@@ -43,9 +43,9 @@ export default function TransactionIcon({
   return (
     <View className="relative h-7 w-7 items-center justify-center bg-transparent">
       {isLoading ? (
-        <ActivityIndicator size="small" color={getPrimaryColor('50')} />
+        <ActivityIndicator size="small" color={getPrimaryColor('0')} />
       ) : (
-        <Icon name={getIconName()} color={getPrimaryColor('50')} size={28} />
+        <Icon name={getIconName()} color={getPrimaryColor('0')} size={28} />
       )}
     </View>
   );

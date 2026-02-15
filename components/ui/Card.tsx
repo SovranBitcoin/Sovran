@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity } from './TouchableOpacity';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
@@ -23,7 +24,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
         return getShadeColor('300');
       case 'info':
       default:
-        return getPrimaryColor('100');
+        return opacity(getPrimaryColor('0'), 0.8);
     }
   };
 
@@ -33,7 +34,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
         return getShadeColor('300');
       case 'info':
       default:
-        return getPrimaryColor('100');
+        return opacity(getPrimaryColor('0'), 0.8);
     }
   };
 
@@ -53,7 +54,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
               overpass
               className="text-base"
               style={{
-                color: getPrimaryColor('300'),
+                color: opacity(getPrimaryColor('0'), 0.5),
                 paddingLeft: 16,
                 paddingRight: 4,
                 paddingTop: 16,

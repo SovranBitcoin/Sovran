@@ -44,6 +44,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import Svg, { Circle } from 'react-native-svg';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import opacity from 'hex-color-opacity';
 
 // ============================================================================
 // Simple Progress Ring using SVG - Static (no animation for better performance)
@@ -331,7 +332,7 @@ function StatsGridComponent({
                         bold
                         overpass
                         size={12}
-                        style={{ color: getPrimaryColor('200'), marginBottom: 4 }}>
+                        style={{ color: opacity(getPrimaryColor('0'), 0.66), marginBottom: 4 }}>
                         {stat.label.toUpperCase()}
                       </Text>
                       <Text
@@ -345,7 +346,7 @@ function StatsGridComponent({
                         bold
                         overpass
                         size={12}
-                        style={{ color: getPrimaryColor('300'), opacity: 0.8 }}>
+                        style={{ color: opacity(getPrimaryColor('0'), 0.5), opacity: 0.8 }}>
                         {stat.description}
                       </Text>
                     </Animated.View>
@@ -470,7 +471,7 @@ function RatingDisplayComponent({
           <Text heavy size={28} style={{ color: getPrimaryColor('0') }}>
             {formattedScore}
           </Text>
-          <Text size={12} style={{ color: getPrimaryColor('300') }}>
+          <Text size={12} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
             out of 5
           </Text>
         </Animated.View>
@@ -488,7 +489,9 @@ function RatingDisplayComponent({
                     <Icon
                       name="ic:round-star"
                       size={12}
-                      color={isTargetRow ? getYellowColor('300') : getPrimaryColor('400')}
+                      color={
+                        isTargetRow ? getYellowColor('300') : opacity(getPrimaryColor('0'), 0.4)
+                      }
                     />
                   </Animated.View>
                 ))}
@@ -780,27 +783,35 @@ function MintInfoModal() {
                 label={
                   contact.method.toUpperCase() === 'NOSTR' ? (
                     <HStack align="center" gap={8}>
-                      <CurrencyIcon colors={[getPrimaryColor('400')]} width={20} currency="nostr" />
-                      <Text style={{ color: getPrimaryColor('50') }} bold>
+                      <CurrencyIcon
+                        colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                        width={20}
+                        currency="nostr"
+                      />
+                      <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                         {truncateMiddle(contact.info, 10)}
                       </Text>
                     </HStack>
                   ) : ['X', 'TWITTER'].includes(contact.method.toUpperCase()) ? (
                     <HStack align="center" gap={8}>
-                      <Icon name="hugeicons:new-twitter" size={20} color={getPrimaryColor('400')} />
-                      <Text style={{ color: getPrimaryColor('50') }} bold>
+                      <Icon
+                        name="hugeicons:new-twitter"
+                        size={20}
+                        color={opacity(getPrimaryColor('0'), 0.4)}
+                      />
+                      <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                         {contact.info}
                       </Text>
                     </HStack>
                   ) : contact.method.toUpperCase() === 'EMAIL' ? (
                     <HStack align="center" gap={8}>
-                      <Icon name="mdi:at" size={20} color={getPrimaryColor('400')} />
-                      <Text style={{ color: getPrimaryColor('50') }} bold>
+                      <Icon name="mdi:at" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+                      <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                         {contact.info}
                       </Text>
                     </HStack>
                   ) : (
-                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                       {contact.info}
                     </Text>
                   )
@@ -823,9 +834,9 @@ function MintInfoModal() {
                   <Icon
                     name="fluent:split-vertical-24-filled"
                     size={20}
-                    color={getPrimaryColor('400')}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
                   />
-                  <Text style={{ color: getPrimaryColor('50') }} bold>
+                  <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                     Balance split
                   </Text>
                 </HStack>

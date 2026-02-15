@@ -49,7 +49,8 @@ function chipIconName(label: string): string {
 export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string }) {
   const { getPrimaryColor, getRedColor } = useTheme();
   const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
-  const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
+  const primary0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const primary50 = useMemo(() => opacity(primary0, 0.9), [primary0]);
   const accentColor = useMemo(() => getRedColor('300'), [getRedColor]);
   const hero = useHeroTransition();
 

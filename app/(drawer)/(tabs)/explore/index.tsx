@@ -369,18 +369,21 @@ const SectionHeader = ({
   return (
     <HStack align="center" style={{ paddingHorizontal: 20, marginBottom: 16 }}>
       <VStack style={{ flex: 1 }}>
-        <Text size={22} heavy style={{ color: getPrimaryColor('50'), letterSpacing: -0.5 }}>
+        <Text
+          size={22}
+          heavy
+          style={{ color: opacity(getPrimaryColor('0'), 0.9), letterSpacing: -0.5 }}>
           {title}
         </Text>
         {subtitle && (
-          <Text size={13} style={{ color: getPrimaryColor('100'), marginTop: 2 }}>
+          <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.66), marginTop: 2 }}>
             {subtitle}
           </Text>
         )}
       </VStack>
       {action && (
         <TouchableOpacity onPress={onAction} activeOpacity={0.7}>
-          <Text size={14} heavy style={{ color: getPrimaryColor('300') }}>
+          <Text size={14} heavy style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
             {action}
           </Text>
         </TouchableOpacity>
@@ -513,15 +516,21 @@ const MapTeaserCard = () => {
         {/* Text section */}
         <View style={[styles.mapTextSection, { backgroundColor: getPrimaryColor('800') }]}>
           <VStack>
-            <Text size={18} heavy style={{ color: getPrimaryColor('50'), marginBottom: 4 }}>
+            <Text
+              size={18}
+              heavy
+              style={{ color: opacity(getPrimaryColor('0'), 0.9), marginBottom: 4 }}>
               Find Bitcoin Merchants
             </Text>
-            <Text size={13} style={{ color: getPrimaryColor('300') }}>
+            <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
               Discover shops, restaurants & services accepting Bitcoin
             </Text>
           </VStack>
           <View
-            style={[styles.mapButton, { backgroundColor: getPrimaryColor('500'), marginTop: 12 }]}>
+            style={[
+              styles.mapButton,
+              { backgroundColor: opacity(getPrimaryColor('0'), 0.15), marginTop: 12 },
+            ]}>
             <Text size={14} heavy style={{ color: '#fff' }}>
               Explore Map
             </Text>
@@ -554,21 +563,23 @@ const CategoryPill = ({
         styles.categoryPill,
         {
           backgroundColor: isActive
-            ? opacity(getPrimaryColor('500'), 0.3)
-            : opacity(getPrimaryColor('700'), 0.3),
-          borderColor: isActive ? getPrimaryColor('500') : 'transparent',
+            ? opacity(getPrimaryColor('0'), 0.12)
+            : opacity(getPrimaryColor('0'), 0.06),
+          borderColor: isActive ? opacity(getPrimaryColor('0'), 0.25) : 'transparent',
         },
       ]}>
       <Icon
         name={icon}
         size={16}
-        color={isActive ? getPrimaryColor('300') : getPrimaryColor('400')}
+        color={isActive ? opacity(getPrimaryColor('0'), 0.5) : opacity(getPrimaryColor('0'), 0.4)}
       />
       <Text
         size={13}
         heavy
         style={{
-          color: isActive ? getPrimaryColor('200') : getPrimaryColor('400'),
+          color: isActive
+            ? opacity(getPrimaryColor('0'), 0.66)
+            : opacity(getPrimaryColor('0'), 0.4),
           marginLeft: 6,
         }}>
         {name}
@@ -599,10 +610,14 @@ const ProductCard = ({ product }: { product: (typeof BITREFILL_PRODUCTS)[0] }) =
         </View>
       </View>
       <VStack style={styles.productInfo}>
-        <Text size={15} heavy style={{ color: getPrimaryColor('50') }} numberOfLines={1}>
+        <Text
+          size={15}
+          heavy
+          style={{ color: opacity(getPrimaryColor('0'), 0.9) }}
+          numberOfLines={1}>
           {product.name}
         </Text>
-        <Text size={12} style={{ color: getPrimaryColor('400'), marginTop: 2 }}>
+        <Text size={12} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 2 }}>
           {product.category}
         </Text>
       </VStack>
@@ -650,14 +665,14 @@ const ConferenceCard = ({ conference }: { conference: (typeof BITCOIN_CONFERENCE
         </HStack>
         <HStack align="center" style={{ marginTop: 8, gap: 12 }}>
           <HStack align="center">
-            <Icon name="mdi:calendar" size={12} color={getPrimaryColor('300')} />
-            <Text size={11} style={{ color: getPrimaryColor('300'), marginLeft: 4 }}>
+            <Icon name="mdi:calendar" size={12} color={opacity(getPrimaryColor('0'), 0.5)} />
+            <Text size={11} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginLeft: 4 }}>
               {conference.date}
             </Text>
           </HStack>
           <HStack align="center">
-            <Icon name="mdi:account-group" size={12} color={getPrimaryColor('400')} />
-            <Text size={11} style={{ color: getPrimaryColor('400'), marginLeft: 4 }}>
+            <Icon name="mdi:account-group" size={12} color={opacity(getPrimaryColor('0'), 0.4)} />
+            <Text size={11} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginLeft: 4 }}>
               {conference.attendees}
             </Text>
           </HStack>
@@ -721,7 +736,7 @@ const LightningAddressCard = () => {
             <ClaimUsernameCardFrame
               accentColor={accentColor}
               backgroundColor={primary950}
-              highlightColor={getPrimaryColor('50')}>
+              highlightColor={opacity(getPrimaryColor('0'), 0.9)}>
               <VStack style={{ padding: 20, zIndex: 1 }}>
                 {/* Header */}
                 <HStack align="center" style={{ marginBottom: 16 }}>
@@ -733,7 +748,7 @@ const LightningAddressCard = () => {
                     <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
                   </View>
                   <VStack style={{ flex: 1, marginLeft: 12 }}>
-                    <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
+                    <Text size={18} heavy style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
                       Claim Your Address
                     </Text>
                     <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
@@ -826,7 +841,7 @@ const LightningAddressCard = () => {
                         color="#22c55e"
                         style={{ marginRight: 8 }}
                       />
-                      <Text size={14} mono style={{ color: getPrimaryColor('50') }}>
+                      <Text size={14} mono style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
                         satoshi
                       </Text>
                       <Text size={14} mono style={{ color: opacity(accentColor, 0.7) }}>
@@ -874,11 +889,15 @@ const LightningAddressCard = () => {
                         size={16}
                         color={opacity(accentColor, 0.9)}
                       />
-                      <Text size={12} heavy style={{ color: getPrimaryColor('50') }}>
+                      <Text size={12} heavy style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
                         Get your username
                       </Text>
                     </HStack>
-                    <Icon name="mdi:arrow-right" size={18} color={getPrimaryColor('50')} />
+                    <Icon
+                      name="mdi:arrow-right"
+                      size={18}
+                      color={opacity(getPrimaryColor('0'), 0.9)}
+                    />
                   </HStack>
                 </View>
               </VStack>
@@ -899,7 +918,8 @@ const PendingEcashCard = () => {
   const cardRef = useRef<any>(null);
 
   const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
-  const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
+  const primary0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const primary50 = useMemo(() => opacity(primary0, 0.9), [primary0]);
   const accentColor = useMemo(() => getGreenColor('400'), [getGreenColor]);
 
   // Filter pending send transactions
@@ -1167,8 +1187,8 @@ const ExploreScreen = () => {
           contentContainerStyle={{ paddingHorizontal: 20, gap: 12, minHeight: 140 }}>
           {modelsLoading ? (
             <View style={styles.modelsLoadingContainer}>
-              <ActivityIndicator size="small" color={getPrimaryColor('300')} />
-              <Text size={12} style={{ color: getPrimaryColor('400'), marginTop: 8 }}>
+              <ActivityIndicator size="small" color={opacity(getPrimaryColor('0'), 0.5)} />
+              <Text size={12} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 8 }}>
                 Loading models...
               </Text>
             </View>
@@ -1176,8 +1196,8 @@ const ExploreScreen = () => {
             displayModels.map((model) => <AIModelCard key={model.id} model={model} />)
           ) : (
             <View style={styles.modelsEmptyContainer}>
-              <Icon name="mdi:robot" size={32} color={getPrimaryColor('500')} />
-              <Text size={13} style={{ color: getPrimaryColor('400'), marginTop: 8 }}>
+              <Icon name="mdi:robot" size={32} color={opacity(getPrimaryColor('0'), 0.33)} />
+              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 8 }}>
                 No models available
               </Text>
             </View>

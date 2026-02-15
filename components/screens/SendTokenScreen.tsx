@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Share, ActivityIndicator } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as SQLite from 'expo-sqlite';
 import { SheetManager } from 'react-native-actions-sheet';
 import { HStack } from 'components/ui/View/HStack';
 import { VStack } from 'components/ui/View/VStack';
@@ -37,12 +38,11 @@ import type { SendHistoryEntry } from 'coco-cashu-core';
 import { popup } from '@/helper/popup';
 import { writeTokenToNFC } from 'helper/nfc';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { Section } from 'components/ui/Section';
+import { DetailsSection } from 'components/ui/DetailsSection';
 import { Card } from 'components/ui/Card';
 import { convertTime } from 'helper/time';
 import { truncateMiddle } from 'helper/strings';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
-import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
@@ -53,6 +53,7 @@ import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 import { useNostrDirectMessage } from '@/hooks/useNostrDirectMessage';
 import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 
 // Default relay for payment requests
@@ -64,6 +65,37 @@ const FALLBACK_PAYMENT_RELAYS = [
   'wss://nos.lol',
   'wss://relay.primal.net',
 ];
+
+/**
+ * Update state for a legacy send history entry (no operationId).
+ *
+ * Legacy entries (pre-Dec 2025) have operationId = NULL in the DB. Coco's
+ * update methods all key on (mintUrl, operationId), and NULL = NULL is false
+ * in SQL, so they can never match these rows.
+ *
+ * We open the same coco.db directly and UPDATE by the row's primary key `id`,
+ * then emit `history:updated` so usePaginatedHistory re-fetches from the
+ * now-updated DB.
+ */
+async function updateLegacyHistoryState(
+  entry: SendHistoryEntry,
+  state: string,
+  mintUrl: string,
+  manager: ReturnType<typeof useManager>
+) {
+  if (!entry.id) return;
+  try {
+    const db = SQLite.openDatabaseSync('coco.db');
+    db.runSync(`UPDATE coco_cashu_history SET state = ? WHERE id = ? AND type = 'send'`, [
+      state,
+      Number(entry.id),
+    ]);
+    // Emit so the UI refreshes from the updated DB
+    await manager.historyService.handleHistoryUpdated(mintUrl, { ...entry, state } as any);
+  } catch (err) {
+    console.warn('[SendTokenScreen] Failed to update legacy history state:', err);
+  }
+}
 
 /** Payment request data for confirmation mode (no token yet) */
 interface PaymentRequestData {
@@ -85,10 +117,11 @@ interface SendTokenScreenProps {
 
 /** Error screen shown when transaction data is missing or invalid */
 function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBack: () => void }) {
+  const { getPrimaryColor } = useTheme();
   return (
     <ModalLayoutWrapper>
       <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-        <Text>{message}</Text>
+        <Text color={opacity(getPrimaryColor('0'), 0.66)}>{message}</Text>
         <ButtonHandler
           buttons={[
             {
@@ -110,9 +143,9 @@ function LoadingState() {
   return (
     <ModalLayoutWrapper>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={getPrimaryColor('400')} />
+        <ActivityIndicator size="large" color={opacity(getPrimaryColor('0'), 0.4)} />
         <Spacer size={16} />
-        <Text color={getPrimaryColor('300')}>Loading payment request...</Text>
+        <Text color={opacity(getPrimaryColor('0'), 0.5)}>Loading payment request...</Text>
       </View>
     </ModalLayoutWrapper>
   );
@@ -298,7 +331,78 @@ export function SendTokenScreen({
 
   const handleCancelSend = useCallback(
     async (onClose: (event: any) => void) => {
-      if (!currentTransaction?.operationId) return;
+      // --- Legacy fallback: no operationId but we have a token ---
+      if (!currentTransaction?.operationId) {
+        if (!token) {
+          popup({
+            message: 'Cannot Cancel',
+            text: 'No operation ID and no token available to reclaim.',
+            type: 'warning',
+            onClose: () => onClose({}),
+          });
+          return;
+        }
+        try {
+          const mintUrl = currentTransaction?.mintUrl;
+          if (!mintUrl) throw new Error('Missing mint URL');
+
+          // Check proof states with the mint (NUT-07)
+          const wallet = await manager.walletService.getWallet(mintUrl);
+          const proofStates = await wallet.checkProofsStates(
+            token.proofs.map((p) => ({ secret: p.secret }))
+          );
+
+          const allSpent = proofStates.every((s) => s.state === 'SPENT');
+          if (allSpent) {
+            await updateLegacyHistoryState(currentTransaction, 'finalized', mintUrl, manager);
+            popup({
+              message: 'Token Already Redeemed',
+              text: 'All proofs are spent — the recipient already claimed it. Nothing to reclaim.',
+              type: 'info',
+              onClose: () => onClose({}),
+            });
+            return;
+          }
+
+          // Filter to only unspent proofs — mint rejects swaps containing spent proofs
+          const unspentProofs = token.proofs.filter((_, i) => proofStates[i]?.state === 'UNSPENT');
+
+          if (unspentProofs.length === 0) {
+            // All proofs are PENDING at the mint
+            popup({
+              message: 'Cannot Reclaim Yet',
+              text: 'All proofs are in a pending state at the mint. Try again shortly.',
+              type: 'warning',
+              onClose: () => onClose({}),
+            });
+            return;
+          }
+
+          // Reclaim unspent proofs
+          const reclaimToken: Token = { mint: token.mint, proofs: unspentProofs, unit: token.unit };
+          await manager.wallet.receive(reclaimToken);
+          await updateLegacyHistoryState(currentTransaction, 'rolledBack', mintUrl, manager);
+
+          const amt = unspentProofs.reduce((s, p) => s + p.amount, 0);
+          popup({
+            message: 'Funds Reclaimed',
+            text: `${amt} ${currentTransaction?.unit || 'sat'} reclaimed back into your wallet.`,
+            type: 'success',
+            onClose: () => onClose({}),
+          });
+        } catch (error) {
+          console.error('[SendTokenScreen] Legacy cancel failed:', error);
+          popup({
+            message: 'Reclaim Failed',
+            text: error instanceof Error ? error.message : String(error),
+            type: 'error',
+            onClose: () => onClose({}),
+          });
+        }
+        return;
+      }
+
+      // --- Normal path: operationId exists ---
       try {
         await manager.send.rollback(currentTransaction.operationId);
         popup({ message: 'Transaction cancelled successfully', onClose: () => onClose({}) });
@@ -309,12 +413,75 @@ export function SendTokenScreen({
         });
       }
     },
-    [currentTransaction?.operationId, manager]
+    [currentTransaction, manager, token]
   );
 
   const handleCheckStatus = useCallback(
     async (onClose: (event: any) => void) => {
-      if (!currentTransaction?.operationId) return;
+      // --- Legacy fallback: no operationId but we have a token ---
+      if (!currentTransaction?.operationId) {
+        if (!token) {
+          popup({
+            message: 'Cannot Check Status',
+            text: 'No operation ID and no token available to verify.',
+            type: 'warning',
+            onClose: () => onClose({}),
+          });
+          return;
+        }
+        setIsCheckingStatus(true);
+        try {
+          const mintUrl = currentTransaction?.mintUrl;
+          if (!mintUrl) throw new Error('Missing mint URL');
+
+          const wallet = await manager.walletService.getWallet(mintUrl);
+          const proofStates = await wallet.checkProofsStates(
+            token.proofs.map((p) => ({ secret: p.secret }))
+          );
+
+          const spentCount = proofStates.filter((s) => s.state === 'SPENT').length;
+          const unspentCount = proofStates.filter((s) => s.state === 'UNSPENT').length;
+          const pendingCount = proofStates.filter((s) => s.state === 'PENDING').length;
+          const total = proofStates.length;
+
+          if (spentCount === total) {
+            await updateLegacyHistoryState(currentTransaction, 'finalized', mintUrl, manager);
+            popup({
+              message: 'Token Redeemed',
+              text: 'All proofs are spent — the recipient has claimed this token.',
+              type: 'success',
+              onClose: () => onClose({}),
+            });
+          } else if (unspentCount === total) {
+            popup({
+              message: 'Token Still Pending',
+              text: 'All proofs are unspent — the recipient has not claimed this token yet. You can cancel to reclaim the funds.',
+              type: 'info',
+              onClose: () => onClose({}),
+            });
+          } else {
+            popup({
+              message: 'Mixed Proof States',
+              text: `${spentCount}/${total} spent, ${unspentCount}/${total} unspent, ${pendingCount}/${total} pending.`,
+              type: 'warning',
+              onClose: () => onClose({}),
+            });
+          }
+        } catch (error) {
+          console.error('[SendTokenScreen] Legacy check status failed:', error);
+          popup({
+            message: 'Check Status Failed',
+            text: error instanceof Error ? error.message : String(error),
+            type: 'error',
+            onClose: () => onClose({}),
+          });
+        } finally {
+          setIsCheckingStatus(false);
+        }
+        return;
+      }
+
+      // --- Normal path: operationId exists ---
       setIsCheckingStatus(true);
       try {
         const operation = await manager.send.getOperation(currentTransaction.operationId);
@@ -374,7 +541,7 @@ export function SendTokenScreen({
         setIsCheckingStatus(false);
       }
     },
-    [currentTransaction?.operationId, manager]
+    [currentTransaction, manager, token]
   );
 
   const handleCopyEmoji = useCallback(
@@ -490,7 +657,6 @@ export function SendTokenScreen({
   }
 
   // Derive display values
-  const amount = currentTransaction?.amount ?? paymentRequest?.amount ?? 0;
   const unit = currentTransaction?.unit ?? decodedRequest?.unit ?? 'sat';
   const mintUrl =
     currentTransaction?.mintUrl ?? paymentRequest?.mintUrl ?? decodedRequest?.mints?.[0] ?? '';
@@ -679,16 +845,12 @@ export function SendTokenScreen({
           />
         )}
 
-        {/* Details Section */}
-        <Section
+        {/* Technical details - collapsed by default */}
+        <DetailsSection
           items={[
             // Payment request mode items
             ...(isPaymentRequestMode && recipientInfo
               ? [
-                  {
-                    title: 'Type',
-                    value: 'Payment Request • Nostr',
-                  },
                   {
                     title: 'Recipient',
                     value: truncateMiddle(recipientInfo.pubkey, 10),
@@ -702,43 +864,16 @@ export function SendTokenScreen({
                     title: 'Date',
                     value: convertTime(new Date(currentTransaction.createdAt)),
                   },
-                  {
-                    title: 'Type',
-                    value: 'Ecash • Send',
-                  },
-                  {
-                    title: 'Status',
-                    value: (
-                      <HStack align="center">
-                        <Text className="text-primary-0" size={16} overpass bold>
-                          {currentTransaction.state === 'finalized'
-                            ? 'Completed'
-                            : currentTransaction.state === 'rolledBack'
-                              ? 'Rolled Back'
-                              : 'Pending'}
-                        </Text>
-                      </HStack>
-                    ),
-                  },
-                  {
-                    title: 'Token',
-                    value: token ? truncateMiddle(getEncodedTokenV4(token), 6) : 'N/A',
-                  },
+                  ...(token
+                    ? [
+                        {
+                          title: 'Token',
+                          value: truncateMiddle(getEncodedTokenV4(token), 6),
+                        },
+                      ]
+                    : []),
                 ]
               : []),
-            // Common items
-            {
-              title: 'Mint',
-              value: mintInfo?.name || truncateMiddle(mintUrl, 20),
-            },
-            {
-              title: 'Amount',
-              value: `${amount} ${unit.toUpperCase()}`,
-            },
-            {
-              title: 'Unit',
-              value: unit.toUpperCase(),
-            },
             // Payment request ID
             ...(isPaymentRequestMode && decodedRequest?.id
               ? [
@@ -750,11 +885,6 @@ export function SendTokenScreen({
               : []),
           ]}
         />
-
-        {/* Debug code (normal mode) */}
-        {!isPaymentRequestMode && currentTransaction && (
-          <TransactionDebugCode historyEntry={currentTransaction} />
-        )}
       </VStack>
     </ModalLayoutWrapper>
   );

@@ -7,6 +7,7 @@ import Icon, { CurrencyIcon } from 'assets/icons';
 import { useWindowDimensions, ActivityIndicator } from 'react-native';
 import EQRCode from 'react-native-qrcode-svg';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 
 // Maximum characters that can fit in a QR code (conservative limit for binary/alphanumeric)
@@ -152,7 +153,11 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
               alignItems: 'center',
               padding: 20,
             }}>
-            <Icon name="ri:error-warning-line" size={48} color={getPrimaryColor('300')} />
+            <Icon
+              name="ri:error-warning-line"
+              size={48}
+              color={opacity(getPrimaryColor('0'), 0.5)}
+            />
           </View>
         ) : canRenderQR ? (
           // Normal QR code render

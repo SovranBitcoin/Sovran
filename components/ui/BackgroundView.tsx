@@ -52,7 +52,7 @@ interface ScrollableGradientOverlayProps {
   blurIntensity?: number;
   /**
    * Blur tint style
-   * @default 'prominent'
+   * @default 'dark'
    */
   blurTint?: BlurTint;
   /**
@@ -94,7 +94,7 @@ interface ScrollableGradientOverlayProps {
 function ScrollableGradientOverlayComponent({
   contentHeight,
   blurIntensity = 200,
-  blurTint = 'prominent',
+  blurTint = 'dark',
   blurGradientStart = 0.3,
   blurGradientEnd = 0.6,
   showGradientOverlay = true,
@@ -160,13 +160,16 @@ function ScrollableGradientOverlayComponent({
       </MaskedView>
       {showGradientOverlay && gradientColors && (
         <LinearGradient
-          colors={['transparent', opacity(gradientColors?.['300'], gradientOverlayOpacity)]}
+          colors={[
+            opacity(gradientColors?.['300'], 0),
+            opacity(gradientColors?.['300'], gradientOverlayOpacity),
+          ]}
           locations={gradientLocations.overlayLocations}
           style={StyleSheet.absoluteFillObject}
         />
       )}
       <LinearGradient
-        colors={['transparent', opacity(primaryColor950, gradientOverlayOpacity)]}
+        colors={[opacity(primaryColor950, 0), opacity(primaryColor950, gradientOverlayOpacity)]}
         locations={gradientLocations.overlayLocations}
         style={StyleSheet.absoluteFillObject}
       />
@@ -184,7 +187,7 @@ interface AnimatedBackgroundViewProps {
   children?: ReactNode;
   /**
    * Blur tint style
-   * @default 'prominent'
+   * @default 'dark'
    */
   blurTint?: BlurTint;
   /**
@@ -209,7 +212,7 @@ interface AnimatedBackgroundViewProps {
  */
 function AnimatedBackgroundViewComponent({
   children,
-  blurTint = 'prominent',
+  blurTint = 'dark',
   style,
 }: AnimatedBackgroundViewProps) {
   const { getPrimaryColor } = useTheme();
@@ -263,7 +266,7 @@ function AnimatedBackgroundViewComponent({
         {/* Gradient overlay for image themes */}
         {gradientColors && (
           <LinearGradient
-            colors={['transparent', opacity(gradientColors['300'], 1)]}
+            colors={[opacity(gradientColors['300'], 0), opacity(gradientColors['300'], 1)]}
             locations={[0, 1]}
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
@@ -304,7 +307,7 @@ function AnimatedBackgroundViewComponent({
       )}
 
       {/* Content */}
-      <View style={styles.content}>{children}</View>
+      <View style={[styles.content]}>{children}</View>
     </View>
   );
 }

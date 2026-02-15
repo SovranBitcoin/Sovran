@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
+
+const profileStorage = createProfileScopedStorage();
 
 /**
  * @fileoverview Mint Distribution Store
@@ -491,7 +493,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
       // Clear all data
       clearAllData: async () => {
         try {
-          await AsyncStorage.removeItem('mint-distribution-store');
+          await profileStorage.removeItem('mint-distribution-store');
           set({ distributions: {} });
         } catch (error) {
           console.error('MintDistributionStore: Error clearing data:', error);
@@ -501,7 +503,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
     }),
     {
       name: 'mint-distribution-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => createProfileScopedStorage()),
       partialize: (state) => ({ distributions: state.distributions }),
       onRehydrateStorage: () => (state, error) => {
         if (error) {

@@ -10,6 +10,7 @@ import * as Clipboard from 'expo-clipboard';
 import { popup } from '@/helper/popup';
 import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
+import opacity from 'hex-color-opacity';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { ModalLayoutWrapper } from 'app/debugModal';
@@ -127,15 +128,17 @@ function ShareModal() {
           <RowButton
             isFirst
             onPress={handleCopy}
-            rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
+            rightIcon={
+              <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+            }
             label={
               <HStack align="center" gap={8}>
                 <CurrencyIcon
-                  colors={[getPrimaryColor('400')]}
+                  colors={[opacity(getPrimaryColor('0'), 0.4)]}
                   width={20}
                   currency={config.iconCurrency}
                 />
-                <Text className="text-primary-50" bold>
+                <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                   {truncateMiddle(activeData, 10)}
                 </Text>
               </HStack>

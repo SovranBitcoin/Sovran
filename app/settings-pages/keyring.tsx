@@ -26,6 +26,7 @@ import { ModalLayoutWrapper } from 'app/debugModal';
 import { nip19 } from 'nostr-tools';
 import QRCode from 'react-native-qrcode-svg';
 import { Tabs } from 'components/ui/Tabs';
+import opacity from 'hex-color-opacity';
 
 /**
  * CurrentKeyItem - Featured display for the active/most recent key
@@ -170,8 +171,8 @@ const CurrentKeyItem: React.FC<{
                 alignItems: 'center',
               }}>
               <HStack align="center" spacing={8}>
-                <Icon name="lets-icons:copy" size={16} color={getPrimaryColor('100')} />
-                <Text size={13} weight="500" style={{ color: getPrimaryColor('100') }}>
+                <Icon name="lets-icons:copy" size={16} color={opacity(getPrimaryColor('0'), 0.8)} />
+                <Text size={13} weight="500" style={{ color: opacity(getPrimaryColor('0'), 0.8) }}>
                   Copy
                 </Text>
               </HStack>
@@ -187,8 +188,8 @@ const CurrentKeyItem: React.FC<{
                 alignItems: 'center',
               }}>
               <HStack align="center" spacing={8}>
-                <Icon name="stash:qr-code" size={16} color={getPrimaryColor('100')} />
-                <Text size={13} weight="500" style={{ color: getPrimaryColor('100') }}>
+                <Icon name="stash:qr-code" size={16} color={opacity(getPrimaryColor('0'), 0.8)} />
+                <Text size={13} weight="500" style={{ color: opacity(getPrimaryColor('0'), 0.8) }}>
                   Show QR
                 </Text>
               </HStack>
@@ -252,7 +253,7 @@ const KeyItem: React.FC<{
         <Icon
           name={isDerived ? 'mdi:key-arrow-right' : 'ph:user-bold'}
           size={16}
-          color={getPrimaryColor('300')}
+          color={opacity(getPrimaryColor('0'), 0.5)}
         />
       </View>
 
@@ -262,11 +263,11 @@ const KeyItem: React.FC<{
           mono
           size={11}
           style={{
-            color: getPrimaryColor('100'),
+            color: opacity(getPrimaryColor('0'), 0.8),
           }}>
           {truncateMiddle(displayKey, 7)}
         </Text>
-        <Text size={10} style={{ color: getPrimaryColor('400'), marginTop: 2 }}>
+        <Text size={10} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 2 }}>
           {isDerived ? `Derived Key ${keypair.derivationIndex}` : `Imported`}
         </Text>
       </VStack>
@@ -279,7 +280,7 @@ const KeyItem: React.FC<{
             padding: 8,
             borderRadius: 8,
           }}>
-          <Icon name="lets-icons:copy" size={16} color={getPrimaryColor('400')} />
+          <Icon name="lets-icons:copy" size={16} color={opacity(getPrimaryColor('0'), 0.4)} />
         </View>
       </TouchableOpacity>
 
@@ -291,7 +292,7 @@ const KeyItem: React.FC<{
             padding: 8,
             borderRadius: 8,
           }}>
-          <Icon name="stash:qr-code" size={16} color={getPrimaryColor('400')} />
+          <Icon name="stash:qr-code" size={16} color={opacity(getPrimaryColor('0'), 0.4)} />
         </View>
       </TouchableOpacity>
     </HStack>
@@ -487,7 +488,7 @@ const KeyringSettings: React.FC = () => {
                 <Text
                   size={13}
                   style={{
-                    color: getPrimaryColor('400'),
+                    color: opacity(getPrimaryColor('0'), 0.4),
                     marginTop: 4,
                   }}>
                   Show your latest P2PK locking key in the receive ecash menu
@@ -518,8 +519,10 @@ const KeyringSettings: React.FC = () => {
             <View style={{ padding: 16 }}>
               {isLoading ? (
                 <VStack align="center" style={{ padding: 24 }}>
-                  <ActivityIndicator size="small" color={getPrimaryColor('400')} />
-                  <Text size={14} style={{ color: getPrimaryColor('400'), marginTop: 8 }}>
+                  <ActivityIndicator size="small" color={opacity(getPrimaryColor('0'), 0.4)} />
+                  <Text
+                    size={14}
+                    style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 8 }}>
                     Loading keys...
                   </Text>
                 </VStack>
@@ -529,7 +532,7 @@ const KeyringSettings: React.FC = () => {
                   <Text
                     size={14}
                     style={{
-                      color: getPrimaryColor('400'),
+                      color: opacity(getPrimaryColor('0'), 0.4),
                       marginTop: 12,
                       textAlign: 'center',
                     }}>

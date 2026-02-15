@@ -21,10 +21,13 @@ const ESTIMATED_FEE_PERCENTAGE = 0.02; // 2%
 
 /**
  * Minimum fee reserve in sats.
- * Must be high enough to cover the mint's Lightning fee_reserve (1–3 sats)
- * plus potential input fees per proof. 3 sats is a safe conservative floor.
+ * Must be high enough to cover the mint's Lightning fee_reserve (typically 2–10 sats)
+ * plus potential input fees per proof.  5 sats is a safer planning floor that
+ * reduces the chance of steps being skipped at execution time due to insufficient
+ * headroom.  The executor handles the real fee_reserve dynamically via melt quote
+ * probes, so this only affects upfront planning accuracy.
  */
-export const MIN_FEE_RESERVE = 3;
+export const MIN_FEE_RESERVE = 5;
 
 export interface MintBalance {
   mintUrl: string;
@@ -163,11 +166,10 @@ function computeTransferSteps(
     const delta = current - target;
 
     if (delta > 0) {
-      // For surplus mints, we need to account for fees
-      // The actual transferable amount is less than the raw surplus
-      const transferable = maxTransferableAmount(delta);
-      if (transferable > 0) {
-        surpluses.push({ mintUrl, amount: transferable });
+      // Store raw surplus — per-step fee overhead is deducted in the greedy loop
+      // so that each transfer correctly reserves fees from the remaining balance.
+      if (delta > MIN_FEE_RESERVE) {
+        surpluses.push({ mintUrl, amount: delta });
       }
     } else if (delta < 0) {
       deficits.push({ mintUrl, amount: -delta }); // Store as positive
@@ -181,12 +183,21 @@ function computeTransferSteps(
   const steps: TransferStep[] = [];
   let stepId = 0;
 
-  // Greedy matching: always pick largest surplus and largest deficit
+  // Greedy matching: always pick largest surplus and largest deficit.
+  // Each iteration accounts for per-step fee overhead so the planner
+  // never over-commits a source mint's balance across multiple steps.
   while (surpluses.length > 0 && deficits.length > 0) {
     const surplus = surpluses[0];
     const deficit = deficits[0];
 
-    const transferAmount = Math.min(surplus.amount, deficit.amount);
+    // Cap to what the surplus can actually transfer after reserving fees
+    const maxFromSurplus = maxTransferableAmount(surplus.amount);
+    if (maxFromSurplus < threshold) {
+      surpluses.shift();
+      continue;
+    }
+
+    const transferAmount = Math.min(maxFromSurplus, deficit.amount);
 
     if (transferAmount >= threshold) {
       steps.push({
@@ -197,8 +208,14 @@ function computeTransferSteps(
       });
     }
 
-    // Update amounts
-    surplus.amount -= transferAmount;
+    // Deduct transfer amount + estimated fee for this step.
+    // This ensures later steps from the same surplus see the real
+    // remaining balance, not an inflated one that ignores prior fees.
+    const estimatedStepFee = Math.max(
+      Math.ceil(transferAmount * ESTIMATED_FEE_PERCENTAGE),
+      MIN_FEE_RESERVE
+    );
+    surplus.amount -= transferAmount + estimatedStepFee;
     deficit.amount -= transferAmount;
 
     // Remove exhausted entries

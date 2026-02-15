@@ -58,7 +58,7 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   if (isDecrypting) {
     return (
       <RNView style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
-        <Text style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>
+        <Text style={{ color: opacity(getPrimaryColor('0'), 0.4), textAlign: 'center' }}>
           Decrypting messages...
         </Text>
       </RNView>
@@ -68,7 +68,9 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   if (data.length === 0) {
     return (
       <RNView style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
-        <Text style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>{emptyMessage}</Text>
+        <Text style={{ color: opacity(getPrimaryColor('0'), 0.4), textAlign: 'center' }}>
+          {emptyMessage}
+        </Text>
       </RNView>
     );
   }

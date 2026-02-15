@@ -21,6 +21,7 @@ import {
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack } from 'expo-router';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { SheetManager } from 'react-native-actions-sheet';
 import { nip19 } from 'nostr-tools';
 import {
@@ -549,7 +550,7 @@ function MessageBubble({
                 <Icon
                   name={message.isRead ? 'ion:checkmark-done' : 'simple-line-icons:check'}
                   size={14}
-                  color={message.isRead ? getPrimaryColor('400') : getShadeColor('500')}
+                  color={message.isRead ? opacity(getPrimaryColor('0'), 0.4) : getShadeColor('500')}
                 />
               ))}
           </HStack>
@@ -669,6 +670,7 @@ export function UserMessagesScreen({
   isFlowContext: _isFlowContext = false,
 }: UserMessagesScreenProps) {
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const screenWidth = Dimensions.get('window').width;
   const scrollViewRef = useRef<ScrollView>(null);
   const pendingMessageRef = useRef<string | null>(null);
@@ -1707,10 +1709,12 @@ export function UserMessagesScreen({
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      behavior="translate-with-padding"
+      keyboardVerticalOffset={headerHeight + 16}>
       <Stack.Screen
         options={{
           headerShown: true,
+          headerTransparent: false,
           headerStyle: { backgroundColor: getPrimaryColor('800') },
           headerShadowVisible: false,
           headerBackVisible: false,
@@ -1775,7 +1779,7 @@ export function UserMessagesScreen({
                     defaultValue=""
                     onChangeText={handleSessionSearchChange}
                     placeholder="Search sessions..."
-                    placeholderTextColor={getPrimaryColor('500')}
+                    placeholderTextColor={opacity(getPrimaryColor('0'), 0.33)}
                     style={{
                       flex: 1,
                       color: getPrimaryColor('0'),

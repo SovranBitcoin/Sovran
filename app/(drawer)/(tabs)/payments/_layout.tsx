@@ -7,6 +7,7 @@ import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
 import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { View } from 'components/ui/View/View';
 
 // Search context for sharing state between layout and index
@@ -83,7 +84,7 @@ function FallbackSearchHeader({ clearKey }: { clearKey: number }) {
         defaultValue=""
         onChangeText={onSearchChange}
         placeholder="Search contacts..."
-        placeholderTextColor={getPrimaryColor('500')}
+        placeholderTextColor={opacity(getPrimaryColor('0'), 0.33)}
         style={{
           flex: 1,
           color: getPrimaryColor('0'),

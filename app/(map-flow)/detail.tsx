@@ -17,6 +17,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import opacity from 'hex-color-opacity';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBTCMapStore, BTCMapPlaceDetails } from 'stores/btcMapStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -192,7 +193,7 @@ export default function MerchantDetailScreen() {
       <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#F7931A" />
-          <Text size={14} style={{ color: getPrimaryColor('300'), marginTop: 12 }}>
+          <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginTop: 12 }}>
             Loading merchant details...
           </Text>
         </View>
@@ -204,8 +205,8 @@ export default function MerchantDetailScreen() {
     return (
       <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
         <View style={styles.loadingContainer}>
-          <Icon name="mdi:alert-circle" size={48} color={getPrimaryColor('400')} />
-          <Text size={14} style={{ color: getPrimaryColor('300'), marginTop: 12 }}>
+          <Icon name="mdi:alert-circle" size={48} color={opacity(getPrimaryColor('0'), 0.4)} />
+          <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginTop: 12 }}>
             No merchant data available
           </Text>
         </View>
@@ -235,11 +236,11 @@ export default function MerchantDetailScreen() {
             <Icon name="mdi:store" size={28} color="#fff" />
           </View>
           <VStack style={{ flex: 1, marginLeft: 16 }}>
-            <Text size={20} heavy style={{ color: getPrimaryColor('50') }}>
+            <Text size={20} heavy style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
               {place.name || 'Unknown Merchant'}
             </Text>
             {place.address && (
-              <Text size={13} style={{ color: getPrimaryColor('400'), marginTop: 4 }}>
+              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 4 }}>
                 {place.address}
               </Text>
             )}
@@ -263,13 +264,17 @@ export default function MerchantDetailScreen() {
                 label={
                   <HStack align="center" gap={8}>
                     <Icon name="mdi:bitcoin" size={20} color="#F7931A" />
-                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                       On-chain
                     </Text>
                   </HStack>
                 }
                 rightIcon={
-                  <Icon name="mdi:check-circle" size={20} color={getPrimaryColor('400')} />
+                  <Icon
+                    name="mdi:check-circle"
+                    size={20}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
                 }
               />
             )}
@@ -280,13 +285,17 @@ export default function MerchantDetailScreen() {
                 label={
                   <HStack align="center" gap={8}>
                     <Icon name="mingcute:lightning-fill" size={20} color="#F7931A" />
-                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                       Lightning
                     </Text>
                   </HStack>
                 }
                 rightIcon={
-                  <Icon name="mdi:check-circle" size={20} color={getPrimaryColor('400')} />
+                  <Icon
+                    name="mdi:check-circle"
+                    size={20}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
                 }
               />
             )}
@@ -297,13 +306,17 @@ export default function MerchantDetailScreen() {
                 label={
                   <HStack align="center" gap={8}>
                     <Icon name="ph:contactless-payment-fill" size={20} color="#F7931A" />
-                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                       Contactless
                     </Text>
                   </HStack>
                 }
                 rightIcon={
-                  <Icon name="mdi:check-circle" size={20} color={getPrimaryColor('400')} />
+                  <Icon
+                    name="mdi:check-circle"
+                    size={20}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
                 }
               />
             )}
@@ -320,8 +333,12 @@ export default function MerchantDetailScreen() {
                 isLast={index === contactItems.length - 1}
                 label={
                   <HStack align="center" gap={8}>
-                    <Icon name={contact.icon} size={20} color={getPrimaryColor('400')} />
-                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                    <Icon
+                      name={contact.icon}
+                      size={20}
+                      color={opacity(getPrimaryColor('0'), 0.4)}
+                    />
+                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                       {contact.info}
                     </Text>
                   </HStack>
@@ -341,7 +358,9 @@ export default function MerchantDetailScreen() {
                 padding: 16,
                 borderRadius: 12,
               }}>
-              <Text size={14} style={{ color: getPrimaryColor('200'), lineHeight: 22 }}>
+              <Text
+                size={14}
+                style={{ color: opacity(getPrimaryColor('0'), 0.66), lineHeight: 22 }}>
                 {place.opening_hours}
               </Text>
             </View>
@@ -357,7 +376,9 @@ export default function MerchantDetailScreen() {
                 padding: 16,
                 borderRadius: 12,
               }}>
-              <Text size={14} style={{ color: getPrimaryColor('200'), lineHeight: 22 }}>
+              <Text
+                size={14}
+                style={{ color: opacity(getPrimaryColor('0'), 0.66), lineHeight: 22 }}>
                 {place.description}
               </Text>
             </View>

@@ -37,31 +37,32 @@ const SEND_STATES = ['prepared', 'pending', 'finalized'] as const;
 // Payment request states include Nostr Send step
 const PAYMENT_REQUEST_STATES = ['prepared', 'nostrSent', 'pending', 'finalized'] as const;
 const SEND_STATE_LABELS: Record<string, string> = {
-  prepared: 'Prepared',
-  nostrSent: 'Nostr Send',
+  prepared: 'Created',
+  nostrSent: 'Delivered',
   pending: 'Pending',
-  finalized: 'Finalized',
-  rolledBack: 'Rolled Back',
+  finalized: 'Claimed',
+  rolledBack: 'Cancelled',
 };
 
 // Receive states: pending (in memory, not yet redeemed) → redeemed (claimed to wallet)
 const RECEIVE_STATES = ['pending', 'redeemed'] as const;
 const RECEIVE_STATE_LABELS: Record<string, string> = {
   pending: 'Pending',
-  redeemed: 'Redeemed',
+  redeemed: 'Added to wallet',
+  alreadySpent: 'Already spent',
 };
 
 // Mint/Melt state display labels
 const MINT_STATE_LABELS: Record<string, string> = {
-  [MintQuoteState.UNPAID]: 'Unpaid',
-  [MintQuoteState.PAID]: 'Paid',
-  [MintQuoteState.ISSUED]: 'Issued',
+  [MintQuoteState.UNPAID]: 'Waiting for payment',
+  [MintQuoteState.PAID]: 'Payment received',
+  [MintQuoteState.ISSUED]: 'Complete',
 };
 
 const MELT_STATE_LABELS: Record<string, string> = {
-  [MeltQuoteState.UNPAID]: 'Request processed',
-  [MeltQuoteState.PENDING]: 'Pending',
-  [MeltQuoteState.PAID]: 'Paid',
+  [MeltQuoteState.UNPAID]: 'Ready to send',
+  [MeltQuoteState.PENDING]: 'Sending',
+  [MeltQuoteState.PAID]: 'Sent',
 };
 
 const EXPIRED_STATE = 'expired';
@@ -74,6 +75,7 @@ type TimelineStepType =
   | 'future-small'
   | 'expired'
   | 'rolled-back'
+  | 'already-spent'
   | 'success';
 
 interface TimelineItem {
@@ -134,11 +136,11 @@ function buildTimeline({
 
         let info: string | undefined;
         if (stepType === 'current' && state === MintQuoteState.UNPAID) {
-          info = 'Waiting for Lightning payment';
+          info = 'Pay the invoice to receive funds';
         } else if (stepType === 'next-pending' && state === MintQuoteState.ISSUED) {
-          info = 'Minting tokens...';
+          info = 'Adding to wallet...';
         } else if (stepType === 'success' && state === MintQuoteState.ISSUED) {
-          info = `+${mintTx.amount} sats received`;
+          info = `+${mintTx.amount} sats added to wallet`;
         }
 
         return {
@@ -190,11 +192,11 @@ function buildTimeline({
 
         let info: string | undefined;
         if (stepType === 'current' && state === MeltQuoteState.UNPAID) {
-          info = 'Quote ready, awaiting execution';
+          info = 'Tap Send to complete payment';
         } else if (stepType === 'current' && state === MeltQuoteState.PENDING) {
-          info = 'Pending blockchain confirmation';
+          info = 'Payment in progress...';
         } else if (stepType === 'success' && state === MeltQuoteState.PAID) {
-          info = 'Invoice paid successfully';
+          info = 'Payment complete';
         }
 
         return {
@@ -286,15 +288,15 @@ function buildTimeline({
 
         let info: string | undefined;
         if (stepType === 'current' && state === 'prepared') {
-          info = 'Token created, ready to share';
+          info = 'Ready to share';
         } else if (stepType === 'complete' && state === 'nostrSent') {
-          info = 'Sent via Nostr DM';
+          info = 'Sent via Nostr';
         } else if (stepType === 'current' && state === 'nostrSent') {
-          info = 'Sending via Nostr...';
+          info = 'Sending...';
         } else if (stepType === 'current' && state === 'pending') {
-          info = 'Waiting for recipient to claim';
+          info = 'Waiting for recipient';
         } else if (stepType === 'success' && state === 'finalized') {
-          info = 'Token claimed by recipient';
+          info = 'Claimed by recipient';
         }
 
         return {
@@ -311,6 +313,24 @@ function buildTimeline({
       const receiveTx = historyEntry as ReceiveHistoryEntry & { state?: string };
       const txState = receiveTx.state || 'redeemed';
 
+      // Local-only terminal state for scans that were already redeemed elsewhere.
+      if (txState === 'alreadySpent') {
+        return [
+          {
+            state: 'pending',
+            displayLabel: RECEIVE_STATE_LABELS.pending,
+            stepType: 'complete',
+            timestamp: receiveTx.createdAt,
+          },
+          {
+            state: 'alreadySpent',
+            displayLabel: RECEIVE_STATE_LABELS.alreadySpent,
+            stepType: 'already-spent',
+            info: 'Token was already redeemed elsewhere',
+          },
+        ];
+      }
+
       const currentIndex = RECEIVE_STATES.indexOf(txState as (typeof RECEIVE_STATES)[number]);
       const effectiveIndex = currentIndex === -1 ? RECEIVE_STATES.length - 1 : currentIndex;
 
@@ -326,7 +346,7 @@ function buildTimeline({
 
         let info: string | undefined;
         if (stepType === 'current' && state === 'pending') {
-          info = 'Ready to redeem token';
+          info = 'Tap Redeem to add to wallet';
         } else if (stepType === 'success' && state === 'redeemed') {
           info = `+${receiveTx.amount} sats added to wallet`;
         }
@@ -429,6 +449,10 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
     case 'rolled-back':
       backgroundColor = orangeColor;
       iconName = 'ic:round-refresh';
+      break;
+    case 'already-spent':
+      backgroundColor = orangeColor;
+      iconName = 'mdi:alert-circle';
       break;
   }
 
@@ -561,7 +585,10 @@ const getCardLabel = (
   nostrSent?: boolean
 ): string => {
   const isFailed = timeline.some(
-    (item) => item.stepType === 'expired' || item.stepType === 'rolled-back'
+    (item) =>
+      item.stepType === 'expired' ||
+      item.stepType === 'rolled-back' ||
+      item.stepType === 'already-spent'
   );
 
   let status = '';
@@ -578,7 +605,7 @@ const getCardLabel = (
       } else {
         status = 'Awaiting Payment';
       }
-      return `Mint • ${status}`;
+      return `Receive • ${status}`;
     }
     case 'melt': {
       const meltTx = historyEntry as MeltHistoryEntry;
@@ -589,26 +616,26 @@ const getCardLabel = (
       } else if (meltTx.state === MeltQuoteState.PENDING) {
         status = 'In Progress';
       } else {
-        status = 'Ready to Pay';
+        status = 'Ready';
       }
-      return `Melt • ${status}`;
+      return `Send • ${status}`;
     }
     case 'send': {
       const sendTx = historyEntry as SendHistoryEntry;
       const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
-      const label = isPaymentRequestMode ? 'Payment Request' : 'Send';
+      const label = isPaymentRequestMode ? 'Payment' : 'Send';
       if (!tokenCreated && !nostrSent && isPaymentRequestMode) {
-        status = 'Ready to Send';
+        status = 'Ready';
       } else if (tokenCreated && !nostrSent) {
-        status = 'Sending via Nostr';
+        status = 'Delivering';
       } else if (sendTx.state === 'rolledBack') {
-        status = 'Rolled Back';
+        status = 'Cancelled';
       } else if (sendTx.state === 'finalized') {
         status = 'Complete';
       } else if (sendTx.state === 'pending') {
         status = 'In Progress';
       } else {
-        status = nostrSent ? 'Sent' : 'Prepared';
+        status = nostrSent ? 'Sent' : 'Ready';
       }
       return `${label} • ${status}`;
     }
@@ -617,6 +644,8 @@ const getCardLabel = (
       const txState = receiveTx.state || 'redeemed';
       if (txState === 'redeemed') {
         status = 'Complete';
+      } else if (txState === 'alreadySpent') {
+        status = 'Already Spent';
       } else {
         status = 'Pending';
       }
@@ -634,7 +663,8 @@ const getStatusHeader = (timeline: TimelineItem[]): string => {
       item.stepType === 'current' ||
       item.stepType === 'success' ||
       item.stepType === 'expired' ||
-      item.stepType === 'rolled-back'
+      item.stepType === 'rolled-back' ||
+      item.stepType === 'already-spent'
   );
   if (current) {
     return current.displayLabel.toUpperCase();
@@ -648,9 +678,11 @@ type StatusColorType = 'default' | 'success' | 'error' | 'warning';
 const getStatusColorType = (timeline: TimelineItem[]): StatusColorType => {
   const hasExpired = timeline.some((item) => item.stepType === 'expired');
   const hasRolledBack = timeline.some((item) => item.stepType === 'rolled-back');
+  const hasAlreadySpent = timeline.some((item) => item.stepType === 'already-spent');
   const hasSuccess = timeline.some((item) => item.stepType === 'success');
 
   if (hasExpired) return 'error';
+  if (hasAlreadySpent) return 'warning';
   if (hasRolledBack) return 'warning';
   if (hasSuccess) return 'success';
   return 'default';
@@ -673,8 +705,8 @@ export function HistoryEntryTimeline({
   const orangeColor = '#fb923c'; // accent-orange from spec
   const greyColor = getPrimaryColor('400');
   const primaryWhite = getPrimaryColor('0');
-  const primaryGrey200 = getPrimaryColor('200');
-  const primaryGrey300 = getPrimaryColor('300');
+  const primaryGrey200 = opacity(getPrimaryColor('0'), 0.66);
+  const primaryGrey300 = opacity(getPrimaryColor('0'), 0.5);
 
   // Update time every second for real-time countdown
   useEffect(() => {
@@ -726,6 +758,7 @@ export function HistoryEntryTimeline({
     nextItem: TimelineItem
   ): 'complete' | 'future' | 'expired-gradient' | 'rolled-back-gradient' => {
     if (nextItem.stepType === 'expired') return 'expired-gradient';
+    if (nextItem.stepType === 'already-spent') return 'rolled-back-gradient';
     if (nextItem.stepType === 'rolled-back') return 'rolled-back-gradient';
     if (
       currentItem.stepType === 'complete' ||
@@ -761,6 +794,7 @@ export function HistoryEntryTimeline({
   const getStateTextColor = (stepType: TimelineStepType, isFuture: boolean) => {
     if (isFuture) return primaryGrey300;
     if (stepType === 'expired') return redColor;
+    if (stepType === 'already-spent') return orangeColor;
     if (stepType === 'rolled-back') return orangeColor;
     return primaryWhite;
   };

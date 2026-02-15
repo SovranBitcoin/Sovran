@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View as RNView } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,7 +11,13 @@ import Icon from 'assets/icons';
 import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
 import { TOTAL_BASIS_POINTS, useMintDistributionStore } from 'stores/mintDistributionStore';
 import { RowButton, Section } from 'app/settings-pages';
-import Animated, { FadeInUp, type SharedValue } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withDelay,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurrencyTabs';
 import type { HealthCta } from './walletHealth';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
@@ -115,9 +121,9 @@ export function WalletHealthModalContent({
 }) {
   const { getPrimaryColor, getRedColor } = useTheme();
   const heroTransition = useHeroTransition();
-  const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
-  const primary300 = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
-  const primary400 = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
+  const primary50 = useMemo(() => opacity(getPrimaryColor('0'), 0.9), [getPrimaryColor]);
+  const primary300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
+  const primary400 = useMemo(() => opacity(getPrimaryColor('0'), 0.4), [getPrimaryColor]);
   const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
   const red = useMemo(() => getRedColor('300'), [getRedColor]);
 
@@ -344,6 +350,40 @@ export function WalletHealthModalContent({
     handleSplitPress,
   ]);
 
+  // ---------------------------------------------------------------------------
+  // Safe fade-in animations (always mounted, no mount/unmount race with Core Animation)
+  // ---------------------------------------------------------------------------
+  const isHeroTransitioning = heroTransition.isTransitioning('walletHealth');
+
+  const tabsOpacity = useSharedValue(0);
+  const tabsTranslateY = useSharedValue(20);
+  const bodyOpacity = useSharedValue(0);
+  const bodyTranslateY = useSharedValue(20);
+
+  useEffect(() => {
+    if (!isHeroTransitioning) {
+      tabsOpacity.value = withDelay(120, withTiming(1, { duration: 220 }));
+      tabsTranslateY.value = withDelay(120, withTiming(0, { duration: 220 }));
+      bodyOpacity.value = withDelay(160, withTiming(1, { duration: 240 }));
+      bodyTranslateY.value = withDelay(160, withTiming(0, { duration: 240 }));
+    } else {
+      tabsOpacity.value = 0;
+      tabsTranslateY.value = 20;
+      bodyOpacity.value = 0;
+      bodyTranslateY.value = 20;
+    }
+  }, [isHeroTransitioning, tabsOpacity, tabsTranslateY, bodyOpacity, bodyTranslateY]);
+
+  const tabsAnimStyle = useAnimatedStyle(() => ({
+    opacity: tabsOpacity.value,
+    transform: [{ translateY: tabsTranslateY.value }],
+  }));
+
+  const bodyAnimStyle = useAnimatedStyle(() => ({
+    opacity: bodyOpacity.value,
+    transform: [{ translateY: bodyTranslateY.value }],
+  }));
+
   const heroContent = (
     <RNView
       ref={heroRef}
@@ -414,8 +454,8 @@ export function WalletHealthModalContent({
     </RNView>
   );
 
-  const tabsContent = !heroTransition.isTransitioning('walletHealth') ? (
-    <Animated.View entering={FadeInUp.duration(220).delay(120)}>
+  const tabsContent = (
+    <Animated.View style={tabsAnimStyle}>
       <MintCurrencyTabs
         currencies={currencies}
         selectedCurrency={selectedCurrency}
@@ -423,10 +463,10 @@ export function WalletHealthModalContent({
         scrollY={scrollY}
       />
     </Animated.View>
-  ) : null;
+  );
 
-  const bodyContent = !heroTransition.isTransitioning('walletHealth') ? (
-    <Animated.View entering={FadeInUp.duration(240).delay(160)}>
+  const bodyContent = (
+    <Animated.View style={bodyAnimStyle}>
       <View style={{ paddingHorizontal: 16 }}>
         <Section title="Actions">
           {actionRows.map((r, i) => (
@@ -442,7 +482,7 @@ export function WalletHealthModalContent({
         </Section>
       </View>
     </Animated.View>
-  ) : null;
+  );
 
   // Render callback: parent controls the layout (sticky header, scroll, etc.)
   if (children) {

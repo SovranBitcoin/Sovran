@@ -12,6 +12,7 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useBTCMapStore } from 'stores/btcMapStore';
 import { useSettingsStore } from 'stores/settingsStore';
+import { applySafetyOffset } from 'utils/locationPrivacy';
 import { useShallow } from 'zustand/react/shallow';
 
 // ---------------------------------------------------------------------------
@@ -257,16 +258,23 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
         ? `${totalCount.toLocaleString()} worldwide`
         : '30,000+ locations';
 
+  // Privacy: offset the camera centre so the preview never reveals exact location.
+  // Marker filtering above still uses real coords for accurate "nearby" counts.
+  const offsetCoords = useMemo(
+    () => applySafetyOffset(coords.latitude, coords.longitude),
+    [coords]
+  );
+
   return (
     <Link href="/(map-flow)" asChild>
       <TouchableOpacity activeOpacity={0.85}>
         <RNView style={[styles.card, { borderColor }]}>
           <BlurCardFrame accentColor={accentColor}>
             <RNView style={styles.container}>
-              {/* Map with markers */}
+              {/* Map with markers — camera uses safety offset */}
               <MapPreview
-                latitude={coords.latitude}
-                longitude={coords.longitude}
+                latitude={offsetCoords.latitude}
+                longitude={offsetCoords.longitude}
                 markers={nearbyMarkers}
               />
 

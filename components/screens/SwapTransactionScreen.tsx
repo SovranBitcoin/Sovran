@@ -13,7 +13,15 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { LayoutAnimation, Platform, StyleSheet, UIManager } from 'react-native';
+import { StyleSheet } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  Easing,
+  LinearTransition,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from 'providers/ThemeProvider';
 import { View } from 'components/ui/View/View';
 import { Text, UntranslatedText } from 'components/ui/Text';
@@ -25,21 +33,22 @@ import { useHistoryWithMelts } from 'hooks/coco/useHistoryWithMelts';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
 import { useSwapTransactionsStore, type SwapLeg } from 'stores/swapTransactionsStore';
 import opacity from 'hex-color-opacity';
-import { BlurCardFrame } from 'components/ui/BlurCardFrame';
 import { Section } from 'components/ui/Section';
 import { Avatar } from 'components/ui/Avatar';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
+import {
+  TransferEntryRow,
+  TransferSeparator,
+  TransferCard,
+  TransferErrorBanner,
+} from 'components/ui/TransferLegCard';
 import { convertTime } from 'helper/time';
 import { formatAmount } from 'helper/currency';
 import { useMintManagement } from 'hooks/coco/useMintManagement';
 import Icon from 'assets/icons';
 import { router } from 'expo-router';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import { IconSymbol } from 'components/ui/icon-symbol';
 
 interface Props {
   groupId: string | undefined;
@@ -98,18 +107,14 @@ function groupLegs(legs: SwapLeg[]): LegGroup[] {
 }
 
 // -----------------------------------------------------------------------
-// Sub-component: a single transaction row with a mint Avatar + arrow badge
+// Helpers for building TransferEntryRow props from history entries
 // -----------------------------------------------------------------------
 
-interface SwapEntryRowProps {
-  historyEntry: MintHistoryEntry | MeltHistoryEntry;
-  mintIconUrl: string | undefined;
-  mintName: string;
-}
-
-const SwapEntryRow = React.memo(({ historyEntry, mintIconUrl, mintName }: SwapEntryRowProps) => {
-  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
-
+function buildSwapEntryRowProps(
+  historyEntry: MintHistoryEntry | MeltHistoryEntry,
+  mintIconUrl: string | undefined,
+  mintName: string
+) {
   const isSend = historyEntry.type === 'melt';
   const fiatAmount = formatAmount(
     { amount: Math.abs(historyEntry.amount), unit: historyEntry.unit },
@@ -130,79 +135,19 @@ const SwapEntryRow = React.memo(({ historyEntry, mintIconUrl, mintName }: SwapEn
     }
   };
 
-  return (
-    <TouchableOpacity style={styles.entryRow} onPress={handlePress}>
-      <HStack spacing={12} flex={1}>
-        {/* Avatar with small arrow overlay */}
-        <View style={styles.avatarWrapper}>
-          <Avatar picture={mintIconUrl} size={36} variant="mint" name={mintName} />
-          <View style={[styles.arrowBadge, { backgroundColor: getPrimaryColor('500') }]}>
-            <Icon
-              name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}
-              size={10}
-              color="#fff"
-            />
-          </View>
-        </View>
-
-        <VStack spacing={0} flex={1}>
-          <HStack justify="space-between" align="flex-end">
-            <UntranslatedText color={getPrimaryColor('0')} bold size={14} numberOfLines={1}>
-              {mintName}
-            </UntranslatedText>
-            <HStack align="center" spacing={0}>
-              <UntranslatedText
-                color={isSend ? getRedColor('300') : getGreenColor('300')}
-                bold
-                size={16}>
-                {isSend ? '- ' : '+ '}
-              </UntranslatedText>
-              <AmountFormatter
-                amount={historyEntry.amount}
-                unit={historyEntry.unit}
-                size={16}
-                weight="heavy"
-                color={isSend ? getRedColor('300') : getGreenColor('300')}
-              />
-            </HStack>
-          </HStack>
-
-          <HStack justify="space-between" align="center">
-            <UntranslatedText regular size={10} color={getPrimaryColor('100')}>
-              {historyEntry.createdAt
-                ? convertTime(new Date(historyEntry.createdAt))
-                : 'Unconfirmed'}
-            </UntranslatedText>
-            <UntranslatedText bold size={10} color={getPrimaryColor('100')}>
-              {fiatAmount}
-            </UntranslatedText>
-          </HStack>
-        </VStack>
-      </HStack>
-    </TouchableOpacity>
-  );
-});
-SwapEntryRow.displayName = 'SwapEntryRow';
-
-// -----------------------------------------------------------------------
-// Sub-component: colored separator between melt → mint
-// -----------------------------------------------------------------------
-
-interface StepSeparatorProps {
-  failed: boolean;
+  return {
+    type: (isSend ? 'send' : 'receive') as 'send' | 'receive',
+    mintIconUrl,
+    mintName,
+    amount: historyEntry.amount,
+    unit: historyEntry.unit,
+    subtitle: historyEntry.createdAt
+      ? convertTime(new Date(historyEntry.createdAt))
+      : 'Unconfirmed',
+    secondarySubtitle: fiatAmount,
+    onPress: handlePress,
+  };
 }
-
-const StepSeparator = React.memo(({ failed }: StepSeparatorProps) => {
-  const { getPrimaryColor, getRedColor } = useTheme();
-  const bgColor = failed ? getRedColor('500') : getPrimaryColor('500');
-
-  return (
-    <View style={[styles.separator, { backgroundColor: bgColor }]}>
-      <Icon name="mdi:arrow-down" size={14} color="#fff" />
-    </View>
-  );
-});
-StepSeparator.displayName = 'StepSeparator';
 
 // -----------------------------------------------------------------------
 // Sub-component: compact collapsed row for a leg group
@@ -235,13 +180,14 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           <UntranslatedText
             bold
             size={13}
-            color={getPrimaryColor('50')}
+            color={opacity(getPrimaryColor('0'), 0.9)}
             numberOfLines={1}
             style={{ flex: 1 }}>
             {srcName}
           </UntranslatedText>
         </HStack>
-        <View style={[styles.collapsedArrow, { backgroundColor: getPrimaryColor('500') }]}>
+        <View
+          style={[styles.collapsedArrow, { backgroundColor: opacity(getPrimaryColor('0'), 0.33) }]}>
           <Icon name="mdi:arrow-right" size={10} color="#fff" />
         </View>
         <HStack spacing={8} align="center" flex={1}>
@@ -249,7 +195,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           <UntranslatedText
             bold
             size={13}
-            color={getPrimaryColor('50')}
+            color={opacity(getPrimaryColor('0'), 0.9)}
             numberOfLines={1}
             style={{ flex: 1 }}>
             {dstName}
@@ -268,16 +214,26 @@ CollapsedLegGroup.displayName = 'CollapsedLegGroup';
 export function SwapTransactionScreen({ groupId }: Props) {
   const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
   const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
-  const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
   const group = useSwapTransactionsStore((state) => (groupId ? state.groups[groupId] : undefined));
   const { history } = useHistoryWithMelts();
   const { getMintInfo } = useMintManagement();
   const [expanded, setExpanded] = useState(false);
+  const chevronRotation = useSharedValue(0);
 
   const toggleExpanded = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpanded((prev) => !prev);
-  }, []);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setExpanded((prev) => {
+      chevronRotation.value = withTiming(prev ? 0 : 180, {
+        duration: 280,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      });
+      return !prev;
+    });
+  }, [chevronRotation]);
+
+  const chevronAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${chevronRotation.value}deg` }],
+  }));
 
   // Load mint info for all mint URLs used in the group (including chain URLs)
   const [mintInfoMap, setMintInfoMap] = useState<
@@ -390,7 +346,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
     return (
       <ModalLayoutWrapper>
         <View style={styles.center}>
-          <Text color={getPrimaryColor('200')}>Swap not found.</Text>
+          <Text color={opacity(getPrimaryColor('0'), 0.66)}>Swap not found.</Text>
         </View>
       </ModalLayoutWrapper>
     );
@@ -423,8 +379,8 @@ export function SwapTransactionScreen({ groupId }: Props) {
                 color={headerColor}
               />
             </HStack>
-            <Text size={18} color={getPrimaryColor('50')} bold>
-              <Text size={18} color={getPrimaryColor('50')} style={{ marginLeft: 8 }}>
+            <Text size={18} color={opacity(getPrimaryColor('0'), 0.9)} bold>
+              <Text size={18} color={opacity(getPrimaryColor('0'), 0.9)} style={{ marginLeft: 8 }}>
                 {fiatAmount}
               </Text>
             </Text>
@@ -432,160 +388,138 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
           {/* Swap icon — same style as TransactionIcon in HistoryEntryHeader */}
           <View className="scale-125 transform bg-transparent p-4">
-            <Icon name="mdi:swap-horizontal" size={28} color={getPrimaryColor('50')} />
+            <Icon name="mdi:swap-horizontal" size={28} color={opacity(getPrimaryColor('0'), 0.9)} />
           </View>
         </HStack>
 
-        {/* ── Toggle header ── */}
+        {/* ── Disclosure toggle (animated chevron, like SwiftUI DisclosureGroup) ── */}
         <TouchableOpacity onPress={toggleExpanded} style={{ marginHorizontal: 16 }}>
           <HStack align="center" justify="space-between" style={styles.toggleHeader}>
-            <UntranslatedText bold size={13} color={getPrimaryColor('200')}>
+            <UntranslatedText bold size={13} color={opacity(getPrimaryColor('0'), 0.66)}>
               Transactions
             </UntranslatedText>
-            <Icon
-              name={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-              size={18}
-              color={getPrimaryColor('300')}
-            />
+            <Animated.View style={chevronAnimatedStyle}>
+              <IconSymbol
+                name="chevron.down"
+                size={14}
+                color={opacity(getPrimaryColor('0'), 0.5)}
+                weight="semibold"
+              />
+            </Animated.View>
           </HStack>
         </TouchableOpacity>
 
-        {/* ── Leg cards: expanded or collapsed ── */}
-        {expanded ? (
-          legGroups.map((legGroup, groupIdx) => {
-            const isChain = legGroup.chainId != null;
+        {/* ── Leg cards: expanded or collapsed (Reanimated layout transition) ── */}
+        <Animated.View layout={LinearTransition.duration(280)}>
+          {expanded ? (
+            legGroups.map((legGroup, groupIdx) => {
+              const isChain = legGroup.chainId != null;
 
-            return (
-              <View key={legGroup.id} style={{ marginHorizontal: 16 }}>
-                {groupIdx > 0 ? <View style={styles.legSpacer} /> : null}
+              return (
+                <View key={legGroup.id} style={{ marginHorizontal: 16 }}>
+                  {groupIdx > 0 ? <View style={styles.legSpacer} /> : null}
 
-                <View style={[styles.card, { borderColor }]}>
-                  <BlurCardFrame accentColor={accentColor}>
-                    <View style={styles.content}>
-                      {/* Render each leg in the group */}
-                      {legGroup.legs.map((leg, legIdx) => {
-                        const mintEntry = leg.mintQuoteId
-                          ? (historyByQuoteId.get(leg.mintQuoteId) as MintHistoryEntry | undefined)
-                          : undefined;
-                        const meltEntry = leg.meltQuoteId
-                          ? (historyByQuoteId.get(leg.meltQuoteId) as MeltHistoryEntry | undefined)
-                          : undefined;
+                  <TransferCard accentColor={accentColor}>
+                    {/* Render each leg in the group */}
+                    {legGroup.legs.map((leg, legIdx) => {
+                      const mintEntry = leg.mintQuoteId
+                        ? (historyByQuoteId.get(leg.mintQuoteId) as MintHistoryEntry | undefined)
+                        : undefined;
+                      const meltEntry = leg.meltQuoteId
+                        ? (historyByQuoteId.get(leg.meltQuoteId) as MeltHistoryEntry | undefined)
+                        : undefined;
 
-                        // Synthetic MeltHistoryEntry for v3 melts missing from Coco history
-                        const meltEntryForDisplay: MeltHistoryEntry | undefined =
-                          meltEntry ??
-                          (leg.meltQuoteId
-                            ? {
-                                id: leg.meltOperationId ?? leg.id,
-                                createdAt: group.createdAt,
-                                mintUrl: leg.fromMintUrl,
-                                unit: group.unit,
-                                type: 'melt' as const,
-                                quoteId: leg.meltQuoteId,
-                                state: leg.localStatus === 'done' ? 'PAID' : 'UNPAID',
-                                amount: leg.amount,
-                              }
-                            : undefined);
+                      // Synthetic MeltHistoryEntry for v3 melts missing from Coco history
+                      const meltEntryForDisplay: MeltHistoryEntry | undefined =
+                        meltEntry ??
+                        (leg.meltQuoteId
+                          ? {
+                              id: leg.meltOperationId ?? leg.id,
+                              createdAt: group.createdAt,
+                              mintUrl: leg.fromMintUrl,
+                              unit: group.unit,
+                              type: 'melt' as const,
+                              quoteId: leg.meltQuoteId,
+                              state: leg.localStatus === 'done' ? 'PAID' : 'UNPAID',
+                              amount: leg.amount,
+                            }
+                          : undefined);
 
-                        const fromInfo = mintInfoMap[leg.fromMintUrl];
-                        const toInfo = mintInfoMap[leg.toMintUrl];
-                        const fromName = fromInfo?.name || extractDomain(leg.fromMintUrl);
-                        const toName = toInfo?.name || extractDomain(leg.toMintUrl);
-                        const hasError = leg.localStatus === 'failed';
+                      const fromInfo = mintInfoMap[leg.fromMintUrl];
+                      const toInfo = mintInfoMap[leg.toMintUrl];
+                      const fromName = fromInfo?.name || extractDomain(leg.fromMintUrl);
+                      const toName = toInfo?.name || extractDomain(leg.toMintUrl);
+                      const hasError = leg.localStatus === 'failed';
 
-                        // Skip the separator between chained legs when the previous
-                        // leg's destination is the same mint as this leg's source
-                        const prevLeg = legIdx > 0 ? legGroup.legs[legIdx - 1] : null;
-                        const sameMintAsPrev =
-                          prevLeg != null && prevLeg.toMintUrl === leg.fromMintUrl;
+                      // Skip the separator between chained legs when the previous
+                      // leg's destination is the same mint as this leg's source
+                      const prevLeg = legIdx > 0 ? legGroup.legs[legIdx - 1] : null;
+                      const sameMintAsPrev =
+                        prevLeg != null && prevLeg.toMintUrl === leg.fromMintUrl;
 
-                        return (
-                          <View key={leg.id}>
-                            {/* Separator between chained legs (skip if same mint) */}
-                            {isChain && legIdx > 0 && !sameMintAsPrev && (
-                              <StepSeparator failed={hasError} />
-                            )}
+                      return (
+                        <View key={leg.id}>
+                          {/* Separator between chained legs (skip if same mint) */}
+                          {isChain && legIdx > 0 && !sameMintAsPrev && (
+                            <TransferSeparator failed={hasError} />
+                          )}
 
-                            {/* Melt row (send from source) */}
-                            {meltEntryForDisplay ? (
-                              <SwapEntryRow
-                                historyEntry={meltEntryForDisplay}
-                                mintIconUrl={fromInfo?.icon_url}
-                                mintName={fromName}
-                              />
-                            ) : null}
+                          {/* Melt row (send from source) */}
+                          {meltEntryForDisplay ? (
+                            <TransferEntryRow
+                              {...buildSwapEntryRowProps(
+                                meltEntryForDisplay,
+                                fromInfo?.icon_url,
+                                fromName
+                              )}
+                            />
+                          ) : null}
 
-                            {/* Colored separator between melt → mint */}
-                            {meltEntryForDisplay && mintEntry ? (
-                              <StepSeparator failed={hasError} />
-                            ) : null}
+                          {/* Colored separator between melt → mint */}
+                          {meltEntryForDisplay && mintEntry ? (
+                            <TransferSeparator failed={hasError} />
+                          ) : null}
 
-                            {/* Mint row (receive on destination) */}
-                            {mintEntry ? (
-                              <SwapEntryRow
-                                historyEntry={mintEntry}
-                                mintIconUrl={toInfo?.icon_url}
-                                mintName={toName}
-                              />
-                            ) : null}
+                          {/* Mint row (receive on destination) */}
+                          {mintEntry ? (
+                            <TransferEntryRow
+                              {...buildSwapEntryRowProps(mintEntry, toInfo?.icon_url, toName)}
+                            />
+                          ) : null}
 
-                            {/* Error banner */}
-                            {hasError && leg.errorMessage ? (
-                              <View
-                                style={[
-                                  styles.errorBanner,
-                                  { backgroundColor: opacity(getRedColor('400'), 0.15) },
-                                ]}>
-                                <HStack spacing={8} align="center">
-                                  <Icon
-                                    name="mdi:alert-circle"
-                                    size={16}
-                                    color={getRedColor('400')}
-                                  />
-                                  <UntranslatedText
-                                    size={11}
-                                    bold
-                                    color={getRedColor('400')}
-                                    style={{ flex: 1 }}>
-                                    {leg.errorMessage}
-                                  </UntranslatedText>
-                                </HStack>
-                              </View>
-                            ) : null}
-                          </View>
-                        );
-                      })}
-                    </View>
-                  </BlurCardFrame>
+                          {/* Error banner */}
+                          {hasError && leg.errorMessage ? (
+                            <TransferErrorBanner message={leg.errorMessage} />
+                          ) : null}
+                        </View>
+                      );
+                    })}
+                  </TransferCard>
                 </View>
-              </View>
-            );
-          })
-        ) : (
-          /* ── Collapsed: compact summary per leg group ── */
-          <View style={{ marginHorizontal: 16 }}>
-            <View style={[styles.card, { borderColor }]}>
-              <BlurCardFrame accentColor={accentColor}>
-                <View style={styles.content}>
-                  {legGroups.map((legGroup, groupIdx) => (
-                    <React.Fragment key={legGroup.id}>
-                      {groupIdx > 0 && (
-                        <View
-                          style={{
-                            height: StyleSheet.hairlineWidth,
-                            backgroundColor: opacity(getPrimaryColor('400'), 0.2),
-                            marginHorizontal: 16,
-                          }}
-                        />
-                      )}
-                      <CollapsedLegGroup legGroup={legGroup} mintInfoMap={mintInfoMap} />
-                    </React.Fragment>
-                  ))}
-                </View>
-              </BlurCardFrame>
+              );
+            })
+          ) : (
+            /* ── Collapsed: compact summary per leg group ── */
+            <View style={{ marginHorizontal: 16 }}>
+              <TransferCard accentColor={accentColor}>
+                {legGroups.map((legGroup, groupIdx) => (
+                  <React.Fragment key={legGroup.id}>
+                    {groupIdx > 0 && (
+                      <View
+                        style={{
+                          height: StyleSheet.hairlineWidth,
+                          backgroundColor: opacity(getPrimaryColor('0'), 0.1),
+                          marginHorizontal: 16,
+                        }}
+                      />
+                    )}
+                    <CollapsedLegGroup legGroup={legGroup} mintInfoMap={mintInfoMap} />
+                  </React.Fragment>
+                ))}
+              </TransferCard>
             </View>
-          </View>
-        )}
+          )}
+        </Animated.View>
 
         {/* ── Section: metadata (below the cards, matching other screens) ── */}
         <Section
@@ -622,11 +556,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 4,
   },
-  card: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-  },
   collapsedRow: {
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -638,49 +567,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-  },
-  content: {
-    zIndex: 1,
-  },
-  entryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'transparent',
-    padding: 20,
-    paddingLeft: 16,
-    paddingRight: 16,
-  },
-  avatarWrapper: {
-    position: 'relative',
-    width: 36,
-    height: 36,
-  },
-  arrowBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  separator: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 24,
-    marginHorizontal: 16,
-    borderRadius: 6,
-  },
-  errorBanner: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 6,
   },
   legSpacer: {
     height: 8,

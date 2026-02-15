@@ -33,6 +33,7 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useMints, useBalanceContext } from 'coco-cashu-react';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useMintDistributionStore, TOTAL_BASIS_POINTS } from 'stores/mintDistributionStore';
+import opacity from 'hex-color-opacity';
 
 // Height constants
 const DISTRIBUTION_BAR_HEIGHT = 48; // 32px bar + 16px margin
@@ -299,7 +300,7 @@ function DistributionScreen() {
         {/* Distribution summary */}
         <View style={styles.summaryContainer}>
           <HStack justify="space-between" align="center" style={{ paddingHorizontal: 16 }}>
-            <Text size={14} style={{ color: getPrimaryColor('300') }}>
+            <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
               Total distribution
             </Text>
             <Text
@@ -341,7 +342,9 @@ function DistributionScreen() {
 
         {/* Info text */}
         <View style={styles.infoContainer}>
-          <Text size={12} style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>
+          <Text
+            size={12}
+            style={{ color: opacity(getPrimaryColor('0'), 0.4), textAlign: 'center' }}>
             {hasActiveMints
               ? 'Adjusting one mint redistributes among active mints only'
               : 'Tap Equalize to distribute evenly across all mints'}

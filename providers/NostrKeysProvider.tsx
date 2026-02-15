@@ -16,6 +16,7 @@ import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { CocoManager } from 'helper/coco/manager';
 import { useInitializationStage } from './InitializationProvider';
+import { useProfileStore } from '@/stores/profileStore';
 
 /**
  * Check if mnemonic exists in Redux store (profile 0) as fallback
@@ -246,7 +247,8 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       setKeys(defaultKeys);
       setCashuMnemonic(defaultCashuMnemonic);
 
-      // Update the cashu mnemonic in CocoManager
+      // Update account index and cashu mnemonic in CocoManager
+      CocoManager.setAccountIndex(defaultAccountIndex);
       if (defaultCashuMnemonic) {
         CocoManager.setCashuMnemonic(defaultCashuMnemonic);
       }
@@ -358,9 +360,15 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         setKeys(defaultKeys);
         setCashuMnemonic(defaultCashuMnemonic);
 
-        // Set the cashu mnemonic in CocoManager for simplified seedGetter
+        // Set the account index and cashu mnemonic in CocoManager before it initializes
+        CocoManager.setAccountIndex(defaultAccountIndex);
         if (defaultCashuMnemonic) {
           CocoManager.setCashuMnemonic(defaultCashuMnemonic);
+        }
+
+        // Seed the profile store with this profile's pubkey (idempotent)
+        if (defaultKeys?.pubkey) {
+          useProfileStore.getState().addProfile(defaultAccountIndex, defaultKeys.pubkey);
         }
 
         setIsReady(true);

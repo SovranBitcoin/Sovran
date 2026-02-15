@@ -4,6 +4,7 @@ import { Link } from 'expo-router';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { HStack } from 'components/ui/View/HStack';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { supportsLiquidGlass } from '@/helper/version';
@@ -194,7 +195,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
             <Icon name="fluent:add-24-filled" size={20} color={getPrimaryColor('0')} />
             <Text
               style={{
-                color: getPrimaryColor('50'),
+                color: opacity(getPrimaryColor('0'), 0.9),
               }}
               className="ml-[-2px]"
               size={12}

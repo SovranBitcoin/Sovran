@@ -20,6 +20,7 @@ import WalletHeaderTitle from 'components/blocks/WalletHeaderTitle';
 import { truncateMiddle } from 'helper/strings';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { Section } from 'components/ui/Section';
+import { DetailsSection } from 'components/ui/DetailsSection';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
 import { useMintStore } from '@/stores/mintStore';
@@ -29,6 +30,7 @@ import { MeltHistoryEntry } from 'coco-cashu-core';
 import { getLightningTimestamp, requestInvoiceFromLnurl } from '@/helper/coco/utils';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { Spinner } from 'components/ui/Spinner';
 import { convertTime } from 'helper/time';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
@@ -67,12 +69,20 @@ function ErrorState({ message, onCancel }: { message: string; onCancel: () => vo
         <Text
           size={18}
           bold
-          style={{ color: getPrimaryColor('0'), marginBottom: 16, textAlign: 'center' }}>
+          style={{
+            color: opacity(getPrimaryColor('0'), 0.9),
+            marginBottom: 16,
+            textAlign: 'center',
+          }}>
           Error
         </Text>
         <Text
           size={14}
-          style={{ color: getPrimaryColor('300'), marginBottom: 24, textAlign: 'center' }}>
+          style={{
+            color: opacity(getPrimaryColor('0'), 0.5),
+            marginBottom: 24,
+            textAlign: 'center',
+          }}>
           {message}
         </Text>
         <ButtonHandler
@@ -98,7 +108,7 @@ function LoadingState({ message }: { message: string }) {
     <ModalLayoutWrapper>
       <VStack style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <Spinner size={32} />
-        <Text size={16} style={{ color: getPrimaryColor('300'), marginTop: 16 }}>
+        <Text size={16} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginTop: 16 }}>
           {message}
         </Text>
       </VStack>
@@ -511,7 +521,20 @@ export function MeltQuoteScreen({
 
         <HistoryEntryTimeline historyEntry={currentTransaction} meltQuote={displayQuote} />
 
-        <Section
+        {/* Fee - shown prominently since it's unique info not displayed elsewhere */}
+        {feeReserve > 0 ? (
+          <Section
+            items={[
+              {
+                title: 'Fee',
+                value: formatAmount({ amount: feeReserve, unit }),
+              },
+            ]}
+          />
+        ) : null}
+
+        {/* Technical details - collapsed by default */}
+        <DetailsSection
           items={[
             {
               title: 'Date',
@@ -519,27 +542,18 @@ export function MeltQuoteScreen({
                 ? convertTime(new Date(getLightningTimestamp(displayQuote.request) * 1000))
                 : convertTime(new Date(currentTransaction.createdAt)),
             },
-            { title: 'Type', value: 'Send • Lightning' },
             ...(displayQuote?.request
               ? [
                   {
-                    title: 'Request',
+                    title: 'Invoice',
                     value: truncateMiddle(displayQuote.request, 5),
                   },
                 ]
               : []),
-            { title: 'Quote', value: truncateMiddle(quoteId, 7) },
-            {
-              title: 'Fee',
-              value: formatAmount({ amount: feeReserve, unit }),
-            },
+            { title: 'Quote ID', value: truncateMiddle(quoteId, 7) },
             {
               title: 'Amount',
               value: `${amount} ${unit.toUpperCase()}`,
-            },
-            {
-              title: 'State',
-              value: currentTransaction.state,
             },
           ]}
         />

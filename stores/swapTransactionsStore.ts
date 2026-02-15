@@ -13,7 +13,9 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
+
+const profileStorage = createProfileScopedStorage();
 
 export type SwapGroupState = 'running' | 'finished' | 'cancelled';
 
@@ -247,7 +249,7 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
 
       clearAllData: async () => {
         try {
-          await AsyncStorage.removeItem('swap-transactions-store');
+          await profileStorage.removeItem('swap-transactions-store');
           set({ groups: {}, quoteIdToGroup: {} });
         } catch (error) {
           console.error('SwapTransactionsStore: Error clearing data:', error);
@@ -257,7 +259,7 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
     }),
     {
       name: 'swap-transactions-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => createProfileScopedStorage()),
       partialize: (state) => ({
         groups: state.groups,
         quoteIdToGroup: state.quoteIdToGroup,

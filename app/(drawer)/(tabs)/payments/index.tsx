@@ -32,7 +32,7 @@ import { LayoutDebugWrapper } from '../example';
 import { NoResultsFound } from '@/components/blocks/contacts/NoResultsFound';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useSearchHistoryStore } from '@/stores/searchHistoryStore';
-import { ProfilesCardFrame } from '@/components/blocks/payments/ProfilesCardFrame';
+import { BlurCardFrame } from 'components/ui/BlurCardFrame';
 import opacity from 'hex-color-opacity';
 
 // Define proper types
@@ -642,7 +642,6 @@ const PaymentsContent = () => {
   );
 
   // Match Recent activity / Mints card frame styling
-  const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
   const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
   const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
 
@@ -793,14 +792,17 @@ const PaymentsContent = () => {
                   keyboardDismissMode="on-drag"
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.searchContainer}>
-                  <View style={{ marginTop: 16, marginBottom: 12, paddingHorizontal: 16 }}>
-                    <Text overpass bold size={14} style={{ color: getPrimaryColor('400') }}>
-                      Search results
-                    </Text>
-                  </View>
-
                   <RNView style={[styles.card, { borderColor }]}>
-                    <ProfilesCardFrame accentColor={accentColor} highlightColor={primary50}>
+                    <BlurCardFrame accentColor={accentColor}>
+                      <View style={styles.searchSectionHeader}>
+                        <Text
+                          overpass
+                          bold
+                          size={14}
+                          style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
+                          Search results
+                        </Text>
+                      </View>
                       <View style={styles.cardContent} className="gap-4">
                         {showNoResults ? (
                           <NoResultsFound />
@@ -815,7 +817,7 @@ const PaymentsContent = () => {
                           ))
                         )}
                       </View>
-                    </ProfilesCardFrame>
+                    </BlurCardFrame>
                   </RNView>
                 </ScrollView>
               </Pressable>
@@ -869,12 +871,19 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,
     marginHorizontal: 16,
   },
   cardContent: {
     padding: 16,
+    zIndex: 1,
+  },
+  searchSectionHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 4,
     zIndex: 1,
   },
 });

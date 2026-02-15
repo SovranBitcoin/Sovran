@@ -36,7 +36,12 @@ import { finalizeEvent } from 'nostr-tools';
 import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from 'components/blocks/claim/ClaimUsernameCardFrame';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInUp, useSharedValue } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withDelay,
+} from 'react-native-reanimated';
 
 // Available domains for Lightning addresses
 const DOMAINS = [
@@ -114,7 +119,7 @@ function UsernameInput({
         onChangeText={handleChange}
         placeholder="username"
         placeholderTextColor={opacity(accentColor, 0.45)}
-        style={[styles.input, { color: getPrimaryColor('50') }]}
+        style={[styles.input, { color: opacity(getPrimaryColor('0'), 0.9) }]}
         autoCorrect={false}
         autoCapitalize="none"
         autoFocus
@@ -145,7 +150,8 @@ function DomainOption({
 
   const getStatusInfo = () => {
     if (!availabilityResult) return null;
-    if (availabilityResult.loading) return { color: getPrimaryColor('500'), text: 'Checking...' };
+    if (availabilityResult.loading)
+      return { color: opacity(getPrimaryColor('0'), 0.33), text: 'Checking...' };
     if (availabilityResult.error)
       return { color: '#ef4444', text: availabilityResult.error, icon: 'mdi:close-circle' };
     if (availabilityResult.available === true)
@@ -183,13 +189,19 @@ function DomainOption({
           <Icon
             name="mingcute:lightning-fill"
             size={16}
-            color={isSelected ? getPrimaryColor('400') : getPrimaryColor('500')}
+            color={
+              isSelected ? opacity(getPrimaryColor('0'), 0.4) : opacity(getPrimaryColor('0'), 0.33)
+            }
           />
         </View>
         <Text
           size={15}
           heavy={isSelected}
-          style={{ color: isSelected ? getPrimaryColor('50') : getPrimaryColor('300') }}>
+          style={{
+            color: isSelected
+              ? opacity(getPrimaryColor('0'), 0.9)
+              : opacity(getPrimaryColor('0'), 0.5),
+          }}>
           @{domain.label}
         </Text>
       </HStack>
@@ -280,6 +292,29 @@ function ClaimUsernameScreen() {
   const handleHeroLayout = useCallback(() => {
     hero.registerRef('claimUsername', 'destination', heroRef.current);
   }, [hero]);
+
+  // ---------------------------------------------------------------------------
+  // Safe fade-in animation (always mounted, no mount/unmount race with Core Animation)
+  // ---------------------------------------------------------------------------
+  const isHeroTransitioning = hero.isTransitioning('claimUsername');
+
+  const contentOpacity = useSharedValue(0);
+  const contentTranslateY = useSharedValue(20);
+
+  useEffect(() => {
+    if (!isHeroTransitioning) {
+      contentOpacity.value = withDelay(120, withTiming(1, { duration: 220 }));
+      contentTranslateY.value = withDelay(120, withTiming(0, { duration: 220 }));
+    } else {
+      contentOpacity.value = 0;
+      contentTranslateY.value = 20;
+    }
+  }, [isHeroTransitioning, contentOpacity, contentTranslateY]);
+
+  const contentAnimStyle = useAnimatedStyle(() => ({
+    opacity: contentOpacity.value,
+    transform: [{ translateY: contentTranslateY.value }],
+  }));
 
   const topOffset = insets.top;
   const accentColor = '#f59e0b';
@@ -451,7 +486,7 @@ function ClaimUsernameScreen() {
                     <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
                   </View>
                   <VStack style={{ flex: 1, marginLeft: 12 }}>
-                    <Text size={18} heavy style={{ color: getPrimaryColor('50') }}>
+                    <Text size={18} heavy style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
                       Claim Your Address
                     </Text>
                     <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
@@ -460,7 +495,9 @@ function ClaimUsernameScreen() {
                   </VStack>
                 </HStack>
 
-                <Text size={14} style={{ color: getPrimaryColor('300'), marginBottom: 14 }}>
+                <Text
+                  size={14}
+                  style={{ color: opacity(getPrimaryColor('0'), 0.5), marginBottom: 14 }}>
                   Choose a memorable username for receiving Bitcoin.
                 </Text>
 
@@ -475,81 +512,93 @@ function ClaimUsernameScreen() {
             </ClaimUsernameCardFrame>
           </RNView>
 
-          {!hero.isTransitioning('claimUsername') ? (
-            <Animated.View entering={FadeInUp.duration(220).delay(120)}>
-              <View style={{ paddingHorizontal: 16 }}>
-                <VStack style={{ gap: 8, marginTop: 18 }}>
+          <Animated.View style={contentAnimStyle}>
+            <View style={{ paddingHorizontal: 16 }}>
+              <VStack style={{ gap: 8, marginTop: 18 }}>
+                <Text
+                  size={12}
+                  heavy
+                  style={{
+                    color: opacity(getPrimaryColor('0'), 0.33),
+                    marginLeft: 4,
+                    marginBottom: 4,
+                  }}>
+                  SELECT DOMAIN
+                </Text>
+                {DOMAINS.map((domain) => (
+                  <DomainOption
+                    key={domain.id}
+                    domain={domain}
+                    isSelected={selectedDomain === domain.id}
+                    onSelect={() => setSelectedDomain(domain.id)}
+                    availabilityResult={
+                      username.length >= 1 ? getAvailabilityForDomain(domain.value) : undefined
+                    }
+                  />
+                ))}
+              </VStack>
+
+              {username.length === 0 && (
+                <View style={[styles.guidelinesBox, { backgroundColor: getPrimaryColor('900') }]}>
                   <Text
-                    size={12}
+                    size={13}
                     heavy
-                    style={{ color: getPrimaryColor('500'), marginLeft: 4, marginBottom: 4 }}>
-                    SELECT DOMAIN
+                    style={{ color: opacity(getPrimaryColor('0'), 0.5), marginBottom: 12 }}>
+                    Username Guidelines
                   </Text>
-                  {DOMAINS.map((domain) => (
-                    <DomainOption
-                      key={domain.id}
-                      domain={domain}
-                      isSelected={selectedDomain === domain.id}
-                      onSelect={() => setSelectedDomain(domain.id)}
-                      availabilityResult={
-                        username.length >= 1 ? getAvailabilityForDomain(domain.value) : undefined
-                      }
-                    />
-                  ))}
-                </VStack>
+                  <VStack style={{ gap: 10 }}>
+                    {[
+                      { text: 'At least 3 characters', icon: 'mdi:check' },
+                      { text: 'Lowercase letters, numbers, underscores', icon: 'mdi:check' },
+                      { text: 'No spaces or special characters', icon: 'mdi:check' },
+                    ].map((item, index) => (
+                      <HStack key={index} align="center">
+                        <Icon
+                          name={item.icon}
+                          size={16}
+                          color={opacity(getPrimaryColor('0'), 0.33)}
+                        />
+                        <Text
+                          size={13}
+                          style={{ color: opacity(getPrimaryColor('0'), 0.4), marginLeft: 10 }}>
+                          {item.text}
+                        </Text>
+                      </HStack>
+                    ))}
+                  </VStack>
+                </View>
+              )}
 
-                {username.length === 0 && (
-                  <View style={[styles.guidelinesBox, { backgroundColor: getPrimaryColor('900') }]}>
-                    <Text
-                      size={13}
-                      heavy
-                      style={{ color: getPrimaryColor('300'), marginBottom: 12 }}>
-                      Username Guidelines
-                    </Text>
-                    <VStack style={{ gap: 10 }}>
-                      {[
-                        { text: 'At least 3 characters', icon: 'mdi:check' },
-                        { text: 'Lowercase letters, numbers, underscores', icon: 'mdi:check' },
-                        { text: 'No spaces or special characters', icon: 'mdi:check' },
-                      ].map((item, index) => (
-                        <HStack key={index} align="center">
-                          <Icon name={item.icon} size={16} color={getPrimaryColor('500')} />
-                          <Text size={13} style={{ color: getPrimaryColor('400'), marginLeft: 10 }}>
-                            {item.text}
-                          </Text>
-                        </HStack>
-                      ))}
-                    </VStack>
-                  </View>
-                )}
-
-                {/* Preview - show when valid username */}
-                {username.length >= 3 && selectedDomainAvailable && (
-                  <View
-                    style={[
-                      styles.previewBox,
-                      {
-                        backgroundColor: opacity(getPrimaryColor('500'), 0.08),
-                        borderColor: opacity(getPrimaryColor('500'), 0.2),
-                      },
-                    ]}>
-                    <Text
-                      size={11}
-                      heavy
-                      style={{ color: getPrimaryColor('500'), marginBottom: 8, letterSpacing: 1 }}>
-                      YOUR NEW ADDRESS
-                    </Text>
-                    <Text
-                      size={18}
-                      heavy
-                      style={{ color: getPrimaryColor('50'), fontFamily: 'monospace' }}>
-                      {username}@{selectedDomainLabel}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </Animated.View>
-          ) : null}
+              {/* Preview - show when valid username */}
+              {username.length >= 3 && selectedDomainAvailable && (
+                <View
+                  style={[
+                    styles.previewBox,
+                    {
+                      backgroundColor: opacity(getPrimaryColor('500'), 0.08),
+                      borderColor: opacity(getPrimaryColor('500'), 0.2),
+                    },
+                  ]}>
+                  <Text
+                    size={11}
+                    heavy
+                    style={{
+                      color: opacity(getPrimaryColor('0'), 0.33),
+                      marginBottom: 8,
+                      letterSpacing: 1,
+                    }}>
+                    YOUR NEW ADDRESS
+                  </Text>
+                  <Text
+                    size={18}
+                    heavy
+                    style={{ color: opacity(getPrimaryColor('0'), 0.9), fontFamily: 'monospace' }}>
+                    {username}@{selectedDomainLabel}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Animated.View>
         </VStack>
       </ModalLayoutWrapper>
     </>

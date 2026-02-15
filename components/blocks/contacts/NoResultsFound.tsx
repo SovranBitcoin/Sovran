@@ -2,6 +2,7 @@ import React from 'react';
 import { VStack } from 'components/ui/View/VStack';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import Icon from '@/assets/icons';
 import { SearchTip } from './SearchTip';
 
@@ -10,21 +11,31 @@ export function NoResultsFound() {
   return (
     <VStack spacing={24} align="center" className="mt-3 px-4">
       <VStack justify="center" align="center" className="h-20 w-20 rounded-full bg-primary-800">
-        <Icon name="nonicons:error-16" size={40} color={getPrimaryColor('400')} />
+        <Icon name="nonicons:error-16" size={40} color={opacity(getPrimaryColor('0'), 0.4)} />
       </VStack>
 
       <VStack spacing={12}>
-        <Text className="text-center" color={getPrimaryColor('300')} overpass bold size={20}>
+        <Text
+          className="text-center"
+          color={opacity(getPrimaryColor('0'), 0.5)}
+          overpass
+          bold
+          size={20}>
           No Results Found
         </Text>
 
-        <Text className="text-center" color={getPrimaryColor('400')} overpass regular size={16}>
+        <Text
+          className="text-center"
+          color={opacity(getPrimaryColor('0'), 0.4)}
+          overpass
+          regular
+          size={16}>
           {"We couldn't find any users matching your search"}
         </Text>
       </VStack>
 
       <VStack className="w-full rounded-xl bg-primary-800 p-4">
-        <Text color={getPrimaryColor('200')} overpass bold size={16}>
+        <Text color={opacity(getPrimaryColor('0'), 0.66)} overpass bold size={16}>
           Try adjusting your search:
         </Text>
         <VStack spacing={12} className="mt-2">

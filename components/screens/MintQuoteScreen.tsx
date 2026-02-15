@@ -11,12 +11,14 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
+import opacity from 'hex-color-opacity';
+import { useTheme } from 'providers/ThemeProvider';
 import * as Clipboard from 'expo-clipboard';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { popup } from '@/helper/popup';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useManager } from 'coco-cashu-react';
-import { Section } from 'components/ui/Section';
+import { DetailsSection } from 'components/ui/DetailsSection';
 import { truncateMiddle } from 'helper/strings';
 import { Card } from 'components/ui/Card';
 import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
@@ -41,6 +43,7 @@ export function MintQuoteScreen({
   extraButtons = [],
 }: MintQuoteScreenProps) {
   const manager = useManager();
+  const { getPrimaryColor } = useTheme();
   const [uri, setUri] = useState<string | null>(null);
   const [mintInfo, setMintInfo] = useState<any>(null);
 
@@ -62,7 +65,9 @@ export function MintQuoteScreen({
     return (
       <ModalLayoutWrapper>
         <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-          <Text>{parseError || 'Loading transaction...'}</Text>
+          <Text color={opacity(getPrimaryColor('0'), 0.66)}>
+            {parseError || 'Loading transaction...'}
+          </Text>
         </View>
       </ModalLayoutWrapper>
     );
@@ -137,30 +142,12 @@ export function MintQuoteScreen({
 
         <HistoryEntryTimeline historyEntry={currentTransaction} />
 
-        <Section
-          special={false}
+        {/* Technical details - collapsed by default */}
+        <DetailsSection
           items={[
             {
-              title: 'Request',
+              title: 'Invoice',
               value: truncateMiddle(currentTransaction.paymentRequest, 10),
-            },
-            {
-              title: 'Type',
-              value: 'Lightning • Receive',
-            },
-            {
-              title: 'Status',
-              value: (
-                <HStack align="center">
-                  <Text className="text-primary-0" size={16} overpass bold>
-                    {isPaid ? 'Completed' : 'Pending'}
-                  </Text>
-                </HStack>
-              ),
-            },
-            {
-              title: 'Amount',
-              value: `${currentTransaction.amount} ${currentTransaction.unit.toUpperCase()}`,
             },
           ]}
         />

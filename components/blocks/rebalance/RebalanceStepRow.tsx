@@ -1,11 +1,12 @@
 /**
  * @fileoverview Rebalance Step Row Component
  *
- * Displays a single transfer step in the rebalance plan:
- * - From mint avatar/name → To mint avatar/name
- * - Amount being transferred
- * - Status indicator (pending, running, done, failed)
- * - Retry/Skip actions on failure
+ * Displays a single transfer step in the rebalance plan using the same
+ * visual language as the SwapTransactionScreen expanded view:
+ * - TransferCard (BlurCardFrame wrapper)
+ * - TransferEntryRow for send/receive rows (avatar + badge + colored amount)
+ * - TransferStepChain: horizontal timeline (Invoice → Send → Done)
+ * - TransferErrorBanner for error display (only shown on failure)
  *
  * When a step is part of a middleman chain, shows the full route path
  * (A → B → C → …) with the active hop highlighted.
@@ -13,6 +14,7 @@
 
 import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
+import opacity from 'hex-color-opacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
@@ -20,8 +22,13 @@ import { HStack } from 'components/ui/View/HStack';
 import { VStack } from 'components/ui/View/VStack';
 import { Avatar } from 'components/ui/Avatar';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { Spinner } from 'components/ui/Spinner';
+import {
+  TransferCard,
+  TransferEntryRow,
+  TransferStepChain,
+  TransferErrorBanner,
+} from 'components/ui/TransferLegCard';
 import Icon from 'assets/icons';
 
 export type StepStatus =
@@ -123,71 +130,25 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   onRouteThrough,
   onRetry,
   onSkip,
-  stepNumber,
-  isCurrent,
+  // stepNumber, isCurrent — kept in interface for API compat but no longer used
   chainInfo,
   routingDetail,
   routingChainPath,
   routingChainPathNames,
   routingHopIndex,
 }) => {
-  const { getPrimaryColor, getGreenColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primaryColor300 = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
-  const primaryColor400 = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
+  const primaryColor300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
+  const primaryColor400 = useMemo(() => opacity(getPrimaryColor('0'), 0.4), [getPrimaryColor]);
   const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
-  const primaryColor800 = useMemo(() => getPrimaryColor('800'), [getPrimaryColor]);
-  const greenColor = useMemo(() => getGreenColor('400'), [getGreenColor]);
-  const redColor = '#ef4444'; // red-500
 
   const fromName = fromMintInfo?.name || extractDomain(fromMintUrl);
   const toName = toMintInfo?.name || extractDomain(toMintUrl);
 
-  const isRunning =
-    status === 'creatingInvoice' ||
-    status === 'invoiceReady' ||
-    status === 'melting' ||
-    status === 'verifying' ||
-    status === 'routing';
   const isDone = status === 'done';
   const isFailed = status === 'failed';
-  const isSkipped = status === 'skipped';
   const isRouting = status === 'routing';
-
-  const statusColor = isDone
-    ? greenColor
-    : isFailed
-      ? redColor
-      : isSkipped
-        ? primaryColor400
-        : isRouting
-          ? '#c084fc' // purple for routing
-          : primaryColor300;
-
-  const getStatusText = () => {
-    switch (status) {
-      case 'pending':
-        return 'Pending';
-      case 'creatingInvoice':
-        return 'Creating invoice...';
-      case 'invoiceReady':
-        return 'Invoice ready';
-      case 'melting':
-        return 'Sending...';
-      case 'verifying':
-        return 'Verifying...';
-      case 'routing':
-        return routingDetail || 'Routing via middleman...';
-      case 'done':
-        return 'Complete';
-      case 'failed':
-        return 'Failed';
-      case 'skipped':
-        return 'Skipped — already transferred';
-      default:
-        return '';
-    }
-  };
 
   // Build the "via X" subtitle for the retry button
   const routeViaLabel = useMemo(() => {
@@ -200,37 +161,11 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   const totalHops = chainInfo ? chainInfo.chainPath.length - 1 : 0;
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: primaryColor800, borderColor: primaryColor700 },
-        isCurrent && { borderColor: primaryColor0 },
-        isDone && { opacity: 0.85 },
-      ]}>
-      {/* Step number badge - shows checkmark when done */}
-      <View
-        style={[
-          styles.stepBadge,
-          { backgroundColor: isDone ? greenColor : isFailed ? redColor : primaryColor700 },
-        ]}>
-        {isDone ? (
-          <Icon name="mdi:check" size={14} color={primaryColor800} />
-        ) : isRunning ? (
-          <Spinner size={12} style={{ opacity: 0.8 }} />
-        ) : isFailed ? (
-          <Icon name="mdi:alert-circle" size={14} color={primaryColor0} />
-        ) : (
-          <Text bold overpass size={12} style={{ color: primaryColor0 }}>
-            {stepNumber}
-          </Text>
-        )}
-      </View>
-
-      {/* Main content */}
-      <VStack gap={12} style={styles.content}>
+    <View style={[styles.outerContainer, isDone && { opacity: 0.85 }]}>
+      <TransferCard>
+        {/* Middleman chain route: A → B → C → … */}
         {chainInfo ? (
-          /* ── Chain route: A → B → C → … ── */
-          <VStack gap={6}>
+          <VStack gap={6} style={styles.chainSection}>
             <Text size={11} bold overpass style={{ color: primaryColor400 }}>
               Middleman route
             </Text>
@@ -238,10 +173,8 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
               {chainInfo.chainPath.map((url, idx) => {
                 const info = chainInfo.pathMintInfos[idx];
                 const name = mintDisplayName(info, url);
-                // The active hop connects idx === chainHopIndex to idx === chainHopIndex + 1
                 const isActiveNode =
                   idx === chainInfo.chainHopIndex || idx === chainInfo.chainHopIndex + 1;
-                // Intermediary mints (not first or last) are shown bold
                 const isIntermediary = idx > 0 && idx < chainInfo.chainPath.length - 1;
 
                 return (
@@ -282,50 +215,15 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                 );
               })}
             </HStack>
-            {/* Current leg indicator */}
             <Text size={10} style={{ color: primaryColor400 }}>
               Leg {chainInfo.chainHopIndex + 1} of {totalHops} — {fromName} → {toName}
             </Text>
           </VStack>
-        ) : (
-          /* ── Standard route: A → B ── */
-          <HStack align="center" gap={8}>
-            {/* From mint */}
-            <HStack align="center" gap={8} style={styles.mintSection}>
-              <Avatar
-                picture={fromMintInfo?.icon_url}
-                size={32}
-                variant="mint"
-                name={fromName}
-                alt={`${fromName} icon`}
-              />
-              <Text size={13} numberOfLines={1} style={[styles.mintName, { color: primaryColor0 }]}>
-                {fromName}
-              </Text>
-            </HStack>
-
-            {/* Arrow */}
-            <Icon name="mdi:arrow-right" size={20} color={primaryColor400} />
-
-            {/* To mint */}
-            <HStack align="center" gap={8} style={styles.mintSection}>
-              <Avatar
-                picture={toMintInfo?.icon_url}
-                size={32}
-                variant="mint"
-                name={toName}
-                alt={`${toName} icon`}
-              />
-              <Text size={13} numberOfLines={1} style={[styles.mintName, { color: primaryColor0 }]}>
-                {toName}
-              </Text>
-            </HStack>
-          </HStack>
-        )}
+        ) : null}
 
         {/* Auto-routing chain path (shown during or after routing) */}
         {isRouting && routingChainPath && routingChainPath.length >= 3 && (
-          <VStack gap={4} style={{ marginTop: 2 }}>
+          <VStack gap={4} style={styles.routingSection}>
             <HStack align="center" gap={4} style={{ flexWrap: 'wrap', rowGap: 4 }}>
               {routingChainPath.map((url, idx) => {
                 const name = routingChainPathNames?.[idx] || extractDomain(url);
@@ -382,36 +280,35 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
           </VStack>
         )}
 
-        {/* Amount and status row */}
-        <HStack align="center" justify="space-between">
-          <AmountFormatter
-            amount={amount}
-            unit={unit}
-            size={16}
-            weight="heavy"
-            color={primaryColor0}
-          />
+        {/* Send row (from source mint) */}
+        <TransferEntryRow
+          type="send"
+          mintIconUrl={fromMintInfo?.icon_url}
+          mintName={fromName}
+          amount={amount}
+          unit={unit}
+        />
 
-          <HStack align="center" gap={6}>
-            {isRunning && <Spinner size={16} />}
-            {isDone && <Icon name="mdi:check-circle" size={18} color={greenColor} />}
-            {isFailed && <Icon name="mdi:alert-circle" size={18} color={redColor} />}
-            {isSkipped && <Icon name="mdi:skip-next-circle" size={18} color={primaryColor400} />}
-            <Text size={12} bold={isDone} style={{ color: statusColor }}>
-              {getStatusText()}
-            </Text>
-          </HStack>
-        </HStack>
+        {/* Step chain: ● Invoice ── ● Send ── ● Done */}
+        <TransferStepChain status={status} routingDetail={routingDetail} />
 
-        {/* Error message and actions */}
+        {/* Receive row (to destination mint) */}
+        <TransferEntryRow
+          type="receive"
+          mintIconUrl={toMintInfo?.icon_url}
+          mintName={toName}
+          amount={amount}
+          unit={unit}
+        />
+
+        {/* Error banner and actions */}
         {isFailed && errorMessage && (
-          <VStack gap={8}>
-            <Text size={12} style={{ color: redColor }}>
-              {errorMessage}
-            </Text>
+          <VStack gap={8} style={styles.errorSection}>
+            <TransferErrorBanner message={errorMessage} />
+
             {String(errorMessage).includes('no_route') &&
               routeSuggestion?.status === 'searching' && (
-                <HStack align="center" gap={8}>
+                <HStack align="center" gap={8} style={styles.errorActionRow}>
                   <Spinner size={14} />
                   <Text size={12} style={{ color: primaryColor300 }}>
                     Finding a middleman…
@@ -419,11 +316,11 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                 </HStack>
               )}
             {String(errorMessage).includes('no_route') && routeSuggestion?.status === 'none' && (
-              <Text size={12} style={{ color: primaryColor300 }}>
+              <Text size={12} style={{ color: primaryColor300, paddingHorizontal: 16 }}>
                 No middleman routes available right now.
               </Text>
             )}
-            <HStack gap={8}>
+            <HStack gap={8} style={styles.errorActionRow}>
               {routeSuggestion?.status === 'found' && routeSuggestion?.path && onRouteThrough ? (
                 <TouchableOpacity
                   onPress={onRouteThrough}
@@ -472,45 +369,38 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
             </HStack>
           </VStack>
         )}
-      </VStack>
+      </TransferCard>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    borderRadius: 16,
-    padding: 16,
+  outerContainer: {
     marginHorizontal: 16,
     marginVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    borderWidth: StyleSheet.hairlineWidth,
   },
-  stepBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    marginTop: 4,
+  chainSection: {
+    paddingTop: 16,
+    paddingHorizontal: 16,
   },
-  content: {
-    flex: 1,
-  },
-  mintSection: {
-    flex: 1,
-    minWidth: 0,
-  },
-  mintName: {
-    flex: 1,
+  routingSection: {
+    paddingTop: 8,
+    paddingHorizontal: 16,
   },
   chainMintSection: {
     minWidth: 0,
   },
   chainDimmed: {
     opacity: 0.4,
+  },
+  mintName: {
+    flex: 1,
+  },
+  errorSection: {
+    paddingBottom: 12,
+  },
+  errorActionRow: {
+    paddingHorizontal: 16,
   },
   actionButton: {
     paddingHorizontal: 12,

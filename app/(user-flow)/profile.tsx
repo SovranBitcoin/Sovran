@@ -51,6 +51,8 @@ import {
 } from 'hooks/useNostrProfile';
 import { formatDate } from '@/helper/time';
 import { LinearGradient } from 'expo-linear-gradient';
+import opacity from 'hex-color-opacity';
+import { UserFeed } from 'components/blocks/UserFeed';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 150;
@@ -232,7 +234,7 @@ function ProfileStatsGridComponent({
               bold
               overpass
               size={12}
-              style={{ color: getPrimaryColor('200'), marginBottom: 4 }}>
+              style={{ color: opacity(getPrimaryColor('0'), 0.66), marginBottom: 4 }}>
               {stat.label.toUpperCase()}
             </Text>
             <Text
@@ -242,7 +244,11 @@ function ProfileStatsGridComponent({
               style={{ color: getPrimaryColor('0'), marginBottom: 2 }}>
               {stat.value}
             </Text>
-            <Text bold overpass size={12} style={{ color: getPrimaryColor('300'), opacity: 0.8 }}>
+            <Text
+              bold
+              overpass
+              size={12}
+              style={{ color: opacity(getPrimaryColor('0'), 0.5), opacity: 0.8 }}>
               {stat.description}
             </Text>
           </Animated.View>
@@ -331,7 +337,7 @@ function TopFollowersComponent({
         bold
         numberOfLines={1}
         style={{
-          color: getPrimaryColor('200'),
+          color: opacity(getPrimaryColor('0'), 0.66),
           marginTop: 6,
           textAlign: 'center',
           width: itemWidth - 8,
@@ -367,7 +373,7 @@ function TopFollowersComponent({
         bold
         overpass
         size={12}
-        style={{ color: getPrimaryColor('400'), marginBottom: 12, marginLeft: 4 }}>
+        style={{ color: opacity(getPrimaryColor('0'), 0.4), marginBottom: 12, marginLeft: 4 }}>
         TOP FOLLOWERS
       </Text>
       {isLoading ? (
@@ -514,8 +520,12 @@ function BannerWithAvatarComponent({
             </Text>
             {nip05 && (
               <HStack align="center" gap={4}>
-                <Icon name="mdi:check-decagram" size={16} color={getPrimaryColor('400')} />
-                <Text size={14} style={{ color: getPrimaryColor('400') }}>
+                <Icon
+                  name="mdi:check-decagram"
+                  size={16}
+                  color={opacity(getPrimaryColor('0'), 0.4)}
+                />
+                <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
                   {nip05}
                 </Text>
               </HStack>
@@ -716,8 +726,12 @@ function UserProfileScreen() {
               isFirst
               label={
                 <HStack align="center" gap={8}>
-                  <Icon name="mdi:message-text" size={20} color={getPrimaryColor('400')} />
-                  <Text style={{ color: getPrimaryColor('50') }} bold>
+                  <Icon
+                    name="mdi:message-text"
+                    size={20}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
+                  <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                     Message User
                   </Text>
                 </HStack>
@@ -740,11 +754,17 @@ function UserProfileScreen() {
             <RowButton
               isFirst
               onPress={() => handleCopy(npub, 'npub_copied')}
-              rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
+              rightIcon={
+                <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+              }
               label={
                 <HStack align="center" gap={8}>
-                  <CurrencyIcon colors={[getPrimaryColor('400')]} width={20} currency="nostr" />
-                  <Text style={{ color: getPrimaryColor('50') }} bold>
+                  <CurrencyIcon
+                    colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                    width={20}
+                    currency="nostr"
+                  />
+                  <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                     {truncateMiddle(npub, 10)}
                   </Text>
                 </HStack>
@@ -753,11 +773,21 @@ function UserProfileScreen() {
             {userInfo?.nip05 && (
               <RowButton
                 onPress={() => handleCopy(userInfo.nip05, 'nip05_copied')}
-                rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
+                rightIcon={
+                  <Icon
+                    name="lets-icons:copy"
+                    size={20}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
+                }
                 label={
                   <HStack align="center" gap={8}>
-                    <Icon name="mdi:check-decagram" size={20} color={getPrimaryColor('400')} />
-                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                    <Icon
+                      name="mdi:check-decagram"
+                      size={20}
+                      color={opacity(getPrimaryColor('0'), 0.4)}
+                    />
+                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                       {userInfo.nip05}
                     </Text>
                   </HStack>
@@ -767,11 +797,21 @@ function UserProfileScreen() {
             {userInfo?.lud16 && (
               <RowButton
                 onPress={() => handleCopy(userInfo.lud16, 'lud16_copied')}
-                rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
+                rightIcon={
+                  <Icon
+                    name="lets-icons:copy"
+                    size={20}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
+                }
                 label={
                   <HStack align="center" gap={8}>
-                    <Icon name="mdi:lightning-bolt" size={20} color={getPrimaryColor('400')} />
-                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                    <Icon
+                      name="mdi:lightning-bolt"
+                      size={20}
+                      color={opacity(getPrimaryColor('0'), 0.4)}
+                    />
+                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                       {userInfo.lud16}
                     </Text>
                   </HStack>
@@ -782,11 +822,17 @@ function UserProfileScreen() {
               <RowButton
                 isLast
                 onPress={() => handleOpenLink(userInfo.website)}
-                rightIcon={<Icon name="mdi:open-in-new" size={20} color={getPrimaryColor('400')} />}
+                rightIcon={
+                  <Icon
+                    name="mdi:open-in-new"
+                    size={20}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
+                }
                 label={
                   <HStack align="center" gap={8}>
-                    <Icon name="mdi:web" size={20} color={getPrimaryColor('400')} />
-                    <Text style={{ color: getPrimaryColor('50') }} bold>
+                    <Icon name="mdi:web" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                       {userInfo.website}
                     </Text>
                   </HStack>
@@ -795,6 +841,13 @@ function UserProfileScreen() {
             )}
           </Section>
         </View>
+
+        <Spacer size={8} />
+
+        {/* User Feed */}
+        {pubkey ? (
+          <UserFeed pubkey={pubkey} authorName={displayName} authorPicture={userInfo?.picture} />
+        ) : null}
       </ScrollView>
 
       <BottomButtons>

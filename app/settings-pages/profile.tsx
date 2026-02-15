@@ -13,6 +13,7 @@ import { Text } from 'components/ui/Text';
 import { Skeleton } from 'components/ui/Skeleton';
 import { Avatar } from 'components/ui/Avatar';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import opacity from 'hex-color-opacity';
 
 const Profile = () => {
   const { getPrimaryColor } = useTheme();
@@ -65,7 +66,7 @@ const Profile = () => {
           overpass
           size={14}
           style={{
-            color: getPrimaryColor('400'),
+            color: opacity(getPrimaryColor('0'), 0.4),
           }}>
           {label}
         </Text>
@@ -103,7 +104,7 @@ const Profile = () => {
                   <Icon
                     name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
                     size={16}
-                    color={getPrimaryColor('400')}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
                   />
                 </View>
               </TouchableOpacity>
@@ -118,7 +119,11 @@ const Profile = () => {
                     padding: 8,
                     marginLeft: 4,
                   }}>
-                  <Icon name="lets-icons:copy" size={16} color={getPrimaryColor('400')} />
+                  <Icon
+                    name="lets-icons:copy"
+                    size={16}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
                 </View>
               </TouchableOpacity>
             )}
@@ -130,7 +135,7 @@ const Profile = () => {
             overpass
             size={12}
             style={{
-              color: getPrimaryColor('200'),
+              color: opacity(getPrimaryColor('0'), 0.66),
               marginTop: 4,
             }}>
             {description}
@@ -150,7 +155,7 @@ const Profile = () => {
             size={13}
             className="uppercase tracking-wide"
             style={{
-              color: getPrimaryColor('300'),
+              color: opacity(getPrimaryColor('0'), 0.5),
               marginBottom: 8,
               marginLeft: 8,
             }}>

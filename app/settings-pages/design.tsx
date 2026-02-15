@@ -17,6 +17,7 @@ import { THEMES, useTheme } from 'providers/ThemeProvider';
 import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { ScrollView } from 'react-native';
+import opacity from 'hex-color-opacity';
 
 function chunkArray(array: any[], size: number) {
   const result = [];
@@ -172,14 +173,20 @@ export default function ModalScreen() {
           <RowButton
             label={
               <HStack align="center" spacing={8}>
-                <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('400')} />
-                <Text className="text-primary-50" bold>
+                <Icon
+                  name="mingcute:lightning-fill"
+                  size={20}
+                  color={opacity(getPrimaryColor('0'), 0.4)}
+                />
+                <Text bold style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
                   npub1example@npubx.cash
                 </Text>
               </HStack>
             }
             onPress={() => {}}
-            rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
+            rightIcon={
+              <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+            }
           />
         </Section>
 

@@ -16,6 +16,7 @@ import * as Clipboard from 'expo-clipboard';
 import { popup } from '@/helper/popup';
 import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
+import opacity from 'hex-color-opacity';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { Tabs } from 'components/ui/Tabs';
 
@@ -152,19 +153,21 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
         <RowButton
           isFirst
           onPress={handleCopy}
-          rightIcon={<Icon name="lets-icons:copy" size={20} color={getPrimaryColor('400')} />}
+          rightIcon={
+            <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+          }
           label={
             <HStack align="center" gap={8}>
               {config.iconCurrency ? (
                 <CurrencyIcon
-                  colors={[getPrimaryColor('400')]}
+                  colors={[opacity(getPrimaryColor('0'), 0.4)]}
                   width={20}
                   currency={config.iconCurrency}
                 />
               ) : config.iconName ? (
-                <Icon name={config.iconName} size={20} color={getPrimaryColor('400')} />
+                <Icon name={config.iconName} size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
               ) : null}
-              <Text className="text-primary-50" bold>
+              <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
                 {truncateMiddle(activeData, 10)}
               </Text>
             </HStack>

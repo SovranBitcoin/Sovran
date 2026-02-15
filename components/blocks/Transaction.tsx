@@ -3,6 +3,7 @@ import { formatAmount } from 'helper/currency';
 import { convertTime } from 'helper/time';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import TransactionIcon from 'components/blocks/TransactionIcon';
 import { nip19 } from 'nostr-tools';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
@@ -177,7 +178,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
 
           <HStack justify="space-between" align="center">
             <HStack align="center" spacing={4}>
-              <UntranslatedText regular size={10} color={getPrimaryColor('100')}>
+              <UntranslatedText regular size={10} color={opacity(getPrimaryColor('0'), 0.8)}>
                 {historyEntry?.createdAt
                   ? convertTime(new Date(historyEntry.createdAt))
                   : 'Unconfirmed'}
@@ -194,14 +195,14 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
                           : 'stash:qr-code'
                   }
                   size={10}
-                  color={getPrimaryColor('100')}
+                  color={opacity(getPrimaryColor('0'), 0.8)}
                 />
               )}
             </HStack>
             <UntranslatedText
               bold
               size={10}
-              color={getPrimaryColor('100')}
+              color={opacity(getPrimaryColor('0'), 0.8)}
               style={{
                 alignSelf: 'flex-end',
                 textAlign: 'right',

@@ -29,6 +29,7 @@ import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { Avatar } from 'components/ui/Avatar';
+import opacity from 'hex-color-opacity';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useRoutstrStore, RoutstrSession } from 'stores/routstrStore';
@@ -125,9 +126,11 @@ const SessionItem: React.FC<{
               numberOfLines={1}>
               {session.title}
             </Text>
-            {isCurrent && <Icon name="mdi:check-circle" size={20} color={getPrimaryColor('400')} />}
+            {isCurrent && (
+              <Icon name="mdi:check-circle" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+            )}
           </HStack>
-          <Text size={12} style={{ color: getPrimaryColor('300') }} numberOfLines={2}>
+          <Text size={12} style={{ color: opacity(getPrimaryColor('0'), 0.5) }} numberOfLines={2}>
             {session.messages.length > 0
               ? `${session.messages.length} message${session.messages.length !== 1 ? 's' : ''}`
               : 'No messages yet'}
@@ -404,7 +407,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                             <Icon
                               name="fa6-solid:chevron-right"
                               size={14}
-                              color={getPrimaryColor('400')}
+                              color={opacity(getPrimaryColor('0'), 0.4)}
                             />
                           </HStack>
                         </TouchableOpacity>
@@ -425,7 +428,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                             <Icon
                               name="fa6-solid:chevron-right"
                               size={14}
-                              color={getPrimaryColor('400')}
+                              color={opacity(getPrimaryColor('0'), 0.4)}
                             />
                           </HStack>
                         </TouchableOpacity>
@@ -446,7 +449,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                             <Icon
                               name="fa6-solid:chevron-right"
                               size={14}
-                              color={getPrimaryColor('400')}
+                              color={opacity(getPrimaryColor('0'), 0.4)}
                             />
                           </HStack>
                         </TouchableOpacity>
@@ -469,7 +472,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                             <Icon
                               name="fa6-solid:chevron-right"
                               size={14}
-                              color={getPrimaryColor('400')}
+                              color={opacity(getPrimaryColor('0'), 0.4)}
                             />
                           </HStack>
                         </TouchableOpacity>
@@ -481,7 +484,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                           medium
                           overpass
                           style={{
-                            color: getPrimaryColor('300'),
+                            color: opacity(getPrimaryColor('0'), 0.5),
                             marginBottom: 8,
                             marginLeft: 4,
                             textTransform: 'uppercase',
@@ -495,7 +498,11 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                   ListEmptyComponent={
                     searchQuery ? (
                       <VStack align="center" justify="center" style={{ paddingTop: 32 }}>
-                        <Text style={{ color: getPrimaryColor('400'), textAlign: 'center' }}>
+                        <Text
+                          style={{
+                            color: opacity(getPrimaryColor('0'), 0.4),
+                            textAlign: 'center',
+                          }}>
                           No sessions found
                         </Text>
                       </VStack>

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
+
+const profileStorage = createProfileScopedStorage();
 
 /** Maximum number of recent searches to store */
 const MAX_RECENT_SEARCHES = 10;
@@ -123,7 +125,7 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
 
       clearAllData: async () => {
         try {
-          await AsyncStorage.removeItem('search-history-store');
+          await profileStorage.removeItem('search-history-store');
           set({ recentSearches: {} });
         } catch (error) {
           console.error('SearchHistoryStore: Failed to clear data:', error);
@@ -132,7 +134,7 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
     }),
     {
       name: 'search-history-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => createProfileScopedStorage()),
       partialize: (state) => ({ recentSearches: state.recentSearches }),
     }
   )

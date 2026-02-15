@@ -4,6 +4,7 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { UserProfile } from 'helper/apiClient';
 import { ProfileImage } from './ProfileImage';
 interface SearchResultProps {
@@ -16,7 +17,7 @@ interface SearchResultProps {
 }
 
 export function SearchResult({ result, onPress, loading }: SearchResultProps) {
-  const { getGreenColor, getRedColor } = useTheme();
+  const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
   const title =
     result.profile?.displayName ||
     result.profile?.name ||
@@ -29,7 +30,12 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
       <HStack spacing={8} align="center">
         <ProfileImage loading={loading} profile={result.profile} />
         <VStack spacing={4} className="flex-1">
-          <Text loading={loading} overpass bold size={16} className="text-primary-50">
+          <Text
+            loading={loading}
+            overpass
+            bold
+            size={16}
+            color={opacity(getPrimaryColor('0'), 0.9)}>
             {title}
           </Text>
           {result.profile?.nip05 && (

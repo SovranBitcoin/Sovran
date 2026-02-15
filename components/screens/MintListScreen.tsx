@@ -17,6 +17,7 @@ import { VStack } from 'components/ui/View/VStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { MintItem } from 'components/blocks/sheets/mint-balance/routes/list';
@@ -335,7 +336,7 @@ export function MintListScreen({
       {/* Mints list section */}
       <View className="pt-3">
         {filteredMints.length === 0 ? (
-          <Text style={{ color: primaryColor0, textAlign: 'center', marginTop: 20 }}>
+          <Text style={{ color: opacity(primaryColor0, 0.66), textAlign: 'center', marginTop: 20 }}>
             {selectedCurrency === 'ALL'
               ? 'No mints available'
               : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
