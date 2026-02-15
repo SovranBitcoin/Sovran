@@ -285,9 +285,11 @@ const ModalScreen = () => {
           </View>
         </Section>
 
-        <Section title="Recovery">
-          <RowButton label="Recover Wallet" href="/settings-pages/recovery" isFirst isLast />
-        </Section>
+        {devMode ? (
+          <Section title="Recovery">
+            <RowButton label="Recover Wallet" href="/settings-pages/recovery" isFirst isLast />
+          </Section>
+        ) : null}
 
         {devMode ? (
           <Section title="Developer">
