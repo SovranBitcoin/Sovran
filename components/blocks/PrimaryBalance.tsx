@@ -23,6 +23,7 @@ import {
 } from '@expo/ui/swift-ui';
 import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { supportsLiquidGlass } from '@/helper/version';
+import { useRouter } from 'expo-router';
 
 interface Account {
   unit: CurrencyUnit;
@@ -46,7 +47,11 @@ const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }
 // Pending outgoing ecash pill – shows total unclaimed send tokens
 // ---------------------------------------------------------------------------
 
-function PendingEcashPill(): React.ReactElement | null {
+interface PendingEcashPillProps {
+  onPress?: () => void;
+}
+
+function PendingEcashPill({ onPress }: PendingEcashPillProps): React.ReactElement | null {
   const { getPrimaryColor } = useTheme();
 
   const { totalAmount, unit } = useAppPendingAmount();
@@ -66,6 +71,7 @@ function PendingEcashPill(): React.ReactElement | null {
     return (
       <Host matchContents>
         <SwiftUIButton
+          onPress={onPress}
           modifiers={[
             frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
             glassEffect({
@@ -101,27 +107,29 @@ function PendingEcashPill(): React.ReactElement | null {
 
   // Fallback (iOS <26 / Android) – current design with increased opacity.
   return (
-    <HStack
-      align="center"
-      justify="center"
-      gap={6}
-      className="overflow-hidden rounded-full"
-      style={{
-        backgroundColor: opacity(getPrimaryColor('500'), 0.3),
-        borderWidth: 1,
-        borderColor: opacity(getPrimaryColor('400'), 0.3),
-        paddingHorizontal: 12,
-        paddingVertical: 5,
-      }}>
-      <Icon name="majesticons:coins" size={14} color={opacity(getPrimaryColor('0'), 0.66)} />
-      <UntranslatedText
-        bold
-        size={11}
-        color={opacity(getPrimaryColor('0'), 0.66)}
-        style={{ letterSpacing: 0.5 }}>
-        {text}
-      </UntranslatedText>
-    </HStack>
+    <TouchableOpacity onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
+      <HStack
+        align="center"
+        justify="center"
+        gap={6}
+        className="overflow-hidden rounded-full"
+        style={{
+          backgroundColor: opacity(getPrimaryColor('500'), 0.3),
+          borderWidth: 1,
+          borderColor: opacity(getPrimaryColor('400'), 0.3),
+          paddingHorizontal: 12,
+          paddingVertical: 5,
+        }}>
+        <Icon name="majesticons:coins" size={14} color={opacity(getPrimaryColor('0'), 0.66)} />
+        <UntranslatedText
+          bold
+          size={11}
+          color={opacity(getPrimaryColor('0'), 0.66)}
+          style={{ letterSpacing: 0.5 }}>
+          {text}
+        </UntranslatedText>
+      </HStack>
+    </TouchableOpacity>
   );
 }
 
@@ -129,6 +137,7 @@ function PendingEcashPill(): React.ReactElement | null {
  * Component that displays the primary balance with unit toggling capability
  */
 export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactElement {
+  const router = useRouter();
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
   const setDisplayBtc = useSettingsStore((state) => state.setDisplayBtc);
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
@@ -144,6 +153,19 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
 
   const displayText = `≈ ${currencyConfig.symbol}${fiatValue}`;
+  const handlePendingPress = useCallback(() => {
+    router.push({
+      pathname: '/transactions',
+      params: {
+        account: JSON.stringify(account),
+        filterCurrency: account.unit,
+        filterPaymentType: 'all',
+        filterDirection: 'all',
+        filterStatus: 'Pending',
+        filterMintUrl: 'all',
+      },
+    });
+  }, [router, account]);
 
   return (
     <VStack align="center" gap={8} className="z-9">
@@ -151,7 +173,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
       <TouchableOpacity onPress={toggleUnit} className="flex-col items-center">
         <AmountFormatter weight="heavy" amount={balance} unit={account.unit} />
       </TouchableOpacity>
-      <PendingEcashPill />
+      <PendingEcashPill onPress={handlePendingPress} />
     </VStack>
   );
 }

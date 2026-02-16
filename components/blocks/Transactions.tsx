@@ -104,7 +104,6 @@ export const Transactions = React.memo(
     // Theme colors for the card frame (matching payments style)
     const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
     const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
-
     const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
 
