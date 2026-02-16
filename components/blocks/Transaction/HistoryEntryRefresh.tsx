@@ -7,6 +7,8 @@ import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { Avatar } from 'components/ui/Avatar';
+import Icon from 'assets/icons';
+import { Button } from 'components/ui/Button';
 import { HistoryEntry } from 'coco-cashu-core';
 import { GetInfoResponse } from '@cashu/cashu-ts';
 
@@ -14,10 +16,12 @@ interface HistoryEntryRefreshProps {
   mintInfo: GetInfoResponse;
   historyEntry: Partial<HistoryEntry> & { type: HistoryEntry['type'] };
   handleCheckStatus?: (onClose: () => void) => Promise<void>;
+  onPress?: () => void;
 }
 
-export function HistoryEntryRefresh({ mintInfo, historyEntry }: HistoryEntryRefreshProps) {
+export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: HistoryEntryRefreshProps) {
   const { getPrimaryColor } = useTheme();
+
   return (
     <HStack
       align="center"
@@ -58,6 +62,16 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry }: HistoryEntryRefr
           </Text>
         </VStack>
       </HStack>
+      {onPress && (
+        <Button
+          onPress={onPress}
+          variant="secondary"
+          icon={
+            <Icon name="lucide:pencil-line" size={16} color={opacity(getPrimaryColor('0'), 0.6)} />
+          }
+          style={{ width: 36, height: 36, margin: 0, marginBottom: 0 }}
+        />
+      )}
     </HStack>
   );
 }

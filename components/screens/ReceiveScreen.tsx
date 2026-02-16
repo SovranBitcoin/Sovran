@@ -5,7 +5,8 @@
  * It is used by both standalone and flow-based route wrappers.
  */
 
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { useCameraPermissions } from 'expo-camera';
@@ -31,6 +32,8 @@ import { useSettingsStore } from 'stores/settingsStore';
 import { useManager } from 'coco-cashu-react';
 import { ModalScreenLayout } from 'components/layouts/ModalScreenLayout';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import { useMintStore } from 'stores/mintStore';
+import { useNpcMintStore } from 'stores/npcMintStore';
 
 interface ReceiveScreenProps {
   unit: string;
@@ -55,23 +58,48 @@ export function ReceiveScreen({
   const [selectedTab, setSelectedTab] = useState('Lightning');
   const [latestKeypair, setLatestKeypair] = useState<Keypair | null>(null);
 
+  // NPC mint store — persisted offline-first source of truth
+  const npcMintUrl = useNpcMintStore((s) =>
+    nostrKeys?.pubkey ? s.getMintUrl(nostrKeys.pubkey) : undefined
+  );
+  const isUpdatingMint = useNpcMintStore((s) => s.isUpdating);
+  const syncFromServer = useNpcMintStore((s) => s.syncFromServer);
+  const updateServerMint = useNpcMintStore((s) => s.updateServerMint);
+
+  // Track whether user opened the mint selector (to avoid auto-syncing on mount)
+  const hasOpenedMintSelector = useRef(false);
+  const previousSelectedMintRef = useRef<string | undefined>(undefined);
+
+  // Watch selected mint from store for detecting changes after mint selector
+  const selectedMint = useMintStore((state) =>
+    nostrKeys?.pubkey ? state.selectedMints[nostrKeys.pubkey] : undefined
+  );
+
   // Check if P2PK quick access is enabled
   const quickAccessP2PK = useSettingsStore((state) => state.quickAccessP2PK);
 
   // Build tabs array based on settings
   const tabs = quickAccessP2PK ? ['Lightning', 'P2PK'] : ['Lightning'];
 
+  // Sync NPC mint URL from server on mount (cached value renders instantly)
   useEffect(() => {
-    const loadMintInfo = async () => {
-      try {
-        const info = await getMintInfo('https://mint.minibits.cash/Bitcoin');
-        setMintInfo(info);
-      } catch (error) {
-        console.error('Failed to load mint info:', error);
-      }
+    if (!nostrKeys?.pubkey || !manager) return;
+    syncFromServer(nostrKeys.pubkey, manager);
+  }, [manager, nostrKeys?.pubkey, syncFromServer]);
+
+  // Load cashu mint info whenever the NPC mint URL changes
+  useEffect(() => {
+    if (!npcMintUrl) return;
+    let cancelled = false;
+    getMintInfo(npcMintUrl)
+      .then((info) => {
+        if (!cancelled) setMintInfo(info);
+      })
+      .catch((err) => console.error('ReceiveScreen: Failed to load mint info:', err));
+    return () => {
+      cancelled = true;
     };
-    loadMintInfo();
-  }, [getMintInfo]);
+  }, [npcMintUrl, getMintInfo]);
 
   // Load latest keypair when P2PK tab is available
   useEffect(() => {
@@ -157,6 +185,39 @@ export function ReceiveScreen({
     popup({ message: 'lightning_address_copied', type: 'success' });
   }, [nostrKeys?.npub]);
 
+  // Watch for mint selection changes after returning from the mint selector
+  useEffect(() => {
+    if (!hasOpenedMintSelector.current) return;
+    if (!selectedMint || selectedMint === npcMintUrl) return;
+    if (selectedMint === previousSelectedMintRef.current) return;
+    if (!nostrKeys?.pubkey || !nostrKeys?.privateKey) return;
+
+    previousSelectedMintRef.current = selectedMint;
+    hasOpenedMintSelector.current = false;
+
+    updateServerMint(nostrKeys.pubkey, selectedMint, nostrKeys.privateKey).then((ok) => {
+      if (ok) {
+        popup({ message: 'Receive mint updated', type: 'success' });
+      } else {
+        popup({ message: 'Failed to update receive mint', emoji: '🚨', type: 'error' });
+      }
+    });
+  }, [selectedMint, npcMintUrl, nostrKeys?.pubkey, nostrKeys?.privateKey, updateServerMint]);
+
+  // Open the mint selector modal so the user can pick a different receive mint
+  const handleOpenMintSelector = useCallback(() => {
+    hasOpenedMintSelector.current = true;
+    previousSelectedMintRef.current = selectedMint;
+    router.push({
+      pathname: '/list',
+      params: {
+        onSelectAction: 'goBack',
+        showAddMintsButton: 'true',
+        showDetailsButton: 'true',
+      },
+    });
+  }, [selectedMint]);
+
   const showLightningAddress = Boolean(nostrKeys?.npub && unit === 'sat');
 
   const handleCopyP2PKKey = useCallback(async () => {
@@ -207,8 +268,9 @@ export function ReceiveScreen({
           mintInfo={mintInfo}
           historyEntry={{
             type: 'receive',
-            mintUrl: mintInfo?.mintUrl,
+            mintUrl: npcMintUrl || undefined,
           }}
+          onPress={isUpdatingMint ? undefined : handleOpenMintSelector}
         />
       )}
     </>
