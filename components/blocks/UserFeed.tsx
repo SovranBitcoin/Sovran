@@ -20,10 +20,10 @@
  * - Lightning invoices (lnbc…)  → tappable payment card
  * - Newlines                    → preserved
  *
- * Uses @nostr-dev-kit/ndk-mobile's useSubscribe hook for real-time subscriptions.
+ * Uses Primal's cache relay API for bundled feed lookups.
  */
 
-import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
 import { StyleSheet, Animated, Easing, TouchableOpacity, Linking, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -38,10 +38,8 @@ import { Skeleton } from 'components/ui/Skeleton';
 import { Avatar } from 'components/ui/Avatar';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { ShortTextNote, Repost, Reaction, GenericRepost, Metadata } from 'nostr-tools/kinds';
+import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
-import type { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CONTENT_WIDTH = SCREEN_WIDTH - 32; // 16px padding each side
@@ -63,6 +61,24 @@ interface NoteMetrics {
   replyCount: number;
 }
 
+interface FeedEvent {
+  id: string;
+  kind: number;
+  pubkey: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+}
+
+interface RawPrimalEvent {
+  kind: number;
+  content: string;
+  id?: string;
+  pubkey?: string;
+  created_at?: number;
+  tags?: string[][];
+}
+
 /** Profile info stored for both inline mentions and quoted post authors */
 interface ProfileInfo {
   name: string;
@@ -71,11 +87,11 @@ interface ProfileInfo {
 
 /** Unified feed item — either an original note or a repost (Kind 6/16) */
 type FeedItem =
-  | { type: 'note'; event: NDKEvent; timestamp: number }
+  | { type: 'note'; event: FeedEvent; timestamp: number }
   | {
       type: 'repost';
-      repostEvent: NDKEvent;
-      originalEvent: NDKEvent | undefined;
+      repostEvent: FeedEvent;
+      originalEvent: FeedEvent | undefined;
       originalEventId: string;
       timestamp: number;
     };
@@ -102,19 +118,14 @@ type ContentSegment =
 // Constants / regex
 // ============================================================================
 
-// Stable subscription option objects (module-level = referentially stable,
-// won't trigger useSubscribe's useEffect re-runs)
-
-/** One-shot fetch: close after initial relay load. Good for ID lookups & profiles. */
-const CLOSE_ON_EOSE_OPTS = { closeOnEose: true } as const;
-
-/** Metrics: skip expensive ed25519 sig checks (we only count), buffer aggressively */
-const METRICS_SUB_OPTS = { skipVerification: true, bufferMs: 150 } as const;
-
 /** Shared empty map — used by QuotedPostCard / RepostCard to prevent quote recursion */
-const EMPTY_QUOTED_EVENTS: Map<string, NDKEvent> = new Map();
+const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
 /** Shared default for cache misses so we don't allocate a new object every call */
 const DEFAULT_METRICS: NoteMetrics = Object.freeze({ likeCount: 0, repostCount: 0, replyCount: 0 });
+const PRIMAL_CACHE_RELAY_URL = 'wss://cache2.primal.net/v1';
+const PRIMAL_KIND_NOTE_STATS = 10000100;
+const PRIMAL_KIND_MENTIONS = 10000107;
+const PRIMAL_KIND_FEED_RANGE = 10000113;
 
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i;
 const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi)(\?.*)?$/i;
@@ -130,6 +141,7 @@ const NOSTR_URI_REGEX = /nostr:(npub1|nprofile1|nevent1|note1|naddr1)[a-z0-9]+/g
 
 const _contentCache = new Map<string, ContentSegment[]>();
 const _CONTENT_CACHE_MAX = 300;
+const _npubCache = new Map<string, string>();
 
 function parseContent(raw: string): ContentSegment[] {
   const cached = _contentCache.get(raw);
@@ -274,7 +286,7 @@ function pushTextWithNewlines(out: ContentSegment[], text: string) {
  * Collect every referenced event ID and pubkey from a set of notes
  * so we can subscribe to them in bulk.
  */
-function collectReferencedIds(notes: NDKEvent[]): {
+function collectReferencedIds(notes: FeedEvent[]): {
   eventIds: string[];
   pubkeys: string[];
 } {
@@ -315,15 +327,21 @@ function formatCount(count: number): string {
   return count.toString();
 }
 
-function isRootNote(event: NDKEvent): boolean {
+function isRootNote(event: FeedEvent): boolean {
   const eTags = (event.tags || []).filter((t) => t[0] === 'e');
   if (eTags.length === 0) return true;
   return eTags.every((t) => t[3] === 'mention');
 }
 
 function tryNpubEncode(hex: string): string {
+  const cached = _npubCache.get(hex);
+  if (cached) return cached;
   try {
-    return nip19.npubEncode(hex);
+    const encoded = nip19.npubEncode(hex);
+    // Very small cache to avoid repeated expensive bech32 encoding in large feeds.
+    if (_npubCache.size > 600) _npubCache.clear();
+    _npubCache.set(hex, encoded);
+    return encoded;
   } catch {
     return '';
   }
@@ -339,6 +357,359 @@ function prettifyUrl(raw: string): string {
   } catch {
     return raw.length > 40 ? raw.slice(0, 37) + '…' : raw;
   }
+}
+
+function normalizeFeedEvent(value: unknown): FeedEvent | null {
+  if (!value || typeof value !== 'object') return null;
+  const input = value as Record<string, unknown>;
+  if (
+    typeof input.id !== 'string' ||
+    typeof input.kind !== 'number' ||
+    typeof input.pubkey !== 'string' ||
+    typeof input.content !== 'string' ||
+    typeof input.created_at !== 'number' ||
+    !Array.isArray(input.tags)
+  ) {
+    return null;
+  }
+
+  return {
+    id: input.id,
+    kind: input.kind,
+    pubkey: input.pubkey,
+    content: input.content,
+    created_at: input.created_at,
+    tags: input.tags.filter(Array.isArray) as string[][],
+  };
+}
+
+function normalizeRawPrimalEvent(value: unknown): RawPrimalEvent | null {
+  if (!value || typeof value !== 'object') return null;
+  const input = value as Record<string, unknown>;
+  if (typeof input.kind !== 'number' || typeof input.content !== 'string') {
+    return null;
+  }
+  return {
+    kind: input.kind,
+    content: input.content,
+    id: typeof input.id === 'string' ? input.id : undefined,
+    pubkey: typeof input.pubkey === 'string' ? input.pubkey : undefined,
+    created_at: typeof input.created_at === 'number' ? input.created_at : undefined,
+    tags: Array.isArray(input.tags) ? (input.tags.filter(Array.isArray) as string[][]) : undefined,
+  };
+}
+
+function parseJson<T>(raw: string): T | null {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function getFirstTagValue(event: FeedEvent, tagName: string): string | undefined {
+  const tag = event.tags.find((t) => t[0] === tagName);
+  return tag?.[1];
+}
+
+function getEmbeddedRepostEvent(
+  repostEvent: FeedEvent,
+  expectedEventId?: string
+): FeedEvent | undefined {
+  if (!repostEvent.content) return undefined;
+  const parsed = normalizeFeedEvent(parseJson<unknown>(repostEvent.content));
+  if (!parsed) return undefined;
+  if (expectedEventId && parsed.id !== expectedEventId) return undefined;
+  return parsed;
+}
+
+function parseProfileFromRaw(raw: RawPrimalEvent): [string, ProfileInfo] | null {
+  if (!raw.pubkey) return null;
+  const parsed = parseJson<Record<string, unknown>>(raw.content);
+  const name =
+    (typeof parsed?.display_name === 'string' && parsed.display_name) ||
+    (typeof parsed?.name === 'string' && parsed.name);
+  const picture = typeof parsed?.picture === 'string' ? parsed.picture : undefined;
+  if (!name) return null;
+  return [raw.pubkey, { name, picture }];
+}
+
+interface Phase1Result {
+  orderedFeedItems: FeedItem[];
+  metricsMap: Map<string, NoteMetrics>;
+  profilesMap: Map<string, ProfileInfo>;
+  quotedEventsMap: Map<string, FeedEvent>;
+  missingQuotedIds: string[];
+  missingProfilePubkeys: string[];
+}
+
+function parsePhase1(
+  feedRawEvents: RawPrimalEvent[],
+  pubkey: string,
+  authorName?: string,
+  authorPicture?: string
+): Phase1Result {
+  const eventMap = new Map<string, FeedEvent>();
+  const userAuthoredPosts: FeedEvent[] = [];
+  const embeddedMentionEvents = new Map<string, FeedEvent>();
+  const metricsMap = new Map<string, NoteMetrics>();
+  const profilesMap = new Map<string, ProfileInfo>();
+  let feedOrder: string[] = [];
+
+  for (const raw of feedRawEvents) {
+    if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
+      const parsed = parseJson<Record<string, unknown>>(raw.content);
+      const eventId = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
+      if (!eventId) continue;
+      metricsMap.set(eventId, {
+        likeCount: typeof parsed?.likes === 'number' ? parsed.likes : 0,
+        repostCount: typeof parsed?.reposts === 'number' ? parsed.reposts : 0,
+        replyCount: typeof parsed?.replies === 'number' ? parsed.replies : 0,
+      });
+      continue;
+    }
+
+    if (raw.kind === PRIMAL_KIND_FEED_RANGE) {
+      const parsed = parseJson<Record<string, unknown>>(raw.content);
+      if (Array.isArray(parsed?.elements)) {
+        feedOrder = parsed.elements.filter((id): id is string => typeof id === 'string');
+      }
+      continue;
+    }
+
+    if (raw.kind === PRIMAL_KIND_MENTIONS) {
+      const mentionEvent = normalizeFeedEvent(parseJson<unknown>(raw.content));
+      if (!mentionEvent) continue;
+      embeddedMentionEvents.set(mentionEvent.id, mentionEvent);
+      eventMap.set(mentionEvent.id, mentionEvent);
+      continue;
+    }
+
+    const ev = normalizeFeedEvent(raw);
+    if (!ev) continue;
+
+    if (ev.kind === ShortTextNote || ev.kind === Repost || ev.kind === GenericRepost) {
+      eventMap.set(ev.id, ev);
+      if (ev.pubkey === pubkey) userAuthoredPosts.push(ev);
+      continue;
+    }
+
+    if (ev.kind === Metadata) {
+      const result = parseProfileFromRaw(raw);
+      if (result) profilesMap.set(result[0], result[1]);
+      continue;
+    }
+  }
+
+  if (authorName) {
+    profilesMap.set(pubkey, { name: authorName, picture: authorPicture });
+  }
+
+  const rootNotes = userAuthoredPosts.filter((ev) => ev.kind === ShortTextNote && isRootNote(ev));
+  const userRepostEvents = userAuthoredPosts.filter(
+    (ev) => ev.kind === Repost || ev.kind === GenericRepost
+  );
+
+  const nextFeedItems: FeedItem[] = [];
+  const feedItemsByEventId = new Map<string, FeedItem>();
+
+  for (const note of rootNotes) {
+    const item: FeedItem = { type: 'note', event: note, timestamp: note.created_at || 0 };
+    nextFeedItems.push(item);
+    feedItemsByEventId.set(note.id, item);
+  }
+
+  for (const repostEvent of userRepostEvents) {
+    const originalEventId = getFirstTagValue(repostEvent, 'e');
+    if (!originalEventId) continue;
+    let originalEvent = eventMap.get(originalEventId);
+    if (!originalEvent) {
+      originalEvent = getEmbeddedRepostEvent(repostEvent, originalEventId);
+      if (originalEvent) eventMap.set(originalEvent.id, originalEvent);
+    }
+
+    const item: FeedItem = {
+      type: 'repost',
+      repostEvent,
+      originalEvent,
+      originalEventId,
+      timestamp: repostEvent.created_at || 0,
+    };
+    nextFeedItems.push(item);
+    feedItemsByEventId.set(repostEvent.id, item);
+  }
+
+  const orderedFeedItems =
+    feedOrder.length > 0
+      ? [
+          ...feedOrder
+            .map((id) => feedItemsByEventId.get(id))
+            .filter((item): item is FeedItem => item !== undefined),
+          ...nextFeedItems.filter(
+            (item) =>
+              !feedOrder.includes(item.type === 'note' ? item.event.id : item.repostEvent.id)
+          ),
+        ]
+      : nextFeedItems;
+
+  if (feedOrder.length === 0) {
+    orderedFeedItems.sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  const repostedOriginalEvents = orderedFeedItems
+    .filter((item): item is Extract<FeedItem, { type: 'repost' }> => item.type === 'repost')
+    .map((item) => item.originalEvent)
+    .filter((ev): ev is FeedEvent => ev !== undefined);
+
+  const contentSources = [...rootNotes, ...repostedOriginalEvents];
+  const { eventIds: referencedEventIds, pubkeys: inlineMentionPubkeys } =
+    collectReferencedIds(contentSources);
+
+  const quotedEventsMap = new Map<string, FeedEvent>(embeddedMentionEvents);
+  const missingQuotedIds = referencedEventIds.filter((id) => !quotedEventsMap.has(id));
+
+  const neededPubkeys = new Set(inlineMentionPubkeys);
+  for (const ev of embeddedMentionEvents.values()) neededPubkeys.add(ev.pubkey);
+  for (const ev of repostedOriginalEvents) neededPubkeys.add(ev.pubkey);
+  const missingProfilePubkeys = Array.from(neededPubkeys).filter((pk) => !profilesMap.has(pk));
+
+  for (const item of orderedFeedItems) {
+    const metricId = item.type === 'note' ? item.event.id : item.originalEventId;
+    if (!metricsMap.has(metricId)) metricsMap.set(metricId, { ...DEFAULT_METRICS });
+  }
+
+  return {
+    orderedFeedItems,
+    metricsMap,
+    profilesMap,
+    quotedEventsMap,
+    missingQuotedIds,
+    missingProfilePubkeys,
+  };
+}
+
+type RelayMessage =
+  | ['EVENT', string, unknown]
+  | ['EVENTS', string, unknown[]]
+  | ['EOSE', string]
+  | ['NOTICE', string]
+  | ['OK', string, boolean, string];
+
+function createPrimalRelayClient(url: string) {
+  const ws = new WebSocket(url);
+  const OPEN_TIMEOUT_MS = 8000;
+  const REQUEST_TIMEOUT_MS = 10000;
+  const inflight = new Map<
+    string,
+    { events: RawPrimalEvent[]; resolve: (events: RawPrimalEvent[]) => void }
+  >();
+  let openSettled = false;
+
+  const failAll = () => {
+    inflight.forEach(({ resolve }) => resolve([]));
+    inflight.clear();
+  };
+
+  ws.onmessage = (msg) => {
+    if (typeof msg.data !== 'string') return;
+    const parsed = parseJson<RelayMessage>(msg.data);
+    if (!parsed || !Array.isArray(parsed)) return;
+
+    if (parsed[0] === 'EVENT') {
+      const subId = parsed[1];
+      const active = inflight.get(subId);
+      if (!active) return;
+      const normalized = normalizeRawPrimalEvent(parsed[2]);
+      if (normalized) active.events.push(normalized);
+      return;
+    }
+
+    if (parsed[0] === 'EVENTS') {
+      const subId = parsed[1];
+      const active = inflight.get(subId);
+      if (!active) return;
+      for (const rawEvent of parsed[2]) {
+        const normalized = normalizeRawPrimalEvent(rawEvent);
+        if (normalized) active.events.push(normalized);
+      }
+      return;
+    }
+
+    if (parsed[0] === 'EOSE') {
+      const subId = parsed[1];
+      const active = inflight.get(subId);
+      if (!active) return;
+      active.resolve(active.events);
+      inflight.delete(subId);
+      return;
+    }
+  };
+
+  ws.onerror = failAll;
+  ws.onclose = failAll;
+
+  const openPromise = new Promise<boolean>((resolve) => {
+    const settle = (value: boolean) => {
+      if (openSettled) return;
+      openSettled = true;
+      resolve(value);
+    };
+
+    if (ws.readyState === WebSocket.OPEN) {
+      settle(true);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => settle(false), OPEN_TIMEOUT_MS);
+    ws.onopen = () => {
+      clearTimeout(timeoutId);
+      settle(true);
+    };
+    ws.onerror = () => {
+      clearTimeout(timeoutId);
+      failAll();
+      settle(false);
+    };
+    ws.onclose = () => {
+      clearTimeout(timeoutId);
+      failAll();
+      settle(false);
+    };
+  });
+
+  const request = async (subId: string, filter: Record<string, unknown>) => {
+    const isOpen = await openPromise;
+    if (!isOpen || ws.readyState !== WebSocket.OPEN) return [];
+
+    return new Promise<RawPrimalEvent[]>((resolve) => {
+      const requestState = { events: [] as RawPrimalEvent[], resolve };
+      const timeoutId = setTimeout(() => {
+        const active = inflight.get(subId);
+        if (!active) return;
+        inflight.delete(subId);
+        resolve(active.events);
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(['CLOSE', subId]));
+        }
+      }, REQUEST_TIMEOUT_MS);
+
+      inflight.set(subId, {
+        events: requestState.events,
+        resolve: (events) => {
+          clearTimeout(timeoutId);
+          resolve(events);
+        },
+      });
+      ws.send(JSON.stringify(['REQ', subId, filter]));
+    });
+  };
+
+  return {
+    request,
+    close: () => {
+      ws.close();
+    },
+  };
 }
 
 // ============================================================================
@@ -471,16 +842,75 @@ const LightningBlock = React.memo(function LightningBlock({ invoice }: { invoice
   );
 });
 
+const MetricsFooter = React.memo(function MetricsFooter({
+  metrics,
+  borderColor,
+  compact = false,
+}: {
+  metrics: NoteMetrics;
+  borderColor: string;
+  compact?: boolean;
+}) {
+  const iconColor = opacity(borderColor, 0.57);
+  const textColor = opacity(borderColor, 0.57);
+  const iconSize = compact ? 13 : 16;
+  const textSize = compact ? 11 : 13;
+
+  return (
+    <View
+      style={[
+        styles.noteFooter,
+        styles.footerBorder,
+        { borderTopColor: opacity(borderColor, 0.1) },
+      ]}>
+      <HStack align="center">
+        <View style={styles.metricItem}>
+          <HStack align="center" gap={5} style={styles.metricRow}>
+            <Icon
+              name="garden:speech-bubble-typing-fill-12"
+              size={iconSize - 1}
+              color={iconColor}
+            />
+            <Text size={textSize} style={{ color: textColor }}>
+              {formatCount(metrics.replyCount)}
+            </Text>
+          </HStack>
+        </View>
+        <View style={styles.metricItem}>
+          <HStack align="center" gap={5} style={styles.metricRow}>
+            <Icon name="garden:arrow-retweet-fill-16" size={iconSize + 1} color={iconColor} />
+            <Text size={textSize} style={{ color: textColor }}>
+              {formatCount(metrics.repostCount)}
+            </Text>
+          </HStack>
+        </View>
+        <View style={styles.metricItem}>
+          <HStack align="center" gap={5} style={styles.metricRow}>
+            <Icon name="garden:heart-fill-16" size={iconSize} color={iconColor} />
+            <Text size={textSize} style={{ color: textColor }}>
+              {formatCount(metrics.likeCount)}
+            </Text>
+          </HStack>
+        </View>
+      </HStack>
+    </View>
+  );
+});
+
 // ============================================================================
 // QuotedPostCard — inline preview of a referenced event with author avatar
 // ============================================================================
 
 const QuotedPostCard = React.memo(function QuotedPostCard({
   event,
+  metrics,
   profiles,
+  getMetrics,
 }: {
-  event: NDKEvent | undefined;
+  event: FeedEvent | undefined;
+  metrics: NoteMetrics;
   profiles: Map<string, ProfileInfo>;
+  getMetrics: (eventId: string) => NoteMetrics;
 }) {
   const { getPrimaryColor } = useTheme();
 
@@ -497,6 +927,7 @@ const QuotedPostCard = React.memo(function QuotedPostCard({
             Quoted post
           </Text>
         </HStack>
+        <MetricsFooter metrics={metrics} borderColor={getPrimaryColor('0')} compact />
       </View>
     );
   }
@@ -546,7 +977,9 @@ const QuotedPostCard = React.memo(function QuotedPostCard({
           content={event.content}
           quotedEvents={EMPTY_QUOTED_EVENTS}
           profiles={profiles}
+          getMetrics={getMetrics}
         />
+        <MetricsFooter metrics={metrics} borderColor={getPrimaryColor('0')} compact />
       </View>
     </TouchableOpacity>
   );
@@ -560,10 +993,12 @@ const NoteContent = React.memo(function NoteContent({
   content,
   quotedEvents,
   profiles,
+  getMetrics,
 }: {
   content: string;
-  quotedEvents: Map<string, NDKEvent>;
+  quotedEvents: Map<string, FeedEvent>;
   profiles: Map<string, ProfileInfo>;
+  getMetrics: (eventId: string) => NoteMetrics;
 }) {
   const { getPrimaryColor } = useTheme();
 
@@ -656,7 +1091,9 @@ const NoteContent = React.memo(function NoteContent({
                 <QuotedPostCard
                   key={`b${i}`}
                   event={quotedEvents.get(seg.eventId)}
+                  metrics={getMetrics(seg.eventId)}
                   profiles={profiles}
+                  getMetrics={getMetrics}
                 />
               );
             default:
@@ -677,15 +1114,17 @@ const NoteCard = React.memo(function NoteCard({
   index,
   quotedEvents,
   profiles,
+  getMetrics,
   authorName,
   authorPicture,
   authorPubkey,
 }: {
-  event: NDKEvent;
+  event: FeedEvent;
   metrics: NoteMetrics;
   index: number;
-  quotedEvents: Map<string, NDKEvent>;
+  quotedEvents: Map<string, FeedEvent>;
   profiles: Map<string, ProfileInfo>;
+  getMetrics: (eventId: string) => NoteMetrics;
   authorName: string;
   authorPicture?: string;
   authorPubkey: string;
@@ -752,61 +1191,17 @@ const NoteCard = React.memo(function NoteCard({
       </HStack>
 
       {/* Content */}
-      <NoteContent content={event.content} quotedEvents={quotedEvents} profiles={profiles} />
+      <NoteContent
+        content={event.content}
+        quotedEvents={quotedEvents}
+        profiles={profiles}
+        getMetrics={getMetrics}
+      />
 
       <Spacer size={12} />
 
       {/* Footer: Engagement metrics — equally spaced across full width */}
-      <View
-        style={[
-          styles.noteFooter,
-          styles.footerBorder,
-          { borderTopColor: getPrimaryColor('700') },
-        ]}>
-        <HStack align="center">
-          {/* Replies */}
-          <View style={styles.metricItem}>
-            <HStack align="center" gap={5} style={styles.metricRow}>
-              <Icon
-                name="garden:speech-bubble-typing-fill-12"
-                size={15}
-                color={opacity(getPrimaryColor('0'), 0.4)}
-              />
-              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
-                {formatCount(metrics.replyCount)}
-              </Text>
-            </HStack>
-          </View>
-
-          {/* Reposts */}
-          <View style={styles.metricItem}>
-            <HStack align="center" gap={5} style={styles.metricRow}>
-              <Icon
-                name="garden:arrow-retweet-fill-16"
-                size={17}
-                color={opacity(getPrimaryColor('0'), 0.4)}
-              />
-              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
-                {formatCount(metrics.repostCount)}
-              </Text>
-            </HStack>
-          </View>
-
-          {/* Likes */}
-          <View style={styles.metricItem}>
-            <HStack align="center" gap={5} style={styles.metricRow}>
-              <Icon
-                name="garden:heart-fill-16"
-                size={16}
-                color={opacity(getPrimaryColor('0'), 0.4)}
-              />
-              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
-                {formatCount(metrics.likeCount)}
-              </Text>
-            </HStack>
-          </View>
-        </HStack>
-      </View>
+      <MetricsFooter metrics={metrics} borderColor={getPrimaryColor('0')} />
     </Animated.View>
   );
 });
@@ -818,17 +1213,21 @@ const NoteCard = React.memo(function NoteCard({
 const RepostCard = React.memo(function RepostCard({
   repostEvent: _repostEvent,
   originalEvent,
+  originalMetrics,
   index,
-  quotedEvents: _quotedEvents,
+  quotedEvents,
   profiles,
+  getMetrics,
   reposterName,
   reposterPubkey,
 }: {
-  repostEvent: NDKEvent;
-  originalEvent: NDKEvent | undefined;
+  repostEvent: FeedEvent;
+  originalEvent: FeedEvent | undefined;
+  originalMetrics: NoteMetrics;
   index: number;
-  quotedEvents: Map<string, NDKEvent>;
+  quotedEvents: Map<string, FeedEvent>;
   profiles: Map<string, ProfileInfo>;
+  getMetrics: (eventId: string) => NoteMetrics;
   reposterName: string;
   reposterPubkey: string;
 }) {
@@ -927,8 +1326,9 @@ const RepostCard = React.memo(function RepostCard({
           {/* Original post body — full rich rendering, no nested quote recursion */}
           <NoteContent
             content={originalEvent.content}
-            quotedEvents={EMPTY_QUOTED_EVENTS}
+            quotedEvents={quotedEvents}
             profiles={profiles}
+            getMetrics={getMetrics}
           />
         </View>
       ) : (
@@ -949,6 +1349,8 @@ const RepostCard = React.memo(function RepostCard({
           </HStack>
         </View>
       )}
+      <Spacer size={12} />
+      <MetricsFooter metrics={originalMetrics} borderColor={getPrimaryColor('0')} />
     </Animated.View>
   );
 });
@@ -1082,158 +1484,147 @@ function EmptyFeed() {
 
 function UserFeedComponent({ pubkey, authorName, authorPicture }: UserFeedProps) {
   const { getPrimaryColor } = useTheme();
+  const [, startTransition] = useTransition();
+  const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
+  const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(new Map());
+  const [quotedEventsMap, setQuotedEventsMap] = useState<Map<string, FeedEvent>>(new Map());
+  const [profilesMap, setProfilesMap] = useState<Map<string, ProfileInfo>>(new Map());
+  const [isLoading, setIsLoading] = useState(true);
 
-  // ---------------------------
-  // 1. Subscribe to ALL user content (Kind 1 + 6 + 16) in ONE relay REQ
-  // ---------------------------
-  const userContentFilters = useMemo(
-    () =>
-      pubkey
-        ? [
-            {
-              kinds: [ShortTextNote as number, Repost as number, GenericRepost as number],
-              authors: [pubkey],
-              limit: 50,
-            },
-          ]
-        : null,
-    [pubkey]
-  );
-  const { events: userContentEvents, eose: contentEose } = useSubscribe({
-    filters: userContentFilters,
-  });
-
-  // Split client-side: root notes vs reposts
-  const { rootNotes, userRepostEvents } = useMemo(() => {
-    if (!userContentEvents?.length)
-      return { rootNotes: [] as NDKEvent[], userRepostEvents: [] as NDKEvent[] };
-    const notes: NDKEvent[] = [];
-    const reposts: NDKEvent[] = [];
-    for (const ev of userContentEvents) {
-      if (ev.kind === ShortTextNote) {
-        if (isRootNote(ev)) notes.push(ev);
-      } else {
-        reposts.push(ev);
-      }
-    }
-    return { rootNotes: notes, userRepostEvents: reposts };
-  }, [userContentEvents]);
-
-  // Extract original event IDs from repost e-tags
-  const repostedEventIds = useMemo(() => {
-    if (!userRepostEvents?.length) return [];
-    const ids: string[] = [];
-    for (const ev of userRepostEvents) {
-      const eTag = ev.tags?.find((t) => t[0] === 'e');
-      if (eTag?.[1]) ids.push(eTag[1]);
-    }
-    return ids;
-  }, [userRepostEvents]);
-
-  // Fetch original events that were reposted
-  const repostedEventsFilter = useMemo(
-    () => (repostedEventIds.length > 0 ? [{ ids: repostedEventIds }] : null),
-    [repostedEventIds]
-  );
-  const { events: repostedEventsList } = useSubscribe({
-    filters: repostedEventsFilter,
-    opts: CLOSE_ON_EOSE_OPTS,
-  });
-
-  const repostedEventsMap = useMemo(() => {
-    const map = new Map<string, NDKEvent>();
-    repostedEventsList?.forEach((ev) => map.set(ev.id, ev));
-    return map;
-  }, [repostedEventsList]);
-
-  // ---------------------------
-  // 2. Build unified timeline (notes + reposts sorted by time)
-  // ---------------------------
-  const feedItems: FeedItem[] = useMemo(() => {
-    const items: FeedItem[] = [];
-
-    // Original notes
-    for (const event of rootNotes) {
-      items.push({ type: 'note', event, timestamp: event.created_at || 0 });
+  useEffect(() => {
+    if (!pubkey) {
+      setFeedItems([]);
+      setMetricsMap(new Map());
+      setQuotedEventsMap(new Map());
+      setProfilesMap(new Map());
+      setIsLoading(false);
+      return;
     }
 
-    // Reposts
-    if (userRepostEvents?.length) {
-      for (const repostEvent of userRepostEvents) {
-        const eTag = repostEvent.tags?.find((t) => t[0] === 'e');
-        if (eTag?.[1]) {
-          items.push({
-            type: 'repost',
-            repostEvent,
-            originalEvent: repostedEventsMap.get(eTag[1]),
-            originalEventId: eTag[1],
-            timestamp: repostEvent.created_at || 0,
+    let cancelled = false;
+    setIsLoading(true);
+
+    const loadFeedFromPrimal = async () => {
+      const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
+
+      try {
+        const requestPrefix = Date.now().toString(36);
+        const feedRawEvents = await client.request(`${requestPrefix}_feed`, {
+          cache: ['feed', { pubkey, notes: 'authored', limit: 50 }],
+        });
+        if (cancelled) return;
+
+        const phase1 = parsePhase1(feedRawEvents, pubkey, authorName, authorPicture);
+        setFeedItems(phase1.orderedFeedItems);
+        setMetricsMap(phase1.metricsMap);
+        setQuotedEventsMap(phase1.quotedEventsMap);
+        setProfilesMap(phase1.profilesMap);
+        setIsLoading(false);
+
+        const phase2Promise = (async () => {
+          if (phase1.missingQuotedIds.length === 0) return;
+
+          const referencedRawEvents = await client.request(`${requestPrefix}_quoted`, {
+            cache: ['events', { event_ids: phase1.missingQuotedIds }],
           });
+          if (cancelled) return;
+
+          const nextQuoted = new Map(phase1.quotedEventsMap);
+          const extraProfiles = new Map<string, ProfileInfo>();
+          const extraMetrics = new Map<string, NoteMetrics>();
+
+          for (const raw of referencedRawEvents) {
+            if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
+              const parsed = parseJson<Record<string, unknown>>(raw.content);
+              const eventId = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
+              if (!eventId) continue;
+              extraMetrics.set(eventId, {
+                likeCount: typeof parsed?.likes === 'number' ? parsed.likes : 0,
+                repostCount: typeof parsed?.reposts === 'number' ? parsed.reposts : 0,
+                replyCount: typeof parsed?.replies === 'number' ? parsed.replies : 0,
+              });
+              continue;
+            }
+
+            if (raw.kind === Metadata) {
+              const result = parseProfileFromRaw(raw);
+              if (result) extraProfiles.set(result[0], result[1]);
+              continue;
+            }
+
+            const ev = normalizeFeedEvent(raw);
+            if (!ev) continue;
+            nextQuoted.set(ev.id, ev);
+          }
+
+          if (cancelled) return;
+          startTransition(() => {
+            setQuotedEventsMap(nextQuoted);
+
+            if (extraMetrics.size > 0) {
+              setMetricsMap((prev) => {
+                const next = new Map(prev);
+                for (const [k, v] of extraMetrics) next.set(k, v);
+                return next;
+              });
+            }
+
+            if (extraProfiles.size > 0) {
+              setProfilesMap((prev) => {
+                const next = new Map(prev);
+                for (const [k, v] of extraProfiles) next.set(k, v);
+                return next;
+              });
+            }
+          });
+        })();
+
+        const phase3Promise = (async () => {
+          if (phase1.missingProfilePubkeys.length === 0) return;
+
+          const profileRawEvents = await client.request(`${requestPrefix}_profiles`, {
+            cache: ['user_infos', { pubkeys: phase1.missingProfilePubkeys }],
+          });
+          if (cancelled) return;
+
+          const extraProfiles = new Map<string, ProfileInfo>();
+          for (const raw of profileRawEvents) {
+            if (raw.kind !== Metadata) continue;
+            const result = parseProfileFromRaw(raw);
+            if (result) extraProfiles.set(result[0], result[1]);
+          }
+
+          if (cancelled || extraProfiles.size === 0) return;
+          startTransition(() => {
+            setProfilesMap((prev) => {
+              const next = new Map(prev);
+              for (const [k, v] of extraProfiles) next.set(k, v);
+              return next;
+            });
+          });
+        })();
+
+        await Promise.all([phase2Promise, phase3Promise]);
+      } catch (error) {
+        console.error('UserFeed: Failed to load Primal cached feed', error);
+        if (!cancelled) {
+          setFeedItems([]);
+          setMetricsMap(new Map());
+          setQuotedEventsMap(new Map());
+          setProfilesMap(new Map());
+          setIsLoading(false);
         }
+      } finally {
+        client.close();
       }
-    }
+    };
 
-    return items.sort((a, b) => b.timestamp - a.timestamp);
-  }, [rootNotes, userRepostEvents, repostedEventsMap]);
+    loadFeedFromPrimal();
 
-  // ---------------------------
-  // 3. Subscribe to engagement metrics for all visible events
-  // ---------------------------
-  // Combine the user's own note IDs + original reposted event IDs
-  const allEventIdsForMetrics = useMemo(() => {
-    const set = new Set<string>();
-    for (const n of rootNotes) set.add(n.id);
-    for (const id of repostedEventIds) set.add(id);
-    return Array.from(set);
-  }, [rootNotes, repostedEventIds]);
-
-  // Single combined metrics subscription: reactions + reposts + replies in ONE relay REQ
-  // (skipVerification: we only count events, don't need sig checks;
-  //  bufferMs: 150 to batch rapid-fire metric events into fewer re-renders)
-  const metricsFilters = useMemo(
-    () =>
-      allEventIdsForMetrics.length > 0
-        ? [
-            {
-              kinds: [
-                Reaction as number,
-                Repost as number,
-                GenericRepost as number,
-                ShortTextNote as number,
-              ],
-              '#e': allEventIdsForMetrics,
-            },
-          ]
-        : null,
-    [allEventIdsForMetrics]
-  );
-  const { events: metricsEvents } = useSubscribe({
-    filters: metricsFilters,
-    opts: METRICS_SUB_OPTS,
-  });
-
-  const metricsMap = useMemo(() => {
-    const map = new Map<string, NoteMetrics>();
-    for (const id of allEventIdsForMetrics)
-      map.set(id, { likeCount: 0, repostCount: 0, replyCount: 0 });
-
-    metricsEvents?.forEach((ev) => {
-      const eTag = ev.tags?.find((t) => t[0] === 'e');
-      if (!eTag) return;
-      const m = map.get(eTag[1]);
-      if (!m) return;
-
-      if (ev.kind === Reaction) {
-        if (ev.content === '+' || ev.content === '') m.likeCount++;
-      } else if (ev.kind === Repost || ev.kind === GenericRepost) {
-        m.repostCount++;
-      } else if (ev.kind === ShortTextNote) {
-        m.replyCount++;
-      }
-    });
-
-    return map;
-  }, [allEventIdsForMetrics, metricsEvents]);
+    return () => {
+      cancelled = true;
+    };
+  }, [authorName, authorPicture, pubkey]);
 
   const getMetrics = useCallback(
     (noteId: string): NoteMetrics => metricsMap.get(noteId) || DEFAULT_METRICS,
@@ -1241,80 +1632,8 @@ function UserFeedComponent({ pubkey, authorName, authorPicture }: UserFeedProps)
   );
 
   // ---------------------------
-  // 4. Resolve nostr: entities in content
-  // ---------------------------
-  // Collect references from the user's own notes AND the reposted originals
-  const { eventIds: referencedEventIds, pubkeys: inlineMentionPubkeys } = useMemo(() => {
-    const allContent: NDKEvent[] = [...rootNotes];
-    repostedEventsList?.forEach((ev) => allContent.push(ev));
-    return collectReferencedIds(allContent);
-  }, [rootNotes, repostedEventsList]);
-
-  // Quoted events (Kind 1) referenced inside content
-  const quotedEventsFilter = useMemo(
-    () =>
-      referencedEventIds.length > 0
-        ? [{ ids: referencedEventIds, kinds: [ShortTextNote as number] }]
-        : null,
-    [referencedEventIds]
-  );
-  const { events: quotedEventsList } = useSubscribe({
-    filters: quotedEventsFilter,
-    opts: CLOSE_ON_EOSE_OPTS,
-  });
-
-  const quotedEventsMap = useMemo(() => {
-    const map = new Map<string, NDKEvent>();
-    quotedEventsList?.forEach((ev) => map.set(ev.id, ev));
-    return map;
-  }, [quotedEventsList]);
-
-  // Merge ALL pubkeys that need profile data:
-  // inline mentions + quoted event authors + reposted event authors
-  const allProfilePubkeys = useMemo(() => {
-    const set = new Set(inlineMentionPubkeys);
-    quotedEventsList?.forEach((ev) => set.add(ev.pubkey));
-    repostedEventsList?.forEach((ev) => set.add(ev.pubkey));
-    return Array.from(set);
-  }, [inlineMentionPubkeys, quotedEventsList, repostedEventsList]);
-
-  // Profile metadata (Kind 0)
-  const profilesFilter = useMemo(
-    () =>
-      allProfilePubkeys.length > 0
-        ? [
-            {
-              authors: allProfilePubkeys,
-              kinds: [Metadata as number],
-              limit: allProfilePubkeys.length,
-            },
-          ]
-        : null,
-    [allProfilePubkeys]
-  );
-  const { events: profileMetadataEvents } = useSubscribe({
-    filters: profilesFilter,
-    opts: CLOSE_ON_EOSE_OPTS,
-  });
-
-  const profilesMap = useMemo(() => {
-    const map = new Map<string, ProfileInfo>();
-    profileMetadataEvents?.forEach((ev) => {
-      try {
-        const meta = JSON.parse(ev.content);
-        const name = meta.display_name || meta.name;
-        if (name) map.set(ev.pubkey, { name, picture: meta.picture });
-      } catch {
-        // skip malformed metadata
-      }
-    });
-    return map;
-  }, [profileMetadataEvents]);
-
-  // ---------------------------
   // Render
   // ---------------------------
-  const isLoading = !contentEose;
   const displayName = authorName || tryNpubEncode(pubkey).slice(0, 12) + '…';
 
   return (
@@ -1348,6 +1667,7 @@ function UserFeedComponent({ pubkey, authorName, authorPicture }: UserFeedProps)
                   index={index}
                   quotedEvents={quotedEventsMap}
                   profiles={profilesMap}
+                  getMetrics={getMetrics}
                   authorName={displayName}
                   authorPicture={authorPicture}
                   authorPubkey={pubkey}
@@ -1360,9 +1680,11 @@ function UserFeedComponent({ pubkey, authorName, authorPicture }: UserFeedProps)
                 key={item.repostEvent.id}
                 repostEvent={item.repostEvent}
                 originalEvent={item.originalEvent}
+                originalMetrics={getMetrics(item.originalEventId)}
                 index={index}
                 quotedEvents={quotedEventsMap}
                 profiles={profilesMap}
+                getMetrics={getMetrics}
                 reposterName={displayName}
                 reposterPubkey={pubkey}
               />
