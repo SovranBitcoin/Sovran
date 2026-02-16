@@ -1,4 +1,5 @@
 import React from 'react';
+import { TouchableOpacity } from 'react-native';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
@@ -8,7 +9,6 @@ import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { Avatar } from 'components/ui/Avatar';
 import Icon from 'assets/icons';
-import { Button } from 'components/ui/Button';
 import { HistoryEntry } from 'coco-cashu-core';
 import { GetInfoResponse } from '@cashu/cashu-ts';
 
@@ -22,7 +22,7 @@ interface HistoryEntryRefreshProps {
 export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: HistoryEntryRefreshProps) {
   const { getPrimaryColor } = useTheme();
 
-  return (
+  const content = (
     <HStack
       align="center"
       justify="space-between"
@@ -63,15 +63,30 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
         </VStack>
       </HStack>
       {onPress && (
-        <Button
-          onPress={onPress}
-          variant="secondary"
-          icon={
-            <Icon name="lucide:pencil-line" size={16} color={opacity(getPrimaryColor('0'), 0.6)} />
-          }
-          style={{ width: 36, height: 36, margin: 0, marginBottom: 0 }}
-        />
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 18,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: getPrimaryColor('950'),
+            // borderWidth: 1,
+            // borderColor: opacity(getPrimaryColor('0'), 0.12),
+          }}>
+          <Icon name="lucide:pencil-line" size={16} color={opacity(getPrimaryColor('0'), 0.6)} />
+        </View>
       )}
     </HStack>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return content;
 }

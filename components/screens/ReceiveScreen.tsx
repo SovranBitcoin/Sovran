@@ -205,7 +205,8 @@ export function ReceiveScreen({
   }, [selectedMint, npcMintUrl, nostrKeys?.pubkey, nostrKeys?.privateKey, updateServerMint]);
 
   // Open the mint selector modal so the user can pick a different receive mint
-  const handleOpenMintSelector = useCallback(() => {
+  const handleOpenMintSelector = useCallback(async () => {
+    await EnhancedHaptics.copyHaptic();
     hasOpenedMintSelector.current = true;
     previousSelectedMintRef.current = selectedMint;
     router.push({
