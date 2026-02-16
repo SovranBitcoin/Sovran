@@ -37,6 +37,8 @@ interface TransactionsScreenProps {
   filterPaymentType?: PaymentType;
   /** External filter: direction (from filter flow) */
   filterDirection?: Direction;
+  /** External filter: mint URL (from filter flow) */
+  filterMintUrl?: string;
   /** External filter: selected month key (format: "YYYY-MM") */
   filterMonth?: string | null;
   /** Callback when month selection changes */
@@ -50,6 +52,7 @@ export function TransactionsScreen({
   filterCurrency,
   filterPaymentType = 'all',
   filterDirection = 'all',
+  filterMintUrl = 'all',
   filterMonth,
   onMonthChange,
 }: TransactionsScreenProps) {
@@ -94,7 +97,7 @@ export function TransactionsScreen({
 
   const { history, isFetching } = useHistoryWithMelts();
 
-  const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${selectedMonth}`;
+  const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}-${selectedMonth}`;
 
   // Filter by currency and payment type/direction
   const filteredByTypeHistory = useMemo(() => {
@@ -143,6 +146,7 @@ export function TransactionsScreen({
         isFetching={isFetching}
         filter={direction}
         type={paymentType}
+        mintUrlFilter={filterMintUrl}
         at="all"
         tab={tab}
         selectedMonth={selectedMonth}

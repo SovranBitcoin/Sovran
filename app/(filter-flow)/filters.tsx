@@ -8,20 +8,27 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
+import { Avatar } from 'components/ui/Avatar';
 import { useTheme } from '@/providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { ModalScreenLayout } from 'components/layouts/ModalScreenLayout';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
+import { useMints } from 'coco-cashu-react';
+import { extractDomain } from 'helper/url';
+import { useHistoryWithMelts } from 'hooks/coco/useHistoryWithMelts';
+import { useSwapTransactionsStore } from 'stores/swapTransactionsStore';
+import { mintHistoryEntryExpired } from 'helper/utils';
+import { HistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
 
 type PaymentType = 'all' | 'lightning' | 'ecash';
 type Direction = 'all' | 'incoming' | 'outgoing';
 type Status = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 
-const SUPPORTED_CURRENCIES = ['SAT', 'USD', 'EUR', 'GBP'];
+const SUPPORTED_CURRENCIES = ['ALL', 'SAT', 'USD', 'EUR', 'GBP'];
 
 interface ChipProps {
   label: string;
@@ -92,8 +99,60 @@ const Section: React.FC<SectionProps> = ({ title, children }) => {
   );
 };
 
+interface MintSelectorChipProps {
+  showIcon?: boolean;
+  name: string;
+  iconUrl?: string;
+  isSelected: boolean;
+  onPress: () => void;
+}
+
+const MintSelectorChip: React.FC<MintSelectorChipProps> = ({
+  showIcon = true,
+  name,
+  iconUrl,
+  isSelected,
+  onPress,
+}) => {
+  const { getPrimaryColor } = useTheme();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.mintChip,
+        {
+          backgroundColor: isSelected
+            ? opacity(getPrimaryColor('0'), 0.15)
+            : opacity(getPrimaryColor('0'), 0.05),
+          borderColor: isSelected
+            ? opacity(getPrimaryColor('0'), 0.25)
+            : opacity(getPrimaryColor('0'), 0.08),
+        },
+      ]}>
+      {showIcon ? (
+        <Avatar picture={iconUrl} size={22} variant="mint" name={name} alt={`${name} icon`} />
+      ) : null}
+      <Text
+        size={13}
+        numberOfLines={1}
+        style={{
+          color: isSelected ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.7),
+          fontFamily: 'OverpassSemibold',
+          maxWidth: 140,
+        }}>
+        {name}
+      </Text>
+    </Pressable>
+  );
+};
+
 export default function FiltersScreen() {
   const { getPrimaryColor } = useTheme();
+  const { trustedMints } = useMints();
+  const { history } = useHistoryWithMelts();
+  const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
+  const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
 
   // Get initial values from params
   const params = useLocalSearchParams<{
@@ -101,6 +160,7 @@ export default function FiltersScreen() {
     paymentType?: string;
     direction?: string;
     status?: string;
+    mintUrl?: string;
   }>();
 
   // State for filters
@@ -110,6 +170,19 @@ export default function FiltersScreen() {
   );
   const [direction, setDirection] = useState<Direction>((params.direction as Direction) || 'all');
   const [status, setStatus] = useState<Status>((params.status as Status) || 'All');
+  const [mintUrl, setMintUrl] = useState<string>(params.mintUrl || 'all');
+
+  const mintOptions = useMemo(
+    () => [
+      { mintUrl: 'all', name: 'All Mints', icon_url: undefined as string | undefined },
+      ...trustedMints.map((mint) => ({
+        mintUrl: mint.mintUrl,
+        name: mint.mintInfo?.name || extractDomain(mint.mintUrl) || 'Unknown',
+        icon_url: mint.mintInfo?.icon_url,
+      })),
+    ],
+    [trustedMints]
+  );
 
   const handleApply = useCallback(() => {
     router.dismissTo({
@@ -119,15 +192,17 @@ export default function FiltersScreen() {
         filterPaymentType: paymentType,
         filterDirection: direction,
         filterStatus: status,
+        filterMintUrl: mintUrl,
       },
     });
-  }, [currency, paymentType, direction, status]);
+  }, [currency, paymentType, direction, status, mintUrl]);
 
   const handleReset = useCallback(() => {
     setCurrency('sat');
     setPaymentType('all');
     setDirection('all');
     setStatus('All');
+    setMintUrl('all');
   }, []);
 
   const hasActiveFilters = useMemo(() => {
@@ -135,9 +210,79 @@ export default function FiltersScreen() {
       currency.toLowerCase() !== 'sat' ||
       paymentType !== 'all' ||
       direction !== 'all' ||
-      status !== 'All'
+      status !== 'All' ||
+      mintUrl !== 'all'
     );
-  }, [currency, paymentType, direction, status]);
+  }, [currency, paymentType, direction, status, mintUrl]);
+
+  const resultCount = useMemo(() => {
+    const normalizedCurrency = currency.toLowerCase();
+
+    const filteredTransactions = history.filter((historyEntry: HistoryEntry) => {
+      if (normalizedCurrency !== 'all' && historyEntry.unit !== normalizedCurrency) return false;
+      if (mintUrl !== 'all' && historyEntry.mintUrl !== mintUrl) return false;
+
+      // Hide transactions that are represented by a swap group row
+      if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
+        const quoteId = (historyEntry as any).quoteId as string | undefined;
+        if (quoteId && quoteIdToGroup[quoteId]) return false;
+      }
+
+      if (
+        direction === 'incoming' &&
+        historyEntry.type !== 'mint' &&
+        historyEntry.type !== 'receive'
+      )
+        return false;
+      if (direction === 'outgoing' && historyEntry.type !== 'send' && historyEntry.type !== 'melt')
+        return false;
+      if (
+        paymentType === 'lightning' &&
+        historyEntry.type !== 'mint' &&
+        historyEntry.type !== 'melt'
+      )
+        return false;
+      if (
+        paymentType === 'ecash' &&
+        historyEntry.type !== 'send' &&
+        historyEntry.type !== 'receive'
+      )
+        return false;
+
+      if (status === 'All') return true;
+
+      const isPending =
+        (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
+        (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') ||
+        (historyEntry.type === 'send' &&
+          (historyEntry.state === 'pending' || historyEntry.state === 'prepared'));
+      const isExpired =
+        historyEntry.type === 'mint' &&
+        historyEntry.state === 'UNPAID' &&
+        mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+
+      if (status === 'Expired') return isExpired;
+      if (status === 'Pending') return isPending && !isExpired;
+      if (status === 'Confirmed') return !isPending && !isExpired;
+      return true;
+    });
+
+    const shouldIncludeSwapRows =
+      paymentType === 'all' &&
+      direction === 'all' &&
+      mintUrl === 'all' &&
+      status !== 'Pending' &&
+      status !== 'Expired';
+
+    const swapCount = shouldIncludeSwapRows
+      ? Object.values(swapGroupsById).filter((group) => {
+          if (normalizedCurrency !== 'all' && group.unit !== normalizedCurrency) return false;
+          return true;
+        }).length
+      : 0;
+
+    return filteredTransactions.length + swapCount;
+  }, [currency, direction, history, mintUrl, paymentType, quoteIdToGroup, status, swapGroupsById]);
 
   return (
     <ModalScreenLayout
@@ -147,7 +292,7 @@ export default function FiltersScreen() {
             style={{ paddingBottom: 0 }}
             buttons={[
               {
-                text: 'Apply Filters',
+                text: `Apply Filters (${resultCount})`,
                 variant: 'primary',
                 onPress: async () => handleApply(),
               },
@@ -166,6 +311,24 @@ export default function FiltersScreen() {
         </View>
       }>
       <View style={styles.filterContent}>
+        <Section title="Mint">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.mintChipsRow}>
+            {mintOptions.map((mint) => (
+              <MintSelectorChip
+                key={mint.mintUrl}
+                showIcon={mint.mintUrl !== 'all'}
+                name={mint.name}
+                iconUrl={mint.icon_url}
+                isSelected={mintUrl === mint.mintUrl}
+                onPress={() => setMintUrl(mint.mintUrl)}
+              />
+            ))}
+          </ScrollView>
+        </Section>
+
         {/* Currency */}
         <Section title="Currency">
           {SUPPORTED_CURRENCIES.map((curr) => (
@@ -173,7 +336,7 @@ export default function FiltersScreen() {
               key={curr}
               label={curr}
               isSelected={currency.toUpperCase() === curr}
-              onPress={() => setCurrency(curr)}
+              onPress={() => setCurrency(curr.toLowerCase())}
             />
           ))}
         </Section>
@@ -266,6 +429,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  mintChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,6 +441,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+  },
+  mintChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
     borderCurve: 'continuous',
     borderWidth: 1,
   },
