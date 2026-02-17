@@ -4,6 +4,7 @@ import { DynamicColorIOS, Platform, StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Colors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { OfflineProvider } from '@/providers/OfflineProvider';
 import {
   GlobalLiquidGlassTabsOverlay,
   isLiquidGlassTabBarAvailable,
@@ -25,54 +26,56 @@ export default function TabLayout() {
   if (isExpo55NativeTabsSupported()) {
     return (
       <BackgroundProvider>
-        <Expo55NativeTabs
-          labelStyle={{
-            color: Platform.select({
-              ios: DynamicColorIOS({
-                dark: Colors.dark.text,
-                light: Colors.light.text,
+        <OfflineProvider>
+          <Expo55NativeTabs
+            labelStyle={{
+              color: Platform.select({
+                ios: DynamicColorIOS({
+                  dark: Colors.dark.text,
+                  light: Colors.light.text,
+                }),
               }),
-            }),
-          }}
-          tintColor={Platform.select({
-            ios: DynamicColorIOS({
-              dark: Colors.dark.tint,
-              light: Colors.light.tint,
-            }),
-          })}
-          disableTransparentOnScrollEdge>
-          <Expo55NativeTabs.Trigger name="payments">
-            <Expo55NativeTabs.Trigger.Icon
-              sf={{
-                default: 'arrow.up.arrow.down',
-                selected: 'arrow.up.arrow.down',
-              }}
-            />
-            <Expo55NativeTabs.Trigger.Label>Payments</Expo55NativeTabs.Trigger.Label>
-          </Expo55NativeTabs.Trigger>
+            }}
+            tintColor={Platform.select({
+              ios: DynamicColorIOS({
+                dark: Colors.dark.tint,
+                light: Colors.light.tint,
+              }),
+            })}
+            disableTransparentOnScrollEdge>
+            <Expo55NativeTabs.Trigger name="payments">
+              <Expo55NativeTabs.Trigger.Icon
+                sf={{
+                  default: 'arrow.up.arrow.down',
+                  selected: 'arrow.up.arrow.down',
+                }}
+              />
+              <Expo55NativeTabs.Trigger.Label>Payments</Expo55NativeTabs.Trigger.Label>
+            </Expo55NativeTabs.Trigger>
 
-          <Expo55NativeTabs.Trigger name="index">
-            <Expo55NativeTabs.Trigger.Icon
-              sf={{
-                default: 'wallet.bifold',
-                selected: 'wallet.bifold',
-              }}
-            />
-            <Expo55NativeTabs.Trigger.Label>Wallet</Expo55NativeTabs.Trigger.Label>
-          </Expo55NativeTabs.Trigger>
+            <Expo55NativeTabs.Trigger name="index">
+              <Expo55NativeTabs.Trigger.Icon
+                sf={{
+                  default: 'wallet.bifold',
+                  selected: 'wallet.bifold',
+                }}
+              />
+              <Expo55NativeTabs.Trigger.Label>Wallet</Expo55NativeTabs.Trigger.Label>
+            </Expo55NativeTabs.Trigger>
 
-          <Expo55NativeTabs.Trigger name="explore">
-            <Expo55NativeTabs.Trigger.Icon
-              sf={{ default: 'paperplane', selected: 'paperplane.fill' }}
-            />
-            <Expo55NativeTabs.Trigger.Label>Explore</Expo55NativeTabs.Trigger.Label>
-          </Expo55NativeTabs.Trigger>
+            <Expo55NativeTabs.Trigger name="explore">
+              <Expo55NativeTabs.Trigger.Icon
+                sf={{ default: 'paperplane', selected: 'paperplane.fill' }}
+              />
+              <Expo55NativeTabs.Trigger.Label>Explore</Expo55NativeTabs.Trigger.Label>
+            </Expo55NativeTabs.Trigger>
 
-          {/* <Expo55NativeTabs.Trigger name="example">
+            {/* <Expo55NativeTabs.Trigger name="example">
           <Expo55NativeTabs.Trigger.Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
           <Expo55NativeTabs.Trigger.Label>Example</Expo55NativeTabs.Trigger.Label>
         </Expo55NativeTabs.Trigger> */}
-        </Expo55NativeTabs>
+          </Expo55NativeTabs>
+        </OfflineProvider>
       </BackgroundProvider>
     );
   }
@@ -80,55 +83,57 @@ export default function TabLayout() {
   // Fallback for pre-iOS 26 and Android
   return (
     <BackgroundProvider>
-      <View style={{ flex: 1 }}>
-        <Tabs
-          screenOptions={{
-            headerShown: false,
-            ...(!hasAndroidLiquidGlass && { tabBarBackground: () => <TabBarBackground /> }),
-            tabBarStyle: hasAndroidLiquidGlass
-              ? { display: 'none' }
-              : {
-                  position: 'absolute',
-                  backgroundColor: 'transparent',
-                  borderTopColor: 'transparent',
-                  elevation: 0,
-                },
-            tabBarActiveTintColor: Colors.dark.tint,
-            tabBarInactiveTintColor: Colors.dark.text,
-          }}>
-          <Tabs.Screen
-            name="payments"
-            options={{
-              title: 'Payments',
-              tabBarIcon: ({ color }) => (
-                <IconSymbol name="arrow.up.arrow.down" color={color} size={24} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="index"
-            options={{
-              title: 'Wallet',
-              tabBarIcon: ({ color }) => (
-                <IconSymbol name="wallet.bifold" color={color} size={24} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="explore"
-            options={{
-              ...(hasAndroidLiquidGlass ? {} : { href: null }),
-            }}
-          />
-          <Tabs.Screen
-            name="example"
-            options={{
-              href: null, // Hide from tab bar
-            }}
-          />
-        </Tabs>
-        {hasAndroidLiquidGlass ? <GlobalLiquidGlassTabsOverlay /> : null}
-      </View>
+      <OfflineProvider>
+        <View style={{ flex: 1 }}>
+          <Tabs
+            screenOptions={{
+              headerShown: false,
+              ...(!hasAndroidLiquidGlass && { tabBarBackground: () => <TabBarBackground /> }),
+              tabBarStyle: hasAndroidLiquidGlass
+                ? { display: 'none' }
+                : {
+                    position: 'absolute',
+                    backgroundColor: 'transparent',
+                    borderTopColor: 'transparent',
+                    elevation: 0,
+                  },
+              tabBarActiveTintColor: Colors.dark.tint,
+              tabBarInactiveTintColor: Colors.dark.text,
+            }}>
+            <Tabs.Screen
+              name="payments"
+              options={{
+                title: 'Payments',
+                tabBarIcon: ({ color }) => (
+                  <IconSymbol name="arrow.up.arrow.down" color={color} size={24} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="index"
+              options={{
+                title: 'Wallet',
+                tabBarIcon: ({ color }) => (
+                  <IconSymbol name="wallet.bifold" color={color} size={24} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="explore"
+              options={{
+                ...(hasAndroidLiquidGlass ? {} : { href: null }),
+              }}
+            />
+            <Tabs.Screen
+              name="example"
+              options={{
+                href: null, // Hide from tab bar
+              }}
+            />
+          </Tabs>
+          {hasAndroidLiquidGlass ? <GlobalLiquidGlassTabsOverlay /> : null}
+        </View>
+      </OfflineProvider>
     </BackgroundProvider>
   );
 }
