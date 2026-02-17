@@ -62,6 +62,7 @@ interface Props {
   // Filtering options
   filter?: 'all' | 'incoming' | 'outgoing';
   type?: 'all' | 'lightning' | 'ecash';
+  mintUrlFilter?: string;
   at?: 'all' | 'at';
   tab?: 'All' | 'Confirmed' | 'Pending' | 'Expired';
   days?: number;
@@ -89,6 +90,7 @@ export const Transactions = React.memo(
     isFetching = false,
     filter = 'all',
     type = 'all',
+    mintUrlFilter = 'all',
     tab = 'All',
     days = 1,
     hideExpired = false,
@@ -102,11 +104,11 @@ export const Transactions = React.memo(
     // Theme colors for the card frame (matching payments style)
     const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
     const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
-
     const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
 
     const swapGroups = useMemo(() => {
+      if (account.unit === 'all') return Object.values(swapGroupsById);
       return Object.values(swapGroupsById).filter((g) => g.unit === account.unit);
     }, [swapGroupsById, account.unit]);
 
@@ -116,7 +118,8 @@ export const Transactions = React.memo(
     const filteredHistory = useMemo(
       () =>
         _.filter(history, (historyEntry: HistoryEntry) => {
-          if (historyEntry.unit !== account.unit) return false;
+          if (account.unit !== 'all' && historyEntry.unit !== account.unit) return false;
+          if (mintUrlFilter !== 'all' && historyEntry.mintUrl !== mintUrlFilter) return false;
 
           // Hide underlying child transactions that are part of a swap group
           if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
@@ -164,7 +167,16 @@ export const Transactions = React.memo(
 
           return true;
         }),
-      [history, account.unit, filter, type, hideExpired, selectedMonth, quoteIdToGroup]
+      [
+        history,
+        account.unit,
+        mintUrlFilter,
+        filter,
+        type,
+        hideExpired,
+        selectedMonth,
+        quoteIdToGroup,
+      ]
     );
 
     // Build unified timeline: mix history entries + swap groups chronologically

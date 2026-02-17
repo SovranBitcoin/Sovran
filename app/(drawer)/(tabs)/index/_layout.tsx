@@ -1,6 +1,6 @@
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Stack, router } from 'expo-router';
-import { Alert, Dimensions } from 'react-native';
+import { Alert, Dimensions, useWindowDimensions, View } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { NfcPayment, NfcError } from '@/helper/nfc';
 import { useMintStore } from 'stores/mintStore';
@@ -8,21 +8,34 @@ import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useBtcPrice } from 'stores/pricelistStore';
 import { useSettingsStore } from 'stores/settingsStore';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import { useBalanceContext, useManager } from 'coco-cashu-react';
 import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getMintDisplayName } from '@/helper/url';
+import { formatAmount } from 'helper/currency';
 import WalletHeaderTitle from '@/components/blocks/WalletHeaderTitle';
+import {
+  AndroidLiquidHeaderOverlay,
+  AndroidLiquidHeaderTitleButton,
+  buildExpoRouterHeaderOptions,
+  isAndroidLiquidHeaderSupported,
+} from '@/components/navigation/expoRouter55';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
-// Header layout constants for calculating title dimensions
-const HEADER_LAYOUT = {
+/** Shared header layout constants for calculating title dimensions. */
+export const HEADER_LAYOUT = {
   TOOLBAR_BUTTON_WIDTH: 44, // iOS standard touch target
   HORIZONTAL_PADDING: 16, // Padding on left/right edges
   BUTTON_SPACING: 12, // Spacing between buttons and title
   BUTTON_HEIGHT: 54, // Height of the header title button
   CONTENT_PADDING_HORIZONTAL: 16, // Inner padding (8 left + 8 right)
   CONTENT_PADDING_VERTICAL: 14, // Inner padding (7 top + 7 bottom) -> 50 - 14 = 36
+  /** Total overlay height: button (44) + topInset offset (8) */
+  ANDROID_OVERLAY_OFFSET: 8,
+  ANDROID_BUTTON_SIZE: 44,
 } as const;
 
 // Calculate header title available width
@@ -59,8 +72,12 @@ const PAYMENT_TIERS = [
 export default function HomeLayout() {
   const iconColor = useThemeColor({}, 'text');
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const useAndroidLiquidHeader = isAndroidLiquidHeaderSupported();
   const { send } = useSendWithHistory();
   const manager = useManager();
+  const { getMintInfo } = useMintManagement();
   const addScan = useScanHistoryStore((state) => state.addScan);
   const linkTransaction = useScanHistoryStore((state) => state.linkTransaction);
 
@@ -77,6 +94,46 @@ export default function HomeLayout() {
   // Get BTC price for USD to sats conversion
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
   const btcPrice = useBtcPrice(displayCurrency);
+
+  // Android liquid header: mint data for the header title button
+  const [headerMintInfo, setHeaderMintInfo] = useState<any>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadMintInfo() {
+      if (!selectedMint) {
+        if (isMounted) setHeaderMintInfo(null);
+        return;
+      }
+      try {
+        const info = await getMintInfo(selectedMint);
+        if (isMounted) setHeaderMintInfo(info);
+      } catch {
+        if (isMounted) setHeaderMintInfo(null);
+      }
+    }
+    loadMintInfo();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedMint, getMintInfo]);
+
+  const headerTitleWidth = useMemo(() => {
+    const side =
+      HEADER_LAYOUT.TOOLBAR_BUTTON_WIDTH +
+      HEADER_LAYOUT.HORIZONTAL_PADDING +
+      HEADER_LAYOUT.BUTTON_SPACING;
+    return windowWidth - side * 2;
+  }, [windowWidth]);
+
+  const headerMintName = selectedMint
+    ? getMintDisplayName(selectedMint, { name: headerMintInfo?.name })
+    : 'Change Mint';
+  const headerBalance = selectedMint ? balancesWithTotal[selectedMint] || 0 : 0;
+  const headerAmountLabel = useMemo(() => {
+    const val = formatAmount({ amount: headerBalance, unit: 'sat' }, { useUserPreference: true });
+    return `${val} sats`;
+  }, [headerBalance]);
 
   const openDrawer = () => {
     navigation.dispatch(DrawerActions.openDrawer());
@@ -289,8 +346,8 @@ export default function HomeLayout() {
     ]
   );
 
-  // Handle NFC payment tier selection for non-iOS (kept for potential Android fallback)
-  const _handleNFCPaymentAlert = useCallback(() => {
+  // Cross-platform fallback for selecting NFC payment tiers from header action.
+  const handleNFCPaymentAlert = useCallback(() => {
     Alert.alert('NFC Payment Limit', 'Select your payment limit', [
       ...PAYMENT_TIERS.map((tier) => ({
         text: tier.label,
@@ -339,49 +396,60 @@ export default function HomeLayout() {
 
   // Fallback for non-Liquid Glass (older iOS, Android, etc.)
   return (
-    <Stack
-      screenOptions={{
-        contentStyle: {
-          backgroundColor: 'transparent',
-        },
-      }}>
-      <Stack.Screen
-        name="index"
-        options={{
-          headerTransparent: true,
-          headerTitleAlign: 'center',
-          headerTitle: () => (
-            <WalletHeaderTitle
-              liquidGlass
-              style={{ width: getHeaderTitleWidth(), height: getHeaderTitleHeight() }}
-              contentWidth={getHeaderContentWidth()}
-              contentHeight={getHeaderContentHeight()}
-            />
-          ),
+    <View style={{ flex: 1 }}>
+      <Stack
+        screenOptions={{
+          contentStyle: {
+            backgroundColor: 'transparent',
+          },
         }}>
-        {/* Left toolbar - Menu button */}
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon="line.3.horizontal"
-            onPress={openDrawer}
-            tintColor={iconColor}
-          />
-        </Stack.Toolbar>
-
-        {/* Right toolbar - NFC Payment with menu */}
-        <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Menu icon="wave.3.right" tintColor={iconColor}>
-            {PAYMENT_TIERS.map((tier) => (
-              <Stack.Toolbar.MenuAction
-                key={tier.label}
-                icon={tier.icon}
-                onPress={() => handleNFCPayment(tier.usdLimit)}>
-                {tier.label}
-              </Stack.Toolbar.MenuAction>
-            ))}
-          </Stack.Toolbar.Menu>
-        </Stack.Toolbar>
-      </Stack.Screen>
-    </Stack>
+        <Stack.Screen
+          name="index"
+          options={buildExpoRouterHeaderOptions({
+            iconColor,
+            headerLeftIcon: 'line.3.horizontal',
+            onHeaderLeftPress: openDrawer,
+            headerRightIcon: 'wave.3.right',
+            onHeaderRightPress: handleNFCPaymentAlert,
+            options: {
+              headerShown: !useAndroidLiquidHeader,
+              headerTransparent: true,
+              headerTitleAlign: 'center',
+              headerTitle: () => (
+                <WalletHeaderTitle
+                  liquidGlass
+                  style={{ width: getHeaderTitleWidth(), height: getHeaderTitleHeight() }}
+                  contentWidth={getHeaderContentWidth()}
+                  contentHeight={getHeaderContentHeight()}
+                />
+              ),
+            },
+          })}
+        />
+      </Stack>
+      {useAndroidLiquidHeader ? (
+        <AndroidLiquidHeaderOverlay
+          topInset={insets.top}
+          iconColor={iconColor}
+          leftIcon="line.3.horizontal"
+          onLeftPress={openDrawer}
+          rightIcon="wave.3.right"
+          onRightPress={handleNFCPaymentAlert}
+          centerWidth={headerTitleWidth}
+          center={
+            <AndroidLiquidHeaderTitleButton
+              width={headerTitleWidth}
+              lineOneText={headerMintName}
+              lineTwoText={headerAmountLabel}
+              avatarName={headerMintName}
+              avatarPicture={headerMintInfo?.icon_url}
+              onPress={() => {
+                router.navigate('/(mint-flow)/list' as any);
+              }}
+            />
+          }
+        />
+      ) : null}
+    </View>
   );
 }

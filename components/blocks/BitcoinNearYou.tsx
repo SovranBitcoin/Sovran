@@ -52,6 +52,7 @@ const GOOGLE_MAPS_NO_LABELS_STYLE = JSON.stringify([
   { featureType: 'poi', stylers: [{ visibility: 'off' }] },
   { featureType: 'transit', stylers: [{ visibility: 'off' }] },
 ]);
+const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 // ---------------------------------------------------------------------------
 // Marker type
@@ -95,7 +96,7 @@ function MapPreview({
           uiSettings={DISABLED_MAP_UI_SETTINGS}
           markers={markers}
         />
-      ) : (
+      ) : HAS_ANDROID_GOOGLE_MAPS_KEY ? (
         <GoogleMaps.View
           style={StyleSheet.absoluteFillObject}
           cameraPosition={cameraPosition}
@@ -107,6 +108,8 @@ function MapPreview({
           uiSettings={DISABLED_MAP_UI_SETTINGS}
           markers={markers}
         />
+      ) : (
+        <RNView style={StyleSheet.absoluteFillObject} />
       )}
 
       {/* Grayscale + desaturation overlays */}

@@ -17,6 +17,7 @@ interface TransactionsFilterState {
   paymentType: PaymentType;
   direction: Direction;
   status: Status;
+  mintUrl: string;
   selectedMonth: string | null;
 }
 
@@ -25,6 +26,7 @@ interface TransactionsFilterContextValue extends TransactionsFilterState {
   setPaymentType: (type: PaymentType) => void;
   setDirection: (dir: Direction) => void;
   setStatus: (status: Status) => void;
+  setMintUrl: (mintUrl: string) => void;
   setSelectedMonth: (month: string | null) => void;
   openFilterSheet: () => void;
   hasActiveFilters: boolean;
@@ -39,6 +41,7 @@ interface TransactionsFilterProviderProps {
   initialPaymentType?: PaymentType;
   initialDirection?: Direction;
   initialStatus?: Status;
+  initialMintUrl?: string;
 }
 
 export function TransactionsFilterProvider({
@@ -47,11 +50,13 @@ export function TransactionsFilterProvider({
   initialPaymentType = 'all',
   initialDirection = 'all',
   initialStatus = 'All',
+  initialMintUrl = 'all',
 }: TransactionsFilterProviderProps) {
   const [currency, setCurrency] = useState(initialCurrency);
   const [paymentType, setPaymentType] = useState<PaymentType>(initialPaymentType);
   const [direction, setDirection] = useState<Direction>(initialDirection);
   const [status, setStatus] = useState<Status>(initialStatus);
+  const [mintUrl, setMintUrl] = useState(initialMintUrl);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const openFilterSheet = useCallback(() => {
@@ -62,21 +67,23 @@ export function TransactionsFilterProvider({
         paymentType,
         direction,
         status,
+        mintUrl,
       },
     });
-  }, [currency, paymentType, direction, status]);
+  }, [currency, paymentType, direction, status, mintUrl]);
 
   const hasActiveFilters = useMemo(() => {
-    return paymentType !== 'all' || direction !== 'all' || status !== 'All';
-  }, [paymentType, direction, status]);
+    return paymentType !== 'all' || direction !== 'all' || status !== 'All' || mintUrl !== 'all';
+  }, [paymentType, direction, status, mintUrl]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (paymentType !== 'all') count++;
     if (direction !== 'all') count++;
     if (status !== 'All') count++;
+    if (mintUrl !== 'all') count++;
     return count;
-  }, [paymentType, direction, status]);
+  }, [paymentType, direction, status, mintUrl]);
 
   const value = useMemo(
     () => ({
@@ -84,11 +91,13 @@ export function TransactionsFilterProvider({
       paymentType,
       direction,
       status,
+      mintUrl,
       selectedMonth,
       setCurrency,
       setPaymentType,
       setDirection,
       setStatus,
+      setMintUrl,
       setSelectedMonth,
       openFilterSheet,
       hasActiveFilters,
@@ -99,6 +108,7 @@ export function TransactionsFilterProvider({
       paymentType,
       direction,
       status,
+      mintUrl,
       selectedMonth,
       openFilterSheet,
       hasActiveFilters,

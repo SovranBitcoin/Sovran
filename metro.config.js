@@ -26,6 +26,13 @@ const nativeWindConfig = withNativeWind(config, { input: './global.css' });
 // This replaces @monicon/metro's withMonicon() which is incompatible with
 // the installed version mix and Expo 55's resolver chain.
 const moniconIconsPath = path.resolve(__dirname, '.monicon', 'icons.js');
+const liquidGlassEntryPath = path.resolve(
+  __dirname,
+  'node_modules',
+  'expo-liquid-glass-native',
+  'build',
+  'index.js'
+);
 
 // Save NativeWind's resolver before adding ours — NativeWind intercepts CSS
 // imports and swaps them for platform-specific JS. Overwriting it causes a
@@ -37,6 +44,12 @@ nativeWindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
     return {
       type: 'sourceFile',
       filePath: moniconIconsPath,
+    };
+  }
+  if (moduleName === 'expo-liquid-glass-native') {
+    return {
+      type: 'sourceFile',
+      filePath: liquidGlassEntryPath,
     };
   }
   // Chain to NativeWind's resolver to preserve CSS interop styling

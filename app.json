@@ -27,14 +27,9 @@
         ],
         "UIBackgroundModes": ["fetch", "bluetooth-central", "bluetooth-peripheral"],
         "UIDeviceFamily": [1],
-        "NSMotionUsageDescription": "Allow motion access to use the motion sensor to rotate the screen",
-        "NSPhotoLibraryAddUsageDescription": "Allow access to your photos to save them to your library",
-        "NSPhotoLibraryUsageDescription": "Allow access to your photos to use them in the app",
-        "NSLocalNetworkUsageDescription": "This app requires access to network features for VPN functionality",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to access your location",
-        "NSLocationAlwaysUsageDescription": "Allow $(PRODUCT_NAME) to access your location",
-        "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect with nearby devices for decentralized messaging.",
-        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to connect with nearby devices for decentralized messaging.",
+        "NSMotionUsageDescription": "Sovran uses motion sensor data to create subtle parallax and visual effects while you use the app.",
+        "NSPhotoLibraryUsageDescription": "Sovran uses your photo library so you can choose an image that contains a QR code to scan for payments.",
+        "NSLocationWhenInUseUsageDescription": "Sovran uses your location while the app is open to show nearby places on the map and to add location context to transactions when you choose to use those features.",
         "NFCReaderUsageDescription": "Sovran uses NFC to send and receive contactless payments."
       },
       "entitlements": {

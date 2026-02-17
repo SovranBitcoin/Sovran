@@ -60,7 +60,6 @@ import { nip19 } from 'nostr-tools';
 import type { ProfilePointer } from 'nostr-tools/nip19';
 import { MintHistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 import CustomKeyboard from 'components/blocks/CustomKeyboard';
-import WalletHeaderTitle from 'components/blocks/WalletHeaderTitle';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -73,8 +72,8 @@ import * as Clipboard from 'expo-clipboard';
 import { checkBalance, createWalletFromToken, topUpBalance } from 'helper/routstr/api';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useTheme } from 'providers/ThemeProvider';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMintStore } from 'stores/mintStore';
 import { useRoutstrStore } from 'stores/routstrStore';
@@ -96,6 +95,7 @@ const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }
 };
 
 type InputMode = 'sats' | 'fiat';
+type SendMode = 'offline' | 'online';
 
 /**
  * Displays fiat amount with styled decimal placeholders
@@ -107,6 +107,7 @@ interface FiatAmountDisplayProps {
   symbol: string;
   activeColor: string;
   placeholderColor: string;
+  size?: number;
 }
 
 function FiatAmountDisplay({
@@ -114,6 +115,7 @@ function FiatAmountDisplay({
   symbol,
   activeColor,
   placeholderColor,
+  size = 48,
 }: FiatAmountDisplayProps) {
   // Determine what to display based on raw input
   const hasDecimal = rawInput.includes('.');
@@ -137,7 +139,7 @@ function FiatAmountDisplay({
 
   return (
     <HStack align="baseline" justify="center">
-      <Text size={48} weight="heavy" style={{ color: activeColor }}>
+      <Text size={size} weight="heavy" style={{ color: activeColor }}>
         {symbol}
         {formattedWhole}
       </Text>
@@ -145,20 +147,20 @@ function FiatAmountDisplay({
         <>
           {/* Show the decimal point - in active color if user typed it, placeholder if auto-shown for "0" */}
           <Text
-            size={48}
+            size={size}
             weight="heavy"
             style={{ color: hasDecimal ? activeColor : placeholderColor }}>
             .
           </Text>
           {/* Show any typed decimal digits */}
           {decimalPart && (
-            <Text size={48} weight="heavy" style={{ color: activeColor }}>
+            <Text size={size} weight="heavy" style={{ color: activeColor }}>
               {decimalPart}
             </Text>
           )}
           {/* Show placeholder for remaining decimal places */}
           {placeholderDecimals && (
-            <Text size={48} weight="heavy" style={{ color: placeholderColor }}>
+            <Text size={size} weight="heavy" style={{ color: placeholderColor }}>
               {placeholderDecimals}
             </Text>
           )}
@@ -200,6 +202,8 @@ interface CurrencyScreenProps {
   processPaymentStringFn?: (scanning: { data: string; type?: string }) => Promise<unknown>;
   /** Called when user tries to send more than current mint's balance */
   onInsufficientBalance?: (amount: number, unit: string) => void;
+  /** Emits exact send route mode based on current mint proofs + amount */
+  onSendModeChange?: (mode: SendMode | null) => void;
 }
 
 export function CurrencyScreen({
@@ -212,9 +216,17 @@ export function CurrencyScreen({
   onDone: _onDone,
   processPaymentStringFn,
   onInsufficientBalance,
+  onSendModeChange,
 }: CurrencyScreenProps) {
   const { getPrimaryColor, getShadeColor } = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: screenHeight } = useWindowDimensions();
+  const isCompactPhone = screenHeight <= 760;
+  const isVeryCompactPhone = screenHeight <= 680;
+  const amountTextSize = isVeryCompactPhone ? 36 : isCompactPhone ? 42 : 48;
+  const centerSpacing = isCompactPhone ? 3 : 4;
+  const topPadding = insets.top + (isCompactPhone ? 12 : 24);
+  const bottomControlsPadding = 0;
 
   const { send } = useSendWithHistory();
   const { requestLightningInvoice } = useLightningOperations();
@@ -233,11 +245,13 @@ export function CurrencyScreen({
   // Track raw input string for fiat mode to preserve decimal state
   const [rawFiatInput, setRawFiatInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sendMode, setSendMode] = useState<SendMode | null>(null);
+  const sendModeRequestIdRef = useRef(0);
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
   const setSelectedMint = useMintStore((state) => state.setSelectedMint);
   const storeSelectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
-  const [unit, setUnit] = useState(params?.unit?.toLowerCase() || 'sat');
+  const unit = params?.unit?.toLowerCase() || 'sat';
   const [isValidAmount, setIsValidAmount] = useState(false);
 
   // Get live balance for the selected mint
@@ -353,10 +367,47 @@ export function CurrencyScreen({
 
   const manager = useManager();
 
-  const handleMintSelected = async (mint: { id: string; unit: string }) => {
-    const newUnit = mint.unit.toLowerCase();
-    setUnit(newUnit);
-  };
+  useEffect(() => {
+    const isSendTokenFlow = params.to === 'sendToken';
+    if (!isSendTokenFlow || !selectedMint || !Number.isFinite(amount) || amount <= 0) {
+      setSendMode(null);
+      return;
+    }
+
+    // If we already know the mint cannot cover this amount, skip route estimation.
+    if (amount > mintBalance) {
+      setSendMode(null);
+      return;
+    }
+
+    const requestId = ++sendModeRequestIdRef.current;
+    void (async () => {
+      try {
+        // Mirror coco SendOperationService.prepare(): if exact proof set exists with includeFees=false,
+        // it's an offline send; otherwise it needs swap and is online.
+        const selectedProofs = await manager.proofService.selectProofsToSend(
+          selectedMint,
+          amount,
+          false
+        );
+        const selectedAmount = selectedProofs.reduce((sum, proof) => sum + proof.amount, 0);
+        const mode: SendMode =
+          selectedProofs.length > 0 && selectedAmount === amount ? 'offline' : 'online';
+
+        if (sendModeRequestIdRef.current === requestId) {
+          setSendMode(mode);
+        }
+      } catch {
+        if (sendModeRequestIdRef.current === requestId) {
+          setSendMode(null);
+        }
+      }
+    })();
+  }, [amount, manager, mintBalance, params.to, selectedMint]);
+
+  useEffect(() => {
+    onSendModeChange?.(params.to === 'sendToken' ? sendMode : null);
+  }, [onSendModeChange, params.to, sendMode]);
 
   const handleLightningReceive = async () => {
     if (!selectedMint) {
@@ -650,7 +701,7 @@ export function CurrencyScreen({
     };
 
     return (
-      <HStack className={'pb-2'} justify="center" align="center">
+      <HStack justify="center" align="center">
         {!params?.amount && isEcashSend && !hasPaymentRequest && <Text></Text>}
         <ButtonHandler
           buttons={[
@@ -704,77 +755,63 @@ export function CurrencyScreen({
 
   return (
     <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingTop: insets.top + 48,
-        }}>
-        <VStack align="center" spacing={4}>
-          {/* Main amount display */}
-          {inputMode === 'sats' ? (
-            <AmountFormatter
-              amount={inputAmount}
-              unit={unit}
-              size={48}
-              weight="heavy"
-              animated
-              useTypeColors
-              transactionType={
-                params?.to === 'sendToken' || params?.to === 'meltQuote' ? 'send' : 'receive'
-              }
-              centered
-            />
-          ) : (
-            <FiatAmountDisplay
-              rawInput={rawFiatInput}
-              symbol={currencyConfig.symbol}
-              activeColor={
-                rawFiatInput
-                  ? params?.to === 'sendToken' || params?.to === 'meltQuote'
+      <View style={{ flex: 1, paddingTop: topPadding, paddingHorizontal: 16 }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <VStack align="center" spacing={centerSpacing}>
+            {/* Main amount display */}
+            {inputMode === 'sats' ? (
+              <AmountFormatter
+                amount={inputAmount}
+                unit={unit}
+                size={amountTextSize}
+                weight="heavy"
+                animated
+                useTypeColors
+                transactionType={
+                  params?.to === 'sendToken' || params?.to === 'meltQuote' ? 'send' : 'receive'
+                }
+                centered
+              />
+            ) : (
+              <FiatAmountDisplay
+                rawInput={rawFiatInput}
+                symbol={currencyConfig.symbol}
+                size={amountTextSize}
+                activeColor={
+                  rawFiatInput
+                    ? params?.to === 'sendToken' || params?.to === 'meltQuote'
+                      ? getShadeColor('300')
+                      : getPrimaryColor('0')
+                    : opacity(getPrimaryColor('0'), 0.4)
+                }
+                placeholderColor={opacity(
+                  params?.to === 'sendToken' || params?.to === 'meltQuote'
                     ? getShadeColor('300')
-                    : getPrimaryColor('0')
-                  : opacity(getPrimaryColor('0'), 0.4)
+                    : getPrimaryColor('0'),
+                  0.35
+                )}
+              />
+            )}
+            {/* Secondary converted value with toggle */}
+            <FiatCurrencyPill
+              displayText={
+                secondaryDisplay ||
+                (inputMode === 'sats' ? `≈ ${currencyConfig.symbol}0.00` : '≈ 0 sats')
               }
-              placeholderColor={opacity(
-                params?.to === 'sendToken' || params?.to === 'meltQuote'
-                  ? getShadeColor('300')
-                  : getPrimaryColor('0'),
-                0.35
-              )}
+              onPress={handleToggleInputMode}
+              showToggleGlyph
+              enableCurrencyMenu={false}
             />
-          )}
-        </VStack>
-        <View style={{ marginVertical: 8 }}>
-          <WalletHeaderTitle
-            width={200}
-            unit={unit}
-            requireBalance={params?.to === 'sendToken' || params?.to === 'meltQuote'}
-            showAddMintsButton={!(params?.to === 'sendToken' || params?.to === 'meltQuote')}
-            showDetailsButton={!(params?.to === 'sendToken' || params?.to === 'meltQuote')}
-            allowedMints={allowedMints}
-            onMintSelected={handleMintSelected}
-          />
+          </VStack>
         </View>
-        <VStack align="center" spacing={4}>
-          {/* Secondary converted value with toggle - always visible */}
-          <FiatCurrencyPill
-            displayText={
-              secondaryDisplay ||
-              (inputMode === 'sats' ? `≈ ${currencyConfig.symbol}0.00` : '≈ 0 sats')
-            }
-            onPress={handleToggleInputMode}
-            showToggleGlyph
-            enableCurrencyMenu={false}
-          />
-        </VStack>
-      </ScrollView>
+      </View>
 
-      <BottomButtons>
+      <BottomButtons style={{ position: 'relative' }} paddingBottom={bottomControlsPadding}>
         {!params?.amount && (
           <CustomKeyboard
             loading={loading}
             unit={keyboardUnit}
+            compact={isCompactPhone}
             onKeyPress={(value: string) => {
               setInputAmount(parseFloat(value) || 0);
               if (inputMode === 'fiat') {

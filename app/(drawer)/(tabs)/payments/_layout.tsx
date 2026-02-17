@@ -9,6 +9,7 @@ import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { View } from 'components/ui/View/View';
+import { buildExpoRouterHeaderOptions } from '@/components/navigation/expoRouter55';
 
 // Search context for sharing state between layout and index
 interface PaymentsSearchContextValue {
@@ -146,30 +147,25 @@ export default function PaymentsLayout() {
         }}>
         <Stack.Screen
           name="index"
-          options={{
-            headerTransparent: true,
-            headerTitle: () =>
-              Platform.OS === 'ios' ? (
-                <NativeSearchHeader width={headerWidth} clearKey={clearKey} />
-              ) : (
-                <FallbackSearchHeader clearKey={clearKey} />
-              ),
-            headerLeft: () => (
-              <Pressable onPress={openDrawer} style={{ margin: 2 }}>
-                <IconSymbol name="line.3.horizontal" size={30} color={iconColor} />
+          options={buildExpoRouterHeaderOptions({
+            iconColor,
+            headerLeftIcon: 'line.3.horizontal',
+            onHeaderLeftPress: openDrawer,
+            headerRight: () => (
+              <Pressable onPress={handleClearSearch} style={{ padding: 8 }}>
+                <IconSymbol name="xmark" size={20} color={iconColor} />
               </Pressable>
             ),
-            headerRight: () =>
-              isSearching ? (
-                <Pressable onPress={handleClearSearch} style={{ padding: 8 }}>
-                  <IconSymbol name="xmark" size={20} color={iconColor} />
-                </Pressable>
-              ) : (
-                <Pressable onPress={handleClearSearch} style={{ padding: 8 }}>
-                  <IconSymbol name="xmark" size={20} color={iconColor} />
-                </Pressable>
-              ),
-          }}
+            options: {
+              headerTransparent: true,
+              headerTitle: () =>
+                Platform.OS === 'ios' ? (
+                  <NativeSearchHeader width={headerWidth} clearKey={clearKey} />
+                ) : (
+                  <FallbackSearchHeader clearKey={clearKey} />
+                ),
+            },
+          })}
         />
       </Stack>
     </PaymentsSearchContext.Provider>

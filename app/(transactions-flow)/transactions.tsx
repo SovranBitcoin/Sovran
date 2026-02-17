@@ -59,25 +59,34 @@ function FilterButton() {
 }
 
 function TransactionsRoute() {
-  const { account, filterCurrency, filterPaymentType, filterDirection, filterStatus } =
-    useLocalSearchParams<{
-      account: string;
-      filterCurrency?: string;
-      filterPaymentType?: string;
-      filterDirection?: string;
-      filterStatus?: string;
-    }>();
+  const {
+    account,
+    filterCurrency,
+    filterPaymentType,
+    filterDirection,
+    filterStatus,
+    filterMintUrl,
+  } = useLocalSearchParams<{
+    account: string;
+    filterCurrency?: string;
+    filterPaymentType?: string;
+    filterDirection?: string;
+    filterStatus?: string;
+    filterMintUrl?: string;
+  }>();
   const {
     currency,
     paymentType,
     direction,
     status,
+    mintUrl,
     selectedMonth,
     setSelectedMonth,
     setCurrency,
     setPaymentType,
     setDirection,
     setStatus,
+    setMintUrl,
   } = useTransactionsFilter();
 
   // Sync filter params from URL to context (when returning from filter flow)
@@ -86,15 +95,18 @@ function TransactionsRoute() {
     if (filterPaymentType) setPaymentType(filterPaymentType as 'all' | 'lightning' | 'ecash');
     if (filterDirection) setDirection(filterDirection as 'all' | 'incoming' | 'outgoing');
     if (filterStatus) setStatus(filterStatus as 'All' | 'Confirmed' | 'Pending' | 'Expired');
+    if (filterMintUrl) setMintUrl(filterMintUrl);
   }, [
     filterCurrency,
     filterPaymentType,
     filterDirection,
     filterStatus,
+    filterMintUrl,
     setCurrency,
     setPaymentType,
     setDirection,
     setStatus,
+    setMintUrl,
   ]);
 
   const initialAccount = account ? JSON.parse(account) : undefined;
@@ -160,6 +172,7 @@ function TransactionsRoute() {
         filterCurrency={currency}
         filterPaymentType={paymentType}
         filterDirection={direction}
+        filterMintUrl={mintUrl}
         filterMonth={selectedMonth}
         onMonthChange={setSelectedMonth}
       />

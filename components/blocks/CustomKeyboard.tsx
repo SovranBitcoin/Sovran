@@ -41,11 +41,17 @@ interface CustomKeyboardProps {
   onKeyPress: (value: string) => void;
   unit: 'sat' | string;
   loading?: boolean;
+  compact?: boolean;
 }
 
 type KeyboardValue = string | number;
 
-const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loading = false }) => {
+const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
+  onKeyPress,
+  unit,
+  loading = false,
+  compact = false,
+}) => {
   const [, setInputValue] = useState<string>('');
   const { getPrimaryColor } = useTheme();
 
@@ -117,15 +123,15 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loadi
         disabled={loading}
         onPress={() => handlePress(value)}>
         {value === '<' ? (
-          <Icon name="lucide:delete" size={24} color="white" />
+          <Icon name="lucide:delete" size={compact ? 22 : 24} color="white" />
         ) : (
           <Text
-            size={24}
+            size={compact ? 22 : 24}
             bold
             overpass
             style={{
-              padding: 16,
-              paddingHorizontal: 24,
+              padding: compact ? 14 : 16,
+              paddingHorizontal: compact ? 22 : 24,
               color: 'white',
             }}>
             {value}
@@ -133,7 +139,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({ onKeyPress, unit, loadi
         )}
       </TouchableOpacity>
     ),
-    [handlePress, loading, getPrimaryColor]
+    [compact, handlePress, loading, getPrimaryColor]
   );
 
   const buttons: KeyboardValue[][] = [
