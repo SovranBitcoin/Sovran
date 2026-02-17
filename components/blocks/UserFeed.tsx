@@ -24,7 +24,15 @@
  */
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
-import { StyleSheet, Animated, Easing, TouchableOpacity, Linking, Dimensions } from 'react-native';
+import {
+  StyleSheet,
+  Animated,
+  Easing,
+  TouchableOpacity,
+  Linking,
+  Dimensions,
+  Platform,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router } from 'expo-router';
@@ -792,8 +800,8 @@ const ImageBlock = React.memo(function ImageBlock({ url }: { url: string }) {
   );
 });
 
-/** Inline video player using expo-video */
-const VideoBlock = React.memo(function VideoBlock({ url }: { url: string }) {
+/** iOS inline video player using expo-video */
+const IOSVideoBlock = React.memo(function IOSVideoBlock({ url }: { url: string }) {
   const { getPrimaryColor } = useTheme();
   const player = useVideoPlayer(url, (p) => {
     p.loop = false;
@@ -810,6 +818,40 @@ const VideoBlock = React.memo(function VideoBlock({ url }: { url: string }) {
       />
     </View>
   );
+});
+
+/** Android fallback while expo-video has native mounting issues on profile switches. */
+const AndroidVideoBlock = React.memo(function AndroidVideoBlock({ url }: { url: string }) {
+  const { getPrimaryColor } = useTheme();
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => Linking.openURL(url).catch(() => {})}
+      style={[
+        styles.mediaCard,
+        { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
+      ]}>
+      <HStack align="center" gap={8}>
+        <Icon name="mdi:play-circle-outline" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+        <VStack style={styles.flex1}>
+          <Text bold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
+            Video
+          </Text>
+          <Text size={11} numberOfLines={1} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
+            Open in browser
+          </Text>
+        </VStack>
+        <Icon name="mdi:open-in-new" size={16} color={opacity(getPrimaryColor('0'), 0.33)} />
+      </HStack>
+    </TouchableOpacity>
+  );
+});
+
+const VideoBlock = React.memo(function VideoBlock({ url }: { url: string }) {
+  if (Platform.OS === 'android') {
+    return <AndroidVideoBlock url={url} />;
+  }
+  return <IOSVideoBlock url={url} />;
 });
 
 /** Lightning invoice card */
