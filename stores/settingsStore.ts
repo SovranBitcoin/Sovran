@@ -39,6 +39,7 @@ interface SettingsState {
   passcode: string;
   experimental: boolean;
   mockMode: boolean;
+  mockOffline: boolean;
   termsAccepted: TermsAccepted | null;
   quickAccessP2PK: boolean;
   sendLocationEnabled: boolean;
@@ -78,6 +79,8 @@ interface SettingsActions {
   // Mock mode (demo data)
   setMockMode: (enabled: boolean) => void;
   getMockMode: () => boolean;
+  setMockOffline: (enabled: boolean) => void;
+  getMockOffline: () => boolean;
 
   // Terms acceptance
   acceptTerms: (date: string) => void;
@@ -119,6 +122,7 @@ export const useSettingsStore = create<SettingsStore>()(
       passcode: '',
       experimental: false,
       mockMode: false,
+      mockOffline: false,
       termsAccepted: null,
       quickAccessP2PK: false,
       sendLocationEnabled: false,
@@ -215,6 +219,14 @@ export const useSettingsStore = create<SettingsStore>()(
         return get().mockMode;
       },
 
+      setMockOffline: (enabled: boolean) => {
+        set({ mockOffline: enabled });
+      },
+
+      getMockOffline: () => {
+        return get().mockOffline;
+      },
+
       // Terms acceptance
       acceptTerms: (date: string) => {
         set({
@@ -292,6 +304,7 @@ export const useSettingsStore = create<SettingsStore>()(
           passcode: '',
           experimental: false,
           mockMode: false,
+          mockOffline: false,
           termsAccepted: null,
           quickAccessP2PK: false,
           sendLocationEnabled: false,
@@ -321,6 +334,7 @@ export const useSettingsStore = create<SettingsStore>()(
             passcode: '',
             experimental: false,
             mockMode: false,
+            mockOffline: false,
             termsAccepted: null,
             quickAccessP2PK: false,
             sendLocationEnabled: false,
@@ -351,6 +365,7 @@ export const useSettingsStore = create<SettingsStore>()(
         displayCurrency: state.displayCurrency,
         experimental: state.experimental,
         mockMode: state.mockMode,
+        mockOffline: state.mockOffline,
         termsAccepted: state.termsAccepted,
         quickAccessP2PK: state.quickAccessP2PK,
         sendLocationEnabled: state.sendLocationEnabled,

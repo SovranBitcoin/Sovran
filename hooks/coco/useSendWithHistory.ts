@@ -60,6 +60,7 @@ export function useSendWithHistory() {
       let capturedEntry: SendHistoryEntry | null = null;
       let resolveEntryPromise: (entry: SendHistoryEntry) => void;
       let targetOperationId: string | null = null;
+      let preparedOperationId: string | null = null;
 
       const entryPromise = new Promise<SendHistoryEntry>((resolve) => {
         resolveEntryPromise = resolve;
@@ -82,6 +83,7 @@ export function useSendWithHistory() {
         // Step 1: Prepare the send operation using new v3 API
         const prepared = await manager.send.prepareSend(mintUrl, amount);
         targetOperationId = prepared.id;
+        preparedOperationId = prepared.id;
 
         // Step 2: Execute the prepared send operation
         const { token, operation } = await manager.send.executePreparedSend(prepared.id);
@@ -127,6 +129,22 @@ export function useSendWithHistory() {
         return result;
       } catch (e) {
         unsubscribe(); // Clean up listener on error
+
+        // Coco docs recommend rolling back prepared/executing/pending sends on failure.
+        if (preparedOperationId) {
+          try {
+            const operation = await manager.send.getOperation(preparedOperationId);
+            if (operation && ['prepared', 'executing', 'pending'].includes(operation.state)) {
+              await manager.send.rollback(preparedOperationId);
+            }
+          } catch (rollbackError) {
+            console.warn(
+              '[useSendWithHistory] Failed to rollback failed send operation:',
+              rollbackError
+            );
+          }
+        }
+
         const err = e instanceof Error ? e : new Error(String(e));
         setError(err);
         setStatus('error');

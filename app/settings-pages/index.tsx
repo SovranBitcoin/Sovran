@@ -177,6 +177,8 @@ const ModalScreen = () => {
   const setDevMode = useSettingsStore((state) => state.setExperimental);
   const mockMode = useSettingsStore((state) => state.mockMode);
   const setMockMode = useSettingsStore((state) => state.setMockMode);
+  const mockOffline = useSettingsStore((state) => state.mockOffline);
+  const setMockOffline = useSettingsStore((state) => state.setMockOffline);
 
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
@@ -324,8 +326,6 @@ const ModalScreen = () => {
                 backgroundColor: getPrimaryColor('800'),
                 borderColor: getPrimaryColor('700'),
                 borderTopWidth: 1,
-                borderBottomLeftRadius: 12,
-                borderBottomRightRadius: 12,
                 padding: 12,
               }}>
               <HStack align="center" justify="space-between">
@@ -335,6 +335,30 @@ const ModalScreen = () => {
                 <Switch
                   value={mockMode}
                   onValueChange={setMockMode}
+                  trackColor={{
+                    false: getPrimaryColor('700'),
+                    true: getShadeColor('300'),
+                  }}
+                  thumbColor={getPrimaryColor('0')}
+                />
+              </HStack>
+            </View>
+            <View
+              style={{
+                backgroundColor: getPrimaryColor('800'),
+                borderColor: getPrimaryColor('700'),
+                borderTopWidth: 1,
+                borderBottomLeftRadius: 12,
+                borderBottomRightRadius: 12,
+                padding: 12,
+              }}>
+              <HStack align="center" justify="space-between">
+                <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                  Mock Offline
+                </Text>
+                <Switch
+                  value={mockOffline}
+                  onValueChange={setMockOffline}
                   trackColor={{
                     false: getPrimaryColor('700'),
                     true: getShadeColor('300'),

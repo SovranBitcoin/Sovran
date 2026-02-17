@@ -183,6 +183,19 @@ export default function HomeLayout() {
       let lastOperationId: string | null = null;
       // Track the last scanned raw data for linking to transaction
       let lastScannedRaw: string | null = null;
+      const rollbackPendingNfcSend = async () => {
+        if (!lastOperationId) return;
+        try {
+          const operation = await manager.send.getOperation(lastOperationId);
+          if (operation && ['prepared', 'executing', 'pending'].includes(operation.state)) {
+            console.log(`[NFC Payment] Fallback rollback for operation: ${lastOperationId}`);
+            await manager.send.rollback(lastOperationId);
+            console.log('[NFC Payment] Fallback rollback successful');
+          }
+        } catch (rollbackError) {
+          console.warn('[NFC Payment] Fallback rollback failed:', rollbackError);
+        }
+      };
 
       try {
         const result = await NfcPayment.performPayment({
@@ -283,6 +296,7 @@ export default function HomeLayout() {
               break;
             case 'TAG_LOST':
             case 'TRANSCEIVE_FAILED':
+              await rollbackPendingNfcSend();
               Alert.alert(
                 'Connection Lost',
                 'Lost connection to the terminal. Please hold your device steady and try again.'
