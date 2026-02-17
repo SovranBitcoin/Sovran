@@ -301,12 +301,43 @@ export function SendTokenScreen({
   const handleNFCSend = useCallback(
     async (close: (event: any) => void): Promise<void> => {
       if (!token) return;
-      const success = await writeTokenToNFC(getEncodedTokenV4(token));
-      if (success) {
+      const writeResult = await writeTokenToNFC(getEncodedTokenV4(token));
+      if (writeResult.success) {
         popup({ message: 'ecash_token_shared_via_nfc', type: 'success', onClose: () => close({}) });
+        return;
       }
+
+      const operationId = currentTransaction?.operationId;
+      const lostConnection =
+        writeResult.errorCode === 'TAG_LOST' || writeResult.errorCode === 'TRANSCEIVE_FAILED';
+
+      // If NFC delivery failed due lost connection, reclaim the pending send immediately.
+      if (lostConnection && operationId) {
+        try {
+          await manager.send.rollback(operationId);
+          popup({
+            message: 'NFC connection lost. Send was rolled back.',
+            type: 'warning',
+          });
+          return;
+        } catch (rollbackError) {
+          console.error('[SendTokenScreen] NFC rollback failed:', rollbackError);
+          popup({
+            message: 'NFC send failed and rollback failed',
+            text: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+            type: 'error',
+          });
+          return;
+        }
+      }
+
+      popup({
+        message: 'NFC send failed',
+        text: writeResult.errorMessage || 'Unable to write token via NFC.',
+        type: 'error',
+      });
     },
-    [token]
+    [token, currentTransaction?.operationId, manager]
   );
 
   const handleCopy = useCallback(

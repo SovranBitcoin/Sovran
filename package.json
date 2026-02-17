@@ -35,7 +35,8 @@
     "build:themes": "node scripts/build-background-themes.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "screenshots": "node scripts/resize-screenshots.js"
+    "screenshots": "node scripts/resize-screenshots.js",
+    "release:freedomstore:pr": "bash scripts/create-freedomstore-pr.sh"
   },
   "dependencies": {
     "@babel/runtime": "^7.28.0",
@@ -87,6 +88,7 @@
     "expo-localization": "~55.0.2",
     "expo-location": "~55.0.3",
     "expo-maps": "~55.0.2",
+    "expo-network": "~55.0.6",
     "expo-router": "~55.0.0-beta.3",
     "expo-secure-store": "~55.0.2",
     "expo-sensors": "~55.0.2",

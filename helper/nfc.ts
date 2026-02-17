@@ -160,6 +160,13 @@ interface PaymentResult {
   amount: number;
 }
 
+/** Result of writing a token to NFC */
+export interface NfcTokenWriteResult {
+  success: boolean;
+  errorCode?: string;
+  errorMessage?: string;
+}
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -587,22 +594,26 @@ function selectBestMint(
  * separate from the POS payment flow. Useful for P2P token sharing.
  *
  * @param token - The encoded Cashu token string to write
- * @returns true if successful, false otherwise
+ * @returns Write result with success flag and optional error details
  */
-export async function writeTokenToNFC(token: string): Promise<boolean> {
+export async function writeTokenToNFC(token: string): Promise<NfcTokenWriteResult> {
   log('Starting NFC token write...');
 
   // Pre-flight checks
   const supported = await NfcPayment.isSupported();
   if (!supported) {
     logError('NFC is not supported on this device');
-    return false;
+    return {
+      success: false,
+      errorCode: 'NOT_SUPPORTED',
+      errorMessage: 'NFC is not supported on this device',
+    };
   }
 
   const enabled = await NfcPayment.isEnabled();
   if (!enabled) {
     logError('NFC is disabled');
-    return false;
+    return { success: false, errorCode: 'NOT_ENABLED', errorMessage: 'NFC is disabled' };
   }
 
   try {
@@ -663,10 +674,16 @@ export async function writeTokenToNFC(token: string): Promise<boolean> {
     }
 
     log('Token written to NFC successfully!');
-    return true;
+    return { success: true };
   } catch (error) {
     logError('NFC token write failed:', error);
-    return false;
+
+    if (error instanceof NfcError) {
+      return { success: false, errorCode: error.code, errorMessage: error.message };
+    }
+
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, errorCode: 'WRITE_FAILED', errorMessage };
   } finally {
     try {
       await NfcManager.cancelTechnologyRequest();
