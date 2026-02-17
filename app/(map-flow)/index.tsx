@@ -104,6 +104,7 @@ const DEFER_MAP_RENDER_MS = 50; // Small delay to let modal animation start
 
 // Numeric width for the stats card Host (percentage widths don't work with SwiftUI Host)
 const STATS_CARD_WIDTH = SCREEN_WIDTH - 32; // matches left: 16 + right: 16
+const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 // ============================================================================
 // Components
@@ -628,20 +629,23 @@ function MapScreen() {
   );
 
   const MapComponent = Platform.OS === 'ios' ? AppleMaps : GoogleMaps;
+  const mapUnavailableOnAndroid = Platform.OS === 'android' && !HAS_ANDROID_GOOGLE_MAPS_KEY;
 
-  if (error) {
+  if (error || mapUnavailableOnAndroid) {
     return (
       <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
         <View style={styles.errorContainer}>
           <Icon name="mdi:alert-circle" size={48} color={opacity(getPrimaryColor('0'), 0.4)} />
           <Text size={16} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginTop: 16 }}>
-            {error}
+            {mapUnavailableOnAndroid
+              ? 'Google Maps is not configured for Android. Set EXPO_PUBLIC_GOOGLE_MAPS_API_KEY and rebuild.'
+              : error}
           </Text>
           <TouchableOpacity
-            onPress={() => setError(null)}
+            onPress={mapUnavailableOnAndroid ? () => router.back() : () => setError(null)}
             style={[styles.retryButton, { backgroundColor: getPrimaryColor('500') }]}>
             <Text size={14} heavy style={{ color: '#fff' }}>
-              Retry
+              {mapUnavailableOnAndroid ? 'Go back' : 'Retry'}
             </Text>
           </TouchableOpacity>
         </View>

@@ -48,6 +48,7 @@ const GOOGLE_MAPS_NO_LABELS_STYLE = JSON.stringify([
   { featureType: 'poi', stylers: [{ visibility: 'off' }] },
   { featureType: 'transit', stylers: [{ visibility: 'off' }] },
 ]);
+const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 /**
  * Reusable grayscale + vignette overlay for maps
@@ -145,7 +146,7 @@ function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
               properties={{ isMyLocationEnabled: false, pointsOfInterest: { including: [] } }}
               uiSettings={DISABLED_MAP_UI_SETTINGS}
             />
-          ) : (
+          ) : HAS_ANDROID_GOOGLE_MAPS_KEY ? (
             <GoogleMaps.View
               style={StyleSheet.absoluteFillObject}
               cameraPosition={previewCameraPosition}
@@ -156,6 +157,8 @@ function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
               }}
               uiSettings={DISABLED_MAP_UI_SETTINGS}
             />
+          ) : (
+            <View style={StyleSheet.absoluteFillObject} />
           )}
           <MapGrayscaleOverlay withBlur />
         </View>
@@ -214,7 +217,7 @@ function TransactionLocationMap({
           uiSettings={DISABLED_MAP_UI_SETTINGS}
           markers={markerConfig}
         />
-      ) : (
+      ) : HAS_ANDROID_GOOGLE_MAPS_KEY ? (
         <GoogleMaps.View
           style={StyleSheet.absoluteFillObject}
           cameraPosition={cameraPosition}
@@ -223,6 +226,8 @@ function TransactionLocationMap({
           uiSettings={DISABLED_MAP_UI_SETTINGS}
           markers={markerConfig}
         />
+      ) : (
+        <View style={StyleSheet.absoluteFillObject} />
       )}
       {grayscale && <MapGrayscaleOverlay />}
     </View>
