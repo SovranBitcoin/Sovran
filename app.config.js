@@ -22,18 +22,32 @@ module.exports = ({ config }) => {
   const appIcon = isDevelopment
     ? './assets/images/development.png'
     : './assets/images/production.png';
+  const androidGoogleMapsApiKey =
+    process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 
   // Spread the static config from app.json and override only what's needed
   return {
     ...config,
     icon: appIcon,
-    plugins: [...(config.plugins || []), 'expo-maps'],
+    plugins: [
+      ...(config.plugins || []),
+      'expo-maps',
+      'expo-liquid-glass-native',
+      './plugins/withLiquidGlassMainApplication',
+    ],
     ios: {
       ...config.ios,
       bundleIdentifier: isDevelopment ? 'com.sovranbitcoin.dev' : 'com.sovranbitcoin',
     },
     android: {
       ...config.android,
+      config: {
+        ...config.android?.config,
+        googleMaps: {
+          ...config.android?.config?.googleMaps,
+          apiKey: androidGoogleMapsApiKey,
+        },
+      },
       adaptiveIcon: {
         ...config.android?.adaptiveIcon,
         foregroundImage: appIcon,
