@@ -1,8 +1,7 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { Stack } from 'expo-router';
-import { Pressable } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
+import { buildExpoRouterHeaderOptions } from '@/components/navigation/expoRouter55';
 
 export default function ExploreLayout() {
   const iconColor = useThemeColor({}, 'text');
@@ -21,15 +20,15 @@ export default function ExploreLayout() {
       }}>
       <Stack.Screen
         name="index"
-        options={{
-          title: 'Explore',
-          headerTransparent: true,
-          headerLeft: () => (
-            <Pressable onPress={openDrawer} style={{ margin: 2 }}>
-              <IconSymbol name="line.3.horizontal" size={30} color={iconColor} />
-            </Pressable>
-          ),
-        }}
+        options={buildExpoRouterHeaderOptions({
+          iconColor,
+          headerLeftIcon: 'line.3.horizontal',
+          onHeaderLeftPress: openDrawer,
+          options: {
+            title: 'Explore',
+            headerTransparent: true,
+          },
+        })}
       />
       <Stack.Screen
         name="healthModal"

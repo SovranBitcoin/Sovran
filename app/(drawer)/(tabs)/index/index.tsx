@@ -13,14 +13,24 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { RefreshControl, useWindowDimensions } from 'react-native';
 import { LayoutDebugWrapper } from '../example';
 import { useSettingsStore } from 'stores/settingsStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isAndroidLiquidHeaderSupported } from '@/components/navigation/expoRouter55';
+import { HEADER_LAYOUT } from './_layout';
 
 function TabOneScreen() {
   // Register this tab's background configuration - animates on focus
   useBackgroundConfig({ blurMode: 'partial' });
 
   const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const devMode = useSettingsStore((state) => state.experimental);
   const supportedUnits = useMemo(() => ['sat', 'usd', 'eur', 'gbp'], []);
+
+  // When the native header is hidden (Android liquid glass), add padding so
+  // content doesn't render underneath the overlay header.
+  const androidHeaderPadding = isAndroidLiquidHeaderSupported()
+    ? insets.top + HEADER_LAYOUT.ANDROID_OVERLAY_OFFSET + HEADER_LAYOUT.ANDROID_BUTTON_SIZE
+    : 0;
 
   const accounts = useMemo(
     () =>
@@ -59,7 +69,7 @@ function TabOneScreen() {
     <LayoutDebugWrapper
       onContentSizeChange={onContentSizeChange}
       refreshControl={<RefreshControl refreshing={false} onRefresh={onRefresh} />}
-      contentContainerStyle={{ padding: 0 }}>
+      contentContainerStyle={{ padding: 0, paddingTop: androidHeaderPadding }}>
       {/* Scrollable gradient overlay - must be first child */}
       <ScrollableGradientOverlay contentHeight={contentHeight} />
 

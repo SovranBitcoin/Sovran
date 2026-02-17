@@ -3,9 +3,8 @@ import { useHandleCameraPermission } from 'hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
 import Swiper from 'react-native-web-infinite-swiper';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 import { supportsLiquidGlass } from 'helper/version';
-import opacity from 'hex-color-opacity';
 import {
   Host,
   Button as SwiftUIButton,
@@ -24,6 +23,7 @@ import {
 
 import { VStack } from 'components/ui/View/VStack';
 import { View } from 'components/ui/View/View';
+import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { EnhancedHaptics } from 'components/ui/Haptics';
@@ -35,6 +35,105 @@ import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Account } from './Account';
 import { router } from 'expo-router';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import { LiquidButtonView } from 'expo-liquid-glass-native';
+import { hasAndroidLiquidButtonView } from '@/components/navigation/expoRouter55';
+
+// Invisible figure-space titles to give LiquidButtonView intrinsic width
+const INVISIBLE_TITLE_WIDE = '\u2007'.repeat(12);
+const INVISIBLE_TITLE_SHORT = '\u2007'.repeat(1);
+
+const BUTTON_H = 48;
+const QR_SIZE = 72;
+
+function AndroidLiquidCapsuleButton({
+  label,
+  icon,
+  color,
+  onPress,
+}: {
+  label: string;
+  icon: string;
+  color: string;
+  onPress: () => void;
+}) {
+  return (
+    <View style={{ width: '100%', height: BUTTON_H }}>
+      <LiquidButtonView
+        title={INVISIBLE_TITLE_WIDE}
+        enabled
+        tint="transparent"
+        blurRadius={3}
+        onPress={onPress}
+        style={{ width: '100%', height: BUTTON_H, borderRadius: BUTTON_H / 2 }}
+      />
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 8,
+          elevation: 1,
+        }}>
+        <Icon name={icon} size={16} color={color} />
+        <Text size={14} style={{ color, fontFamily: 'OverpassSemibold' }}>
+          {label}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function AndroidLiquidQRButton({
+  tint,
+  color,
+  onPress,
+}: {
+  tint: string;
+  color: string;
+  onPress: () => void;
+}) {
+  return (
+    <View
+      style={{
+        width: QR_SIZE,
+        height: QR_SIZE,
+        borderRadius: QR_SIZE / 2,
+        overflow: 'hidden',
+        transform: [{ scale: 1.3 }],
+      }}>
+      <LiquidButtonView
+        title={INVISIBLE_TITLE_SHORT}
+        enabled
+        tint={tint}
+        blurRadius={4}
+        lensX={24}
+        lensY={24}
+        onPress={onPress}
+        style={{ width: '100%', height: '100%' }}
+      />
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          justifyContent: 'center',
+          alignItems: 'center',
+          elevation: 1,
+        }}>
+        <Icon name="stash:qr-code" size={24} color={color} />
+      </View>
+    </View>
+  );
+}
 
 interface AccountType {
   unit: string;
@@ -126,12 +225,9 @@ export function AccountPagerView({
   }, [getBalances, selectedMintUrl, account.unit]);
 
   // Button components
-  const ACTION_SIZE = 48;
-  const BUTTON_H = 48;
-  const QR_SIZE = 72;
-  // Keep Send/Receive foreground neutral; reserve accent tint for the QR background only.
   const liquidGlassForeground = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
   const qrGlassTint = useMemo(() => getShadeColor('300'), [getShadeColor]);
+  const useAndroidLiquidButtons = Platform.OS === 'android' && hasAndroidLiquidButtonView();
 
   function LiquidCapsuleButton({
     label,
@@ -195,22 +291,6 @@ export function AccountPagerView({
       </Host>
     );
   }
-
-  // Quick-action handlers
-  const handleSweep = useCallback(() => {
-    router.navigate('/pendingEcash');
-  }, []);
-
-  const handleSwap = useCallback(() => {
-    router.navigate('/(mint-flow)/distribution');
-  }, []);
-
-  const handleMore = useCallback(() => {
-    // Placeholder — can be wired to a menu / settings later
-  }, []);
-
-  const actionFg = useMemo(() => opacity(getPrimaryColor('0'), 0.66), [getPrimaryColor]);
-  const actionBg = useMemo(() => opacity(getPrimaryColor('0'), 0.08), [getPrimaryColor]);
 
   return (
     <>
@@ -386,6 +466,13 @@ export function AccountPagerView({
                 systemIcon="arrow.down.left"
                 onPress={handleReceive}
               />
+            ) : useAndroidLiquidButtons ? (
+              <AndroidLiquidCapsuleButton
+                label="Receive"
+                icon="lucide:arrow-down-left"
+                color={liquidGlassForeground}
+                onPress={handleReceive}
+              />
             ) : (
               <Button
                 text="Receive"
@@ -407,6 +494,13 @@ export function AccountPagerView({
           <View style={{ flex: 1 }}>
             {supportsLiquidGlass() ? (
               <LiquidCapsuleButton label="Send" systemIcon="arrow.up.right" onPress={handleSend} />
+            ) : useAndroidLiquidButtons ? (
+              <AndroidLiquidCapsuleButton
+                label="Send"
+                icon="lucide:arrow-up-right"
+                color={liquidGlassForeground}
+                onPress={handleSend}
+              />
             ) : (
               <Button
                 text="Send"
@@ -438,6 +532,12 @@ export function AccountPagerView({
           }}>
           {supportsLiquidGlass() ? (
             <LiquidQRButton onPress={handleScanQR} />
+          ) : useAndroidLiquidButtons ? (
+            <AndroidLiquidQRButton
+              tint={qrGlassTint}
+              color={liquidGlassForeground}
+              onPress={handleScanQR}
+            />
           ) : (
             <TouchableOpacity
               style={{
@@ -477,24 +577,3 @@ export function AccountPagerView({
     </>
   );
 }
-
-const actionStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 32,
-    paddingTop: 0,
-    paddingBottom: 8,
-  },
-  button: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  circle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
