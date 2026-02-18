@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { popup } from '@/helper/popup';
-import { SheetManager } from 'react-native-actions-sheet';
+import { router } from 'expo-router';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { DetailsSection } from 'components/ui/DetailsSection';
 import { truncateMiddle } from 'helper/strings';
@@ -250,12 +250,12 @@ export function ReceiveTokenScreen({
     if (isMintTrusted) {
       await handleRedeem();
     } else {
-      SheetManager.show('mint-accepter', {
-        payload: { mint: receiveHistoryEntry.mintUrl },
-        onClose: async (result) => {
-          if (result?.trusted) {
-            await handleRedeem();
-          }
+      router.navigate({
+        pathname: '/(mint-flow)/info',
+        params: {
+          mintUrl: receiveHistoryEntry.mintUrl,
+          fromAccepter: '1',
+          ...(tokenString ? { token: tokenString } : {}),
         },
       });
     }

@@ -26,20 +26,6 @@ export function extractDomain(url: string): string {
 }
 
 /**
- * Remove protocol from URL (both http and https)
- * @param url - The URL to remove protocol from
- * @returns URL without protocol
- *
- * @example
- * removeProtocol('https://mint.example.com/path') // 'mint.example.com/path'
- * removeProtocol('http://test.com') // 'test.com'
- */
-export function removeProtocol(url: string): string {
-  if (!url) return '';
-  return url.replace(/^https?:\/\//, '');
-}
-
-/**
  * Extract mint name from URL, falling back to domain if no specific name
  * @param url - The mint URL
  * @param mintInfo - Optional mint info object with name property

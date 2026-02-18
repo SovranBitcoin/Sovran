@@ -44,6 +44,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import Svg, { Circle } from 'react-native-svg';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import { useReceive } from 'coco-cashu-react';
 import opacity from 'hex-color-opacity';
 
 // ============================================================================
@@ -552,13 +553,19 @@ const getMintDisplayName = (
 function MintInfoModal() {
   const { getPrimaryColor, getRedColor, getGreenColor, getYellowColor } = useTheme();
   const insets = useSafeAreaInsets();
-  const { mintUrl, fromScan } = useLocalSearchParams<{ mintUrl: string; fromScan?: string }>();
+  const { mintUrl, fromScan, fromAccepter, token } = useLocalSearchParams<{
+    mintUrl: string;
+    fromScan?: string;
+    fromAccepter?: string;
+    token?: string;
+  }>();
   const {
     getMintInfo,
     isKnownMint,
     addMint,
     isLoading: mintManagementLoading,
   } = useMintManagement();
+  const { receive } = useReceive();
 
   const [mintInfo, setMintInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -650,15 +657,23 @@ function MintInfoModal() {
     setAddingMint(true);
     try {
       await addMint(mintUrl);
-      Alert.alert('Success', 'Mint added successfully', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      if (fromAccepter === '1' && token) {
+        // Trust + redeem in one step, then dismiss back
+        await receive(token);
+        router.back();
+      } else if (fromAccepter === '1') {
+        router.back();
+      } else {
+        Alert.alert('Success', 'Mint added successfully', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add mint');
     } finally {
       setAddingMint(false);
     }
-  }, [mintUrl, addMint]);
+  }, [mintUrl, addMint, fromAccepter, token, receive]);
 
   const isLoading = loading || auditLoading;
 
@@ -688,19 +703,22 @@ function MintInfoModal() {
     <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
       <Stack.Screen
         options={{
-          title: isLoading ? 'Mint Details' : displayName,
-          headerRight: () => (
-            <Link
-              href={{
-                pathname: '/reviews',
-                params: { mintUrl: mintUrl || '' },
-              }}
-              asChild>
-              <TouchableOpacity style={{ padding: 8 }}>
-                <Icon name="ic:round-star" size={24} color={getYellowColor('300')} />
-              </TouchableOpacity>
-            </Link>
-          ),
+          title: fromAccepter === '1' ? 'Verify Mint' : isLoading ? 'Mint Details' : displayName,
+          headerRight:
+            fromAccepter === '1'
+              ? undefined
+              : () => (
+                  <Link
+                    href={{
+                      pathname: '/reviews',
+                      params: { mintUrl: mintUrl || '' },
+                    }}
+                    asChild>
+                    <TouchableOpacity style={{ padding: 8 }}>
+                      <Icon name="ic:round-star" size={24} color={getYellowColor('300')} />
+                    </TouchableOpacity>
+                  </Link>
+                ),
         }}
       />
 
@@ -824,7 +842,7 @@ function MintInfoModal() {
 
         {/* Settings: entry point for mint distribution + rebalance tooling.
             We only show this for known/added mints (not random scanned mints). */}
-        {isKnownMintState && (
+        {isKnownMintState && fromAccepter !== '1' && (
           <Section title="Settings">
             <RowButton
               isFirst
@@ -851,31 +869,47 @@ function MintInfoModal() {
       <BottomButtons>
         <ButtonHandler
           buttons={
-            mintUrl && (fromScan === '1' || isKnownMintState === false)
+            fromAccepter === '1'
               ? [
                   {
-                    text: 'Close',
+                    text: 'Reject',
                     variant: 'secondary',
                     onPress: async () => {
                       router.back();
                     },
                   },
                   {
-                    text: addingMint ? 'Adding...' : 'Add mint',
+                    text: addingMint ? 'Accepting...' : 'Accept',
                     variant: 'primary',
                     disabled: addingMint || mintManagementLoading,
                     onPress: handleAddMint,
                   },
                 ]
-              : [
-                  {
-                    text: 'Close',
-                    variant: 'secondary',
-                    onPress: async () => {
-                      router.back();
+              : mintUrl && (fromScan === '1' || isKnownMintState === false)
+                ? [
+                    {
+                      text: 'Close',
+                      variant: 'secondary',
+                      onPress: async () => {
+                        router.back();
+                      },
                     },
-                  },
-                ]
+                    {
+                      text: addingMint ? 'Adding...' : 'Add mint',
+                      variant: 'primary',
+                      disabled: addingMint || mintManagementLoading,
+                      onPress: handleAddMint,
+                    },
+                  ]
+                : [
+                    {
+                      text: 'Close',
+                      variant: 'secondary',
+                      onPress: async () => {
+                        router.back();
+                      },
+                    },
+                  ]
           }
         />
       </BottomButtons>
