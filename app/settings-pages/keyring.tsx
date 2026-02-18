@@ -313,6 +313,8 @@ const KeyringSettings: React.FC = () => {
   // Quick access setting from settings store
   const quickAccessP2PK = useSettingsStore((state) => state.quickAccessP2PK);
   const setQuickAccessP2PK = useSettingsStore((state) => state.setQuickAccessP2PK);
+  const regenerateP2PKOnReceive = useSettingsStore((state) => state.regenerateP2PKOnReceive);
+  const setRegenerateP2PKOnReceive = useSettingsStore((state) => state.setRegenerateP2PKOnReceive);
 
   /**
    * Loads all keypairs from the keyring
@@ -497,6 +499,31 @@ const KeyringSettings: React.FC = () => {
               <Switch
                 value={quickAccessP2PK ?? false}
                 onValueChange={setQuickAccessP2PK}
+                trackColor={{
+                  false: getPrimaryColor('700'),
+                  true: getShadeColor('300'),
+                }}
+                thumbColor={getPrimaryColor('0')}
+              />
+            </HStack>
+            <View style={{ height: 1, backgroundColor: opacity(getPrimaryColor('0'), 0.08), marginVertical: 12 }} />
+            <HStack align="center" justify="space-between">
+              <VStack flex={1} style={{ marginRight: 12 }}>
+                <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                  Regenerate Key on Receive
+                </Text>
+                <Text
+                  size={13}
+                  style={{
+                    color: opacity(getPrimaryColor('0'), 0.4),
+                    marginTop: 4,
+                  }}>
+                  Automatically generate a new P2PK key after redeeming a locked token for improved privacy
+                </Text>
+              </VStack>
+              <Switch
+                value={regenerateP2PKOnReceive ?? true}
+                onValueChange={setRegenerateP2PKOnReceive}
                 trackColor={{
                   false: getPrimaryColor('700'),
                   true: getShadeColor('300'),
