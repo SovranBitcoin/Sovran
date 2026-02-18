@@ -27,8 +27,10 @@ import { ModalLayoutWrapper } from 'app/debugModal';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useReceive, useManager } from 'coco-cashu-react';
+import { getDecodedToken } from '@cashu/cashu-ts';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
+import { useSettingsStore } from 'stores/settingsStore';
 
 interface ReceiveTokenScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
@@ -192,7 +194,40 @@ export function ReceiveTokenScreen({
         throw new Error('Missing token data');
       }
 
+      const decoded = getDecodedToken(tokenString);
+      if (decoded.unit !== 'sat') {
+        popup({
+          message: `Unsupported token unit "${decoded.unit}". Only sat tokens can be redeemed.`,
+          type: 'error',
+        });
+        setLoading(false);
+        return;
+      }
+
       await receive(tokenString);
+
+      // If the token contained P2PK-locked proofs and the setting is enabled,
+      // generate a fresh key so the used pubkey is retired.
+      const regenerateP2PK = useSettingsStore.getState().regenerateP2PKOnReceive;
+      if (regenerateP2PK) {
+        try {
+          const decoded = getDecodedToken(tokenString);
+          const hadP2PK = decoded.proofs.some((proof) => {
+            try {
+              const parsed = JSON.parse(proof.secret);
+              return Array.isArray(parsed) && parsed[0] === 'P2PK';
+            } catch {
+              return false;
+            }
+          });
+          if (hadP2PK) {
+            await manager.keyring.generateKeyPair();
+          }
+        } catch (e) {
+          // Non-critical — don't block the receive flow
+          console.warn('Failed to regenerate P2PK key:', e);
+        }
+      }
 
       // Find the real history entry created by coco and store location against it
       const history = await manager.history.getPaginatedHistory(0, 5);
