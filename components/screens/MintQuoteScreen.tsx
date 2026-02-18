@@ -28,6 +28,7 @@ import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntry
 import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
 import type { MintHistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
+import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
@@ -50,6 +51,7 @@ export function MintQuoteScreen({
   // Use the generic history entry hook for parsing, state, and event subscription
   const { entry: currentTransaction, error: parseError } =
     useHistoryEntry<MintHistoryEntry>(mintHistoryEntryProp);
+  const sourceLabel = useTransactionSource(currentTransaction?.id);
 
   useEffect(() => {
     if (currentTransaction?.mintUrl) {
@@ -145,6 +147,7 @@ export function MintQuoteScreen({
         {/* Technical details - collapsed by default */}
         <DetailsSection
           items={[
+            ...(sourceLabel ? [{ title: 'Source', value: sourceLabel }] : []),
             {
               title: 'Invoice',
               value: truncateMiddle(currentTransaction.paymentRequest, 10),
