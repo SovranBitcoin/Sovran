@@ -12,6 +12,7 @@ const ThemeContext = createContext<{
   getShadeColor: (shade: string, themeName?: string) => string;
   getRedColor: (shade: string, themeName?: string) => string;
   getGreenColor: (shade: string, themeName?: string) => string;
+  getBlueColor: (shade: string, themeName?: string) => string;
   getPurpleColor: (shade: string, themeName?: string) => string;
   getYellowColor: (shade: string, themeName?: string) => string;
   primaryColors: Record<number, string>;
@@ -23,6 +24,7 @@ const ThemeContext = createContext<{
   getShadeColor: () => '#000000',
   getRedColor: () => '#000000',
   getGreenColor: () => '#000000',
+  getBlueColor: () => '#000000',
   getPurpleColor: () => '#000000',
   getYellowColor: () => '#000000',
   primaryColors: {},
@@ -73,6 +75,18 @@ const getGreenColor = (themeName: string, shade: string): string => {
   };
 
   return staticGreens[shade as keyof typeof staticGreens] || '#0CED3E';
+};
+
+const getBlueColor = (themeName: string, shade: string): string => {
+  const staticBlues = {
+    '100': '#DBEAFE',
+    '200': '#93C5FD',
+    '300': '#3B82F6',
+    '400': '#2563EB',
+    '500': '#1D4ED8',
+  };
+
+  return staticBlues[shade as keyof typeof staticBlues] || '#3B82F6';
 };
 
 const getYellowColor = (themeName: string, shade: string): string => {
@@ -142,6 +156,10 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
     return getGreenColor(themeName || currentTheme, shade);
   };
 
+  const getBlueColorForShade = (shade: string, themeName?: string) => {
+    return getBlueColor(themeName || currentTheme, shade);
+  };
+
   const getPurpleColorForShade = (shade: string, themeName?: string) => {
     return getPurpleColor(themeName || currentTheme, shade);
   };
@@ -177,6 +195,7 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
         getShadeColor: getShadeColorForShade,
         getRedColor: getRedColorForShade,
         getGreenColor: getGreenColorForShade,
+        getBlueColor: getBlueColorForShade,
         getPurpleColor: getPurpleColorForShade,
         getYellowColor: getYellowColorForShade,
         primaryColors,
