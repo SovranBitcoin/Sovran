@@ -42,6 +42,7 @@ interface SettingsState {
   mockOffline: boolean;
   termsAccepted: TermsAccepted | null;
   quickAccessP2PK: boolean;
+  regenerateP2PKOnReceive: boolean;
   sendLocationEnabled: boolean;
 
   // Rebalancing settings
@@ -91,6 +92,10 @@ interface SettingsActions {
   setQuickAccessP2PK: (enabled: boolean) => void;
   getQuickAccessP2PK: () => boolean;
 
+  // P2PK key regeneration on receive
+  setRegenerateP2PKOnReceive: (enabled: boolean) => void;
+  getRegenerateP2PKOnReceive: () => boolean;
+
   // Send location stamping
   setSendLocationEnabled: (enabled: boolean) => void;
   getSendLocationEnabled: () => boolean;
@@ -125,6 +130,7 @@ export const useSettingsStore = create<SettingsStore>()(
       mockOffline: false,
       termsAccepted: null,
       quickAccessP2PK: false,
+      regenerateP2PKOnReceive: true,
       sendLocationEnabled: false,
       minTransferThreshold: 5,
       middlemanRouting: {
@@ -258,6 +264,15 @@ export const useSettingsStore = create<SettingsStore>()(
         return get().quickAccessP2PK;
       },
 
+      // P2PK key regeneration on receive
+      setRegenerateP2PKOnReceive: (enabled: boolean) => {
+        set({ regenerateP2PKOnReceive: enabled });
+      },
+
+      getRegenerateP2PKOnReceive: () => {
+        return get().regenerateP2PKOnReceive;
+      },
+
       // Send location stamping
       setSendLocationEnabled: (enabled: boolean) => {
         set({ sendLocationEnabled: enabled });
@@ -307,6 +322,7 @@ export const useSettingsStore = create<SettingsStore>()(
           mockOffline: false,
           termsAccepted: null,
           quickAccessP2PK: false,
+          regenerateP2PKOnReceive: true,
           sendLocationEnabled: false,
           minTransferThreshold: 5,
           middlemanRouting: {
@@ -337,6 +353,7 @@ export const useSettingsStore = create<SettingsStore>()(
             mockOffline: false,
             termsAccepted: null,
             quickAccessP2PK: false,
+            regenerateP2PKOnReceive: true,
             sendLocationEnabled: false,
             minTransferThreshold: 5,
             middlemanRouting: {
@@ -368,6 +385,7 @@ export const useSettingsStore = create<SettingsStore>()(
         mockOffline: state.mockOffline,
         termsAccepted: state.termsAccepted,
         quickAccessP2PK: state.quickAccessP2PK,
+        regenerateP2PKOnReceive: state.regenerateP2PKOnReceive,
         sendLocationEnabled: state.sendLocationEnabled,
         minTransferThreshold: state.minTransferThreshold,
         middlemanRouting: state.middlemanRouting,

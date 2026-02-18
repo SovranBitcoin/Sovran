@@ -65,16 +65,16 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
       {onPress && (
         <View
           style={{
-            width: 40,
-            height: 40,
+            width: 24,
+            height: 24,
             borderRadius: 18,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: getPrimaryColor('950'),
+            // backgroundColor: getPrimaryColor('950'),
             // borderWidth: 1,
             // borderColor: opacity(getPrimaryColor('0'), 0.12),
           }}>
-          <Icon name="lucide:pencil-line" size={16} color={opacity(getPrimaryColor('0'), 0.6)} />
+          <Icon name="lucide:pencil-line" size={16} color={getPrimaryColor('300')} />
         </View>
       )}
     </HStack>
