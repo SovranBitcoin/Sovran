@@ -5,7 +5,7 @@
  * It is used by both standalone and flow-based route wrappers.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { popup } from '@/helper/popup';
 import { router } from 'expo-router';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -31,6 +31,7 @@ import { getDecodedToken } from '@cashu/cashu-ts';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
 import { useSettingsStore } from 'stores/settingsStore';
+import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
 
 interface ReceiveTokenScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
@@ -79,10 +80,28 @@ export function ReceiveTokenScreen({
   // Use the generic history entry hook for parsing, state, and event subscription
   const { entry: receiveHistoryEntry, error: parseError } =
     useHistoryEntry<ReceiveHistoryEntry>(receiveHistoryEntryProp);
+  const sourceLabel = useTransactionSource(finalizedTransactionId ?? receiveHistoryEntry?.id);
 
   const tokenString = receiveHistoryEntry?.token
     ? manager.wallet.encodeToken(receiveHistoryEntry.token)
     : undefined;
+
+  // Extract P2PK locking pubkey from token proofs (if any)
+  const p2pkPubkey = useMemo(() => {
+    const proofs = receiveHistoryEntry?.token?.proofs;
+    if (!proofs?.length) return null;
+    for (const proof of proofs) {
+      try {
+        const parsed = JSON.parse(proof.secret);
+        if (Array.isArray(parsed) && parsed[0] === 'P2PK' && parsed[1]?.data) {
+          return parsed[1].data as string;
+        }
+      } catch {
+        // not a structured secret
+      }
+    }
+    return null;
+  }, [receiveHistoryEntry?.token?.proofs]);
 
   // Detect if this is a scan placeholder (created by useProcessPaymentString before redeem)
   const isScanPlaceholder = receiveHistoryEntry?.id?.startsWith('receive-') ?? false;
@@ -345,6 +364,8 @@ export function ReceiveTokenScreen({
         {/* Technical details - collapsed by default */}
         <DetailsSection
           items={[
+            ...(sourceLabel ? [{ title: 'Source', value: sourceLabel }] : []),
+            ...(p2pkPubkey ? [{ title: 'P2PK', value: truncateMiddle(p2pkPubkey, 8) }] : []),
             ...(tokenString ? [{ title: 'Token', value: truncateMiddle(tokenString, 6) }] : []),
           ]}
         />

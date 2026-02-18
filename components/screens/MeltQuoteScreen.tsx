@@ -44,6 +44,7 @@ import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
+import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
 
 interface MeltQuoteScreenProps {
   /** For viewing existing transaction - either parsed entry or JSON string */
@@ -169,6 +170,7 @@ export function MeltQuoteScreen({
 
   // The history entry to display - prefer newly created (e.g., after mint change) over initial prop
   const currentTransaction = createdHistoryEntry || trackedHistoryEntry;
+  const sourceLabel = useTransactionSource(currentTransaction?.id);
 
   // The quote to display - either derived from history entry or created
   const displayQuote: MeltQuoteBolt11Response | null =
@@ -536,6 +538,7 @@ export function MeltQuoteScreen({
         {/* Technical details - collapsed by default */}
         <DetailsSection
           items={[
+            ...(sourceLabel ? [{ title: 'Source', value: sourceLabel }] : []),
             {
               title: 'Date',
               value: displayQuote?.request

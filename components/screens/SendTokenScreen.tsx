@@ -52,6 +52,7 @@ import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 import { useNostrDirectMessage } from '@/hooks/useNostrDirectMessage';
 import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
+import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
 import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
@@ -187,6 +188,7 @@ export function SendTokenScreen({
   // Use the generic history entry hook for parsing, state, and event subscription
   const { entry: currentTransaction, error: parseError } =
     useHistoryEntry<SendHistoryEntry>(entryToUse);
+  const sourceLabel = useTransactionSource(currentTransaction?.id);
 
   // Determine mode: payment request mode if we have paymentRequest and no transaction yet
   const isPaymentRequestMode = !!paymentRequest && !currentTransaction;
@@ -879,6 +881,7 @@ export function SendTokenScreen({
         {/* Technical details - collapsed by default */}
         <DetailsSection
           items={[
+            ...(sourceLabel ? [{ title: 'Source', value: sourceLabel }] : []),
             // Payment request mode items
             ...(isPaymentRequestMode && recipientInfo
               ? [
