@@ -48,6 +48,7 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
+import { LegendList } from '@legendapp/list';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CONTENT_WIDTH = SCREEN_WIDTH - 32; // 16px padding each side
@@ -61,6 +62,8 @@ interface UserFeedProps {
   /** Author info passed from the profile screen so we don't re-fetch */
   authorName?: string;
   authorPicture?: string;
+  /** Optional header rendered above the feed inside the LegendList */
+  ListHeaderComponent?: React.ReactElement | null;
 }
 
 interface NoteMetrics {
@@ -1524,7 +1527,7 @@ function EmptyFeed() {
 // Main UserFeed Component
 // ============================================================================
 
-function UserFeedComponent({ pubkey, authorName, authorPicture }: UserFeedProps) {
+function UserFeedComponent({ pubkey, authorName, authorPicture, ListHeaderComponent }: UserFeedProps) {
   const { getPrimaryColor } = useTheme();
   const [, startTransition] = useTransition();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
@@ -1678,63 +1681,95 @@ function UserFeedComponent({ pubkey, authorName, authorPicture }: UserFeedProps)
   // ---------------------------
   const displayName = authorName || tryNpubEncode(pubkey).slice(0, 12) + '…';
 
-  return (
-    <View style={styles.feedContainer}>
-      {/* Section title — styled the same as "Profile Info" (Section component) */}
-      <Text
-        medium
-        overpass
-        size={13}
-        style={[styles.sectionTitle, { color: opacity(getPrimaryColor('0'), 0.5) }]}>
-        Notes
-      </Text>
+  const feedHeader = (
+    <View>
+      {ListHeaderComponent}
+      <View style={styles.feedContainer}>
+        <Text
+          medium
+          overpass
+          size={13}
+          style={[styles.sectionTitle, { color: opacity(getPrimaryColor('0'), 0.5) }]}>
+          Notes
+        </Text>
+        {isLoading ? (
+          <VStack gap={12}>
+            {[0, 1, 2].map((i) => (
+              <NoteCardSkeleton key={i} />
+            ))}
+          </VStack>
+        ) : feedItems.length === 0 ? (
+          <EmptyFeed />
+        ) : null}
+      </View>
+    </View>
+  );
 
-      {isLoading ? (
-        <VStack gap={12}>
-          {[0, 1, 2].map((i) => (
-            <NoteCardSkeleton key={i} />
-          ))}
-        </VStack>
-      ) : feedItems.length === 0 ? (
-        <EmptyFeed />
-      ) : (
-        <VStack gap={12}>
-          {feedItems.map((item, index) => {
-            if (item.type === 'note') {
-              return (
-                <NoteCard
-                  key={item.event.id}
-                  event={item.event}
-                  metrics={getMetrics(item.event.id)}
-                  index={index}
-                  quotedEvents={quotedEventsMap}
-                  profiles={profilesMap}
-                  getMetrics={getMetrics}
-                  authorName={displayName}
-                  authorPicture={authorPicture}
-                  authorPubkey={pubkey}
-                />
-              );
-            }
-            // Repost
-            return (
-              <RepostCard
-                key={item.repostEvent.id}
-                repostEvent={item.repostEvent}
-                originalEvent={item.originalEvent}
-                originalMetrics={getMetrics(item.originalEventId)}
+  // When loading or empty, render without LegendList (header-only mode)
+  if (isLoading || feedItems.length === 0) {
+    return (
+      <LegendList
+        data={[] as FeedItem[]}
+        estimatedItemSize={200}
+        renderItem={() => null}
+        ListHeaderComponent={feedHeader}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+      />
+    );
+  }
+
+  return (
+    <LegendList
+      data={feedItems}
+      keyExtractor={(item) =>
+        item.type === 'note' ? item.event.id : item.repostEvent.id
+      }
+      getItemType={(item) => item.type}
+      estimatedItemSize={300}
+      drawDistance={500}
+      maintainVisibleContentPosition
+      renderItem={({ item, index }) => {
+        if (item.type === 'note') {
+          return (
+            <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+              <NoteCard
+                event={item.event}
+                metrics={getMetrics(item.event.id)}
                 index={index}
                 quotedEvents={quotedEventsMap}
                 profiles={profilesMap}
                 getMetrics={getMetrics}
-                reposterName={displayName}
-                reposterPubkey={pubkey}
+                authorName={displayName}
+                authorPicture={authorPicture}
+                authorPubkey={pubkey}
               />
-            );
-          })}
-        </VStack>
-      )}
-    </View>
+            </View>
+          );
+        }
+        return (
+          <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+            <RepostCard
+              repostEvent={item.repostEvent}
+              originalEvent={item.originalEvent}
+              originalMetrics={getMetrics(item.originalEventId)}
+              index={index}
+              quotedEvents={quotedEventsMap}
+              profiles={profilesMap}
+              getMetrics={getMetrics}
+              reposterName={displayName}
+              reposterPubkey={pubkey}
+            />
+          </View>
+        );
+      }}
+      ListHeaderComponent={feedHeader}
+      style={{ flex: 1 }}
+      contentContainerStyle={{ paddingBottom: 120 }}
+      showsVerticalScrollIndicator={false}
+      scrollEventThrottle={16}
+    />
   );
 }
 

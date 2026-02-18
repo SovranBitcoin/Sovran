@@ -12,8 +12,9 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import type { NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
-import { VStack } from 'components/ui/View/VStack';
+import { LegendList } from '@legendapp/list';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
@@ -77,6 +78,9 @@ export function MintListScreen({
 
   // Scroll tracking for animated currency tabs
   const scrollY = useSharedValue(0);
+
+  // Track header height from ModalLayoutWrapper
+  const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
 
   // Use useMints() for live-updating trusted mints list (listens to mint:added/mint:updated events)
   const { trustedMints } = useMints();
@@ -307,6 +311,76 @@ export function MintListScreen({
     [availableCurrencies, selectedCurrency, handleCurrencyChange, scrollY]
   );
 
+  // Regular scroll handler for LegendList - updates scrollY for currency tab animations
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollY.value = Math.max(0, event.nativeEvent.contentOffset.y);
+    },
+    [scrollY]
+  );
+
+  // Render item for LegendList
+  type MintWithBalance = Mint & { amount: number; unit: string };
+  const renderItem = useCallback(
+    ({ item }: { item: MintWithBalance }) => {
+      const normalizedUrl = normalizeUrl(item.mintUrl);
+      const kymData = kymScores[normalizedUrl];
+      const kymScore = kymData?.score;
+
+      return (
+        <MintItem
+          mint={item}
+          balance={{ amount: item.amount, unit: item.unit }}
+          isLoading={loadingId === item.mintUrl}
+          globalLoading={loadingId !== null}
+          requireBalance={requireBalance}
+          minAmount={minAmount}
+          showDetailsButton={showDetailsButton}
+          onInspectPress={onInspectMint ? () => handleInspectMint(item.mintUrl) : undefined}
+          selectedCurrency={selectedCurrency}
+          kymScore={kymScore}
+          kymLoading={kymLoading}
+          isAllowed={isMintAllowed(item.mintUrl)}
+          onPress={() => {
+            handleMintSelect(item.mintUrl);
+          }}
+        />
+      );
+    },
+    [
+      normalizeUrl,
+      kymScores,
+      kymLoading,
+      loadingId,
+      requireBalance,
+      minAmount,
+      showDetailsButton,
+      onInspectMint,
+      handleInspectMint,
+      selectedCurrency,
+      isMintAllowed,
+      handleMintSelect,
+    ]
+  );
+
+  // List header spacer to push content below sticky header + currency tabs
+  const listHeader = useMemo(
+    () => <View style={{ height: totalHeaderHeight }} />,
+    [totalHeaderHeight]
+  );
+
+  // Empty state component
+  const emptyComponent = useMemo(
+    () => (
+      <Text style={{ color: opacity(primaryColor0, 0.66), textAlign: 'center', marginTop: 20 }}>
+        {selectedCurrency === 'ALL'
+          ? 'No mints available'
+          : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
+      </Text>
+    ),
+    [selectedCurrency, primaryColor0]
+  );
+
   // Bottom buttons component
   const bottomButtons = useMemo(
     () => (
@@ -330,48 +404,22 @@ export function MintListScreen({
       headerGradient
       stickyContent={currencyTabs}
       stickyContentHeight={CURRENCY_TABS_HEIGHT}
-      useAnimatedScroll
-      scrollY={scrollY}
+      useCustomScrollView
+      onHeaderHeightChange={setTotalHeaderHeight}
       bottomContent={bottomButtons}>
-      {/* Mints list section */}
-      <View className="pt-3">
-        {filteredMints.length === 0 ? (
-          <Text style={{ color: opacity(primaryColor0, 0.66), textAlign: 'center', marginTop: 20 }}>
-            {selectedCurrency === 'ALL'
-              ? 'No mints available'
-              : `No mints available for ${selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}`}
-          </Text>
-        ) : (
-          <VStack gap={4}>
-            {filteredMints.map((mint) => {
-              const normalizedUrl = normalizeUrl(mint.mintUrl);
-              const kymData = kymScores[normalizedUrl];
-              const kymScore = kymData?.score;
-
-              return (
-                <MintItem
-                  key={mint.mintUrl}
-                  mint={mint}
-                  balance={{ amount: mint.amount, unit: mint.unit }}
-                  isLoading={loadingId === mint.mintUrl}
-                  globalLoading={loadingId !== null}
-                  requireBalance={requireBalance}
-                  minAmount={minAmount}
-                  showDetailsButton={showDetailsButton}
-                  onInspectPress={onInspectMint ? () => handleInspectMint(mint.mintUrl) : undefined}
-                  selectedCurrency={selectedCurrency}
-                  kymScore={kymScore}
-                  kymLoading={kymLoading}
-                  isAllowed={isMintAllowed(mint.mintUrl)}
-                  onPress={() => {
-                    handleMintSelect(mint.mintUrl);
-                  }}
-                />
-              );
-            })}
-          </VStack>
-        )}
-      </View>
+      <LegendList
+        data={filteredMints}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.mintUrl}
+        estimatedItemSize={120}
+        drawDistance={300}
+        style={{ flex: 1, height: 0 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={emptyComponent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      />
     </ModalLayoutWrapper>
   );
 }

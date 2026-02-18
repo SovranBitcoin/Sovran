@@ -10,7 +10,6 @@
 
 import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
 import {
-  ScrollView,
   Animated,
   Easing,
   StyleSheet,
@@ -674,181 +673,188 @@ function UserProfileScreen() {
         }}
       />
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingBottom: 120,
-        }}
-        showsVerticalScrollIndicator={false}>
-        {/* Banner with Overlapping Avatar */}
-        <BannerWithAvatar
-          bannerUrl={userInfo?.banner}
-          pictureUrl={userInfo?.picture}
+      {pubkey ? (
+        <UserFeed
           pubkey={pubkey}
-          displayName={displayName}
-          nip05={userInfo?.nip05}
-          isLoading={isMetadataLoading}
-        />
+          authorName={displayName}
+          authorPicture={userInfo?.picture}
+          ListHeaderComponent={
+            <View>
+              {/* Banner with Overlapping Avatar */}
+              <BannerWithAvatar
+                bannerUrl={userInfo?.banner}
+                pictureUrl={userInfo?.picture}
+                pubkey={pubkey}
+                displayName={displayName}
+                nip05={userInfo?.nip05}
+                isLoading={isMetadataLoading}
+              />
 
-        <Spacer size={16} />
+              <Spacer size={16} />
 
-        {/* Stats Grid */}
-        <View style={{ paddingHorizontal: 16 }}>
-          <ProfileStatsGrid
-            followingCount={followingCount}
-            followerCount={followerCount}
-            reputationScore={reputationScore}
-            joinedDate={joinedDate}
-            isLoading={isStatsLoading}
-          />
-        </View>
+              {/* Stats Grid */}
+              <View style={{ paddingHorizontal: 16 }}>
+                <ProfileStatsGrid
+                  followingCount={followingCount}
+                  followerCount={followerCount}
+                  reputationScore={reputationScore}
+                  joinedDate={joinedDate}
+                  isLoading={isStatsLoading}
+                />
+              </View>
 
-        <Spacer size={16} />
+              <Spacer size={16} />
 
-        {/* Top Followers */}
-        <TopFollowers
-          topFollowers={profileData?.topFollowers || []}
-          isLoading={isProfileApiLoading}
-        />
+              {/* Top Followers */}
+              <TopFollowers
+                topFollowers={profileData?.topFollowers || []}
+                isLoading={isProfileApiLoading}
+              />
 
-        {/* About Card */}
-        {userInfo?.about && (
-          <View style={{ paddingHorizontal: 16 }}>
-            <Card variant="info" message={userInfo.about} />
-            <Spacer size={16} />
-          </View>
-        )}
+              {/* About Card */}
+              {userInfo?.about && (
+                <View style={{ paddingHorizontal: 16 }}>
+                  <Card variant="info" message={userInfo.about} />
+                  <Spacer size={16} />
+                </View>
+              )}
 
-        {/* Actions Section */}
-        <View style={{ paddingHorizontal: 16 }}>
-          <Section title="Actions">
-            <RowButton
-              isFirst
-              label={
-                <HStack align="center" gap={8}>
-                  <Icon
-                    name="mdi:message-text"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
+              {/* Actions Section */}
+              <View style={{ paddingHorizontal: 16 }}>
+                <Section title="Actions">
+                  <RowButton
+                    isFirst
+                    label={
+                      <HStack align="center" gap={8}>
+                        <Icon
+                          name="mdi:message-text"
+                          size={20}
+                          color={opacity(getPrimaryColor('0'), 0.4)}
+                        />
+                        <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
+                          Message User
+                        </Text>
+                      </HStack>
+                    }
+                    onPress={() => {
+                      router.push({
+                        pathname: '/(user-flow)/userMessages' as any,
+                        params: { pubkey },
+                      });
+                    }}
                   />
-                  <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                    Message User
-                  </Text>
-                </HStack>
-              }
-              onPress={() => {
-                router.push({
-                  pathname: '/(user-flow)/userMessages' as any,
-                  params: { pubkey },
-                });
-              }}
-            />
-          </Section>
-        </View>
+                </Section>
+              </View>
 
-        <Spacer size={8} />
+              <Spacer size={8} />
 
-        {/* Profile Info Section */}
-        <View style={{ paddingHorizontal: 16 }}>
-          <Section title="Profile Info">
-            <RowButton
-              isFirst
-              onPress={() => handleCopy(npub, 'npub_copied')}
-              rightIcon={
-                <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
-              }
-              label={
-                <HStack align="center" gap={8}>
-                  <CurrencyIcon
-                    colors={[opacity(getPrimaryColor('0'), 0.4)]}
-                    width={20}
-                    currency="nostr"
+              {/* Profile Info Section */}
+              <View style={{ paddingHorizontal: 16 }}>
+                <Section title="Profile Info">
+                  <RowButton
+                    isFirst
+                    onPress={() => handleCopy(npub, 'npub_copied')}
+                    rightIcon={
+                      <Icon
+                        name="lets-icons:copy"
+                        size={20}
+                        color={opacity(getPrimaryColor('0'), 0.4)}
+                      />
+                    }
+                    label={
+                      <HStack align="center" gap={8}>
+                        <CurrencyIcon
+                          colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                          width={20}
+                          currency="nostr"
+                        />
+                        <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
+                          {truncateMiddle(npub, 10)}
+                        </Text>
+                      </HStack>
+                    }
                   />
-                  <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                    {truncateMiddle(npub, 10)}
-                  </Text>
-                </HStack>
-              }
-            />
-            {userInfo?.nip05 && (
-              <RowButton
-                onPress={() => handleCopy(userInfo.nip05, 'nip05_copied')}
-                rightIcon={
-                  <Icon
-                    name="lets-icons:copy"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                }
-                label={
-                  <HStack align="center" gap={8}>
-                    <Icon
-                      name="mdi:check-decagram"
-                      size={20}
-                      color={opacity(getPrimaryColor('0'), 0.4)}
+                  {userInfo?.nip05 && (
+                    <RowButton
+                      onPress={() => handleCopy(userInfo.nip05, 'nip05_copied')}
+                      rightIcon={
+                        <Icon
+                          name="lets-icons:copy"
+                          size={20}
+                          color={opacity(getPrimaryColor('0'), 0.4)}
+                        />
+                      }
+                      label={
+                        <HStack align="center" gap={8}>
+                          <Icon
+                            name="mdi:check-decagram"
+                            size={20}
+                            color={opacity(getPrimaryColor('0'), 0.4)}
+                          />
+                          <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
+                            {userInfo.nip05}
+                          </Text>
+                        </HStack>
+                      }
                     />
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      {userInfo.nip05}
-                    </Text>
-                  </HStack>
-                }
-              />
-            )}
-            {userInfo?.lud16 && (
-              <RowButton
-                onPress={() => handleCopy(userInfo.lud16, 'lud16_copied')}
-                rightIcon={
-                  <Icon
-                    name="lets-icons:copy"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                }
-                label={
-                  <HStack align="center" gap={8}>
-                    <Icon
-                      name="mdi:lightning-bolt"
-                      size={20}
-                      color={opacity(getPrimaryColor('0'), 0.4)}
+                  )}
+                  {userInfo?.lud16 && (
+                    <RowButton
+                      onPress={() => handleCopy(userInfo.lud16, 'lud16_copied')}
+                      rightIcon={
+                        <Icon
+                          name="lets-icons:copy"
+                          size={20}
+                          color={opacity(getPrimaryColor('0'), 0.4)}
+                        />
+                      }
+                      label={
+                        <HStack align="center" gap={8}>
+                          <Icon
+                            name="mdi:lightning-bolt"
+                            size={20}
+                            color={opacity(getPrimaryColor('0'), 0.4)}
+                          />
+                          <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
+                            {userInfo.lud16}
+                          </Text>
+                        </HStack>
+                      }
                     />
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      {userInfo.lud16}
-                    </Text>
-                  </HStack>
-                }
-              />
-            )}
-            {userInfo?.website && (
-              <RowButton
-                isLast
-                onPress={() => handleOpenLink(userInfo.website)}
-                rightIcon={
-                  <Icon
-                    name="mdi:open-in-new"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                }
-                label={
-                  <HStack align="center" gap={8}>
-                    <Icon name="mdi:web" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      {userInfo.website}
-                    </Text>
-                  </HStack>
-                }
-              />
-            )}
-          </Section>
-        </View>
+                  )}
+                  {userInfo?.website && (
+                    <RowButton
+                      isLast
+                      onPress={() => handleOpenLink(userInfo.website)}
+                      rightIcon={
+                        <Icon
+                          name="mdi:open-in-new"
+                          size={20}
+                          color={opacity(getPrimaryColor('0'), 0.4)}
+                        />
+                      }
+                      label={
+                        <HStack align="center" gap={8}>
+                          <Icon
+                            name="mdi:web"
+                            size={20}
+                            color={opacity(getPrimaryColor('0'), 0.4)}
+                          />
+                          <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
+                            {userInfo.website}
+                          </Text>
+                        </HStack>
+                      }
+                    />
+                  )}
+                </Section>
+              </View>
 
-        <Spacer size={8} />
-
-        {/* User Feed */}
-        {pubkey ? (
-          <UserFeed pubkey={pubkey} authorName={displayName} authorPicture={userInfo?.picture} />
-        ) : null}
-      </ScrollView>
+              <Spacer size={8} />
+            </View>
+          }
+        />
+      ) : null}
 
       <BottomButtons>
         <ButtonHandler

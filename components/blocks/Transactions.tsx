@@ -237,7 +237,7 @@ export const Transactions = React.memo(
     );
 
     const sections = useMemo(() => {
-      const createSections = (items: TimelineItem[]) => {
+      const createSections = (items: TimelineItem[], prefix: string) => {
         // Group by date string for display, but keep track of the original date for sorting
         const groupedByDate = _.groupBy(items, (item) => formatDate(getTimelineCreatedAt(item)));
 
@@ -262,13 +262,13 @@ export const Transactions = React.memo(
         return datesToShow.map(({ dateString }) => ({
           title: dateString,
           data: groupedByDate[dateString],
-          index: dateString,
+          index: `${prefix}-${dateString}`,
         }));
       };
 
-      const pendingSections = createSections(pending || []);
-      const confirmedSections = createSections(confirmed || []);
-      const expiredSections = createSections(expired || []);
+      const pendingSections = createSections(pending || [], 'pending');
+      const confirmedSections = createSections(confirmed || [], 'confirmed');
+      const expiredSections = createSections(expired || [], 'expired');
 
       return {
         pending: pendingSections,
@@ -469,8 +469,8 @@ export const Transactions = React.memo(
         key={listKey}
         style={{ flex: 1 }}
         data={sectionsToDisplay}
+        keyExtractor={(section) => section.index!}
         estimatedItemSize={estimateSectionHeight(sectionsToDisplay[0] || { data: [] })}
-        scrollEnabled
         maintainVisibleContentPosition
         contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
         ListHeaderComponent={<View>{typeof header === 'function' ? header() : header}</View>}

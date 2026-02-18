@@ -865,7 +865,7 @@ function AddMintsScreen() {
           <LegendList
             data={sortedMints}
             renderItem={renderItem}
-            keyExtractor={keyExtractor} // turning this on breaks the scrolling :shrug:
+            keyExtractor={keyExtractor}
             extraData={selectedMints}
             estimatedItemSize={120}
             recycleItems
@@ -874,10 +874,8 @@ function AddMintsScreen() {
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
             ListHeaderComponent={listHeader}
             ListEmptyComponent={emptyComponent}
-            // Wire up scroll events to update scrollY for currency tab animations
             onScroll={handleScroll}
-            // scrollEventThrottle={16}
-            scrollEventThrottle={0}
+            scrollEventThrottle={16}
           />
         )}
       </ModalLayoutWrapper>

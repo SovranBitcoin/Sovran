@@ -2117,13 +2117,11 @@ export function UserMessagesScreen({
                       data={filteredModels}
                       renderItem={renderModelItem}
                       keyExtractor={(item: RoutstrModel) => item.id}
-                      estimatedItemSize={72}
                       style={{ flex: 1 }}
                       contentContainerStyle={{ paddingBottom: 20 }}
-                      maintainVisibleContentPosition
                       waitForInitialLayout={true}
                       recycleItems
-                      getEstimatedItemSize={() => 96}
+                      getFixedItemSize={() => 96}
                       drawDistance={260}
                     />
                   </View>
