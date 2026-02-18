@@ -57,13 +57,13 @@ function isOfflineFromState(state: Network.NetworkState): boolean {
 
 export function OfflineProvider({ children }: OfflineProviderProps) {
   const [networkOffline, setNetworkOffline] = useState(false);
-  const { getPrimaryColor } = useTheme();
+  const { getBlueColor, getPrimaryColor } = useTheme();
   const insets = useSafeAreaInsets();
   const frame = useSafeAreaFrame();
   const isCheckingRef = useRef(false);
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || networkOffline;
-  const offlineAccentColor = useMemo(() => getPrimaryColor('500'), [getPrimaryColor]);
+  const offlineAccentColor = useMemo(() => getBlueColor('300'), [getBlueColor]);
   const offlineTextColor = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
   const screenCornerRadius = useMemo(
     () => getIosCornerRadius(frame.width, frame.height),

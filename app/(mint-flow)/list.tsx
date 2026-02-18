@@ -79,7 +79,7 @@ function MintListRoute() {
               },
             });
           } else {
-            router.back();
+            router.dismiss();
           }
         }}
         onInspectMint={(mintUrl) => {
