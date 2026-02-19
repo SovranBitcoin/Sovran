@@ -37,8 +37,8 @@ import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { Metadata } from 'nostr-tools/kinds';
+import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { Contacts, Metadata } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
 import { popup } from '@/helper/popup';
 import {
@@ -52,9 +52,36 @@ import { formatDate } from '@/helper/time';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { UserFeed } from 'components/blocks/UserFeed';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { selectIsFollowingPubkey, useNostrSocialStore } from '@/stores/nostrSocialStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 150;
+
+function buildUpdatedContactTags(
+  existingTags: string[][],
+  targetPubkey: string,
+  shouldFollow: boolean
+): string[][] {
+  const nextTags = existingTags.filter((tag) => !(tag[0] === 'p' && tag[1] === targetPubkey));
+  if (shouldFollow) {
+    nextTags.push(['p', targetPubkey]);
+  }
+  // Keep one p-tag per pubkey while preserving order for NIP-02 contact lists.
+  const seenP = new Set<string>();
+  const deduped: string[][] = [];
+  for (const tag of nextTags) {
+    if (tag[0] !== 'p') {
+      deduped.push(tag);
+      continue;
+    }
+    const pk = tag[1];
+    if (!pk || seenP.has(pk)) continue;
+    seenP.add(pk);
+    deduped.push(tag);
+  }
+  return deduped;
+}
 
 // ============================================================================
 // Gradient Generation from Seed (same algorithm as Avatar)
@@ -398,6 +425,10 @@ function BannerWithAvatarComponent({
   displayName,
   nip05,
   isLoading,
+  showFollowButton,
+  isFollowing,
+  isFollowLoading,
+  onToggleFollow,
 }: {
   bannerUrl?: string;
   pictureUrl?: string;
@@ -405,6 +436,10 @@ function BannerWithAvatarComponent({
   displayName: string;
   nip05?: string;
   isLoading: boolean;
+  showFollowButton: boolean;
+  isFollowing: boolean;
+  isFollowLoading: boolean;
+  onToggleFollow: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -529,6 +564,34 @@ function BannerWithAvatarComponent({
                 </Text>
               </HStack>
             )}
+            {showFollowButton ? (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={onToggleFollow}
+                disabled={isFollowLoading}
+                style={[
+                  styles.followButton,
+                  {
+                    backgroundColor: isFollowing
+                      ? opacity(getPrimaryColor('0'), 0.12)
+                      : getPrimaryColor('0'),
+                    borderColor: isFollowing
+                      ? opacity(getPrimaryColor('0'), 0.25)
+                      : getPrimaryColor('0'),
+                  },
+                  isFollowLoading && styles.followButtonDisabled,
+                ]}>
+                <Text
+                  bold
+                  overpass
+                  size={13}
+                  style={{
+                    color: isFollowing ? getPrimaryColor('0') : getPrimaryColor('950'),
+                  }}>
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </>
         )}
       </VStack>
@@ -542,6 +605,8 @@ const BannerWithAvatar = React.memo(BannerWithAvatarComponent);
 // ============================================================================
 function UserProfileScreen() {
   const { getPrimaryColor } = useTheme();
+  const { ndk } = useNDK();
+  const { keys: nostrKeys } = useNostrKeysContext();
   const _insets = useSafeAreaInsets();
   const { npub: npubParam, pubkey: pubkeyParam } = useLocalSearchParams<{
     npub?: string;
@@ -590,6 +655,44 @@ function UserProfileScreen() {
     filters: metadataFilters,
   });
 
+  const contactListFilters = useMemo(
+    () =>
+      nostrKeys?.pubkey
+        ? [
+            {
+              authors: [nostrKeys.pubkey],
+              kinds: [Contacts],
+              limit: 20,
+            },
+          ]
+        : null,
+    [nostrKeys?.pubkey]
+  );
+  const { events: contactListEvents } = useSubscribe({ filters: contactListFilters });
+
+  const contactsTags = useNostrSocialStore((state) => state.contactsTags);
+  const contactsContent = useNostrSocialStore((state) => state.contactsContent);
+  const setContactsFromRelay = useNostrSocialStore((state) => state.setContactsFromRelay);
+  const setFollowOptimistic = useNostrSocialStore((state) => state.setFollowOptimistic);
+  const clearFollowOptimistic = useNostrSocialStore((state) => state.clearFollowOptimistic);
+  const clearSettledFollowOptimistic = useNostrSocialStore(
+    (state) => state.clearSettledFollowOptimistic
+  );
+  const followOptimisticEntry = useNostrSocialStore((state) =>
+    pubkey ? state.optimisticFollowsByPubkey[pubkey] : undefined
+  );
+  const ownFollowingCount = useNostrSocialStore((state) => {
+    let count = Object.keys(state.followingPubkeys).length;
+
+    for (const [followedPubkey, optimistic] of Object.entries(state.optimisticFollowsByPubkey)) {
+      const baseIsFollowing = !!state.followingPubkeys[followedPubkey];
+      if (optimistic.value === baseIsFollowing) continue;
+      count += optimistic.value ? 1 : -1;
+    }
+
+    return Math.max(0, count);
+  });
+
   // Fetch profile stats from Sovran API (followers, following, top followers, rank)
   const { data: profileData, isLoading: isProfileApiLoading } = useNostrProfile(pubkey || null);
 
@@ -599,9 +702,6 @@ function UserProfileScreen() {
   const userInfo = metadataEvents?.[0] ? JSON.parse(metadataEvents[0].content) : null;
   const displayName = userInfo?.display_name || userInfo?.name || truncateMiddle(npub, 8);
   const isMetadataLoading = !metadataEose;
-
-  // Following count from API
-  const followingCount = profileData?.follows;
 
   // Follower count from API
   const followerCount = profileData?.followers;
@@ -613,6 +713,41 @@ function UserProfileScreen() {
   const joinedDate = formatDate((profileData?.created_at || 0) * 1000);
 
   const isStatsLoading = isProfileApiLoading;
+
+  const latestContactListEvent = useMemo(() => {
+    if (!nostrKeys?.pubkey) return null;
+    const candidates = (contactListEvents || []).filter(
+      (event) => event.kind === Contacts && event.pubkey === nostrKeys.pubkey
+    );
+    if (candidates.length === 0) return null;
+    return [...candidates].sort((a, b) => {
+      const byCreatedAt = (b.created_at || 0) - (a.created_at || 0);
+      if (byCreatedAt !== 0) return byCreatedAt;
+      return (b.id || '').localeCompare(a.id || '');
+    })[0];
+  }, [contactListEvents, nostrKeys?.pubkey]);
+
+  useEffect(() => {
+    if (!latestContactListEvent) return;
+    const tags = Array.isArray(latestContactListEvent.tags)
+      ? (latestContactListEvent.tags as string[][])
+      : [];
+    const content =
+      typeof latestContactListEvent.content === 'string' ? latestContactListEvent.content : '';
+    setContactsFromRelay({
+      tags,
+      content,
+      createdAt: latestContactListEvent.created_at || 0,
+    });
+    clearSettledFollowOptimistic();
+  }, [latestContactListEvent, setContactsFromRelay, clearSettledFollowOptimistic]);
+
+  const isOwnProfile = !!nostrKeys?.pubkey && nostrKeys.pubkey === pubkey;
+  const followingCount = isOwnProfile ? ownFollowingCount : profileData?.follows;
+  const isFollowingProfile = useNostrSocialStore(
+    useMemo(() => selectIsFollowingPubkey(pubkey || ''), [pubkey])
+  );
+  const followInFlight = !!followOptimisticEntry?.pending;
 
   // ===========================
   // HANDLERS
@@ -634,6 +769,49 @@ function UserProfileScreen() {
       popup({ message: 'Failed to open link', type: 'error' });
     }
   }, []);
+
+  const handleToggleFollow = useCallback(async () => {
+    if (!pubkey || !nostrKeys?.pubkey || !ndk) {
+      popup({ message: 'Unable to update follow right now', type: 'error' });
+      return;
+    }
+    if (nostrKeys.pubkey === pubkey || followInFlight) return;
+
+    const shouldFollow = !isFollowingProfile;
+    setFollowOptimistic(pubkey, shouldFollow, true);
+
+    const sourceTags = contactsTags.map((tag) => [...tag]);
+    const sourceContent = contactsContent;
+
+    const nextTags = buildUpdatedContactTags(sourceTags, pubkey, shouldFollow);
+
+    const createdAt = Math.floor(Date.now() / 1000);
+
+    try {
+      const contactEvent = new NDKEvent(ndk);
+      contactEvent.kind = Contacts;
+      contactEvent.tags = nextTags;
+      contactEvent.content = sourceContent;
+      contactEvent.created_at = createdAt;
+      await contactEvent.publish();
+      setContactsFromRelay({ tags: nextTags, content: sourceContent, createdAt });
+      clearFollowOptimistic(pubkey);
+    } catch {
+      clearFollowOptimistic(pubkey);
+      popup({ message: 'Failed to update follow. Please try again.', type: 'error' });
+    }
+  }, [
+    pubkey,
+    nostrKeys?.pubkey,
+    ndk,
+    followInFlight,
+    isFollowingProfile,
+    contactsTags,
+    contactsContent,
+    setFollowOptimistic,
+    setContactsFromRelay,
+    clearFollowOptimistic,
+  ]);
 
   return (
     <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
@@ -678,6 +856,7 @@ function UserProfileScreen() {
           pubkey={pubkey}
           authorName={displayName}
           authorPicture={userInfo?.picture}
+          isOwnProfile={isOwnProfile}
           ListHeaderComponent={
             <View>
               {/* Banner with Overlapping Avatar */}
@@ -688,6 +867,10 @@ function UserProfileScreen() {
                 displayName={displayName}
                 nip05={userInfo?.nip05}
                 isLoading={isMetadataLoading}
+                showFollowButton={!isOwnProfile && !!pubkey}
+                isFollowing={isFollowingProfile}
+                isFollowLoading={followInFlight}
+                onToggleFollow={handleToggleFollow}
               />
 
               <Spacer size={16} />
@@ -944,6 +1127,19 @@ const styles = StyleSheet.create({
   },
   topFollowerAvatar: {
     borderRadius: 32,
+  },
+  followButton: {
+    marginTop: 10,
+    minWidth: 108,
+    height: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  followButtonDisabled: {
+    opacity: 0.6,
   },
 });
 

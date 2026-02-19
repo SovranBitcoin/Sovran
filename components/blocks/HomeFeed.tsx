@@ -16,7 +16,7 @@ import { Spacer } from 'components/ui/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
-import { LegendList, ListRenderItemInfo } from '@legendapp/list';
+import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -44,12 +44,14 @@ import {
   parseJson,
   getFirstTagValue,
   parseProfileFromRaw,
+  parseNoteMetrics,
   tryNpubEncode,
   getVideoUrlsFromContent,
 } from './nostr/shared';
 
 import { PostCard } from './nostr/PostCard';
 import { RepostCard, VideoFeedOverlay, type VideoPost } from './UserFeed';
+import { useNostrEngagement } from '@/hooks/useNostrEngagement';
 
 // ============================================================================
 // Types
@@ -113,6 +115,7 @@ interface Phase1Result {
   missingQuotedIds: string[];
   missingProfilePubkeys: string[];
   paginationUntil: number;
+  paginationOffset: number;
 }
 
 function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): Phase1Result {
@@ -129,12 +132,8 @@ function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): Phase1Result {
     if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
       const parsed = parseJson<Record<string, unknown>>(raw.content);
       const eventId = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-      if (!eventId) continue;
-      metricsMap.set(eventId, {
-        likeCount: typeof parsed?.likes === 'number' ? parsed.likes : 0,
-        repostCount: typeof parsed?.reposts === 'number' ? parsed.reposts : 0,
-        replyCount: typeof parsed?.replies === 'number' ? parsed.replies : 0,
-      });
+      if (!eventId || !parsed) continue;
+      metricsMap.set(eventId, parseNoteMetrics(parsed));
       continue;
     }
 
@@ -143,7 +142,13 @@ function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): Phase1Result {
       if (Array.isArray(parsed?.elements)) {
         feedOrder = parsed.elements.filter((id): id is string => typeof id === 'string');
       }
-      if (typeof parsed?.until === 'number') paginationUntil = parsed.until;
+      const rawUntil = parsed?.until;
+      if (typeof rawUntil === 'number' && rawUntil > 0) {
+        paginationUntil = rawUntil;
+      } else if (typeof rawUntil === 'string') {
+        const num = Number(rawUntil);
+        if (num > 0) paginationUntil = num;
+      }
       continue;
     }
 
@@ -246,6 +251,15 @@ function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): Phase1Result {
     if (!metricsMap.has(metricId)) metricsMap.set(metricId, { ...DEFAULT_METRICS });
   }
 
+  // Fallback cursor: use oldest item timestamp when FeedRange didn't provide `until`
+  if (paginationUntil === 0 && orderedFeedItems.length > 0) {
+    for (const item of orderedFeedItems) {
+      if (paginationUntil === 0 || item.timestamp < paginationUntil) {
+        paginationUntil = item.timestamp;
+      }
+    }
+  }
+
   return {
     orderedFeedItems,
     metricsMap,
@@ -254,6 +268,7 @@ function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): Phase1Result {
     missingQuotedIds,
     missingProfilePubkeys,
     paginationUntil,
+    paginationOffset: feedOrder.length || orderedFeedItems.length,
   };
 }
 
@@ -462,9 +477,7 @@ function HomeFeedComponent() {
 
         paginationUntilRef.current = phase1.paginationUntil;
         hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
-        paginationOffsetRef.current = phase1.orderedFeedItems.filter(
-          (item) => item.timestamp === phase1.paginationUntil
-        ).length;
+        paginationOffsetRef.current = phase1.paginationOffset;
         feedItemIdsRef.current = new Set(
           phase1.orderedFeedItems.map((item) =>
             item.type === 'note' ? item.event.id : item.repostEvent.id
@@ -498,12 +511,8 @@ function HomeFeedComponent() {
             if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
               const parsed = parseJson<Record<string, unknown>>(raw.content);
               const eventId = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-              if (!eventId) continue;
-              extraMetrics.set(eventId, {
-                likeCount: typeof parsed?.likes === 'number' ? parsed.likes : 0,
-                repostCount: typeof parsed?.reposts === 'number' ? parsed.reposts : 0,
-                replyCount: typeof parsed?.replies === 'number' ? parsed.replies : 0,
-              });
+              if (!eventId || !parsed) continue;
+              extraMetrics.set(eventId, parseNoteMetrics(parsed));
               continue;
             }
 
@@ -638,19 +647,28 @@ function HomeFeedComponent() {
       });
       const page = parseMegaFeedResponse(rawEvents);
 
-      if (
-        page.orderedFeedItems.length === 0 ||
-        page.paginationUntil === 0 ||
-        page.paginationUntil >= paginationUntilRef.current
-      ) {
+      if (page.orderedFeedItems.length === 0) {
         hasMoreRef.current = false;
         return [];
       }
 
-      paginationUntilRef.current = page.paginationUntil;
-      paginationOffsetRef.current = page.orderedFeedItems.filter(
-        (item) => item.timestamp === page.paginationUntil
-      ).length;
+      if (page.paginationUntil > 0 && page.paginationUntil < paginationUntilRef.current) {
+        paginationUntilRef.current = page.paginationUntil;
+        paginationOffsetRef.current = page.paginationOffset;
+      } else if (page.paginationUntil === paginationUntilRef.current) {
+        paginationOffsetRef.current += page.paginationOffset;
+      } else {
+        let oldest = paginationUntilRef.current;
+        for (const item of page.orderedFeedItems) {
+          if (item.timestamp < oldest) oldest = item.timestamp;
+        }
+        if (oldest >= paginationUntilRef.current) {
+          hasMoreRef.current = false;
+          return [];
+        }
+        paginationUntilRef.current = oldest;
+        paginationOffsetRef.current = page.paginationOffset;
+      }
 
       const newItems = page.orderedFeedItems.filter((item) => {
         const id = item.type === 'note' ? item.event.id : item.repostEvent.id;
@@ -703,12 +721,8 @@ function HomeFeedComponent() {
                 if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
                   const p = parseJson<Record<string, unknown>>(raw.content);
                   const eid = typeof p?.event_id === 'string' ? p.event_id : undefined;
-                  if (!eid) continue;
-                  xM.set(eid, {
-                    likeCount: typeof p?.likes === 'number' ? p.likes : 0,
-                    repostCount: typeof p?.reposts === 'number' ? p.reposts : 0,
-                    replyCount: typeof p?.replies === 'number' ? p.replies : 0,
-                  });
+                  if (!eid || !p) continue;
+                  xM.set(eid, parseNoteMetrics(p));
                   continue;
                 }
                 if (raw.kind === Metadata) {
@@ -806,6 +820,21 @@ function HomeFeedComponent() {
     []
   );
 
+  const actionableEvents = useMemo(() => {
+    const map = new Map<string, FeedEvent>();
+    for (const item of feedItems) {
+      if (item.type === 'note') {
+        map.set(item.event.id, item.event);
+      } else if (item.originalEvent) {
+        map.set(item.originalEvent.id, item.originalEvent);
+      }
+    }
+    return Array.from(map.values());
+  }, [feedItems]);
+
+  const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
+    useNostrEngagement(actionableEvents, getMetrics);
+
   const videoPosts = useMemo((): VideoPost[] => {
     const result: VideoPost[] = [];
     const seenUrls = new Set<string>();
@@ -843,18 +872,26 @@ function HomeFeedComponent() {
   // ── Render ──
 
   const renderFeedItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<FeedItem>) => {
+    ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
       if (item.type === 'note') {
+        const metrics = getDisplayMetrics(item.event.id);
+        const engagement = getEngagementState(item.event.id);
         return (
           <PostCard
             variant="feed"
             event={item.event}
-            metrics={getMetrics(item.event.id)}
+            metrics={metrics}
             index={index}
             quotedEvents={quotedRef.current}
             profiles={profilesRef.current}
             getMetrics={getMetrics}
             onVideoTap={handleVideoTap}
+            liked={engagement.liked}
+            reposted={engagement.reposted}
+            likePending={engagement.likePending}
+            repostPending={engagement.repostPending}
+            onLikePress={() => toggleLike(item.event)}
+            onRepostPress={() => toggleRepost(item.event)}
             skipAnimation={!isFirstRender.current}
           />
         );
@@ -864,11 +901,12 @@ function HomeFeedComponent() {
       const reposterName =
         reposterProfile?.name || tryNpubEncode(item.repostEvent.pubkey).slice(0, 12) + '…';
 
+      const originalEvent = item.originalEvent;
       return (
         <RepostCard
           repostEvent={item.repostEvent}
           originalEvent={item.originalEvent}
-          originalMetrics={getMetrics(item.originalEventId)}
+          originalMetrics={getDisplayMetrics(item.originalEventId)}
           index={index}
           quotedEvents={quotedRef.current}
           profiles={profilesRef.current}
@@ -876,11 +914,17 @@ function HomeFeedComponent() {
           reposterName={reposterName}
           reposterPubkey={item.repostEvent.pubkey}
           onVideoTap={handleVideoTap}
+          liked={getEngagementState(item.originalEventId).liked}
+          reposted={getEngagementState(item.originalEventId).reposted}
+          likePending={getEngagementState(item.originalEventId).likePending}
+          repostPending={getEngagementState(item.originalEventId).repostPending}
+          onLikePress={originalEvent ? () => toggleLike(originalEvent) : undefined}
+          onRepostPress={originalEvent ? () => toggleRepost(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
         />
       );
     },
-    [getMetrics, handleVideoTap]
+    [getDisplayMetrics, getEngagementState, getMetrics, handleVideoTap, toggleLike, toggleRepost]
   );
 
   const refreshTintColor = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
@@ -945,7 +989,7 @@ function HomeFeedComponent() {
         estimatedItemSize={300}
         drawDistance={400}
         renderItem={renderFeedItem}
-        extraData={dataVersion}
+        extraData={`${dataVersion}:${engagementRevision}`}
         recycleItems
         ListHeaderComponent={feedHeader}
         ListFooterComponent={
@@ -972,7 +1016,17 @@ function HomeFeedComponent() {
           startIndex={overlayStartIndex}
           onClose={closeOverlay}
           onEndReached={loadMoreVideos}
-          isLoadingMore={isLoadingMore}
+          getDisplayMetrics={getDisplayMetrics}
+          getEngagementState={getEngagementState}
+          engagementRevision={engagementRevision}
+          onLikePress={(eventId) => {
+            const event = actionableEvents.find((e) => e.id === eventId);
+            if (event) toggleLike(event);
+          }}
+          onRepostPress={(eventId) => {
+            const event = actionableEvents.find((e) => e.id === eventId);
+            if (event) toggleRepost(event);
+          }}
         />
       )}
     </>

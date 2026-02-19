@@ -14,7 +14,7 @@ import { Spacer } from 'components/ui/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { ShortTextNote, Metadata } from 'nostr-tools/kinds';
-import { LegendList, ListRenderItemInfo } from '@legendapp/list';
+import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -30,12 +30,14 @@ import {
   normalizeFeedEvent,
   parseJson,
   parseProfileFromRaw,
+  parseNoteMetrics,
   getVideoUrlsFromContent,
 } from './nostr/shared';
 
 import { PostCard } from './nostr/PostCard';
 
 import { VideoFeedOverlay, type VideoPost } from './UserFeed';
+import { useNostrEngagement } from '@/hooks/useNostrEngagement';
 
 // ============================================================================
 // Types
@@ -179,6 +181,11 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
     []
   );
 
+  const actionableEvents = useMemo(() => threadItems.map((item) => item.event), [threadItems]);
+
+  const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
+    useNostrEngagement(actionableEvents, getMetrics);
+
   // Build video posts list from thread items
   const videoPosts = useMemo((): VideoPost[] => {
     const result: VideoPost[] = [];
@@ -248,12 +255,8 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
           if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
             const parsed = parseJson<Record<string, unknown>>(raw.content);
             const eid = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-            if (!eid) continue;
-            metrics.set(eid, {
-              likeCount: typeof parsed?.likes === 'number' ? parsed.likes : 0,
-              repostCount: typeof parsed?.reposts === 'number' ? parsed.reposts : 0,
-              replyCount: typeof parsed?.replies === 'number' ? parsed.replies : 0,
-            });
+            if (!eid || !parsed) continue;
+            metrics.set(eid, parseNoteMetrics(parsed));
             continue;
           }
 
@@ -304,12 +307,8 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
               if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
                 const parsed = parseJson<Record<string, unknown>>(raw.content);
                 const eid = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-                if (!eid) continue;
-                metrics.set(eid, {
-                  likeCount: typeof parsed?.likes === 'number' ? parsed.likes : 0,
-                  repostCount: typeof parsed?.reposts === 'number' ? parsed.reposts : 0,
-                  replyCount: typeof parsed?.replies === 'number' ? parsed.replies : 0,
-                });
+                if (!eid || !parsed) continue;
+                metrics.set(eid, parseNoteMetrics(parsed));
                 continue;
               }
               if (raw.kind === PRIMAL_KIND_MENTIONS) {
@@ -360,12 +359,8 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
               if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
                 const parsed = parseJson<Record<string, unknown>>(raw.content);
                 const eid = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-                if (!eid) continue;
-                metrics.set(eid, {
-                  likeCount: typeof parsed?.likes === 'number' ? parsed.likes : 0,
-                  repostCount: typeof parsed?.reposts === 'number' ? parsed.reposts : 0,
-                  replyCount: typeof parsed?.replies === 'number' ? parsed.replies : 0,
-                });
+                if (!eid || !parsed) continue;
+                metrics.set(eid, parseNoteMetrics(parsed));
                 continue;
               }
               const ev = normalizeFeedEvent(raw);
@@ -427,7 +422,7 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
           setDataVersion((v) => v + 1);
           setIsLoading(false);
         }
-      } catch (err) {
+      } catch {
         if (mountedRef.current && !cancelled) {
           setError('Failed to load thread');
           setIsLoading(false);
@@ -461,14 +456,15 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
   const hasParents = useMemo(() => threadItems.some((i) => i.type === 'parent'), [threadItems]);
 
   const renderItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<ThreadItem>) => {
+    ({ item, index }: LegendListRenderItemProps<ThreadItem, string | undefined>) => {
       const isParent = item.type === 'parent';
       const isTarget = item.type === 'target';
 
       const showLineAbove = isParent ? index > 0 : isTarget ? hasParents : false;
       const showLineBelow = isParent ? true : false;
 
-      const metrics = metricsRef.current.get(item.event.id) || DEFAULT_METRICS;
+      const metrics = getDisplayMetrics(item.event.id);
+      const engagement = getEngagementState(item.event.id);
 
       return (
         <PostCard
@@ -481,10 +477,24 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
           showLineAbove={showLineAbove}
           showLineBelow={showLineBelow}
           onVideoTap={handleVideoTap}
+          liked={engagement.liked}
+          reposted={engagement.reposted}
+          likePending={engagement.likePending}
+          repostPending={engagement.repostPending}
+          onLikePress={() => toggleLike(item.event)}
+          onRepostPress={() => toggleRepost(item.event)}
         />
       );
     },
-    [getMetrics, hasParents, handleVideoTap]
+    [
+      getDisplayMetrics,
+      getEngagementState,
+      getMetrics,
+      hasParents,
+      handleVideoTap,
+      toggleLike,
+      toggleRepost,
+    ]
   );
 
   if (isLoading) {
@@ -526,7 +536,7 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
         estimatedItemSize={200}
         drawDistance={500}
         renderItem={renderItem}
-        extraData={dataVersion}
+        extraData={`${dataVersion}:${engagementRevision}`}
         recycleItems
         ListFooterComponent={
           hiddenReplyCount > 0 ? (
@@ -550,6 +560,17 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
           metricsMap={metricsMap}
           startIndex={overlayStartIndex}
           onClose={() => setOverlayVisible(false)}
+          getDisplayMetrics={getDisplayMetrics}
+          getEngagementState={getEngagementState}
+          engagementRevision={engagementRevision}
+          onLikePress={(eventId) => {
+            const event = actionableEvents.find((e) => e.id === eventId);
+            if (event) toggleLike(event);
+          }}
+          onRepostPress={(eventId) => {
+            const event = actionableEvents.find((e) => e.id === eventId);
+            if (event) toggleRepost(event);
+          }}
         />
       )}
     </View>

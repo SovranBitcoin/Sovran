@@ -58,6 +58,7 @@ const PROFILE_SCOPED_STORE_KEYS = [
   'search-history-store',
   'swap-transactions-store',
   'transaction-location-store',
+  'nostr-social-store',
 ];
 
 /**
@@ -102,6 +103,7 @@ export async function rehydrateProfileStores(): Promise<void> {
   const { useSearchHistoryStore } = await import('@/stores/searchHistoryStore');
   const { useSwapTransactionsStore } = await import('@/stores/swapTransactionsStore');
   const { useTransactionLocationStore } = await import('@/stores/transactionLocationStore');
+  const { useNostrSocialStore } = await import('@/stores/nostrSocialStore');
 
   // Reset each store to its initial state.
   // Skip persist writes so the empty reset state doesn't overwrite
@@ -124,6 +126,17 @@ export async function rehydrateProfileStores(): Promise<void> {
     useSearchHistoryStore.setState({ recentSearches: {} });
     useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} });
     useTransactionLocationStore.setState({ locations: {} });
+    useNostrSocialStore.setState({
+      contactsTags: [],
+      contactsContent: '',
+      contactsUpdatedAt: 0,
+      followingPubkeys: {},
+      likesByEventId: {},
+      repostsByEventId: {},
+      optimisticFollowsByPubkey: {},
+      optimisticLikesByEventId: {},
+      optimisticRepostsByEventId: {},
+    });
   } finally {
     _skipPersistWrite = false;
   }
@@ -137,6 +150,7 @@ export async function rehydrateProfileStores(): Promise<void> {
     useSearchHistoryStore.persist.rehydrate(),
     useSwapTransactionsStore.persist.rehydrate(),
     useTransactionLocationStore.persist.rehydrate(),
+    useNostrSocialStore.persist.rehydrate(),
   ]);
 
   console.log('[ProfileScopedStorage] All profile stores rehydrated');

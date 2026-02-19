@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
@@ -14,7 +14,6 @@ import Reanimated, {
   useAnimatedStyle,
   withDelay,
   withTiming,
-  interpolate,
   runOnJS,
   Easing,
 } from 'react-native-reanimated';
@@ -51,6 +50,14 @@ interface PostCardProps {
 
   onVideoTap?: (url: string) => void;
   onCommentPress?: () => void;
+  onRepostPress?: () => void;
+  onLikePress?: () => void;
+  reposted?: boolean;
+  liked?: boolean;
+  repostPending?: boolean;
+  likePending?: boolean;
+  onNestedProfilePressIn?: () => void;
+  onNestedProfilePressOut?: () => void;
 }
 
 export const PostCard = React.memo(function PostCard({
@@ -66,6 +73,14 @@ export const PostCard = React.memo(function PostCard({
   skipAnimation = true,
   onVideoTap,
   onCommentPress,
+  onRepostPress,
+  onLikePress,
+  reposted = false,
+  liked = false,
+  repostPending = false,
+  likePending = false,
+  onNestedProfilePressIn,
+  onNestedProfilePressOut,
 }: PostCardProps) {
   const { getPrimaryColor } = useTheme();
 
@@ -110,32 +125,51 @@ export const PostCard = React.memo(function PostCard({
     });
   }, [event.pubkey]);
 
-  // GPU-thread press feedback — gives instant visual response even when JS
-  // thread is busy with navigation or data loading.
-  const pressVal = useSharedValue(0);
+  const suppressThreadTapRef = useRef(false);
+
+  const suppressThreadTapStart = useCallback(() => {
+    suppressThreadTapRef.current = true;
+  }, []);
+
+  const suppressThreadTapEnd = useCallback(() => {
+    setTimeout(() => {
+      suppressThreadTapRef.current = false;
+    }, 0);
+  }, []);
+
+  const handleProfilePressIn = useCallback(() => {
+    suppressThreadTapStart();
+    onNestedProfilePressIn?.();
+  }, [suppressThreadTapStart, onNestedProfilePressIn]);
+
+  const handleProfilePressOut = useCallback(() => {
+    suppressThreadTapEnd();
+    onNestedProfilePressOut?.();
+  }, [suppressThreadTapEnd, onNestedProfilePressOut]);
+
+  const handleActionPressIn = useCallback(() => {
+    suppressThreadTapStart();
+    onNestedProfilePressIn?.();
+  }, [onNestedProfilePressIn, suppressThreadTapStart]);
+
+  const handleActionPressOut = useCallback(() => {
+    suppressThreadTapEnd();
+    onNestedProfilePressOut?.();
+  }, [onNestedProfilePressOut, suppressThreadTapEnd]);
+
+  const handleThreadPress = useCallback(() => {
+    if (suppressThreadTapRef.current) return;
+    navigateToThread();
+  }, [navigateToThread]);
 
   const tapGesture = useMemo(
     () =>
-      Gesture.Tap()
-        .onBegin(() => {
-          'worklet';
-          pressVal.set(withTiming(1, { duration: 80 }));
-        })
-        .onFinalize(() => {
-          'worklet';
-          pressVal.set(withTiming(0, { duration: 200 }));
-        })
-        .onEnd(() => {
-          'worklet';
-          runOnJS(navigateToThread)();
-        }),
-    [navigateToThread, pressVal]
+      Gesture.Tap().onEnd(() => {
+        'worklet';
+        runOnJS(handleThreadPress)();
+      }),
+    [handleThreadPress]
   );
-
-  const pressStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(pressVal.get(), [0, 1], [1, 0.98]) }],
-    opacity: interpolate(pressVal.get(), [0, 1], [1, 0.85]),
-  }));
 
   // ── Thread target: stacked layout (no gutter) ──
   if (isTarget) {
@@ -153,7 +187,11 @@ export const PostCard = React.memo(function PostCard({
     return (
       <View>
         <View style={pcStyles.targetRow}>
-          <TouchableOpacity activeOpacity={0.7} onPress={navigateToProfile}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPressIn={handleProfilePressIn}
+            onPressOut={handleProfilePressOut}
+            onPress={navigateToProfile}>
             <HStack align="center" gap={10} style={sharedStyles.mb6}>
               <Avatar
                 picture={profile?.picture}
@@ -183,6 +221,8 @@ export const PostCard = React.memo(function PostCard({
             profiles={profiles}
             getMetrics={getMetrics}
             onVideoTap={onVideoTap}
+            onQuotedPressIn={handleProfilePressIn}
+            onQuotedPressOut={handleProfilePressOut}
           />
 
           {fullDate ? (
@@ -197,6 +237,14 @@ export const PostCard = React.memo(function PostCard({
             metrics={metrics}
             borderColor={getPrimaryColor('0')}
             onCommentPress={onCommentPress ?? navigateToThread}
+            onRepostPress={onRepostPress}
+            onLikePress={onLikePress}
+            reposted={reposted}
+            liked={liked}
+            repostPending={repostPending}
+            likePending={likePending}
+            onActionPressIn={handleActionPressIn}
+            onActionPressOut={handleActionPressOut}
           />
         </View>
       </View>
@@ -211,7 +259,11 @@ export const PostCard = React.memo(function PostCard({
     <View style={pcStyles.gutterRow}>
       <View style={pcStyles.gutterCol}>
         {showLineAbove && <View style={[pcStyles.lineAbove, { backgroundColor: lineColor }]} />}
-        <TouchableOpacity activeOpacity={0.7} onPress={navigateToProfile}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPressIn={handleProfilePressIn}
+          onPressOut={handleProfilePressOut}
+          onPress={navigateToProfile}>
           <Avatar
             picture={profile?.picture}
             seed={event.pubkey}
@@ -225,13 +277,19 @@ export const PostCard = React.memo(function PostCard({
 
       <View style={sharedStyles.flex1}>
         <HStack align="center" gap={6} style={sharedStyles.mb4}>
-          <Text
-            bold
-            size={14}
-            style={{ color: opacity(getPrimaryColor('0'), 0.9) }}
-            numberOfLines={isThread ? 1 : undefined}>
-            {displayName}
-          </Text>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPressIn={handleProfilePressIn}
+            onPressOut={handleProfilePressOut}
+            onPress={navigateToProfile}>
+            <Text
+              bold
+              size={14}
+              style={{ color: opacity(getPrimaryColor('0'), 0.9) }}
+              numberOfLines={isThread ? 1 : undefined}>
+              {displayName}
+            </Text>
+          </TouchableOpacity>
           {shortTime ? (
             <>
               <Text
@@ -253,6 +311,8 @@ export const PostCard = React.memo(function PostCard({
           profiles={profiles}
           getMetrics={getMetrics}
           onVideoTap={onVideoTap}
+          onQuotedPressIn={handleProfilePressIn}
+          onQuotedPressOut={handleProfilePressOut}
         />
 
         <Spacer size={8} />
@@ -264,6 +324,14 @@ export const PostCard = React.memo(function PostCard({
             compact={isThread}
             showBorder={isThread ? !hasConnectingBars : true}
             onCommentPress={isThread ? (onCommentPress ?? navigateToThread) : undefined}
+            onRepostPress={onRepostPress}
+            onLikePress={onLikePress}
+            reposted={reposted}
+            liked={liked}
+            repostPending={repostPending}
+            likePending={likePending}
+            onActionPressIn={handleActionPressIn}
+            onActionPressOut={handleActionPressOut}
           />
         </View>
       </View>
@@ -273,14 +341,14 @@ export const PostCard = React.memo(function PostCard({
   if (isFeed) {
     return (
       <GestureDetector gesture={tapGesture}>
-        <Reanimated.View style={[animStyle, pressStyle]}>{gutterContent}</Reanimated.View>
+        <Reanimated.View style={animStyle}>{gutterContent}</Reanimated.View>
       </GestureDetector>
     );
   }
 
   if (isThread) {
     return (
-      <TouchableOpacity activeOpacity={0.7} onPress={navigateToThread}>
+      <TouchableOpacity activeOpacity={0.7} onPress={handleThreadPress}>
         {gutterContent}
       </TouchableOpacity>
     );

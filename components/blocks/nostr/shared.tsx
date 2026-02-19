@@ -5,8 +5,10 @@
  * extracted to eliminate duplication and ensure consistent behavior.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, TouchableOpacity, Linking, Dimensions, Platform } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router } from 'expo-router';
@@ -28,6 +30,7 @@ export interface NoteMetrics {
   likeCount: number;
   repostCount: number;
   replyCount: number;
+  satsZapped: number;
 }
 
 export interface FeedEvent {
@@ -86,6 +89,7 @@ export const DEFAULT_METRICS: NoteMetrics = Object.freeze({
   likeCount: 0,
   repostCount: 0,
   replyCount: 0,
+  satsZapped: 0,
 });
 
 export const PRIMAL_CACHE_RELAY_URL = 'wss://cache2.primal.net/v1';
@@ -283,6 +287,22 @@ export function formatCount(count: number): string {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
   if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
   return count.toString();
+}
+
+export function formatSats(sats: number): string {
+  if (sats >= 100_000_000) return `${(sats / 100_000_000).toFixed(2)} BTC`;
+  if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(1)}M`;
+  if (sats >= 1_000) return `${(sats / 1_000).toFixed(1)}K`;
+  return sats.toString();
+}
+
+export function parseNoteMetrics(parsed: Record<string, unknown>): NoteMetrics {
+  return {
+    likeCount: typeof parsed?.likes === 'number' ? parsed.likes : 0,
+    repostCount: typeof parsed?.reposts === 'number' ? parsed.reposts : 0,
+    replyCount: typeof parsed?.replies === 'number' ? parsed.replies : 0,
+    satsZapped: typeof parsed?.satszapped === 'number' ? parsed.satszapped : 0,
+  };
 }
 
 export function tryNpubEncode(hex: string): string {
@@ -588,12 +608,19 @@ const IOSVideoBlock = React.memo(function IOSVideoBlock({
     p.muted = true;
   });
 
-  return (
-    <TouchableOpacity
-      activeOpacity={onTap ? 0.85 : 1}
-      onPress={onTap}
-      disabled={!onTap}
-      style={[sharedStyles.videoBlockOuter, { backgroundColor: getPrimaryColor('900') }]}>
+  const tapGesture = useMemo(
+    () =>
+      onTap
+        ? Gesture.Tap().onEnd(() => {
+            'worklet';
+            runOnJS(onTap)();
+          })
+        : undefined,
+    [onTap]
+  );
+
+  const content = (
+    <View style={[sharedStyles.videoBlockOuter, { backgroundColor: getPrimaryColor('900') }]}>
       <View pointerEvents={onTap ? 'none' : 'auto'}>
         <VideoView
           player={player}
@@ -609,8 +636,13 @@ const IOSVideoBlock = React.memo(function IOSVideoBlock({
           <Icon name="mdi:play-circle-outline" size={48} color="rgba(255,255,255,0.75)" />
         </View>
       )}
-    </TouchableOpacity>
+    </View>
   );
+
+  if (tapGesture) {
+    return <GestureDetector gesture={tapGesture}>{content}</GestureDetector>;
+  }
+  return content;
 });
 
 const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
@@ -621,32 +653,49 @@ const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
   onTap?: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
-  const handlePress = onTap ?? (() => Linking.openURL(url).catch(() => {}));
+  const openInBrowser = useCallback(() => Linking.openURL(url).catch(() => {}), [url]);
+
+  const tapGesture = useMemo(
+    () =>
+      Gesture.Tap().onEnd(() => {
+        'worklet';
+        runOnJS(onTap ?? openInBrowser)();
+      }),
+    [onTap, openInBrowser]
+  );
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={handlePress}
-      style={[
-        sharedStyles.mediaCard,
-        { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
-      ]}>
-      <HStack align="center" gap={8}>
-        <Icon name="mdi:play-circle-outline" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
-        <VStack style={sharedStyles.flex1}>
-          <Text bold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
-            Video
-          </Text>
-          <Text size={11} numberOfLines={1} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
-            {onTap ? 'Tap to watch' : 'Open in browser'}
-          </Text>
-        </VStack>
-        <Icon
-          name={onTap ? 'mdi:play-circle' : 'mdi:open-in-new'}
-          size={16}
-          color={opacity(getPrimaryColor('0'), 0.33)}
-        />
-      </HStack>
-    </TouchableOpacity>
+    <GestureDetector gesture={tapGesture}>
+      <View
+        style={[
+          sharedStyles.mediaCard,
+          { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
+        ]}>
+        <HStack align="center" gap={8}>
+          <Icon
+            name="mdi:play-circle-outline"
+            size={20}
+            color={opacity(getPrimaryColor('0'), 0.4)}
+          />
+          <VStack style={sharedStyles.flex1}>
+            <Text bold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
+              Video
+            </Text>
+            <Text
+              size={11}
+              numberOfLines={1}
+              style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
+              {onTap ? 'Tap to watch' : 'Open in browser'}
+            </Text>
+          </VStack>
+          <Icon
+            name={onTap ? 'mdi:play-circle' : 'mdi:open-in-new'}
+            size={16}
+            color={opacity(getPrimaryColor('0'), 0.33)}
+          />
+        </HStack>
+      </View>
+    </GestureDetector>
   );
 });
 
@@ -702,15 +751,33 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   compact = false,
   showBorder = true,
   onCommentPress,
+  onRepostPress,
+  onLikePress,
+  reposted = false,
+  liked = false,
+  repostPending = false,
+  likePending = false,
+  onActionPressIn,
+  onActionPressOut,
 }: {
   metrics: NoteMetrics;
   borderColor: string;
   compact?: boolean;
   showBorder?: boolean;
   onCommentPress?: () => void;
+  onRepostPress?: () => void;
+  onLikePress?: () => void;
+  reposted?: boolean;
+  liked?: boolean;
+  repostPending?: boolean;
+  likePending?: boolean;
+  onActionPressIn?: () => void;
+  onActionPressOut?: () => void;
 }) {
   const iconColor = opacity(borderColor, 0.57);
   const textColor = opacity(borderColor, 0.57);
+  const likedColor = '#ff5a7a';
+  const repostedColor = '#4cd964';
   const iconSize = compact ? 13 : 16;
   const textSize = compact ? 11 : 13;
 
@@ -725,7 +792,9 @@ export const MetricsFooter = React.memo(function MetricsFooter({
         <TouchableOpacity
           activeOpacity={onCommentPress ? 0.7 : 1}
           onPress={onCommentPress}
-          disabled={!onCommentPress}>
+          disabled={!onCommentPress}
+          onPressIn={onActionPressIn}
+          onPressOut={onActionPressOut}>
           <HStack align="center" gap={5}>
             <Icon name="iconamoon:comment-fill" size={iconSize - 1} color={iconColor} />
             <Text size={textSize} style={{ color: textColor }}>
@@ -733,19 +802,50 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             </Text>
           </HStack>
         </TouchableOpacity>
-        <HStack align="center" gap={5}>
-          <Icon name="garden:arrow-retweet-fill-16" size={iconSize + 1} color={iconColor} />
-          <Text size={textSize} style={{ color: textColor }}>
-            {formatCount(metrics.repostCount)}
-          </Text>
-        </HStack>
-        <HStack align="center" gap={5}>
-          <Icon name="iconamoon:heart-fill" size={iconSize} color={iconColor} />
-          <Text size={textSize} style={{ color: textColor }}>
-            {formatCount(metrics.likeCount)}
-          </Text>
-        </HStack>
-        <Icon name="iconamoon:bookmark-fill" size={iconSize} color={iconColor} />
+        <TouchableOpacity
+          activeOpacity={onRepostPress ? 0.7 : 1}
+          onPress={onRepostPress}
+          disabled={!onRepostPress || repostPending}
+          onPressIn={onActionPressIn}
+          onPressOut={onActionPressOut}>
+          <HStack align="center" gap={5}>
+            <Icon
+              name="garden:arrow-retweet-fill-16"
+              size={iconSize + 1}
+              color={reposted ? repostedColor : iconColor}
+            />
+            <Text size={textSize} style={{ color: reposted ? repostedColor : textColor }}>
+              {formatCount(metrics.repostCount)}
+            </Text>
+          </HStack>
+        </TouchableOpacity>
+        <TouchableOpacity
+          activeOpacity={onLikePress ? 0.7 : 1}
+          onPress={onLikePress}
+          disabled={!onLikePress || likePending}
+          onPressIn={onActionPressIn}
+          onPressOut={onActionPressOut}>
+          <HStack align="center" gap={5}>
+            <Icon
+              name="iconamoon:heart-fill"
+              size={iconSize}
+              color={liked ? likedColor : iconColor}
+            />
+            <Text size={textSize} style={{ color: liked ? likedColor : textColor }}>
+              {formatCount(metrics.likeCount)}
+            </Text>
+          </HStack>
+        </TouchableOpacity>
+        {metrics.satsZapped > 0 ? (
+          <HStack align="center" gap={4}>
+            <Icon name="mingcute:lightning-fill" size={iconSize} color={iconColor} />
+            <Text size={textSize} style={{ color: textColor }}>
+              {formatSats(metrics.satsZapped)}
+            </Text>
+          </HStack>
+        ) : (
+          <Icon name="mingcute:lightning-fill" size={iconSize} color={iconColor} />
+        )}
       </HStack>
     </View>
   );
@@ -759,12 +859,32 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
   event,
   profiles,
   getMetrics,
+  onPressIn,
+  onPressOut,
 }: {
   event: FeedEvent | undefined;
   profiles: Map<string, ProfileInfo>;
   getMetrics: (eventId: string) => NoteMetrics;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
+
+  const suppressQuotedTapStart = useCallback(() => {
+    onPressIn?.();
+  }, [onPressIn]);
+
+  const suppressQuotedTapEnd = useCallback(() => {
+    onPressOut?.();
+  }, [onPressOut]);
+
+  const handleOpenQuotedThread = useCallback(() => {
+    if (!event) return;
+    router.push({
+      pathname: '/(user-flow)/thread' as any,
+      params: { eventId: event.id },
+    });
+  }, [event]);
 
   if (!event) {
     return (
@@ -790,12 +910,9 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
   return (
     <TouchableOpacity
       activeOpacity={0.7}
-      onPress={() => {
-        router.push({
-          pathname: '/(user-flow)/thread' as any,
-          params: { eventId: event.id },
-        });
-      }}>
+      onPressIn={suppressQuotedTapStart}
+      onPressOut={suppressQuotedTapEnd}
+      onPress={handleOpenQuotedThread}>
       <View
         style={[
           sharedStyles.quotedCard,
@@ -835,6 +952,8 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
           quotedEvents={EMPTY_QUOTED_EVENTS}
           profiles={profiles}
           getMetrics={getMetrics}
+          onQuotedPressIn={suppressQuotedTapStart}
+          onQuotedPressOut={suppressQuotedTapEnd}
         />
       </View>
     </TouchableOpacity>
@@ -851,12 +970,16 @@ export const NoteContent = React.memo(function NoteContent({
   profiles,
   getMetrics,
   onVideoTap,
+  onQuotedPressIn,
+  onQuotedPressOut,
 }: {
   content: string;
   quotedEvents: Map<string, FeedEvent>;
   profiles: Map<string, ProfileInfo>;
   getMetrics: (eventId: string) => NoteMetrics;
   onVideoTap?: (url: string) => void;
+  onQuotedPressIn?: () => void;
+  onQuotedPressOut?: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
 
@@ -953,6 +1076,8 @@ export const NoteContent = React.memo(function NoteContent({
                   event={quotedEvents.get(seg.eventId)}
                   profiles={profiles}
                   getMetrics={getMetrics}
+                  onPressIn={onQuotedPressIn}
+                  onPressOut={onQuotedPressOut}
                 />
               );
             default:

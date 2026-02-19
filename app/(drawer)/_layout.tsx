@@ -8,7 +8,6 @@ import { StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { DrawerContentComponentProps } from '@react-navigation/drawer';
 import { LinearGradient } from 'expo-linear-gradient';
-import { nip19 } from 'nostr-tools';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
@@ -215,10 +214,9 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
     if (nostrKeys?.pubkey) {
       closeDrawer();
       router.navigate({
-        pathname: '/share',
+        pathname: '/(user-flow)/profile' as any,
         params: {
-          type: 'profile',
-          data: nostrKeys?.npub || nip19.npubEncode(nostrKeys?.pubkey),
+          pubkey: nostrKeys.pubkey,
         },
       });
     }

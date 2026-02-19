@@ -55,7 +55,7 @@ import { Avatar } from 'components/ui/Avatar';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
-import { LegendList, LegendListRef, ListRenderItemInfo } from '@legendapp/list';
+import { LegendList, LegendListRef, type LegendListRenderItemProps } from '@legendapp/list';
 import { FullWindowOverlay } from 'react-native-screens';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Reanimated, {
@@ -63,12 +63,14 @@ import Reanimated, {
   useAnimatedStyle,
   withDelay,
   withTiming,
+  withRepeat,
   withSpring,
   interpolate,
   Extrapolation,
   cancelAnimation,
   runOnJS,
   Easing,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -99,11 +101,14 @@ import {
   parseJson,
   getFirstTagValue,
   parseProfileFromRaw,
+  parseNoteMetrics,
   tryNpubEncode,
   getVideoUrlsFromContent,
 } from './nostr/shared';
 
 import { PostCard } from './nostr/PostCard';
+import { useNostrEngagement, type EngagementViewState } from '@/hooks/useNostrEngagement';
+import { useNostrSocialStore } from '@/stores/nostrSocialStore';
 
 // ============================================================================
 // Re-exports for backward compatibility (ThreadView imports from './UserFeed')
@@ -136,6 +141,8 @@ interface UserFeedProps {
   /** Author info passed from the profile screen so we don't re-fetch */
   authorName?: string;
   authorPicture?: string;
+  /** When true, repost items that were locally unreposted are filtered out on load */
+  isOwnProfile?: boolean;
   /** Optional header rendered above the feed inside the LegendList */
   ListHeaderComponent?: React.ReactElement | null;
 }
@@ -158,6 +165,19 @@ export interface VideoPost {
   content: string;
   pubkey: string;
   created_at: number;
+}
+
+/** Sentinel appended to the video feed for infinite scroll loading */
+interface VideoLoadingSlot {
+  slotType: 'loading';
+}
+
+type VideoFeedSlot = VideoPost | VideoLoadingSlot;
+
+const LOADING_SLOT: VideoLoadingSlot = { slotType: 'loading' };
+
+function isLoadingSlot(item: VideoFeedSlot): item is VideoLoadingSlot {
+  return 'slotType' in item && item.slotType === 'loading';
 }
 
 // ============================================================================
@@ -189,6 +209,7 @@ interface Phase1Result {
   missingQuotedIds: string[];
   missingProfilePubkeys: string[];
   paginationUntil: number;
+  paginationOffset: number;
 }
 
 function parsePhase1(
@@ -209,12 +230,8 @@ function parsePhase1(
     if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
       const parsed = parseJson<Record<string, unknown>>(raw.content);
       const eventId = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-      if (!eventId) continue;
-      metricsMap.set(eventId, {
-        likeCount: typeof parsed?.likes === 'number' ? parsed.likes : 0,
-        repostCount: typeof parsed?.reposts === 'number' ? parsed.reposts : 0,
-        replyCount: typeof parsed?.replies === 'number' ? parsed.replies : 0,
-      });
+      if (!eventId || !parsed) continue;
+      metricsMap.set(eventId, parseNoteMetrics(parsed));
       continue;
     }
 
@@ -223,7 +240,13 @@ function parsePhase1(
       if (Array.isArray(parsed?.elements)) {
         feedOrder = parsed.elements.filter((id): id is string => typeof id === 'string');
       }
-      if (typeof parsed?.until === 'number') paginationUntil = parsed.until;
+      const rawUntil = parsed?.until;
+      if (typeof rawUntil === 'number' && rawUntil > 0) {
+        paginationUntil = rawUntil;
+      } else if (typeof rawUntil === 'string') {
+        const num = Number(rawUntil);
+        if (num > 0) paginationUntil = num;
+      }
       continue;
     }
 
@@ -328,6 +351,15 @@ function parsePhase1(
     if (!metricsMap.has(metricId)) metricsMap.set(metricId, { ...DEFAULT_METRICS });
   }
 
+  // Fallback cursor: use oldest item timestamp when FeedRange didn't provide `until`
+  if (paginationUntil === 0 && orderedFeedItems.length > 0) {
+    for (const item of orderedFeedItems) {
+      if (paginationUntil === 0 || item.timestamp < paginationUntil) {
+        paginationUntil = item.timestamp;
+      }
+    }
+  }
+
   return {
     orderedFeedItems,
     metricsMap,
@@ -336,6 +368,7 @@ function parsePhase1(
     missingQuotedIds,
     missingProfilePubkeys,
     paginationUntil,
+    paginationOffset: feedOrder.length || orderedFeedItems.length,
   };
 }
 
@@ -354,6 +387,12 @@ export const RepostCard = React.memo(function RepostCard({
   reposterName,
   reposterPubkey,
   onVideoTap,
+  liked = false,
+  reposted = false,
+  likePending = false,
+  repostPending = false,
+  onLikePress,
+  onRepostPress,
   skipAnimation,
 }: {
   repostEvent: FeedEvent;
@@ -366,6 +405,12 @@ export const RepostCard = React.memo(function RepostCard({
   reposterName: string;
   reposterPubkey: string;
   onVideoTap?: (url: string) => void;
+  liked?: boolean;
+  reposted?: boolean;
+  likePending?: boolean;
+  repostPending?: boolean;
+  onLikePress?: () => void;
+  onRepostPress?: () => void;
   skipAnimation?: boolean;
 }) {
   const { getPrimaryColor } = useTheme();
@@ -395,37 +440,40 @@ export const RepostCard = React.memo(function RepostCard({
     });
   }, [threadEventId]);
 
-  const pressVal = useSharedValue(0);
+  const suppressThreadTapRef = useRef(false);
+
+  const suppressThreadTapStart = useCallback(() => {
+    suppressThreadTapRef.current = true;
+  }, []);
+
+  const suppressThreadTapEnd = useCallback(() => {
+    setTimeout(() => {
+      suppressThreadTapRef.current = false;
+    }, 0);
+  }, []);
+
+  const handleThreadPress = useCallback(() => {
+    if (suppressThreadTapRef.current) return;
+    navigateToThread();
+  }, [navigateToThread]);
 
   const tapGesture = useMemo(
     () =>
-      Gesture.Tap()
-        .onBegin(() => {
-          'worklet';
-          pressVal.set(withTiming(1, { duration: 80 }));
-        })
-        .onFinalize(() => {
-          'worklet';
-          pressVal.set(withTiming(0, { duration: 200 }));
-        })
-        .onEnd(() => {
-          'worklet';
-          runOnJS(navigateToThread)();
-        }),
-    [navigateToThread, pressVal]
+      Gesture.Tap().onEnd(() => {
+        'worklet';
+        runOnJS(handleThreadPress)();
+      }),
+    [handleThreadPress]
   );
-
-  const pressStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(pressVal.get(), [0, 1], [1, 0.98]) }],
-    opacity: interpolate(pressVal.get(), [0, 1], [1, 0.85]),
-  }));
 
   return (
     <GestureDetector gesture={tapGesture}>
-      <Reanimated.View style={[animStyle, pressStyle]}>
+      <Reanimated.View style={animStyle}>
         {/* Repost header */}
         <TouchableOpacity
           activeOpacity={0.7}
+          onPressIn={suppressThreadTapStart}
+          onPressOut={suppressThreadTapEnd}
           onPress={() =>
             router.push({
               pathname: '/(user-flow)/profile' as any,
@@ -456,6 +504,14 @@ export const RepostCard = React.memo(function RepostCard({
             profiles={profiles}
             getMetrics={getMetrics}
             onVideoTap={onVideoTap}
+            liked={liked}
+            reposted={reposted}
+            likePending={likePending}
+            repostPending={repostPending}
+            onLikePress={onLikePress}
+            onRepostPress={onRepostPress}
+            onNestedProfilePressIn={suppressThreadTapStart}
+            onNestedProfilePressOut={suppressThreadTapEnd}
           />
         ) : (
           <View
@@ -532,7 +588,7 @@ function formatDuration(sec: number): string {
 }
 
 interface TimelineScrubberProps {
-  progress: Reanimated.SharedValue<number>; // 0..1
+  progress: SharedValue<number>; // 0..1
   duration: number;
   currentTime: number;
   onSeek: (fraction: number) => void;
@@ -645,6 +701,9 @@ interface VideoFeedItemProps {
   isAppActive: boolean;
   profile: ProfileInfo | undefined;
   metrics: NoteMetrics;
+  engagement: EngagementViewState;
+  onLikePress?: () => void;
+  onRepostPress?: () => void;
   screenHeight: number;
   screenWidth: number;
 }
@@ -656,6 +715,9 @@ const VideoFeedItem = memo(function VideoFeedItem({
   isAppActive,
   profile,
   metrics,
+  engagement,
+  onLikePress,
+  onRepostPress,
   screenHeight,
   screenWidth,
 }: VideoFeedItemProps) {
@@ -879,7 +941,7 @@ const VideoFeedItem = memo(function VideoFeedItem({
           <Text
             size={13}
             style={{ color: 'rgba(255,255,255,0.7)', lineHeight: 19, marginBottom: 10 }}
-            numberOfLines={3}>
+            numberOfLines={1}>
             {displayContent}
           </Text>
         )}
@@ -892,18 +954,44 @@ const VideoFeedItem = memo(function VideoFeedItem({
               {metrics.replyCount > 0 ? formatVideoCount(metrics.replyCount) : '0'}
             </Text>
           </View>
-          <View style={vCtrl.metricPill}>
-            <Icon name="garden:arrow-retweet-fill-16" size={15} color="rgba(255,255,255,0.7)" />
-            <Text size={12} style={vCtrl.metricText}>
+          <TouchableOpacity
+            activeOpacity={onRepostPress ? 0.7 : 1}
+            onPress={onRepostPress}
+            disabled={!onRepostPress || engagement.repostPending}
+            style={[
+              vCtrl.metricPill,
+              engagement.reposted ? { backgroundColor: 'rgba(76,217,100,0.25)' } : undefined,
+            ]}>
+            <Icon
+              name="garden:arrow-retweet-fill-16"
+              size={15}
+              color={engagement.reposted ? '#4cd964' : 'rgba(255,255,255,0.7)'}
+            />
+            <Text
+              size={12}
+              style={[vCtrl.metricText, engagement.reposted ? { color: '#4cd964' } : undefined]}>
               {metrics.repostCount > 0 ? formatVideoCount(metrics.repostCount) : '0'}
             </Text>
-          </View>
-          <View style={vCtrl.metricPill}>
-            <Icon name="iconamoon:heart-fill" size={15} color="rgba(255,255,255,0.7)" />
-            <Text size={12} style={vCtrl.metricText}>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={onLikePress ? 0.7 : 1}
+            onPress={onLikePress}
+            disabled={!onLikePress || engagement.likePending}
+            style={[
+              vCtrl.metricPill,
+              engagement.liked ? { backgroundColor: 'rgba(255,90,122,0.25)' } : undefined,
+            ]}>
+            <Icon
+              name="iconamoon:heart-fill"
+              size={15}
+              color={engagement.liked ? '#ff5a7a' : 'rgba(255,255,255,0.7)'}
+            />
+            <Text
+              size={12}
+              style={[vCtrl.metricText, engagement.liked ? { color: '#ff5a7a' } : undefined]}>
               {metrics.likeCount > 0 ? formatVideoCount(metrics.likeCount) : '0'}
             </Text>
-          </View>
+          </TouchableOpacity>
         </HStack>
 
         {/* Timeline scrubber */}
@@ -972,7 +1060,11 @@ interface VideoFeedOverlayProps {
   startIndex: number;
   onClose: () => void;
   onEndReached?: () => void;
-  isLoadingMore?: boolean;
+  getDisplayMetrics?: (eventId: string) => NoteMetrics;
+  getEngagementState?: (eventId: string) => EngagementViewState;
+  onLikePress?: (eventId: string) => void;
+  onRepostPress?: (eventId: string) => void;
+  engagementRevision?: number;
 }
 
 export function VideoFeedOverlay({
@@ -982,6 +1074,11 @@ export function VideoFeedOverlay({
   startIndex,
   onClose,
   onEndReached: onEndReachedProp,
+  getDisplayMetrics,
+  getEngagementState,
+  onLikePress,
+  onRepostPress,
+  engagementRevision = 0,
 }: VideoFeedOverlayProps) {
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -998,6 +1095,8 @@ export function VideoFeedOverlay({
   const slideAnim = useSharedValue(0);
   // Horizontal drag for swipe-right-to-close
   const dragX = useSharedValue(0);
+  // Loading-slot media skeleton pulse (0..1)
+  const loadingSkeletonPulse = useSharedValue(0);
 
   // FIX #5: Track whether the gesture direction has been committed (worklet-safe).
   // Once the initial swipe direction is determined, we commit to it for the
@@ -1008,6 +1107,23 @@ export function VideoFeedOverlay({
   useEffect(() => {
     slideAnim.set(withSpring(1, { damping: 26, stiffness: 220 }));
   }, [slideAnim]);
+
+  useEffect(() => {
+    loadingSkeletonPulse.set(
+      withRepeat(
+        withTiming(1, {
+          duration: 900,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        -1,
+        true
+      )
+    );
+    return () => {
+      cancelAnimation(loadingSkeletonPulse);
+      loadingSkeletonPulse.set(0);
+    };
+  }, [loadingSkeletonPulse]);
 
   // Imperatively scroll to startIndex after mount, then open the gate.
   useEffect(() => {
@@ -1031,6 +1147,40 @@ export function VideoFeedOverlay({
     });
     return () => sub.remove();
   }, []);
+
+  // Infinite scroll: show a loading slot at the end of the list when loading.
+  // Uses index-based keys so that when the loading slot "becomes" a video
+  // (same array index, different content), the cell re-renders in place
+  // without any scroll position shift.
+  const [showLoadingSlot, setShowLoadingSlot] = useState(false);
+  const videoCountAtLoadStart = useRef(0);
+  const loadTriggeredForLength = useRef(0);
+
+  useEffect(() => {
+    if (
+      videoPosts.length > 0 &&
+      activeIndex >= videoPosts.length - 1 &&
+      !showLoadingSlot &&
+      videoPosts.length > loadTriggeredForLength.current
+    ) {
+      loadTriggeredForLength.current = videoPosts.length;
+      videoCountAtLoadStart.current = videoPosts.length;
+      setShowLoadingSlot(true);
+      onEndReachedProp?.();
+    }
+  }, [activeIndex, videoPosts.length, showLoadingSlot, onEndReachedProp]);
+
+  // Hide loading slot once new videos have actually arrived
+  useEffect(() => {
+    if (showLoadingSlot && videoPosts.length > videoCountAtLoadStart.current) {
+      setShowLoadingSlot(false);
+    }
+  }, [videoPosts.length, showLoadingSlot]);
+
+  const displayItems: VideoFeedSlot[] = useMemo(() => {
+    const items = showLoadingSlot ? [...videoPosts, LOADING_SLOT] : videoPosts;
+    return items;
+  }, [videoPosts, showLoadingSlot]);
 
   const close = useCallback(() => {
     cancelAnimation(slideAnim);
@@ -1058,6 +1208,10 @@ export function VideoFeedOverlay({
       opacity: dragOpacity,
     };
   });
+
+  const loadingMediaSkeletonStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(loadingSkeletonPulse.get(), [0, 1], [0.45, 0.8], Extrapolation.CLAMP),
+  }));
 
   // FIX #5: Improved gesture controls with proper direction locking.
   const panGesture = Gesture.Pan()
@@ -1117,9 +1271,64 @@ export function VideoFeedOverlay({
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
   const renderItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<VideoPost>) => {
+    ({ item, index }: LegendListRenderItemProps<VideoFeedSlot, string | undefined>) => {
+      if (isLoadingSlot(item)) {
+        return (
+          <View style={{ width: screenWidth, height: screenHeight, backgroundColor: '#000' }}>
+            <Reanimated.View
+              style={[
+                { flex: 1, backgroundColor: 'rgba(255,255,255,0.14)' },
+                loadingMediaSkeletonStyle,
+              ]}
+            />
+            <View
+              style={{
+                backgroundColor: '#111',
+                paddingHorizontal: 16,
+                paddingTop: 12,
+                paddingBottom: insets.bottom + 8,
+              }}>
+              <HStack align="center" gap={10} style={{ marginBottom: 8 }}>
+                <View style={vCtrl.skeletonAvatar} />
+                <VStack style={{ flex: 1, gap: 6 }}>
+                  <View style={[vCtrl.skeletonLine, { width: '42%', height: 15 }]} />
+                  <View style={[vCtrl.skeletonLine, { width: '30%', height: 12 }]} />
+                </VStack>
+              </HStack>
+
+              <View style={[vCtrl.skeletonLine, { width: '88%', height: 14, marginBottom: 10 }]} />
+
+              <HStack gap={8} style={{ marginBottom: 12 }}>
+                <View style={[vCtrl.skeletonPill, { width: 56 }]} />
+                <View style={[vCtrl.skeletonPill, { width: 62 }]} />
+                <View style={[vCtrl.skeletonPill, { width: 60 }]} />
+              </HStack>
+
+              <View style={[vCtrl.skeletonScrubber, { marginBottom: 10 }]} />
+
+              <HStack align="center" style={{ marginTop: 4 }}>
+                <View style={[vCtrl.skeletonControlButton, { marginLeft: 0 }]} />
+                <View style={{ flex: 1 }} />
+                <View style={vCtrl.skeletonControlButton} />
+                <View style={vCtrl.skeletonControlButton} />
+                <View style={vCtrl.skeletonControlButton} />
+              </HStack>
+            </View>
+          </View>
+        );
+      }
       const profile = profilesMap.get(item.pubkey);
-      const metrics = metricsMap.get(item.eventId) ?? DEFAULT_METRICS;
+      const metrics = getDisplayMetrics
+        ? getDisplayMetrics(item.eventId)
+        : (metricsMap.get(item.eventId) ?? DEFAULT_METRICS);
+      const engagement = getEngagementState
+        ? getEngagementState(item.eventId)
+        : {
+            liked: false,
+            reposted: false,
+            likePending: false,
+            repostPending: false,
+          };
       return (
         <VideoFeedItem
           item={item}
@@ -1128,12 +1337,28 @@ export function VideoFeedOverlay({
           isAppActive={isAppActive}
           profile={profile}
           metrics={metrics}
+          engagement={engagement}
+          onLikePress={onLikePress ? () => onLikePress(item.eventId) : undefined}
+          onRepostPress={onRepostPress ? () => onRepostPress(item.eventId) : undefined}
           screenHeight={screenHeight}
           screenWidth={screenWidth}
         />
       );
     },
-    [activeIndex, isAppActive, profilesMap, metricsMap, screenHeight, screenWidth]
+    [
+      activeIndex,
+      getDisplayMetrics,
+      getEngagementState,
+      insets.bottom,
+      isAppActive,
+      loadingMediaSkeletonStyle,
+      metricsMap,
+      onLikePress,
+      onRepostPress,
+      profilesMap,
+      screenHeight,
+      screenWidth,
+    ]
   );
 
   const overlay = (
@@ -1143,8 +1368,9 @@ export function VideoFeedOverlay({
           style={[StyleSheet.absoluteFill, containerStyle, { backgroundColor: '#000' }]}>
           <LegendList
             ref={listRef}
-            data={videoPosts}
-            keyExtractor={(item: VideoPost) => item.eventId}
+            data={displayItems}
+            keyExtractor={(_: VideoFeedSlot, index: number) => String(index)}
+            getItemType={(item: VideoFeedSlot) => (isLoadingSlot(item) ? 'loading' : 'video')}
             estimatedItemSize={screenHeight}
             drawDistance={screenHeight * 2}
             pagingEnabled
@@ -1157,10 +1383,8 @@ export function VideoFeedOverlay({
             onViewableItemsChanged={onViewableItemsChanged}
             viewabilityConfig={viewabilityConfig}
             renderItem={renderItem}
-            extraData={activeIndex}
+            extraData={`${activeIndex}:${engagementRevision}`}
             showsVerticalScrollIndicator={false}
-            onEndReached={onEndReachedProp}
-            onEndReachedThreshold={0.5}
             style={{ flex: 1 }}
           />
 
@@ -1202,6 +1426,7 @@ function UserFeedComponent({
   pubkey,
   authorName,
   authorPicture,
+  isOwnProfile,
   ListHeaderComponent,
 }: UserFeedProps) {
   const { getPrimaryColor } = useTheme();
@@ -1230,6 +1455,11 @@ function UserFeedComponent({
   // Track whether initial load has completed — skip fade-in for items after first render
   const isFirstRender = useRef(true);
 
+  // Snapshot of deleted-repost IDs taken at first feed load. Using a snapshot
+  // rather than live state means unreposting while viewing won't yank items away
+  // (protects against accidental taps). Primal's cache will catch up eventually.
+  const deletedRepostIdsRef = useRef<Record<string, number> | null>(null);
+
   // Video feed overlay state
   const [overlayVisible, setOverlayVisible] = useState(false);
   const [overlayStartIndex, setOverlayStartIndex] = useState(0);
@@ -1252,6 +1482,7 @@ function UserFeedComponent({
     paginationOffsetRef.current = 0;
     feedItemIdsRef.current.clear();
     loadingMoreRef.current = false;
+    deletedRepostIdsRef.current = null;
 
     const loadFeedFromPrimal = async () => {
       const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
@@ -1267,16 +1498,26 @@ function UserFeedComponent({
 
         paginationUntilRef.current = phase1.paginationUntil;
         hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
-        paginationOffsetRef.current = phase1.orderedFeedItems.filter(
-          (item) => item.timestamp === phase1.paginationUntil
-        ).length;
+        paginationOffsetRef.current = phase1.paginationOffset;
         feedItemIdsRef.current = new Set(
           phase1.orderedFeedItems.map((item) =>
             item.type === 'note' ? item.event.id : item.repostEvent.id
           )
         );
 
-        setFeedItems(phase1.orderedFeedItems);
+        if (isOwnProfile && deletedRepostIdsRef.current === null) {
+          deletedRepostIdsRef.current = useNostrSocialStore.getState().deletedRepostOriginalIds;
+        }
+
+        const displayItems =
+          isOwnProfile && deletedRepostIdsRef.current
+            ? phase1.orderedFeedItems.filter((item) => {
+                if (item.type !== 'repost') return true;
+                return !deletedRepostIdsRef.current![item.originalEventId];
+              })
+            : phase1.orderedFeedItems;
+
+        setFeedItems(displayItems);
         setMetricsMap(phase1.metricsMap);
         setQuotedEventsMap(phase1.quotedEventsMap);
         setProfilesMap(phase1.profilesMap);
@@ -1303,12 +1544,8 @@ function UserFeedComponent({
             if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
               const parsed = parseJson<Record<string, unknown>>(raw.content);
               const eventId = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-              if (!eventId) continue;
-              extraMetrics.set(eventId, {
-                likeCount: typeof parsed?.likes === 'number' ? parsed.likes : 0,
-                repostCount: typeof parsed?.reposts === 'number' ? parsed.reposts : 0,
-                replyCount: typeof parsed?.replies === 'number' ? parsed.replies : 0,
-              });
+              if (!eventId || !parsed) continue;
+              extraMetrics.set(eventId, parseNoteMetrics(parsed));
               continue;
             }
 
@@ -1396,7 +1633,7 @@ function UserFeedComponent({
       cancelled = true;
       task.cancel();
     };
-  }, [authorName, authorPicture, pubkey]);
+  }, [authorName, authorPicture, isOwnProfile, pubkey]);
 
   // ── Pagination: load older items ──
 
@@ -1426,36 +1663,55 @@ function UserFeedComponent({
       const rawEvents = await client.request(`${rp}_more`, { cache: ['feed', payload] });
       const page = parsePhase1(rawEvents, pubkey, authorName, authorPicture);
 
-      if (
-        page.orderedFeedItems.length === 0 ||
-        page.paginationUntil === 0 ||
-        page.paginationUntil >= paginationUntilRef.current
-      ) {
+      if (page.orderedFeedItems.length === 0) {
         hasMoreRef.current = false;
         return [];
       }
 
-      paginationUntilRef.current = page.paginationUntil;
-      paginationOffsetRef.current = page.orderedFeedItems.filter(
-        (item) => item.timestamp === page.paginationUntil
-      ).length;
+      if (page.paginationUntil > 0 && page.paginationUntil < paginationUntilRef.current) {
+        paginationUntilRef.current = page.paginationUntil;
+        paginationOffsetRef.current = page.paginationOffset;
+      } else if (page.paginationUntil === paginationUntilRef.current) {
+        // Same cursor (score-based feeds) — accumulate offset
+        paginationOffsetRef.current += page.paginationOffset;
+      } else {
+        // No valid cursor from FeedRange — fallback to oldest item timestamp
+        let oldest = paginationUntilRef.current;
+        for (const item of page.orderedFeedItems) {
+          if (item.timestamp < oldest) oldest = item.timestamp;
+        }
+        if (oldest >= paginationUntilRef.current) {
+          hasMoreRef.current = false;
+          return [];
+        }
+        paginationUntilRef.current = oldest;
+        paginationOffsetRef.current = page.paginationOffset;
+      }
 
-      const newItems = page.orderedFeedItems.filter((item) => {
+      const dedupedItems = page.orderedFeedItems.filter((item) => {
         const id = item.type === 'note' ? item.event.id : item.repostEvent.id;
         return !feedItemIdsRef.current.has(id);
       });
 
-      if (newItems.length === 0) {
+      if (dedupedItems.length === 0) {
         hasMoreRef.current = false;
         return [];
       }
 
-      for (const item of newItems) {
+      for (const item of dedupedItems) {
         feedItemIdsRef.current.add(item.type === 'note' ? item.event.id : item.repostEvent.id);
       }
 
+      const newItems =
+        isOwnProfile && deletedRepostIdsRef.current
+          ? dedupedItems.filter((item) => {
+              if (item.type !== 'repost') return true;
+              return !deletedRepostIdsRef.current![item.originalEventId];
+            })
+          : dedupedItems;
+
       startTransition(() => {
-        setFeedItems((prev) => [...prev, ...newItems]);
+        if (newItems.length > 0) setFeedItems((prev) => [...prev, ...newItems]);
         setMetricsMap((prev) => {
           const n = new Map(prev);
           for (const [k, v] of page.metricsMap) n.set(k, v);
@@ -1491,12 +1747,8 @@ function UserFeedComponent({
                 if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
                   const p = parseJson<Record<string, unknown>>(raw.content);
                   const eid = typeof p?.event_id === 'string' ? p.event_id : undefined;
-                  if (!eid) continue;
-                  xM.set(eid, {
-                    likeCount: typeof p?.likes === 'number' ? p.likes : 0,
-                    repostCount: typeof p?.reposts === 'number' ? p.reposts : 0,
-                    replyCount: typeof p?.replies === 'number' ? p.replies : 0,
-                  });
+                  if (!eid || !p) continue;
+                  xM.set(eid, parseNoteMetrics(p));
                   continue;
                 }
                 if (raw.kind === Metadata) {
@@ -1558,7 +1810,7 @@ function UserFeedComponent({
       }
 
       await Promise.all(enrichTasks);
-      return newItems;
+      return dedupedItems;
     } catch (error) {
       console.error('UserFeed: loadMore failed', error);
       return [];
@@ -1567,7 +1819,7 @@ function UserFeedComponent({
       loadingMoreRef.current = false;
       setIsLoadingMore(false);
     }
-  }, [pubkey, authorName, authorPicture, startTransition]);
+  }, [pubkey, authorName, authorPicture, isOwnProfile, startTransition]);
 
   const loadMoreVideos = useCallback(async () => {
     const MAX_ATTEMPTS = 5;
@@ -1591,6 +1843,21 @@ function UserFeedComponent({
     (noteId: string): NoteMetrics => metricsRef.current.get(noteId) || DEFAULT_METRICS,
     []
   );
+
+  const actionableEvents = useMemo(() => {
+    const map = new Map<string, FeedEvent>();
+    for (const item of feedItems) {
+      if (item.type === 'note') {
+        map.set(item.event.id, item.event);
+      } else if (item.originalEvent) {
+        map.set(item.originalEvent.id, item.originalEvent);
+      }
+    }
+    return Array.from(map.values());
+  }, [feedItems]);
+
+  const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
+    useNostrEngagement(actionableEvents, getMetrics);
 
   // FIX #1: Build the video-only list for the full-screen video feed.
   // Deduplicate by videoUrl so that a repost of the same video doesn't
@@ -1636,27 +1903,37 @@ function UserFeedComponent({
   const displayName = authorName || tryNpubEncode(pubkey).slice(0, 12) + '…';
 
   const renderFeedItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<FeedItem>) => {
+    ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
       if (item.type === 'note') {
+        const metrics = getDisplayMetrics(item.event.id);
+        const engagement = getEngagementState(item.event.id);
         return (
           <PostCard
             variant="feed"
             event={item.event}
-            metrics={getMetrics(item.event.id)}
+            metrics={metrics}
             index={index}
             quotedEvents={quotedRef.current}
             profiles={profilesRef.current}
             getMetrics={getMetrics}
             onVideoTap={handleVideoTap}
+            liked={engagement.liked}
+            reposted={engagement.reposted}
+            likePending={engagement.likePending}
+            repostPending={engagement.repostPending}
+            onLikePress={() => toggleLike(item.event)}
+            onRepostPress={() => toggleRepost(item.event)}
             skipAnimation={!isFirstRender.current}
           />
         );
       }
+      const engagement = getEngagementState(item.originalEventId);
+      const originalEvent = item.originalEvent;
       return (
         <RepostCard
           repostEvent={item.repostEvent}
           originalEvent={item.originalEvent}
-          originalMetrics={getMetrics(item.originalEventId)}
+          originalMetrics={getDisplayMetrics(item.originalEventId)}
           index={index}
           quotedEvents={quotedRef.current}
           profiles={profilesRef.current}
@@ -1664,11 +1941,26 @@ function UserFeedComponent({
           reposterName={displayName}
           reposterPubkey={pubkey}
           onVideoTap={handleVideoTap}
+          liked={engagement.liked}
+          reposted={engagement.reposted}
+          likePending={engagement.likePending}
+          repostPending={engagement.repostPending}
+          onLikePress={originalEvent ? () => toggleLike(originalEvent) : undefined}
+          onRepostPress={originalEvent ? () => toggleRepost(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
         />
       );
     },
-    [getMetrics, handleVideoTap, displayName, pubkey]
+    [
+      getDisplayMetrics,
+      getEngagementState,
+      getMetrics,
+      handleVideoTap,
+      displayName,
+      pubkey,
+      toggleLike,
+      toggleRepost,
+    ]
   );
 
   const feedHeader = (
@@ -1712,7 +2004,7 @@ function UserFeedComponent({
         drawDistance={500}
         maintainVisibleContentPosition
         renderItem={renderFeedItem}
-        extraData={dataVersion}
+        extraData={`${dataVersion}:${engagementRevision}`}
         recycleItems
         ListHeaderComponent={feedHeader}
         ListFooterComponent={
@@ -1738,7 +2030,17 @@ function UserFeedComponent({
           startIndex={overlayStartIndex}
           onClose={() => setOverlayVisible(false)}
           onEndReached={loadMoreVideos}
-          isLoadingMore={isLoadingMore}
+          getDisplayMetrics={getDisplayMetrics}
+          getEngagementState={getEngagementState}
+          engagementRevision={engagementRevision}
+          onLikePress={(eventId) => {
+            const event = actionableEvents.find((e) => e.id === eventId);
+            if (event) toggleLike(event);
+          }}
+          onRepostPress={(eventId) => {
+            const event = actionableEvents.find((e) => e.id === eventId);
+            if (event) toggleRepost(event);
+          }}
         />
       )}
     </>
@@ -1800,5 +2102,33 @@ const vCtrl = StyleSheet.create({
   },
   controlBtn: {
     padding: 6,
+  },
+  skeletonAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  skeletonLine: {
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  skeletonPill: {
+    height: 30,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  skeletonScrubber: {
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    width: '100%',
+  },
+  skeletonControlButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    marginLeft: 8,
   },
 });
