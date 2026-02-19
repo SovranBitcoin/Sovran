@@ -1,0 +1,1010 @@
+/**
+ * @fileoverview Shared Nostr rendering components, types, utilities, and constants
+ *
+ * This module contains all shared code between UserFeed and ThreadView,
+ * extracted to eliminate duplication and ensure consistent behavior.
+ */
+
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, TouchableOpacity, Linking, Dimensions, Platform } from 'react-native';
+import { Image } from 'expo-image';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { router } from 'expo-router';
+import { useTheme } from 'providers/ThemeProvider';
+import { Text } from 'components/ui/Text';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { Avatar } from 'components/ui/Avatar';
+import Icon from 'assets/icons';
+import opacity from 'hex-color-opacity';
+import { nip19 } from 'nostr-tools';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export interface NoteMetrics {
+  likeCount: number;
+  repostCount: number;
+  replyCount: number;
+}
+
+export interface FeedEvent {
+  id: string;
+  kind: number;
+  pubkey: string;
+  content: string;
+  tags: string[][];
+  created_at: number;
+}
+
+export interface RawPrimalEvent {
+  kind: number;
+  content: string;
+  id?: string;
+  pubkey?: string;
+  created_at?: number;
+  tags?: string[][];
+}
+
+export interface ProfileInfo {
+  name: string;
+  picture?: string;
+}
+
+export type ContentSegment =
+  | { kind: 'text'; text: string }
+  | { kind: 'newline' }
+  | { kind: 'url'; url: string }
+  | { kind: 'image'; url: string }
+  | { kind: 'video'; url: string }
+  | { kind: 'hashtag'; tag: string }
+  | { kind: 'lightning'; invoice: string }
+  | { kind: 'npub'; pubkey: string; bech32: string }
+  | { kind: 'nprofile'; pubkey: string; bech32: string }
+  | { kind: 'nevent'; eventId: string }
+  | { kind: 'note'; eventId: string }
+  | { kind: 'naddr'; identifier: string };
+
+export type RelayMessage =
+  | ['EVENT', string, unknown]
+  | ['EVENTS', string, unknown[]]
+  | ['EOSE', string]
+  | ['NOTICE', string]
+  | ['OK', string, boolean, string];
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+export const SCREEN_WIDTH = Dimensions.get('window').width;
+export const CONTENT_WIDTH = SCREEN_WIDTH - 32;
+
+export const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
+export const DEFAULT_METRICS: NoteMetrics = Object.freeze({
+  likeCount: 0,
+  repostCount: 0,
+  replyCount: 0,
+});
+
+export const PRIMAL_CACHE_RELAY_URL = 'wss://cache2.primal.net/v1';
+export const PRIMAL_KIND_NOTE_STATS = 10000100;
+export const PRIMAL_KIND_MENTIONS = 10000107;
+export const PRIMAL_KIND_FEED_RANGE = 10000113;
+
+export const IMAGE_EXT = /\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i;
+export const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi)(\?.*)?$/i;
+
+const LIGHTNING_INVOICE_REGEX = /\b(lnbc[a-z0-9]{20,})\b/gi;
+const HASHTAG_REGEX = /#([a-zA-Z][a-zA-Z0-9_]*)/g;
+const URL_REGEX = /https?:\/\/[^\s<>"')\]]+/gi;
+const NOSTR_URI_REGEX = /nostr:(npub1|nprofile1|nevent1|note1|naddr1)[a-z0-9]+/gi;
+
+// ============================================================================
+// Utility functions
+// ============================================================================
+
+export function getVideoUrlsFromContent(content: string): string[] {
+  const urls: string[] = [];
+  for (const m of content.matchAll(URL_REGEX)) {
+    if (VIDEO_EXT.test(m[0])) {
+      urls.push(m[0]);
+    }
+  }
+  return urls;
+}
+
+// ============================================================================
+// Content parser
+// ============================================================================
+
+const _contentCache = new Map<string, ContentSegment[]>();
+const _CONTENT_CACHE_MAX = 300;
+const _npubCache = new Map<string, string>();
+
+export function parseContent(raw: string): ContentSegment[] {
+  const cached = _contentCache.get(raw);
+  if (cached) return cached;
+  const result = _parseContentInner(raw);
+  if (_contentCache.size >= _CONTENT_CACHE_MAX) _contentCache.clear();
+  _contentCache.set(raw, result);
+  return result;
+}
+
+function _parseContentInner(raw: string): ContentSegment[] {
+  type Span = { start: number; end: number; seg: ContentSegment };
+  const spans: Span[] = [];
+
+  for (const m of raw.matchAll(NOSTR_URI_REGEX)) {
+    const bech32 = m[0].replace('nostr:', '');
+    try {
+      const decoded = nip19.decode(bech32);
+      let seg: ContentSegment;
+      switch (decoded.type) {
+        case 'npub':
+          seg = { kind: 'npub', pubkey: decoded.data as string, bech32 };
+          break;
+        case 'nprofile':
+          seg = {
+            kind: 'nprofile',
+            pubkey: (decoded.data as nip19.ProfilePointer).pubkey,
+            bech32,
+          };
+          break;
+        case 'nevent':
+          seg = { kind: 'nevent', eventId: (decoded.data as nip19.EventPointer).id };
+          break;
+        case 'note':
+          seg = { kind: 'note', eventId: decoded.data as string };
+          break;
+        case 'naddr':
+          seg = {
+            kind: 'naddr',
+            identifier: (decoded.data as nip19.AddressPointer).identifier,
+          };
+          break;
+        default:
+          continue;
+      }
+      spans.push({ start: m.index!, end: m.index! + m[0].length, seg });
+    } catch {
+      // skip undecodable
+    }
+  }
+
+  for (const m of raw.matchAll(LIGHTNING_INVOICE_REGEX)) {
+    spans.push({
+      start: m.index!,
+      end: m.index! + m[0].length,
+      seg: { kind: 'lightning', invoice: m[0] },
+    });
+  }
+
+  for (const m of raw.matchAll(URL_REGEX)) {
+    const url = m[0];
+    let seg: ContentSegment;
+    if (IMAGE_EXT.test(url)) {
+      seg = { kind: 'image', url };
+    } else if (VIDEO_EXT.test(url)) {
+      seg = { kind: 'video', url };
+    } else {
+      seg = { kind: 'url', url };
+    }
+    spans.push({ start: m.index!, end: m.index! + m[0].length, seg });
+  }
+
+  for (const m of raw.matchAll(HASHTAG_REGEX)) {
+    spans.push({
+      start: m.index!,
+      end: m.index! + m[0].length,
+      seg: { kind: 'hashtag', tag: m[1] },
+    });
+  }
+
+  spans.sort((a, b) => a.start - b.start || a.end - b.end);
+  const cleaned: Span[] = [];
+  let cursor = 0;
+  for (const sp of spans) {
+    if (sp.start >= cursor) {
+      cleaned.push(sp);
+      cursor = sp.end;
+    }
+  }
+
+  const segments: ContentSegment[] = [];
+  let pos = 0;
+
+  for (const sp of cleaned) {
+    if (sp.start > pos) pushTextWithNewlines(segments, raw.slice(pos, sp.start));
+    segments.push(sp.seg);
+    pos = sp.end;
+  }
+  if (pos < raw.length) pushTextWithNewlines(segments, raw.slice(pos));
+
+  while (segments.length > 0 && segments[0].kind === 'newline') segments.shift();
+  while (segments.length > 0 && segments[segments.length - 1].kind === 'newline') segments.pop();
+
+  return segments;
+}
+
+function pushTextWithNewlines(out: ContentSegment[], text: string) {
+  const lines = text.split('\n');
+  let lastWasNewline = out.length > 0 && out[out.length - 1].kind === 'newline';
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].length > 0) {
+      out.push({ kind: 'text', text: lines[i] });
+      lastWasNewline = false;
+    }
+    if (i < lines.length - 1 && !lastWasNewline) {
+      out.push({ kind: 'newline' });
+      lastWasNewline = true;
+    }
+  }
+}
+
+export function collectReferencedIds(notes: FeedEvent[]): {
+  eventIds: string[];
+  pubkeys: string[];
+} {
+  const eventIdSet = new Set<string>();
+  const pubkeySet = new Set<string>();
+
+  for (const note of notes) {
+    for (const seg of parseContent(note.content)) {
+      if (seg.kind === 'nevent' || seg.kind === 'note') eventIdSet.add(seg.eventId);
+      else if (seg.kind === 'npub' || seg.kind === 'nprofile') pubkeySet.add(seg.pubkey);
+    }
+  }
+
+  return { eventIds: Array.from(eventIdSet), pubkeys: Array.from(pubkeySet) };
+}
+
+// ============================================================================
+// Small helpers
+// ============================================================================
+
+export function formatTimestamp(unixTimestamp: number): string {
+  const now = Date.now() / 1000;
+  const diff = now - unixTimestamp;
+
+  if (diff < 60) return 'now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 2592000) return `${Math.floor(diff / 604800)}w ago`;
+
+  const date = new Date(unixTimestamp * 1000);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+export function formatCount(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return count.toString();
+}
+
+export function tryNpubEncode(hex: string): string {
+  const cached = _npubCache.get(hex);
+  if (cached) return cached;
+  try {
+    const encoded = nip19.npubEncode(hex);
+    if (_npubCache.size > 600) _npubCache.clear();
+    _npubCache.set(hex, encoded);
+    return encoded;
+  } catch {
+    return '';
+  }
+}
+
+export function prettifyUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    const host = u.hostname.replace(/^www\./, '');
+    const path = u.pathname === '/' ? '' : u.pathname;
+    const display = host + path;
+    return display.length > 40 ? display.slice(0, 37) + '…' : display;
+  } catch {
+    return raw.length > 40 ? raw.slice(0, 37) + '…' : raw;
+  }
+}
+
+export function normalizeFeedEvent(value: unknown): FeedEvent | null {
+  if (!value || typeof value !== 'object') return null;
+  const input = value as Record<string, unknown>;
+  if (
+    typeof input.id !== 'string' ||
+    typeof input.kind !== 'number' ||
+    typeof input.pubkey !== 'string' ||
+    typeof input.content !== 'string' ||
+    typeof input.created_at !== 'number' ||
+    !Array.isArray(input.tags)
+  ) {
+    return null;
+  }
+
+  return {
+    id: input.id,
+    kind: input.kind,
+    pubkey: input.pubkey,
+    content: input.content,
+    created_at: input.created_at,
+    tags: input.tags.filter(Array.isArray) as string[][],
+  };
+}
+
+export function normalizeRawPrimalEvent(value: unknown): RawPrimalEvent | null {
+  if (!value || typeof value !== 'object') return null;
+  const input = value as Record<string, unknown>;
+  if (typeof input.kind !== 'number' || typeof input.content !== 'string') {
+    return null;
+  }
+  return {
+    kind: input.kind,
+    content: input.content,
+    id: typeof input.id === 'string' ? input.id : undefined,
+    pubkey: typeof input.pubkey === 'string' ? input.pubkey : undefined,
+    created_at: typeof input.created_at === 'number' ? input.created_at : undefined,
+    tags: Array.isArray(input.tags) ? (input.tags.filter(Array.isArray) as string[][]) : undefined,
+  };
+}
+
+export function parseJson<T>(raw: string): T | null {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+export function getFirstTagValue(event: FeedEvent, tagName: string): string | undefined {
+  const tag = event.tags.find((t) => t[0] === tagName);
+  return tag?.[1];
+}
+
+export function parseProfileFromRaw(raw: RawPrimalEvent): [string, ProfileInfo] | null {
+  if (!raw.pubkey) return null;
+  const parsed = parseJson<Record<string, unknown>>(raw.content);
+  const name =
+    (typeof parsed?.display_name === 'string' && parsed.display_name) ||
+    (typeof parsed?.name === 'string' && parsed.name);
+  const picture = typeof parsed?.picture === 'string' ? parsed.picture : undefined;
+  if (!name) return null;
+  return [raw.pubkey, { name, picture }];
+}
+
+// ============================================================================
+// Primal relay client
+// ============================================================================
+
+export function createPrimalRelayClient(url: string) {
+  const ws = new WebSocket(url);
+  const OPEN_TIMEOUT_MS = 8000;
+  const REQUEST_TIMEOUT_MS = 10000;
+  const inflight = new Map<
+    string,
+    { events: RawPrimalEvent[]; resolve: (events: RawPrimalEvent[]) => void }
+  >();
+  let openSettled = false;
+
+  const failAll = () => {
+    inflight.forEach(({ resolve }) => resolve([]));
+    inflight.clear();
+  };
+
+  ws.onmessage = (msg) => {
+    if (typeof msg.data !== 'string') return;
+    const parsed = parseJson<RelayMessage>(msg.data);
+    if (!parsed || !Array.isArray(parsed)) return;
+
+    if (parsed[0] === 'EVENT') {
+      const subId = parsed[1];
+      const active = inflight.get(subId);
+      if (!active) return;
+      const normalized = normalizeRawPrimalEvent(parsed[2]);
+      if (normalized) active.events.push(normalized);
+      return;
+    }
+
+    if (parsed[0] === 'EVENTS') {
+      const subId = parsed[1];
+      const active = inflight.get(subId);
+      if (!active) return;
+      for (const rawEvent of parsed[2]) {
+        const normalized = normalizeRawPrimalEvent(rawEvent);
+        if (normalized) active.events.push(normalized);
+      }
+      return;
+    }
+
+    if (parsed[0] === 'EOSE') {
+      const subId = parsed[1];
+      const active = inflight.get(subId);
+      if (!active) return;
+      active.resolve(active.events);
+      inflight.delete(subId);
+      return;
+    }
+  };
+
+  ws.onerror = failAll;
+  ws.onclose = failAll;
+
+  const openPromise = new Promise<boolean>((resolve) => {
+    const settle = (value: boolean) => {
+      if (openSettled) return;
+      openSettled = true;
+      resolve(value);
+    };
+
+    if (ws.readyState === WebSocket.OPEN) {
+      settle(true);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => settle(false), OPEN_TIMEOUT_MS);
+    ws.onopen = () => {
+      clearTimeout(timeoutId);
+      settle(true);
+    };
+    ws.onerror = () => {
+      clearTimeout(timeoutId);
+      failAll();
+      settle(false);
+    };
+    ws.onclose = () => {
+      clearTimeout(timeoutId);
+      failAll();
+      settle(false);
+    };
+  });
+
+  const request = async (subId: string, filter: Record<string, unknown>) => {
+    const isOpen = await openPromise;
+    if (!isOpen || ws.readyState !== WebSocket.OPEN) return [];
+
+    return new Promise<RawPrimalEvent[]>((resolve) => {
+      const requestState = { events: [] as RawPrimalEvent[], resolve };
+      const timeoutId = setTimeout(() => {
+        const active = inflight.get(subId);
+        if (!active) return;
+        inflight.delete(subId);
+        resolve(active.events);
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(['CLOSE', subId]));
+        }
+      }, REQUEST_TIMEOUT_MS);
+
+      inflight.set(subId, {
+        events: requestState.events,
+        resolve: (events) => {
+          clearTimeout(timeoutId);
+          resolve(events);
+        },
+      });
+      ws.send(JSON.stringify(['REQ', subId, filter]));
+    });
+  };
+
+  return {
+    request,
+    close: () => {
+      ws.close();
+    },
+  };
+}
+
+// ============================================================================
+// Inline renderers
+// ============================================================================
+
+export const InlineMention = React.memo(function InlineMention({
+  pubkey,
+  bech32,
+  profiles,
+}: {
+  pubkey: string;
+  bech32: string;
+  profiles: Map<string, ProfileInfo>;
+}) {
+  const { getPrimaryColor } = useTheme();
+  const profile = profiles.get(pubkey);
+  const label = profile?.name || `${bech32.slice(0, 12)}…`;
+
+  return (
+    <Text
+      bold
+      size={15}
+      style={{ color: opacity(getPrimaryColor('0'), 0.5) }}
+      onPress={() => {
+        router.push({ pathname: '/(user-flow)/profile' as any, params: { pubkey } });
+      }}>
+      @{label}
+    </Text>
+  );
+});
+
+export const InlineHashtag = React.memo(function InlineHashtag({ tag }: { tag: string }) {
+  const { getPrimaryColor } = useTheme();
+  return (
+    <Text bold size={15} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+      #{tag}
+    </Text>
+  );
+});
+
+export const InlineLink = React.memo(function InlineLink({ url }: { url: string }) {
+  const { getPrimaryColor } = useTheme();
+  return (
+    <Text
+      size={15}
+      style={{ color: opacity(getPrimaryColor('0'), 0.5) }}
+      onPress={() => Linking.openURL(url).catch(() => {})}>
+      {prettifyUrl(url)}
+    </Text>
+  );
+});
+
+// ============================================================================
+// Block renderers
+// ============================================================================
+
+export const ImageBlock = React.memo(function ImageBlock({ url }: { url: string }) {
+  const [aspectRatio, setAspectRatio] = useState(16 / 9);
+  const [error, setError] = useState(false);
+
+  if (error) return null;
+
+  return (
+    <View style={sharedStyles.imageBlockOuter}>
+      <Image
+        source={{ uri: url }}
+        style={{ width: CONTENT_WIDTH - 32, aspectRatio, borderRadius: 12 }}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        recyclingKey={url}
+        transition={300}
+        onLoad={(e) => {
+          const { width, height } = e.source;
+          if (width && height) setAspectRatio(width / height);
+        }}
+        onError={() => setError(true)}
+      />
+    </View>
+  );
+});
+
+const IOSVideoBlock = React.memo(function IOSVideoBlock({
+  url,
+  onTap,
+}: {
+  url: string;
+  onTap?: () => void;
+}) {
+  const { getPrimaryColor } = useTheme();
+  const player = useVideoPlayer(url, (p) => {
+    p.loop = false;
+    p.muted = true;
+  });
+
+  return (
+    <TouchableOpacity
+      activeOpacity={onTap ? 0.85 : 1}
+      onPress={onTap}
+      disabled={!onTap}
+      style={[sharedStyles.videoBlockOuter, { backgroundColor: getPrimaryColor('900') }]}>
+      <View pointerEvents={onTap ? 'none' : 'auto'}>
+        <VideoView
+          player={player}
+          style={{ width: CONTENT_WIDTH - 32, aspectRatio: 16 / 9 }}
+          contentFit="contain"
+          nativeControls={!onTap}
+        />
+      </View>
+      {onTap && (
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+          <Icon name="mdi:play-circle-outline" size={48} color="rgba(255,255,255,0.75)" />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+});
+
+const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
+  url,
+  onTap,
+}: {
+  url: string;
+  onTap?: () => void;
+}) {
+  const { getPrimaryColor } = useTheme();
+  const handlePress = onTap ?? (() => Linking.openURL(url).catch(() => {}));
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={handlePress}
+      style={[
+        sharedStyles.mediaCard,
+        { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
+      ]}>
+      <HStack align="center" gap={8}>
+        <Icon name="mdi:play-circle-outline" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+        <VStack style={sharedStyles.flex1}>
+          <Text bold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
+            Video
+          </Text>
+          <Text size={11} numberOfLines={1} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
+            {onTap ? 'Tap to watch' : 'Open in browser'}
+          </Text>
+        </VStack>
+        <Icon
+          name={onTap ? 'mdi:play-circle' : 'mdi:open-in-new'}
+          size={16}
+          color={opacity(getPrimaryColor('0'), 0.33)}
+        />
+      </HStack>
+    </TouchableOpacity>
+  );
+});
+
+export const VideoBlock = React.memo(function VideoBlock({
+  url,
+  onTap,
+}: {
+  url: string;
+  onTap?: () => void;
+}) {
+  if (Platform.OS === 'android') {
+    return <AndroidVideoBlock url={url} onTap={onTap} />;
+  }
+  return <IOSVideoBlock url={url} onTap={onTap} />;
+});
+
+export const LightningBlock = React.memo(function LightningBlock({ invoice }: { invoice: string }) {
+  const { getPrimaryColor } = useTheme();
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => {
+        router.push({ pathname: '/(send-flow)/meltQuote' as any, params: { invoice } });
+      }}
+      style={[
+        sharedStyles.mediaCard,
+        { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
+      ]}>
+      <HStack align="center" gap={8}>
+        <Icon name="mingcute:lightning-fill" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+        <VStack style={sharedStyles.flex1}>
+          <Text bold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
+            Lightning Invoice
+          </Text>
+          <Text size={11} numberOfLines={1} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
+            {invoice.slice(0, 30)}…
+          </Text>
+        </VStack>
+        <Icon name="mdi:chevron-right" size={18} color={opacity(getPrimaryColor('0'), 0.33)} />
+      </HStack>
+    </TouchableOpacity>
+  );
+});
+
+// ============================================================================
+// MetricsFooter (superset — includes showBorder + onCommentPress from ThreadView)
+// ============================================================================
+
+export const MetricsFooter = React.memo(function MetricsFooter({
+  metrics,
+  borderColor,
+  compact = false,
+  showBorder = true,
+  onCommentPress,
+}: {
+  metrics: NoteMetrics;
+  borderColor: string;
+  compact?: boolean;
+  showBorder?: boolean;
+  onCommentPress?: () => void;
+}) {
+  const iconColor = opacity(borderColor, 0.57);
+  const textColor = opacity(borderColor, 0.57);
+  const iconSize = compact ? 13 : 16;
+  const textSize = compact ? 11 : 13;
+
+  return (
+    <View
+      style={[
+        sharedStyles.noteFooter,
+        showBorder && sharedStyles.footerBorder,
+        showBorder && { borderBottomColor: opacity(borderColor, 0.1) },
+      ]}>
+      <HStack align="center" justify="space-between">
+        <TouchableOpacity
+          activeOpacity={onCommentPress ? 0.7 : 1}
+          onPress={onCommentPress}
+          disabled={!onCommentPress}>
+          <HStack align="center" gap={5}>
+            <Icon name="iconamoon:comment-fill" size={iconSize - 1} color={iconColor} />
+            <Text size={textSize} style={{ color: textColor }}>
+              {formatCount(metrics.replyCount)}
+            </Text>
+          </HStack>
+        </TouchableOpacity>
+        <HStack align="center" gap={5}>
+          <Icon name="garden:arrow-retweet-fill-16" size={iconSize + 1} color={iconColor} />
+          <Text size={textSize} style={{ color: textColor }}>
+            {formatCount(metrics.repostCount)}
+          </Text>
+        </HStack>
+        <HStack align="center" gap={5}>
+          <Icon name="iconamoon:heart-fill" size={iconSize} color={iconColor} />
+          <Text size={textSize} style={{ color: textColor }}>
+            {formatCount(metrics.likeCount)}
+          </Text>
+        </HStack>
+        <Icon name="iconamoon:bookmark-fill" size={iconSize} color={iconColor} />
+      </HStack>
+    </View>
+  );
+});
+
+// ============================================================================
+// QuotedPostCard
+// ============================================================================
+
+export const QuotedPostCard = React.memo(function QuotedPostCard({
+  event,
+  profiles,
+  getMetrics,
+}: {
+  event: FeedEvent | undefined;
+  profiles: Map<string, ProfileInfo>;
+  getMetrics: (eventId: string) => NoteMetrics;
+}) {
+  const { getPrimaryColor } = useTheme();
+
+  if (!event) {
+    return (
+      <View
+        style={[
+          sharedStyles.quotedCard,
+          { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
+        ]}>
+        <HStack align="center" gap={6}>
+          <Icon name="mdi:message-text" size={14} color={opacity(getPrimaryColor('0'), 0.33)} />
+          <Text size={13} italic style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
+            Quoted post
+          </Text>
+        </HStack>
+      </View>
+    );
+  }
+
+  const timestamp = event.created_at ? formatTimestamp(event.created_at) : '';
+  const profile = profiles.get(event.pubkey);
+  const displayName = profile?.name || `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => {
+        router.push({
+          pathname: '/(user-flow)/thread' as any,
+          params: { eventId: event.id },
+        });
+      }}>
+      <View
+        style={[
+          sharedStyles.quotedCard,
+          { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
+        ]}>
+        <HStack align="center" gap={8} style={sharedStyles.mb6}>
+          <Avatar
+            picture={profile?.picture}
+            seed={event.pubkey}
+            size={24}
+            variant="person"
+            name={displayName}
+          />
+          <Text
+            bold
+            size={13}
+            style={{ color: opacity(getPrimaryColor('0'), 0.66), flex: 1 }}
+            numberOfLines={1}>
+            {displayName}
+          </Text>
+          {timestamp ? (
+            <>
+              <Text
+                bold
+                size={11}
+                style={{ color: opacity(getPrimaryColor('0'), 0.25), marginRight: 4 }}>
+                {'•'}
+              </Text>
+              <Text size={11} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
+                {timestamp}
+              </Text>
+            </>
+          ) : null}
+        </HStack>
+        <NoteContent
+          content={event.content}
+          quotedEvents={EMPTY_QUOTED_EVENTS}
+          profiles={profiles}
+          getMetrics={getMetrics}
+        />
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+// ============================================================================
+// NoteContent (superset — includes onVideoTap from UserFeed)
+// ============================================================================
+
+export const NoteContent = React.memo(function NoteContent({
+  content,
+  quotedEvents,
+  profiles,
+  getMetrics,
+  onVideoTap,
+}: {
+  content: string;
+  quotedEvents: Map<string, FeedEvent>;
+  profiles: Map<string, ProfileInfo>;
+  getMetrics: (eventId: string) => NoteMetrics;
+  onVideoTap?: (url: string) => void;
+}) {
+  const { getPrimaryColor } = useTheme();
+
+  const { inlineSegments, blockSegments } = useMemo(() => {
+    const segments = parseContent(content);
+    const inline: ContentSegment[] = [];
+    const blocks: ContentSegment[] = [];
+
+    for (const seg of segments) {
+      switch (seg.kind) {
+        case 'image':
+        case 'video':
+        case 'lightning':
+        case 'nevent':
+        case 'note':
+          blocks.push(seg);
+          break;
+        default:
+          inline.push(seg);
+      }
+    }
+
+    while (inline.length > 0 && inline[inline.length - 1].kind === 'newline') {
+      inline.pop();
+    }
+
+    return { inlineSegments: inline, blockSegments: blocks };
+  }, [content]);
+
+  const hasInline = inlineSegments.length > 0;
+  const hasBlocks = blockSegments.length > 0;
+
+  return (
+    <VStack gap={0}>
+      {hasInline && (
+        <Text size={15} style={{ color: opacity(getPrimaryColor('0'), 0.9), lineHeight: 22 }}>
+          {inlineSegments.map((seg, i) => {
+            switch (seg.kind) {
+              case 'text':
+                return <React.Fragment key={i}>{seg.text}</React.Fragment>;
+              case 'newline':
+                return <React.Fragment key={i}>{'\n'}</React.Fragment>;
+              case 'npub':
+              case 'nprofile':
+                return (
+                  <InlineMention
+                    key={i}
+                    pubkey={seg.pubkey}
+                    bech32={seg.bech32}
+                    profiles={profiles}
+                  />
+                );
+              case 'hashtag':
+                return <InlineHashtag key={i} tag={seg.tag} />;
+              case 'url':
+                return <InlineLink key={i} url={seg.url} />;
+              case 'naddr':
+                return (
+                  <Text
+                    key={i}
+                    bold
+                    size={15}
+                    style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+                    [article]
+                  </Text>
+                );
+              default:
+                return null;
+            }
+          })}
+        </Text>
+      )}
+
+      {hasBlocks &&
+        blockSegments.map((seg, i) => {
+          switch (seg.kind) {
+            case 'image':
+              return <ImageBlock key={`b${i}`} url={seg.url} />;
+            case 'video':
+              return (
+                <VideoBlock
+                  key={`b${i}`}
+                  url={seg.url}
+                  onTap={onVideoTap ? () => onVideoTap(seg.url) : undefined}
+                />
+              );
+            case 'lightning':
+              return <LightningBlock key={`b${i}`} invoice={seg.invoice} />;
+            case 'nevent':
+            case 'note':
+              return (
+                <QuotedPostCard
+                  key={`b${i}`}
+                  event={quotedEvents.get(seg.eventId)}
+                  profiles={profiles}
+                  getMetrics={getMetrics}
+                />
+              );
+            default:
+              return null;
+          }
+        })}
+    </VStack>
+  );
+});
+
+// ============================================================================
+// Shared Styles
+// ============================================================================
+
+export const sharedStyles = StyleSheet.create({
+  noteFooter: {},
+  footerBorder: {
+    borderBottomWidth: 1,
+    paddingBottom: 10,
+  },
+  quotedCard: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 6,
+  },
+  mediaCard: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 6,
+  },
+  imageBlockOuter: {
+    marginVertical: 6,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  videoBlockOuter: {
+    marginVertical: 6,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  flex1: {
+    flex: 1,
+  },
+  mb4: {
+    marginBottom: 4,
+  },
+  mb6: {
+    marginBottom: 6,
+  },
+  mb10: {
+    marginBottom: 10,
+  },
+});

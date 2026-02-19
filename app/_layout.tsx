@@ -9,13 +9,13 @@ import { StatusBar } from 'expo-status-bar';
 import 'global.css';
 import 'intl';
 import 'intl/locale-data/jsonp/en';
-import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { registerAllSheets } from '@/components/blocks/sheets/registerSheets';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFonts } from '@/hooks/useFonts';
 import Icon from 'assets/icons';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LogBox, TouchableOpacity, Platform } from 'react-native';
 import { supportsLiquidGlass } from '@/helper/version';
 
@@ -218,12 +218,14 @@ export default function RootLayout() {
   }
 
   return (
-    <OuterProviders>
-      <AccountScopedProviders
-        key={`account-${activeAccountIndex}`}
-        accountIndex={activeAccountIndex}>
-        <RootLayoutContent />
-      </AccountScopedProviders>
-    </OuterProviders>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <OuterProviders>
+        <AccountScopedProviders
+          key={`account-${activeAccountIndex}`}
+          accountIndex={activeAccountIndex}>
+          <RootLayoutContent />
+        </AccountScopedProviders>
+      </OuterProviders>
+    </GestureHandlerRootView>
   );
 }

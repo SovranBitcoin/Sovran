@@ -43,6 +43,11 @@ export default function TabLayout() {
               }),
             })}
             disableTransparentOnScrollEdge>
+            <Expo55NativeTabs.Trigger name="feed">
+              <Expo55NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />
+              <Expo55NativeTabs.Trigger.Label>Feed</Expo55NativeTabs.Trigger.Label>
+            </Expo55NativeTabs.Trigger>
+
             <Expo55NativeTabs.Trigger name="payments">
               <Expo55NativeTabs.Trigger.Icon
                 sf={{
@@ -101,6 +106,13 @@ export default function TabLayout() {
               tabBarInactiveTintColor: Colors.dark.text,
             }}>
             <Tabs.Screen
+              name="feed"
+              options={{
+                title: 'Feed',
+                tabBarIcon: ({ color }) => <IconSymbol name="house" color={color} size={24} />,
+              }}
+            />
+            <Tabs.Screen
               name="payments"
               options={{
                 title: 'Payments',
@@ -127,7 +139,7 @@ export default function TabLayout() {
             <Tabs.Screen
               name="example"
               options={{
-                href: null, // Hide from tab bar
+                href: null,
               }}
             />
           </Tabs>

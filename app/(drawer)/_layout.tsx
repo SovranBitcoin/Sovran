@@ -42,6 +42,12 @@ type MenuItem = {
 
 const MENU_ITEMS: MenuItem[] = [
   {
+    icon: 'mingcute:home-4-fill',
+    label: 'Feed',
+    route: '(drawer)/(tabs)/feed',
+    drawerLabel: 'feed',
+  },
+  {
     icon: 'fluent:wallet-20-filled',
     label: 'Wallet',
     route: '(drawer)/(tabs)',
@@ -314,8 +320,12 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
         pathname.includes('(tabs)/index') ||
         (pathname.includes('(tabs)') &&
           !pathname.includes('payments') &&
-          !pathname.includes('explore'))
+          !pathname.includes('explore') &&
+          !pathname.includes('feed'))
       );
+    }
+    if (route.includes('(tabs)/feed') && pathname.includes('feed')) {
+      return true;
     }
     if (route.includes('(tabs)/payments') && pathname.includes('payments')) {
       return true;
