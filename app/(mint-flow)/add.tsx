@@ -19,7 +19,6 @@ import {
   InteractionManager,
 } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
-import type { NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -42,7 +41,7 @@ import { Skeleton } from 'components/ui/Skeleton';
 import { Avatar } from 'components/ui/Avatar';
 import { Badge } from 'components/ui/Badge';
 import { Checkbox } from 'components/ui/Checkbox';
-import { LegendList } from '@legendapp/list';
+import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurrencyTabs';
 import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
