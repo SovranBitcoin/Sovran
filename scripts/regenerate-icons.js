@@ -18,7 +18,7 @@ if (!match) {
   process.exit(1);
 }
 
-const icons = match[1].match(/'([^']+)'/g).map(s => s.replace(/'/g, ''));
+const icons = match[1].match(/'([^']+)'/g).map((s) => s.replace(/'/g, ''));
 console.log(`Found ${icons.length} icons to load`);
 
 loadIcons({
@@ -28,9 +28,11 @@ loadIcons({
   type: 'cjs',
   outputFileName: 'icons',
   generateTypes: true,
-}).then(() => {
-  console.log('Done! .monicon/icons.js regenerated.');
-}).catch(err => {
-  console.error('Error regenerating icons:', err);
-  process.exit(1);
-});
+})
+  .then(() => {
+    console.log('Done! .monicon/icons.js regenerated.');
+  })
+  .catch((err) => {
+    console.error('Error regenerating icons:', err);
+    process.exit(1);
+  });

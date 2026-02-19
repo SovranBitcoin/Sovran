@@ -506,7 +506,13 @@ const KeyringSettings: React.FC = () => {
                 thumbColor={getPrimaryColor('0')}
               />
             </HStack>
-            <View style={{ height: 1, backgroundColor: opacity(getPrimaryColor('0'), 0.08), marginVertical: 12 }} />
+            <View
+              style={{
+                height: 1,
+                backgroundColor: opacity(getPrimaryColor('0'), 0.08),
+                marginVertical: 12,
+              }}
+            />
             <HStack align="center" justify="space-between">
               <VStack flex={1} style={{ marginRight: 12 }}>
                 <Text size={16} style={{ color: getPrimaryColor('0') }}>
@@ -518,7 +524,8 @@ const KeyringSettings: React.FC = () => {
                     color: opacity(getPrimaryColor('0'), 0.4),
                     marginTop: 4,
                   }}>
-                  Automatically generate a new P2PK key after redeeming a locked token for improved privacy
+                  Automatically generate a new P2PK key after redeeming a locked token for improved
+                  privacy
                 </Text>
               </VStack>
               <Switch

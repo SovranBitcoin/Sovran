@@ -1,5 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
-import { Stack } from 'expo-router';
+import { useLocalSearchParams, Stack } from 'expo-router';
 import { ThreadView } from 'components/blocks/ThreadView';
 
 export default function ThreadScreen() {
