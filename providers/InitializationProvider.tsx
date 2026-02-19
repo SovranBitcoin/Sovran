@@ -52,7 +52,7 @@ const STROKE_BODY_D =
   'M321.256 133C257 144.5 202.321 202 257 271C299 324 383 340.5 394 385.5C405 430.5 380.252 458.658 349.5 473C295.977 497.962 231.26 477.061 227.252 413.031C225.687 388.031 230.252 358.031 274.331 332.579';
 
 const STROKE_CURL_D =
-  'M280.909 180.988C313 142 405.858 154.333 405 211.5C404.473 246.611 394 263 354.195 288.961';
+  'M354.195 288.961C394 263 404.473 246.611 405 211.5C405.858 154.333 313 142 280.909 180.988';
 
 const AnimatedSvgPath = createAnimatedComponent(SvgPath);
 
@@ -589,29 +589,32 @@ function AnimatedLogoSplash() {
   const logoSize = Math.min(screenW, screenH) * 1.25;
 
   useEffect(() => {
-    // Overlap 70%: path2 starts when path1 is ~70% drawn (delay = 2000 * 0.7 = 1400ms)
-    // Forward draw: path1 (2s) + path2 starts at 1.4s (0.6s) → both done by ~2.6s
-    // Hold 0.8s
-    // Reverse erase: path2 (0.6s) then path1 (2s, starts when path2 is ~30% erased = 0.18s overlap)
-    // Hold 0.4s → total ≈ 6.4s
+    // Slight-overlap sequence:
+    // 1) path1 in (2.0s)
+    // 2) path2 in starts earlier before path1 in completes (~0.7s overlap)
+    // 3) hold (0.8s)
+    // 4) path1 out (2.0s, same travel direction via negative dash offset)
+    // 5) path2 out starts shortly before path1 out completes (0.5s overlap)
+    // 6) hold (0.4s) then hard reset for next loop
+    // Total loop: 5.2s
 
-    // Path1: draw → hold → erase → hold
+    // Path1 defines the main timeline: in → hold → out → hold → reset
     dash1.value = withRepeat(
       withSequence(
         withTiming(0, { duration: 2000, easing: LOGO_EASE }),
-        withDelay(1400, withTiming(0, { duration: 0 })),
-        withTiming(PATH1_LENGTH, { duration: 2000, easing: LOGO_EASE }),
+        withDelay(800, withTiming(0, { duration: 0 })),
+        withTiming(-PATH1_LENGTH, { duration: 2000, easing: LOGO_EASE }),
         withDelay(400, withTiming(PATH1_LENGTH, { duration: 0 }))
       ),
       -1
     );
 
-    // Path2: wait for overlap point → draw → hold → erase → wait for next loop
+    // Path2: delayed in (overlaps end of path1 in) → delayed out (overlaps end of path1 out)
     dash2.value = withRepeat(
       withSequence(
-        withDelay(1400, withTiming(0, { duration: 600, easing: LOGO_EASE })),
-        withDelay(1000, withTiming(PATH2_LENGTH, { duration: 600, easing: LOGO_EASE })),
-        withDelay(2200, withTiming(PATH2_LENGTH, { duration: 0 }))
+        withDelay(1300, withTiming(0, { duration: 600, easing: LOGO_EASE })),
+        withDelay(2300, withTiming(-PATH2_LENGTH, { duration: 600, easing: LOGO_EASE })),
+        withDelay(300, withTiming(PATH2_LENGTH, { duration: 0 }))
       ),
       -1
     );
