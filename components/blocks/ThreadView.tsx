@@ -18,6 +18,7 @@ import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
+  buildDedupedVideoPosts,
   type FeedEvent,
   type NoteMetrics,
   type ProfileInfo,
@@ -31,7 +32,6 @@ import {
   parseJson,
   parseProfileFromRaw,
   parseNoteMetrics,
-  getVideoUrlsFromContent,
 } from './nostr/shared';
 
 import { PostCard } from './nostr/PostCard';
@@ -182,40 +182,41 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
   );
 
   const actionableEvents = useMemo(() => threadItems.map((item) => item.event), [threadItems]);
+  const actionableEventsById = useMemo(() => {
+    const map = new Map<string, FeedEvent>();
+    for (const event of actionableEvents) map.set(event.id, event);
+    return map;
+  }, [actionableEvents]);
 
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
     useNostrEngagement(actionableEvents, getMetrics);
 
   // Build video posts list from thread items
   const videoPosts = useMemo((): VideoPost[] => {
-    const result: VideoPost[] = [];
-    const seenUrls = new Set<string>();
+    const sourceEvents: FeedEvent[] = [];
     for (const item of threadItems) {
       const event = item.event;
-      const videoUrls = getVideoUrlsFromContent(event.content);
-      if (videoUrls.length === 0) continue;
-      const url = videoUrls[0];
-      if (seenUrls.has(url)) continue;
-      seenUrls.add(url);
-      result.push({
-        eventId: event.id,
-        videoUrl: url,
-        content: event.content,
-        pubkey: event.pubkey,
-        created_at: event.created_at,
-      });
+      sourceEvents.push(event);
     }
-    return result;
+    return buildDedupedVideoPosts(sourceEvents);
   }, [threadItems]);
+
+  const videoIndexByUrl = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < videoPosts.length; i++) {
+      map.set(videoPosts[i].videoUrl, i);
+    }
+    return map;
+  }, [videoPosts]);
 
   const handleVideoTap = useCallback(
     (tappedUrl: string) => {
-      const index = videoPosts.findIndex((vp) => vp.videoUrl === tappedUrl);
-      if (index === -1) return;
+      const index = videoIndexByUrl.get(tappedUrl);
+      if (index == null) return;
       setOverlayStartIndex(index);
       setOverlayVisible(true);
     },
-    [videoPosts]
+    [videoIndexByUrl]
   );
 
   // Fetch thread data
@@ -481,6 +482,8 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
           reposted={engagement.reposted}
           likePending={engagement.likePending}
           repostPending={engagement.repostPending}
+          likePendingDirection={engagement.likePendingDirection}
+          repostPendingDirection={engagement.repostPendingDirection}
           onLikePress={() => toggleLike(item.event)}
           onRepostPress={() => toggleRepost(item.event)}
         />
@@ -564,11 +567,11 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
           getEngagementState={getEngagementState}
           engagementRevision={engagementRevision}
           onLikePress={(eventId) => {
-            const event = actionableEvents.find((e) => e.id === eventId);
+            const event = actionableEventsById.get(eventId);
             if (event) toggleLike(event);
           }}
           onRepostPress={(eventId) => {
-            const event = actionableEvents.find((e) => e.id === eventId);
+            const event = actionableEventsById.get(eventId);
             if (event) toggleRepost(event);
           }}
         />

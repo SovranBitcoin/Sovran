@@ -5,10 +5,19 @@
  * extracted to eliminate duplication and ensure consistent behavior.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, TouchableOpacity, Linking, Dimensions, Platform } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
+import Reanimated, {
+  cancelAnimation,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { EnhancedHaptics } from 'components/ui/Haptics';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router } from 'expo-router';
@@ -117,6 +126,34 @@ export function getVideoUrlsFromContent(content: string): string[] {
     }
   }
   return urls;
+}
+
+export interface VideoPostRecord {
+  eventId: string;
+  videoUrl: string;
+  content: string;
+  pubkey: string;
+  created_at: number;
+}
+
+export function buildDedupedVideoPosts(events: FeedEvent[]): VideoPostRecord[] {
+  const result: VideoPostRecord[] = [];
+  const seenUrls = new Set<string>();
+  for (const event of events) {
+    const videoUrls = getVideoUrlsFromContent(event.content);
+    if (videoUrls.length === 0) continue;
+    const url = videoUrls[0];
+    if (seenUrls.has(url)) continue;
+    seenUrls.add(url);
+    result.push({
+      eventId: event.id,
+      videoUrl: url,
+      content: event.content,
+      pubkey: event.pubkey,
+      created_at: event.created_at,
+    });
+  }
+  return result;
 }
 
 // ============================================================================
@@ -745,6 +782,104 @@ export const LightningBlock = React.memo(function LightningBlock({ invoice }: { 
 // MetricsFooter (superset — includes showBorder + onCommentPress from ThreadView)
 // ============================================================================
 
+const BOUNCE_SPRING = { damping: 10, stiffness: 350, mass: 0.5 };
+const SETTLE_SPRING = { damping: 14, stiffness: 200 };
+
+const AnimatedMetric = React.memo(function AnimatedMetric({
+  iconName,
+  iconSize,
+  text,
+  inactiveColor,
+  activeColor,
+  textSize,
+  isActive,
+  pending,
+  pendingDirection,
+}: {
+  iconName: string;
+  iconSize: number;
+  text: string;
+  inactiveColor: string;
+  activeColor: string;
+  textSize: number;
+  isActive: boolean;
+  pending: boolean;
+  pendingDirection?: 'activating' | 'deactivating';
+}) {
+  const [displayText, setDisplayText] = useState(text);
+  const iconScale = useSharedValue(1);
+  const numberSlide = useSharedValue(0);
+  const numberOpacity = useSharedValue(1);
+  const prevPendingRef = useRef(pending);
+  const lastDirectionRef = useRef<'activating' | 'deactivating'>('activating');
+
+  useEffect(() => {
+    return () => {
+      cancelAnimation(iconScale);
+      cancelAnimation(numberSlide);
+      cancelAnimation(numberOpacity);
+    };
+  }, [iconScale, numberSlide, numberOpacity]);
+
+  useEffect(() => {
+    const wasPending = prevPendingRef.current;
+
+    if (pending && !wasPending) {
+      const direction = pendingDirection ?? 'activating';
+      lastDirectionRef.current = direction;
+
+      if (direction === 'activating') {
+        EnhancedHaptics.buttonHaptic();
+        iconScale.set(
+          withSequence(withTiming(1.35, { duration: 50 }), withSpring(1, BOUNCE_SPRING))
+        );
+      } else {
+        EnhancedHaptics.navigateHaptic();
+        iconScale.set(
+          withSequence(withTiming(0.7, { duration: 50 }), withSpring(1, SETTLE_SPRING))
+        );
+      }
+
+      if (text !== displayText) {
+        const slideFrom = direction === 'activating' ? 8 : -8;
+        setDisplayText(text);
+        numberSlide.set(slideFrom);
+        numberOpacity.set(0);
+        numberSlide.set(withSpring(0, { damping: 15, stiffness: 200 }));
+        numberOpacity.set(withTiming(1, { duration: 180 }));
+      }
+    } else if (text !== displayText) {
+      setDisplayText(text);
+    }
+
+    prevPendingRef.current = pending;
+  }, [displayText, iconScale, numberOpacity, numberSlide, pending, pendingDirection, text]);
+
+  const iconAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.get() }],
+  }));
+
+  const numberAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: numberSlide.get() }],
+    opacity: numberOpacity.get(),
+  }));
+
+  const color = isActive ? activeColor : inactiveColor;
+
+  return (
+    <HStack align="center" gap={5}>
+      <Reanimated.View style={iconAnimStyle}>
+        <Icon name={iconName} size={iconSize} color={color} />
+      </Reanimated.View>
+      <Reanimated.View style={numberAnimStyle}>
+        <Text size={textSize} style={{ color }}>
+          {displayText}
+        </Text>
+      </Reanimated.View>
+    </HStack>
+  );
+});
+
 export const MetricsFooter = React.memo(function MetricsFooter({
   metrics,
   borderColor,
@@ -757,6 +892,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   liked = false,
   repostPending = false,
   likePending = false,
+  repostPendingDirection,
+  likePendingDirection,
   onActionPressIn,
   onActionPressOut,
 }: {
@@ -771,6 +908,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   liked?: boolean;
   repostPending?: boolean;
   likePending?: boolean;
+  repostPendingDirection?: 'activating' | 'deactivating';
+  likePendingDirection?: 'activating' | 'deactivating';
   onActionPressIn?: () => void;
   onActionPressOut?: () => void;
 }) {
@@ -808,16 +947,17 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           disabled={!onRepostPress || repostPending}
           onPressIn={onActionPressIn}
           onPressOut={onActionPressOut}>
-          <HStack align="center" gap={5}>
-            <Icon
-              name="garden:arrow-retweet-fill-16"
-              size={iconSize + 1}
-              color={reposted ? repostedColor : iconColor}
-            />
-            <Text size={textSize} style={{ color: reposted ? repostedColor : textColor }}>
-              {formatCount(metrics.repostCount)}
-            </Text>
-          </HStack>
+          <AnimatedMetric
+            iconName="garden:arrow-retweet-fill-16"
+            iconSize={iconSize + 1}
+            text={formatCount(metrics.repostCount)}
+            inactiveColor={textColor}
+            activeColor={repostedColor}
+            textSize={textSize}
+            isActive={reposted}
+            pending={repostPending}
+            pendingDirection={repostPendingDirection}
+          />
         </TouchableOpacity>
         <TouchableOpacity
           activeOpacity={onLikePress ? 0.7 : 1}
@@ -825,16 +965,17 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           disabled={!onLikePress || likePending}
           onPressIn={onActionPressIn}
           onPressOut={onActionPressOut}>
-          <HStack align="center" gap={5}>
-            <Icon
-              name="iconamoon:heart-fill"
-              size={iconSize}
-              color={liked ? likedColor : iconColor}
-            />
-            <Text size={textSize} style={{ color: liked ? likedColor : textColor }}>
-              {formatCount(metrics.likeCount)}
-            </Text>
-          </HStack>
+          <AnimatedMetric
+            iconName="iconamoon:heart-fill"
+            iconSize={iconSize}
+            text={formatCount(metrics.likeCount)}
+            inactiveColor={textColor}
+            activeColor={likedColor}
+            textSize={textSize}
+            isActive={liked}
+            pending={likePending}
+            pendingDirection={likePendingDirection}
+          />
         </TouchableOpacity>
         {metrics.satsZapped > 0 ? (
           <HStack align="center" gap={4}>

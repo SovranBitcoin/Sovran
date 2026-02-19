@@ -56,6 +56,8 @@ interface PostCardProps {
   liked?: boolean;
   repostPending?: boolean;
   likePending?: boolean;
+  repostPendingDirection?: 'activating' | 'deactivating';
+  likePendingDirection?: 'activating' | 'deactivating';
   onNestedProfilePressIn?: () => void;
   onNestedProfilePressOut?: () => void;
 }
@@ -79,6 +81,8 @@ export const PostCard = React.memo(function PostCard({
   liked = false,
   repostPending = false,
   likePending = false,
+  repostPendingDirection,
+  likePendingDirection,
   onNestedProfilePressIn,
   onNestedProfilePressOut,
 }: PostCardProps) {
@@ -243,6 +247,8 @@ export const PostCard = React.memo(function PostCard({
             liked={liked}
             repostPending={repostPending}
             likePending={likePending}
+            repostPendingDirection={repostPendingDirection}
+            likePendingDirection={likePendingDirection}
             onActionPressIn={handleActionPressIn}
             onActionPressOut={handleActionPressOut}
           />
@@ -330,6 +336,8 @@ export const PostCard = React.memo(function PostCard({
             liked={liked}
             repostPending={repostPending}
             likePending={likePending}
+            repostPendingDirection={repostPendingDirection}
+            likePendingDirection={likePendingDirection}
             onActionPressIn={handleActionPressIn}
             onActionPressOut={handleActionPressOut}
           />

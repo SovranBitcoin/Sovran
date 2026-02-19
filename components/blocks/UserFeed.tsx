@@ -32,6 +32,7 @@ import React, {
   useTransition,
   memo,
 } from 'react';
+import { useEventListener } from 'expo';
 import {
   StyleSheet,
   InteractionManager,
@@ -65,6 +66,7 @@ import Reanimated, {
   withTiming,
   withRepeat,
   withSpring,
+  withSequence,
   interpolate,
   Extrapolation,
   cancelAnimation,
@@ -73,6 +75,7 @@ import Reanimated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
+import { EnhancedHaptics } from 'components/ui/Haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ============================================================================
@@ -80,6 +83,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // ============================================================================
 
 import {
+  buildDedupedVideoPosts,
   type FeedEvent,
   type NoteMetrics,
   type ProfileInfo,
@@ -104,6 +108,7 @@ import {
   parseNoteMetrics,
   tryNpubEncode,
   getVideoUrlsFromContent,
+  type VideoPostRecord,
 } from './nostr/shared';
 
 import { PostCard } from './nostr/PostCard';
@@ -159,13 +164,7 @@ type FeedItem =
     };
 
 /** One entry shown in the full-screen video feed overlay */
-export interface VideoPost {
-  eventId: string;
-  videoUrl: string;
-  content: string;
-  pubkey: string;
-  created_at: number;
-}
+export type VideoPost = VideoPostRecord;
 
 /** Sentinel appended to the video feed for infinite scroll loading */
 interface VideoLoadingSlot {
@@ -391,6 +390,8 @@ export const RepostCard = React.memo(function RepostCard({
   reposted = false,
   likePending = false,
   repostPending = false,
+  likePendingDirection,
+  repostPendingDirection,
   onLikePress,
   onRepostPress,
   skipAnimation,
@@ -409,6 +410,8 @@ export const RepostCard = React.memo(function RepostCard({
   reposted?: boolean;
   likePending?: boolean;
   repostPending?: boolean;
+  likePendingDirection?: 'activating' | 'deactivating';
+  repostPendingDirection?: 'activating' | 'deactivating';
   onLikePress?: () => void;
   onRepostPress?: () => void;
   skipAnimation?: boolean;
@@ -508,6 +511,8 @@ export const RepostCard = React.memo(function RepostCard({
             reposted={reposted}
             likePending={likePending}
             repostPending={repostPending}
+            likePendingDirection={likePendingDirection}
+            repostPendingDirection={repostPendingDirection}
             onLikePress={onLikePress}
             onRepostPress={onRepostPress}
             onNestedProfilePressIn={suppressThreadTapStart}
@@ -578,6 +583,8 @@ function formatVideoCount(n: number): string {
 const SCRUBBER_HEIGHT = 3;
 const SCRUBBER_HIT_SLOP = 14; // extra touch area above/below the thin bar
 const SCRUBBER_ACTIVE_HEIGHT = 5;
+const BOUNCE_SPRING = { damping: 10, stiffness: 350, mass: 0.5 };
+const SETTLE_SPRING = { damping: 14, stiffness: 200 };
 
 /** Format seconds → "M:SS" */
 function formatDuration(sec: number): string {
@@ -692,6 +699,97 @@ const TimelineScrubber = memo(function TimelineScrubber({
   );
 });
 
+const AnimatedPillMetric = memo(function AnimatedPillMetric({
+  iconName,
+  text,
+  inactiveColor,
+  activeColor,
+  isActive,
+  pending,
+  pendingDirection,
+}: {
+  iconName: string;
+  text: string;
+  inactiveColor: string;
+  activeColor: string;
+  isActive: boolean;
+  pending: boolean;
+  pendingDirection?: 'activating' | 'deactivating';
+}) {
+  const [displayText, setDisplayText] = useState(text);
+  const iconScale = useSharedValue(1);
+  const numberSlide = useSharedValue(0);
+  const numberOpacity = useSharedValue(1);
+  const prevPendingRef = useRef(pending);
+  const lastDirectionRef = useRef<'activating' | 'deactivating'>('activating');
+
+  useEffect(() => {
+    return () => {
+      cancelAnimation(iconScale);
+      cancelAnimation(numberSlide);
+      cancelAnimation(numberOpacity);
+    };
+  }, [iconScale, numberSlide, numberOpacity]);
+
+  useEffect(() => {
+    const wasPending = prevPendingRef.current;
+
+    if (pending && !wasPending) {
+      const direction = pendingDirection ?? 'activating';
+      lastDirectionRef.current = direction;
+
+      if (direction === 'activating') {
+        EnhancedHaptics.buttonHaptic();
+        iconScale.set(
+          withSequence(withTiming(1.35, { duration: 50 }), withSpring(1, BOUNCE_SPRING))
+        );
+      } else {
+        EnhancedHaptics.navigateHaptic();
+        iconScale.set(
+          withSequence(withTiming(0.7, { duration: 50 }), withSpring(1, SETTLE_SPRING))
+        );
+      }
+
+      if (text !== displayText) {
+        const slideFrom = direction === 'activating' ? 8 : -8;
+        setDisplayText(text);
+        numberSlide.set(slideFrom);
+        numberOpacity.set(0);
+        numberSlide.set(withSpring(0, { damping: 15, stiffness: 200 }));
+        numberOpacity.set(withTiming(1, { duration: 180 }));
+      }
+    } else if (text !== displayText) {
+      setDisplayText(text);
+    }
+
+    prevPendingRef.current = pending;
+  }, [displayText, iconScale, numberOpacity, numberSlide, pending, pendingDirection, text]);
+
+  const iconAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.get() }],
+  }));
+
+  const numberAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: numberSlide.get() }],
+    opacity: numberOpacity.get(),
+  }));
+
+  const color = isActive ? activeColor : inactiveColor;
+
+  return (
+    <HStack align="center" gap={5}>
+      <Reanimated.View style={iconAnimStyle}>
+        <Icon name={iconName} size={15} color={color} />
+      </Reanimated.View>
+      <Reanimated.View style={numberAnimStyle}>
+        <Text size={12} style={[vCtrl.metricText, { color }]}>
+          {displayText}
+        </Text>
+      </Reanimated.View>
+    </HStack>
+  );
+});
+
 // ── VideoFeedItem ───────────────────────────────────────────────────────────
 
 interface VideoFeedItemProps {
@@ -771,26 +869,27 @@ const VideoFeedItem = memo(function VideoFeedItem({
   }, [isActive, isPaused, isAppActive, isMuted, player]);
 
   // Poll playback progress at ~15fps for the scrubber.
-  // Only runs while the item is the active one.
+  // Track playback progress via expo-video time update events.
+  // Only emits while active to avoid background event churn.
   useEffect(() => {
-    if (!isActive) return;
-
-    const poll = setInterval(() => {
-      try {
-        const ct = player.currentTime ?? 0;
-        const dur = player.duration ?? 0;
-        setCurrentTime(ct);
-        setDuration(dur);
-        if (dur > 0) {
-          progress.set(ct / dur);
-        }
-      } catch {
-        // player not ready
-      }
-    }, 66); // ~15fps — smooth enough for a thin bar, cheap on JS thread
-
-    return () => clearInterval(poll);
+    player.timeUpdateEventInterval = isActive ? 0.1 : 0;
+    return () => {
+      player.timeUpdateEventInterval = 0;
+    };
   }, [isActive, player, progress]);
+
+  useEventListener(player, 'timeUpdate', () => {
+    if (!isActive) return;
+    try {
+      const ct = player.currentTime ?? 0;
+      const dur = player.duration ?? 0;
+      setCurrentTime(ct);
+      setDuration(dur);
+      progress.set(dur > 0 ? ct / dur : 0);
+    } catch {
+      // player not ready
+    }
+  });
 
   // ── Handlers ──
 
@@ -860,6 +959,7 @@ const VideoFeedItem = memo(function VideoFeedItem({
   const npubShort = tryNpubEncode(item.pubkey);
   const displayHandle = npubShort ? `@${npubShort.slice(5, 15)}…` : '';
   const displayContent = item.content.replace(VIDEO_URL_STRIP_REGEX, '').trim();
+  const neutralMetricColor = 'rgba(255,255,255,0.7)';
 
   const infoPanelPaddingBottom = insets.bottom + 8;
   const barWidth = screenWidth - 32; // 16px padding each side
@@ -962,16 +1062,15 @@ const VideoFeedItem = memo(function VideoFeedItem({
               vCtrl.metricPill,
               engagement.reposted ? { backgroundColor: 'rgba(76,217,100,0.25)' } : undefined,
             ]}>
-            <Icon
-              name="garden:arrow-retweet-fill-16"
-              size={15}
-              color={engagement.reposted ? '#4cd964' : 'rgba(255,255,255,0.7)'}
+            <AnimatedPillMetric
+              iconName="garden:arrow-retweet-fill-16"
+              inactiveColor={neutralMetricColor}
+              activeColor="#4cd964"
+              isActive={engagement.reposted}
+              pending={engagement.repostPending}
+              pendingDirection={engagement.repostPendingDirection}
+              text={metrics.repostCount > 0 ? formatVideoCount(metrics.repostCount) : '0'}
             />
-            <Text
-              size={12}
-              style={[vCtrl.metricText, engagement.reposted ? { color: '#4cd964' } : undefined]}>
-              {metrics.repostCount > 0 ? formatVideoCount(metrics.repostCount) : '0'}
-            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={onLikePress ? 0.7 : 1}
@@ -981,16 +1080,15 @@ const VideoFeedItem = memo(function VideoFeedItem({
               vCtrl.metricPill,
               engagement.liked ? { backgroundColor: 'rgba(255,90,122,0.25)' } : undefined,
             ]}>
-            <Icon
-              name="iconamoon:heart-fill"
-              size={15}
-              color={engagement.liked ? '#ff5a7a' : 'rgba(255,255,255,0.7)'}
+            <AnimatedPillMetric
+              iconName="iconamoon:heart-fill"
+              inactiveColor={neutralMetricColor}
+              activeColor="#ff5a7a"
+              isActive={engagement.liked}
+              pending={engagement.likePending}
+              pendingDirection={engagement.likePendingDirection}
+              text={metrics.likeCount > 0 ? formatVideoCount(metrics.likeCount) : '0'}
             />
-            <Text
-              size={12}
-              style={[vCtrl.metricText, engagement.liked ? { color: '#ff5a7a' } : undefined]}>
-              {metrics.likeCount > 0 ? formatVideoCount(metrics.likeCount) : '0'}
-            </Text>
           </TouchableOpacity>
         </HStack>
 
@@ -1369,8 +1467,8 @@ export function VideoFeedOverlay({
           <LegendList
             ref={listRef}
             data={displayItems}
-            keyExtractor={(_: VideoFeedSlot, index: number) => String(index)}
-            getItemType={(item: VideoFeedSlot) => (isLoadingSlot(item) ? 'loading' : 'video')}
+            keyExtractor={videoOverlayKeyExtractor}
+            getItemType={videoOverlayItemType}
             estimatedItemSize={screenHeight}
             drawDistance={screenHeight * 2}
             pagingEnabled
@@ -1864,43 +1962,43 @@ function UserFeedComponent({
   // produce a second entry (which would show a black screen since both
   // items point to the same underlying content / eventId).
   const videoPosts = useMemo((): VideoPost[] => {
-    const result: VideoPost[] = [];
-    const seenUrls = new Set<string>();
+    const sourceEvents: FeedEvent[] = [];
     for (const item of feedItems) {
       const event = item.type === 'note' ? item.event : item.originalEvent;
       if (!event) continue;
-      const videoUrls = getVideoUrlsFromContent(event.content);
-      if (videoUrls.length === 0) continue;
-      const url = videoUrls[0];
-      // Skip duplicate video URLs (e.g. original note + its repost)
-      if (seenUrls.has(url)) continue;
-      seenUrls.add(url);
-      result.push({
-        eventId: event.id,
-        videoUrl: url,
-        content: event.content,
-        pubkey: event.pubkey,
-        created_at: event.created_at,
-      });
+      sourceEvents.push(event);
     }
-    return result;
+    return buildDedupedVideoPosts(sourceEvents);
   }, [feedItems]);
+
+  const videoIndexByUrl = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < videoPosts.length; i++) {
+      map.set(videoPosts[i].videoUrl, i);
+    }
+    return map;
+  }, [videoPosts]);
 
   // Called when a user taps a video in the inline feed — opens the overlay
   const handleVideoTap = useCallback(
     (tappedUrl: string) => {
-      const index = videoPosts.findIndex((vp) => vp.videoUrl === tappedUrl);
-      if (index === -1) return;
+      const index = videoIndexByUrl.get(tappedUrl);
+      if (index == null) return;
       setOverlayStartIndex(index);
       setOverlayVisible(true);
     },
-    [videoPosts]
+    [videoIndexByUrl]
   );
 
   // ---------------------------
   // Render
   // ---------------------------
   const displayName = authorName || tryNpubEncode(pubkey).slice(0, 12) + '…';
+  const actionableEventsById = useMemo(() => {
+    const map = new Map<string, FeedEvent>();
+    for (const event of actionableEvents) map.set(event.id, event);
+    return map;
+  }, [actionableEvents]);
 
   const renderFeedItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
@@ -1921,6 +2019,8 @@ function UserFeedComponent({
             reposted={engagement.reposted}
             likePending={engagement.likePending}
             repostPending={engagement.repostPending}
+            likePendingDirection={engagement.likePendingDirection}
+            repostPendingDirection={engagement.repostPendingDirection}
             onLikePress={() => toggleLike(item.event)}
             onRepostPress={() => toggleRepost(item.event)}
             skipAnimation={!isFirstRender.current}
@@ -1945,6 +2045,8 @@ function UserFeedComponent({
           reposted={engagement.reposted}
           likePending={engagement.likePending}
           repostPending={engagement.repostPending}
+          likePendingDirection={engagement.likePendingDirection}
+          repostPendingDirection={engagement.repostPendingDirection}
           onLikePress={originalEvent ? () => toggleLike(originalEvent) : undefined}
           onRepostPress={originalEvent ? () => toggleRepost(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
@@ -1998,8 +2100,8 @@ function UserFeedComponent({
     ) : (
       <LegendList
         data={feedItems}
-        keyExtractor={(item) => (item.type === 'note' ? item.event.id : item.repostEvent.id)}
-        getItemType={(item) => item.type}
+        keyExtractor={feedKeyExtractor}
+        getItemType={feedItemType}
         estimatedItemSize={300}
         drawDistance={500}
         maintainVisibleContentPosition
@@ -2034,11 +2136,11 @@ function UserFeedComponent({
           getEngagementState={getEngagementState}
           engagementRevision={engagementRevision}
           onLikePress={(eventId) => {
-            const event = actionableEvents.find((e) => e.id === eventId);
+            const event = actionableEventsById.get(eventId);
             if (event) toggleLike(event);
           }}
           onRepostPress={(eventId) => {
-            const event = actionableEvents.find((e) => e.id === eventId);
+            const event = actionableEventsById.get(eventId);
             if (event) toggleRepost(event);
           }}
         />
@@ -2048,6 +2150,16 @@ function UserFeedComponent({
 }
 
 export const UserFeed = React.memo(UserFeedComponent);
+
+// ============================================================================
+// Stable list references
+// ============================================================================
+
+const videoOverlayKeyExtractor = (_: VideoFeedSlot, index: number) => String(index);
+const videoOverlayItemType = (item: VideoFeedSlot) => (isLoadingSlot(item) ? 'loading' : 'video');
+const feedKeyExtractor = (item: FeedItem) =>
+  item.type === 'note' ? item.event.id : item.repostEvent.id;
+const feedItemType = (item: FeedItem) => item.type;
 
 // ============================================================================
 // Styles (UserFeed-specific only — shared styles live in nostr/shared.tsx)

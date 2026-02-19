@@ -32,6 +32,7 @@ import {
   type FeedEvent,
   type NoteMetrics,
   type ProfileInfo,
+  buildDedupedVideoPosts,
   type RawPrimalEvent,
   DEFAULT_METRICS,
   PRIMAL_CACHE_RELAY_URL,
@@ -592,11 +593,7 @@ function HomeFeedComponent() {
   const currentSpec = feedSpecs[activeSpecIndex]?.spec;
   useEffect(() => {
     if (!currentSpec) return;
-    let cancelled = false;
-    if (!cancelled) loadFeed(currentSpec);
-    return () => {
-      cancelled = true;
-    };
+    loadFeed(currentSpec);
   }, [currentSpec, loadFeed]);
 
   const handleRefresh = useCallback(() => {
@@ -832,29 +829,22 @@ function HomeFeedComponent() {
     return Array.from(map.values());
   }, [feedItems]);
 
+  const actionableEventsById = useMemo(() => {
+    const map = new Map<string, FeedEvent>();
+    for (const event of actionableEvents) map.set(event.id, event);
+    return map;
+  }, [actionableEvents]);
+
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
     useNostrEngagement(actionableEvents, getMetrics);
 
   const videoPosts = useMemo((): VideoPost[] => {
-    const result: VideoPost[] = [];
-    const seenUrls = new Set<string>();
+    const sourceEvents: FeedEvent[] = [];
     for (const item of feedItems) {
       const event = item.type === 'note' ? item.event : item.originalEvent;
-      if (!event) continue;
-      const videoUrls = getVideoUrlsFromContent(event.content);
-      if (videoUrls.length === 0) continue;
-      const url = videoUrls[0];
-      if (seenUrls.has(url)) continue;
-      seenUrls.add(url);
-      result.push({
-        eventId: event.id,
-        videoUrl: url,
-        content: event.content,
-        pubkey: event.pubkey,
-        created_at: event.created_at,
-      });
+      if (event) sourceEvents.push(event);
     }
-    return result;
+    return buildDedupedVideoPosts(sourceEvents);
   }, [feedItems]);
 
   // Keep ref in sync — avoids renderFeedItem depending on videoPosts
@@ -890,6 +880,8 @@ function HomeFeedComponent() {
             reposted={engagement.reposted}
             likePending={engagement.likePending}
             repostPending={engagement.repostPending}
+            likePendingDirection={engagement.likePendingDirection}
+            repostPendingDirection={engagement.repostPendingDirection}
             onLikePress={() => toggleLike(item.event)}
             onRepostPress={() => toggleRepost(item.event)}
             skipAnimation={!isFirstRender.current}
@@ -902,6 +894,7 @@ function HomeFeedComponent() {
         reposterProfile?.name || tryNpubEncode(item.repostEvent.pubkey).slice(0, 12) + '…';
 
       const originalEvent = item.originalEvent;
+      const repostEngagement = getEngagementState(item.originalEventId);
       return (
         <RepostCard
           repostEvent={item.repostEvent}
@@ -914,10 +907,12 @@ function HomeFeedComponent() {
           reposterName={reposterName}
           reposterPubkey={item.repostEvent.pubkey}
           onVideoTap={handleVideoTap}
-          liked={getEngagementState(item.originalEventId).liked}
-          reposted={getEngagementState(item.originalEventId).reposted}
-          likePending={getEngagementState(item.originalEventId).likePending}
-          repostPending={getEngagementState(item.originalEventId).repostPending}
+          liked={repostEngagement.liked}
+          reposted={repostEngagement.reposted}
+          likePending={repostEngagement.likePending}
+          repostPending={repostEngagement.repostPending}
+          likePendingDirection={repostEngagement.likePendingDirection}
+          repostPendingDirection={repostEngagement.repostPendingDirection}
           onLikePress={originalEvent ? () => toggleLike(originalEvent) : undefined}
           onRepostPress={originalEvent ? () => toggleRepost(originalEvent) : undefined}
           skipAnimation={!isFirstRender.current}
@@ -1020,11 +1015,11 @@ function HomeFeedComponent() {
           getEngagementState={getEngagementState}
           engagementRevision={engagementRevision}
           onLikePress={(eventId) => {
-            const event = actionableEvents.find((e) => e.id === eventId);
+            const event = actionableEventsById.get(eventId);
             if (event) toggleLike(event);
           }}
           onRepostPress={(eventId) => {
-            const event = actionableEvents.find((e) => e.id === eventId);
+            const event = actionableEventsById.get(eventId);
             if (event) toggleRepost(event);
           }}
         />

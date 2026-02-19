@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventDeletion, Reaction, Repost } from 'nostr-tools/kinds';
 import { popup } from '@/helper/popup';
@@ -11,9 +11,14 @@ type EngagementState = {
   reposted: boolean;
   likePending: boolean;
   repostPending: boolean;
+  likePendingDirection?: 'activating' | 'deactivating';
+  repostPendingDirection?: 'activating' | 'deactivating';
 };
 
 export type EngagementViewState = EngagementState;
+
+const OPTIMISTIC_SETTLE_GRACE_MS = 15_000;
+const OPTIMISTIC_STALE_WARN_MS = 30_000;
 
 function normalizeTags(input: unknown): string[][] {
   if (!Array.isArray(input)) return [];
@@ -50,6 +55,7 @@ export function useNostrEngagement(
   const clearRepostOptimistic = useNostrSocialStore((state) => state.clearRepostOptimistic);
   const markRepostDeleted = useNostrSocialStore((state) => state.markRepostDeleted);
   const unmarkRepostDeleted = useNostrSocialStore((state) => state.unmarkRepostDeleted);
+  const lastStaleWarningRef = useRef(0);
 
   const eventsById = useMemo(() => {
     const map = new Map<string, FeedEvent>();
@@ -170,7 +176,9 @@ export function useNostrEngagement(
         const baseCount = getBaseMetrics(eventId).likeCount;
         const expectedCount = likeOpt.expectedCount;
         const countSettled = expectedCount === undefined || baseCount === expectedCount;
-        if (baseLiked === likeOpt.value && countSettled) {
+        const ageMs = Date.now() - (likeOpt.updatedAt || 0);
+        const isAgedOut = ageMs >= OPTIMISTIC_SETTLE_GRACE_MS;
+        if (baseLiked === likeOpt.value && (countSettled || isAgedOut)) {
           clearLikeOptimistic(eventId);
         }
       }
@@ -181,7 +189,9 @@ export function useNostrEngagement(
         const baseCount = getBaseMetrics(eventId).repostCount;
         const expectedCount = repostOpt.expectedCount;
         const countSettled = expectedCount === undefined || baseCount === expectedCount;
-        if (baseReposted === repostOpt.value && countSettled) {
+        const ageMs = Date.now() - (repostOpt.updatedAt || 0);
+        const isAgedOut = ageMs >= OPTIMISTIC_SETTLE_GRACE_MS;
+        if (baseReposted === repostOpt.value && (countSettled || isAgedOut)) {
           clearRepostOptimistic(eventId);
         }
       }
@@ -196,6 +206,29 @@ export function useNostrEngagement(
     optimisticRepostsByEventId,
     repostsByEventId,
   ]);
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    const now = Date.now();
+    if (now - lastStaleWarningRef.current < 10_000) return;
+
+    let staleLikes = 0;
+    let staleReposts = 0;
+    for (const eventId of eventIds) {
+      const likeOpt = optimisticLikesByEventId[eventId];
+      if (likeOpt && now - (likeOpt.updatedAt || 0) >= OPTIMISTIC_STALE_WARN_MS) staleLikes++;
+      const repostOpt = optimisticRepostsByEventId[eventId];
+      if (repostOpt && now - (repostOpt.updatedAt || 0) >= OPTIMISTIC_STALE_WARN_MS) staleReposts++;
+    }
+
+    if (staleLikes > 0 || staleReposts > 0) {
+      lastStaleWarningRef.current = now;
+      console.warn('useNostrEngagement: stale optimistic entries detected', {
+        staleLikes,
+        staleReposts,
+      });
+    }
+  }, [eventIds, optimisticLikesByEventId, optimisticRepostsByEventId]);
 
   const engagementRevision = useMemo(() => {
     let revision = 0;
@@ -231,6 +264,16 @@ export function useNostrEngagement(
         reposted: optRepost ? optRepost.value : baseReposted,
         likePending: !!optLike?.pending,
         repostPending: !!optRepost?.pending,
+        likePendingDirection: optLike?.pending
+          ? optLike.value
+            ? 'activating'
+            : 'deactivating'
+          : undefined,
+        repostPendingDirection: optRepost?.pending
+          ? optRepost.value
+            ? 'activating'
+            : 'deactivating'
+          : undefined,
       };
     },
     [likesByEventId, optimisticLikesByEventId, optimisticRepostsByEventId, repostsByEventId]
