@@ -49,13 +49,15 @@ export const MODAL_SCREENS: ModalConfig[] = [
       gestureDirection: 'vertical',
     },
   },
-  // User flow modal group - profile, user messages, share
+  // User flow group - profile, user messages, share, thread
   {
     name: '(user-flow)',
     options: {
-      presentation: 'modal',
+      // Open as a standard card so direct links to /(user-flow)/thread slide in horizontally.
+      presentation: 'card',
+      animation: 'slide_from_right',
       headerShown: false,
-      gestureDirection: 'vertical',
+      gestureDirection: 'horizontal',
     },
   },
   // Filter flow modal group - transaction filters
