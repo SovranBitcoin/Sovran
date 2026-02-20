@@ -872,9 +872,17 @@ const VideoFeedItem = memo(function VideoFeedItem({
   // Track playback progress via expo-video time update events.
   // Only emits while active to avoid background event churn.
   useEffect(() => {
-    player.timeUpdateEventInterval = isActive ? 0.1 : 0;
+    try {
+      player.timeUpdateEventInterval = isActive ? 0.1 : 0;
+    } catch {
+      // player may have been released
+    }
     return () => {
-      player.timeUpdateEventInterval = 0;
+      try {
+        player.timeUpdateEventInterval = 0;
+      } catch {
+        // player may have been released before cleanup
+      }
     };
   }, [isActive, player, progress]);
 

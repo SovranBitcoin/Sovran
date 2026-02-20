@@ -453,7 +453,11 @@ export function createPrimalRelayClient(url: string) {
   ws.onmessage = (msg) => {
     if (typeof msg.data !== 'string') return;
     const parsed = parseJson<RelayMessage>(msg.data);
-    if (!parsed || !Array.isArray(parsed)) return;
+    if (!parsed || !Array.isArray(parsed)) {
+      console.log('[PrimalWS] non-array message:', String(msg.data).slice(0, 200));
+      return;
+    }
+    console.log('[PrimalWS] msg type:', parsed[0], 'subId:', parsed[1], 'inflight?', inflight.has(parsed[1] as string));
 
     if (parsed[0] === 'EVENT') {
       const subId = parsed[1];
@@ -1105,6 +1109,18 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
 // NoteContent (superset — includes onVideoTap from UserFeed)
 // ============================================================================
 
+const CONTENT_TRUNCATE_LIMIT = 280;
+
+function segmentCharCount(seg: ContentSegment): number {
+  if (seg.kind === 'text') return seg.text.length;
+  if (seg.kind === 'newline') return 1;
+  if (seg.kind === 'url') return seg.url.length;
+  if (seg.kind === 'hashtag') return seg.tag.length + 1;
+  if (seg.kind === 'npub' || seg.kind === 'nprofile') return 12;
+  if (seg.kind === 'naddr') return 9;
+  return 0;
+}
+
 export const NoteContent = React.memo(function NoteContent({
   content,
   quotedEvents,
@@ -1123,6 +1139,7 @@ export const NoteContent = React.memo(function NoteContent({
   onQuotedPressOut?: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
+  const [expanded, setExpanded] = useState(false);
 
   const { inlineSegments, blockSegments } = useMemo(() => {
     const segments = parseContent(content);
@@ -1150,47 +1167,97 @@ export const NoteContent = React.memo(function NoteContent({
     return { inlineSegments: inline, blockSegments: blocks };
   }, [content]);
 
+  const { displaySegments, isTruncated, truncatedLastText } = useMemo(() => {
+    let total = 0;
+    for (const seg of inlineSegments) {
+      total += segmentCharCount(seg);
+    }
+    if (total <= CONTENT_TRUNCATE_LIMIT) {
+      return { displaySegments: inlineSegments, isTruncated: false, truncatedLastText: undefined };
+    }
+
+    // Build truncated list
+    let count = 0;
+    const truncated: ContentSegment[] = [];
+    let lastText: string | undefined;
+    for (const seg of inlineSegments) {
+      const len = segmentCharCount(seg);
+      if (count + len > CONTENT_TRUNCATE_LIMIT) {
+        if (seg.kind === 'text') {
+          const remaining = CONTENT_TRUNCATE_LIMIT - count;
+          lastText = seg.text.slice(0, remaining);
+        }
+        break;
+      }
+      truncated.push(seg);
+      count += len;
+    }
+    return { displaySegments: truncated, isTruncated: true, truncatedLastText: lastText };
+  }, [inlineSegments]);
+
   const hasInline = inlineSegments.length > 0;
   const hasBlocks = blockSegments.length > 0;
+
+  const activeSegments = expanded ? inlineSegments : displaySegments;
+
+  const textColor = { color: opacity(getPrimaryColor('0'), 0.9) };
+  const accentColor = { color: opacity(getPrimaryColor('0'), 0.5) };
+
+  const renderSegment = (seg: ContentSegment, i: number) => {
+    switch (seg.kind) {
+      case 'text':
+        return <React.Fragment key={i}>{seg.text}</React.Fragment>;
+      case 'newline':
+        return <React.Fragment key={i}>{'\n'}</React.Fragment>;
+      case 'npub':
+      case 'nprofile':
+        return (
+          <InlineMention
+            key={i}
+            pubkey={seg.pubkey}
+            bech32={seg.bech32}
+            profiles={profiles}
+          />
+        );
+      case 'hashtag':
+        return <InlineHashtag key={i} tag={seg.tag} />;
+      case 'url':
+        return <InlineLink key={i} url={seg.url} />;
+      case 'naddr':
+        return (
+          <Text key={i} bold size={15} style={accentColor}>
+            [article]
+          </Text>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <VStack gap={0}>
       {hasInline && (
-        <Text size={15} style={{ color: opacity(getPrimaryColor('0'), 0.9), lineHeight: 22 }}>
-          {inlineSegments.map((seg, i) => {
-            switch (seg.kind) {
-              case 'text':
-                return <React.Fragment key={i}>{seg.text}</React.Fragment>;
-              case 'newline':
-                return <React.Fragment key={i}>{'\n'}</React.Fragment>;
-              case 'npub':
-              case 'nprofile':
-                return (
-                  <InlineMention
-                    key={i}
-                    pubkey={seg.pubkey}
-                    bech32={seg.bech32}
-                    profiles={profiles}
-                  />
-                );
-              case 'hashtag':
-                return <InlineHashtag key={i} tag={seg.tag} />;
-              case 'url':
-                return <InlineLink key={i} url={seg.url} />;
-              case 'naddr':
-                return (
-                  <Text
-                    key={i}
-                    bold
-                    size={15}
-                    style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
-                    [article]
-                  </Text>
-                );
-              default:
-                return null;
-            }
-          })}
+        <Text size={15} style={[textColor, { lineHeight: 22 }]}>
+          {activeSegments.map((seg, i) => renderSegment(seg, i))}
+          {!expanded && isTruncated && truncatedLastText !== undefined && (
+            <React.Fragment key="truncated-tail">{truncatedLastText}</React.Fragment>
+          )}
+          {!expanded && isTruncated && (
+            <Text
+              size={15}
+              style={accentColor}
+              onPress={() => setExpanded(true)}>
+              {' show more'}
+            </Text>
+          )}
+          {expanded && isTruncated && (
+            <Text
+              size={15}
+              style={accentColor}
+              onPress={() => setExpanded(false)}>
+              {' show less'}
+            </Text>
+          )}
         </Text>
       )}
 

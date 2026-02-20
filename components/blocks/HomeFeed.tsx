@@ -15,18 +15,15 @@ import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
+import { nip19 } from 'nostr-tools';
 import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Reanimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  interpolate,
-  runOnJS,
-} from 'react-native-reanimated';
+import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 import {
   type FeedEvent,
@@ -49,10 +46,12 @@ import {
   tryNpubEncode,
   getVideoUrlsFromContent,
 } from './nostr/shared';
+import { CATEGORY_NPUBS } from './nostr/categoryNpubs';
 
 import { PostCard } from './nostr/PostCard';
 import { RepostCard, VideoFeedOverlay, type VideoPost } from './UserFeed';
 import { useNostrEngagement } from '@/hooks/useNostrEngagement';
+import PagerView from 'react-native-pager-view';
 
 // ============================================================================
 // Types
@@ -102,10 +101,44 @@ function getEmbeddedRepostEvent(
 function hydrateSpecWithPubkey(spec: string, pubkey: string): string {
   const parsed = parseJson<Record<string, unknown>>(spec);
   if (!parsed || typeof parsed !== 'object') return spec;
-  if (parsed.id === 'feed' && !parsed.pubkey) {
+  const hasExplicitPubkeys = Array.isArray(parsed.pubkeys);
+  if (parsed.id === 'feed' && !parsed.pubkey && !hasExplicitPubkeys) {
     return JSON.stringify({ ...parsed, pubkey });
   }
   return spec;
+}
+
+function npubToPubkeySafe(npub: string): string | null {
+  try {
+    const decoded = nip19.decode(npub);
+    return decoded.type === 'npub' ? decoded.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function categoryToLabel(category: string): string {
+  return category
+    .split('_')
+    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+    .join(' ');
+}
+
+function getCategoryPubkeysFromSpec(spec: string): string[] {
+  const parsed = parseJson<Record<string, unknown>>(spec);
+  if (!parsed) return [];
+  if (parsed.id !== 'feed' || parsed.kind !== 'notes' || parsed.notes !== 'authored') return [];
+  if (!Array.isArray(parsed.pubkeys)) return [];
+
+  const seen = new Set<string>();
+  const pubkeys: string[] = [];
+  for (const value of parsed.pubkeys) {
+    if (typeof value !== 'string' || value.length !== 64) continue;
+    if (seen.has(value)) continue;
+    seen.add(value);
+    pubkeys.push(value);
+  }
+  return pubkeys;
 }
 
 interface Phase1Result {
@@ -141,7 +174,19 @@ function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): Phase1Result {
     if (raw.kind === PRIMAL_KIND_FEED_RANGE) {
       const parsed = parseJson<Record<string, unknown>>(raw.content);
       if (Array.isArray(parsed?.elements)) {
-        feedOrder = parsed.elements.filter((id): id is string => typeof id === 'string');
+        feedOrder = parsed.elements
+          .map((el: unknown) => {
+            if (typeof el === 'string') return el;
+            if (
+              el &&
+              typeof el === 'object' &&
+              'id' in el &&
+              typeof (el as Record<string, unknown>).id === 'string'
+            )
+              return (el as Record<string, unknown>).id as string;
+            return null;
+          })
+          .filter((id): id is string => id !== null);
       }
       const rawUntil = parsed?.until;
       if (typeof rawUntil === 'number' && rawUntil > 0) {
@@ -274,73 +319,6 @@ function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): Phase1Result {
 }
 
 // ============================================================================
-// Feed Pill Selector
-// ============================================================================
-
-const FeedPill = React.memo(function FeedPill({
-  label,
-  isActive,
-  onPress,
-}: {
-  label: string;
-  isActive: boolean;
-  onPress: () => void;
-}) {
-  const { getPrimaryColor } = useTheme();
-  const pressed = useSharedValue(0);
-
-  const tap = useMemo(
-    () =>
-      Gesture.Tap()
-        .onBegin(() => {
-          'worklet';
-          pressed.set(withTiming(1, { duration: 100 }));
-        })
-        .onFinalize(() => {
-          'worklet';
-          pressed.set(withTiming(0, { duration: 180 }));
-        })
-        .onEnd(() => {
-          'worklet';
-          runOnJS(onPress)();
-        }),
-    [onPress, pressed]
-  );
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(pressed.get(), [0, 1], [1, 0.92]) }],
-    opacity: interpolate(pressed.get(), [0, 1], [1, 0.7]),
-  }));
-
-  return (
-    <GestureDetector gesture={tap}>
-      <Reanimated.View
-        style={[
-          styles.feedPill,
-          {
-            backgroundColor: isActive
-              ? opacity(getPrimaryColor('0'), 0.12)
-              : opacity(getPrimaryColor('0'), 0.04),
-            borderColor: isActive ? opacity(getPrimaryColor('0'), 0.25) : 'transparent',
-          },
-          animStyle,
-        ]}>
-        <Text
-          size={13}
-          heavy={isActive}
-          style={{
-            color: isActive
-              ? opacity(getPrimaryColor('0'), 0.8)
-              : opacity(getPrimaryColor('0'), 0.4),
-          }}>
-          {label}
-        </Text>
-      </Reanimated.View>
-    </GestureDetector>
-  );
-});
-
-// ============================================================================
 // Empty / Error States
 // ============================================================================
 
@@ -371,6 +349,9 @@ function HomeFeedComponent() {
   const { getPrimaryColor } = useTheme();
   const { keys: nostrKeys } = useNostrKeysContext();
   const userPubkey = nostrKeys?.pubkey;
+  const insets = useSafeAreaInsets();
+  const nativeHeaderHeight = useHeaderHeight();
+  const topContentInset = Math.max(nativeHeaderHeight, insets.top + 56);
 
   const [, startTransition] = useTransition();
   const [feedSpecs, setFeedSpecs] = useState<FeedSpec[]>([]);
@@ -401,49 +382,39 @@ function HomeFeedComponent() {
   // Video overlay state
   const [overlayVisible, setOverlayVisible] = useState(false);
   const [overlayStartIndex, setOverlayStartIndex] = useState(0);
+  const pagerRef = useRef<PagerView>(null);
+  const [tabMeasurements, setTabMeasurements] = useState<
+    Record<number, { x: number; width: number }>
+  >({});
+  const indicatorX = useSharedValue(0);
+  const indicatorWidth = useSharedValue(0);
 
   // Ref for handleVideoTap so renderFeedItem doesn't depend on videoPosts
   const videoPostsRef = useRef<VideoPost[]>([]);
 
+  const categoryFeedSpecs = useMemo<FeedSpec[]>(() => {
+    return Object.entries(CATEGORY_NPUBS).map(([category, npubs]) => {
+      const pubkeys = npubs
+        .map((npub) => npubToPubkeySafe(npub))
+        .filter((pubkey): pubkey is string => !!pubkey);
+
+      return {
+        name: categoryToLabel(category),
+        spec: JSON.stringify({
+          id: 'feed',
+          kind: 'notes',
+          notes: 'authored',
+          pubkeys,
+        }),
+      };
+    });
+  }, []);
+
   // ── Phase 0: Fetch available feed specs ──
 
   useEffect(() => {
-    let cancelled = false;
-
-    const fetchSpecs = async () => {
-      const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
-      try {
-        const rawEvents = await client.request('home_feeds', {
-          cache: ['get_home_feeds'],
-        });
-        if (cancelled) return;
-
-        for (const raw of rawEvents) {
-          const parsed = parseJson<FeedSpec[]>(raw.content);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const enabled = parsed.filter((s) => s.enabled !== false);
-            if (enabled.length > 0) {
-              setFeedSpecs(enabled);
-              return;
-            }
-          }
-        }
-
-        setFeedSpecs(FALLBACK_SPECS);
-      } catch (err) {
-        console.error('HomeFeed: Failed to fetch feed specs', err);
-        setFeedSpecs(FALLBACK_SPECS);
-      } finally {
-        client.close();
-      }
-    };
-
-    fetchSpecs();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    setFeedSpecs([...PRIMAL_FEED_SPECS, ...categoryFeedSpecs]);
+  }, [categoryFeedSpecs]);
 
   // ── Phase 1–3: Load feed content for selected spec ──
 
@@ -463,18 +434,58 @@ function HomeFeedComponent() {
       try {
         // Hydrate spec with user pubkey for personalized feeds
         const hydratedSpec = userPubkey ? hydrateSpecWithPubkey(spec, userPubkey) : spec;
+        const parsedHydrated = parseJson<Record<string, unknown>>(hydratedSpec);
+        if (
+          parsedHydrated &&
+          Array.isArray(parsedHydrated.pubkeys) &&
+          parsedHydrated.pubkeys.length === 0
+        ) {
+          setFeedItems([]);
+          setMetricsMap(new Map());
+          setQuotedEventsMap(new Map());
+          setProfilesMap(new Map());
+          setDataVersion((v) => v + 1);
+          setIsLoading(false);
+          setIsRefreshing(false);
+          hasMoreRef.current = false;
+          return;
+        }
 
-        const megaFeedPayload: Record<string, unknown> = {
-          spec: hydratedSpec,
-          limit: 30,
-        };
-        if (userPubkey) megaFeedPayload.user_pubkey = userPubkey;
+        const categoryPubkeys = getCategoryPubkeysFromSpec(hydratedSpec);
+        const feedRawEvents =
+          categoryPubkeys.length > 0
+            ? (
+                await Promise.all(
+                  categoryPubkeys.map((pubkey, index) =>
+                    client.request(`${requestPrefix}_author_${index}`, {
+                      cache: ['feed', { pubkey, notes: 'authored', limit: 6 }],
+                    })
+                  )
+                )
+              )
+                .flat()
+                .filter((event) => event.kind !== PRIMAL_KIND_FEED_RANGE)
+            : await (async () => {
+                const megaFeedPayload: Record<string, unknown> = {
+                  spec: hydratedSpec,
+                  limit: 30,
+                };
+                if (userPubkey) megaFeedPayload.user_pubkey = userPubkey;
+                return client.request(`${requestPrefix}_mega`, {
+                  cache: ['mega_feed_directive', megaFeedPayload],
+                });
+              })();
 
-        const feedRawEvents = await client.request(`${requestPrefix}_mega`, {
-          cache: ['mega_feed_directive', megaFeedPayload],
-        });
+        console.log('[HomeFeed DEBUG] feedRawEvents count:', feedRawEvents.length);
+        console.log('[HomeFeed DEBUG] feedRawEvents kinds:', feedRawEvents.map((e) => e.kind));
+        if (feedRawEvents.length > 0) {
+          console.log('[HomeFeed DEBUG] sample event:', JSON.stringify(feedRawEvents[0]).slice(0, 300));
+        }
 
         const phase1 = parseMegaFeedResponse(feedRawEvents);
+
+        console.log('[HomeFeed DEBUG] phase1 notes:', phase1.orderedFeedItems.length);
+        console.log('[HomeFeed DEBUG] paginationUntil:', phase1.paginationUntil);
 
         paginationUntilRef.current = phase1.paginationUntil;
         hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
@@ -591,10 +602,22 @@ function HomeFeedComponent() {
 
   // Trigger feed load when spec changes
   const currentSpec = feedSpecs[activeSpecIndex]?.spec;
+  const prevSpecRef = useRef<string | undefined>(undefined);
+  const prevPubkeyRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!currentSpec) return;
+    // Only reload when the spec or pubkey actually changed, not when loadFeed ref changes
+    if (currentSpec === prevSpecRef.current && userPubkey === prevPubkeyRef.current) return;
+    prevSpecRef.current = currentSpec;
+    prevPubkeyRef.current = userPubkey;
     loadFeed(currentSpec);
-  }, [currentSpec, loadFeed]);
+  }, [currentSpec, userPubkey, loadFeed]);
+
+  useEffect(() => {
+    if (feedSpecs.length === 0) return;
+    if (activeSpecIndex < feedSpecs.length) return;
+    setActiveSpecIndex(0);
+  }, [activeSpecIndex, feedSpecs.length]);
 
   const handleRefresh = useCallback(() => {
     if (!currentSpec) return;
@@ -605,11 +628,37 @@ function HomeFeedComponent() {
   const handleSpecChange = useCallback(
     (index: number) => {
       if (index === activeSpecIndex) return;
+      pagerRef.current?.setPage(index);
       setActiveSpecIndex(index);
       setFeedItems([]);
     },
     [activeSpecIndex]
   );
+
+  const handlePageSelected = useCallback(
+    (event: { nativeEvent: { position: number } }) => {
+      const nextIndex = event.nativeEvent.position;
+      if (nextIndex === activeSpecIndex) return;
+      setActiveSpecIndex(nextIndex);
+      setFeedItems([]);
+    },
+    [activeSpecIndex]
+  );
+
+  const handleTabLayout = useCallback((index: number, x: number, width: number) => {
+    setTabMeasurements((prev) => {
+      const existing = prev[index];
+      if (existing?.x === x && existing?.width === width) return prev;
+      return { ...prev, [index]: { x, width } };
+    });
+  }, []);
+
+  useEffect(() => {
+    const measurement = tabMeasurements[activeSpecIndex];
+    if (!measurement) return;
+    indicatorX.set(withTiming(measurement.x, { duration: 220 }));
+    indicatorWidth.set(withTiming(measurement.width, { duration: 220 }));
+  }, [activeSpecIndex, indicatorWidth, indicatorX, tabMeasurements]);
 
   // ── Pagination: load older items ──
 
@@ -631,17 +680,40 @@ function HomeFeedComponent() {
       const hydratedSpec = userPubkey
         ? hydrateSpecWithPubkey(currentSpec, userPubkey)
         : currentSpec;
-      const payload: Record<string, unknown> = {
-        spec: hydratedSpec,
-        limit: 20,
-        until: paginationUntilRef.current,
-      };
-      if (paginationOffsetRef.current > 0) payload.offset = paginationOffsetRef.current;
-      if (userPubkey) payload.user_pubkey = userPubkey;
-
-      const rawEvents = await client.request(`${rp}_more`, {
-        cache: ['mega_feed_directive', payload],
-      });
+      const categoryPubkeys = getCategoryPubkeysFromSpec(hydratedSpec);
+      const rawEvents =
+        categoryPubkeys.length > 0
+          ? (
+              await Promise.all(
+                categoryPubkeys.map((pubkey, index) =>
+                  client.request(`${rp}_author_more_${index}`, {
+                    cache: [
+                      'feed',
+                      {
+                        pubkey,
+                        notes: 'authored',
+                        limit: 5,
+                        until: paginationUntilRef.current,
+                      },
+                    ],
+                  })
+                )
+              )
+            )
+              .flat()
+              .filter((event) => event.kind !== PRIMAL_KIND_FEED_RANGE)
+          : await (async () => {
+              const payload: Record<string, unknown> = {
+                spec: hydratedSpec,
+                limit: 20,
+                until: paginationUntilRef.current,
+              };
+              if (paginationOffsetRef.current > 0) payload.offset = paginationOffsetRef.current;
+              if (userPubkey) payload.user_pubkey = userPubkey;
+              return client.request(`${rp}_more`, {
+                cache: ['mega_feed_directive', payload],
+              });
+            })();
       const page = parseMegaFeedResponse(rawEvents);
 
       if (page.orderedFeedItems.length === 0) {
@@ -649,7 +721,18 @@ function HomeFeedComponent() {
         return [];
       }
 
-      if (page.paginationUntil > 0 && page.paginationUntil < paginationUntilRef.current) {
+      if (categoryPubkeys.length > 0) {
+        const oldest = page.orderedFeedItems.reduce(
+          (acc, item) => (item.timestamp < acc ? item.timestamp : acc),
+          paginationUntilRef.current
+        );
+        if (oldest >= paginationUntilRef.current) {
+          hasMoreRef.current = false;
+          return [];
+        }
+        paginationUntilRef.current = oldest;
+        paginationOffsetRef.current = 0;
+      } else if (page.paginationUntil > 0 && page.paginationUntil < paginationUntilRef.current) {
         paginationUntilRef.current = page.paginationUntil;
         paginationOffsetRef.current = page.paginationOffset;
       } else if (page.paginationUntil === paginationUntilRef.current) {
@@ -935,33 +1018,55 @@ function HomeFeedComponent() {
     [isRefreshing, handleRefresh, refreshTintColor]
   );
 
-  const feedHeader = useMemo(
-    () => (
-      <View>
-        {feedSpecs.length > 1 && (
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: indicatorX.get() }],
+    width: indicatorWidth.get(),
+  }));
+
+  const tabsBar = useMemo(
+    () =>
+      feedSpecs.length > 1 ? (
+        <View style={styles.feedTabsContainer}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.feedPillsContainer}>
-            {feedSpecs.map((spec, idx) => (
-              <FeedPill
-                key={spec.name}
-                label={spec.name}
-                isActive={idx === activeSpecIndex}
-                onPress={() => handleSpecChange(idx)}
-              />
-            ))}
+            contentContainerStyle={styles.feedTabsRow}>
+            {feedSpecs.map((spec, idx) => {
+              const isActive = idx === activeSpecIndex;
+              return (
+                <TouchableOpacity
+                  key={spec.name}
+                  style={styles.feedTab}
+                  onPress={() => handleSpecChange(idx)}
+                  onLayout={(event) => {
+                    const { x, width } = event.nativeEvent.layout;
+                    handleTabLayout(idx, x, width);
+                  }}>
+                  <Text
+                    size={14}
+                    heavy
+                    style={{
+                      color: isActive
+                        ? opacity(getPrimaryColor('0'), 0.95)
+                        : opacity(getPrimaryColor('0'), 0.45),
+                    }}>
+                    {spec.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+            <Reanimated.View
+              pointerEvents="none"
+              style={[
+                styles.feedTabIndicator,
+                { backgroundColor: getPrimaryColor('0') },
+                indicatorStyle,
+              ]}
+            />
           </ScrollView>
-        )}
-
-        {isLoading ? (
-          <ActivityIndicator style={styles.loader} />
-        ) : feedItems.length === 0 ? (
-          <EmptyFeed />
-        ) : null}
-      </View>
-    ),
-    [feedSpecs, activeSpecIndex, isLoading, feedItems.length, handleSpecChange]
+        </View>
+      ) : null,
+    [activeSpecIndex, feedSpecs, getPrimaryColor, handleSpecChange, handleTabLayout, indicatorStyle]
   );
 
   const feedList =
@@ -970,7 +1075,8 @@ function HomeFeedComponent() {
         data={EMPTY_FEED}
         estimatedItemSize={200}
         renderItem={NOOP_RENDER}
-        ListHeaderComponent={feedHeader}
+        ListHeaderComponent={null}
+        ListEmptyComponent={isLoading ? <ActivityIndicator style={styles.loader} /> : <EmptyFeed />}
         style={styles.flex1}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -986,7 +1092,7 @@ function HomeFeedComponent() {
         renderItem={renderFeedItem}
         extraData={`${dataVersion}:${engagementRevision}`}
         recycleItems
-        ListHeaderComponent={feedHeader}
+        ListHeaderComponent={null}
         ListFooterComponent={
           isLoadingMore ? <ActivityIndicator style={styles.loadMoreSpinner} /> : null
         }
@@ -1002,7 +1108,24 @@ function HomeFeedComponent() {
 
   return (
     <>
-      {feedList}
+      <View style={[styles.flex1, { paddingTop: topContentInset }]}>
+        {tabsBar}
+        {feedSpecs.length > 0 ? (
+          <PagerView
+            ref={pagerRef}
+            style={styles.flex1}
+            initialPage={0}
+            onPageSelected={handlePageSelected}>
+            {feedSpecs.map((spec, idx) => (
+              <View key={`${spec.name}-${idx}`} style={styles.flex1}>
+                {idx === activeSpecIndex ? feedList : null}
+              </View>
+            ))}
+          </PagerView>
+        ) : (
+          feedList
+        )}
+      </View>
       {overlayVisible && (
         <VideoFeedOverlay
           videoPosts={videoPosts}
@@ -1040,14 +1163,18 @@ const keyExtractor = (item: FeedItem) =>
   item.type === 'note' ? item.event.id : item.repostEvent.id;
 const getItemType = (item: FeedItem) => item.type;
 
-const FALLBACK_SPECS: FeedSpec[] = [
+const PRIMAL_FEED_SPECS: FeedSpec[] = [
   {
     name: 'Trending',
-    spec: JSON.stringify({ id: 'explore-global-trending-24h', kind: 'notes' }),
+    spec: JSON.stringify({ id: 'global-trending', kind: 'notes', hours: 24 }),
   },
   {
-    name: 'Most Zapped',
-    spec: JSON.stringify({ id: 'explore-global-mostzapped-4h', kind: 'notes' }),
+    name: 'Latest',
+    spec: JSON.stringify({ id: 'feed', kind: 'notes', notes: 'follows' }),
+  },
+  {
+    name: 'Latest with Replies',
+    spec: JSON.stringify({ id: 'feed', kind: 'notes', notes: 'follows_replies' }),
   },
 ];
 
@@ -1056,17 +1183,28 @@ const FALLBACK_SPECS: FeedSpec[] = [
 // ============================================================================
 
 const styles = StyleSheet.create({
-  feedPillsContainer: {
-    paddingHorizontal: 16,
+  feedTabsContainer: {
     paddingTop: 8,
-    paddingBottom: 12,
-    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
-  feedPill: {
+  feedTabsRow: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
+    minHeight: 38,
+    alignItems: 'flex-end',
+  },
+  feedTab: {
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    paddingTop: 6,
+    marginRight: 10,
+  },
+  feedTabIndicator: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    height: 3,
+    borderRadius: 999,
   },
   emptyState: {
     paddingVertical: 32,
