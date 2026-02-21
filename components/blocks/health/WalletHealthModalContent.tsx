@@ -10,7 +10,7 @@ import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
 import { TOTAL_BASIS_POINTS, useMintDistributionStore } from 'stores/mintDistributionStore';
-import { RowButton, Section } from 'app/settings-pages';
+import { RowButton, ROW_ICON_SIZE, Section } from 'app/settings-pages';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -301,7 +301,8 @@ export function WalletHealthModalContent({
   const actionRows = useMemo(() => {
     const rows: {
       key: string;
-      label: React.ReactElement;
+      leftIcon?: React.ReactNode;
+      label: string;
       value?: string;
       onPress?: () => void;
     }[] = [];
@@ -311,14 +312,10 @@ export function WalletHealthModalContent({
       const driftValue = needsRebalance ? `~${formatPctFromBp(maxDriftBp)}` : 'OK';
       rows.push({
         key: 'rebalance',
-        label: (
-          <HStack align="center" gap={10}>
-            <Icon name="mdi:swap-horizontal" size={18} color={primary400} />
-            <Text style={{ color: primary50 }} bold>
-              Rebalance now
-            </Text>
-          </HStack>
+        leftIcon: (
+          <Icon name="mdi:swap-horizontal" size={ROW_ICON_SIZE} color={primary400} />
         ),
+        label: 'Rebalance now',
         value: driftValue,
         onPress: handleRebalancePress,
       });
@@ -326,14 +323,10 @@ export function WalletHealthModalContent({
 
     rows.push({
       key: 'split',
-      label: (
-        <HStack align="center" gap={10}>
-          <Icon name="fluent:split-vertical-24-filled" size={18} color={primary400} />
-          <Text style={{ color: primary50 }} bold>
-            {hasDesired ? 'Edit balance split' : 'Set balance split'}
-          </Text>
-        </HStack>
+      leftIcon: (
+        <Icon name="fluent:split-vertical-24-filled" size={ROW_ICON_SIZE} color={primary400} />
       ),
+      label: hasDesired ? 'Edit balance split' : 'Set balance split',
       value: !hasDesired ? 'Not set' : undefined,
       onPress: handleSplitPress,
     });
@@ -474,6 +467,7 @@ export function WalletHealthModalContent({
               key={r.key}
               isFirst={i === 0}
               isLast={i === actionRows.length - 1}
+              leftIcon={r.leftIcon}
               label={r.label}
               value={r.value}
               onPress={r.onPress}

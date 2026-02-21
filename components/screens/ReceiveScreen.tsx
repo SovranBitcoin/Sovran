@@ -15,7 +15,7 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { View } from 'components/ui/View/View';
-import { RowButton, Section } from 'app/settings-pages';
+import { RowButton, ROW_ICON_SIZE, Section } from 'app/settings-pages';
 import Icon from 'assets/icons';
 import { getDecodedToken, type ReceiveHistoryEntry, type Keypair } from 'coco-cashu-core';
 import { Text } from 'components/ui/Text';
@@ -242,22 +242,22 @@ export function ReceiveScreen({
         <View style={{ marginHorizontal: 16 }}>
           <Section title="RECEIVE ADDRESS">
             <RowButton
-              label={
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Icon
-                    name="mingcute:lightning-fill"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                  <Text style={{ marginLeft: 8 }} color={opacity(getPrimaryColor('0'), 0.9)} bold>
-                    {truncateMiddle(nostrKeys?.npub || '', 7)}@npubx.cash
-                  </Text>
-                </View>
+              leftIcon={
+                <Icon
+                  name="mingcute:lightning-fill"
+                  size={ROW_ICON_SIZE}
+                  color={opacity(getPrimaryColor('0'), 0.4)}
+                />
               }
+              label={`${truncateMiddle(nostrKeys?.npub || '', 7)}@npubx.cash`}
               isFirst
               onPress={handleCopyLightningAddress}
               rightIcon={
-                <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+                <Icon
+                  name="lets-icons:copy"
+                  size={ROW_ICON_SIZE}
+                  color={opacity(getPrimaryColor('0'), 0.4)}
+                />
               }
             />
           </Section>
@@ -286,24 +286,20 @@ export function ReceiveScreen({
           <View style={{ marginHorizontal: 16 }}>
             <Section title="P2PK PUBLIC KEY">
               <RowButton
-                label={
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Icon
-                      name="solar:key-bold"
-                      size={20}
-                      color={opacity(getPrimaryColor('0'), 0.4)}
-                    />
-                    <Text style={{ marginLeft: 8 }} color={opacity(getPrimaryColor('0'), 0.9)} bold>
-                      {truncateMiddle(latestKeypair.publicKeyHex, 10)}
-                    </Text>
-                  </View>
+                leftIcon={
+                  <Icon
+                    name="solar:key-bold"
+                    size={ROW_ICON_SIZE}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
                 }
+                label={truncateMiddle(latestKeypair.publicKeyHex, 10)}
                 isFirst
                 onPress={handleCopyP2PKKey}
                 rightIcon={
                   <Icon
                     name="lets-icons:copy"
-                    size={20}
+                    size={ROW_ICON_SIZE}
                     color={opacity(getPrimaryColor('0'), 0.4)}
                   />
                 }

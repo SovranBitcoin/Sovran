@@ -71,7 +71,7 @@ const Profile = () => {
           {label}
         </Text>
         <HStack align="center" justify="space-between">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexShrink: 1 }}>
             {isLoading ? (
               <Skeleton
                 style={{

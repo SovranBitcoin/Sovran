@@ -32,7 +32,7 @@ import { npubToPubkey } from 'components/blocks/Transaction';
 import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { useKYMMint } from 'hooks/coco/useKYMMint';
 import { Card } from 'components/ui/Card';
-import { RowButton, Section } from 'app/settings-pages';
+import { RowButton, ROW_ICON_SIZE, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from 'components/ui/Avatar';
 import { Badge } from 'components/ui/Badge';
@@ -798,41 +798,27 @@ function MintInfoModal() {
               <RowButton
                 isFirst={index === 0}
                 key={index}
-                label={
+                leftIcon={
                   contact.method.toUpperCase() === 'NOSTR' ? (
-                    <HStack align="center" gap={8}>
-                      <CurrencyIcon
-                        colors={[opacity(getPrimaryColor('0'), 0.4)]}
-                        width={20}
-                        currency="nostr"
-                      />
-                      <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                        {truncateMiddle(contact.info, 10)}
-                      </Text>
-                    </HStack>
+                    <CurrencyIcon
+                      colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                      width={ROW_ICON_SIZE}
+                      currency="nostr"
+                    />
                   ) : ['X', 'TWITTER'].includes(contact.method.toUpperCase()) ? (
-                    <HStack align="center" gap={8}>
-                      <Icon
-                        name="hugeicons:new-twitter"
-                        size={20}
-                        color={opacity(getPrimaryColor('0'), 0.4)}
-                      />
-                      <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                        {contact.info}
-                      </Text>
-                    </HStack>
+                    <Icon
+                      name="hugeicons:new-twitter"
+                      size={ROW_ICON_SIZE}
+                      color={opacity(getPrimaryColor('0'), 0.4)}
+                    />
                   ) : contact.method.toUpperCase() === 'EMAIL' ? (
-                    <HStack align="center" gap={8}>
-                      <Icon name="mdi:at" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
-                      <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                        {contact.info}
-                      </Text>
-                    </HStack>
-                  ) : (
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      {contact.info}
-                    </Text>
-                  )
+                    <Icon name="mdi:at" size={ROW_ICON_SIZE} color={opacity(getPrimaryColor('0'), 0.4)} />
+                  ) : undefined
+                }
+                label={
+                  contact.method.toUpperCase() === 'NOSTR'
+                    ? truncateMiddle(contact.info, 10)
+                    : contact.info
                 }
                 onPress={() => handleContactPress(contact.method, contact.info)}
               />
@@ -847,18 +833,14 @@ function MintInfoModal() {
             <RowButton
               isFirst
               isLast
-              label={
-                <HStack align="center" gap={8}>
-                  <Icon
-                    name="fluent:split-vertical-24-filled"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                  <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                    Balance split
-                  </Text>
-                </HStack>
+              leftIcon={
+                <Icon
+                  name="fluent:split-vertical-24-filled"
+                  size={ROW_ICON_SIZE}
+                  color={opacity(getPrimaryColor('0'), 0.4)}
+                />
               }
+              label="Balance split"
               // Route into the balance split editor (mint-flow modal).
               onPress={() => router.navigate('/distribution')}
             />

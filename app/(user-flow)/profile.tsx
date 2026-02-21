@@ -27,7 +27,7 @@ import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { npubToPubkey } from 'components/blocks/Transaction';
 import { Card } from 'components/ui/Card';
-import { RowButton, Section } from 'app/settings-pages';
+import { RowButton, ROW_ICON_SIZE, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from 'components/ui/Avatar';
 import { truncateMiddle } from 'helper/strings';
@@ -961,18 +961,14 @@ function UserProfileScreen() {
                 <Section title="Actions">
                   <RowButton
                     isFirst
-                    label={
-                      <HStack align="center" gap={8}>
-                        <Icon
-                          name="mdi:message-text"
-                          size={20}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
-                        />
-                        <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                          Message User
-                        </Text>
-                      </HStack>
+                    leftIcon={
+                      <Icon
+                        name="mdi:message-text"
+                        size={ROW_ICON_SIZE}
+                        color={opacity(getPrimaryColor('0'), 0.4)}
+                      />
                     }
+                    label="Message User"
                     onPress={() => {
                       router.push({
                         pathname: '/(user-flow)/userMessages' as any,
@@ -994,22 +990,18 @@ function UserProfileScreen() {
                     rightIcon={
                       <Icon
                         name="lets-icons:copy"
-                        size={20}
+                        size={ROW_ICON_SIZE}
                         color={opacity(getPrimaryColor('0'), 0.4)}
                       />
                     }
-                    label={
-                      <HStack align="center" gap={8}>
-                        <CurrencyIcon
-                          colors={[opacity(getPrimaryColor('0'), 0.4)]}
-                          width={20}
-                          currency="nostr"
-                        />
-                        <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                          {truncateMiddle(npub, 10)}
-                        </Text>
-                      </HStack>
+                    leftIcon={
+                      <CurrencyIcon
+                        colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                        width={ROW_ICON_SIZE}
+                        currency="nostr"
+                      />
                     }
+                    label={truncateMiddle(npub, 10)}
                   />
                   {userInfo?.nip05 && (
                     <RowButton
@@ -1017,22 +1009,18 @@ function UserProfileScreen() {
                       rightIcon={
                         <Icon
                           name="lets-icons:copy"
-                          size={20}
+                          size={ROW_ICON_SIZE}
                           color={opacity(getPrimaryColor('0'), 0.4)}
                         />
                       }
-                      label={
-                        <HStack align="center" gap={8}>
-                          <Icon
-                            name="mdi:check-decagram"
-                            size={20}
-                            color={opacity(getPrimaryColor('0'), 0.4)}
-                          />
-                          <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                            {userInfo.nip05}
-                          </Text>
-                        </HStack>
+                      leftIcon={
+                        <Icon
+                          name="mdi:check-decagram"
+                          size={ROW_ICON_SIZE}
+                          color={opacity(getPrimaryColor('0'), 0.4)}
+                        />
                       }
+                      label={userInfo.nip05}
                     />
                   )}
                   {userInfo?.lud16 && (
@@ -1041,22 +1029,18 @@ function UserProfileScreen() {
                       rightIcon={
                         <Icon
                           name="lets-icons:copy"
-                          size={20}
+                          size={ROW_ICON_SIZE}
                           color={opacity(getPrimaryColor('0'), 0.4)}
                         />
                       }
-                      label={
-                        <HStack align="center" gap={8}>
-                          <Icon
-                            name="mdi:lightning-bolt"
-                            size={20}
-                            color={opacity(getPrimaryColor('0'), 0.4)}
-                          />
-                          <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                            {userInfo.lud16}
-                          </Text>
-                        </HStack>
+                      leftIcon={
+                        <Icon
+                          name="mdi:lightning-bolt"
+                          size={ROW_ICON_SIZE}
+                          color={opacity(getPrimaryColor('0'), 0.4)}
+                        />
                       }
+                      label={userInfo.lud16}
                     />
                   )}
                   {userInfo?.website && (
@@ -1066,22 +1050,18 @@ function UserProfileScreen() {
                       rightIcon={
                         <Icon
                           name="mdi:open-in-new"
-                          size={20}
+                          size={ROW_ICON_SIZE}
                           color={opacity(getPrimaryColor('0'), 0.4)}
                         />
                       }
-                      label={
-                        <HStack align="center" gap={8}>
-                          <Icon
-                            name="mdi:web"
-                            size={20}
-                            color={opacity(getPrimaryColor('0'), 0.4)}
-                          />
-                          <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                            {userInfo.website}
-                          </Text>
-                        </HStack>
+                      leftIcon={
+                        <Icon
+                          name="mdi:web"
+                          size={ROW_ICON_SIZE}
+                          color={opacity(getPrimaryColor('0'), 0.4)}
+                        />
                       }
+                      label={userInfo.website}
                     />
                   )}
                 </Section>

@@ -7,7 +7,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
-import { RowButton, Section } from 'app/settings-pages';
+import { RowButton, ROW_ICON_SIZE, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Text } from 'components/ui/Text';
 import { HStack } from 'components/ui/View/HStack';
@@ -154,24 +154,20 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
           isFirst
           onPress={handleCopy}
           rightIcon={
-            <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+            <Icon name="lets-icons:copy" size={ROW_ICON_SIZE} color={opacity(getPrimaryColor('0'), 0.4)} />
           }
-          label={
-            <HStack align="center" gap={8}>
-              {config.iconCurrency ? (
-                <CurrencyIcon
-                  colors={[opacity(getPrimaryColor('0'), 0.4)]}
-                  width={20}
-                  currency={config.iconCurrency}
-                />
-              ) : config.iconName ? (
-                <Icon name={config.iconName} size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
-              ) : null}
-              <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                {truncateMiddle(activeData, 10)}
-              </Text>
-            </HStack>
+          leftIcon={
+            config.iconCurrency ? (
+              <CurrencyIcon
+                colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                width={ROW_ICON_SIZE}
+                currency={config.iconCurrency}
+              />
+            ) : config.iconName ? (
+              <Icon name={config.iconName} size={ROW_ICON_SIZE} color={opacity(getPrimaryColor('0'), 0.4)} />
+            ) : undefined
           }
+          label={truncateMiddle(activeData, 10)}
         />
       </Section>
     </ModalLayoutWrapper>

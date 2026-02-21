@@ -11,7 +11,7 @@ import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
-import { RowButton, Section } from 'app/settings-pages';
+import { RowButton, ROW_ICON_SIZE, Section } from 'app/settings-pages';
 import * as Linking from 'expo-linking';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
@@ -261,18 +261,12 @@ export default function MerchantDetailScreen() {
               <RowButton
                 isFirst
                 isLast={!supportsLightning && !supportsContactless}
-                label={
-                  <HStack align="center" gap={8}>
-                    <Icon name="mdi:bitcoin" size={20} color="#F7931A" />
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      On-chain
-                    </Text>
-                  </HStack>
-                }
+                leftIcon={<Icon name="mdi:bitcoin" size={ROW_ICON_SIZE} color="#F7931A" />}
+                label="On-chain"
                 rightIcon={
                   <Icon
                     name="mdi:check-circle"
-                    size={20}
+                    size={ROW_ICON_SIZE}
                     color={opacity(getPrimaryColor('0'), 0.4)}
                   />
                 }
@@ -282,18 +276,12 @@ export default function MerchantDetailScreen() {
               <RowButton
                 isFirst={!supportsOnchain}
                 isLast={!supportsContactless}
-                label={
-                  <HStack align="center" gap={8}>
-                    <Icon name="mingcute:lightning-fill" size={20} color="#F7931A" />
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      Lightning
-                    </Text>
-                  </HStack>
-                }
+                leftIcon={<Icon name="mingcute:lightning-fill" size={ROW_ICON_SIZE} color="#F7931A" />}
+                label="Lightning"
                 rightIcon={
                   <Icon
                     name="mdi:check-circle"
-                    size={20}
+                    size={ROW_ICON_SIZE}
                     color={opacity(getPrimaryColor('0'), 0.4)}
                   />
                 }
@@ -303,18 +291,12 @@ export default function MerchantDetailScreen() {
               <RowButton
                 isFirst={!supportsOnchain && !supportsLightning}
                 isLast
-                label={
-                  <HStack align="center" gap={8}>
-                    <Icon name="ph:contactless-payment-fill" size={20} color="#F7931A" />
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      Contactless
-                    </Text>
-                  </HStack>
-                }
+                leftIcon={<Icon name="ph:contactless-payment-fill" size={ROW_ICON_SIZE} color="#F7931A" />}
+                label="Contactless"
                 rightIcon={
                   <Icon
                     name="mdi:check-circle"
-                    size={20}
+                    size={ROW_ICON_SIZE}
                     color={opacity(getPrimaryColor('0'), 0.4)}
                   />
                 }
@@ -331,18 +313,14 @@ export default function MerchantDetailScreen() {
                 key={contact.method}
                 isFirst={index === 0}
                 isLast={index === contactItems.length - 1}
-                label={
-                  <HStack align="center" gap={8}>
-                    <Icon
-                      name={contact.icon}
-                      size={20}
-                      color={opacity(getPrimaryColor('0'), 0.4)}
-                    />
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      {contact.info}
-                    </Text>
-                  </HStack>
+                leftIcon={
+                  <Icon
+                    name={contact.icon}
+                    size={ROW_ICON_SIZE}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
                 }
+                label={contact.info}
                 onPress={() => handleContactPress(contact.method, contact.info, contact.fullInfo)}
               />
             ))}

@@ -3,7 +3,7 @@ import { useSettingsStore } from 'stores/settingsStore';
 import { Card } from 'components/ui/Card';
 import Container from 'components/blocks/Container';
 import { Section as TableSection } from 'components/ui/Section';
-import { RowButton, Section } from './index';
+import { RowButton, ROW_ICON_SIZE, Section } from './index';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -171,21 +171,21 @@ export default function ModalScreen() {
           <RowButton label="Label" isDanger value={'Optional Value'} onPress={() => {}} />
           {/* Example with a custom right icon and label */}
           <RowButton
-            label={
-              <HStack align="center" spacing={8}>
-                <Icon
-                  name="mingcute:lightning-fill"
-                  size={20}
-                  color={opacity(getPrimaryColor('0'), 0.4)}
-                />
-                <Text bold style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
-                  npub1example@npubx.cash
-                </Text>
-              </HStack>
+            leftIcon={
+              <Icon
+                name="mingcute:lightning-fill"
+                size={ROW_ICON_SIZE}
+                color={opacity(getPrimaryColor('0'), 0.4)}
+              />
             }
+            label="npub1example@npubx.cash"
             onPress={() => {}}
             rightIcon={
-              <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+              <Icon
+                name="lets-icons:copy"
+                size={ROW_ICON_SIZE}
+                color={opacity(getPrimaryColor('0'), 0.4)}
+              />
             }
           />
         </Section>

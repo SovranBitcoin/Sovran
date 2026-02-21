@@ -95,16 +95,19 @@ const ProfileButton = () => {
   );
 };
 
+export const ROW_ICON_SIZE = 20;
+
 export const RowButton: React.FC<{
-  label: string | React.ReactElement;
+  label: string;
   value?: string;
   onPress?: () => void;
   href?: string;
   isFirst?: boolean;
   isLast?: boolean;
   isDanger?: boolean;
+  leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
-}> = ({ label, value, onPress, href, isFirst, isLast, isDanger, rightIcon }) => {
+}> = ({ label, value, onPress, href, isFirst, isLast, isDanger, leftIcon, rightIcon }) => {
   const { getPrimaryColor, getRedColor } = useTheme();
 
   const content = (
@@ -115,24 +118,30 @@ export const RowButton: React.FC<{
         borderColor: getPrimaryColor('700'),
         borderTopWidth: !isFirst ? 1 : 0,
       }}>
-      <View className="w-full flex-row items-center justify-start pr-1">
+      <HStack align="center" gap={8} style={{ paddingRight: 4 }}>
+        {leftIcon}
         <Text
           className="tracking-tight"
-          size={16}
+          size={ROW_ICON_SIZE - 5}
+          bold
           style={{
+            flex: 1,
             color: isDanger ? getRedColor('300') : getPrimaryColor('0'),
+            includeFontPadding: false,
+            lineHeight: ROW_ICON_SIZE - 4,
           }}>
           {label}
         </Text>
-        <View className="flex-1" />
         {value && (
           <Text
             className="tracking-tight"
             overpass
             bold
-            size={16}
+            size={ROW_ICON_SIZE}
             style={{
               color: isDanger ? getRedColor('300') : opacity(getPrimaryColor('0'), 0.4),
+              includeFontPadding: false,
+              lineHeight: ROW_ICON_SIZE,
             }}>
             {value}
           </Text>
@@ -142,13 +151,13 @@ export const RowButton: React.FC<{
             <Icon
               name="fa6-solid:chevron-right"
               color={isDanger ? getRedColor('300') : opacity(getPrimaryColor('0'), 0.4)}
-              size={19}
+              size={ROW_ICON_SIZE}
             />
           ))
         ) : (
           <Spacer size={4} />
         )}
-      </View>
+      </HStack>
     </View>
   );
 
