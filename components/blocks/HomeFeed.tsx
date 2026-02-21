@@ -7,7 +7,13 @@
  */
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
-import { StyleSheet, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
+import {
+  StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  useWindowDimensions,
+} from 'react-native';
 import { BlurView } from 'components/ui/BlurView';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -356,6 +362,7 @@ function HomeFeedComponent() {
   const nativeHeaderHeight = useHeaderHeight();
   const topContentInset = Math.max(nativeHeaderHeight, insets.top + 56);
 
+  const { height: screenHeight } = useWindowDimensions();
   const [, startTransition] = useTransition();
   const [feedSpecs, setFeedSpecs] = useState<FeedSpec[]>([]);
   const [activeSpecIndex, setActiveSpecIndex] = useState(0);
@@ -394,6 +401,9 @@ function HomeFeedComponent() {
 
   // Ref for handleVideoTap so renderFeedItem doesn't depend on videoPosts
   const videoPostsRef = useRef<VideoPost[]>([]);
+  const pendingScrollToTabsRef = useRef(false);
+  const storiesHeightRef = useRef(0);
+  const scrollOffsetRef = useRef(0);
 
   const categoryFeedSpecs = useMemo<FeedSpec[]>(() => {
     return Object.entries(CATEGORY_NPUBS).map(([category, npubs]) => {
@@ -631,15 +641,35 @@ function HomeFeedComponent() {
   const handleSpecChange = useCallback(
     (index: number) => {
       if (index === activeSpecIndex) return;
+      const storiesWereHidden = scrollOffsetRef.current > storiesHeightRef.current;
+      if (storiesWereHidden) {
+        // Snap to stories height immediately while old data is still rendered,
+        // so the list has enough content to hold this scroll position
+        listRef.current?.scrollToOffset({
+          offset: storiesHeightRef.current,
+          animated: false,
+        });
+      }
       setActiveSpecIndex(index);
+      setIsLoading(true);
       setFeedItems([]);
-      // Scroll so tabs are pinned at top (stories hidden)
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToIndex({ index: 1, animated: false });
-      });
+      pendingScrollToTabsRef.current = storiesWereHidden;
     },
     [activeSpecIndex]
   );
+
+  // Re-apply scroll position once new feed items arrive after a tab switch
+  useEffect(() => {
+    if (!pendingScrollToTabsRef.current || feedItems.length === 0) return;
+    pendingScrollToTabsRef.current = false;
+
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({
+        offset: storiesHeightRef.current,
+        animated: false,
+      });
+    });
+  }, [feedItems]);
 
   const handleTabLayout = useCallback((index: number, x: number, width: number) => {
     setTabMeasurements((prev) => {
@@ -1076,7 +1106,14 @@ function HomeFeedComponent() {
   const renderItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<HomeFeedListItem, string | undefined>) => {
       if (item.type === 'stories') {
-        return <StoriesRow userPubkey={userPubkey} />;
+        return (
+          <View
+            onLayout={(e) => {
+              storiesHeightRef.current = e.nativeEvent.layout.height;
+            }}>
+            <StoriesRow userPubkey={userPubkey} />
+          </View>
+        );
       }
       if (item.type === 'tabs') {
         return tabsBar;
@@ -1085,6 +1122,10 @@ function HomeFeedComponent() {
     },
     [userPubkey, tabsBar, renderFeedItem]
   );
+
+  const handleScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
+    scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+  }, []);
 
   return (
     <>
@@ -1102,7 +1143,9 @@ function HomeFeedComponent() {
           stickyHeaderIndices={STICKY_INDICES}
           ListFooterComponent={
             isLoading ? (
-              <ActivityIndicator style={styles.loader} />
+              <View style={{ height: screenHeight }}>
+                <ActivityIndicator style={styles.loader} />
+              </View>
             ) : feedItems.length === 0 ? (
               <EmptyFeed />
             ) : isLoadingMore ? (
@@ -1114,6 +1157,8 @@ function HomeFeedComponent() {
           style={styles.flex1}
           contentContainerStyle={LIST_CONTENT_STYLE}
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           refreshControl={refreshControl}
         />
       </View>
