@@ -227,6 +227,8 @@ export const PostCard = React.memo(function PostCard({
             onVideoTap={onVideoTap}
             onQuotedPressIn={handleProfilePressIn}
             onQuotedPressOut={handleProfilePressOut}
+            onInlineActionPressIn={handleProfilePressIn}
+            onInlineActionPressOut={handleProfilePressOut}
           />
 
           {fullDate ? (
@@ -319,6 +321,8 @@ export const PostCard = React.memo(function PostCard({
           onVideoTap={onVideoTap}
           onQuotedPressIn={handleProfilePressIn}
           onQuotedPressOut={handleProfilePressOut}
+          onInlineActionPressIn={handleProfilePressIn}
+          onInlineActionPressOut={handleProfilePressOut}
         />
 
         <Spacer size={8} />

@@ -564,10 +564,14 @@ export const InlineMention = React.memo(function InlineMention({
   pubkey,
   bech32,
   profiles,
+  onPressIn,
+  onPressOut,
 }: {
   pubkey: string;
   bech32: string;
   profiles: Map<string, ProfileInfo>;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
   const profile = profiles.get(pubkey);
@@ -578,6 +582,8 @@ export const InlineMention = React.memo(function InlineMention({
       bold
       size={15}
       style={{ color: opacity(getPrimaryColor('0'), 0.5) }}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       onPress={() => {
         router.push({ pathname: '/(user-flow)/profile' as any, params: { pubkey } });
       }}>
@@ -595,12 +601,22 @@ export const InlineHashtag = React.memo(function InlineHashtag({ tag }: { tag: s
   );
 });
 
-export const InlineLink = React.memo(function InlineLink({ url }: { url: string }) {
+export const InlineLink = React.memo(function InlineLink({
+  url,
+  onPressIn,
+  onPressOut,
+}: {
+  url: string;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
+}) {
   const { getPrimaryColor } = useTheme();
   return (
     <Text
       size={15}
       style={{ color: opacity(getPrimaryColor('0'), 0.5) }}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       onPress={() => Linking.openURL(url).catch(() => {})}>
       {prettifyUrl(url)}
     </Text>
@@ -1129,6 +1145,8 @@ export const NoteContent = React.memo(function NoteContent({
   onVideoTap,
   onQuotedPressIn,
   onQuotedPressOut,
+  onInlineActionPressIn,
+  onInlineActionPressOut,
 }: {
   content: string;
   quotedEvents: Map<string, FeedEvent>;
@@ -1137,6 +1155,8 @@ export const NoteContent = React.memo(function NoteContent({
   onVideoTap?: (url: string) => void;
   onQuotedPressIn?: () => void;
   onQuotedPressOut?: () => void;
+  onInlineActionPressIn?: () => void;
+  onInlineActionPressOut?: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -1217,12 +1237,21 @@ export const NoteContent = React.memo(function NoteContent({
             pubkey={seg.pubkey}
             bech32={seg.bech32}
             profiles={profiles}
+            onPressIn={onInlineActionPressIn}
+            onPressOut={onInlineActionPressOut}
           />
         );
       case 'hashtag':
         return <InlineHashtag key={i} tag={seg.tag} />;
       case 'url':
-        return <InlineLink key={i} url={seg.url} />;
+        return (
+          <InlineLink
+            key={i}
+            url={seg.url}
+            onPressIn={onInlineActionPressIn}
+            onPressOut={onInlineActionPressOut}
+          />
+        );
       case 'naddr':
         return (
           <Text key={i} bold size={15} style={accentColor}>
@@ -1246,6 +1275,8 @@ export const NoteContent = React.memo(function NoteContent({
             <Text
               size={15}
               style={accentColor}
+              onPressIn={onInlineActionPressIn}
+              onPressOut={onInlineActionPressOut}
               onPress={() => setExpanded(true)}>
               {' show more'}
             </Text>
@@ -1254,6 +1285,8 @@ export const NoteContent = React.memo(function NoteContent({
             <Text
               size={15}
               style={accentColor}
+              onPressIn={onInlineActionPressIn}
+              onPressOut={onInlineActionPressOut}
               onPress={() => setExpanded(false)}>
               {' show less'}
             </Text>
