@@ -52,8 +52,11 @@ import { formatDate } from '@/helper/time';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { UserFeed } from 'components/blocks/UserFeed';
+import { GradientRing } from 'components/blocks/nostr/StoriesRow';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { selectIsFollowingPubkey, useNostrSocialStore } from '@/stores/nostrSocialStore';
+import type { VideoPostRecord } from 'components/blocks/nostr/shared';
+import type { StoryUser } from 'components/blocks/nostr/StoriesCarousel';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 150;
@@ -142,6 +145,9 @@ function generateBannerGradient(seed: string): [string, string] {
 }
 const AVATAR_SIZE = 90;
 const AVATAR_OVERFLOW = AVATAR_SIZE / 4; // 1/4 overflows below banner
+
+// Ring size for the profile avatar gradient (avatar + padding + stroke)
+const PROFILE_RING_SIZE = AVATAR_SIZE + 10;
 
 // ============================================================================
 // Profile Stats Grid
@@ -429,6 +435,8 @@ function BannerWithAvatarComponent({
   isFollowing,
   isFollowLoading,
   onToggleFollow,
+  hasStories,
+  onAvatarPress,
 }: {
   bannerUrl?: string;
   pictureUrl?: string;
@@ -440,6 +448,8 @@ function BannerWithAvatarComponent({
   isFollowing: boolean;
   isFollowLoading: boolean;
   onToggleFollow: () => void;
+  hasStories?: boolean;
+  onAvatarPress?: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -509,20 +519,35 @@ function BannerWithAvatarComponent({
       {/* Avatar - positioned to overlap */}
       <Animated.View
         style={[styles.avatarContainer, { opacity: fadeAnim, transform: [{ scale: fadeAnim }] }]}>
-        <View
-          style={[
-            styles.avatarBorder,
-            { borderColor: getPrimaryColor('950'), backgroundColor: getPrimaryColor('950') },
-          ]}>
-          <Avatar
-            picture={pictureUrl}
-            seed={pubkey}
-            size={AVATAR_SIZE}
-            variant="person"
-            name={displayName}
-            loading={isLoading}
-          />
-        </View>
+        {hasStories ? (
+          <TouchableOpacity activeOpacity={0.8} onPress={onAvatarPress}>
+            <GradientRing size={PROFILE_RING_SIZE}>
+              <Avatar
+                picture={pictureUrl}
+                seed={pubkey}
+                size={AVATAR_SIZE}
+                variant="person"
+                name={displayName}
+                loading={isLoading}
+              />
+            </GradientRing>
+          </TouchableOpacity>
+        ) : (
+          <View
+            style={[
+              styles.avatarBorder,
+              { borderColor: getPrimaryColor('950'), backgroundColor: getPrimaryColor('950') },
+            ]}>
+            <Avatar
+              picture={pictureUrl}
+              seed={pubkey}
+              size={AVATAR_SIZE}
+              variant="person"
+              name={displayName}
+              loading={isLoading}
+            />
+          </View>
+        )}
       </Animated.View>
 
       {/* Name and NIP-05 */}
@@ -750,6 +775,32 @@ function UserProfileScreen() {
   const followInFlight = !!followOptimisticEntry?.pending;
 
   // ===========================
+  // VIDEO STORIES STATE
+  // ===========================
+  const [userVideoPosts, setUserVideoPosts] = useState<VideoPostRecord[]>([]);
+  const hasStories = userVideoPosts.length > 0;
+
+  const handleVideoPostsReady = useCallback((videoPosts: VideoPostRecord[]) => {
+    setUserVideoPosts(videoPosts);
+  }, []);
+
+  const handleAvatarStoryPress = useCallback(() => {
+    if (userVideoPosts.length === 0) return;
+    const storyUser: StoryUser = {
+      pubkey,
+      profile: userInfo ? { name: displayName, picture: userInfo.picture } : undefined,
+      videoPosts: userVideoPosts,
+    };
+    router.push({
+      pathname: '/(stories-flow)/stories' as any,
+      params: {
+        startIndex: '0',
+        storyUsersJson: JSON.stringify([storyUser]),
+      },
+    });
+  }, [userVideoPosts, pubkey, userInfo, displayName]);
+
+  // ===========================
   // HANDLERS
   // ===========================
   const handleCopy = useCallback(async (text: string, message: string) => {
@@ -857,6 +908,7 @@ function UserProfileScreen() {
           authorName={displayName}
           authorPicture={userInfo?.picture}
           isOwnProfile={isOwnProfile}
+          onVideoPostsReady={handleVideoPostsReady}
           ListHeaderComponent={
             <View>
               {/* Banner with Overlapping Avatar */}
@@ -871,6 +923,8 @@ function UserProfileScreen() {
                 isFollowing={isFollowingProfile}
                 isFollowLoading={followInFlight}
                 onToggleFollow={handleToggleFollow}
+                hasStories={hasStories}
+                onAvatarPress={handleAvatarStoryPress}
               />
 
               <Spacer size={16} />

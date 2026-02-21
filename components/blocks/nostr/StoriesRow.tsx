@@ -34,15 +34,25 @@ import type { StoryUser } from './StoriesCarousel';
 // Gradient Ring
 // ============================================================================
 
-const RING_SIZE = 72;
+const DEFAULT_RING_SIZE = 72;
 const AVATAR_SIZE = 64;
 const STROKE_WIDTH = 3;
-const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
 
-function GradientRing({ children }: { children: React.ReactNode }) {
+/**
+ * Instagram-style gradient ring around an avatar.
+ * Accepts an optional `size` so it can be reused at different scales (e.g. profile page).
+ */
+export function GradientRing({
+  children,
+  size = DEFAULT_RING_SIZE,
+}: {
+  children: React.ReactNode;
+  size?: number;
+}) {
+  const radius = (size - STROKE_WIDTH) / 2;
   return (
-    <View style={styles.ringContainer}>
-      <Svg width={RING_SIZE} height={RING_SIZE} style={styles.ringSvg}>
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={{ position: 'absolute' }}>
         <Defs>
           <LinearGradient id="storyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
             <Stop offset="0%" stopColor="#F58529" />
@@ -52,15 +62,15 @@ function GradientRing({ children }: { children: React.ReactNode }) {
           </LinearGradient>
         </Defs>
         <SvgCircle
-          cx={RING_SIZE / 2}
-          cy={RING_SIZE / 2}
-          r={RADIUS}
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
           stroke="url(#storyGrad)"
           strokeWidth={STROKE_WIDTH}
           fill="none"
         />
       </Svg>
-      <View style={styles.avatarInner}>{children}</View>
+      <View style={{ borderRadius: size / 2, overflow: 'hidden' }}>{children}</View>
     </View>
   );
 }
@@ -241,20 +251,7 @@ const styles = StyleSheet.create({
   },
   storyItem: {
     alignItems: 'center',
-    width: RING_SIZE + 4,
-  },
-  ringContainer: {
-    width: RING_SIZE,
-    height: RING_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringSvg: {
-    position: 'absolute',
-  },
-  avatarInner: {
-    borderRadius: AVATAR_SIZE / 2,
-    overflow: 'hidden',
+    width: DEFAULT_RING_SIZE + 4,
   },
   storyName: {
     marginTop: 4,

@@ -150,6 +150,8 @@ interface UserFeedProps {
   isOwnProfile?: boolean;
   /** Optional header rendered above the feed inside the LegendList */
   ListHeaderComponent?: React.ReactElement | null;
+  /** Called when video posts are computed from the feed, so the parent can show a story ring */
+  onVideoPostsReady?: (videoPosts: VideoPostRecord[]) => void;
 }
 
 /** Unified feed item — either an original note or a repost (Kind 6/16) */
@@ -1211,7 +1213,7 @@ export function VideoFeedOverlay({
 
   // Mount: slide in from bottom
   useEffect(() => {
-    slideAnim.set(withSpring(1, { damping: 26, stiffness: 220 }));
+    slideAnim.set(withTiming(1, { duration: 280 }));
   }, [slideAnim]);
 
   useEffect(() => {
@@ -1534,6 +1536,7 @@ function UserFeedComponent({
   authorPicture,
   isOwnProfile,
   ListHeaderComponent,
+  onVideoPostsReady,
 }: UserFeedProps) {
   const { getPrimaryColor } = useTheme();
   const [, startTransition] = useTransition();
@@ -1978,6 +1981,10 @@ function UserFeedComponent({
     }
     return buildDedupedVideoPosts(sourceEvents);
   }, [feedItems]);
+
+  useEffect(() => {
+    onVideoPostsReady?.(videoPosts);
+  }, [videoPosts, onVideoPostsReady]);
 
   const videoIndexByUrl = useMemo(() => {
     const map = new Map<string, number>();
