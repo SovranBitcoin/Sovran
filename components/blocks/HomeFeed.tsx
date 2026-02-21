@@ -8,6 +8,7 @@
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
 import { StyleSheet, ActivityIndicator, RefreshControl, ScrollView } from 'react-native';
+import { BlurView } from 'components/ui/BlurView';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
@@ -18,7 +19,7 @@ import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
-import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
+import { LegendList, type LegendListRenderItemProps, type LegendListRef } from '@legendapp/list';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -51,7 +52,7 @@ import { CATEGORY_NPUBS } from './nostr/categoryNpubs';
 import { PostCard } from './nostr/PostCard';
 import { RepostCard, VideoFeedOverlay, type VideoPost } from './UserFeed';
 import { useNostrEngagement } from '@/hooks/useNostrEngagement';
-import PagerView from 'react-native-pager-view';
+import { StoriesRow } from './nostr/StoriesRow';
 
 // ============================================================================
 // Types
@@ -66,6 +67,8 @@ type FeedItem =
       originalEventId: string;
       timestamp: number;
     };
+
+type HomeFeedListItem = { type: 'stories' } | { type: 'tabs' } | FeedItem;
 
 interface FeedSpec {
   name: string;
@@ -382,7 +385,7 @@ function HomeFeedComponent() {
   // Video overlay state
   const [overlayVisible, setOverlayVisible] = useState(false);
   const [overlayStartIndex, setOverlayStartIndex] = useState(0);
-  const pagerRef = useRef<PagerView>(null);
+  const listRef = useRef<LegendListRef>(null);
   const [tabMeasurements, setTabMeasurements] = useState<
     Record<number, { x: number; width: number }>
   >({});
@@ -628,19 +631,12 @@ function HomeFeedComponent() {
   const handleSpecChange = useCallback(
     (index: number) => {
       if (index === activeSpecIndex) return;
-      pagerRef.current?.setPage(index);
       setActiveSpecIndex(index);
       setFeedItems([]);
-    },
-    [activeSpecIndex]
-  );
-
-  const handlePageSelected = useCallback(
-    (event: { nativeEvent: { position: number } }) => {
-      const nextIndex = event.nativeEvent.position;
-      if (nextIndex === activeSpecIndex) return;
-      setActiveSpecIndex(nextIndex);
-      setFeedItems([]);
+      // Scroll so tabs are pinned at top (stories hidden)
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToIndex({ index: 1, animated: false });
+      });
     },
     [activeSpecIndex]
   );
@@ -944,6 +940,58 @@ function HomeFeedComponent() {
 
   // ── Render ──
 
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: indicatorX.get() }],
+    width: indicatorWidth.get(),
+  }));
+
+  const tabsBar = useMemo(
+    () =>
+      feedSpecs.length > 1 ? (
+        <View style={[styles.feedTabsContainer, { backgroundColor: getPrimaryColor('900') }]}>
+          <BlurView intensity={200} tint="dark" style={StyleSheet.absoluteFill} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.feedTabsRow}>
+            {feedSpecs.map((spec, idx) => {
+              const isActive = idx === activeSpecIndex;
+              return (
+                <TouchableOpacity
+                  key={spec.name}
+                  style={styles.feedTab}
+                  onPress={() => handleSpecChange(idx)}
+                  onLayout={(event) => {
+                    const { x, width } = event.nativeEvent.layout;
+                    handleTabLayout(idx, x, width);
+                  }}>
+                  <Text
+                    size={14}
+                    heavy
+                    style={{
+                      color: isActive
+                        ? opacity(getPrimaryColor('0'), 0.95)
+                        : opacity(getPrimaryColor('0'), 0.45),
+                    }}>
+                    {spec.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+            <Reanimated.View
+              pointerEvents="none"
+              style={[
+                styles.feedTabIndicator,
+                { backgroundColor: getPrimaryColor('0') },
+                indicatorStyle,
+              ]}
+            />
+          </ScrollView>
+        </View>
+      ) : null,
+    [activeSpecIndex, feedSpecs, getPrimaryColor, handleSpecChange, handleTabLayout, indicatorStyle]
+  );
+
   const renderFeedItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
       if (item.type === 'note') {
@@ -1018,113 +1066,56 @@ function HomeFeedComponent() {
     [isRefreshing, handleRefresh, refreshTintColor]
   );
 
-  const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: indicatorX.get() }],
-    width: indicatorWidth.get(),
-  }));
-
-  const tabsBar = useMemo(
-    () =>
-      feedSpecs.length > 1 ? (
-        <View style={styles.feedTabsContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.feedTabsRow}>
-            {feedSpecs.map((spec, idx) => {
-              const isActive = idx === activeSpecIndex;
-              return (
-                <TouchableOpacity
-                  key={spec.name}
-                  style={styles.feedTab}
-                  onPress={() => handleSpecChange(idx)}
-                  onLayout={(event) => {
-                    const { x, width } = event.nativeEvent.layout;
-                    handleTabLayout(idx, x, width);
-                  }}>
-                  <Text
-                    size={14}
-                    heavy
-                    style={{
-                      color: isActive
-                        ? opacity(getPrimaryColor('0'), 0.95)
-                        : opacity(getPrimaryColor('0'), 0.45),
-                    }}>
-                    {spec.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-            <Reanimated.View
-              pointerEvents="none"
-              style={[
-                styles.feedTabIndicator,
-                { backgroundColor: getPrimaryColor('0') },
-                indicatorStyle,
-              ]}
-            />
-          </ScrollView>
-        </View>
-      ) : null,
-    [activeSpecIndex, feedSpecs, getPrimaryColor, handleSpecChange, handleTabLayout, indicatorStyle]
+  // Stories (index 0) and Tabs (index 1) are prepended as data items.
+  // stickyHeaderIndices={[1]} makes tabs pin to the top when scrolled past.
+  const listData = useMemo<HomeFeedListItem[]>(
+    () => [STORIES_ITEM, TABS_ITEM, ...feedItems],
+    [feedItems]
   );
 
-  const feedList =
-    isLoading || feedItems.length === 0 ? (
-      <LegendList
-        data={EMPTY_FEED}
-        estimatedItemSize={200}
-        renderItem={NOOP_RENDER}
-        ListHeaderComponent={null}
-        ListEmptyComponent={isLoading ? <ActivityIndicator style={styles.loader} /> : <EmptyFeed />}
-        style={styles.flex1}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={refreshControl}
-      />
-    ) : (
-      <LegendList
-        data={feedItems}
-        keyExtractor={keyExtractor}
-        getItemType={getItemType}
-        estimatedItemSize={300}
-        drawDistance={400}
-        renderItem={renderFeedItem}
-        extraData={`${dataVersion}:${engagementRevision}`}
-        recycleItems
-        ListHeaderComponent={null}
-        ListFooterComponent={
-          isLoadingMore ? <ActivityIndicator style={styles.loadMoreSpinner} /> : null
-        }
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.4}
-        style={styles.flex1}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        refreshControl={refreshControl}
-      />
-    );
+  const renderItem = useCallback(
+    ({ item, index }: LegendListRenderItemProps<HomeFeedListItem, string | undefined>) => {
+      if (item.type === 'stories') {
+        return <StoriesRow userPubkey={userPubkey} />;
+      }
+      if (item.type === 'tabs') {
+        return tabsBar;
+      }
+      return renderFeedItem({ item, index } as LegendListRenderItemProps<FeedItem, string | undefined>); // eslint-disable-line prettier/prettier
+    },
+    [userPubkey, tabsBar, renderFeedItem]
+  );
 
   return (
     <>
       <View style={[styles.flex1, { paddingTop: topContentInset }]}>
-        {tabsBar}
-        {feedSpecs.length > 0 ? (
-          <PagerView
-            ref={pagerRef}
-            style={styles.flex1}
-            initialPage={0}
-            onPageSelected={handlePageSelected}>
-            {feedSpecs.map((spec, idx) => (
-              <View key={`${spec.name}-${idx}`} style={styles.flex1}>
-                {idx === activeSpecIndex ? feedList : null}
-              </View>
-            ))}
-          </PagerView>
-        ) : (
-          feedList
-        )}
+        <LegendList
+          ref={listRef}
+          data={listData}
+          keyExtractor={listKeyExtractor}
+          getItemType={listGetItemType}
+          estimatedItemSize={300}
+          drawDistance={400}
+          renderItem={renderItem}
+          extraData={`${dataVersion}:${engagementRevision}`}
+          recycleItems
+          stickyHeaderIndices={STICKY_INDICES}
+          ListFooterComponent={
+            isLoading ? (
+              <ActivityIndicator style={styles.loader} />
+            ) : feedItems.length === 0 ? (
+              <EmptyFeed />
+            ) : isLoadingMore ? (
+              <ActivityIndicator style={styles.loadMoreSpinner} />
+            ) : null
+          }
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.4}
+          style={styles.flex1}
+          contentContainerStyle={LIST_CONTENT_STYLE}
+          showsVerticalScrollIndicator={false}
+          refreshControl={refreshControl}
+        />
       </View>
       {overlayVisible && (
         <VideoFeedOverlay
@@ -1157,11 +1148,17 @@ export const HomeFeed = React.memo(HomeFeedComponent);
 // Stable references — defined outside the component to avoid re-creation
 // ============================================================================
 
-const EMPTY_FEED: FeedItem[] = [];
-const NOOP_RENDER = () => null;
-const keyExtractor = (item: FeedItem) =>
-  item.type === 'note' ? item.event.id : item.repostEvent.id;
-const getItemType = (item: FeedItem) => item.type;
+const STORIES_ITEM: HomeFeedListItem = { type: 'stories' };
+const TABS_ITEM: HomeFeedListItem = { type: 'tabs' };
+const STICKY_INDICES = [1]; // tabs item at index 1
+const LIST_CONTENT_STYLE = { paddingBottom: 120 };
+
+const listKeyExtractor = (item: HomeFeedListItem) => {
+  if (item.type === 'stories') return '__stories__';
+  if (item.type === 'tabs') return '__tabs__';
+  return item.type === 'note' ? item.event.id : item.repostEvent.id;
+};
+const listGetItemType = (item: HomeFeedListItem) => item.type;
 
 const PRIMAL_FEED_SPECS: FeedSpec[] = [
   {
@@ -1184,6 +1181,7 @@ const PRIMAL_FEED_SPECS: FeedSpec[] = [
 
 const styles = StyleSheet.create({
   feedTabsContainer: {
+    overflow: 'hidden',
     paddingTop: 8,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
@@ -1222,8 +1220,5 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1,
-  },
-  listContent: {
-    paddingBottom: 120,
   },
 });

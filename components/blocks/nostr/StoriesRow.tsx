@@ -1,0 +1,263 @@
+/**
+ * Horizontal stories row showing avatars of followed users who have video posts.
+ *
+ * Each avatar is wrapped in an Instagram-style gradient ring.
+ * Tapping opens the full-screen stories carousel.
+ */
+
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import Svg, { Defs, LinearGradient, Stop, Circle as SvgCircle } from 'react-native-svg';
+import { Metadata } from 'nostr-tools/kinds';
+import { router } from 'expo-router';
+
+import { Avatar } from 'components/ui/Avatar';
+import { Text } from 'components/ui/Text';
+import { useTheme } from 'providers/ThemeProvider';
+import opacity from 'hex-color-opacity';
+
+import {
+  type ProfileInfo,
+  type VideoPostRecord,
+  type RawPrimalEvent,
+  type FeedEvent,
+  createPrimalRelayClient,
+  PRIMAL_CACHE_RELAY_URL,
+  getVideoUrlsFromContent,
+  normalizeFeedEvent,
+  parseProfileFromRaw,
+  parseJson,
+} from './shared';
+import type { StoryUser } from './StoriesCarousel';
+
+// ============================================================================
+// Gradient Ring
+// ============================================================================
+
+const RING_SIZE = 72;
+const AVATAR_SIZE = 64;
+const STROKE_WIDTH = 3;
+const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
+
+function GradientRing({ children }: { children: React.ReactNode }) {
+  return (
+    <View style={styles.ringContainer}>
+      <Svg width={RING_SIZE} height={RING_SIZE} style={styles.ringSvg}>
+        <Defs>
+          <LinearGradient id="storyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor="#F58529" />
+            <Stop offset="33%" stopColor="#DD2A7B" />
+            <Stop offset="66%" stopColor="#8134AF" />
+            <Stop offset="100%" stopColor="#515BD4" />
+          </LinearGradient>
+        </Defs>
+        <SvgCircle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RADIUS}
+          stroke="url(#storyGrad)"
+          strokeWidth={STROKE_WIDTH}
+          fill="none"
+        />
+      </Svg>
+      <View style={styles.avatarInner}>{children}</View>
+    </View>
+  );
+}
+
+// ============================================================================
+// StoriesRow
+// ============================================================================
+
+interface StoriesRowProps {
+  userPubkey?: string;
+}
+
+export function StoriesRow({ userPubkey }: StoriesRowProps) {
+  const { getPrimaryColor } = useTheme();
+  const [storyUsers, setStoryUsers] = useState<StoryUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userPubkey) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
+    const rp = Date.now().toString(36);
+
+    (async () => {
+      try {
+        // Fetch latest from follows
+        const spec = JSON.stringify({ id: 'feed', kind: 'notes', notes: 'follows', pubkey: userPubkey });
+        const rawEvents: RawPrimalEvent[] = await client.request(`${rp}_stories`, {
+          cache: [
+            'mega_feed_directive',
+            { spec, limit: 50, user_pubkey: userPubkey },
+          ],
+        });
+
+        if (cancelled) return;
+
+        // Parse events and profiles
+        const profiles = new Map<string, ProfileInfo>();
+        const events: FeedEvent[] = [];
+
+        for (const raw of rawEvents) {
+          if (raw.kind === Metadata) {
+            const result = parseProfileFromRaw(raw);
+            if (result) profiles.set(result[0], result[1]);
+            continue;
+          }
+          const ev = normalizeFeedEvent(raw);
+          if (ev && ev.kind === 1) events.push(ev);
+        }
+
+        // Filter to video posts and group by author
+        const userVideoMap = new Map<string, VideoPostRecord[]>();
+
+        for (const ev of events) {
+          const videoUrls = getVideoUrlsFromContent(ev.content);
+          if (videoUrls.length === 0) continue;
+          const existing = userVideoMap.get(ev.pubkey) || [];
+          existing.push({
+            eventId: ev.id,
+            videoUrl: videoUrls[0]!,
+            content: ev.content,
+            pubkey: ev.pubkey,
+            created_at: ev.created_at,
+          });
+          userVideoMap.set(ev.pubkey, existing);
+        }
+
+        // Build StoryUser array
+        const users: StoryUser[] = [];
+        for (const [pubkey, videoPosts] of userVideoMap) {
+          users.push({
+            pubkey,
+            profile: profiles.get(pubkey),
+            videoPosts,
+          });
+        }
+
+        // Fetch missing profiles
+        const missingPubkeys = users
+          .filter((u) => !u.profile)
+          .map((u) => u.pubkey);
+        if (missingPubkeys.length > 0) {
+          try {
+            const profileRawEvents: RawPrimalEvent[] = await client.request(`${rp}_sp`, {
+              cache: ['user_infos', { pubkeys: missingPubkeys }],
+            });
+            for (const raw of profileRawEvents) {
+              if (raw.kind !== Metadata) continue;
+              const result = parseProfileFromRaw(raw);
+              if (result) profiles.set(result[0], result[1]);
+            }
+            // Update profile refs
+            for (const u of users) {
+              if (!u.profile) u.profile = profiles.get(u.pubkey);
+            }
+          } catch {}
+        }
+
+        if (!cancelled) {
+          setStoryUsers(users);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('StoriesRow: failed to fetch stories', error);
+        if (!cancelled) setLoading(false);
+      } finally {
+        client.close();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userPubkey]);
+
+  const handleStoryPress = useCallback(
+    (index: number) => {
+      router.push({
+        pathname: '/(stories-flow)/stories' as any,
+        params: {
+          startIndex: String(index),
+          storyUsersJson: JSON.stringify(storyUsers),
+        },
+      });
+    },
+    [storyUsers]
+  );
+
+  if (loading || storyUsers.length === 0) return null;
+
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}>
+        {storyUsers.map((user, index) => {
+          const name =
+            user.profile?.name || user.pubkey.slice(0, 8) + '…';
+          return (
+            <TouchableOpacity
+              key={user.pubkey}
+              style={styles.storyItem}
+              onPress={() => handleStoryPress(index)}
+              activeOpacity={0.7}>
+              <GradientRing>
+                <Avatar picture={user.profile?.picture} seed={user.pubkey} size={AVATAR_SIZE} />
+              </GradientRing>
+              <Text
+                size={11}
+                numberOfLines={1}
+                style={[styles.storyName, { color: opacity(getPrimaryColor('0'), 0.7) }]}>
+                {name}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ============================================================================
+// Styles
+// ============================================================================
+
+const styles = StyleSheet.create({
+  container: {
+    paddingVertical: 8,
+  },
+  scrollContent: {
+    paddingHorizontal: 12,
+    gap: 12,
+  },
+  storyItem: {
+    alignItems: 'center',
+    width: RING_SIZE + 4,
+  },
+  ringContainer: {
+    width: RING_SIZE,
+    height: RING_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringSvg: {
+    position: 'absolute',
+  },
+  avatarInner: {
+    borderRadius: AVATAR_SIZE / 2,
+    overflow: 'hidden',
+  },
+  storyName: {
+    marginTop: 4,
+    textAlign: 'center',
+  },
+});

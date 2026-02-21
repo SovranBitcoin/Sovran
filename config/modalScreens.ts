@@ -60,6 +60,16 @@ export const MODAL_SCREENS: ModalConfig[] = [
       gestureDirection: 'horizontal',
     },
   },
+  // Stories flow - full-screen Instagram-style stories carousel
+  {
+    name: '(stories-flow)',
+    options: {
+      presentation: 'fullScreenModal',
+      headerShown: false,
+      gestureDirection: 'vertical',
+      contentStyle: { backgroundColor: '#000' },
+    },
+  },
   // Filter flow modal group - transaction filters
   {
     name: '(filter-flow)',

@@ -130,6 +130,7 @@ declare module "@monicon/icon-loader" {
 	| "mdi:email"
 	| "mdi:instagram"
 	| "mdi:close-circle"
+	| "mdi:close"
 	| "mdi:coffee"
 	| "mdi:silverware-fork-knife"
 	| "mdi:cart"
