@@ -953,7 +953,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           onPress={onCommentPress}
           disabled={!onCommentPress}
           onPressIn={onActionPressIn}
-          onPressOut={onActionPressOut}>
+          onPressOut={onActionPressOut}
+          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <HStack align="center" gap={5}>
             <Icon name="iconamoon:comment-fill" size={iconSize - 1} color={iconColor} />
             <Text size={textSize} style={{ color: textColor }}>
@@ -966,7 +967,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           onPress={onRepostPress}
           disabled={!onRepostPress || repostPending}
           onPressIn={onActionPressIn}
-          onPressOut={onActionPressOut}>
+          onPressOut={onActionPressOut}
+          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <AnimatedMetric
             iconName="garden:arrow-retweet-fill-16"
             iconSize={iconSize + 1}
@@ -984,7 +986,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
           onPress={onLikePress}
           disabled={!onLikePress || likePending}
           onPressIn={onActionPressIn}
-          onPressOut={onActionPressOut}>
+          onPressOut={onActionPressOut}
+          hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
           <AnimatedMetric
             iconName="iconamoon:heart-fill"
             iconSize={iconSize}

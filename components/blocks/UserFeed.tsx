@@ -1068,6 +1068,7 @@ const VideoFeedItem = memo(function VideoFeedItem({
             activeOpacity={onRepostPress ? 0.7 : 1}
             onPress={onRepostPress}
             disabled={!onRepostPress || engagement.repostPending}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[
               vCtrl.metricPill,
               engagement.reposted ? { backgroundColor: 'rgba(76,217,100,0.25)' } : undefined,
@@ -1086,6 +1087,7 @@ const VideoFeedItem = memo(function VideoFeedItem({
             activeOpacity={onLikePress ? 0.7 : 1}
             onPress={onLikePress}
             disabled={!onLikePress || engagement.likePending}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[
               vCtrl.metricPill,
               engagement.liked ? { backgroundColor: 'rgba(255,90,122,0.25)' } : undefined,
