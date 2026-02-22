@@ -323,6 +323,8 @@ export const PostCard = React.memo(function PostCard({
           onQuotedPressOut={handleProfilePressOut}
           onInlineActionPressIn={handleProfilePressIn}
           onInlineActionPressOut={handleProfilePressOut}
+          onImagePressIn={handleProfilePressIn}
+          onImagePressOut={handleProfilePressOut}
         />
 
         <Spacer size={8} />

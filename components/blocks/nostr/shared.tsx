@@ -6,11 +6,19 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, TouchableOpacity, Linking, Dimensions, Platform } from 'react-native';
+import {
+  StyleSheet,
+  TouchableOpacity,
+  Linking,
+  Dimensions,
+  Platform,
+  Pressable,
+} from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
   cancelAnimation,
   runOnJS,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -30,6 +38,10 @@ import { Avatar } from 'components/ui/Avatar';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { nip19 } from 'nostr-tools';
+import { BlurView } from 'components/ui/BlurView';
+import { useImageOverlay } from './image-overlay-provider';
+
+const AnimatedBlurView = Reanimated.createAnimatedComponent(BlurView);
 
 // ============================================================================
 // Types
@@ -91,7 +103,7 @@ export type RelayMessage =
 // ============================================================================
 
 export const SCREEN_WIDTH = Dimensions.get('window').width;
-export const CONTENT_WIDTH = SCREEN_WIDTH - 32;
+export const CONTENT_WIDTH = SCREEN_WIDTH;
 
 export const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
 export const DEFAULT_METRICS: NoteMetrics = Object.freeze({
@@ -457,7 +469,14 @@ export function createPrimalRelayClient(url: string) {
       console.log('[PrimalWS] non-array message:', String(msg.data).slice(0, 200));
       return;
     }
-    console.log('[PrimalWS] msg type:', parsed[0], 'subId:', parsed[1], 'inflight?', inflight.has(parsed[1] as string));
+    console.log(
+      '[PrimalWS] msg type:',
+      parsed[0],
+      'subId:',
+      parsed[1],
+      'inflight?',
+      inflight.has(parsed[1] as string)
+    );
 
     if (parsed[0] === 'EVENT') {
       const subId = parsed[1];
@@ -627,27 +646,114 @@ export const InlineLink = React.memo(function InlineLink({
 // Block renderers
 // ============================================================================
 
-export const ImageBlock = React.memo(function ImageBlock({ url }: { url: string }) {
+/**
+ * ImageBlock: feed image with optional overlay. Perf logs (__DEV__, [ImageOverlay:Perf]):
+ * - render count (per url), handlePress (tap to open overlay).
+ * Optional onPressIn/onPressOut suppress parent tap (e.g. PostCard thread navigation).
+ */
+export const ImageBlock = React.memo(function ImageBlock({
+  url,
+  onPressIn,
+  onPressOut,
+}: {
+  url: string;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
+}) {
   const [aspectRatio, setAspectRatio] = useState(16 / 9);
   const [error, setError] = useState(false);
+  const containerRef = useRef<React.ComponentRef<typeof View>>(null);
+  const imageOverlay = useImageOverlay();
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('[ImageOverlay:Perf] ImageBlock render', {
+        url: url.slice(0, 40),
+        count: renderCountRef.current,
+      });
+    }
+  });
+
+  const handlePress = useCallback(() => {
+    if (__DEV__) {
+      console.log('[ImageOverlay:Perf] ImageBlock handlePress', { url: url.slice(0, 40) });
+    }
+    if (!imageOverlay?.open) return;
+    containerRef.current?.measureInWindow(
+      (pageX: number, pageY: number, width: number, height: number) => {
+        if (__DEV__) {
+          console.log('[ImageOverlay] measureInWindow →', {
+            pageX,
+            pageY,
+            width,
+            height,
+            aspectRatio,
+            x: pageX,
+            y: pageY,
+          });
+        }
+        imageOverlay.open({
+          url,
+          aspectRatio,
+          pageX,
+          pageY,
+          width,
+          height,
+        });
+      }
+    );
+  }, [imageOverlay, url, aspectRatio]);
+
+  const fallbackBlur = useSharedValue(0);
+  const thumbnailBlur = imageOverlay?.thumbnailBlurIntensity ?? fallbackBlur;
+  const thumbnailBlurAnimatedProps = useAnimatedProps(() => ({
+    intensity: thumbnailBlur.value,
+  }));
 
   if (error) return null;
 
+  const image = (
+    <Image
+      source={{ uri: url }}
+      style={{ width: '100%', aspectRatio, borderRadius: 12 }}
+      contentFit="cover"
+      cachePolicy="memory-disk"
+      recyclingKey={url}
+      transition={300}
+      onLoad={(e) => {
+        const { width, height } = e.source;
+        if (width && height) setAspectRatio(width / height);
+      }}
+      onError={() => setError(true)}
+    />
+  );
+
+  const isOverlayActive = imageOverlay?.activeUrl === url;
   return (
     <View style={sharedStyles.imageBlockOuter}>
-      <Image
-        source={{ uri: url }}
-        style={{ width: CONTENT_WIDTH - 32, aspectRatio, borderRadius: 12 }}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-        recyclingKey={url}
-        transition={300}
-        onLoad={(e) => {
-          const { width, height } = e.source;
-          if (width && height) setAspectRatio(width / height);
-        }}
-        onError={() => setError(true)}
-      />
+      <View ref={containerRef} collapsable={false} style={{ aspectRatio }}>
+        {imageOverlay?.open ? (
+          <Pressable
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
+            onPress={handlePress}
+            style={StyleSheet.absoluteFill}>
+            {image}
+          </Pressable>
+        ) : (
+          image
+        )}
+        {isOverlayActive && (
+          <AnimatedBlurView
+            tint="dark"
+            style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
+            pointerEvents="none"
+            animatedProps={thumbnailBlurAnimatedProps}
+          />
+        )}
+      </View>
     </View>
   );
 });
@@ -690,7 +796,7 @@ const IOSVideoBlock = React.memo(function IOSVideoBlock({
         <View
           pointerEvents="none"
           style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-          <Icon name="mdi:play-circle-outline" size={48} color="rgba(255,255,255,0.75)" />
+          <Icon name="mingcute:play-fill" size={48} color="rgba(255,255,255,0.75)" />
         </View>
       )}
     </View>
@@ -729,11 +835,7 @@ const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
           { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
         ]}>
         <HStack align="center" gap={8}>
-          <Icon
-            name="mdi:play-circle-outline"
-            size={20}
-            color={opacity(getPrimaryColor('0'), 0.4)}
-          />
+          <Icon name="mingcute:play-fill" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
           <VStack style={sharedStyles.flex1}>
             <Text bold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
               Video
@@ -746,7 +848,7 @@ const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
             </Text>
           </VStack>
           <Icon
-            name={onTap ? 'mdi:play-circle' : 'mdi:open-in-new'}
+            name={onTap ? 'mingcute:play-fill' : 'mdi:open-in-new'}
             size={16}
             color={opacity(getPrimaryColor('0'), 0.33)}
           />
@@ -1150,6 +1252,8 @@ export const NoteContent = React.memo(function NoteContent({
   onQuotedPressOut,
   onInlineActionPressIn,
   onInlineActionPressOut,
+  onImagePressIn,
+  onImagePressOut,
 }: {
   content: string;
   quotedEvents: Map<string, FeedEvent>;
@@ -1160,6 +1264,8 @@ export const NoteContent = React.memo(function NoteContent({
   onQuotedPressOut?: () => void;
   onInlineActionPressIn?: () => void;
   onInlineActionPressOut?: () => void;
+  onImagePressIn?: () => void;
+  onImagePressOut?: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -1301,7 +1407,14 @@ export const NoteContent = React.memo(function NoteContent({
         blockSegments.map((seg, i) => {
           switch (seg.kind) {
             case 'image':
-              return <ImageBlock key={`b${i}`} url={seg.url} />;
+              return (
+                <ImageBlock
+                  key={`b${i}`}
+                  url={seg.url}
+                  onPressIn={onImagePressIn}
+                  onPressOut={onImagePressOut}
+                />
+              );
             case 'video':
               return (
                 <VideoBlock
