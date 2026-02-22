@@ -312,9 +312,7 @@ export function WalletHealthModalContent({
       const driftValue = needsRebalance ? `~${formatPctFromBp(maxDriftBp)}` : 'OK';
       rows.push({
         key: 'rebalance',
-        leftIcon: (
-          <Icon name="mdi:swap-horizontal" size={ROW_ICON_SIZE} color={primary400} />
-        ),
+        leftIcon: <Icon name="mdi:swap-horizontal" size={ROW_ICON_SIZE} color={primary400} />,
         label: 'Rebalance now',
         value: driftValue,
         onPress: handleRebalancePress,

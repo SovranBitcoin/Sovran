@@ -159,6 +159,7 @@ export const icons: string[] = [
   'hugeicons:new-twitter',
   'mdi:at',
   'mingcute:lightning-fill',
+  'mingcute:play-fill',
   'material-symbols:info-rounded',
   'material-symbols:report-rounded',
   'material-symbols:settings-rounded',
@@ -254,7 +255,9 @@ export const icons: string[] = [
   'mdi:check-circle-outline',
   'fluent:wallet-24-filled',
 
-  // Video feed icons
+  // Video feed icons (iconamoon to match comment/heart engagement icons)
+  'iconamoon:player-start-fill',
+  'iconamoon:player-pause-fill',
   'mdi:play-circle-outline',
   'mdi:play-circle',
   'mdi:pause',

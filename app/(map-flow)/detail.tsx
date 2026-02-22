@@ -276,7 +276,9 @@ export default function MerchantDetailScreen() {
               <RowButton
                 isFirst={!supportsOnchain}
                 isLast={!supportsContactless}
-                leftIcon={<Icon name="mingcute:lightning-fill" size={ROW_ICON_SIZE} color="#F7931A" />}
+                leftIcon={
+                  <Icon name="mingcute:lightning-fill" size={ROW_ICON_SIZE} color="#F7931A" />
+                }
                 label="Lightning"
                 rightIcon={
                   <Icon
@@ -291,7 +293,9 @@ export default function MerchantDetailScreen() {
               <RowButton
                 isFirst={!supportsOnchain && !supportsLightning}
                 isLast
-                leftIcon={<Icon name="ph:contactless-payment-fill" size={ROW_ICON_SIZE} color="#F7931A" />}
+                leftIcon={
+                  <Icon name="ph:contactless-payment-fill" size={ROW_ICON_SIZE} color="#F7931A" />
+                }
                 label="Contactless"
                 rightIcon={
                   <Icon

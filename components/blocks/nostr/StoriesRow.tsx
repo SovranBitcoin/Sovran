@@ -5,7 +5,7 @@
  * Tapping opens the full-screen stories carousel.
  */
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Circle as SvgCircle } from 'react-native-svg';
 import { Metadata } from 'nostr-tools/kinds';
@@ -26,7 +26,6 @@ import {
   getVideoUrlsFromContent,
   normalizeFeedEvent,
   parseProfileFromRaw,
-  parseJson,
 } from './shared';
 import type { StoryUser } from './StoriesCarousel';
 
@@ -101,12 +100,14 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
     (async () => {
       try {
         // Fetch latest from follows
-        const spec = JSON.stringify({ id: 'feed', kind: 'notes', notes: 'follows', pubkey: userPubkey });
+        const spec = JSON.stringify({
+          id: 'feed',
+          kind: 'notes',
+          notes: 'follows',
+          pubkey: userPubkey,
+        });
         const rawEvents: RawPrimalEvent[] = await client.request(`${rp}_stories`, {
-          cache: [
-            'mega_feed_directive',
-            { spec, limit: 50, user_pubkey: userPubkey },
-          ],
+          cache: ['mega_feed_directive', { spec, limit: 50, user_pubkey: userPubkey }],
         });
 
         if (cancelled) return;
@@ -153,9 +154,7 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
         }
 
         // Fetch missing profiles
-        const missingPubkeys = users
-          .filter((u) => !u.profile)
-          .map((u) => u.pubkey);
+        const missingPubkeys = users.filter((u) => !u.profile).map((u) => u.pubkey);
         if (missingPubkeys.length > 0) {
           try {
             const profileRawEvents: RawPrimalEvent[] = await client.request(`${rp}_sp`, {
@@ -212,8 +211,7 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}>
         {storyUsers.map((user, index) => {
-          const name =
-            user.profile?.name || user.pubkey.slice(0, 8) + '…';
+          const name = user.profile?.name || user.pubkey.slice(0, 8) + '…';
           return (
             <TouchableOpacity
               key={user.pubkey}

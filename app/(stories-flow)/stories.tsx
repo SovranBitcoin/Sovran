@@ -31,7 +31,8 @@ export default function StoriesScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 6 }]}>
+    <View
+      style={[styles.container, { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 6 }]}>
       <StoriesCarousel
         storyUsers={storyUsers}
         startIndex={Number(startIndex) || 0}

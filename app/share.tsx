@@ -3,8 +3,6 @@ import { TouchableOpacity } from 'react-native';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { RowButton, ROW_ICON_SIZE, Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
-import { Text } from 'components/ui/Text';
-import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { popup } from '@/helper/popup';
@@ -129,7 +127,11 @@ function ShareModal() {
             isFirst
             onPress={handleCopy}
             rightIcon={
-              <Icon name="lets-icons:copy" size={ROW_ICON_SIZE} color={opacity(getPrimaryColor('0'), 0.4)} />
+              <Icon
+                name="lets-icons:copy"
+                size={ROW_ICON_SIZE}
+                color={opacity(getPrimaryColor('0'), 0.4)}
+              />
             }
             leftIcon={
               <CurrencyIcon

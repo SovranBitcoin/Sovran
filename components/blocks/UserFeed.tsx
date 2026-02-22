@@ -112,6 +112,8 @@ import {
 } from './nostr/shared';
 
 import { PostCard } from './nostr/PostCard';
+import { ImageOverlayProvider, useImageOverlay } from './nostr/image-overlay-provider';
+import { AnimatedImageOverlay } from './nostr/animated-image-overlay';
 import { useNostrEngagement, type EngagementViewState } from '@/hooks/useNostrEngagement';
 import { useNostrSocialStore } from '@/stores/nostrSocialStore';
 
@@ -1121,7 +1123,7 @@ const VideoFeedItem = memo(function VideoFeedItem({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={vCtrl.controlBtn}>
             <Icon
-              name={isPaused ? 'mdi:play' : 'mdi:pause'}
+              name={isPaused ? 'mingcute:play-fill' : 'mdi:pause'}
               size={24}
               color="rgba(255,255,255,0.85)"
             />
@@ -1532,7 +1534,7 @@ export function VideoFeedOverlay({
 // Main UserFeed Component
 // ============================================================================
 
-function UserFeedComponent({
+function UserFeedInner({
   pubkey,
   authorName,
   authorPicture,
@@ -1541,6 +1543,7 @@ function UserFeedComponent({
   onVideoPostsReady,
 }: UserFeedProps) {
   const { getPrimaryColor } = useTheme();
+  const imageOverlay = useImageOverlay();
   const [, startTransition] = useTransition();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(new Map());
@@ -2113,6 +2116,14 @@ function UserFeedComponent({
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
+        onScroll={
+          imageOverlay?.scrollOffsetY != null
+            ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+                imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
+              }
+            : undefined
+        }
+        scrollEventThrottle={16}
       />
     ) : (
       <LegendList
@@ -2134,6 +2145,13 @@ function UserFeedComponent({
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
+        onScroll={
+          imageOverlay?.scrollOffsetY != null
+            ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+                imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
+              }
+            : undefined
+        }
         scrollEventThrottle={16}
       />
     );
@@ -2141,6 +2159,7 @@ function UserFeedComponent({
   return (
     <>
       {feedList}
+      <AnimatedImageOverlay />
       {overlayVisible && (
         <VideoFeedOverlay
           videoPosts={videoPosts}
@@ -2163,6 +2182,14 @@ function UserFeedComponent({
         />
       )}
     </>
+  );
+}
+
+function UserFeedComponent(props: UserFeedProps) {
+  return (
+    <ImageOverlayProvider>
+      <UserFeedInner {...props} />
+    </ImageOverlayProvider>
   );
 }
 

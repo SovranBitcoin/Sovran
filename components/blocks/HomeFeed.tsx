@@ -57,6 +57,8 @@ import { CATEGORY_NPUBS } from './nostr/categoryNpubs';
 
 import { PostCard } from './nostr/PostCard';
 import { RepostCard, VideoFeedOverlay, type VideoPost } from './UserFeed';
+import { ImageOverlayProvider, useImageOverlay } from './nostr/image-overlay-provider';
+import { AnimatedImageOverlay } from './nostr/animated-image-overlay';
 import { useNostrEngagement } from '@/hooks/useNostrEngagement';
 import { StoriesRow } from './nostr/StoriesRow';
 
@@ -353,9 +355,10 @@ function EmptyFeed() {
 // Main HomeFeed Component
 // ============================================================================
 
-function HomeFeedComponent() {
+function HomeFeedInner() {
   useBackgroundConfig(BG_CONFIG);
   const { getPrimaryColor } = useTheme();
+  const imageOverlay = useImageOverlay();
   const { keys: nostrKeys } = useNostrKeysContext();
   const userPubkey = nostrKeys?.pubkey;
   const insets = useSafeAreaInsets();
@@ -490,9 +493,15 @@ function HomeFeedComponent() {
               })();
 
         console.log('[HomeFeed DEBUG] feedRawEvents count:', feedRawEvents.length);
-        console.log('[HomeFeed DEBUG] feedRawEvents kinds:', feedRawEvents.map((e) => e.kind));
+        console.log(
+          '[HomeFeed DEBUG] feedRawEvents kinds:',
+          feedRawEvents.map((e) => e.kind)
+        );
         if (feedRawEvents.length > 0) {
-          console.log('[HomeFeed DEBUG] sample event:', JSON.stringify(feedRawEvents[0]).slice(0, 300));
+          console.log(
+            '[HomeFeed DEBUG] sample event:',
+            JSON.stringify(feedRawEvents[0]).slice(0, 300)
+          );
         }
 
         const phase1 = parseMegaFeedResponse(feedRawEvents);
@@ -1118,7 +1127,10 @@ function HomeFeedComponent() {
       if (item.type === 'tabs') {
         return tabsBar;
       }
-      return renderFeedItem({ item, index } as LegendListRenderItemProps<FeedItem, string | undefined>); // eslint-disable-line prettier/prettier
+      return renderFeedItem({ item, index } as LegendListRenderItemProps<
+        FeedItem,
+        string | undefined
+      >);
     },
     [userPubkey, tabsBar, renderFeedItem]
   );
@@ -1126,6 +1138,16 @@ function HomeFeedComponent() {
   const handleScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
     scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
   }, []);
+
+  const onScroll = useCallback(
+    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+      handleScroll(e);
+      if (imageOverlay?.scrollOffsetY != null) {
+        imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
+      }
+    },
+    [handleScroll, imageOverlay]
+  );
 
   return (
     <>
@@ -1157,11 +1179,12 @@ function HomeFeedComponent() {
           style={styles.flex1}
           contentContainerStyle={LIST_CONTENT_STYLE}
           showsVerticalScrollIndicator={false}
-          onScroll={handleScroll}
+          onScroll={onScroll}
           scrollEventThrottle={16}
           refreshControl={refreshControl}
         />
       </View>
+      <AnimatedImageOverlay />
       {overlayVisible && (
         <VideoFeedOverlay
           videoPosts={videoPosts}
@@ -1184,6 +1207,14 @@ function HomeFeedComponent() {
         />
       )}
     </>
+  );
+}
+
+function HomeFeedComponent() {
+  return (
+    <ImageOverlayProvider>
+      <HomeFeedInner />
+    </ImageOverlayProvider>
   );
 }
 

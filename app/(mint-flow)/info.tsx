@@ -812,7 +812,11 @@ function MintInfoModal() {
                       color={opacity(getPrimaryColor('0'), 0.4)}
                     />
                   ) : contact.method.toUpperCase() === 'EMAIL' ? (
-                    <Icon name="mdi:at" size={ROW_ICON_SIZE} color={opacity(getPrimaryColor('0'), 0.4)} />
+                    <Icon
+                      name="mdi:at"
+                      size={ROW_ICON_SIZE}
+                      color={opacity(getPrimaryColor('0'), 0.4)}
+                    />
                   ) : undefined
                 }
                 label={

@@ -37,6 +37,8 @@ import {
 import { PostCard } from './nostr/PostCard';
 
 import { VideoFeedOverlay, type VideoPost } from './UserFeed';
+import { ImageOverlayProvider, useImageOverlay } from './nostr/image-overlay-provider';
+import { AnimatedImageOverlay } from './nostr/animated-image-overlay';
 import { useNostrEngagement } from '@/hooks/useNostrEngagement';
 
 // ============================================================================
@@ -135,9 +137,10 @@ function buildThreadStructure(
 // Main ThreadView Component
 // ============================================================================
 
-function ThreadViewComponent({ eventId }: ThreadViewProps) {
+function ThreadViewInner({ eventId }: ThreadViewProps) {
   const { getPrimaryColor } = useTheme();
   const headerHeight = useHeaderHeight();
+  const imageOverlay = useImageOverlay();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -552,9 +555,17 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
+        onScroll={
+          imageOverlay?.scrollOffsetY != null
+            ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+                imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
+              }
+            : undefined
+        }
         scrollEventThrottle={16}
         initialScrollIndex={targetIndex > 0 ? targetIndex : undefined}
       />
+      <AnimatedImageOverlay />
       {overlayVisible && (
         <VideoFeedOverlay
           videoPosts={videoPosts}
@@ -576,6 +587,14 @@ function ThreadViewComponent({ eventId }: ThreadViewProps) {
         />
       )}
     </View>
+  );
+}
+
+function ThreadViewComponent(props: ThreadViewProps) {
+  return (
+    <ImageOverlayProvider>
+      <ThreadViewInner {...props} />
+    </ImageOverlayProvider>
   );
 }
 

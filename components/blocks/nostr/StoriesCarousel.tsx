@@ -14,6 +14,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   View,
+  TouchableOpacity,
 } from 'react-native';
 import Animated, {
   SharedValue,
@@ -31,7 +32,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { Avatar } from 'components/ui/Avatar';
 import { Text } from 'components/ui/Text';
-import { TouchableOpacity } from 'react-native';
 import Icon from 'assets/icons';
 import { StoriesContainer } from './StoriesContainer';
 import { StoryProgressBar } from './StoryProgressBar';
@@ -88,7 +88,7 @@ export const StoriesCarousel: FC<CarouselProps> = ({ storyUsers, startIndex = 0,
   }));
 
   const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
+    ({ viewableItems }: { viewableItems: { index: number | null }[] }) => {
       if (viewableItems.length > 0 && viewableItems[0]?.index !== null) {
         setListCurrentIndex(viewableItems[0].index!);
       }
@@ -289,7 +289,15 @@ const UserStoriesItem: FC<UserItemProps> = ({
         }
       }
     },
-    [currentStoryIndex, userIndex, totalUsers, scrollRef, screenWidth, user.videoPosts.length, onClose]
+    [
+      currentStoryIndex,
+      userIndex,
+      totalUsers,
+      scrollRef,
+      screenWidth,
+      user.videoPosts.length,
+      onClose,
+    ]
   );
 
   const onStoryLongPress = useCallback(() => {
@@ -312,8 +320,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
     },
   });
 
-  const profileName =
-    user.profile?.name || user.pubkey.slice(0, 12) + '…';
+  const profileName = user.profile?.name || user.pubkey.slice(0, 12) + '…';
   const profilePicture = user.profile?.picture;
 
   return (
