@@ -112,6 +112,34 @@ function logPerfImageState(state: 'open' | 'close') {
   }
 }
 
+/** Post payload for overlay bottom panel (author, content, stats, actions). Kept minimal to avoid circular deps. */
+export interface ImageOverlayPost {
+  event: {
+    id: string;
+    pubkey: string;
+    content: string;
+    created_at: number;
+  };
+  metrics: {
+    replyCount: number;
+    repostCount: number;
+    likeCount: number;
+    satsZapped: number;
+  };
+  profile?: { name: string; picture?: string } | null;
+  reposted?: boolean;
+  liked?: boolean;
+  repostPending?: boolean;
+  likePending?: boolean;
+  repostPendingDirection?: 'activating' | 'deactivating';
+  likePendingDirection?: 'activating' | 'deactivating';
+  onCommentPress?: () => void;
+  onRepostPress?: () => void;
+  onLikePress?: () => void;
+  onActionPressIn?: () => void;
+  onActionPressOut?: () => void;
+}
+
 export interface ImageOverlayLayout {
   url: string;
   aspectRatio?: number;
@@ -122,6 +150,8 @@ export interface ImageOverlayLayout {
   /** When opening a post with multiple images, pass all urls and the index of the tapped image. */
   urls?: string[];
   initialIndex?: number;
+  /** When opening from a post card, pass post data so the overlay can show author, content, stats, reply. */
+  post?: ImageOverlayPost | null;
 }
 
 export type ThumbnailLayout = { pageX: number; pageY: number; width: number; height: number };
@@ -153,12 +183,14 @@ export type ImageOverlayContextValue = {
   expandedHeight: number;
   screenWidth: number;
   screenHeight: number;
+  /** Post data for overlay bottom panel; set when open(layout) is called with layout.post. */
+  activeOverlayPost: ImageOverlayPost | null;
 };
 
 /** State that changes on open/close; separate context to keep actions context stable. */
 type ImageOverlayStateValue = Pick<
   ImageOverlayContextValue,
-  'activeUrl' | 'activeAspectRatio' | 'activeUrls' | 'activeIndex'
+  'activeUrl' | 'activeAspectRatio' | 'activeUrls' | 'activeIndex' | 'activeOverlayPost'
 >;
 
 /** Callbacks + shared values; stable across open/close so consumers don't re-render unnecessarily. */
@@ -168,6 +200,7 @@ type ImageOverlayActionsValue = Omit<
   | 'activeAspectRatio'
   | 'activeUrls'
   | 'activeIndex'
+  | 'activeOverlayPost'
   | 'expandedWidth'
   | 'expandedHeight'
 > & { screenWidth: number; screenHeight: number };
@@ -196,6 +229,7 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
   const [activeIndex, setActiveIndexState] = useState(0);
   const activeUrl = activeUrls.length > 0 ? (activeUrls[activeIndex] ?? activeUrls[0]) : null;
   const [activeAspectRatio, setActiveAspectRatio] = useState(16 / 9);
+  const [activeOverlayPost, setActiveOverlayPost] = useState<ImageOverlayPost | null>(null);
 
   const setActiveIndex = useCallback((index: number) => {
     setActiveIndexState((prev) => (index === prev ? prev : index));
@@ -273,6 +307,7 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
   });
 
   const clearUrlDelayed = useCallback(() => {
+    setActiveOverlayPost(null);
     setTimeout(() => setActiveUrls([]), CLEAR_URL_DELAY_MS);
   }, []);
 
@@ -325,6 +360,7 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
       setActiveUrls(urls);
       setActiveIndexState(initialIndex);
       setActiveAspectRatio(aspectRatio);
+      setActiveOverlayPost(layout.post ?? null);
 
       scrollOffsetAtOpen.value = scrollOffsetY.value;
       closeTargetPageX.value = layout.pageX;
@@ -541,8 +577,8 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
   ]);
 
   const stateValue = useMemo<ImageOverlayStateValue>(
-    () => ({ activeUrl, activeAspectRatio, activeUrls, activeIndex }),
-    [activeUrl, activeAspectRatio, activeUrls, activeIndex]
+    () => ({ activeUrl, activeAspectRatio, activeUrls, activeIndex, activeOverlayPost }),
+    [activeUrl, activeAspectRatio, activeUrls, activeIndex, activeOverlayPost]
   );
 
   const actionsRecreateCountRef = useRef(0);

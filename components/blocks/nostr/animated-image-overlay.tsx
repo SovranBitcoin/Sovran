@@ -26,8 +26,13 @@ import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import Icon from 'assets/icons';
-import type { ImageOverlayContextValue } from './image-overlay-provider';
+import { Text } from 'components/ui/Text';
+import { Avatar } from 'components/ui/Avatar';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { formatTimestamp, formatCount, formatSats } from './shared';
+import type { ImageOverlayContextValue, ImageOverlayPost } from './image-overlay-provider';
 import { IMAGE_OVERLAY_TIMING_CONFIG, useImageOverlay } from './image-overlay-provider';
 import {
   DISMISS_ACTIVE_OFFSET_Y,
@@ -60,6 +65,10 @@ import {
   CLOSE_BUTTON_PADDING,
   CLOSE_BUTTON_TOP_OFFSET,
   DOT_PAGER_BOTTOM,
+  BOTTOM_PANEL_SAFE_HEIGHT,
+  BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
+  BOTTOM_PANEL_PADDING_TOP,
+  BOTTOM_PANEL_PADDING_HORIZONTAL,
 } from './image-overlay.config';
 
 function logPerfOverlayMount() {
@@ -206,9 +215,171 @@ const overlayDotStyles = StyleSheet.create({
   },
 });
 
+const PANEL_BG = 'rgba(0,0,0,0.82)';
+const PANEL_TEXT = 'rgba(255,255,255,0.95)';
+const PANEL_TEXT_MUTED = 'rgba(255,255,255,0.6)';
+const LIKED_COLOR = '#ff5a7a';
+const REPOSTED_COLOR = '#4cd964';
+
+const ImageOverlayBottomPanel = React.memo(function ImageOverlayBottomPanel({
+  post,
+  currentUserPubkey,
+  onReplyPress,
+}: {
+  post: ImageOverlayPost;
+  currentUserPubkey: string | null;
+  onReplyPress: () => void;
+}) {
+  const { event, metrics, profile, reposted, liked, onCommentPress, onRepostPress, onLikePress } =
+    post;
+  const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
+  const shortTime = formatTimestamp(event.created_at);
+  const contentPreview = event.content.trim().slice(0, 120);
+  const contentTruncated = event.content.trim().length > 120;
+
+  return (
+    <View style={bottomPanelStyles.wrap}>
+      {/* Author row */}
+      <Pressable
+        onPress={() => {
+          router.push({
+            pathname: '/(user-flow)/profile' as any,
+            params: { pubkey: event.pubkey },
+          });
+        }}
+        style={bottomPanelStyles.authorRow}>
+        <Avatar
+          picture={profile?.picture}
+          seed={event.pubkey}
+          size={32}
+          variant="person"
+          name={displayName}
+        />
+        <View style={bottomPanelStyles.authorTextWrap}>
+          <Text bold size={14} style={{ color: PANEL_TEXT }} numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            {shortTime}
+          </Text>
+        </View>
+      </Pressable>
+      {/* Post content */}
+      {contentPreview.length > 0 ? (
+        <Text
+          size={14}
+          style={[bottomPanelStyles.contentText, { color: PANEL_TEXT_MUTED }]}
+          numberOfLines={2}>
+          {contentPreview}
+          {contentTruncated ? '…' : ''}
+        </Text>
+      ) : null}
+      {/* Stats / actions row */}
+      <View style={bottomPanelStyles.metricsRow}>
+        <Pressable
+          onPress={onCommentPress}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={bottomPanelStyles.metricBtn}>
+          <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
+          <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            {formatCount(metrics.replyCount)}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onRepostPress}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={bottomPanelStyles.metricBtn}>
+          <Icon
+            name="garden:arrow-retweet-fill-16"
+            size={17}
+            color={reposted ? REPOSTED_COLOR : PANEL_TEXT_MUTED}
+          />
+          <Text size={13} style={{ color: reposted ? REPOSTED_COLOR : PANEL_TEXT_MUTED }}>
+            {formatCount(metrics.repostCount)}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onLikePress}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={bottomPanelStyles.metricBtn}>
+          <Icon
+            name="iconamoon:heart-fill"
+            size={16}
+            color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
+          />
+          <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
+            {formatCount(metrics.likeCount)}
+          </Text>
+        </Pressable>
+        <View style={bottomPanelStyles.metricBtn}>
+          <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
+          <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
+          </Text>
+        </View>
+      </View>
+      {/* Reply row: current user avatar + input */}
+      <Pressable onPress={onReplyPress} style={bottomPanelStyles.replyRow}>
+        <Avatar seed={currentUserPubkey ?? ''} size={28} variant="person" name="" />
+        <View style={bottomPanelStyles.replyInputWrap}>
+          <Text size={14} style={{ color: PANEL_TEXT_MUTED }}>
+            Post your reply
+          </Text>
+        </View>
+      </Pressable>
+    </View>
+  );
+});
+
+const bottomPanelStyles = StyleSheet.create({
+  wrap: {
+    paddingHorizontal: BOTTOM_PANEL_PADDING_HORIZONTAL,
+    paddingTop: BOTTOM_PANEL_PADDING_TOP,
+    gap: 10,
+  },
+  authorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  authorTextWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    minWidth: 0,
+  },
+  contentText: {
+    lineHeight: 20,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+  },
+  metricBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  replyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 20,
+  },
+  replyInputWrap: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+});
+
 function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue }) {
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { keys: nostrKeys } = useNostrKeysContext();
   const renderCountRef = useRef(0);
   renderCountRef.current += 1;
 
@@ -225,12 +396,15 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   const panStartX = useSharedValue(0);
   const panStartY = useSharedValue(0);
   const dismissPanActive = useSharedValue(0);
+  /** Toggle via tap on image: 1 = show close/panel/dots, 0 = hide to focus on image. */
+  const overlayUIVisible = useSharedValue(1);
 
   const {
     activeUrl,
     activeUrls,
     activeIndex,
     setActiveIndex,
+    activeOverlayPost,
     imageState,
     imageXCoord,
     imageYCoord,
@@ -269,6 +443,10 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   useEffect(() => {
     pagerOffsetSv.value = activeIndex;
   }, [activeIndex, pagerOffsetSv]);
+
+  useEffect(() => {
+    if (activeUrl) overlayUIVisible.value = 1;
+  }, [activeUrl, overlayUIVisible]);
 
   const rContainerStyle = useAnimatedStyle(() => ({
     pointerEvents: imageState.value === 'open' ? 'auto' : 'none',
@@ -318,12 +496,17 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   }));
 
   const rCloseBtnStyle = useAnimatedStyle(() => ({
+    opacity: closeBtnOpacity.value * overlayUIVisible.value,
+  }));
+
+  /** Fade dots only during drag-to-dismiss (not affected by tap-on-image toggle). */
+  const rDotPagerStyle = useAnimatedStyle(() => ({
     opacity: closeBtnOpacity.value,
   }));
 
-  /** Fade dots with the same curve as blur/close button during dismiss. */
-  const rDotPagerStyle = useAnimatedStyle(() => ({
-    opacity: closeBtnOpacity.value,
+  /** Fade bottom panel with close button during dismiss. Tap image toggles overlayUIVisible. */
+  const rBottomPanelStyle = useAnimatedStyle(() => ({
+    opacity: closeBtnOpacity.value * overlayUIVisible.value,
   }));
 
   const pan = useMemo(
@@ -395,22 +578,40 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     if (fn) scheduleOnUI(fn);
   }, []);
 
+  const toggleOverlayUI = useCallback(() => {
+    scheduleOnUI(() => {
+      'worklet';
+      const next = overlayUIVisible.value === 1 ? 0 : 1;
+      overlayUIVisible.value = withTiming(next, { duration: 200 });
+    });
+  }, [overlayUIVisible]);
+
+  /** Max finger movement (px) for tap to count; prevents swipe-to-page from triggering toggle. */
+  const TAP_MAX_DISTANCE = 12;
+
   const tapBackdrop = useMemo(
     () =>
-      Gesture.Tap().onEnd((e) => {
-        if (imageState.value === 'close') return;
-        const x = e.x;
-        const y = e.y;
-        const ix = imageXCoord.value;
-        const iy = imageYCoord.value;
-        const iw = imageWidth.value;
-        const ih = imageHeight.value;
-        const insideImage = x >= ix && x <= ix + iw && y >= iy && y <= iy + ih;
-        if (insideImage) return;
-        runOnJS(triggerClose)();
-      }),
+      Gesture.Tap()
+        .maxDistance(TAP_MAX_DISTANCE)
+        .onEnd((e) => {
+          if (imageState.value === 'close') return;
+          const x = e.x;
+          const y = e.y;
+          const ix = imageXCoord.value;
+          const iy = imageYCoord.value;
+          const iw = imageWidth.value;
+          const ih = imageHeight.value;
+          const insideImage = x >= ix && x <= ix + iw && y >= iy && y <= iy + ih;
+          if (insideImage) {
+            runOnJS(toggleOverlayUI)();
+            return;
+          }
+          const insideBottomPanel = y >= screenHeight - BOTTOM_PANEL_SAFE_HEIGHT;
+          if (insideBottomPanel) return;
+          runOnJS(triggerClose)();
+        }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- worklet reads shared values
-    [triggerClose]
+    [triggerClose, toggleOverlayUI, screenHeight]
   );
 
   const horizontalPan = useMemo(
@@ -544,6 +745,26 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
               )}
             </Animated.View>
           ) : null}
+          {activeOverlayPost ? (
+            <Animated.View
+              style={[
+                styles.bottomPanel,
+                rBottomPanelStyle,
+                { paddingBottom: insets.bottom + BOTTOM_PANEL_PADDING_BOTTOM_EXTRA },
+              ]}
+              pointerEvents="auto">
+              <ImageOverlayBottomPanel
+                post={activeOverlayPost}
+                currentUserPubkey={nostrKeys?.pubkey ?? null}
+                onReplyPress={() => {
+                  router.push({
+                    pathname: '/(user-flow)/thread' as any,
+                    params: { eventId: activeOverlayPost.event.id },
+                  });
+                }}
+              />
+            </Animated.View>
+          ) : null}
         </AnimatedPressable>
       </GestureDetector>
     </View>
@@ -585,5 +806,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  bottomPanel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: PANEL_BG,
   },
 });

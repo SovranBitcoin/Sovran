@@ -39,7 +39,7 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { nip19 } from 'nostr-tools';
 import { BlurView } from 'components/ui/BlurView';
-import { useImageOverlay } from './image-overlay-provider';
+import { useImageOverlay, type ImageOverlayPost } from './image-overlay-provider';
 
 const AnimatedBlurView = Reanimated.createAnimatedComponent(BlurView);
 
@@ -651,12 +651,44 @@ export const InlineLink = React.memo(function InlineLink({
  * - render count (per url), handlePress (tap to open overlay).
  * Optional onPressIn/onPressOut suppress parent tap (e.g. PostCard thread navigation).
  */
+/** Optional post payload for image overlay bottom panel (passed when opening from PostCard). */
+interface ImageBlockOverlayPostProps {
+  event: FeedEvent;
+  metrics: NoteMetrics;
+  profile?: ProfileInfo | null;
+  reposted?: boolean;
+  liked?: boolean;
+  repostPending?: boolean;
+  likePending?: boolean;
+  repostPendingDirection?: 'activating' | 'deactivating';
+  likePendingDirection?: 'activating' | 'deactivating';
+  onCommentPress?: () => void;
+  onRepostPress?: () => void;
+  onLikePress?: () => void;
+  onActionPressIn?: () => void;
+  onActionPressOut?: () => void;
+}
+
 export const ImageBlock = React.memo(function ImageBlock({
   url,
   allImageUrls,
   imageIndex,
   onPressIn,
   onPressOut,
+  event: overlayEvent,
+  metrics: overlayMetrics,
+  profile: overlayProfile,
+  reposted,
+  liked,
+  repostPending,
+  likePending,
+  repostPendingDirection,
+  likePendingDirection,
+  onCommentPress,
+  onRepostPress,
+  onLikePress,
+  onActionPressIn,
+  onActionPressOut,
 }: {
   url: string;
   /** When the post has multiple images, pass all urls so the overlay can show a pager. */
@@ -665,7 +697,7 @@ export const ImageBlock = React.memo(function ImageBlock({
   imageIndex?: number;
   onPressIn?: () => void;
   onPressOut?: () => void;
-}) {
+} & Partial<ImageBlockOverlayPostProps>) {
   const [aspectRatio, setAspectRatio] = useState(16 / 9);
   const [error, setError] = useState(false);
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
@@ -708,6 +740,35 @@ export const ImageBlock = React.memo(function ImageBlock({
             y: pageY,
           });
         }
+        const post: ImageOverlayPost | undefined =
+          overlayEvent && overlayMetrics
+            ? {
+                event: {
+                  id: overlayEvent.id,
+                  pubkey: overlayEvent.pubkey,
+                  content: overlayEvent.content,
+                  created_at: overlayEvent.created_at,
+                },
+                metrics: {
+                  replyCount: overlayMetrics.replyCount,
+                  repostCount: overlayMetrics.repostCount,
+                  likeCount: overlayMetrics.likeCount,
+                  satsZapped: overlayMetrics.satsZapped,
+                },
+                profile: overlayProfile ?? null,
+                reposted,
+                liked,
+                repostPending,
+                likePending,
+                repostPendingDirection,
+                likePendingDirection,
+                onCommentPress,
+                onRepostPress,
+                onLikePress,
+                onActionPressIn,
+                onActionPressOut,
+              }
+            : undefined;
         imageOverlay.open({
           url,
           aspectRatio,
@@ -717,10 +778,31 @@ export const ImageBlock = React.memo(function ImageBlock({
           height,
           urls: allImageUrls && allImageUrls.length > 1 ? allImageUrls : undefined,
           initialIndex: imageIndex,
+          post: post ?? null,
         });
       }
     );
-  }, [imageOverlay, url, aspectRatio, allImageUrls, imageIndex]);
+  }, [
+    imageOverlay,
+    url,
+    aspectRatio,
+    allImageUrls,
+    imageIndex,
+    overlayEvent,
+    overlayMetrics,
+    overlayProfile,
+    reposted,
+    liked,
+    repostPending,
+    likePending,
+    repostPendingDirection,
+    likePendingDirection,
+    onCommentPress,
+    onRepostPress,
+    onLikePress,
+    onActionPressIn,
+    onActionPressOut,
+  ]);
 
   const fallbackBlur = useSharedValue(0);
   const thumbnailBlur = imageOverlay?.thumbnailBlurIntensity ?? fallbackBlur;
@@ -1274,6 +1356,20 @@ export const NoteContent = React.memo(function NoteContent({
   onInlineActionPressOut,
   onImagePressIn,
   onImagePressOut,
+  event: overlayEvent,
+  metrics: overlayMetrics,
+  profile: overlayProfile,
+  reposted,
+  liked,
+  repostPending,
+  likePending,
+  repostPendingDirection,
+  likePendingDirection,
+  onCommentPress,
+  onRepostPress,
+  onLikePress,
+  onActionPressIn,
+  onActionPressOut,
 }: {
   content: string;
   quotedEvents: Map<string, FeedEvent>;
@@ -1286,6 +1382,21 @@ export const NoteContent = React.memo(function NoteContent({
   onInlineActionPressOut?: () => void;
   onImagePressIn?: () => void;
   onImagePressOut?: () => void;
+  /** Optional: when present, image overlay shows post bottom panel (author, content, stats, reply). */
+  event?: FeedEvent;
+  metrics?: NoteMetrics;
+  profile?: ProfileInfo | null;
+  reposted?: boolean;
+  liked?: boolean;
+  repostPending?: boolean;
+  likePending?: boolean;
+  repostPendingDirection?: 'activating' | 'deactivating';
+  likePendingDirection?: 'activating' | 'deactivating';
+  onCommentPress?: () => void;
+  onRepostPress?: () => void;
+  onLikePress?: () => void;
+  onActionPressIn?: () => void;
+  onActionPressOut?: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -1440,6 +1551,20 @@ export const NoteContent = React.memo(function NoteContent({
                     imageIndex={imageIndex >= 0 ? imageIndex : 0}
                     onPressIn={onImagePressIn}
                     onPressOut={onImagePressOut}
+                    event={overlayEvent}
+                    metrics={overlayMetrics}
+                    profile={overlayProfile}
+                    reposted={reposted}
+                    liked={liked}
+                    repostPending={repostPending}
+                    likePending={likePending}
+                    repostPendingDirection={repostPendingDirection}
+                    likePendingDirection={likePendingDirection}
+                    onCommentPress={onCommentPress}
+                    onRepostPress={onRepostPress}
+                    onLikePress={onLikePress}
+                    onActionPressIn={onActionPressIn}
+                    onActionPressOut={onActionPressOut}
                   />
                 );
               }

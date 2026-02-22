@@ -123,6 +123,14 @@ export const IMAGE_WRAP_BORDER_RADIUS = 12;
 
 export const DOT_PAGER_BOTTOM = 16;
 
+/** Min height (px) of bottom panel area; taps in this region do not close the overlay. */
+export const BOTTOM_PANEL_SAFE_HEIGHT = 220;
+
+/** Bottom panel (post info) padding and layout. */
+export const BOTTOM_PANEL_PADDING_TOP = 12;
+export const BOTTOM_PANEL_PADDING_HORIZONTAL = 16;
+export const BOTTOM_PANEL_PADDING_BOTTOM_EXTRA = 12;
+
 // -----------------------------------------------------------------------------
 // Provider: open / expand animation
 // -----------------------------------------------------------------------------

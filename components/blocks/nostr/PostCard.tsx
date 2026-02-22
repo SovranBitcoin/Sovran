@@ -325,6 +325,20 @@ export const PostCard = React.memo(function PostCard({
           onInlineActionPressOut={handleProfilePressOut}
           onImagePressIn={handleProfilePressIn}
           onImagePressOut={handleProfilePressOut}
+          event={event}
+          metrics={metrics}
+          profile={profile}
+          reposted={reposted}
+          liked={liked}
+          repostPending={repostPending}
+          likePending={likePending}
+          repostPendingDirection={repostPendingDirection}
+          likePendingDirection={likePendingDirection}
+          onCommentPress={onCommentPress ?? navigateToThread}
+          onRepostPress={onRepostPress}
+          onLikePress={onLikePress}
+          onActionPressIn={handleActionPressIn}
+          onActionPressOut={handleActionPressOut}
         />
 
         <Spacer size={8} />
