@@ -14,7 +14,6 @@ import {
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
-import { BlurView } from 'components/ui/BlurView';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
@@ -435,7 +434,9 @@ function HomeFeedInner() {
   // ── Phase 1–3: Load feed content for selected spec ──
 
   const loadFeed = useCallback(
-    async (spec: string, isRefresh = false) => {
+    async (specIndex: number, isRefresh = false) => {
+      const spec = feedSpecs[specIndex]?.spec;
+      if (!spec) return;
       if (!isRefresh) setIsLoading(true);
       isFirstRender.current = true;
       hasMoreRef.current = true;
@@ -619,21 +620,20 @@ function HomeFeedInner() {
         client.close();
       }
     },
-    [userPubkey]
+    [feedSpecs, userPubkey]
   );
 
-  // Trigger feed load when spec changes
+  // Trigger feed load when spec (page) changes
   const currentSpec = feedSpecs[activeSpecIndex]?.spec;
   const prevSpecRef = useRef<string | undefined>(undefined);
   const prevPubkeyRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!currentSpec) return;
-    // Only reload when the spec or pubkey actually changed, not when loadFeed ref changes
     if (currentSpec === prevSpecRef.current && userPubkey === prevPubkeyRef.current) return;
     prevSpecRef.current = currentSpec;
     prevPubkeyRef.current = userPubkey;
-    loadFeed(currentSpec);
-  }, [currentSpec, userPubkey, loadFeed]);
+    loadFeed(activeSpecIndex);
+  }, [activeSpecIndex, currentSpec, userPubkey, loadFeed]);
 
   useEffect(() => {
     if (feedSpecs.length === 0) return;
@@ -644,16 +644,14 @@ function HomeFeedInner() {
   const handleRefresh = useCallback(() => {
     if (!currentSpec) return;
     setIsRefreshing(true);
-    loadFeed(currentSpec, true);
-  }, [currentSpec, loadFeed]);
+    loadFeed(activeSpecIndex, true);
+  }, [activeSpecIndex, currentSpec, loadFeed]);
 
   const handleSpecChange = useCallback(
     (index: number) => {
       if (index === activeSpecIndex) return;
       const storiesWereHidden = scrollOffsetRef.current > storiesHeightRef.current;
       if (storiesWereHidden) {
-        // Snap to stories height immediately while old data is still rendered,
-        // so the list has enough content to hold this scroll position
         listRef.current?.scrollToOffset({
           offset: storiesHeightRef.current,
           animated: false,
@@ -666,19 +664,6 @@ function HomeFeedInner() {
     },
     [activeSpecIndex]
   );
-
-  // Re-apply scroll position once new feed items arrive after a tab switch
-  useEffect(() => {
-    if (!pendingScrollToTabsRef.current || feedItems.length === 0) return;
-    pendingScrollToTabsRef.current = false;
-
-    requestAnimationFrame(() => {
-      listRef.current?.scrollToOffset({
-        offset: storiesHeightRef.current,
-        animated: false,
-      });
-    });
-  }, [feedItems]);
 
   const handleTabLayout = useCallback((index: number, x: number, width: number) => {
     setTabMeasurements((prev) => {
@@ -694,6 +679,18 @@ function HomeFeedInner() {
     indicatorX.set(withTiming(measurement.x, { duration: 220 }));
     indicatorWidth.set(withTiming(measurement.width, { duration: 220 }));
   }, [activeSpecIndex, indicatorWidth, indicatorX, tabMeasurements]);
+
+  // Re-apply scroll position once new feed items arrive after a tab switch
+  useEffect(() => {
+    if (!pendingScrollToTabsRef.current || feedItems.length === 0) return;
+    pendingScrollToTabsRef.current = false;
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({
+        offset: storiesHeightRef.current,
+        animated: false,
+      });
+    });
+  }, [feedItems]);
 
   // ── Pagination: load older items ──
 
@@ -984,11 +981,16 @@ function HomeFeedInner() {
     width: indicatorWidth.get(),
   }));
 
+  const tabLabelActiveColor = useMemo(() => opacity(getPrimaryColor('0'), 0.95), [getPrimaryColor]);
+  const tabLabelInactiveColor = useMemo(
+    () => opacity(getPrimaryColor('0'), 0.45),
+    [getPrimaryColor]
+  );
+
   const tabsBar = useMemo(
     () =>
       feedSpecs.length > 1 ? (
         <View style={[styles.feedTabsContainer, { backgroundColor: getPrimaryColor('900') }]}>
-          <BlurView intensity={200} tint="dark" style={StyleSheet.absoluteFill} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1008,9 +1010,7 @@ function HomeFeedInner() {
                     size={14}
                     heavy
                     style={{
-                      color: isActive
-                        ? opacity(getPrimaryColor('0'), 0.95)
-                        : opacity(getPrimaryColor('0'), 0.45),
+                      color: isActive ? tabLabelActiveColor : tabLabelInactiveColor,
                     }}>
                     {spec.name}
                   </Text>
@@ -1028,7 +1028,16 @@ function HomeFeedInner() {
           </ScrollView>
         </View>
       ) : null,
-    [activeSpecIndex, feedSpecs, getPrimaryColor, handleSpecChange, handleTabLayout, indicatorStyle]
+    [
+      activeSpecIndex,
+      feedSpecs,
+      getPrimaryColor,
+      handleSpecChange,
+      handleTabLayout,
+      indicatorStyle,
+      tabLabelActiveColor,
+      tabLabelInactiveColor,
+    ]
   );
 
   const renderFeedItem = useCallback(
@@ -1127,10 +1136,10 @@ function HomeFeedInner() {
       if (item.type === 'tabs') {
         return tabsBar;
       }
-      return renderFeedItem({ item, index } as LegendListRenderItemProps<
-        FeedItem,
-        string | undefined
-      >);
+      return renderFeedItem({
+        item,
+        index,
+      } as LegendListRenderItemProps<FeedItem, string | undefined>);
     },
     [userPubkey, tabsBar, renderFeedItem]
   );

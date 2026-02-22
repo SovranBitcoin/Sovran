@@ -12,6 +12,7 @@ import { Metadata } from 'nostr-tools/kinds';
 import { router } from 'expo-router';
 
 import { Avatar } from 'components/ui/Avatar';
+import { Skeleton } from 'components/ui/Skeleton';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
@@ -36,6 +37,8 @@ import type { StoryUser } from './StoriesCarousel';
 const DEFAULT_RING_SIZE = 72;
 const AVATAR_SIZE = 64;
 const STROKE_WIDTH = 3;
+const SKELETON_SLOTS = 5;
+const STORY_NAME_LINE_HEIGHT = 14;
 
 /**
  * Instagram-style gradient ring around an avatar.
@@ -70,6 +73,46 @@ export function GradientRing({
         />
       </Svg>
       <View style={{ borderRadius: size / 2, overflow: 'hidden' }}>{children}</View>
+    </View>
+  );
+}
+
+// ============================================================================
+// Stories row skeleton (same layout as content to avoid content shift)
+// ============================================================================
+
+function StoriesRowSkeleton() {
+  const { getPrimaryColor } = useTheme();
+  const skeletonBg = getPrimaryColor('700');
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}>
+        {Array.from({ length: SKELETON_SLOTS }).map((_, i) => (
+          <View key={i} style={styles.storyItem}>
+            <Skeleton
+              style={{
+                width: DEFAULT_RING_SIZE,
+                height: DEFAULT_RING_SIZE,
+                borderRadius: DEFAULT_RING_SIZE / 2,
+                backgroundColor: skeletonBg,
+              }}
+            />
+            <Skeleton
+              style={[
+                styles.storyName,
+                {
+                  width: 48,
+                  height: STORY_NAME_LINE_HEIGHT,
+                  backgroundColor: skeletonBg,
+                },
+              ]}
+            />
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -202,7 +245,9 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
     [storyUsers]
   );
 
-  if (loading || storyUsers.length === 0) return null;
+  if (loading || storyUsers.length === 0) {
+    return <StoriesRowSkeleton />;
+  }
 
   return (
     <View style={styles.container}>
