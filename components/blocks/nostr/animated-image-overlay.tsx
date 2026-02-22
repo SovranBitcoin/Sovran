@@ -29,6 +29,38 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'assets/icons';
 import type { ImageOverlayContextValue } from './image-overlay-provider';
 import { IMAGE_OVERLAY_TIMING_CONFIG, useImageOverlay } from './image-overlay-provider';
+import {
+  DISMISS_ACTIVE_OFFSET_Y,
+  DISMISS_BLUR_AT_REST,
+  DISMISS_CLOSE_BTN_FADE_DURATION_MS,
+  DISMISS_DRAG_FOLLOW,
+  DISMISS_DRAG_RANGE_FRACTION,
+  DISMISS_FAIL_OFFSET_X,
+  DISMISS_MIN_DISTANCE,
+  DISMISS_SCALE_AT_DRAG,
+  DISMISS_THRESHOLD_FRACTION,
+  DOTS_ACTIVE_COLOR,
+  DOTS_GAP,
+  DOTS_OPACITY_INPUT,
+  DOTS_OPACITY_OUTPUT,
+  DOTS_SCALE_INPUT,
+  DOTS_SCALE_OUTPUT,
+  DOTS_SIZE,
+  IMAGE_WRAP_BORDER_RADIUS,
+  PAGER_ACTIVE_OFFSET_X,
+  PAGER_FAIL_OFFSET_Y,
+  PAGER_FLICK_VELOCITY_THRESHOLD,
+  PAGER_MIN_DISTANCE,
+  PAGER_VELOCITY_CLAMP,
+  PAGER_VELOCITY_WEIGHT,
+  SNAP_SPRING_PAGE_CHANGE,
+  SNAP_SPRING_SAME_PAGE,
+  CLOSE_BUTTON_BG,
+  CLOSE_BUTTON_LEFT,
+  CLOSE_BUTTON_PADDING,
+  CLOSE_BUTTON_TOP_OFFSET,
+  DOT_PAGER_BOTTOM,
+} from './image-overlay.config';
 
 function logPerfOverlayMount() {
   if (__DEV__) console.log('[ImageOverlay:Perf] AnimatedImageOverlayContent mounted');
@@ -121,10 +153,7 @@ function PagerPage({
 
 const MemoizedPagerPage = React.memo(PagerPage);
 
-// Instagram-style animated dots: scale by distance from current page (bell curve)
-const DOT_SIZE = 6;
-const DOT_GAP = 4;
-const DOT_CONTAINER_WIDTH = DOT_SIZE + DOT_GAP;
+const DOT_CONTAINER_WIDTH = DOTS_SIZE + DOTS_GAP;
 
 function OverlayDot({
   index,
@@ -139,15 +168,14 @@ function OverlayDot({
     const position = index - pagerOffsetSv.value;
     const scale = interpolate(
       position,
-      [-2, -1, 0, 1, 2],
-      [0.3, 0.7, 1, 0.7, 0.3],
+      [...DOTS_SCALE_INPUT],
+      [...DOTS_SCALE_OUTPUT],
       Extrapolation.CLAMP
     );
-    // Drive opacity from position so the "current" dot is always brightest without waiting on JS state
     const opacity = interpolate(
       Math.abs(position),
-      [0, 0.5, 1],
-      [1, 0.85, 0.4],
+      [...DOTS_OPACITY_INPUT],
+      [...DOTS_OPACITY_OUTPUT],
       Extrapolation.CLAMP
     );
     return {
@@ -172,9 +200,9 @@ const overlayDotStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   dot: {
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
+    width: DOTS_SIZE,
+    height: DOTS_SIZE,
+    borderRadius: DOTS_SIZE / 2,
   },
 });
 
@@ -223,12 +251,12 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     if (__DEV__ && hasMultipleImages) {
       console.log('[ImageOverlay:Gesture] Config (multi-image)', {
         dismiss: {
-          activeOffsetY: '[-14, 14] (dismiss activates after 14px vertical)',
-          failOffsetX: '[-32, 32] (dismiss fails only if 32px horizontal first)',
+          activeOffsetY: `[-${DISMISS_ACTIVE_OFFSET_Y}, ${DISMISS_ACTIVE_OFFSET_Y}] (dismiss activates after ${DISMISS_ACTIVE_OFFSET_Y}px vertical)`,
+          failOffsetX: `[-${DISMISS_FAIL_OFFSET_X}, ${DISMISS_FAIL_OFFSET_X}] (dismiss fails if ${DISMISS_FAIL_OFFSET_X}px horizontal first)`,
         },
         pager: {
-          activeOffsetX: '[-20, 20] (pager activates after 20px horizontal)',
-          failOffsetY: '[-8, 8] (pager fails if 12px vertical first)',
+          activeOffsetX: `[-${PAGER_ACTIVE_OFFSET_X}, ${PAGER_ACTIVE_OFFSET_X}] (pager activates after ${PAGER_ACTIVE_OFFSET_X}px horizontal)`,
+          failOffsetY: `[-${PAGER_FAIL_OFFSET_Y}, ${PAGER_FAIL_OFFSET_Y}] (pager fails if ${PAGER_FAIL_OFFSET_Y}px vertical first)`,
         },
         expected: 'Horizontal swipe → PAGER. Vertical swipe → DISMISS.',
       });
@@ -293,32 +321,39 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     opacity: closeBtnOpacity.value,
   }));
 
+  /** Fade dots with the same curve as blur/close button during dismiss. */
+  const rDotPagerStyle = useAnimatedStyle(() => ({
+    opacity: closeBtnOpacity.value,
+  }));
+
   const pan = useMemo(
     () =>
       Gesture.Pan()
-        .minDistance(6)
-        .activeOffsetY([-14, 14])
-        .failOffsetX([-32, 32])
+        .minDistance(DISMISS_MIN_DISTANCE)
+        .activeOffsetY([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
+        .failOffsetX([-DISMISS_FAIL_OFFSET_X, DISMISS_FAIL_OFFSET_X])
         .onStart(() => {
           dismissPanActive.value = 1;
           scheduleOnRN(logPerfPanStart);
           scheduleOnRN(logDismissPanStart);
           panStartX.value = imageXCoord.value;
           panStartY.value = imageYCoord.value;
-          closeBtnOpacity.value = withTiming(0, { duration: 200 });
+          closeBtnOpacity.value = withTiming(0, {
+            duration: DISMISS_CLOSE_BTN_FADE_DURATION_MS,
+          });
         })
         .onChange((event) => {
           if (imageState.value === 'close') return;
-          imageXCoord.value += event.changeX * 0.85;
-          imageYCoord.value += event.changeY * 0.85;
+          imageXCoord.value += event.changeX * DISMISS_DRAG_FOLLOW;
+          imageYCoord.value += event.changeY * DISMISS_DRAG_FOLLOW;
           const deltaX = imageXCoord.value - panStartX.value;
           const deltaY = imageYCoord.value - panStartY.value;
           const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-          const dragRange = screenWidth * 0.35;
-          const scale = interpolate(distance, [0, dragRange], [1, 0.9], {
+          const dragRange = screenWidth * DISMISS_DRAG_RANGE_FRACTION;
+          const scale = interpolate(distance, [0, dragRange], [1, DISMISS_SCALE_AT_DRAG], {
             extrapolateRight: 'clamp',
           });
-          const blur = interpolate(distance, [0, dragRange], [100, 0], {
+          const blur = interpolate(distance, [0, dragRange], [DISMISS_BLUR_AT_REST, 0], {
             extrapolateRight: 'clamp',
           });
           imageScale.value = scale;
@@ -330,7 +365,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           const deltaX = imageXCoord.value - panStartX.value;
           const deltaY = imageYCoord.value - panStartY.value;
           const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-          const threshold = Math.max(expandedWidth, expandedHeight) / 4;
+          const threshold = Math.max(expandedWidth, expandedHeight) * DISMISS_THRESHOLD_FRACTION;
           const dismissed = distance > threshold;
           scheduleOnRN(logPerfPanFinalize, distance, threshold, dismissed);
           scheduleOnRN(
@@ -378,23 +413,13 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     [triggerClose]
   );
 
-  const SNAP_SPRING = {
-    duration: 580,
-    dampingRatio: 1,
-  };
-  /** Softer, longer settle when moving to the next/prev page so the animation eases into place instead of snapping. */
-  const SNAP_SPRING_PAGE_CHANGE = {
-    duration: 420,
-    dampingRatio: 0.92,
-  };
-
   const horizontalPan = useMemo(
     () =>
       Gesture.Pan()
         .enabled(hasMultipleImages)
-        .activeOffsetX([-20, 20])
-        .failOffsetY([-8, 8])
-        .minDistance(6)
+        .activeOffsetX([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X])
+        .failOffsetY([-PAGER_FAIL_OFFSET_Y, PAGER_FAIL_OFFSET_Y])
+        .minDistance(PAGER_MIN_DISTANCE)
         .onStart(() => {
           if (imageState.value !== 'open') return;
           scheduleOnRN(logPagerPanStart);
@@ -411,10 +436,14 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           const delta = -e.translationX / expandedWidth;
           const current = startPagerOffsetSv.value + delta;
           const velocity = -e.velocityX / expandedWidth;
-          const VELOCITY_WEIGHT = 0.12;
-          const effective = current + velocity * VELOCITY_WEIGHT;
-          const snapTo = Math.max(0, Math.min(maxPagerIndex, Math.round(effective)));
+          const effective = current + velocity * PAGER_VELOCITY_WEIGHT;
+          let snapTo = Math.max(0, Math.min(maxPagerIndex, Math.round(effective)));
           const startIndex = Math.round(startPagerOffsetSv.value);
+          if (velocity >= PAGER_FLICK_VELOCITY_THRESHOLD && startIndex < maxPagerIndex) {
+            snapTo = startIndex + 1;
+          } else if (velocity <= -PAGER_FLICK_VELOCITY_THRESHOLD && startIndex > 0) {
+            snapTo = startIndex - 1;
+          }
           const didChangePage = snapTo !== startIndex;
           scheduleOnRN(
             logPagerPanEnd,
@@ -424,9 +453,10 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             startIndex,
             didChangePage
           );
-          // Defer setActiveIndex until the spring finishes. Updating React state mid-animation causes the provider to re-render and run effects (e.g. closeTarget sync), which can interrupt the animation. Dots stay correct because they're driven by pagerOffsetSv.
-          const initialVelocity = didChangePage ? 0 : Math.max(-12, Math.min(12, velocity));
-          const springConfig = didChangePage ? SNAP_SPRING_PAGE_CHANGE : SNAP_SPRING;
+          const initialVelocity = didChangePage
+            ? 0
+            : Math.max(-PAGER_VELOCITY_CLAMP, Math.min(PAGER_VELOCITY_CLAMP, velocity));
+          const springConfig = didChangePage ? SNAP_SPRING_PAGE_CHANGE : SNAP_SPRING_SAME_PAGE;
           pagerOffsetSv.value = withSpring(
             snapTo,
             {
@@ -463,7 +493,9 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             style={StyleSheet.absoluteFill}
             animatedProps={backdropAnimatedProps}
           />
-          <Pressable onPress={triggerClose} style={[styles.closeButton, { top: insets.top + 16 }]}>
+          <Pressable
+            onPress={triggerClose}
+            style={[styles.closeButton, { top: insets.top + CLOSE_BUTTON_TOP_OFFSET }]}>
             <Animated.View style={rCloseBtnStyle}>
               <Icon name="material-symbols:close-rounded" size={22} color="#fff" />
             </Animated.View>
@@ -489,16 +521,16 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                       </Animated.View>
                     </Animated.View>
                   </View>
-                  <View style={styles.dotPager} pointerEvents="none">
+                  <Animated.View style={[styles.dotPager, rDotPagerStyle]} pointerEvents="none">
                     {activeUrls.map((_, i) => (
                       <OverlayDot
                         key={i}
                         index={i}
                         pagerOffsetSv={pagerOffsetSv}
-                        activeColor="rgba(255,255,255,0.95)"
+                        activeColor={DOTS_ACTIVE_COLOR}
                       />
                     ))}
-                  </View>
+                  </Animated.View>
                 </>
               ) : (
                 <Pressable style={StyleSheet.absoluteFill} onPress={() => {}}>
@@ -534,20 +566,20 @@ export function AnimatedImageOverlay() {
 const styles = StyleSheet.create({
   closeButton: {
     position: 'absolute',
-    left: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 4,
+    left: CLOSE_BUTTON_LEFT,
+    backgroundColor: CLOSE_BUTTON_BG,
+    padding: CLOSE_BUTTON_PADDING,
     borderRadius: 9999,
   },
   imageWrap: {
     position: 'absolute',
-    borderRadius: 12,
+    borderRadius: IMAGE_WRAP_BORDER_RADIUS,
     overflow: 'hidden',
     transformOrigin: 'center',
   },
   dotPager: {
     position: 'absolute',
-    bottom: 16,
+    bottom: DOT_PAGER_BOTTOM,
     left: 0,
     right: 0,
     flexDirection: 'row',

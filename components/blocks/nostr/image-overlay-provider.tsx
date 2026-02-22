@@ -30,15 +30,18 @@ import {
 } from 'react-native-reanimated';
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { useScrollViewOffset } from '@/hooks/useScrollViewOffset';
+import {
+  CLEAR_URL_DELAY_MS,
+  CLOSE_BLUR_AND_BTN_DURATION_MS,
+  CLOSE_SPRING,
+  OPEN_DURATION_MS,
+  THUMB_BLUR_DISTANCE_FACTOR,
+  THUMB_BLUR_MAX_INTENSITY,
+} from './image-overlay.config';
 
-const DURATION = 250;
-const TIMING_CONFIG = { duration: DURATION, easing: Easing.out(Easing.quad) };
-
-/** Spring config for close: smooth settle back to thumbnail, no overshoot */
-const CLOSE_SPRING_CONFIG = {
-  damping: 24,
-  stiffness: 320,
-  mass: 0.8,
+const TIMING_CONFIG = {
+  duration: OPEN_DURATION_MS,
+  easing: Easing.out(Easing.quad),
 };
 function logCloseTarget(
   x: number,
@@ -260,17 +263,17 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
     const ty = closeTargetPageY.value + closeTargetHeight.value / 2;
     const positionDist = Math.sqrt((cx - tx) ** 2 + (cy - ty) ** 2);
     const thumbDiag = Math.sqrt(closeTargetWidth.value ** 2 + closeTargetHeight.value ** 2) || 1;
-    const positionD = Math.min(1, positionDist / (thumbDiag * 1.5));
+    const positionD = Math.min(1, positionDist / (thumbDiag * THUMB_BLUR_DISTANCE_FACTOR));
     const tw = closeTargetWidth.value;
     const expandedW = expandedWidthSv.value;
     const sizeD =
       expandedW > tw ? Math.min(1, Math.max(0, (imageWidth.value - tw) / (expandedW - tw))) : 0;
     const displacement = Math.max(positionD, sizeD);
-    return Math.round(displacement * 80);
+    return Math.round(displacement * THUMB_BLUR_MAX_INTENSITY);
   });
 
   const clearUrlDelayed = useCallback(() => {
-    setTimeout(() => setActiveUrls([]), 50);
+    setTimeout(() => setActiveUrls([]), CLEAR_URL_DELAY_MS);
   }, []);
 
   const finishClose = useCallback(() => {
@@ -300,7 +303,7 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
     imageYCoord.value = withTiming(cy - eh / 2, TIMING_CONFIG);
     imageWidth.value = withTiming(ew, TIMING_CONFIG);
     imageHeight.value = withTiming(eh, TIMING_CONFIG);
-    closeBtnOpacity.value = withDelay(DURATION, withTiming(1));
+    closeBtnOpacity.value = withDelay(OPEN_DURATION_MS, withTiming(1));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- worklet captures shared-value refs
   }, []);
 
@@ -472,31 +475,31 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
     };
 
     blurIntensity.value = withTiming(0, {
-      duration: 320,
+      duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
       easing: Easing.out(Easing.cubic),
     });
-    imageXCoord.value = withSpring(x, CLOSE_SPRING_CONFIG, () => {
+    imageXCoord.value = withSpring(x, CLOSE_SPRING, () => {
       'worklet';
       imageXCoord.value = x;
       maybeFinishClose();
     });
-    imageYCoord.value = withSpring(y, CLOSE_SPRING_CONFIG, () => {
+    imageYCoord.value = withSpring(y, CLOSE_SPRING, () => {
       'worklet';
       imageYCoord.value = y;
       maybeFinishClose();
     });
-    imageWidth.value = withSpring(w, CLOSE_SPRING_CONFIG, () => {
+    imageWidth.value = withSpring(w, CLOSE_SPRING, () => {
       'worklet';
       imageWidth.value = w;
       maybeFinishClose();
     });
-    imageHeight.value = withSpring(h, CLOSE_SPRING_CONFIG, () => {
+    imageHeight.value = withSpring(h, CLOSE_SPRING, () => {
       'worklet';
       imageHeight.value = h;
       maybeFinishClose();
     });
     closeBtnOpacity.value = withTiming(0, {
-      duration: 320,
+      duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
       easing: Easing.out(Easing.cubic),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- worklet captures shared-value refs
