@@ -653,10 +653,16 @@ export const InlineLink = React.memo(function InlineLink({
  */
 export const ImageBlock = React.memo(function ImageBlock({
   url,
+  allImageUrls,
+  imageIndex,
   onPressIn,
   onPressOut,
 }: {
   url: string;
+  /** When the post has multiple images, pass all urls so the overlay can show a pager. */
+  allImageUrls?: string[];
+  /** Index of this image among the post's images (for opening overlay at the correct page). */
+  imageIndex?: number;
   onPressIn?: () => void;
   onPressOut?: () => void;
 }) {
@@ -675,6 +681,14 @@ export const ImageBlock = React.memo(function ImageBlock({
       });
     }
   });
+
+  const registerLayout = useCallback(() => {
+    containerRef.current?.measureInWindow(
+      (pageX: number, pageY: number, width: number, height: number) => {
+        imageOverlay?.registerThumbnailLayout?.(url, { pageX, pageY, width, height });
+      }
+    );
+  }, [imageOverlay, url]);
 
   const handlePress = useCallback(() => {
     if (__DEV__) {
@@ -701,10 +715,12 @@ export const ImageBlock = React.memo(function ImageBlock({
           pageY,
           width,
           height,
+          urls: allImageUrls && allImageUrls.length > 1 ? allImageUrls : undefined,
+          initialIndex: imageIndex,
         });
       }
     );
-  }, [imageOverlay, url, aspectRatio]);
+  }, [imageOverlay, url, aspectRatio, allImageUrls, imageIndex]);
 
   const fallbackBlur = useSharedValue(0);
   const thumbnailBlur = imageOverlay?.thumbnailBlurIntensity ?? fallbackBlur;
@@ -733,7 +749,11 @@ export const ImageBlock = React.memo(function ImageBlock({
   const isOverlayActive = imageOverlay?.activeUrl === url;
   return (
     <View style={sharedStyles.imageBlockOuter}>
-      <View ref={containerRef} collapsable={false} style={{ aspectRatio }}>
+      <View
+        ref={containerRef}
+        collapsable={false}
+        style={{ aspectRatio }}
+        onLayout={registerLayout}>
         {imageOverlay?.open ? (
           <Pressable
             onPressIn={onPressIn}
@@ -1404,43 +1424,52 @@ export const NoteContent = React.memo(function NoteContent({
       )}
 
       {hasBlocks &&
-        blockSegments.map((seg, i) => {
-          switch (seg.kind) {
-            case 'image':
-              return (
-                <ImageBlock
-                  key={`b${i}`}
-                  url={seg.url}
-                  onPressIn={onImagePressIn}
-                  onPressOut={onImagePressOut}
-                />
-              );
-            case 'video':
-              return (
-                <VideoBlock
-                  key={`b${i}`}
-                  url={seg.url}
-                  onTap={onVideoTap ? () => onVideoTap(seg.url) : undefined}
-                />
-              );
-            case 'lightning':
-              return <LightningBlock key={`b${i}`} invoice={seg.invoice} />;
-            case 'nevent':
-            case 'note':
-              return (
-                <QuotedPostCard
-                  key={`b${i}`}
-                  event={quotedEvents.get(seg.eventId)}
-                  profiles={profiles}
-                  getMetrics={getMetrics}
-                  onPressIn={onQuotedPressIn}
-                  onPressOut={onQuotedPressOut}
-                />
-              );
-            default:
-              return null;
-          }
-        })}
+        (() => {
+          const imageUrls = blockSegments
+            .filter((s): s is typeof s & { kind: 'image' } => s.kind === 'image')
+            .map((s) => s.url);
+          return blockSegments.map((seg, i) => {
+            switch (seg.kind) {
+              case 'image': {
+                const imageIndex = imageUrls.indexOf(seg.url);
+                return (
+                  <ImageBlock
+                    key={`b${i}`}
+                    url={seg.url}
+                    allImageUrls={imageUrls.length > 1 ? imageUrls : undefined}
+                    imageIndex={imageIndex >= 0 ? imageIndex : 0}
+                    onPressIn={onImagePressIn}
+                    onPressOut={onImagePressOut}
+                  />
+                );
+              }
+              case 'video':
+                return (
+                  <VideoBlock
+                    key={`b${i}`}
+                    url={seg.url}
+                    onTap={onVideoTap ? () => onVideoTap(seg.url) : undefined}
+                  />
+                );
+              case 'lightning':
+                return <LightningBlock key={`b${i}`} invoice={seg.invoice} />;
+              case 'nevent':
+              case 'note':
+                return (
+                  <QuotedPostCard
+                    key={`b${i}`}
+                    event={quotedEvents.get(seg.eventId)}
+                    profiles={profiles}
+                    getMetrics={getMetrics}
+                    onPressIn={onQuotedPressIn}
+                    onPressOut={onQuotedPressOut}
+                  />
+                );
+              default:
+                return null;
+            }
+          });
+        })()}
     </VStack>
   );
 });

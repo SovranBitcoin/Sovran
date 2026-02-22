@@ -17,6 +17,7 @@ import Animated, {
   useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
@@ -24,6 +25,7 @@ import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'assets/icons';
+import type { SharedValue } from 'react-native-reanimated';
 import type { ImageOverlayContextValue } from './image-overlay-provider';
 import { IMAGE_OVERLAY_TIMING_CONFIG, useImageOverlay } from './image-overlay-provider';
 
@@ -49,8 +51,86 @@ function logPerfPanFinalize(distance: number, threshold: number, dismissed: bool
   }
 }
 
+// Gesture debug logs (filter by [ImageOverlay:Gesture])
+function logDismissPanStart() {
+  if (__DEV__) console.log('[ImageOverlay:Gesture] DISMISS pan onStart (vertical drag-to-dismiss)');
+}
+function logDismissPanFinalize(
+  tx: number,
+  ty: number,
+  distance: number,
+  threshold: number,
+  dismissed: boolean
+) {
+  if (__DEV__) {
+    console.log('[ImageOverlay:Gesture] DISMISS pan onFinalize', {
+      translationX: Math.round(tx),
+      translationY: Math.round(ty),
+      distance: Math.round(distance),
+      threshold: Math.round(threshold),
+      dismissed,
+      action: dismissed ? 'CLOSING overlay' : 'snapping back to center',
+    });
+  }
+}
+function logPagerPanStart() {
+  if (__DEV__) console.log('[ImageOverlay:Gesture] PAGER pan onStart (horizontal page swipe)');
+}
+function logPagerPanEnd(
+  tx: number,
+  velocityX: number,
+  snapTo: number,
+  startIndex: number,
+  didChangePage: boolean
+) {
+  if (__DEV__) {
+    console.log('[ImageOverlay:Gesture] PAGER pan onEnd', {
+      translationX: Math.round(tx),
+      velocityX: Math.round(velocityX),
+      snapTo,
+      startIndex,
+      didChangePage,
+      action: didChangePage ? 'CHANGING page' : 'staying on same page',
+    });
+  }
+}
+
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
+
+function SlidingPage({
+  index,
+  url,
+  pagerOffset,
+  pageWidthSv,
+  pageHeightSv,
+}: {
+  index: number;
+  url: string;
+  pagerOffset: SharedValue<number>;
+  pageWidthSv: SharedValue<number>;
+  pageHeightSv: SharedValue<number>;
+}) {
+  const rStyle = useAnimatedStyle(() => {
+    const w = pageWidthSv.value;
+    const x = (index - pagerOffset.value) * w;
+    return {
+      width: w,
+      height: pageHeightSv.value,
+      transform: [{ translateX: x }],
+    };
+  });
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, rStyle]} pointerEvents="none">
+      <Image
+        source={{ uri: url }}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+      />
+    </Animated.View>
+  );
+}
 
 function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue }) {
   const insets = useSafeAreaInsets();
@@ -70,9 +150,13 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   const imageScale = useSharedValue(1);
   const panStartX = useSharedValue(0);
   const panStartY = useSharedValue(0);
+  const dismissPanActive = useSharedValue(0);
 
   const {
     activeUrl,
+    activeUrls,
+    activeIndex,
+    setActiveIndex,
     imageState,
     imageXCoord,
     imageYCoord,
@@ -85,6 +169,32 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     close,
     openToCenter,
   } = ctx;
+
+  const hasMultipleImages = activeUrls.length > 1;
+  const maxPagerIndex = Math.max(0, activeUrls.length - 1);
+
+  useEffect(() => {
+    if (__DEV__ && hasMultipleImages) {
+      console.log('[ImageOverlay:Gesture] Config (multi-image)', {
+        dismiss: {
+          activeOffsetY: '[-14, 14] (dismiss activates after 14px vertical)',
+          failOffsetX: '[-32, 32] (dismiss fails only if 32px horizontal first)',
+        },
+        pager: {
+          activeOffsetX: '[-20, 20] (pager activates after 20px horizontal)',
+          failOffsetY: '[-8, 8] (pager fails if 12px vertical first)',
+        },
+        expected: 'Horizontal swipe → PAGER. Vertical swipe → DISMISS.',
+      });
+    }
+  }, [hasMultipleImages]);
+
+  const pagerOffsetSv = useSharedValue(activeIndex);
+  const startPagerOffsetSv = useSharedValue(activeIndex);
+
+  useEffect(() => {
+    pagerOffsetSv.value = activeIndex;
+  }, [activeIndex, pagerOffsetSv]);
 
   const rContainerStyle = useAnimatedStyle(() => ({
     pointerEvents: imageState.value === 'open' ? 'auto' : 'none',
@@ -109,9 +219,13 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   }));
 
   const pan = Gesture.Pan()
-    .minDistance(10)
+    .minDistance(6)
+    .activeOffsetY([-14, 14])
+    .failOffsetX([-32, 32])
     .onStart(() => {
+      dismissPanActive.value = 1;
       scheduleOnRN(logPerfPanStart);
+      scheduleOnRN(logDismissPanStart);
       panStartX.value = imageXCoord.value;
       panStartY.value = imageYCoord.value;
       closeBtnOpacity.value = withTiming(0, { duration: 200 });
@@ -134,14 +248,25 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
       imageScale.value = scale;
       blurIntensity.value = blur;
     })
-    .onFinalize(() => {
+    .onFinalize((event) => {
+      const wasActive = dismissPanActive.value === 1;
+      dismissPanActive.value = 0;
       const deltaX = imageXCoord.value - panStartX.value;
       const deltaY = imageYCoord.value - panStartY.value;
       const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
       const threshold = Math.max(expandedWidth, expandedHeight) / 4;
       const dismissed = distance > threshold;
       scheduleOnRN(logPerfPanFinalize, distance, threshold, dismissed);
+      scheduleOnRN(
+        logDismissPanFinalize,
+        event.translationX,
+        event.translationY,
+        distance,
+        threshold,
+        dismissed
+      );
       imageScale.value = withTiming(1, IMAGE_OVERLAY_TIMING_CONFIG);
+      if (!wasActive) return;
       if (dismissed) {
         close();
       } else {
@@ -169,7 +294,56 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     runOnJS(triggerClose)();
   });
 
-  const composed = Gesture.Exclusive(pan, tapBackdrop);
+  const SNAP_SPRING = {
+    duration: 580,
+    dampingRatio: 1,
+  };
+
+  const horizontalPan = Gesture.Pan()
+    .enabled(hasMultipleImages)
+    .activeOffsetX([-20, 20])
+    .failOffsetY([-8, 8])
+    .minDistance(6)
+    .onStart(() => {
+      if (imageState.value !== 'open') return;
+      scheduleOnRN(logPagerPanStart);
+      startPagerOffsetSv.value = pagerOffsetSv.value;
+    })
+    .onChange((e) => {
+      if (imageState.value !== 'open') return;
+      const delta = -e.translationX / expandedWidth;
+      const next = startPagerOffsetSv.value + delta;
+      pagerOffsetSv.value = Math.max(0, Math.min(maxPagerIndex, next));
+    })
+    .onEnd((e) => {
+      if (imageState.value !== 'open') return;
+      const delta = -e.translationX / expandedWidth;
+      const current = startPagerOffsetSv.value + delta;
+      const velocity = -e.velocityX / expandedWidth;
+      const VELOCITY_WEIGHT = 0.12;
+      const effective = current + velocity * VELOCITY_WEIGHT;
+      const snapTo = Math.max(0, Math.min(maxPagerIndex, Math.round(effective)));
+      const startIndex = Math.round(startPagerOffsetSv.value);
+      const didChangePage = snapTo !== startIndex;
+      scheduleOnRN(logPagerPanEnd, e.translationX, e.velocityX, snapTo, startIndex, didChangePage);
+      const clampedVelocity = Math.max(-12, Math.min(12, velocity));
+      pagerOffsetSv.value = withSpring(
+        snapTo,
+        {
+          ...SNAP_SPRING,
+          velocity: clampedVelocity,
+        },
+        (finished) => {
+          if (finished && didChangePage) {
+            runOnJS(setActiveIndex)(snapTo);
+          }
+        }
+      );
+    });
+
+  const composed = hasMultipleImages
+    ? Gesture.Exclusive(horizontalPan, pan, tapBackdrop)
+    : Gesture.Exclusive(pan, tapBackdrop);
 
   return (
     <View
@@ -189,14 +363,42 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           </Pressable>
           {activeUrl ? (
             <Animated.View style={[styles.imageWrap, rImageStyle]}>
-              <Pressable style={StyleSheet.absoluteFill} onPress={() => {}}>
-                <Image
-                  source={{ uri: activeUrl }}
-                  style={StyleSheet.absoluteFill}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                />
-              </Pressable>
+              {hasMultipleImages ? (
+                <>
+                  <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                    {activeUrls.map((url, i) => (
+                      <SlidingPage
+                        key={url}
+                        index={i}
+                        url={url}
+                        pagerOffset={pagerOffsetSv}
+                        pageWidthSv={imageWidth}
+                        pageHeightSv={imageHeight}
+                      />
+                    ))}
+                  </View>
+                  <View style={styles.dotPager} pointerEvents="none">
+                    {activeUrls.map((_, i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.dot,
+                          i === activeIndex ? styles.dotActive : styles.dotInactive,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </>
+              ) : (
+                <Pressable style={StyleSheet.absoluteFill} onPress={() => {}}>
+                  <Image
+                    source={{ uri: activeUrl }}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                  />
+                </Pressable>
+              )}
             </Animated.View>
           ) : null}
         </AnimatedPressable>
@@ -231,5 +433,26 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     transformOrigin: 'center',
+  },
+  dotPager: {
+    position: 'absolute',
+    bottom: 16,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  dotActive: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+  },
+  dotInactive: {
+    backgroundColor: 'rgba(255,255,255,0.4)',
   },
 });

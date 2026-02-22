@@ -61,9 +61,39 @@ function logCloseTarget(
   }
 }
 
+/** Pager dismiss debug: log FROM (current overlay rect) and TO (target thumbnail rect). */
+function logPagerDismissClose(
+  fromX: number,
+  fromY: number,
+  fromW: number,
+  fromH: number,
+  toX: number,
+  toY: number,
+  toW: number,
+  toH: number,
+  activeIndex: number,
+  activeUrlCount: number
+) {
+  if (__DEV__) {
+    console.log('[ImageOverlay:PagerDismiss] close() started', {
+      FROM_overlayRect: { x: fromX, y: fromY, width: fromW, height: fromH },
+      TO_targetThumbnailRect: { x: toX, y: toY, width: toW, height: toH },
+      activeIndex,
+      activeUrlCount,
+      sizeMismatch: fromW !== toW || fromH !== toH ? { fromW, fromH, toW, toH } : null,
+    });
+  }
+}
+
 function logSpringEnd(finalX: number, finalY: number, finalW: number, finalH: number) {
   if (__DEV__) {
     console.log('[ImageOverlay] spring ended at (final position/size)', {
+      x: finalX,
+      y: finalY,
+      width: finalW,
+      height: finalH,
+    });
+    console.log('[ImageOverlay:PagerDismiss] close animation ended at rect', {
       x: finalX,
       y: finalY,
       width: finalW,
@@ -86,7 +116,12 @@ export interface ImageOverlayLayout {
   pageY: number;
   width: number;
   height: number;
+  /** When opening a post with multiple images, pass all urls and the index of the tapped image. */
+  urls?: string[];
+  initialIndex?: number;
 }
+
+export type ThumbnailLayout = { pageX: number; pageY: number; width: number; height: number };
 
 export type ImageOverlayContextValue = {
   scrollHandler: ReturnType<typeof useScrollViewOffset>['scrollHandler'];
@@ -94,7 +129,14 @@ export type ImageOverlayContextValue = {
   open: (layout: ImageOverlayLayout) => void;
   close: () => void;
   openToCenter: () => void;
+  /** Register a thumbnail's layout (e.g. from onLayout + measureInWindow). Used so pager dismiss animates to the correct image. */
+  registerThumbnailLayout: (url: string, layout: ThumbnailLayout) => void;
   activeUrl: string | null;
+  /** All image urls when overlay shows multiple (e.g. post with 2+ images). Same as [activeUrl] when single. */
+  activeUrls: string[];
+  /** Current page index when activeUrls.length > 1. */
+  activeIndex: number;
+  setActiveIndex: (index: number) => void;
   activeAspectRatio: number;
   imageState: ReturnType<typeof useSharedValue<'open' | 'close'>>;
   imageXCoord: ReturnType<typeof useSharedValue<number>>;
@@ -111,12 +153,20 @@ export type ImageOverlayContextValue = {
 };
 
 /** State that changes on open/close; separate context to keep actions context stable. */
-type ImageOverlayStateValue = Pick<ImageOverlayContextValue, 'activeUrl' | 'activeAspectRatio'>;
+type ImageOverlayStateValue = Pick<
+  ImageOverlayContextValue,
+  'activeUrl' | 'activeAspectRatio' | 'activeUrls' | 'activeIndex'
+>;
 
 /** Callbacks + shared values; stable across open/close so consumers don't re-render unnecessarily. */
 type ImageOverlayActionsValue = Omit<
   ImageOverlayContextValue,
-  'activeUrl' | 'activeAspectRatio' | 'expandedWidth' | 'expandedHeight'
+  | 'activeUrl'
+  | 'activeAspectRatio'
+  | 'activeUrls'
+  | 'activeIndex'
+  | 'expandedWidth'
+  | 'expandedHeight'
 > & { screenWidth: number; screenHeight: number };
 
 const ImageOverlayStateContext = createContext<ImageOverlayStateValue | null>(null);
@@ -139,8 +189,29 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { scrollOffsetY, scrollHandler } = useScrollViewOffset();
 
-  const [activeUrl, setActiveUrl] = useState<string | null>(null);
+  const [activeUrls, setActiveUrls] = useState<string[]>([]);
+  const [activeIndex, setActiveIndexState] = useState(0);
+  const activeUrl = activeUrls.length > 0 ? (activeUrls[activeIndex] ?? activeUrls[0]) : null;
   const [activeAspectRatio, setActiveAspectRatio] = useState(16 / 9);
+
+  const setActiveIndex = useCallback((index: number) => {
+    setActiveIndexState((prev) => (index === prev ? prev : index));
+  }, []);
+
+  const registerThumbnailLayout = useCallback((url: string, layout: ThumbnailLayout) => {
+    if (__DEV__) {
+      console.log('[ImageOverlay:PagerDismiss] registerThumbnailLayout', {
+        urlShort: url.slice(0, 50) + (url.length > 50 ? '…' : ''),
+        layout: {
+          pageX: layout.pageX,
+          pageY: layout.pageY,
+          width: layout.width,
+          height: layout.height,
+        },
+      });
+    }
+    thumbnailLayoutsRef.current[url] = layout;
+  }, []);
 
   const scrollOffsetAtOpen = useSharedValue(0);
   const imageState = useSharedValue<'open' | 'close'>('close');
@@ -155,6 +226,8 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
   const closeTargetPageY = useSharedValue(0);
   const closeTargetWidth = useSharedValue(0);
   const closeTargetHeight = useSharedValue(0);
+  const activeIndexForLogSv = useSharedValue(0);
+  const activeUrlCountForLogSv = useSharedValue(0);
 
   const centerXSv = useSharedValue(0);
   const centerYSv = useSharedValue(0);
@@ -165,6 +238,7 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
 
   const openTimestampRef = useRef(0);
   const closeTimestampRef = useRef(0);
+  const thumbnailLayoutsRef = useRef<Record<string, ThumbnailLayout>>({});
 
   const logPerfCloseStartedCallback = useCallback(() => {
     if (__DEV__) {
@@ -196,7 +270,7 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
   });
 
   const clearUrlDelayed = useCallback(() => {
-    setTimeout(() => setActiveUrl(null), 50);
+    setTimeout(() => setActiveUrls([]), 50);
   }, []);
 
   const finishClose = useCallback(() => {
@@ -243,7 +317,10 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
         aspectRatio
       );
 
-      setActiveUrl(layout.url);
+      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
+      const initialIndex = Math.min(layout.initialIndex ?? 0, Math.max(0, urls.length - 1));
+      setActiveUrls(urls);
+      setActiveIndexState(initialIndex);
       setActiveAspectRatio(aspectRatio);
 
       scrollOffsetAtOpen.value = scrollOffsetY.value;
@@ -251,6 +328,12 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
       closeTargetPageY.value = layout.pageY;
       closeTargetWidth.value = layout.width;
       closeTargetHeight.value = layout.height;
+      thumbnailLayoutsRef.current[layout.url] = {
+        pageX: layout.pageX,
+        pageY: layout.pageY,
+        width: layout.width,
+        height: layout.height,
+      };
 
       closeSpringsDoneCount.value = 0;
       isClosing.value = false;
@@ -284,6 +367,18 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
             height: layout.height,
           },
           scrollOffsetAtOpen: scrollOffsetY.value,
+        });
+        const urlCount = urls?.length ?? 1;
+        console.log('[ImageOverlay:PagerDismiss] open() set closeTarget (shared-element source)', {
+          urlShort: layout.url.slice(0, 50) + (layout.url.length > 50 ? '…' : ''),
+          initialIndex,
+          urlCount,
+          closeTargetRect: {
+            pageX: layout.pageX,
+            pageY: layout.pageY,
+            width: layout.width,
+            height: layout.height,
+          },
         });
       }
 
@@ -338,6 +433,10 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
 
     scheduleOnRN(logPerfCloseStartedCallback);
 
+    const fromX = imageXCoord.value;
+    const fromY = imageYCoord.value;
+    const fromW = imageWidth.value;
+    const fromH = imageHeight.value;
     const x = closeTargetPageX.value;
     const scrollY = scrollOffsetY.value;
     const scrollAtOpen = scrollOffsetAtOpen.value;
@@ -345,6 +444,19 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
     const w = closeTargetWidth.value;
     const h = closeTargetHeight.value;
 
+    scheduleOnRN(
+      logPagerDismissClose,
+      fromX,
+      fromY,
+      fromW,
+      fromH,
+      x,
+      y,
+      w,
+      h,
+      activeIndexForLogSv.value,
+      activeUrlCountForLogSv.value
+    );
     scheduleOnRN(logCloseTarget, x, y, w, h, scrollY, scrollAtOpen);
 
     closeSpringsDoneCount.value = 0;
@@ -390,9 +502,44 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- worklet captures shared-value refs
   }, [finishClose, imageState, logPerfCloseStartedCallback, isClosing]);
 
+  useEffect(() => {
+    activeIndexForLogSv.value = activeIndex;
+    activeUrlCountForLogSv.value = activeUrls.length;
+  }, [activeIndex, activeUrls.length, activeIndexForLogSv, activeUrlCountForLogSv]);
+
+  useEffect(() => {
+    if (activeUrls.length <= 1) return;
+    const url = activeUrls[activeIndex];
+    const layout = url ? thumbnailLayoutsRef.current[url] : undefined;
+    if (__DEV__) {
+      console.log('[ImageOverlay:PagerDismiss] closeTarget sync (activeIndex changed)', {
+        activeIndex,
+        activeUrlCount: activeUrls.length,
+        activeUrlShort: url ? url.slice(0, 50) + (url.length > 50 ? '…' : '') : null,
+        hasLayout: !!layout,
+        layout: layout
+          ? { pageX: layout.pageX, pageY: layout.pageY, width: layout.width, height: layout.height }
+          : null,
+      });
+    }
+    if (layout) {
+      closeTargetPageX.value = layout.pageX;
+      closeTargetPageY.value = layout.pageY;
+      closeTargetWidth.value = layout.width;
+      closeTargetHeight.value = layout.height;
+    }
+  }, [
+    activeIndex,
+    activeUrls,
+    closeTargetPageX,
+    closeTargetPageY,
+    closeTargetWidth,
+    closeTargetHeight,
+  ]);
+
   const stateValue = useMemo<ImageOverlayStateValue>(
-    () => ({ activeUrl, activeAspectRatio }),
-    [activeUrl, activeAspectRatio]
+    () => ({ activeUrl, activeAspectRatio, activeUrls, activeIndex }),
+    [activeUrl, activeAspectRatio, activeUrls, activeIndex]
   );
 
   const actionsRecreateCountRef = useRef(0);
@@ -404,6 +551,8 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
       open,
       close,
       openToCenter,
+      registerThumbnailLayout,
+      setActiveIndex,
       imageState,
       imageXCoord,
       imageYCoord,
@@ -421,6 +570,8 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
     open,
     close,
     openToCenter,
+    registerThumbnailLayout,
+    setActiveIndex,
     imageState,
     imageXCoord,
     imageYCoord,
