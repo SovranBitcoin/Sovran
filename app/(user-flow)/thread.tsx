@@ -1,5 +1,6 @@
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { ThreadView } from 'components/blocks/ThreadView';
+import { ModalLayoutWrapper } from 'app/debugModal';
 
 export default function ThreadScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
@@ -7,7 +8,9 @@ export default function ThreadScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'Thread' }} />
-      <ThreadView eventId={eventId ?? ''} />
+      <ModalLayoutWrapper useCustomScrollView>
+        <ThreadView eventId={eventId ?? ''} />
+      </ModalLayoutWrapper>
     </>
   );
 }

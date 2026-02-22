@@ -15,7 +15,7 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { ShortTextNote, Metadata } from 'nostr-tools/kinds';
 import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useHeaderHeight } from '@react-navigation/elements';
 
 import {
   buildDedupedVideoPosts,
@@ -137,8 +137,7 @@ function buildThreadStructure(
 
 function ThreadViewComponent({ eventId }: ThreadViewProps) {
   const { getPrimaryColor } = useTheme();
-  const insets = useSafeAreaInsets();
-  const headerHeight = insets.top + 32;
+  const headerHeight = useHeaderHeight();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
