@@ -22,6 +22,7 @@ import Animated, {
   interpolate,
   runOnJS,
   useAnimatedProps,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -37,7 +38,8 @@ import Icon from 'assets/icons';
 import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { formatTimestamp, formatCount, formatSats } from './shared';
+import { formatTimestamp, formatCount, formatSats, parseContent } from './shared';
+import type { ContentSegment } from './shared';
 import type { ImageOverlayContextValue, ImageOverlayPost } from './image-overlay-provider';
 import { IMAGE_OVERLAY_TIMING_CONFIG, useImageOverlay } from './image-overlay-provider';
 import {
@@ -71,8 +73,11 @@ import {
   CLOSE_BUTTON_PADDING,
   CLOSE_BUTTON_TOP_OFFSET,
   DOT_PAGER_BOTTOM,
+  BOTTOM_PANEL_ABSOLUTE_OVERLAY_HEIGHT,
   BOTTOM_PANEL_MAX_HEIGHT_FRACTION,
+  BOTTOM_PANEL_MAX_HEIGHT_INSET_PX,
   BOTTOM_PANEL_SAFE_HEIGHT,
+  BOTTOM_PANEL_SHEET_SNAP_60_FRACTION,
   BOTTOM_PANEL_STIFF_DURATION_MS,
   BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
   BOTTOM_PANEL_PADDING_TOP,
@@ -286,6 +291,129 @@ const PANEL_TEXT_MUTED = 'rgba(255,255,255,0.6)';
 const LIKED_COLOR = '#ff5a7a';
 const REPOSTED_COLOR = '#4cd964';
 
+const PANEL_CONTENT_TRUNCATE_LIMIT = 120;
+const PANEL_INLINE_IMAGE_MAX_HEIGHT = 200;
+
+type PanelBlock = { type: 'text'; value: string } | { type: 'image'; url: string };
+
+/** Build ordered blocks (text + image) from parsed segments for overlay panel. */
+function segmentsToBlocks(segments: ContentSegment[]): PanelBlock[] {
+  const blocks: PanelBlock[] = [];
+  let textAcc = '';
+  for (const seg of segments) {
+    if (seg.kind === 'text') {
+      textAcc += seg.text;
+    } else if (seg.kind === 'newline') {
+      textAcc += '\n';
+    } else if (seg.kind === 'url') {
+      textAcc += seg.url;
+    } else if (seg.kind === 'hashtag') {
+      textAcc += `#${seg.tag}`;
+    } else if (seg.kind === 'image') {
+      if (textAcc.length > 0) {
+        blocks.push({ type: 'text', value: textAcc });
+        textAcc = '';
+      }
+      blocks.push({ type: 'image', url: seg.url });
+    }
+  }
+  if (textAcc.length > 0) blocks.push({ type: 'text', value: textAcc });
+  return blocks;
+}
+
+/** Fallback background for inline image area before load or if blur unavailable. */
+const PANEL_INLINE_IMAGE_BG = 'rgba(40, 40, 48, 0.95)';
+
+/** Renders an image full width at original aspect ratio, capped by max height; letterbox areas show a blurred cover of the same image. */
+function InlinePanelImage({ uri }: { uri: string }) {
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
+  const [layoutWidth, setLayoutWidth] = useState<number>(0);
+  const onLoad = useCallback((e: { source: { width: number; height: number } }) => {
+    const { width, height } = e.source;
+    if (!width || !height) return;
+    setNaturalSize({ w: width, h: height });
+  }, []);
+  const onLayout = useCallback((e: { nativeEvent: { layout: { width: number } } }) => {
+    setLayoutWidth(e.nativeEvent.layout.width);
+  }, []);
+  const { boxHeight, imageStyle } = useMemo(() => {
+    const placeholderHeight = 120;
+    if (!layoutWidth) {
+      return {
+        boxHeight: placeholderHeight,
+        imageStyle: {
+          width: '100%' as const,
+          height: placeholderHeight,
+          borderRadius: 8,
+          backgroundColor: PANEL_INLINE_IMAGE_BG,
+        },
+      };
+    }
+    if (!naturalSize) {
+      const h = Math.min(placeholderHeight, PANEL_INLINE_IMAGE_MAX_HEIGHT);
+      return {
+        boxHeight: h,
+        imageStyle: {
+          width: layoutWidth,
+          height: h,
+          borderRadius: 8,
+          backgroundColor: PANEL_INLINE_IMAGE_BG,
+        },
+      };
+    }
+    const { w, h } = naturalSize;
+    const height = Math.min((layoutWidth * h) / w, PANEL_INLINE_IMAGE_MAX_HEIGHT);
+    const boxHeight = Math.round(height);
+    return {
+      boxHeight,
+      imageStyle: {
+        width: layoutWidth,
+        height: boxHeight,
+        borderRadius: 8,
+      },
+    };
+  }, [layoutWidth, naturalSize]);
+
+  const showBlurredLetterbox = layoutWidth > 0 && naturalSize !== null;
+
+  return (
+    <View
+      style={[
+        bottomPanelStyles.inlineImageWrap,
+        { backgroundColor: PANEL_INLINE_IMAGE_BG, width: layoutWidth || '100%', height: boxHeight },
+      ]}
+      onLayout={onLayout}
+      pointerEvents="none">
+      {showBlurredLetterbox ? (
+        <>
+          <Image
+            source={{ uri }}
+            style={[StyleSheet.absoluteFill, { borderRadius: 8 }]}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+          <BlurView style={StyleSheet.absoluteFill} tint="dark" intensity={80} />
+          <Image
+            source={{ uri }}
+            style={imageStyle}
+            contentFit="contain"
+            cachePolicy="memory-disk"
+            onLoad={onLoad}
+          />
+        </>
+      ) : (
+        <Image
+          source={{ uri }}
+          style={imageStyle}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+          onLoad={onLoad}
+        />
+      )}
+    </View>
+  );
+}
+
 /** Scrollable part of the bottom panel: author, note content (with show more), metrics. */
 const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBottomPanelContent({
   post,
@@ -293,15 +421,39 @@ const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBottomPan
   post: ImageOverlayPost;
 }) {
   const [contentExpanded, setContentExpanded] = useState(false);
-  const { event, metrics, profile, reposted, liked, onCommentPress, onRepostPress, onLikePress } =
-    post;
+  const { event, metrics, profile, reposted, liked, onRepostPress, onLikePress } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatTimestamp(event.created_at);
   const fullContent = event.content.trim();
-  const contentPreview = fullContent.slice(0, 120);
-  const contentTruncated = fullContent.length > 120;
-  const showContent = contentExpanded ? fullContent : contentPreview;
-  const showEllipsis = contentTruncated && !contentExpanded;
+
+  const { blocks } = useMemo(() => {
+    const allSegments = parseContent(fullContent);
+    const allBlocks = segmentsToBlocks(allSegments);
+    if (fullContent.length <= PANEL_CONTENT_TRUNCATE_LIMIT || contentExpanded) {
+      return { blocks: allBlocks };
+    }
+    let count = 0;
+    const out: PanelBlock[] = [];
+    for (const block of allBlocks) {
+      if (block.type === 'text') {
+        if (count + block.value.length > PANEL_CONTENT_TRUNCATE_LIMIT) {
+          const take = PANEL_CONTENT_TRUNCATE_LIMIT - count;
+          out.push({ type: 'text', value: block.value.slice(0, take) + '…' });
+          return { blocks: out };
+        }
+        out.push(block);
+        count += block.value.length;
+      } else {
+        out.push(block);
+      }
+    }
+    return { blocks: out };
+  }, [fullContent, contentExpanded]);
+
+  const hasContent = fullContent.length > 0;
+  const canExpand = fullContent.length > PANEL_CONTENT_TRUNCATE_LIMIT;
+  const showMoreVisible = canExpand && !contentExpanded;
+  const showLessVisible = canExpand && contentExpanded;
 
   return (
     <View style={bottomPanelStyles.wrap}>
@@ -330,37 +482,48 @@ const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBottomPan
           </Text>
         </View>
       </Pressable>
-      {/* Post content with show more */}
-      {fullContent.length > 0 ? (
+      {/* Post content with inline image blocks (non-clickable) and show more */}
+      {hasContent ? (
         <View>
-          <Text
-            size={14}
-            style={[bottomPanelStyles.contentText, { color: PANEL_TEXT_MUTED }]}
-            numberOfLines={contentExpanded ? undefined : 2}>
-            {showContent}
-            {showEllipsis ? '…' : ''}
-          </Text>
-          {contentTruncated && (
+          {blocks.map((block, i) =>
+            block.type === 'text' ? (
+              <Text
+                key={i}
+                size={14}
+                style={[bottomPanelStyles.contentText, { color: PANEL_TEXT_MUTED }]}
+                numberOfLines={contentExpanded ? undefined : 2}>
+                {block.value}
+              </Text>
+            ) : (
+              <InlinePanelImage key={i} uri={block.url} />
+            )
+          )}
+          {showMoreVisible && (
             <Text
               size={14}
               style={[bottomPanelStyles.contentText, { color: PANEL_TEXT_MUTED, marginTop: 4 }]}
               onPress={() => setContentExpanded((e) => !e)}>
-              {contentExpanded ? 'show less' : 'show more'}
+              show more
+            </Text>
+          )}
+          {showLessVisible && (
+            <Text
+              size={14}
+              style={[bottomPanelStyles.contentText, { color: PANEL_TEXT_MUTED, marginTop: 4 }]}
+              onPress={() => setContentExpanded((e) => !e)}>
+              show less
             </Text>
           )}
         </View>
       ) : null}
-      {/* Stats / actions row */}
+      {/* Stats / actions row — comment is display-only in overlay (no thread modal) */}
       <View style={bottomPanelStyles.metricsRow}>
-        <Pressable
-          onPress={onCommentPress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={bottomPanelStyles.metricBtn}>
+        <View style={bottomPanelStyles.metricBtn}>
           <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
           <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
             {formatCount(metrics.replyCount)}
           </Text>
-        </Pressable>
+        </View>
         <Pressable
           onPress={onRepostPress}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -418,6 +581,137 @@ const ImageOverlayBottomPanelReply = React.memo(function ImageOverlayBottomPanel
   );
 });
 
+/** Absolute overlay bar when sheet is closed: pfp, truncated content, show more, metric buttons. Tapping comment or show more opens the sheet. */
+const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteBar({
+  post,
+  onOpenSheet,
+}: {
+  post: ImageOverlayPost;
+  onOpenSheet: () => void;
+}) {
+  const { event, metrics, profile, reposted, liked, onRepostPress, onLikePress } = post;
+  const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
+  const shortTime = formatTimestamp(event.created_at);
+  const fullContent = event.content.trim();
+  const contentPreview = fullContent.slice(0, 120);
+  const contentTruncated = fullContent.length > 120;
+
+  const handleCommentPress = useCallback(() => {
+    onOpenSheet();
+  }, [onOpenSheet]);
+
+  const handleShowMorePress = useCallback(() => {
+    onOpenSheet();
+  }, [onOpenSheet]);
+
+  return (
+    <View style={[bottomPanelStyles.wrap, absoluteBarStyles.bar]}>
+      <Pressable
+        onPress={() => {
+          router.push({
+            pathname: '/(user-flow)/profile' as any,
+            params: { pubkey: event.pubkey },
+          });
+        }}
+        style={bottomPanelStyles.authorRow}>
+        <Avatar
+          picture={profile?.picture}
+          seed={event.pubkey}
+          size={28}
+          variant="person"
+          name={displayName}
+        />
+        <View style={bottomPanelStyles.authorTextWrap}>
+          <Text bold size={13} style={{ color: PANEL_TEXT }} numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Text size={12} style={{ color: PANEL_TEXT_MUTED }}>
+            {shortTime}
+          </Text>
+        </View>
+      </Pressable>
+      {fullContent.length > 0 ? (
+        <View style={absoluteBarStyles.contentRow}>
+          <Text
+            size={13}
+            style={[bottomPanelStyles.contentText, { color: PANEL_TEXT_MUTED }]}
+            numberOfLines={1}>
+            {contentPreview}
+            {contentTruncated ? '…' : ''}
+          </Text>
+          {contentTruncated && (
+            <Text
+              size={13}
+              style={[bottomPanelStyles.contentText, absoluteBarStyles.showMore]}
+              onPress={handleShowMorePress}>
+              show more
+            </Text>
+          )}
+        </View>
+      ) : null}
+      <View style={bottomPanelStyles.metricsRow}>
+        <Pressable
+          onPress={handleCommentPress}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={bottomPanelStyles.metricBtn}>
+          <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
+          <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            {formatCount(metrics.replyCount)}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onRepostPress}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={bottomPanelStyles.metricBtn}>
+          <Icon
+            name="garden:arrow-retweet-fill-16"
+            size={17}
+            color={reposted ? REPOSTED_COLOR : PANEL_TEXT_MUTED}
+          />
+          <Text size={13} style={{ color: reposted ? REPOSTED_COLOR : PANEL_TEXT_MUTED }}>
+            {formatCount(metrics.repostCount)}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onLikePress}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={bottomPanelStyles.metricBtn}>
+          <Icon
+            name="iconamoon:heart-fill"
+            size={16}
+            color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
+          />
+          <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
+            {formatCount(metrics.likeCount)}
+          </Text>
+        </Pressable>
+        <View style={bottomPanelStyles.metricBtn}>
+          <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
+          <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+            {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+});
+
+const absoluteBarStyles = StyleSheet.create({
+  bar: {
+    paddingVertical: 10,
+    paddingBottom: 12,
+  },
+  contentRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
+  },
+  showMore: {
+    marginTop: 0,
+  },
+});
+
 const bottomPanelStyles = StyleSheet.create({
   wrap: {
     paddingHorizontal: BOTTOM_PANEL_PADDING_HORIZONTAL,
@@ -436,6 +730,14 @@ const bottomPanelStyles = StyleSheet.create({
   },
   contentText: {
     lineHeight: 20,
+  },
+  inlineImageWrap: {
+    marginVertical: 6,
+    borderRadius: 8,
+    overflow: 'hidden',
+    alignSelf: 'stretch',
+    width: '100%',
+    maxHeight: PANEL_INLINE_IMAGE_MAX_HEIGHT,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -463,9 +765,6 @@ const bottomPanelStyles = StyleSheet.create({
   },
 });
 
-/** Height reserved for the fixed reply row (avatar 28 + padding) for min panel height. */
-const BOTTOM_PANEL_REPLY_ROW_HEIGHT = 44;
-
 function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue }) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -489,6 +788,8 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   const dismissPanActive = useSharedValue(0);
   /** Toggle via tap on image: 1 = show close/panel/dots, 0 = hide to focus on image. */
   const overlayUIVisible = useSharedValue(1);
+  /** Opacity for the absolute overlay bar (sheet closed); animated so it fades in/out instead of popping. */
+  const absoluteOverlayOpacitySv = useSharedValue(0);
 
   const {
     activeUrl,
@@ -508,10 +809,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     expandedWidthSv,
     expandedHeightSv,
     panelHeightSv,
-    panelContentMinHeightSv,
-    setPanelHeight,
     setPanelContentMinHeight,
-    startOpenPanelImageAnimation,
     close,
     openToCenter,
   } = ctx;
@@ -576,6 +874,49 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     panelMinHeightReportedRef.current = false;
   }, [activeOverlayPost]);
 
+  /** Sheet is closed initially (absolute overlay only); opens to 60% when user taps comment or show more. */
+  const [sheetOpen, setSheetOpen] = useState(false);
+  useEffect(() => {
+    if (!activeOverlayPost) setSheetOpen(false);
+  }, [activeOverlayPost]);
+
+  /** Sync sheetOpen with panel height; only runOnJS when threshold crosses to avoid 60fps setState during animation. */
+  const setSheetOpenFromReaction = useCallback((open: boolean) => {
+    setSheetOpen(open);
+  }, []);
+  useAnimatedReaction(
+    () => panelHeightSv.value > 10,
+    (isOpen, wasOpen) => {
+      if (wasOpen !== undefined && isOpen !== wasOpen) {
+        runOnJS(setSheetOpenFromReaction)(isOpen);
+      }
+    },
+    [setSheetOpenFromReaction, panelHeightSv]
+  );
+
+  /** Fade absolute overlay bar in when sheet is closed, out when sheet opens or overlay closes. */
+  useEffect(() => {
+    if (!activeOverlayPost) {
+      absoluteOverlayOpacitySv.value = withTiming(0, { duration: 150 });
+      return;
+    }
+    if (sheetOpen) {
+      absoluteOverlayOpacitySv.value = withTiming(0, { duration: 180 });
+    } else {
+      absoluteOverlayOpacitySv.value = withTiming(1, { duration: 220 });
+    }
+  }, [activeOverlayPost, sheetOpen, absoluteOverlayOpacitySv]);
+
+  /** Open sheet with spring for fluid feel; no setState so no re-render/mount during animation. */
+  const openSheet = useCallback(() => {
+    const snap60 = screenHeight * BOTTOM_PANEL_SHEET_SNAP_60_FRACTION;
+    setPanelContentMinHeight(snap60);
+    panelHeightSv.value = withSpring(snap60, {
+      dampingRatio: 0.82,
+      duration: 520,
+    });
+  }, [screenHeight, setPanelContentMinHeight, panelHeightSv]);
+
   const onReplyPress = useCallback(() => {
     if (!activeOverlayPost) return;
     router.push({
@@ -636,7 +977,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   }));
 
   const rCloseBtnStyle = useAnimatedStyle(() => ({
-    opacity: closeBtnOpacity.value * overlayUIVisible.value,
+    opacity: closeBtnOpacity.value * overlayUIVisible.value * (panelHeightSv.value <= 10 ? 1 : 0),
   }));
 
   /** Fade dots only during drag-to-dismiss (not affected by tap-on-image toggle). */
@@ -649,16 +990,37 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     opacity: closeBtnOpacity.value * overlayUIVisible.value,
   }));
 
-  /** Panel position/size driven by panelHeightSv so image area updates when panel is dragged. */
+  /** Absolute overlay bar opacity: fades in when sheet closed, fades out when sheet opens; still tied to closeBtn/overlayUI for dismiss. */
+  const rAbsoluteOverlayBarOpacityStyle = useAnimatedStyle(() => ({
+    opacity: absoluteOverlayOpacitySv.value * closeBtnOpacity.value * overlayUIVisible.value,
+  }));
+
+  /** Panel position/size driven by panelHeightSv. */
   const rBottomPanelLayoutStyle = useAnimatedStyle(() => {
     const h = panelHeightSv.value;
-    // Fallback so panel is visible on first frame when open() set panelHeightSv from JS (UI thread may read before update)
-    const effectiveHeight = h <= 0 ? screenHeight * BOTTOM_PANEL_MAX_HEIGHT_FRACTION : h;
     return {
-      top: screenHeight - effectiveHeight,
-      height: effectiveHeight,
+      top: screenHeight - h,
+      height: h,
     };
   }, [screenHeight, panelHeightSv]);
+
+  /** When true, dismiss pan was active; skip image tap-to-toggle so drag-to-dismiss doesn't trigger toggle. */
+  const dismissPanActiveRef = useRef(false);
+  const clearDismissPanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setDismissPanActive = useCallback((active: boolean) => {
+    if (clearDismissPanTimeoutRef.current) {
+      clearTimeout(clearDismissPanTimeoutRef.current);
+      clearDismissPanTimeoutRef.current = null;
+    }
+    if (active) {
+      dismissPanActiveRef.current = true;
+    } else {
+      clearDismissPanTimeoutRef.current = setTimeout(() => {
+        dismissPanActiveRef.current = false;
+        clearDismissPanTimeoutRef.current = null;
+      }, 200);
+    }
+  }, []);
 
   const pan = useMemo(
     () =>
@@ -668,6 +1030,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
         .failOffsetX([-DISMISS_FAIL_OFFSET_X, DISMISS_FAIL_OFFSET_X])
         .onStart(() => {
           dismissPanActive.value = 1;
+          runOnJS(setDismissPanActive)(true);
           panStartX.value = imageXCoord.value;
           panStartY.value = imageYCoord.value;
           if (__DEV__) {
@@ -737,6 +1100,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             threshold,
             dismissed
           );
+          runOnJS(setDismissPanActive)(false);
           imageScale.value = withTiming(1, IMAGE_OVERLAY_TIMING_CONFIG);
           if (!wasActive) return;
           if (dismissed) {
@@ -746,7 +1110,14 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           }
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- shared values are stable refs
-    [expandedWidth, expandedHeight, expandedWidthSv, expandedHeightSv, screenWidth]
+    [
+      expandedWidth,
+      expandedHeight,
+      expandedWidthSv,
+      expandedHeightSv,
+      screenWidth,
+      setDismissPanActive,
+    ]
   );
 
   const closeRef = useRef(close);
@@ -768,7 +1139,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   const pagerDragActiveRef = useRef(false);
   const clearPagerDragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleImagePress = useCallback(() => {
-    if (pagerDragActiveRef.current) return;
+    if (pagerDragActiveRef.current || dismissPanActiveRef.current) return;
     toggleOverlayUI();
   }, [toggleOverlayUI]);
   const setPagerDragActive = useCallback((active: boolean) => {
@@ -804,9 +1175,12 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           const ih = imageHeight.value;
           const insideImage = x >= ix && x <= ix + iw && y >= iy && y <= iy + ih;
           if (insideImage) return;
-          const panelTopY = activeOverlayPost
-            ? screenHeight - panelHeightSv.value
-            : screenHeight - BOTTOM_PANEL_SAFE_HEIGHT;
+          const effectiveBottom = activeOverlayPost
+            ? panelHeightSv.value > 0
+              ? panelHeightSv.value
+              : BOTTOM_PANEL_ABSOLUTE_OVERLAY_HEIGHT
+            : BOTTOM_PANEL_SAFE_HEIGHT;
+          const panelTopY = screenHeight - effectiveBottom;
           const insideBottomPanel = y >= panelTopY;
           if (insideBottomPanel) return;
           runOnJS(triggerClose)();
@@ -816,10 +1190,15 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   );
 
   const panelDragStartSv = useSharedValue(0);
-  const panelMaxHeight = screenHeight * BOTTOM_PANEL_MAX_HEIGHT_FRACTION;
+  const panelMaxHeight = Math.max(
+    0,
+    screenHeight * BOTTOM_PANEL_MAX_HEIGHT_FRACTION - BOTTOM_PANEL_MAX_HEIGHT_INSET_PX
+  );
+  const snap60Height = screenHeight * BOTTOM_PANEL_SHEET_SNAP_60_FRACTION;
   const scrollOffsetYInPanel = useSharedValue(0);
   /** When touch is in scroll area we delay activate/fail until onTouchesMove to detect drag direction. */
   const panelTouchStartYSv = useSharedValue(-1);
+
   const panelScrollHandler = useCallback(
     (e: { nativeEvent: { contentOffset: { y: number } } }) => {
       scrollOffsetYInPanel.value = e.nativeEvent.contentOffset.y;
@@ -830,10 +1209,10 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   /** Min movement (px) in scroll area before we activate/fail. */
   const PANEL_DRAG_THRESHOLD = 10;
   const SCROLL_AT_TOP_THRESHOLD = 2;
-  /** When sheet height is below this fraction of range (min→max), any drag in content resizes sheet; above it, scroll is allowed at 70%. */
-  const PANEL_SCROLL_VS_DRAG_MID_FRACTION = 0.5;
+  /** When sheet is below this height, any drag resizes; above it, only at-top + drag-down resizes. */
+  const scrollVsDragMidHeight = (snap60Height + panelMaxHeight) / 2;
 
-  /** Handle-only pan: only sheet resize, no scroll. Attached only to the handle. */
+  /** Handle-only pan: only sheet resize, no scroll. Snap to 0 / 60% / 100%; at 0 run setSheetOpen(false). */
   const handlePan = useMemo(
     () =>
       Gesture.Pan()
@@ -841,32 +1220,51 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           panelDragStartSv.value = panelHeightSv.value;
         })
         .onChange((e) => {
-          const minH = panelContentMinHeightSv.value;
           const maxH = panelMaxHeight;
           const next = panelDragStartSv.value - e.translationY;
-          panelHeightSv.value = Math.max(minH, Math.min(maxH, next));
+          panelHeightSv.value = Math.max(0, Math.min(maxH, next));
         })
         .onEnd((e) => {
-          const minH = panelContentMinHeightSv.value;
-          const maxH = panelMaxHeight;
+          'worklet';
           const current = panelHeightSv.value;
-          const mid = (minH + maxH) / 2;
           const velocityY = -e.velocityY;
+          const SNAP_0 = 0;
+          const SNAP_60 = snap60Height;
+          const SNAP_100 = panelMaxHeight;
+          const t30 = screenHeight * 0.3;
+          const t80 = screenHeight * 0.8;
           let snapTo: number;
-          if (velocityY > 200) snapTo = maxH;
-          else if (velocityY < -200) snapTo = minH;
-          else snapTo = current < mid ? minH : maxH;
-          panelHeightSv.value = withTiming(snapTo, {
-            duration: BOTTOM_PANEL_STIFF_DURATION_MS,
-            easing: Easing.out(Easing.cubic),
-          });
+          if (velocityY > 250) snapTo = SNAP_100;
+          else if (velocityY < -250) snapTo = current < screenHeight * 0.5 ? SNAP_0 : SNAP_60;
+          else if (current < t30) snapTo = SNAP_0;
+          else if (current < t80) snapTo = SNAP_60;
+          else snapTo = SNAP_100;
+          const closeSheet = snapTo <= 0;
+          panelHeightSv.value = withTiming(
+            snapTo,
+            {
+              duration: BOTTOM_PANEL_STIFF_DURATION_MS,
+              easing: Easing.out(Easing.cubic),
+            },
+            (finished) => {
+              'worklet';
+              if (finished && closeSheet) runOnJS(setSheetOpenFromReaction)(false);
+            }
+          );
         }),
-    [panelHeightSv, panelDragStartSv, panelContentMinHeightSv, panelMaxHeight]
+    [
+      panelHeightSv,
+      panelDragStartSv,
+      panelMaxHeight,
+      snap60Height,
+      screenHeight,
+      setSheetOpenFromReaction,
+    ]
   );
 
   /**
-   * Scroll-area pan: at small snap (min height) any drag resizes the sheet; at 70% (max) snap
-   * we use scroll (only at-top + drag-down resizes). Seamless transition between the two.
+   * Scroll-area pan: below 60% any drag resizes; at 60%/100% only at-top + drag-down resizes.
+   * Snap to 0 / 60% / 100%; at 0 run setSheetOpen(false).
    */
   const scrollAreaPanRef = useRef<GestureType | undefined>(undefined);
   const scrollAreaPan = useMemo(
@@ -891,11 +1289,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           }
           const touchY = e.allTouches[0]?.y ?? 0;
           const deltaY = touchY - panelTouchStartYSv.value;
-          const minH = panelContentMinHeightSv.value;
-          const maxH = panelMaxHeight;
-          const range = maxH - minH;
-          const midHeight = minH + range * PANEL_SCROLL_VS_DRAG_MID_FRACTION;
-          const sheetAtSmallSnap = panelHeightSv.value < midHeight;
+          const sheetAtSmallSnap = panelHeightSv.value < scrollVsDragMidHeight;
           const draggedDown = deltaY >= PANEL_DRAG_THRESHOLD;
           const draggedUp = deltaY <= -PANEL_DRAG_THRESHOLD;
           if (draggedDown || draggedUp) {
@@ -930,34 +1324,49 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           panelDragStartSv.value = panelHeightSv.value;
         })
         .onChange((e) => {
-          const minH = panelContentMinHeightSv.value;
           const maxH = panelMaxHeight;
           const next = panelDragStartSv.value - e.translationY;
-          panelHeightSv.value = Math.max(minH, Math.min(maxH, next));
+          panelHeightSv.value = Math.max(0, Math.min(maxH, next));
         })
         .onEnd((e) => {
-          const minH = panelContentMinHeightSv.value;
-          const maxH = panelMaxHeight;
+          'worklet';
           const current = panelHeightSv.value;
-          const mid = (minH + maxH) / 2;
           const velocityY = -e.velocityY;
+          const SNAP_0 = 0;
+          const SNAP_60 = snap60Height;
+          const SNAP_100 = panelMaxHeight;
+          const t30 = screenHeight * 0.3;
+          const t80 = screenHeight * 0.8;
           let snapTo: number;
-          if (velocityY > 200) snapTo = maxH;
-          else if (velocityY < -200) snapTo = minH;
-          else snapTo = current < mid ? minH : maxH;
-          panelHeightSv.value = withTiming(snapTo, {
-            duration: BOTTOM_PANEL_STIFF_DURATION_MS,
-            easing: Easing.out(Easing.cubic),
-          });
+          if (velocityY > 250) snapTo = SNAP_100;
+          else if (velocityY < -250) snapTo = current < screenHeight * 0.5 ? SNAP_0 : SNAP_60;
+          else if (current < t30) snapTo = SNAP_0;
+          else if (current < t80) snapTo = SNAP_60;
+          else snapTo = SNAP_100;
+          const closeSheet = snapTo <= 0;
+          panelHeightSv.value = withTiming(
+            snapTo,
+            {
+              duration: BOTTOM_PANEL_STIFF_DURATION_MS,
+              easing: Easing.out(Easing.cubic),
+            },
+            (finished) => {
+              'worklet';
+              if (finished && closeSheet) runOnJS(setSheetOpenFromReaction)(false);
+            }
+          );
         })
         .withRef(scrollAreaPanRef),
     [
       panelHeightSv,
       panelDragStartSv,
-      panelContentMinHeightSv,
       panelMaxHeight,
+      snap60Height,
+      screenHeight,
+      scrollVsDragMidHeight,
       panelTouchStartYSv,
       scrollOffsetYInPanel,
+      setSheetOpenFromReaction,
     ]
   );
 
@@ -1055,13 +1464,16 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             animatedProps={backdropAnimatedProps}
             pointerEvents="none"
           />
-          <Pressable
-            onPress={triggerClose}
-            style={[styles.closeButton, { top: insets.top + CLOSE_BUTTON_TOP_OFFSET }]}>
-            <Animated.View style={rCloseBtnStyle}>
+          <Animated.View
+            style={[
+              styles.closeButton,
+              { top: insets.top + CLOSE_BUTTON_TOP_OFFSET },
+              rCloseBtnStyle,
+            ]}>
+            <Pressable onPress={triggerClose} style={StyleSheet.absoluteFill}>
               <Icon name="material-symbols:close-rounded" size={22} color="#fff" />
-            </Animated.View>
-          </Pressable>
+            </Pressable>
+          </Animated.View>
           {activeUrl ? (
             <Animated.View style={[styles.imageWrap, rImageStyle]}>
               {hasMultipleImages ? (
@@ -1109,6 +1521,20 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
       {activeOverlayPost ? (
         <Animated.View
           style={[
+            styles.absoluteOverlayBar,
+            rAbsoluteOverlayBarOpacityStyle,
+            {
+              bottom: 0,
+              paddingBottom: insets.bottom + BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
+            },
+          ]}
+          pointerEvents={sheetOpen ? 'none' : 'auto'}>
+          <ImageOverlayAbsoluteBar post={activeOverlayPost} onOpenSheet={openSheet} />
+        </Animated.View>
+      ) : null}
+      {activeOverlayPost ? (
+        <Animated.View
+          style={[
             styles.bottomPanel,
             rBottomPanelStyle,
             rBottomPanelLayoutStyle,
@@ -1133,56 +1559,9 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                   contentContainerStyle={styles.bottomPanelScrollContent}
                   showsVerticalScrollIndicator={true}>
                   <View
-                    onLayout={(e) => {
+                    onLayout={() => {
                       if (panelMinHeightReportedRef.current) return;
-                      const contentHeight = e.nativeEvent.layout.height;
-                      const handleHeight = 24;
-                      const minPanelHeight = Math.min(
-                        contentHeight +
-                          handleHeight +
-                          BOTTOM_PANEL_REPLY_ROW_HEIGHT +
-                          insets.bottom +
-                          BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
-                        panelMaxHeight
-                      );
-                      if (__DEV__) {
-                        console.log('[Image:panelOnLayout]', {
-                          contentHeight,
-                          handleHeight,
-                          replyRowHeight: BOTTOM_PANEL_REPLY_ROW_HEIGHT,
-                          insetsBottom: insets.bottom,
-                          panelMaxHeight,
-                          minPanelHeight,
-                        });
-                        const sumBeforeClamp =
-                          contentHeight +
-                          handleHeight +
-                          BOTTOM_PANEL_REPLY_ROW_HEIGHT +
-                          insets.bottom +
-                          BOTTOM_PANEL_PADDING_BOTTOM_EXTRA;
-                        logImageVerbose('panel onLayout', {
-                          contentHeight,
-                          handleHeight,
-                          replyRowHeight: BOTTOM_PANEL_REPLY_ROW_HEIGHT,
-                          insetsBottom: insets.bottom,
-                          BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
-                          formula:
-                            'min(contentHeight + handleHeight + replyRow + insets.bottom + paddingExtra, panelMaxHeight)',
-                          sumBeforeClamp,
-                          panelMaxHeight,
-                          minPanelHeight,
-                          clamped: sumBeforeClamp > panelMaxHeight,
-                          thenCalls: [
-                            'setPanelContentMinHeight(minPanelHeight)',
-                            'startOpenPanelImageAnimation(minPanelHeight)',
-                            'setPanelHeight(minPanelHeight)',
-                          ],
-                        });
-                      }
-                      setPanelContentMinHeight(minPanelHeight);
-                      // Animate image to final position (for min panel) so no overshoot; panel animates 70%→min in parallel
-                      startOpenPanelImageAnimation(minPanelHeight);
-                      setPanelHeight(minPanelHeight);
+                      setPanelContentMinHeight(snap60Height);
                       panelMinHeightReportedRef.current = true;
                     }}
                     collapsable={false}>
@@ -1240,10 +1619,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  absoluteOverlayBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 1,
+    backgroundColor: 'transparent',
+  },
   bottomPanel: {
     position: 'absolute',
     left: 0,
     right: 0,
+    zIndex: 2,
     backgroundColor: PANEL_BG,
   },
   panelContentWrap: {

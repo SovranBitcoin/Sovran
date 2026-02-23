@@ -126,11 +126,20 @@ export const DOT_PAGER_BOTTOM = 16;
 /** Min height (px) of bottom panel area; taps in this region do not close the overlay. */
 export const BOTTOM_PANEL_SAFE_HEIGHT = 220;
 
-/** When panel is visible (same-layer layout), max fraction of screen height the panel can occupy (image gets the rest). */
-export const BOTTOM_PANEL_MAX_HEIGHT_FRACTION = 0.7;
+/** Height (px) of the absolute overlay bar when sheet is closed (pfp, truncated content, metric buttons). */
+export const BOTTOM_PANEL_ABSOLUTE_OVERLAY_HEIGHT = 200;
 
-/** Duration (ms) for panel height changes (set/snap). Stiff timing so image scales with the sheet without bounce. */
-export const BOTTOM_PANEL_STIFF_DURATION_MS = 220;
+/** When sheet is open, snap point as fraction of screen height (e.g. 0.6 = 60%). */
+export const BOTTOM_PANEL_SHEET_SNAP_60_FRACTION = 0.6;
+
+/** When panel is visible (same-layer layout), max fraction of screen height the panel can occupy (image gets the rest). */
+export const BOTTOM_PANEL_MAX_HEIGHT_FRACTION = 1;
+
+/** Inset (px) subtracted from max sheet height so a strip of the image stays visible when sheet is fully expanded. */
+export const BOTTOM_PANEL_MAX_HEIGHT_INSET_PX = 32;
+
+/** Duration (ms) for panel height changes (set/snap). Slightly longer for smooth open/close. */
+export const BOTTOM_PANEL_STIFF_DURATION_MS = 280;
 
 /** Bottom panel (post info) padding and layout. */
 export const BOTTOM_PANEL_PADDING_TOP = 12;

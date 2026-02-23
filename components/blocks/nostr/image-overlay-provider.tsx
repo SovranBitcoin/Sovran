@@ -18,6 +18,7 @@ import React, {
   useState,
 } from 'react';
 import { useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   cancelAnimation,
   Easing,
@@ -414,7 +415,12 @@ type ImageOverlayActionsValue = Omit<
   | 'activeOverlayPost'
   | 'expandedWidth'
   | 'expandedHeight'
-> & { screenWidth: number; screenHeight: number };
+> & {
+  screenWidth: number;
+  screenHeight: number;
+  /** Image viewport height (screenHeight - top inset); used by hook for expandedHeight. */
+  expandedHeightFromContext: number;
+};
 
 const ImageOverlayStateContext = createContext<ImageOverlayStateValue | null>(null);
 const ImageOverlayActionsContext = createContext<ImageOverlayActionsValue | null>(null);
@@ -434,7 +440,12 @@ export function computeExpandedSize(
 
 export function ImageOverlayProvider({ children }: { children: React.ReactNode }) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { scrollOffsetY, scrollHandler } = useScrollViewOffset();
+  const safeTop = insets.top;
+  const safeBottom = insets.bottom;
+  /** Image viewport: below notch only (no bottom inset) so image extends to screen bottom. */
+  const imageViewportHeight = screenHeight - safeTop;
 
   const [activeUrls, setActiveUrls] = useState<string[]>([]);
   const [activeIndex, setActiveIndexState] = useState(0);
@@ -512,6 +523,8 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
 
   const panelHeightSv = useSharedValue(0);
   const panelContentMinHeightSv = useSharedValue(0);
+  const safeTopSv = useSharedValue(0);
+  const safeBottomSv = useSharedValue(0);
   const aspectRatioSv = useSharedValue(16 / 9);
   const hasPanelSv = useSharedValue(0);
   /** 1 while image is animating from thumbnail to expanded on open-with-panel; reaction skips so it doesn't overwrite. */
@@ -547,6 +560,11 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
     },
     [panelContentMinHeightSv]
   );
+
+  useEffect(() => {
+    safeTopSv.value = safeTop;
+    safeBottomSv.value = safeBottom;
+  }, [safeTop, safeBottom, safeTopSv, safeBottomSv]);
 
   const openTimestampRef = useRef(0);
   const closeTimestampRef = useRef(0);
@@ -620,7 +638,8 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
   }, [clearUrlDelayed, imageState, isClosing]);
 
   const screenCenterX = screenWidth / 2;
-  const screenCenterY = screenHeight / 2;
+  /** Center Y for image when no panel: center of viewport (below notch, to screen bottom). */
+  const screenCenterY = safeTop + imageViewportHeight / 2;
 
   const openToCenter = useCallback(() => {
     'worklet';
@@ -689,11 +708,11 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
   const startOpenPanelImageAnimation = useCallback(
     (minPanelHeight: number) => {
       // openAnimationInProgressSv already set to 1 in open() when hasPanel so reaction skips from first frame
-      const availableHeight = screenHeight - minPanelHeight;
+      const availableHeight = imageViewportHeight - minPanelHeight;
       // Max viewport so each image fits independently (contentFit="contain")
       const expW = screenWidth;
       const expH = availableHeight;
-      const centerY = availableHeight / 2;
+      const centerY = safeTop + availableHeight / 2;
       const targetX = screenCenterX - expW / 2;
       const targetY = centerY - expH / 2;
       if (__DEV__) {
@@ -734,6 +753,8 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
       screenWidth,
       screenHeight,
       screenCenterX,
+      safeTop,
+      imageViewportHeight,
       activeAspectRatio,
       centerYSv,
       expandedWidthSv,
@@ -745,19 +766,20 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
 
   const open = useCallback(
     (layout: ImageOverlayLayout) => {
+      safeTopSv.value = safeTop;
+      safeBottomSv.value = safeBottom;
       if (__DEV__) {
         openTimestampRef.current = performance.now();
         console.log('[Image:Perf] open() started', { url: layout.url });
       }
       const aspectRatio = layout.aspectRatio ?? layout.width / layout.height;
       const hasPanel = !!layout.post;
-      const availableHeight = hasPanel
-        ? screenHeight * (1 - BOTTOM_PANEL_MAX_HEIGHT_FRACTION)
-        : screenHeight;
+      // When hasPanel we start with sheet closed: image centered in viewport (below notch to bottom); absolute overlay sits on top.
+      const availableHeight = imageViewportHeight;
       // Max viewport so each image fits independently (contentFit="contain"); not tied to clicked image aspect ratio
       const expW = screenWidth;
       const expH = availableHeight;
-      const imageAreaCenterY = availableHeight / 2;
+      const imageAreaCenterY = safeTop + availableHeight / 2;
 
       const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
       const initialIndex = Math.min(layout.initialIndex ?? 0, Math.max(0, urls.length - 1));
@@ -771,8 +793,8 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
       aspectRatioSv.value = aspectRatio;
       if (hasPanel) {
         hasPanelSv.value = 1;
-        panelHeightSv.value = screenHeight * BOTTOM_PANEL_MAX_HEIGHT_FRACTION;
-        // Block panel reaction until startOpenPanelImageAnimation runs (reaction runs on mount before onLayout)
+        panelHeightSv.value = 0; // Sheet closed initially; absolute overlay only
+        // Block panel reaction until startOpenPanelImageAnimation runs
         openAnimationInProgressSv.value = 1;
       } else {
         hasPanelSv.value = 0;
@@ -846,7 +868,7 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
         console.log('[Image:open]', {
           hasPanel,
           screenHeight,
-          panelHeight: hasPanel ? screenHeight * BOTTOM_PANEL_MAX_HEIGHT_FRACTION : 0,
+          panelHeight: 0,
           availableHeight,
           imageAreaCenterY,
           initialImageRect: {
@@ -934,7 +956,7 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
             centerYSv: hasPanel ? imageAreaCenterY : screenCenterY,
             expandedWidthSv: expW,
             expandedHeightSv: expH,
-            panelHeightSv: hasPanel ? screenHeight * BOTTOM_PANEL_MAX_HEIGHT_FRACTION : 0,
+            panelHeightSv: hasPanel ? 0 : 0,
             openAnimationInProgressSv: hasPanel ? 1 : 0,
           },
           scrollOffsetY: scrollOffsetY.value,
@@ -968,13 +990,20 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
       cancelAnimation(closeBtnOpacity);
       cancelAnimation(panelHeightSv);
 
-      // Run the expand-to-center animation on the UI thread. When hasPanel, only reveal blur+btn; overlay will call startOpenPanelImageAnimation(minPanelHeight) so image animates to final position (no overshoot).
-      if (hasPanel) scheduleOnUI(openRevealUi);
-      else scheduleOnUI(openToCenter);
+      // Run the expand-to-center animation on the UI thread. When hasPanel, reveal blur+btn then animate image to position above absolute overlay.
+      if (hasPanel) {
+        scheduleOnUI(openRevealUi);
+        startOpenPanelImageAnimation(0); // Full screen so image is centered when sheet is closed
+      } else scheduleOnUI(openToCenter);
     },
     [
       screenWidth,
       screenHeight,
+      safeTop,
+      safeBottom,
+      imageViewportHeight,
+      safeTopSv,
+      safeBottomSv,
       screenCenterX,
       screenCenterY,
       scrollOffsetY,
@@ -998,6 +1027,7 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
       isClosing,
       openToCenter,
       openRevealUi,
+      startOpenPanelImageAnimation,
       hasPanelSv,
       openAnimationInProgressSv,
       panelHeightSv,
@@ -1242,6 +1272,7 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
       panelContentMinHeightSv,
       screenWidth,
       screenHeight,
+      expandedHeightFromContext: imageViewportHeight,
     };
   }, [
     scrollHandler,
@@ -1268,6 +1299,7 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
     panelContentMinHeightSv,
     screenWidth,
     screenHeight,
+    imageViewportHeight,
   ]);
 
   useAnimatedReaction(
@@ -1285,8 +1317,12 @@ export function ImageOverlayProvider({ children }: { children: React.ReactNode }
       if (isClosing.value) return;
       const sh = screenHeightSv.value;
       const sw = screenWidthSv.value;
-      const availableHeight = sh - panelH;
-      const centerY = availableHeight / 2;
+      const topInset = safeTopSv.value;
+      const bottomInset = safeBottomSv.value;
+      // Only shrink image when the sheet would collide with it (sheet top above content).
+      const effectiveBottom = panelH > bottomInset ? panelH : 0;
+      const availableHeight = sh - topInset - effectiveBottom;
+      const centerY = topInset + availableHeight / 2;
       // Max viewport: full width and height so each image can fit independently (contentFit="contain")
       const expW = sw;
       const expH = availableHeight;
@@ -1324,13 +1360,9 @@ export function useImageOverlay(): ImageOverlayContextValue | null {
   const actions = useContext(ImageOverlayActionsContext);
   return useMemo((): ImageOverlayContextValue | null => {
     if (!actions || !state) return null;
-    const hasPanel = !!state.activeOverlayPost;
-    const availableHeight = hasPanel
-      ? actions.screenHeight * (1 - BOTTOM_PANEL_MAX_HEIGHT_FRACTION)
-      : actions.screenHeight;
-    // Max viewport so each image fits independently (contentFit="contain")
+    // When sheet is closed image is centered in safe area; when sheet open the reaction drives layout.
     const expandedWidth = actions.screenWidth;
-    const expandedHeight = availableHeight;
+    const expandedHeight = actions.expandedHeightFromContext;
     return {
       ...actions,
       ...state,
