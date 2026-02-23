@@ -56,9 +56,16 @@ interface CarouselProps {
   storyUsers: StoryUser[];
   startIndex?: number;
   onClose?: () => void;
+  /** When true, VideoViews are not rendered so they unmount before navigation (avoids native crash). */
+  isClosing?: boolean;
 }
 
-export const StoriesCarousel: FC<CarouselProps> = ({ storyUsers, startIndex = 0, onClose }) => {
+export const StoriesCarousel: FC<CarouselProps> = ({
+  storyUsers,
+  startIndex = 0,
+  onClose,
+  isClosing = false,
+}) => {
   const [listCurrentIndex, setListCurrentIndex] = useState(startIndex);
   const { width } = useWindowDimensions();
 
@@ -116,6 +123,7 @@ export const StoriesCarousel: FC<CarouselProps> = ({ storyUsers, startIndex = 0,
           isDragging={isDragging}
           scrollRef={scrollRef}
           onClose={onClose}
+          isClosing={isClosing}
         />
       )}
       horizontal
@@ -150,6 +158,7 @@ type UserItemProps = {
   isDragging: SharedValue<boolean>;
   scrollRef: React.RefObject<FlatList<StoryUser> | null>;
   onClose?: () => void;
+  isClosing?: boolean;
 };
 
 const UserStoriesItem: FC<UserItemProps> = ({
@@ -161,16 +170,11 @@ const UserStoriesItem: FC<UserItemProps> = ({
   isDragging,
   scrollRef,
   onClose,
+  isClosing = false,
 }) => {
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const { width: screenWidth } = useWindowDimensions();
   const mountedRef = useRef(true);
-
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   const isActive = userIndex === listCurrentIndex;
   const currentVideo = user.videoPosts[currentStoryIndex];
@@ -180,6 +184,25 @@ const UserStoriesItem: FC<UserItemProps> = ({
     p.loop = false;
     p.muted = false;
   });
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      try {
+        player.pause();
+      } catch {
+        // player may already be released
+      }
+    };
+  }, [player]);
+
+  useEffect(() => {
+    if (isClosing) {
+      try {
+        player.pause();
+      } catch {}
+    }
+  }, [isClosing, player]);
 
   // Track progress via expo-video time updates
   useEffect(() => {
@@ -331,18 +354,24 @@ const UserStoriesItem: FC<UserItemProps> = ({
         onLongPress={onStoryLongPress}
         delayLongPress={250}
         onPressOut={onStoryPressOut}>
-        {/* Video player */}
+        {/* Video player — hide when closing so all VideoViews unmount before navigation */}
         <Animated.View
           key={currentVideo?.videoUrl}
           entering={FadeIn.duration(200)}
           exiting={FadeOut.duration(200)}
           style={StyleSheet.absoluteFill}>
-          <VideoView
-            player={player}
-            style={[StyleSheet.absoluteFill, styles.videoRadius]}
-            contentFit="contain"
-            nativeControls={false}
-          />
+          {isClosing ? (
+            <View
+              style={[StyleSheet.absoluteFill, styles.videoRadius, styles.closingPlaceholder]}
+            />
+          ) : (
+            <VideoView
+              player={player}
+              style={[StyleSheet.absoluteFill, styles.videoRadius]}
+              contentFit="contain"
+              nativeControls={false}
+            />
+          )}
         </Animated.View>
 
         {/* Top gradient overlay */}
@@ -370,7 +399,15 @@ const UserStoriesItem: FC<UserItemProps> = ({
           <Text size={14} bold style={[styles.profileName, styles.flex1]} numberOfLines={1}>
             {profileName}
           </Text>
-          <TouchableOpacity onPress={onClose} hitSlop={12} style={styles.closeButton}>
+          <TouchableOpacity
+            onPress={() => {
+              try {
+                player.pause();
+              } catch {}
+              onClose?.();
+            }}
+            hitSlop={12}
+            style={styles.closeButton}>
             <Icon name="mdi:close" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -386,6 +423,7 @@ const UserStoriesItem: FC<UserItemProps> = ({
 const styles = StyleSheet.create({
   flex1: { flex: 1 },
   videoRadius: { borderRadius: 16 },
+  closingPlaceholder: { backgroundColor: '#000' },
   topGradient: {
     position: 'absolute',
     top: 0,
