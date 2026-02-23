@@ -647,7 +647,7 @@ export const InlineLink = React.memo(function InlineLink({
 // ============================================================================
 
 /**
- * ImageBlock: feed image with optional overlay. Perf logs (__DEV__, [ImageOverlay:Perf]):
+ * ImageBlock: feed image with optional overlay. Perf logs (__DEV__, [Image:Perf]):
  * - render count (per url), handlePress (tap to open overlay).
  * Optional onPressIn/onPressOut suppress parent tap (e.g. PostCard thread navigation).
  */
@@ -707,7 +707,7 @@ export const ImageBlock = React.memo(function ImageBlock({
 
   useEffect(() => {
     if (__DEV__) {
-      console.log('[ImageOverlay:Perf] ImageBlock render', {
+      console.log('[Image:Perf] ImageBlock render', {
         url: url.slice(0, 40),
         count: renderCountRef.current,
       });
@@ -724,13 +724,13 @@ export const ImageBlock = React.memo(function ImageBlock({
 
   const handlePress = useCallback(() => {
     if (__DEV__) {
-      console.log('[ImageOverlay:Perf] ImageBlock handlePress', { url: url.slice(0, 40) });
+      console.log('[Image:Perf] ImageBlock handlePress', { url: url.slice(0, 40) });
     }
     if (!imageOverlay?.open) return;
     containerRef.current?.measureInWindow(
       (pageX: number, pageY: number, width: number, height: number) => {
         if (__DEV__) {
-          console.log('[ImageOverlay] measureInWindow →', {
+          console.log('[Image:Overlay] measureInWindow →', {
             pageX,
             pageY,
             width,

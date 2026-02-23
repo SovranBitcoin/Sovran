@@ -126,6 +126,12 @@ export const DOT_PAGER_BOTTOM = 16;
 /** Min height (px) of bottom panel area; taps in this region do not close the overlay. */
 export const BOTTOM_PANEL_SAFE_HEIGHT = 220;
 
+/** When panel is visible (same-layer layout), max fraction of screen height the panel can occupy (image gets the rest). */
+export const BOTTOM_PANEL_MAX_HEIGHT_FRACTION = 0.7;
+
+/** Duration (ms) for panel height changes (set/snap). Stiff timing so image scales with the sheet without bounce. */
+export const BOTTOM_PANEL_STIFF_DURATION_MS = 220;
+
 /** Bottom panel (post info) padding and layout. */
 export const BOTTOM_PANEL_PADDING_TOP = 12;
 export const BOTTOM_PANEL_PADDING_HORIZONTAL = 16;
