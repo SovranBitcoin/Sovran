@@ -764,6 +764,28 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     });
   }, [overlayUIVisible]);
 
+  /** When true, a pager drag is in progress or just ended; skip image tap-to-toggle. */
+  const pagerDragActiveRef = useRef(false);
+  const clearPagerDragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleImagePress = useCallback(() => {
+    if (pagerDragActiveRef.current) return;
+    toggleOverlayUI();
+  }, [toggleOverlayUI]);
+  const setPagerDragActive = useCallback((active: boolean) => {
+    if (clearPagerDragTimeoutRef.current) {
+      clearTimeout(clearPagerDragTimeoutRef.current);
+      clearPagerDragTimeoutRef.current = null;
+    }
+    if (active) {
+      pagerDragActiveRef.current = true;
+    } else {
+      clearPagerDragTimeoutRef.current = setTimeout(() => {
+        pagerDragActiveRef.current = false;
+        clearPagerDragTimeoutRef.current = null;
+      }, 200);
+    }
+  }, []);
+
   /** Max finger movement (px) for tap to count; prevents swipe-to-page from triggering toggle. */
   const TAP_MAX_DISTANCE = 12;
 
@@ -948,6 +970,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
         .minDistance(PAGER_MIN_DISTANCE)
         .onStart(() => {
           if (imageState.value !== 'open') return;
+          runOnJS(setPagerDragActive)(true);
           scheduleOnRN(logPagerPanStart);
           startPagerOffsetSv.value = pagerOffsetSv.value;
         })
@@ -997,9 +1020,17 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
               }
             }
           );
+          runOnJS(setPagerDragActive)(false);
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- shared values stable refs
-    [hasMultipleImages, expandedWidth, expandedWidthSv, maxPagerIndex, setActiveIndex]
+    [
+      hasMultipleImages,
+      expandedWidth,
+      expandedWidthSv,
+      maxPagerIndex,
+      setActiveIndex,
+      setPagerDragActive,
+    ]
   );
 
   const composed = useMemo(
@@ -1035,7 +1066,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             <Animated.View style={[styles.imageWrap, rImageStyle]}>
               {hasMultipleImages ? (
                 <>
-                  <Pressable style={StyleSheet.absoluteFill} onPress={toggleOverlayUI}>
+                  <Pressable style={StyleSheet.absoluteFill} onPress={handleImagePress}>
                     <Animated.View style={rPagerScaleStyle}>
                       <Animated.View style={rPagerRowStyle}>
                         {activeUrls.map((url, i) => (
@@ -1062,7 +1093,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                   </Animated.View>
                 </>
               ) : (
-                <Pressable style={StyleSheet.absoluteFill} onPress={toggleOverlayUI}>
+                <Pressable style={StyleSheet.absoluteFill} onPress={handleImagePress}>
                   <Image
                     source={{ uri: activeUrl }}
                     style={StyleSheet.absoluteFill}
