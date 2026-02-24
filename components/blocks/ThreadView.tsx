@@ -37,8 +37,7 @@ import {
 import { PostCard } from './nostr/PostCard';
 
 import { VideoFeedOverlay, type VideoPost } from './UserFeed';
-import { ImageOverlayProvider, useImageOverlay } from './nostr/image-overlay-provider';
-import { AnimatedImageOverlay } from './nostr/animated-image-overlay';
+import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/hooks/useNostrEngagement';
 
 // ============================================================================
@@ -533,69 +532,69 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
-      <LegendList
-        data={threadItems}
-        keyExtractor={keyExtractor}
-        getItemType={(item) => item.type}
-        estimatedItemSize={200}
-        drawDistance={500}
-        renderItem={renderItem}
-        extraData={`${dataVersion}:${engagementRevision}`}
-        recycleItems
-        ListFooterComponent={
-          hiddenReplyCount > 0 ? (
-            <View style={styles.hiddenReplyFooter}>
-              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
-                {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not loaded
-              </Text>
-            </View>
-          ) : null
-        }
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-        onScroll={
-          imageOverlay?.scrollOffsetY != null
-            ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
-              }
-            : undefined
-        }
-        scrollEventThrottle={16}
-        initialScrollIndex={targetIndex > 0 ? targetIndex : undefined}
-      />
-      <AnimatedImageOverlay />
-      {overlayVisible && (
-        <VideoFeedOverlay
-          videoPosts={videoPosts}
-          profilesMap={profilesMap}
-          metricsMap={metricsMap}
-          startIndex={overlayStartIndex}
-          onClose={() => setOverlayVisible(false)}
-          getDisplayMetrics={getDisplayMetrics}
-          getEngagementState={getEngagementState}
-          engagementRevision={engagementRevision}
-          onLikePress={(eventId) => {
-            const event = actionableEventsById.get(eventId);
-            if (event) toggleLike(event);
-          }}
-          onRepostPress={(eventId) => {
-            const event = actionableEventsById.get(eventId);
-            if (event) toggleRepost(event);
-          }}
+    <ImageOverlayProvider
+      getDisplayMetrics={getDisplayMetrics}
+      getEngagementState={getEngagementState}>
+      <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
+        <LegendList
+          data={threadItems}
+          keyExtractor={keyExtractor}
+          getItemType={(item) => item.type}
+          estimatedItemSize={200}
+          drawDistance={500}
+          renderItem={renderItem}
+          extraData={`${dataVersion}:${engagementRevision}`}
+          recycleItems
+          ListFooterComponent={
+            hiddenReplyCount > 0 ? (
+              <View style={styles.hiddenReplyFooter}>
+                <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
+                  {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not loaded
+                </Text>
+              </View>
+            ) : null
+          }
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: 120 }}
+          showsVerticalScrollIndicator={false}
+          onScroll={
+            imageOverlay?.scrollOffsetY != null
+              ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+                  imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
+                }
+              : undefined
+          }
+          scrollEventThrottle={16}
+          initialScrollIndex={targetIndex > 0 ? targetIndex : undefined}
         />
-      )}
-    </View>
+        <AnimatedImageOverlay />
+        {overlayVisible && (
+          <VideoFeedOverlay
+            videoPosts={videoPosts}
+            profilesMap={profilesMap}
+            metricsMap={metricsMap}
+            startIndex={overlayStartIndex}
+            onClose={() => setOverlayVisible(false)}
+            getDisplayMetrics={getDisplayMetrics}
+            getEngagementState={getEngagementState}
+            engagementRevision={engagementRevision}
+            onLikePress={(eventId) => {
+              const event = actionableEventsById.get(eventId);
+              if (event) toggleLike(event);
+            }}
+            onRepostPress={(eventId) => {
+              const event = actionableEventsById.get(eventId);
+              if (event) toggleRepost(event);
+            }}
+          />
+        )}
+      </View>
+    </ImageOverlayProvider>
   );
 }
 
 function ThreadViewComponent(props: ThreadViewProps) {
-  return (
-    <ImageOverlayProvider>
-      <ThreadViewInner {...props} />
-    </ImageOverlayProvider>
-  );
+  return <ThreadViewInner {...props} />;
 }
 
 export const ThreadView = React.memo(ThreadViewComponent);

@@ -66,7 +66,6 @@ import Reanimated, {
   withTiming,
   withRepeat,
   withSpring,
-  withSequence,
   interpolate,
   Extrapolation,
   cancelAnimation,
@@ -75,7 +74,6 @@ import Reanimated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
-import { EnhancedHaptics } from 'components/ui/Haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ============================================================================
@@ -112,8 +110,7 @@ import {
 } from './nostr/shared';
 
 import { PostCard } from './nostr/PostCard';
-import { ImageOverlayProvider, useImageOverlay } from './nostr/image-overlay-provider';
-import { AnimatedImageOverlay } from './nostr/animated-image-overlay';
+import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement, type EngagementViewState } from '@/hooks/useNostrEngagement';
 import { useNostrSocialStore } from '@/stores/nostrSocialStore';
 
@@ -574,12 +571,6 @@ function EmptyFeed() {
 
 const VIDEO_URL_STRIP_REGEX = /https?:\/\/\S+\.(mp4|webm|mov|m4v|avi)(\?\S*)?/gi;
 
-function formatVideoCount(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toString();
-}
-
 // ── Custom timeline scrubber ────────────────────────────────────────────────
 // Uses Reanimated shared values for 60fps-smooth progress updates and a Pan
 // gesture so users can scrub through the video by dragging on the bar.
@@ -587,8 +578,6 @@ function formatVideoCount(n: number): string {
 const SCRUBBER_HEIGHT = 3;
 const SCRUBBER_HIT_SLOP = 14; // extra touch area above/below the thin bar
 const SCRUBBER_ACTIVE_HEIGHT = 5;
-const BOUNCE_SPRING = { damping: 10, stiffness: 350, mass: 0.5 };
-const SETTLE_SPRING = { damping: 14, stiffness: 200 };
 
 /** Format seconds → "M:SS" */
 function formatDuration(sec: number): string {
@@ -703,93 +692,32 @@ const TimelineScrubber = memo(function TimelineScrubber({
   );
 });
 
+function formatVideoCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toString();
+}
+
 const AnimatedPillMetric = memo(function AnimatedPillMetric({
   iconName,
   text,
   inactiveColor,
   activeColor,
   isActive,
-  pending,
-  pendingDirection,
 }: {
   iconName: string;
   text: string;
   inactiveColor: string;
   activeColor: string;
   isActive: boolean;
-  pending: boolean;
-  pendingDirection?: 'activating' | 'deactivating';
 }) {
-  const [displayText, setDisplayText] = useState(text);
-  const iconScale = useSharedValue(1);
-  const numberSlide = useSharedValue(0);
-  const numberOpacity = useSharedValue(1);
-  const prevPendingRef = useRef(pending);
-  const lastDirectionRef = useRef<'activating' | 'deactivating'>('activating');
-
-  useEffect(() => {
-    return () => {
-      cancelAnimation(iconScale);
-      cancelAnimation(numberSlide);
-      cancelAnimation(numberOpacity);
-    };
-  }, [iconScale, numberSlide, numberOpacity]);
-
-  useEffect(() => {
-    const wasPending = prevPendingRef.current;
-
-    if (pending && !wasPending) {
-      const direction = pendingDirection ?? 'activating';
-      lastDirectionRef.current = direction;
-
-      if (direction === 'activating') {
-        EnhancedHaptics.buttonHaptic();
-        iconScale.set(
-          withSequence(withTiming(1.35, { duration: 50 }), withSpring(1, BOUNCE_SPRING))
-        );
-      } else {
-        EnhancedHaptics.navigateHaptic();
-        iconScale.set(
-          withSequence(withTiming(0.7, { duration: 50 }), withSpring(1, SETTLE_SPRING))
-        );
-      }
-
-      if (text !== displayText) {
-        const slideFrom = direction === 'activating' ? 8 : -8;
-        setDisplayText(text);
-        numberSlide.set(slideFrom);
-        numberOpacity.set(0);
-        numberSlide.set(withSpring(0, { damping: 15, stiffness: 200 }));
-        numberOpacity.set(withTiming(1, { duration: 180 }));
-      }
-    } else if (text !== displayText) {
-      setDisplayText(text);
-    }
-
-    prevPendingRef.current = pending;
-  }, [displayText, iconScale, numberOpacity, numberSlide, pending, pendingDirection, text]);
-
-  const iconAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: iconScale.get() }],
-  }));
-
-  const numberAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: numberSlide.get() }],
-    opacity: numberOpacity.get(),
-  }));
-
   const color = isActive ? activeColor : inactiveColor;
-
   return (
     <HStack align="center" gap={5}>
-      <Reanimated.View style={iconAnimStyle}>
-        <Icon name={iconName} size={15} color={color} />
-      </Reanimated.View>
-      <Reanimated.View style={numberAnimStyle}>
-        <Text size={12} style={[vCtrl.metricText, { color }]}>
-          {displayText}
-        </Text>
-      </Reanimated.View>
+      <Icon name={iconName} size={15} color={color} />
+      <Text size={12} style={[vCtrl.metricText, { color }]}>
+        {text}
+      </Text>
     </HStack>
   );
 });
@@ -1080,8 +1008,6 @@ const VideoFeedItem = memo(function VideoFeedItem({
               inactiveColor={neutralMetricColor}
               activeColor="#4cd964"
               isActive={engagement.reposted}
-              pending={engagement.repostPending}
-              pendingDirection={engagement.repostPendingDirection}
               text={metrics.repostCount > 0 ? formatVideoCount(metrics.repostCount) : '0'}
             />
           </TouchableOpacity>
@@ -1099,8 +1025,6 @@ const VideoFeedItem = memo(function VideoFeedItem({
               inactiveColor={neutralMetricColor}
               activeColor="#ff5a7a"
               isActive={engagement.liked}
-              pending={engagement.likePending}
-              pendingDirection={engagement.likePendingDirection}
               text={metrics.likeCount > 0 ? formatVideoCount(metrics.likeCount) : '0'}
             />
           </TouchableOpacity>
@@ -2157,7 +2081,9 @@ function UserFeedInner({
     );
 
   return (
-    <>
+    <ImageOverlayProvider
+      getDisplayMetrics={getDisplayMetrics}
+      getEngagementState={getEngagementState}>
       {feedList}
       <AnimatedImageOverlay />
       {overlayVisible && (
@@ -2181,16 +2107,12 @@ function UserFeedInner({
           }}
         />
       )}
-    </>
+    </ImageOverlayProvider>
   );
 }
 
 function UserFeedComponent(props: UserFeedProps) {
-  return (
-    <ImageOverlayProvider>
-      <UserFeedInner {...props} />
-    </ImageOverlayProvider>
-  );
+  return <UserFeedInner {...props} />;
 }
 
 export const UserFeed = React.memo(UserFeedComponent);

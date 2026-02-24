@@ -56,8 +56,7 @@ import { CATEGORY_NPUBS } from './nostr/categoryNpubs';
 
 import { PostCard } from './nostr/PostCard';
 import { RepostCard, VideoFeedOverlay, type VideoPost } from './UserFeed';
-import { ImageOverlayProvider, useImageOverlay } from './nostr/image-overlay-provider';
-import { AnimatedImageOverlay } from './nostr/animated-image-overlay';
+import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/hooks/useNostrEngagement';
 import { StoriesRow } from './nostr/StoriesRow';
 
@@ -1159,7 +1158,9 @@ function HomeFeedInner() {
   );
 
   return (
-    <>
+    <ImageOverlayProvider
+      getDisplayMetrics={getDisplayMetrics}
+      getEngagementState={getEngagementState}>
       <View style={[styles.flex1, { paddingTop: topContentInset }]}>
         <LegendList
           ref={listRef}
@@ -1215,16 +1216,12 @@ function HomeFeedInner() {
           }}
         />
       )}
-    </>
+    </ImageOverlayProvider>
   );
 }
 
 function HomeFeedComponent() {
-  return (
-    <ImageOverlayProvider>
-      <HomeFeedInner />
-    </ImageOverlayProvider>
-  );
+  return <HomeFeedInner />;
 }
 
 export const HomeFeed = React.memo(HomeFeedComponent);

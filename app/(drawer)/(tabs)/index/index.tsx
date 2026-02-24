@@ -75,7 +75,6 @@ function TabOneScreen() {
 
       <AccountPagerView accounts={accounts} setAccount={setAccount} account={account} />
       {devMode ? <DebugBalancePanel /> : null}
-
       <View
         className="p-4 pb-24 pt-4"
         style={{

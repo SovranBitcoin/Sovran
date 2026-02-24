@@ -141,30 +141,29 @@ export const BOTTOM_PANEL_MAX_HEIGHT_INSET_PX = 32;
 /** Duration (ms) for panel height changes (set/snap). Slightly longer for smooth open/close. */
 export const BOTTOM_PANEL_STIFF_DURATION_MS = 280;
 
+/** Border radius (px) for the top corners of the bottom sheet. */
+export const BOTTOM_PANEL_SHEET_TOP_BORDER_RADIUS = 24;
+
 /** Bottom panel (post info) padding and layout. */
 export const BOTTOM_PANEL_PADDING_TOP = 12;
 export const BOTTOM_PANEL_PADDING_HORIZONTAL = 16;
 export const BOTTOM_PANEL_PADDING_BOTTOM_EXTRA = 12;
 
 // -----------------------------------------------------------------------------
-// Provider: open / expand animation
+// Provider: open / expand and close / dismiss (shared config)
 // -----------------------------------------------------------------------------
 
-/** Duration (ms) for expand-to-center (open) animation. */
-export const OPEN_DURATION_MS = 250;
+/** Delay (ms) before starting the expand so the overlay can mount and paint the thumbnail. */
+export const OPEN_START_DELAY_MS = 0;
 
-// -----------------------------------------------------------------------------
-// Provider: close animation (tap or pan dismiss)
-// -----------------------------------------------------------------------------
-
-/** Spring for close (image back to thumbnail). No overshoot. */
+/** Spring for image position/size (open and close). Same config for both directions. */
 export const CLOSE_SPRING = {
   damping: 24,
   stiffness: 320,
   mass: 0.8,
 } as const;
 
-/** Duration (ms) for blur and close-button fade during close. */
+/** Duration (ms) for blur and close-button fade (open and close). */
 export const CLOSE_BLUR_AND_BTN_DURATION_MS = 320;
 
 /** Delay (ms) after close animation before clearing overlay URLs (avoids flash). */

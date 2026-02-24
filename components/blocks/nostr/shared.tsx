@@ -5,28 +5,10 @@
  * extracted to eliminate duplication and ensure consistent behavior.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  StyleSheet,
-  TouchableOpacity,
-  Linking,
-  Dimensions,
-  Platform,
-  Pressable,
-} from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { StyleSheet, TouchableOpacity, Linking, Dimensions, Platform } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Reanimated, {
-  cancelAnimation,
-  runOnJS,
-  useAnimatedProps,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
-import { EnhancedHaptics } from 'components/ui/Haptics';
-import { Image } from 'expo-image';
+import { runOnJS } from 'react-native-reanimated';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
@@ -38,10 +20,7 @@ import { Avatar } from 'components/ui/Avatar';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { nip19 } from 'nostr-tools';
-import { BlurView } from 'components/ui/BlurView';
-import { useImageOverlay, type ImageOverlayPost } from './image-overlay-provider';
-
-const AnimatedBlurView = Reanimated.createAnimatedComponent(BlurView);
+import { ImageBlock } from './image-overlay';
 
 // ============================================================================
 // Types
@@ -646,219 +625,8 @@ export const InlineLink = React.memo(function InlineLink({
 // Block renderers
 // ============================================================================
 
-/**
- * ImageBlock: feed image with optional overlay. Perf logs (__DEV__, [Image:Perf]):
- * - render count (per url), handlePress (tap to open overlay).
- * Optional onPressIn/onPressOut suppress parent tap (e.g. PostCard thread navigation).
- */
-/** Optional post payload for image overlay bottom panel (passed when opening from PostCard). */
-interface ImageBlockOverlayPostProps {
-  event: FeedEvent;
-  metrics: NoteMetrics;
-  profile?: ProfileInfo | null;
-  reposted?: boolean;
-  liked?: boolean;
-  repostPending?: boolean;
-  likePending?: boolean;
-  repostPendingDirection?: 'activating' | 'deactivating';
-  likePendingDirection?: 'activating' | 'deactivating';
-  onCommentPress?: () => void;
-  onRepostPress?: () => void;
-  onLikePress?: () => void;
-  onActionPressIn?: () => void;
-  onActionPressOut?: () => void;
-}
-
-export const ImageBlock = React.memo(function ImageBlock({
-  url,
-  allImageUrls,
-  imageIndex,
-  onPressIn,
-  onPressOut,
-  event: overlayEvent,
-  metrics: overlayMetrics,
-  profile: overlayProfile,
-  reposted,
-  liked,
-  repostPending,
-  likePending,
-  repostPendingDirection,
-  likePendingDirection,
-  onCommentPress,
-  onRepostPress,
-  onLikePress,
-  onActionPressIn,
-  onActionPressOut,
-}: {
-  url: string;
-  /** When the post has multiple images, pass all urls so the overlay can show a pager. */
-  allImageUrls?: string[];
-  /** Index of this image among the post's images (for opening overlay at the correct page). */
-  imageIndex?: number;
-  onPressIn?: () => void;
-  onPressOut?: () => void;
-} & Partial<ImageBlockOverlayPostProps>) {
-  const [aspectRatio, setAspectRatio] = useState(16 / 9);
-  const [error, setError] = useState(false);
-  const containerRef = useRef<React.ComponentRef<typeof View>>(null);
-  const imageOverlay = useImageOverlay();
-  const renderCountRef = useRef(0);
-  renderCountRef.current += 1;
-
-  useEffect(() => {
-    if (__DEV__) {
-      console.log('[Image:Perf] ImageBlock render', {
-        url: url.slice(0, 40),
-        count: renderCountRef.current,
-      });
-    }
-  });
-
-  const registerLayout = useCallback(() => {
-    containerRef.current?.measureInWindow(
-      (pageX: number, pageY: number, width: number, height: number) => {
-        imageOverlay?.registerThumbnailLayout?.(url, { pageX, pageY, width, height });
-      }
-    );
-  }, [imageOverlay, url]);
-
-  const handlePress = useCallback(() => {
-    if (__DEV__) {
-      console.log('[Image:Perf] ImageBlock handlePress', { url: url.slice(0, 40) });
-    }
-    if (!imageOverlay?.open) return;
-    containerRef.current?.measureInWindow(
-      (pageX: number, pageY: number, width: number, height: number) => {
-        if (__DEV__) {
-          console.log('[Image:Overlay] measureInWindow →', {
-            pageX,
-            pageY,
-            width,
-            height,
-            aspectRatio,
-            x: pageX,
-            y: pageY,
-          });
-        }
-        const post: ImageOverlayPost | undefined =
-          overlayEvent && overlayMetrics
-            ? {
-                event: {
-                  id: overlayEvent.id,
-                  pubkey: overlayEvent.pubkey,
-                  content: overlayEvent.content,
-                  created_at: overlayEvent.created_at,
-                },
-                metrics: {
-                  replyCount: overlayMetrics.replyCount,
-                  repostCount: overlayMetrics.repostCount,
-                  likeCount: overlayMetrics.likeCount,
-                  satsZapped: overlayMetrics.satsZapped,
-                },
-                profile: overlayProfile ?? null,
-                reposted,
-                liked,
-                repostPending,
-                likePending,
-                repostPendingDirection,
-                likePendingDirection,
-                onCommentPress,
-                onRepostPress,
-                onLikePress,
-                onActionPressIn,
-                onActionPressOut,
-              }
-            : undefined;
-        imageOverlay.open({
-          url,
-          aspectRatio,
-          pageX,
-          pageY,
-          width,
-          height,
-          urls: allImageUrls && allImageUrls.length > 1 ? allImageUrls : undefined,
-          initialIndex: imageIndex,
-          post: post ?? null,
-        });
-      }
-    );
-  }, [
-    imageOverlay,
-    url,
-    aspectRatio,
-    allImageUrls,
-    imageIndex,
-    overlayEvent,
-    overlayMetrics,
-    overlayProfile,
-    reposted,
-    liked,
-    repostPending,
-    likePending,
-    repostPendingDirection,
-    likePendingDirection,
-    onCommentPress,
-    onRepostPress,
-    onLikePress,
-    onActionPressIn,
-    onActionPressOut,
-  ]);
-
-  const fallbackBlur = useSharedValue(0);
-  const thumbnailBlur = imageOverlay?.thumbnailBlurIntensity ?? fallbackBlur;
-  const thumbnailBlurAnimatedProps = useAnimatedProps(() => ({
-    intensity: thumbnailBlur.value,
-  }));
-
-  if (error) return null;
-
-  const image = (
-    <Image
-      source={{ uri: url }}
-      style={{ width: '100%', aspectRatio, borderRadius: 12 }}
-      contentFit="cover"
-      cachePolicy="memory-disk"
-      recyclingKey={url}
-      transition={300}
-      onLoad={(e) => {
-        const { width, height } = e.source;
-        if (width && height) setAspectRatio(width / height);
-      }}
-      onError={() => setError(true)}
-    />
-  );
-
-  const isOverlayActive = imageOverlay?.activeUrl === url;
-  return (
-    <View style={sharedStyles.imageBlockOuter}>
-      <View
-        ref={containerRef}
-        collapsable={false}
-        style={{ aspectRatio }}
-        onLayout={registerLayout}>
-        {imageOverlay?.open ? (
-          <Pressable
-            onPressIn={onPressIn}
-            onPressOut={onPressOut}
-            onPress={handlePress}
-            style={StyleSheet.absoluteFill}>
-            {image}
-          </Pressable>
-        ) : (
-          image
-        )}
-        {isOverlayActive && (
-          <AnimatedBlurView
-            tint="dark"
-            style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
-            pointerEvents="none"
-            animatedProps={thumbnailBlurAnimatedProps}
-          />
-        )}
-      </View>
-    </View>
-  );
-});
+// ImageBlock is now in ./image-overlay/ImageBlock.tsx — re-exported via the import above.
+export { ImageBlock };
 
 const IOSVideoBlock = React.memo(function IOSVideoBlock({
   url,
@@ -1006,9 +774,6 @@ export const LightningBlock = React.memo(function LightningBlock({ invoice }: { 
 // MetricsFooter (superset — includes showBorder + onCommentPress from ThreadView)
 // ============================================================================
 
-const BOUNCE_SPRING = { damping: 10, stiffness: 350, mass: 0.5 };
-const SETTLE_SPRING = { damping: 14, stiffness: 200 };
-
 const AnimatedMetric = React.memo(function AnimatedMetric({
   iconName,
   iconSize,
@@ -1017,8 +782,7 @@ const AnimatedMetric = React.memo(function AnimatedMetric({
   activeColor,
   textSize,
   isActive,
-  pending,
-  pendingDirection,
+  pending: _pending,
 }: {
   iconName: string;
   iconSize: number;
@@ -1028,78 +792,14 @@ const AnimatedMetric = React.memo(function AnimatedMetric({
   textSize: number;
   isActive: boolean;
   pending: boolean;
-  pendingDirection?: 'activating' | 'deactivating';
 }) {
-  const [displayText, setDisplayText] = useState(text);
-  const iconScale = useSharedValue(1);
-  const numberSlide = useSharedValue(0);
-  const numberOpacity = useSharedValue(1);
-  const prevPendingRef = useRef(pending);
-  const lastDirectionRef = useRef<'activating' | 'deactivating'>('activating');
-
-  useEffect(() => {
-    return () => {
-      cancelAnimation(iconScale);
-      cancelAnimation(numberSlide);
-      cancelAnimation(numberOpacity);
-    };
-  }, [iconScale, numberSlide, numberOpacity]);
-
-  useEffect(() => {
-    const wasPending = prevPendingRef.current;
-
-    if (pending && !wasPending) {
-      const direction = pendingDirection ?? 'activating';
-      lastDirectionRef.current = direction;
-
-      if (direction === 'activating') {
-        EnhancedHaptics.buttonHaptic();
-        iconScale.set(
-          withSequence(withTiming(1.35, { duration: 50 }), withSpring(1, BOUNCE_SPRING))
-        );
-      } else {
-        EnhancedHaptics.navigateHaptic();
-        iconScale.set(
-          withSequence(withTiming(0.7, { duration: 50 }), withSpring(1, SETTLE_SPRING))
-        );
-      }
-
-      if (text !== displayText) {
-        const slideFrom = direction === 'activating' ? 8 : -8;
-        setDisplayText(text);
-        numberSlide.set(slideFrom);
-        numberOpacity.set(0);
-        numberSlide.set(withSpring(0, { damping: 15, stiffness: 200 }));
-        numberOpacity.set(withTiming(1, { duration: 180 }));
-      }
-    } else if (text !== displayText) {
-      setDisplayText(text);
-    }
-
-    prevPendingRef.current = pending;
-  }, [displayText, iconScale, numberOpacity, numberSlide, pending, pendingDirection, text]);
-
-  const iconAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: iconScale.get() }],
-  }));
-
-  const numberAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: numberSlide.get() }],
-    opacity: numberOpacity.get(),
-  }));
-
   const color = isActive ? activeColor : inactiveColor;
-
   return (
     <HStack align="center" gap={5}>
-      <Reanimated.View style={iconAnimStyle}>
-        <Icon name={iconName} size={iconSize} color={color} />
-      </Reanimated.View>
-      <Reanimated.View style={numberAnimStyle}>
-        <Text size={textSize} style={{ color }}>
-          {displayText}
-        </Text>
-      </Reanimated.View>
+      <Icon name={iconName} size={iconSize} color={color} />
+      <Text size={textSize} style={{ color }}>
+        {text}
+      </Text>
     </HStack>
   );
 });
@@ -1116,8 +816,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   liked = false,
   repostPending = false,
   likePending = false,
-  repostPendingDirection,
-  likePendingDirection,
+  repostPendingDirection: _repostPendingDirection,
+  likePendingDirection: _likePendingDirection,
   onActionPressIn,
   onActionPressOut,
 }: {
@@ -1182,7 +882,6 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             textSize={textSize}
             isActive={reposted}
             pending={repostPending}
-            pendingDirection={repostPendingDirection}
           />
         </TouchableOpacity>
         <TouchableOpacity
@@ -1201,7 +900,6 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             textSize={textSize}
             isActive={liked}
             pending={likePending}
-            pendingDirection={likePendingDirection}
           />
         </TouchableOpacity>
         {metrics.satsZapped > 0 ? (
