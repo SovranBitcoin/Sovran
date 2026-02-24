@@ -1161,14 +1161,29 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                   </>
                 ) : (
                   <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-                    <MemoizedMediaPagerPage
-                      url={activeUrl}
-                      mediaType={activeMediaTypes[0] ?? 'image'}
-                      index={0}
-                      isActive={true}
-                      expandedWidthSv={expandedWidthSv}
-                      expandedHeightSv={expandedHeightSv}
-                    />
+                    {activeMediaTypes[0] === 'image' ? (
+                      <Animated.View style={rPagerScaleStyle}>
+                        <MemoizedMediaPagerPage
+                          url={activeUrl}
+                          mediaType="image"
+                          index={0}
+                          isActive={true}
+                          expandedWidthSv={expandedWidthSv}
+                          expandedHeightSv={expandedHeightSv}
+                        />
+                      </Animated.View>
+                    ) : (
+                      <MemoizedMediaPagerPage
+                        url={activeUrl}
+                        mediaType={activeMediaTypes[0] ?? 'video'}
+                        index={0}
+                        isActive={true}
+                        expandedWidthSv={expandedWidthSv}
+                        expandedHeightSv={expandedHeightSv}
+                        containerWidthSv={imageWidth}
+                        containerHeightSv={imageHeight}
+                      />
+                    )}
                   </View>
                 )}
                 {(isVerticalFeed || isCurrentPageVideo) && (

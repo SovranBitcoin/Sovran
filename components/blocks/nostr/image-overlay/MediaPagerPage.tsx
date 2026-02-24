@@ -18,6 +18,8 @@ function MediaPageAnimated({
   isActive,
   expandedWidthSv,
   expandedHeightSv,
+  containerWidthSv,
+  containerHeightSv,
 }: {
   url: string;
   mediaType: MediaType;
@@ -25,14 +27,27 @@ function MediaPageAnimated({
   isActive: boolean;
   expandedWidthSv: SharedValue<number>;
   expandedHeightSv: SharedValue<number>;
+  /** When set (e.g. single-media dismiss), size the view to the container so it shrinks with the animation instead of relying on scale transform. */
+  containerWidthSv?: SharedValue<number>;
+  containerHeightSv?: SharedValue<number>;
 }) {
-  const animatedStyle = useAnimatedStyle(() => ({
-    position: 'absolute' as const,
-    top: 0,
-    left: index * expandedWidthSv.value,
-    width: expandedWidthSv.value,
-    height: expandedHeightSv.value,
-  }));
+  const animatedStyle = useAnimatedStyle(() => {
+    const w =
+      containerWidthSv != null && containerHeightSv != null
+        ? containerWidthSv.value
+        : expandedWidthSv.value;
+    const h =
+      containerWidthSv != null && containerHeightSv != null
+        ? containerHeightSv.value
+        : expandedHeightSv.value;
+    return {
+      position: 'absolute' as const,
+      top: 0,
+      left: index * (containerWidthSv != null ? w : expandedWidthSv.value),
+      width: w,
+      height: h,
+    };
+  });
 
   const player = useVideoPlayer(mediaType === 'video' ? url : '', (p) => {
     p.loop = true;
