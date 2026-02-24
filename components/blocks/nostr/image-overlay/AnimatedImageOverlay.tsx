@@ -8,7 +8,15 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import {
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import {
   type GestureType,
   Gesture,
@@ -30,14 +38,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnUI } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
-import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Icon from 'assets/icons';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import type { ImageOverlayContextValue } from './types';
 import { IMAGE_OVERLAY_TIMING_CONFIG, useImageOverlay } from './provider';
-import { MemoizedPagerPage } from './PagerPage';
+import { MemoizedMediaPagerPage } from './MediaPagerPage';
 import { OverlayDot } from './PagerDots';
 import {
   ImageOverlayBottomPanelContent,
@@ -65,6 +72,10 @@ import {
   PAGER_VELOCITY_WEIGHT,
   SNAP_SPRING_PAGE_CHANGE,
   SNAP_SPRING_SAME_PAGE,
+  SWIPE_UP_ACTIVE_OFFSET_Y,
+  SWIPE_UP_FAIL_OFFSET_X,
+  SWIPE_UP_CONFIRM_DISTANCE,
+  SWIPE_UP_TRANSITION_DURATION_MS,
   CLOSE_BUTTON_BG,
   CLOSE_BUTTON_LEFT,
   CLOSE_BUTTON_PADDING,
@@ -98,13 +109,23 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   const overlayUIVisible = useSharedValue(1);
   /** Opacity for the absolute overlay bar (sheet closed); animated so it fades in/out instead of popping. */
   const absoluteOverlayOpacitySv = useSharedValue(0);
+  /** Vertical offset for swipe-to-next transition: 0 = rest, negative = dragged up (current leaving), set to screenHeight then animate to 0 for next entering. */
+  const swipeUpTranslateY = useSharedValue(0);
+  const animatingToNextRef = useRef(false);
 
   const {
     activeUrl,
     activeUrls,
+    activeMediaTypes,
     activeIndex,
     setActiveIndex,
     activeOverlayPost,
+    onSwipeUpToNextPost,
+    videoFeedLayouts,
+    videoFeedLayoutIndex,
+    setVideoFeedLayouts,
+    setVideoFeedIndex,
+    getVideoFeedLayoutsAndIndex,
     imageState,
     imageXCoord,
     imageYCoord,
@@ -121,14 +142,23 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     panelHeightSv,
     setPanelContentMinHeight,
     close,
+    openReplace,
     openToCenter,
   } = ctx;
 
-  const hasMultipleImages = activeUrls.length > 1;
+  const hasMultipleMedia = activeUrls.length > 1;
   const maxPagerIndex = Math.max(0, activeUrls.length - 1);
+  const isCurrentPageVideo = activeMediaTypes[hasMultipleMedia ? activeIndex : 0] === 'video';
 
   const pagerOffsetSv = useSharedValue(activeIndex);
   const startPagerOffsetSv = useSharedValue(activeIndex);
+  /** 1 when current pager page is video (for swipe-up-to-next-post). Updated from JS when activeIndex/activeMediaTypes change. */
+  const isCurrentPageVideoSv = useSharedValue(0);
+  useEffect(() => {
+    const idx = activeIndex;
+    const isVideo = activeMediaTypes.length > idx && activeMediaTypes[idx] === 'video';
+    isCurrentPageVideoSv.value = isVideo ? 1 : 0;
+  }, [activeIndex, activeMediaTypes, isCurrentPageVideoSv]);
 
   useEffect(() => {
     pagerOffsetSv.value = activeIndex;
@@ -137,6 +167,16 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   useEffect(() => {
     if (activeUrl) overlayUIVisible.value = 1;
   }, [activeUrl, overlayUIVisible]);
+
+  /** When overlay opens from a video, enable vertical feed; never switch to video feed when user opened an image. */
+  useEffect(() => {
+    if (!activeUrl || !getVideoFeedLayoutsAndIndex) return;
+    const result = getVideoFeedLayoutsAndIndex();
+    if (!result || result.layouts.length <= 1) return;
+    const firstLayoutUrl = result.layouts[result.initialIndex]?.url;
+    if (firstLayoutUrl !== activeUrl) return;
+    setVideoFeedLayouts(result.layouts, result.initialIndex);
+  }, [activeUrl, getVideoFeedLayoutsAndIndex, setVideoFeedLayouts]);
 
   useEffect(() => {
     panelMinHeightReportedRef.current = false;
@@ -329,20 +369,21 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
       const idx =
         typeof dismissedPageIndex === 'number'
           ? dismissedPageIndex
-          : hasMultipleImages
+          : hasMultipleMedia
             ? Math.round(pagerOffsetSv.value)
             : 0;
       const fn = closeRef.current;
       if (fn) fn(idx);
     },
-    [hasMultipleImages, pagerOffsetSv, imageScale]
+    [hasMultipleMedia, pagerOffsetSv, imageScale]
   );
 
+  /** Dismiss only on downward drag; upward swipes go to vertical scroll. activeOffsetY = range where we do NOT activate, so [-1e6, 14] means activate only when translationY > 14. */
   const pan = useMemo(
     () =>
       Gesture.Pan()
         .minDistance(DISMISS_MIN_DISTANCE)
-        .activeOffsetY([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
+        .activeOffsetY([-1e6, DISMISS_ACTIVE_OFFSET_Y])
         .failOffsetX([-DISMISS_FAIL_OFFSET_X, DISMISS_FAIL_OFFSET_X])
         .onStart(() => {
           dismissPanActive.value = 1;
@@ -390,7 +431,8 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           } else {
             openToCenter();
           }
-        }),
+        })
+        .withRef(dismissPanRef),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- shared values are stable refs
     [
       expandedWidth,
@@ -437,7 +479,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   /** Max finger movement (px) for tap to count; prevents swipe-to-page from triggering toggle. */
   const TAP_MAX_DISTANCE = 12;
 
-  /** Tap on blur only → dismiss. Tap on image → do not dismiss (handled by Pressable for toggle). */
+  /** Tap on image → toggle UI visibility. Tap on blur (not panel) → dismiss. Handled here so swipe-up pan can win over tap. */
   const tapBackdrop = useMemo(
     () =>
       Gesture.Tap()
@@ -451,7 +493,10 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           const iw = imageWidth.value;
           const ih = imageHeight.value;
           const insideImage = x >= ix && x <= ix + iw && y >= iy && y <= iy + ih;
-          if (insideImage) return;
+          if (insideImage) {
+            runOnJS(handleImagePress)();
+            return;
+          }
           const effectiveBottom = activeOverlayPost
             ? panelHeightSv.value > 0
               ? panelHeightSv.value
@@ -465,7 +510,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           runOnJS(triggerClose)(Math.round(pagerOffsetSv.value));
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- worklet reads shared values
-    [triggerClose, screenHeight, activeOverlayPost, panelHeightSv, pagerOffsetSv]
+    [triggerClose, handleImagePress, screenHeight, activeOverlayPost, panelHeightSv, pagerOffsetSv]
   );
 
   const panelDragStartSv = useSharedValue(0);
@@ -546,6 +591,8 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
    * Snap to 0 / 60% / 100%; at 0 run setSheetOpen(false).
    */
   const scrollAreaPanRef = useRef<GestureType | undefined>(undefined);
+  const dismissPanRef = useRef<GestureType | undefined>(undefined);
+  const verticalFeedScrollRef = useRef<React.ComponentRef<typeof GHScrollView>>(null);
   const scrollAreaPan = useMemo(
     () =>
       Gesture.Pan()
@@ -649,10 +696,104 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     ]
   );
 
+  const triggerSwipeUpToNext = useCallback(() => {
+    if (onSwipeUpToNextPost && openReplace) {
+      onSwipeUpToNextPost(openReplace);
+    }
+  }, [onSwipeUpToNextPost, openReplace]);
+
+  /** Run slide-off animation then trigger next post; used by both bar gesture and demo button. */
+  const commitToNextPost = useCallback(() => {
+    if (!onSwipeUpToNextPost || !openReplace) return;
+    animatingToNextRef.current = true;
+    const duration = SWIPE_UP_TRANSITION_DURATION_MS;
+    swipeUpTranslateY.value = withTiming(
+      -screenHeight,
+      { duration, easing: Easing.out(Easing.cubic) },
+      (finished) => {
+        if (finished) runOnJS(triggerSwipeUpToNext)();
+      }
+    );
+  }, [onSwipeUpToNextPost, openReplace, screenHeight, swipeUpTranslateY, triggerSwipeUpToNext]);
+
+  /** In vertical feed mode, scroll to next page instead of slide animation. */
+  const _scrollToNextFeedPage = useCallback(() => {
+    if (!videoFeedLayouts || videoFeedLayouts.length <= 1) return;
+    const next = Math.min(videoFeedLayoutIndex + 1, videoFeedLayouts.length - 1);
+    if (next === videoFeedLayoutIndex) return;
+    verticalFeedScrollRef.current?.scrollTo({
+      y: next * screenHeight,
+      animated: true,
+    });
+  }, [videoFeedLayouts, videoFeedLayoutIndex, screenHeight]);
+
+  /** Sync active index when vertical feed scroll snaps. */
+  const onVerticalFeedScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (!videoFeedLayouts?.length) return;
+      const y = e.nativeEvent.contentOffset.y;
+      const page = Math.round(y / screenHeight);
+      const index = Math.max(0, Math.min(page, videoFeedLayouts.length - 1));
+      const layout = videoFeedLayouts[index];
+      if (layout) setVideoFeedIndex(index, layout);
+    },
+    [videoFeedLayouts, screenHeight, setVideoFeedIndex]
+  );
+
+  useEffect(() => {
+    if (!animatingToNextRef.current) return;
+    animatingToNextRef.current = false;
+    swipeUpTranslateY.value = screenHeight;
+    const duration = SWIPE_UP_TRANSITION_DURATION_MS;
+    swipeUpTranslateY.value = withTiming(0, {
+      duration,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [activeUrl, activeOverlayPost?.event?.id, screenHeight, swipeUpTranslateY]);
+
+  const rSwipeUpWrapperStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: swipeUpTranslateY.value }],
+  }));
+
+  /** Swipe up on the overlay bar: only when current media is video. */
+  const overlayBarSwipeUp = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(!!onSwipeUpToNextPost && isCurrentPageVideo)
+        .activeOffsetY([SWIPE_UP_ACTIVE_OFFSET_Y, 1e6])
+        .failOffsetX([-SWIPE_UP_FAIL_OFFSET_X, SWIPE_UP_FAIL_OFFSET_X])
+        .minDistance(6)
+        .onChange((e) => {
+          'worklet';
+          if (imageState.value !== 'open') return;
+          const ty = e.translationY;
+          const clamped = Math.max(-screenHeight, Math.min(0, ty));
+          swipeUpTranslateY.value = clamped;
+        })
+        .onEnd((e) => {
+          'worklet';
+          if (imageState.value !== 'open') return;
+          const ty = e.translationY;
+          if (ty > -SWIPE_UP_CONFIRM_DISTANCE) {
+            swipeUpTranslateY.value = withSpring(0, SNAP_SPRING_SAME_PAGE);
+            return;
+          }
+          runOnJS(commitToNextPost)();
+        }),
+    [
+      onSwipeUpToNextPost,
+      isCurrentPageVideo,
+      imageState,
+      screenHeight,
+      swipeUpTranslateY,
+      commitToNextPost,
+    ]
+  );
+
   const horizontalPan = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(hasMultipleImages)
+        .enabled(hasMultipleMedia)
         .activeOffsetX([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X])
         .failOffsetY([-PAGER_FAIL_OFFSET_Y, PAGER_FAIL_OFFSET_Y])
         .minDistance(PAGER_MIN_DISTANCE)
@@ -703,7 +844,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- shared values stable refs
     [
-      hasMultipleImages,
+      hasMultipleMedia,
       expandedWidth,
       expandedWidthSv,
       maxPagerIndex,
@@ -712,98 +853,143 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     ]
   );
 
-  const composed = useMemo(
-    () =>
-      hasMultipleImages
-        ? Gesture.Exclusive(horizontalPan, pan, tapBackdrop)
-        : Gesture.Exclusive(pan, tapBackdrop),
-    [hasMultipleImages, horizontalPan, pan, tapBackdrop]
-  );
+  const composed = useMemo(() => {
+    return hasMultipleMedia
+      ? Gesture.Exclusive(horizontalPan, pan, tapBackdrop)
+      : Gesture.Exclusive(pan, tapBackdrop);
+  }, [hasMultipleMedia, horizontalPan, pan, tapBackdrop]);
+
+  /** No-op so bar doesn't steal vertical scroll in feed mode; bar is same position as image overlay. */
+  const noopBarGesture = useMemo(() => Gesture.Pan().enabled(false), []);
 
   return (
     <View
       style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}
       pointerEvents={activeUrl ? 'auto' : 'none'}>
-      <GestureDetector gesture={composed}>
-        <AnimatedPressable style={[StyleSheet.absoluteFill, rContainerStyle]}>
-          {/* box-none so taps on the blur fall through to the gesture (tapBackdrop → triggerClose); overlay root still blocks content behind */}
-          <View style={StyleSheet.absoluteFill} pointerEvents="box-none" />
-          <AnimatedBlurView
-            tint="dark"
-            style={StyleSheet.absoluteFill}
-            animatedProps={backdropAnimatedProps}
-            pointerEvents="none"
-          />
-          <Animated.View
-            style={[
-              overlayStyles.closeButton,
-              { top: insets.top + CLOSE_BUTTON_TOP_OFFSET },
-              rCloseBtnStyle,
-            ]}>
-            <Pressable onPress={() => triggerClose()} style={StyleSheet.absoluteFill}>
-              <Icon name="material-symbols:close-rounded" size={22} color="#fff" />
-            </Pressable>
-          </Animated.View>
-          {activeUrl ? (
-            <Animated.View style={[overlayStyles.imageWrap, rImageStyle]}>
-              {hasMultipleImages ? (
-                <>
-                  <Pressable style={StyleSheet.absoluteFill} onPress={handleImagePress}>
-                    <Animated.View style={rPagerScaleStyle}>
-                      <Animated.View style={rPagerRowStyle}>
-                        {activeUrls.map((url, i) => (
-                          <MemoizedPagerPage
-                            key={url}
-                            url={url}
-                            index={i}
-                            expandedWidthSv={expandedWidthSv}
-                            expandedHeightSv={expandedHeightSv}
-                          />
-                        ))}
-                      </Animated.View>
-                    </Animated.View>
-                  </Pressable>
-                  <Animated.View
-                    style={[overlayStyles.dotPager, rDotPagerStyle]}
-                    pointerEvents="none">
-                    {activeUrls.map((_, i) => (
-                      <OverlayDot
-                        key={i}
-                        index={i}
-                        pagerOffsetSv={pagerOffsetSv}
-                        activeColor={DOTS_ACTIVE_COLOR}
-                      />
-                    ))}
-                  </Animated.View>
-                </>
-              ) : (
-                <Pressable style={StyleSheet.absoluteFill} onPress={handleImagePress}>
-                  <Image
-                    source={{ uri: activeUrl }}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="contain"
-                    cachePolicy="memory-disk"
-                  />
-                </Pressable>
-              )}
+      <Animated.View style={[StyleSheet.absoluteFill, rSwipeUpWrapperStyle]}>
+        <GestureDetector gesture={composed}>
+          <AnimatedPressable style={[StyleSheet.absoluteFill, rContainerStyle]}>
+            {/* box-none so taps on the blur fall through to the gesture (tapBackdrop → triggerClose); overlay root still blocks content behind */}
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none" />
+            <AnimatedBlurView
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+              animatedProps={backdropAnimatedProps}
+              pointerEvents="none"
+            />
+            <Animated.View
+              style={[
+                overlayStyles.closeButton,
+                { top: insets.top + CLOSE_BUTTON_TOP_OFFSET },
+                rCloseBtnStyle,
+              ]}>
+              <Pressable onPress={() => triggerClose()} style={StyleSheet.absoluteFill}>
+                <Icon name="material-symbols:close-rounded" size={22} color="#fff" />
+              </Pressable>
             </Animated.View>
-          ) : null}
-        </AnimatedPressable>
-      </GestureDetector>
-      {activeOverlayPost ? (
-        <Animated.View
-          style={[
-            overlayStyles.absoluteOverlayBar,
-            rAbsoluteOverlayBarOpacityStyle,
-            {
-              bottom: 0,
-              paddingBottom: insets.bottom + BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
-            },
-          ]}
-          pointerEvents={sheetOpen ? 'none' : 'auto'}>
-          <ImageOverlayAbsoluteBar post={activeOverlayPost} onOpenSheet={openSheet} />
-        </Animated.View>
-      ) : null}
+            {activeUrl ? (
+              <Animated.View style={[overlayStyles.imageWrap, rImageStyle]}>
+                {videoFeedLayouts && videoFeedLayouts.length > 1 ? (
+                  <GHScrollView
+                    ref={verticalFeedScrollRef}
+                    waitFor={dismissPanRef}
+                    style={StyleSheet.absoluteFill}
+                    contentContainerStyle={{ height: videoFeedLayouts.length * screenHeight }}
+                    showsVerticalScrollIndicator={false}
+                    snapToInterval={screenHeight}
+                    snapToAlignment="start"
+                    decelerationRate="fast"
+                    onMomentumScrollEnd={onVerticalFeedScrollEnd}
+                    onScrollEndDrag={onVerticalFeedScrollEnd}
+                    onLayout={() => {
+                      verticalFeedScrollRef.current?.scrollTo({
+                        y: videoFeedLayoutIndex * screenHeight,
+                        animated: false,
+                      });
+                    }}>
+                    {videoFeedLayouts.map((layout, index) => (
+                      <View
+                        key={`${layout.url}-${index}`}
+                        style={{ width: screenWidth, height: screenHeight }}>
+                        <MemoizedMediaPagerPage
+                          url={layout.url}
+                          mediaType={layout.mediaTypes?.[0] ?? 'image'}
+                          index={0}
+                          isActive={index === videoFeedLayoutIndex}
+                          expandedWidthSv={expandedWidthSv}
+                          expandedHeightSv={expandedHeightSv}
+                        />
+                      </View>
+                    ))}
+                  </GHScrollView>
+                ) : hasMultipleMedia ? (
+                  <>
+                    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                      <Animated.View style={rPagerScaleStyle}>
+                        <Animated.View style={rPagerRowStyle}>
+                          {activeUrls.map((url, i) => (
+                            <MemoizedMediaPagerPage
+                              key={url}
+                              url={url}
+                              mediaType={activeMediaTypes[i] ?? 'image'}
+                              index={i}
+                              isActive={i === activeIndex}
+                              expandedWidthSv={expandedWidthSv}
+                              expandedHeightSv={expandedHeightSv}
+                            />
+                          ))}
+                        </Animated.View>
+                      </Animated.View>
+                    </View>
+                    <Animated.View
+                      style={[overlayStyles.dotPager, rDotPagerStyle]}
+                      pointerEvents="none">
+                      {activeUrls.map((_, i) => (
+                        <OverlayDot
+                          key={i}
+                          index={i}
+                          pagerOffsetSv={pagerOffsetSv}
+                          activeColor={DOTS_ACTIVE_COLOR}
+                        />
+                      ))}
+                    </Animated.View>
+                  </>
+                ) : (
+                  <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                    <MemoizedMediaPagerPage
+                      url={activeUrl}
+                      mediaType={activeMediaTypes[0] ?? 'image'}
+                      index={0}
+                      isActive={true}
+                      expandedWidthSv={expandedWidthSv}
+                      expandedHeightSv={expandedHeightSv}
+                    />
+                  </View>
+                )}
+              </Animated.View>
+            ) : null}
+          </AnimatedPressable>
+        </GestureDetector>
+        {activeOverlayPost ? (
+          <GestureDetector
+            gesture={
+              videoFeedLayouts && videoFeedLayouts.length > 1 ? noopBarGesture : overlayBarSwipeUp
+            }>
+            <Animated.View
+              style={[
+                overlayStyles.absoluteOverlayBar,
+                rAbsoluteOverlayBarOpacityStyle,
+                {
+                  bottom: 0,
+                  paddingBottom: insets.bottom + BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
+                },
+              ]}
+              pointerEvents={sheetOpen ? 'none' : 'auto'}>
+              <ImageOverlayAbsoluteBar post={activeOverlayPost} onOpenSheet={openSheet} />
+            </Animated.View>
+          </GestureDetector>
+        ) : null}
+      </Animated.View>
       {activeOverlayPost ? (
         <Animated.View
           style={[

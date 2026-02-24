@@ -75,6 +75,22 @@ export const PAGER_FLICK_VELOCITY_THRESHOLD = 0.55;
 export const PAGER_VELOCITY_CLAMP = 12;
 
 // -----------------------------------------------------------------------------
+// Swipe up on video (go to next post)
+// -----------------------------------------------------------------------------
+
+/** Vertical movement (px) upward required to activate swipe-up-to-next-post (on overlay bar). Negative = upward. */
+export const SWIPE_UP_ACTIVE_OFFSET_Y = -28;
+
+/** Horizontal movement (px) that fails swipe-up (so pager/dismiss can win). */
+export const SWIPE_UP_FAIL_OFFSET_X = 40;
+
+/** Min upward distance (px) to confirm next-post. */
+export const SWIPE_UP_CONFIRM_DISTANCE = 10;
+
+/** Duration (ms) for slide-off (current) and slide-in (next) when going to next post. */
+export const SWIPE_UP_TRANSITION_DURATION_MS = 280;
+
+// -----------------------------------------------------------------------------
 // Springs and timing (overlay)
 // -----------------------------------------------------------------------------
 

@@ -47,6 +47,10 @@ interface PostCardProps {
 
   index?: number;
   skipAnimation?: boolean;
+  /** Feed list index (when in feed); used so swipe-up can scroll to next video post. */
+  feedIndex?: number;
+  /** Called when overlay is opened from this post so feed can track source index. */
+  onOverlayOpenedFromIndex?: (index: number) => void;
 
   onVideoTap?: (url: string) => void;
   onCommentPress?: () => void;
@@ -73,6 +77,8 @@ export const PostCard = React.memo(function PostCard({
   showLineBelow = false,
   index = 0,
   skipAnimation = true,
+  feedIndex,
+  onOverlayOpenedFromIndex,
   onVideoTap,
   onCommentPress,
   onRepostPress,
@@ -328,6 +334,8 @@ export const PostCard = React.memo(function PostCard({
           event={event}
           metrics={metrics}
           profile={profile}
+          feedIndex={feedIndex}
+          onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
           reposted={reposted}
           liked={liked}
           repostPending={repostPending}

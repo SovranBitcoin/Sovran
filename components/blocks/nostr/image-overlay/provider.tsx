@@ -40,6 +40,7 @@ import {
 import type {
   ImageOverlayPost,
   ImageOverlayLayout,
+  ImageOverlayReplaceLayout,
   ThumbnailLayout,
   ImageOverlayContextValue,
 } from './types';
@@ -60,7 +61,14 @@ export type {
 /** State that changes on open/close; separate context to keep actions context stable. */
 type ImageOverlayStateValue = Pick<
   ImageOverlayContextValue,
-  'activeUrl' | 'activeAspectRatio' | 'activeUrls' | 'activeIndex' | 'activeOverlayPost'
+  | 'activeUrl'
+  | 'activeAspectRatio'
+  | 'activeUrls'
+  | 'activeMediaTypes'
+  | 'activeIndex'
+  | 'activeOverlayPost'
+  | 'videoFeedLayouts'
+  | 'videoFeedLayoutIndex'
 >;
 
 /** Callbacks + shared values; stable across open/close so consumers don't re-render unnecessarily. */
@@ -71,9 +79,13 @@ type ImageOverlayActionsValue = Omit<
   | 'activeUrls'
   | 'activeIndex'
   | 'activeOverlayPost'
+  | 'activeMediaTypes'
+  | 'videoFeedLayouts'
+  | 'videoFeedLayoutIndex'
   | 'expandedWidth'
   | 'expandedHeight'
 > & {
+  onSwipeUpToNextPost: ((openNext: (layout: ImageOverlayReplaceLayout) => void) => void) | null;
   screenWidth: number;
   screenHeight: number;
   /** Image viewport height (screenHeight - top inset); used by hook for expandedHeight. */
@@ -96,18 +108,33 @@ export function computeExpandedSize(
   return { width: screenHeight * aspectRatio, height: screenHeight };
 }
 
+const VIDEO_EXT = /\.(mp4|webm|mov|m4v|avi)(\?\S*)?$/i;
+
+function inferMediaType(url: string): 'image' | 'video' {
+  return VIDEO_EXT.test(url) ? 'video' : 'image';
+}
+
 export type ImageOverlayProviderProps = {
   children: React.ReactNode;
   /** When provided, overlay panel shows live metrics (optimistic counts) for the active post. */
   getDisplayMetrics?: (eventId: string) => NoteMetrics;
   /** When provided, overlay panel shows live engagement (liked, reposted, pending) for the active post. */
   getEngagementState?: (eventId: string) => EngagementViewState;
+  /** When on a video page, swipe up calls this with openNext. Feed calls openNext(nextLayout) to show next video in overlay. */
+  onSwipeUpToNextPost?: (openNext: (layout: ImageOverlayReplaceLayout) => void) => void;
+  /** When provided, overlay can request layouts for TikTok-style vertical feed. Return layouts from current post onward; initialIndex is 0. */
+  getVideoFeedLayoutsAndIndex?: () => {
+    layouts: ImageOverlayReplaceLayout[];
+    initialIndex: number;
+  } | null;
 };
 
 export function ImageOverlayProvider({
   children,
   getDisplayMetrics,
   getEngagementState,
+  onSwipeUpToNextPost,
+  getVideoFeedLayoutsAndIndex,
 }: ImageOverlayProviderProps) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -118,10 +145,19 @@ export function ImageOverlayProvider({
   const imageViewportHeight = screenHeight - safeTop;
 
   const [activeUrls, setActiveUrls] = useState<string[]>([]);
+  const [activeMediaTypes, setActiveMediaTypes] = useState<('image' | 'video')[]>([]);
   const [activeIndex, setActiveIndexState] = useState(0);
   const activeUrl = activeUrls.length > 0 ? (activeUrls[activeIndex] ?? activeUrls[0]) : null;
   const [activeAspectRatio, setActiveAspectRatio] = useState(16 / 9);
   const [activeOverlayPost, setActiveOverlayPost] = useState<ImageOverlayPost | null>(null);
+  const [videoFeedLayouts, setVideoFeedLayoutsState] = useState<ImageOverlayReplaceLayout[] | null>(
+    null
+  );
+  const [videoFeedLayoutIndex, setVideoFeedLayoutIndexState] = useState(0);
+  const onSwipeUpToNextPostRef = useRef<
+    ((openNext: (layout: ImageOverlayReplaceLayout) => void) => void) | undefined
+  >(onSwipeUpToNextPost);
+  onSwipeUpToNextPostRef.current = onSwipeUpToNextPost;
 
   const setActiveIndex = useCallback((index: number) => {
     setActiveIndexState((prev) => (index === prev ? prev : index));
@@ -220,6 +256,8 @@ export function ImageOverlayProvider({
 
   const clearUrlDelayed = useCallback(() => {
     setActiveOverlayPost(null);
+    setVideoFeedLayoutsState(null);
+    setVideoFeedLayoutIndexState(0);
     hasPanelSv.value = 0;
     openAnimationInProgressSv.value = 0;
     panelHeightSv.value = 0;
@@ -338,8 +376,13 @@ export function ImageOverlayProvider({
       const imageAreaCenterY = safeTop + availableHeight / 2;
 
       const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
+      const types =
+        layout.mediaTypes && layout.mediaTypes.length === urls.length
+          ? layout.mediaTypes
+          : urls.map((u) => inferMediaType(u));
       const initialIndex = Math.min(layout.initialIndex ?? 0, Math.max(0, urls.length - 1));
       setActiveUrls(urls);
+      setActiveMediaTypes(types);
       setActiveIndexState(initialIndex);
       setActiveAspectRatio(aspectRatio);
       setActiveOverlayPost(layout.post ?? null);
@@ -471,6 +514,150 @@ export function ImageOverlayProvider({
       screenWidthSv,
       screenHeightSv,
     ]
+  );
+
+  /** Replace overlay content in-place (e.g. next video post). No open animation; image stays expanded. */
+  const openReplace = useCallback(
+    (layout: ImageOverlayReplaceLayout) => {
+      safeTopSv.value = safeTop;
+      safeBottomSv.value = safeBottom;
+      const aspectRatio = layout.aspectRatio ?? 16 / 9;
+      const hasPanel = !!layout.post;
+      const availableHeight = imageViewportHeight;
+      const expW = screenWidth;
+      const expH = availableHeight;
+      const imageAreaCenterY = safeTop + availableHeight / 2;
+      const centerX = screenWidth / 2;
+      const toCenterY = hasPanel ? imageAreaCenterY : screenCenterY;
+
+      const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
+      const types =
+        layout.mediaTypes && layout.mediaTypes.length === urls.length
+          ? layout.mediaTypes
+          : urls.map((u) => inferMediaType(u));
+      const initialIndex = Math.min(layout.initialIndex ?? 0, Math.max(0, urls.length - 1));
+      setActiveUrls(urls);
+      setActiveMediaTypes(types);
+      setActiveIndexState(initialIndex);
+      setActiveAspectRatio(aspectRatio);
+      setActiveOverlayPost(layout.post ?? null);
+
+      screenWidthSv.value = screenWidth;
+      screenHeightSv.value = screenHeight;
+      aspectRatioSv.value = aspectRatio;
+      if (hasPanel) {
+        hasPanelSv.value = 1;
+        panelHeightSv.value = 0;
+        openAnimationInProgressSv.value = 1;
+      } else {
+        hasPanelSv.value = 0;
+        panelHeightSv.value = 0;
+      }
+
+      const targetX = centerX - expW / 2;
+      const targetY = toCenterY - expH / 2;
+      closeTargetPageX.value = targetX;
+      closeTargetPageY.value = targetY;
+      closeTargetWidth.value = expW;
+      closeTargetHeight.value = expH;
+      centerXSv.value = centerX;
+      centerYSv.value = toCenterY;
+      expandedWidthSv.value = expW;
+      expandedHeightSv.value = expH;
+
+      const eventId = layout.post?.event?.id;
+      const keyForIndex = (i: number, u: string) => (eventId != null ? `${eventId}-${i}` : u);
+      const centerLayout: ThumbnailLayout = {
+        pageX: targetX,
+        pageY: targetY,
+        width: expW,
+        height: expH,
+      };
+      openSessionInitialLayoutRef.current = centerLayout;
+      openSessionInitialIndexRef.current = initialIndex;
+      openSessionLayoutsByIndexRef.current = urls.map(() => centerLayout);
+      urls.forEach((url, i) => {
+        thumbnailLayoutsRef.current[keyForIndex(i, url)] = centerLayout;
+      });
+
+      scheduleOnUI(() => {
+        'worklet';
+        cancelAnimation(imageXCoord);
+        cancelAnimation(imageYCoord);
+        cancelAnimation(imageWidth);
+        cancelAnimation(imageHeight);
+        closeSpringsDoneCount.value = 0;
+        isClosing.value = false;
+        imageState.value = 'open';
+        imageXCoord.value = targetX;
+        imageYCoord.value = targetY;
+        imageWidth.value = expW;
+        imageHeight.value = expH;
+        blurIntensity.value = 100;
+        closeBtnOpacity.value = 1;
+        if (hasPanel) {
+          openAnimationInProgressSv.value = 0;
+        }
+      });
+
+      if (hasPanel) {
+        setTimeout(() => startOpenPanelImageAnimation(0), OPEN_START_DELAY_MS);
+      }
+    },
+    [
+      screenWidth,
+      screenHeight,
+      safeTop,
+      safeBottom,
+      imageViewportHeight,
+      screenCenterY,
+      safeTopSv,
+      safeBottomSv,
+      closeTargetPageX,
+      closeTargetPageY,
+      closeTargetWidth,
+      closeTargetHeight,
+      centerXSv,
+      centerYSv,
+      expandedWidthSv,
+      expandedHeightSv,
+      closeSpringsDoneCount,
+      imageState,
+      imageXCoord,
+      imageYCoord,
+      imageWidth,
+      imageHeight,
+      blurIntensity,
+      closeBtnOpacity,
+      isClosing,
+      hasPanelSv,
+      panelHeightSv,
+      openAnimationInProgressSv,
+      screenWidthSv,
+      screenHeightSv,
+      aspectRatioSv,
+      startOpenPanelImageAnimation,
+    ]
+  );
+
+  const setVideoFeedLayouts = useCallback(
+    (layouts: ImageOverlayReplaceLayout[] | null, initialIndex: number) => {
+      setVideoFeedLayoutsState(layouts);
+      setVideoFeedLayoutIndexState(initialIndex);
+      if (layouts != null && layouts.length > 0) {
+        const layout = layouts[initialIndex] ?? layouts[0];
+        openReplace(layout);
+      }
+    },
+    [openReplace]
+  );
+
+  const setVideoFeedIndex = useCallback(
+    (index: number, layout: ImageOverlayReplaceLayout) => {
+      setVideoFeedLayoutIndexState(index);
+      openReplace(layout);
+    },
+    [openReplace]
   );
 
   /** Worklet: run close animation to current closeTarget* (call after syncing targets from dismiss index). */
@@ -637,17 +824,34 @@ export function ImageOverlayProvider({
       activeUrl,
       activeAspectRatio,
       activeUrls,
+      activeMediaTypes,
       activeIndex,
       activeOverlayPost: effectiveOverlayPost,
+      videoFeedLayouts,
+      videoFeedLayoutIndex,
     }),
-    [activeUrl, activeAspectRatio, activeUrls, activeIndex, effectiveOverlayPost]
+    [
+      activeUrl,
+      activeAspectRatio,
+      activeUrls,
+      activeMediaTypes,
+      activeIndex,
+      effectiveOverlayPost,
+      videoFeedLayouts,
+      videoFeedLayoutIndex,
+    ]
   );
+
+  const stableOnSwipeUp = useCallback((openNext: (layout: ImageOverlayReplaceLayout) => void) => {
+    onSwipeUpToNextPostRef.current?.(openNext);
+  }, []);
 
   const actionsValue = useMemo<ImageOverlayActionsValue>(() => {
     return {
       scrollHandler,
       scrollOffsetY,
       open,
+      openReplace,
       close,
       openToCenter,
       registerThumbnailLayout,
@@ -655,6 +859,10 @@ export function ImageOverlayProvider({
       setPanelContentMinHeight,
       startOpenPanelImageAnimation,
       setActiveIndex,
+      onSwipeUpToNextPost: onSwipeUpToNextPost ? stableOnSwipeUp : null,
+      setVideoFeedLayouts,
+      setVideoFeedIndex,
+      getVideoFeedLayoutsAndIndex: getVideoFeedLayoutsAndIndex ?? null,
       imageState,
       imageXCoord,
       imageYCoord,
@@ -677,6 +885,7 @@ export function ImageOverlayProvider({
     scrollHandler,
     scrollOffsetY,
     open,
+    openReplace,
     close,
     openToCenter,
     registerThumbnailLayout,
@@ -684,6 +893,11 @@ export function ImageOverlayProvider({
     setPanelContentMinHeight,
     startOpenPanelImageAnimation,
     setActiveIndex,
+    onSwipeUpToNextPost,
+    stableOnSwipeUp,
+    setVideoFeedLayouts,
+    setVideoFeedIndex,
+    getVideoFeedLayoutsAndIndex,
     imageState,
     imageXCoord,
     imageYCoord,

@@ -25,6 +25,7 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
 import { LegendList, type LegendListRenderItemProps, type LegendListRef } from '@legendapp/list';
+import { router } from 'expo-router';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -35,8 +36,8 @@ import {
   type FeedEvent,
   type NoteMetrics,
   type ProfileInfo,
-  buildDedupedVideoPosts,
   type RawPrimalEvent,
+  type ContentSegment,
   DEFAULT_METRICS,
   PRIMAL_CACHE_RELAY_URL,
   PRIMAL_KIND_NOTE_STATS,
@@ -46,6 +47,7 @@ import {
   collectReferencedIds,
   normalizeFeedEvent,
   parseJson,
+  parseContent,
   getFirstTagValue,
   parseProfileFromRaw,
   parseNoteMetrics,
@@ -55,8 +57,13 @@ import {
 import { CATEGORY_NPUBS } from './nostr/categoryNpubs';
 
 import { PostCard } from './nostr/PostCard';
-import { RepostCard, VideoFeedOverlay, type VideoPost } from './UserFeed';
-import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
+import { RepostCard } from './UserFeed';
+import {
+  ImageOverlayProvider,
+  useImageOverlay,
+  AnimatedImageOverlay,
+  type ImageOverlayReplaceLayout,
+} from './nostr/image-overlay';
 import { useNostrEngagement } from '@/hooks/useNostrEngagement';
 import { StoriesRow } from './nostr/StoriesRow';
 
@@ -390,9 +397,6 @@ function HomeFeedInner() {
 
   const isFirstRender = useRef(true);
 
-  // Video overlay state
-  const [overlayVisible, setOverlayVisible] = useState(false);
-  const [overlayStartIndex, setOverlayStartIndex] = useState(0);
   const listRef = useRef<LegendListRef>(null);
   const [tabMeasurements, setTabMeasurements] = useState<
     Record<number, { x: number; width: number }>
@@ -400,8 +404,6 @@ function HomeFeedInner() {
   const indicatorX = useSharedValue(0);
   const indicatorWidth = useSharedValue(0);
 
-  // Ref for handleVideoTap so renderFeedItem doesn't depend on videoPosts
-  const videoPostsRef = useRef<VideoPost[]>([]);
   const pendingScrollToTabsRef = useRef(false);
   const storiesHeightRef = useRef(0);
   const scrollOffsetRef = useRef(0);
@@ -906,20 +908,6 @@ function HomeFeedInner() {
     }
   }, [currentSpec, userPubkey, startTransition]);
 
-  const loadMoreVideos = useCallback(async () => {
-    const MAX_ATTEMPTS = 5;
-    for (let i = 0; i < MAX_ATTEMPTS; i++) {
-      if (!hasMoreRef.current) return;
-      const newItems = await loadMoreItems();
-      if (newItems.length === 0) return;
-      const hasNew = newItems.some((item) => {
-        const ev = item.type === 'note' ? item.event : item.originalEvent;
-        return ev ? getVideoUrlsFromContent(ev.content).length > 0 : false;
-      });
-      if (hasNew) return;
-    }
-  }, [loadMoreItems]);
-
   const handleEndReached = useCallback(() => {
     loadMoreItems();
   }, [loadMoreItems]);
@@ -943,35 +931,169 @@ function HomeFeedInner() {
     return Array.from(map.values());
   }, [feedItems]);
 
-  const actionableEventsById = useMemo(() => {
-    const map = new Map<string, FeedEvent>();
-    for (const event of actionableEvents) map.set(event.id, event);
-    return map;
-  }, [actionableEvents]);
-
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
     useNostrEngagement(actionableEvents, getMetrics);
 
-  const videoPosts = useMemo((): VideoPost[] => {
-    const sourceEvents: FeedEvent[] = [];
-    for (const item of feedItems) {
-      const event = item.type === 'note' ? item.event : item.originalEvent;
-      if (event) sourceEvents.push(event);
-    }
-    return buildDedupedVideoPosts(sourceEvents);
+  // listData = [stories, tabs, ...feedItems] so feed item at list index i has feedItems index i - 2
+  const FEED_ITEM_OFFSET = 2;
+  const overlaySourceIndexRef = useRef(-1);
+  const feedIndicesWithVideo = useMemo(() => {
+    const out: number[] = [];
+    feedItems.forEach((item, i) => {
+      const ev = item.type === 'note' ? item.event : item.originalEvent;
+      if (ev && getVideoUrlsFromContent(ev.content).length > 0) out.push(i);
+    });
+    return out;
   }, [feedItems]);
 
-  // Keep ref in sync — avoids renderFeedItem depending on videoPosts
-  videoPostsRef.current = videoPosts;
-
-  const handleVideoTap = useCallback((tappedUrl: string) => {
-    const index = videoPostsRef.current.findIndex((vp) => vp.videoUrl === tappedUrl);
-    if (index === -1) return;
-    setOverlayStartIndex(index);
-    setOverlayVisible(true);
+  const onOverlayOpenedFromIndex = useCallback((index: number) => {
+    overlaySourceIndexRef.current = index;
   }, []);
 
-  const closeOverlay = useCallback(() => setOverlayVisible(false), []);
+  const MAX_VIDEO_FEED_PAGES = 20;
+
+  const buildLayoutForVideoIndex = useCallback(
+    (feedIndex: number): ImageOverlayReplaceLayout | null => {
+      const item = feedItems[feedIndex];
+      const event = item?.type === 'note' ? item.event : item?.originalEvent;
+      if (!event) return null;
+      const segments = parseContent(event.content);
+      const blockSegments = segments.filter(
+        (s): s is ContentSegment & { kind: 'image' | 'video'; url: string } =>
+          s.kind === 'image' || s.kind === 'video'
+      );
+      if (blockSegments.length === 0) return null;
+      const urls = blockSegments.map((s) => s.url);
+      const mediaTypes = blockSegments.map((s) =>
+        s.kind === 'video' ? ('video' as const) : ('image' as const)
+      );
+      const firstVideoIndex = mediaTypes.indexOf('video');
+      if (firstVideoIndex === -1) return null;
+      const metrics = getDisplayMetrics(event.id) || DEFAULT_METRICS;
+      const engagement = getEngagementState(event.id);
+      const profile = profilesRef.current.get(event.pubkey) ?? null;
+      return {
+        url: urls[firstVideoIndex],
+        urls,
+        mediaTypes,
+        initialIndex: firstVideoIndex,
+        aspectRatio: 16 / 9,
+        post: {
+          event: {
+            id: event.id,
+            pubkey: event.pubkey,
+            content: event.content,
+            created_at: event.created_at,
+          },
+          metrics: {
+            replyCount: metrics.replyCount,
+            repostCount: metrics.repostCount,
+            likeCount: metrics.likeCount,
+            satsZapped: metrics.satsZapped,
+          },
+          profile: profile ?? undefined,
+          reposted: engagement.reposted,
+          liked: engagement.liked,
+          repostPending: engagement.repostPending,
+          likePending: engagement.likePending,
+          repostPendingDirection: engagement.repostPendingDirection,
+          likePendingDirection: engagement.likePendingDirection,
+          onCommentPress: () =>
+            router.push({
+              pathname: '/(user-flow)/thread' as any,
+              params: { eventId: event.id },
+            }),
+          onRepostPress: () => toggleRepost(event),
+          onLikePress: () => toggleLike(event),
+        },
+      };
+    },
+    [feedItems, getDisplayMetrics, getEngagementState, toggleLike, toggleRepost]
+  );
+
+  const getVideoFeedLayoutsAndIndex = useCallback((): {
+    layouts: ImageOverlayReplaceLayout[];
+    initialIndex: number;
+  } | null => {
+    const start = overlaySourceIndexRef.current;
+    const indices = feedIndicesWithVideo.filter((i) => i >= start).slice(0, MAX_VIDEO_FEED_PAGES);
+    const layouts = indices
+      .map((i) => buildLayoutForVideoIndex(i))
+      .filter((l): l is ImageOverlayReplaceLayout => l != null);
+    return layouts.length ? { layouts, initialIndex: 0 } : null;
+  }, [feedIndicesWithVideo, buildLayoutForVideoIndex]);
+
+  const onSwipeUpToNextPost = useCallback(
+    (openNext: (layout: ImageOverlayReplaceLayout) => void) => {
+      const current = overlaySourceIndexRef.current;
+      const nextVideoIndex = feedIndicesWithVideo.find((i) => i > current);
+      if (typeof nextVideoIndex !== 'number') return;
+      const item = feedItems[nextVideoIndex];
+      const event = item.type === 'note' ? item.event : item.originalEvent;
+      if (!event) return;
+      const segments = parseContent(event.content);
+      const blockSegments = segments.filter(
+        (s): s is ContentSegment & { kind: 'image' | 'video'; url: string } =>
+          s.kind === 'image' || s.kind === 'video'
+      );
+      const media = blockSegments;
+      if (media.length === 0) return;
+      const urls = media.map((s) => s.url);
+      const mediaTypes = media.map((s) =>
+        s.kind === 'video' ? ('video' as const) : ('image' as const)
+      );
+      const firstVideoIndex = mediaTypes.indexOf('video');
+      if (firstVideoIndex === -1) return;
+      const metrics = getDisplayMetrics(event.id) || DEFAULT_METRICS;
+      const engagement = getEngagementState(event.id);
+      const profile = profilesRef.current.get(event.pubkey) ?? null;
+      const layout: ImageOverlayReplaceLayout = {
+        url: urls[firstVideoIndex],
+        urls,
+        mediaTypes,
+        initialIndex: firstVideoIndex,
+        aspectRatio: 16 / 9,
+        post: {
+          event: {
+            id: event.id,
+            pubkey: event.pubkey,
+            content: event.content,
+            created_at: event.created_at,
+          },
+          metrics: {
+            replyCount: metrics.replyCount,
+            repostCount: metrics.repostCount,
+            likeCount: metrics.likeCount,
+            satsZapped: metrics.satsZapped,
+          },
+          profile: profile ?? undefined,
+          reposted: engagement.reposted,
+          liked: engagement.liked,
+          repostPending: engagement.repostPending,
+          likePending: engagement.likePending,
+          repostPendingDirection: engagement.repostPendingDirection,
+          likePendingDirection: engagement.likePendingDirection,
+          onCommentPress: () =>
+            router.push({
+              pathname: '/(user-flow)/thread' as any,
+              params: { eventId: event.id },
+            }),
+          onRepostPress: () => toggleRepost(event),
+          onLikePress: () => toggleLike(event),
+        },
+      };
+      overlaySourceIndexRef.current = nextVideoIndex;
+      openNext(layout);
+    },
+    [
+      feedIndicesWithVideo,
+      feedItems,
+      getDisplayMetrics,
+      getEngagementState,
+      toggleLike,
+      toggleRepost,
+    ]
+  );
 
   // ── Render ──
 
@@ -1041,6 +1163,7 @@ function HomeFeedInner() {
 
   const renderFeedItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
+      const feedIndex = index - FEED_ITEM_OFFSET;
       if (item.type === 'note') {
         const metrics = getDisplayMetrics(item.event.id);
         const engagement = getEngagementState(item.event.id);
@@ -1050,10 +1173,11 @@ function HomeFeedInner() {
             event={item.event}
             metrics={metrics}
             index={index}
+            feedIndex={feedIndex}
+            onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
             quotedEvents={quotedRef.current}
             profiles={profilesRef.current}
             getMetrics={getMetrics}
-            onVideoTap={handleVideoTap}
             liked={engagement.liked}
             reposted={engagement.reposted}
             likePending={engagement.likePending}
@@ -1079,12 +1203,13 @@ function HomeFeedInner() {
           originalEvent={item.originalEvent}
           originalMetrics={getDisplayMetrics(item.originalEventId)}
           index={index}
+          feedIndex={feedIndex}
+          onOverlayOpenedFromIndex={onOverlayOpenedFromIndex}
           quotedEvents={quotedRef.current}
           profiles={profilesRef.current}
           getMetrics={getMetrics}
           reposterName={reposterName}
           reposterPubkey={item.repostEvent.pubkey}
-          onVideoTap={handleVideoTap}
           liked={repostEngagement.liked}
           reposted={repostEngagement.reposted}
           likePending={repostEngagement.likePending}
@@ -1097,7 +1222,14 @@ function HomeFeedInner() {
         />
       );
     },
-    [getDisplayMetrics, getEngagementState, getMetrics, handleVideoTap, toggleLike, toggleRepost]
+    [
+      getDisplayMetrics,
+      getEngagementState,
+      getMetrics,
+      onOverlayOpenedFromIndex,
+      toggleLike,
+      toggleRepost,
+    ]
   );
 
   const refreshTintColor = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
@@ -1160,7 +1292,9 @@ function HomeFeedInner() {
   return (
     <ImageOverlayProvider
       getDisplayMetrics={getDisplayMetrics}
-      getEngagementState={getEngagementState}>
+      getEngagementState={getEngagementState}
+      onSwipeUpToNextPost={onSwipeUpToNextPost}
+      getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
       <View style={[styles.flex1, { paddingTop: topContentInset }]}>
         <LegendList
           ref={listRef}
@@ -1195,27 +1329,6 @@ function HomeFeedInner() {
         />
       </View>
       <AnimatedImageOverlay />
-      {overlayVisible && (
-        <VideoFeedOverlay
-          videoPosts={videoPosts}
-          profilesMap={profilesMap}
-          metricsMap={metricsMap}
-          startIndex={overlayStartIndex}
-          onClose={closeOverlay}
-          onEndReached={loadMoreVideos}
-          getDisplayMetrics={getDisplayMetrics}
-          getEngagementState={getEngagementState}
-          engagementRevision={engagementRevision}
-          onLikePress={(eventId) => {
-            const event = actionableEventsById.get(eventId);
-            if (event) toggleLike(event);
-          }}
-          onRepostPress={(eventId) => {
-            const event = actionableEventsById.get(eventId);
-            if (event) toggleRepost(event);
-          }}
-        />
-      )}
     </ImageOverlayProvider>
   );
 }

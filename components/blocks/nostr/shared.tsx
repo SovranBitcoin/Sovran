@@ -5,7 +5,7 @@
  * extracted to eliminate duplication and ensure consistent behavior.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, TouchableOpacity, Linking, Dimensions, Platform } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -20,7 +20,8 @@ import { Avatar } from 'components/ui/Avatar';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { nip19 } from 'nostr-tools';
-import { ImageBlock } from './image-overlay';
+import { ImageBlock, useImageOverlay } from './image-overlay';
+import type { ImageOverlayLayout, ImageOverlayPost } from './image-overlay';
 
 // ============================================================================
 // Types
@@ -631,38 +632,69 @@ export { ImageBlock };
 const IOSVideoBlock = React.memo(function IOSVideoBlock({
   url,
   onTap,
+  onBeforeOpen,
+  openOverlay,
+  overlayLayout,
 }: {
   url: string;
   onTap?: () => void;
+  onBeforeOpen?: () => void;
+  openOverlay?: (layout: ImageOverlayLayout) => void;
+  overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
 }) {
   const { getPrimaryColor } = useTheme();
+  const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   const player = useVideoPlayer(url, (p) => {
     p.loop = false;
     p.muted = true;
   });
 
+  const handleTap = useCallback(() => {
+    if (openOverlay && overlayLayout && containerRef.current) {
+      onBeforeOpen?.();
+      containerRef.current.measureInWindow(
+        (pageX: number, pageY: number, width: number, height: number) => {
+          openOverlay({
+            ...overlayLayout,
+            pageX,
+            pageY,
+            width,
+            height,
+          });
+        }
+      );
+    } else if (onTap) {
+      onTap();
+    }
+  }, [openOverlay, overlayLayout, onBeforeOpen, onTap]);
+
   const tapGesture = useMemo(
     () =>
-      onTap
+      handleTap
         ? Gesture.Tap().onEnd(() => {
             'worklet';
-            runOnJS(onTap)();
+            runOnJS(handleTap)();
           })
         : undefined,
-    [onTap]
+    [handleTap]
   );
 
+  const hasTap = !!(openOverlay && overlayLayout) || !!onTap;
+
   const content = (
-    <View style={[sharedStyles.videoBlockOuter, { backgroundColor: getPrimaryColor('900') }]}>
-      <View pointerEvents={onTap ? 'none' : 'auto'}>
+    <View
+      ref={containerRef}
+      collapsable={false}
+      style={[sharedStyles.videoBlockOuter, { backgroundColor: getPrimaryColor('900') }]}>
+      <View pointerEvents={hasTap ? 'none' : 'auto'}>
         <VideoView
           player={player}
           style={{ width: CONTENT_WIDTH - 32, aspectRatio: 16 / 9 }}
           contentFit="contain"
-          nativeControls={!onTap}
+          nativeControls={!hasTap}
         />
       </View>
-      {onTap && (
+      {hasTap && (
         <View
           pointerEvents="none"
           style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
@@ -681,25 +713,53 @@ const IOSVideoBlock = React.memo(function IOSVideoBlock({
 const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
   url,
   onTap,
+  onBeforeOpen,
+  openOverlay,
+  overlayLayout,
 }: {
   url: string;
   onTap?: () => void;
+  onBeforeOpen?: () => void;
+  openOverlay?: (layout: ImageOverlayLayout) => void;
+  overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
 }) {
   const { getPrimaryColor } = useTheme();
+  const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   const openInBrowser = useCallback(() => Linking.openURL(url).catch(() => {}), [url]);
+
+  const handleTap = useCallback(() => {
+    if (openOverlay && overlayLayout && containerRef.current) {
+      onBeforeOpen?.();
+      containerRef.current.measureInWindow(
+        (pageX: number, pageY: number, width: number, height: number) => {
+          openOverlay({
+            ...overlayLayout,
+            pageX,
+            pageY,
+            width,
+            height,
+          });
+        }
+      );
+    } else {
+      (onTap ?? openInBrowser)();
+    }
+  }, [openOverlay, overlayLayout, onBeforeOpen, onTap, openInBrowser]);
 
   const tapGesture = useMemo(
     () =>
       Gesture.Tap().onEnd(() => {
         'worklet';
-        runOnJS(onTap ?? openInBrowser)();
+        runOnJS(handleTap)();
       }),
-    [onTap, openInBrowser]
+    [handleTap]
   );
 
   return (
     <GestureDetector gesture={tapGesture}>
       <View
+        ref={containerRef}
+        collapsable={false}
         style={[
           sharedStyles.mediaCard,
           { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
@@ -714,11 +774,13 @@ const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
               size={11}
               numberOfLines={1}
               style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
-              {onTap ? 'Tap to watch' : 'Open in browser'}
+              {(openOverlay && overlayLayout) || onTap ? 'Tap to watch' : 'Open in browser'}
             </Text>
           </VStack>
           <Icon
-            name={onTap ? 'mingcute:play-fill' : 'mdi:open-in-new'}
+            name={
+              (openOverlay && overlayLayout) || onTap ? 'mingcute:play-fill' : 'mdi:open-in-new'
+            }
             size={16}
             color={opacity(getPrimaryColor('0'), 0.33)}
           />
@@ -731,14 +793,36 @@ const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
 export const VideoBlock = React.memo(function VideoBlock({
   url,
   onTap,
+  onBeforeOpen,
+  openOverlay,
+  overlayLayout,
 }: {
   url: string;
   onTap?: () => void;
+  onBeforeOpen?: () => void;
+  openOverlay?: (layout: ImageOverlayLayout) => void;
+  overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
 }) {
   if (Platform.OS === 'android') {
-    return <AndroidVideoBlock url={url} onTap={onTap} />;
+    return (
+      <AndroidVideoBlock
+        url={url}
+        onTap={onTap}
+        onBeforeOpen={onBeforeOpen}
+        openOverlay={openOverlay}
+        overlayLayout={overlayLayout}
+      />
+    );
   }
-  return <IOSVideoBlock url={url} onTap={onTap} />;
+  return (
+    <IOSVideoBlock
+      url={url}
+      onTap={onTap}
+      onBeforeOpen={onBeforeOpen}
+      openOverlay={openOverlay}
+      overlayLayout={overlayLayout}
+    />
+  );
 });
 
 export const LightningBlock = React.memo(function LightningBlock({ invoice }: { invoice: string }) {
@@ -1068,11 +1152,17 @@ export const NoteContent = React.memo(function NoteContent({
   onLikePress,
   onActionPressIn,
   onActionPressOut,
+  feedIndex,
+  onOverlayOpenedFromIndex,
 }: {
   content: string;
   quotedEvents: Map<string, FeedEvent>;
   profiles: Map<string, ProfileInfo>;
   getMetrics: (eventId: string) => NoteMetrics;
+  /** Feed list index when in feed; used so swipe-up can scroll to next video post. */
+  feedIndex?: number;
+  /** Called when overlay is opened from this post. */
+  onOverlayOpenedFromIndex?: (index: number) => void;
   onVideoTap?: (url: string) => void;
   onQuotedPressIn?: () => void;
   onQuotedPressOut?: () => void;
@@ -1098,6 +1188,13 @@ export const NoteContent = React.memo(function NoteContent({
 }) {
   const { getPrimaryColor } = useTheme();
   const [expanded, setExpanded] = useState(false);
+  const imageOverlay = useImageOverlay();
+
+  const onBeforeOpen = useCallback(() => {
+    if (typeof feedIndex === 'number' && onOverlayOpenedFromIndex) {
+      onOverlayOpenedFromIndex(feedIndex);
+    }
+  }, [feedIndex, onOverlayOpenedFromIndex]);
 
   const { inlineSegments, blockSegments } = useMemo(() => {
     const segments = parseContent(content);
@@ -1124,6 +1221,66 @@ export const NoteContent = React.memo(function NoteContent({
 
     return { inlineSegments: inline, blockSegments: blocks };
   }, [content]);
+
+  const { mediaSegments, allMediaUrls, allMediaTypes, overlayPost } = useMemo(() => {
+    const media = blockSegments.filter(
+      (s): s is ContentSegment & { kind: 'image' | 'video'; url: string } =>
+        s.kind === 'image' || s.kind === 'video'
+    );
+    const urls = media.map((s) => s.url);
+    const types = media.map((s) => (s.kind === 'video' ? ('video' as const) : ('image' as const)));
+    const post: ImageOverlayPost | null =
+      overlayEvent && overlayMetrics
+        ? {
+            event: {
+              id: overlayEvent.id,
+              pubkey: overlayEvent.pubkey,
+              content: overlayEvent.content,
+              created_at: overlayEvent.created_at,
+            },
+            metrics: {
+              replyCount: overlayMetrics.replyCount,
+              repostCount: overlayMetrics.repostCount,
+              likeCount: overlayMetrics.likeCount,
+              satsZapped: overlayMetrics.satsZapped,
+            },
+            profile: overlayProfile ?? null,
+            reposted,
+            liked,
+            repostPending,
+            likePending,
+            repostPendingDirection,
+            likePendingDirection,
+            onCommentPress,
+            onRepostPress,
+            onLikePress,
+            onActionPressIn,
+            onActionPressOut,
+          }
+        : null;
+    return {
+      mediaSegments: media,
+      allMediaUrls: urls,
+      allMediaTypes: types,
+      overlayPost: post,
+    };
+  }, [
+    blockSegments,
+    overlayEvent,
+    overlayMetrics,
+    overlayProfile,
+    reposted,
+    liked,
+    repostPending,
+    likePending,
+    repostPendingDirection,
+    likePendingDirection,
+    onCommentPress,
+    onRepostPress,
+    onLikePress,
+    onActionPressIn,
+    onActionPressOut,
+  ]);
 
   const { displaySegments, isTruncated, truncatedLastText } = useMemo(() => {
     let total = 0;
@@ -1241,12 +1398,19 @@ export const NoteContent = React.memo(function NoteContent({
             switch (seg.kind) {
               case 'image': {
                 const imageIndex = imageUrls.indexOf(seg.url);
+                const mediaIndex = mediaSegments.findIndex(
+                  (m) => m.kind === 'image' && m.url === seg.url
+                );
                 return (
                   <ImageBlock
                     key={`b${i}`}
                     url={seg.url}
                     allImageUrls={imageUrls.length > 1 ? imageUrls : undefined}
                     imageIndex={imageIndex >= 0 ? imageIndex : 0}
+                    allMediaUrls={allMediaUrls.length > 0 ? allMediaUrls : undefined}
+                    mediaTypes={allMediaTypes.length > 0 ? allMediaTypes : undefined}
+                    mediaIndex={mediaIndex >= 0 ? mediaIndex : undefined}
+                    onBeforeOpen={onBeforeOpen}
                     onPressIn={onImagePressIn}
                     onPressOut={onImagePressOut}
                     event={overlayEvent}
@@ -1266,14 +1430,38 @@ export const NoteContent = React.memo(function NoteContent({
                   />
                 );
               }
-              case 'video':
+              case 'video': {
+                const mediaIndex = mediaSegments.findIndex(
+                  (m) => m.kind === 'video' && m.url === seg.url
+                );
+                const overlayLayout: Omit<
+                  ImageOverlayLayout,
+                  'pageX' | 'pageY' | 'width' | 'height'
+                > = {
+                  url: seg.url,
+                  urls: allMediaUrls.length > 0 ? allMediaUrls : undefined,
+                  mediaTypes: allMediaTypes.length > 0 ? allMediaTypes : undefined,
+                  initialIndex: mediaIndex >= 0 ? mediaIndex : 0,
+                  post: overlayPost,
+                  aspectRatio: 16 / 9,
+                };
                 return (
                   <VideoBlock
                     key={`b${i}`}
                     url={seg.url}
-                    onTap={onVideoTap ? () => onVideoTap(seg.url) : undefined}
+                    onBeforeOpen={onBeforeOpen}
+                    onTap={
+                      !imageOverlay?.open
+                        ? onVideoTap
+                          ? () => onVideoTap(seg.url)
+                          : undefined
+                        : undefined
+                    }
+                    openOverlay={imageOverlay?.open}
+                    overlayLayout={imageOverlay?.open && overlayPost ? overlayLayout : undefined}
                   />
                 );
+              }
               case 'lightning':
                 return <LightningBlock key={`b${i}`} invoice={seg.invoice} />;
               case 'nevent':

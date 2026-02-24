@@ -11,7 +11,7 @@
  *   AnimatedImageOverlay.tsx - Fullscreen overlay with gestures (dismiss, pager, tap)
  *   ImageBlock.tsx           - Feed thumbnail with tap-to-open and blur
  *   BottomPanel.tsx          - Sheet content, absolute bar, reply row
- *   PagerPage.tsx            - Single page in multi-image pager
+ *   MediaPagerPage.tsx       - Single page in multi-image/video pager
  *   PagerDots.tsx            - Instagram-style pagination dots
  */
 
@@ -34,6 +34,8 @@ export { ImageBlock } from './ImageBlock';
 export type {
   ImageOverlayPost,
   ImageOverlayLayout,
+  ImageOverlayReplaceLayout,
   ThumbnailLayout,
   ImageOverlayContextValue,
+  MediaType,
 } from './types';

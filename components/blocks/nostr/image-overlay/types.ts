@@ -34,6 +34,8 @@ export interface ImageOverlayPost {
   onActionPressOut?: () => void;
 }
 
+export type MediaType = 'image' | 'video';
+
 export interface ImageOverlayLayout {
   url: string;
   aspectRatio?: number;
@@ -41,12 +43,20 @@ export interface ImageOverlayLayout {
   pageY: number;
   width: number;
   height: number;
-  /** When opening a post with multiple images, pass all urls and the index of the tapped image. */
+  /** When opening a post with multiple media (images + videos), pass all urls and the index of the tapped item. */
   urls?: string[];
+  /** Type per url: 'image' or 'video'. Same length as urls. Omitted or missing entries default to 'image'. */
+  mediaTypes?: MediaType[];
   initialIndex?: number;
   /** When opening from a post card, pass post data so the overlay can show author, content, stats, reply. */
   post?: ImageOverlayPost | null;
 }
+
+/** Layout for replacing overlay content in-place (e.g. next video post). Provider fills pageX/pageY/width/height. */
+export type ImageOverlayReplaceLayout = Omit<
+  ImageOverlayLayout,
+  'pageX' | 'pageY' | 'width' | 'height'
+>;
 
 export type ThumbnailLayout = { pageX: number; pageY: number; width: number; height: number };
 
@@ -54,6 +64,8 @@ export type ImageOverlayContextValue = {
   scrollHandler: ReturnType<typeof useScrollViewOffset>['scrollHandler'];
   scrollOffsetY: ReturnType<typeof useScrollViewOffset>['scrollOffsetY'];
   open: (layout: ImageOverlayLayout) => void;
+  /** Replace overlay content in-place (no open animation). Used when swiping up to next video post. */
+  openReplace: (layout: ImageOverlayReplaceLayout) => void;
   /** Close overlay. Pass current pager index when multiple images so dismiss animates to the visible thumbnail. */
   close: (dismissedPageIndex?: number) => void;
   openToCenter: () => void;
@@ -70,12 +82,25 @@ export type ImageOverlayContextValue = {
   /** Start image open animation to final position (for min panel). Call from overlay onLayout when has panel. */
   startOpenPanelImageAnimation: (minPanelHeight: number) => void;
   activeUrl: string | null;
-  /** All image urls when overlay shows multiple (e.g. post with 2+ images). Same as [activeUrl] when single. */
+  /** All media urls when overlay shows multiple (images + videos). Same as [activeUrl] when single. */
   activeUrls: string[];
+  /** Type per url: 'image' or 'video'. Same length as activeUrls. */
+  activeMediaTypes: MediaType[];
   /** Current page index when activeUrls.length > 1. */
   activeIndex: number;
   setActiveIndex: (index: number) => void;
   activeAspectRatio: number;
+  /** When on a video page, swipe up triggers this with openNext. Feed calls openNext(nextLayout) to show next video in overlay. */
+  onSwipeUpToNextPost: ((openNext: (layout: ImageOverlayReplaceLayout) => void) => void) | null;
+  /** When set, overlay renders as vertical snap scroller (TikTok-style). Feed provides via getVideoFeedLayoutsAndIndex. */
+  videoFeedLayouts: ImageOverlayReplaceLayout[] | null;
+  videoFeedLayoutIndex: number;
+  setVideoFeedLayouts: (layouts: ImageOverlayReplaceLayout[] | null, initialIndex: number) => void;
+  setVideoFeedIndex: (index: number, layout: ImageOverlayReplaceLayout) => void;
+  /** Called by overlay to get layouts for vertical feed; feed returns { layouts, initialIndex: 0 }. */
+  getVideoFeedLayoutsAndIndex:
+    | (() => { layouts: ImageOverlayReplaceLayout[]; initialIndex: number } | null)
+    | null;
   imageState: ReturnType<typeof useSharedValue<'open' | 'close'>>;
   imageXCoord: ReturnType<typeof useSharedValue<number>>;
   imageYCoord: ReturnType<typeof useSharedValue<number>>;

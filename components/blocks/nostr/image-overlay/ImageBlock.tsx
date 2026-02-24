@@ -15,7 +15,7 @@ import { BlurView } from 'components/ui/BlurView';
 import { View } from 'components/ui/View/View';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../shared';
 import { useImageOverlay } from './provider';
-import type { ImageOverlayPost } from './types';
+import type { ImageOverlayPost, MediaType } from './types';
 
 const AnimatedBlurView = Reanimated.createAnimatedComponent(BlurView);
 
@@ -40,7 +40,11 @@ interface ImageBlockOverlayPostProps {
 export const ImageBlock = React.memo(function ImageBlock({
   url,
   allImageUrls,
+  allMediaUrls,
+  mediaTypes,
+  mediaIndex,
   imageIndex,
+  onBeforeOpen,
   onPressIn,
   onPressOut,
   event: overlayEvent,
@@ -63,6 +67,13 @@ export const ImageBlock = React.memo(function ImageBlock({
   allImageUrls?: string[];
   /** Index of this image among the post's images (for opening overlay at the correct page). */
   imageIndex?: number;
+  /** When the post has mixed media (images + videos), pass all media urls and types for unified pager. */
+  allMediaUrls?: string[];
+  mediaTypes?: MediaType[];
+  /** Index of this item in the combined media list (when using allMediaUrls). */
+  mediaIndex?: number;
+  /** Called just before opening overlay so feed can track source index (for swipe-up to next). */
+  onBeforeOpen?: () => void;
   onPressIn?: () => void;
   onPressOut?: () => void;
 } & Partial<ImageBlockOverlayPostProps>) {
@@ -70,6 +81,7 @@ export const ImageBlock = React.memo(function ImageBlock({
   const [error, setError] = useState(false);
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   const imageOverlay = useImageOverlay();
+  const layoutIndex = mediaIndex ?? imageIndex ?? 0;
 
   const registerLayout = useCallback(() => {
     containerRef.current?.measureInWindow(
@@ -77,16 +89,17 @@ export const ImageBlock = React.memo(function ImageBlock({
         imageOverlay?.registerThumbnailLayout?.(
           url,
           { pageX, pageY, width, height },
-          overlayEvent?.id != null && imageIndex != null
-            ? { eventId: overlayEvent.id, imageIndex }
+          overlayEvent?.id != null && layoutIndex != null
+            ? { eventId: overlayEvent.id, imageIndex: layoutIndex }
             : undefined
         );
       }
     );
-  }, [imageOverlay, url, overlayEvent?.id, imageIndex]);
+  }, [imageOverlay, url, overlayEvent?.id, layoutIndex]);
 
   const handlePress = useCallback(() => {
     if (!imageOverlay?.open) return;
+    onBeforeOpen?.();
     containerRef.current?.measureInWindow(
       (pageX: number, pageY: number, width: number, height: number) => {
         const post: ImageOverlayPost | undefined =
@@ -118,6 +131,12 @@ export const ImageBlock = React.memo(function ImageBlock({
                 onActionPressOut,
               }
             : undefined;
+        const urls =
+          allMediaUrls && allMediaUrls.length > 0
+            ? allMediaUrls
+            : allImageUrls && allImageUrls.length > 1
+              ? allImageUrls
+              : undefined;
         imageOverlay.open({
           url,
           aspectRatio,
@@ -125,8 +144,10 @@ export const ImageBlock = React.memo(function ImageBlock({
           pageY,
           width,
           height,
-          urls: allImageUrls && allImageUrls.length > 1 ? allImageUrls : undefined,
-          initialIndex: imageIndex,
+          urls: urls && urls.length > 1 ? urls : undefined,
+          mediaTypes:
+            mediaTypes && urls && mediaTypes.length === urls.length ? mediaTypes : undefined,
+          initialIndex: mediaIndex ?? imageIndex ?? 0,
           post: post ?? null,
         });
       }
@@ -136,7 +157,11 @@ export const ImageBlock = React.memo(function ImageBlock({
     url,
     aspectRatio,
     allImageUrls,
+    allMediaUrls,
+    mediaTypes,
+    mediaIndex,
     imageIndex,
+    onBeforeOpen,
     overlayEvent,
     overlayMetrics,
     overlayProfile,

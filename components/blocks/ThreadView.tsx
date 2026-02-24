@@ -18,7 +18,6 @@ import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import {
-  buildDedupedVideoPosts,
   type FeedEvent,
   type NoteMetrics,
   type ProfileInfo,
@@ -36,7 +35,6 @@ import {
 
 import { PostCard } from './nostr/PostCard';
 
-import { VideoFeedOverlay, type VideoPost } from './UserFeed';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/hooks/useNostrEngagement';
 
@@ -158,9 +156,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   quotedRef.current = quotedEventsMap;
   const [dataVersion, setDataVersion] = useState(0);
 
-  // Video feed overlay state
-  const [overlayVisible, setOverlayVisible] = useState(false);
-  const [overlayStartIndex, setOverlayStartIndex] = useState(0);
   const [hiddenReplyCount, setHiddenReplyCount] = useState(0);
 
   const mountedRef = useRef(true);
@@ -183,42 +178,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   );
 
   const actionableEvents = useMemo(() => threadItems.map((item) => item.event), [threadItems]);
-  const actionableEventsById = useMemo(() => {
-    const map = new Map<string, FeedEvent>();
-    for (const event of actionableEvents) map.set(event.id, event);
-    return map;
-  }, [actionableEvents]);
-
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
     useNostrEngagement(actionableEvents, getMetrics);
-
-  // Build video posts list from thread items
-  const videoPosts = useMemo((): VideoPost[] => {
-    const sourceEvents: FeedEvent[] = [];
-    for (const item of threadItems) {
-      const event = item.event;
-      sourceEvents.push(event);
-    }
-    return buildDedupedVideoPosts(sourceEvents);
-  }, [threadItems]);
-
-  const videoIndexByUrl = useMemo(() => {
-    const map = new Map<string, number>();
-    for (let i = 0; i < videoPosts.length; i++) {
-      map.set(videoPosts[i].videoUrl, i);
-    }
-    return map;
-  }, [videoPosts]);
-
-  const handleVideoTap = useCallback(
-    (tappedUrl: string) => {
-      const index = videoIndexByUrl.get(tappedUrl);
-      if (index == null) return;
-      setOverlayStartIndex(index);
-      setOverlayVisible(true);
-    },
-    [videoIndexByUrl]
-  );
 
   // Fetch thread data
   useEffect(() => {
@@ -478,7 +439,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           getMetrics={getMetrics}
           showLineAbove={showLineAbove}
           showLineBelow={showLineBelow}
-          onVideoTap={handleVideoTap}
           liked={engagement.liked}
           reposted={engagement.reposted}
           likePending={engagement.likePending}
@@ -490,15 +450,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         />
       );
     },
-    [
-      getDisplayMetrics,
-      getEngagementState,
-      getMetrics,
-      hasParents,
-      handleVideoTap,
-      toggleLike,
-      toggleRepost,
-    ]
+    [getDisplayMetrics, getEngagementState, getMetrics, hasParents, toggleLike, toggleRepost]
   );
 
   if (isLoading) {
@@ -534,7 +486,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   return (
     <ImageOverlayProvider
       getDisplayMetrics={getDisplayMetrics}
-      getEngagementState={getEngagementState}>
+      getEngagementState={getEngagementState}
+      onSwipeUpToNextPost={(_openNext) => {
+        /* no next video in thread view */
+      }}>
       <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
         <LegendList
           data={threadItems}
@@ -568,26 +523,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           initialScrollIndex={targetIndex > 0 ? targetIndex : undefined}
         />
         <AnimatedImageOverlay />
-        {overlayVisible && (
-          <VideoFeedOverlay
-            videoPosts={videoPosts}
-            profilesMap={profilesMap}
-            metricsMap={metricsMap}
-            startIndex={overlayStartIndex}
-            onClose={() => setOverlayVisible(false)}
-            getDisplayMetrics={getDisplayMetrics}
-            getEngagementState={getEngagementState}
-            engagementRevision={engagementRevision}
-            onLikePress={(eventId) => {
-              const event = actionableEventsById.get(eventId);
-              if (event) toggleLike(event);
-            }}
-            onRepostPress={(eventId) => {
-              const event = actionableEventsById.get(eventId);
-              if (event) toggleRepost(event);
-            }}
-          />
-        )}
       </View>
     </ImageOverlayProvider>
   );
