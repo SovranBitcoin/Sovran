@@ -172,9 +172,9 @@ export const BOTTOM_PANEL_PADDING_BOTTOM_EXTRA = 12;
 /** Delay (ms) before starting the expand so the overlay can mount and paint the thumbnail. */
 export const OPEN_START_DELAY_MS = 0;
 
-/** Spring for image position/size (open and close). Same config for both directions. */
+/** Spring for image position/size (open and close). Damping high enough to avoid overshoot past thumbnail. */
 export const CLOSE_SPRING = {
-  damping: 24,
+  damping: 32,
   stiffness: 320,
   mass: 0.8,
 } as const;

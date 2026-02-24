@@ -2,9 +2,6 @@
  * ImageBlock: feed image thumbnail with tap-to-open overlay.
  * Registers layout on mount for shared-element close animation.
  * Applies blur to thumbnail when overlay is displaced.
- *
- * Perf logs (__DEV__, [Image:Perf]):
- * - render count (per url), handlePress (tap to open overlay).
  */
 
 import React, { useCallback, useRef, useState } from 'react';
@@ -80,80 +77,94 @@ export const ImageBlock = React.memo(function ImageBlock({
   const [aspectRatio, setAspectRatio] = useState(16 / 9);
   const [error, setError] = useState(false);
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
+  /** Ref to the actual image so we measure the image bounds for shared-element, not the container. */
+  const imageRef = useRef<React.ComponentRef<typeof Image> | null>(null);
   const imageOverlay = useImageOverlay();
   const layoutIndex = mediaIndex ?? imageIndex ?? 0;
 
+  type Measureable = {
+    measureInWindow: (cb: (x: number, y: number, w: number, h: number) => void) => void;
+  };
+  const measureSourceRef = useCallback((): Measureable | null => {
+    const imageNode = imageRef.current as Measureable | null;
+    const containerNode = containerRef.current as Measureable | null;
+    if (imageNode && typeof imageNode.measureInWindow === 'function') return imageNode;
+    if (containerNode && typeof containerNode.measureInWindow === 'function') return containerNode;
+    return null;
+  }, []);
+
   const registerLayout = useCallback(() => {
-    containerRef.current?.measureInWindow(
-      (pageX: number, pageY: number, width: number, height: number) => {
-        imageOverlay?.registerThumbnailLayout?.(
-          url,
-          { pageX, pageY, width, height },
-          overlayEvent?.id != null && layoutIndex != null
-            ? { eventId: overlayEvent.id, imageIndex: layoutIndex }
-            : undefined
-        );
-      }
-    );
-  }, [imageOverlay, url, overlayEvent?.id, layoutIndex]);
+    const node = measureSourceRef();
+    if (!node) return;
+    node.measureInWindow((pageX: number, pageY: number, width: number, height: number) => {
+      imageOverlay?.registerThumbnailLayout?.(
+        url,
+        { pageX, pageY, width, height },
+        overlayEvent?.id != null && layoutIndex != null
+          ? { eventId: overlayEvent.id, imageIndex: layoutIndex }
+          : undefined
+      );
+    });
+  }, [imageOverlay, url, overlayEvent?.id, layoutIndex, measureSourceRef]);
 
   const handlePress = useCallback(() => {
     if (!imageOverlay?.open) return;
     onBeforeOpen?.();
-    containerRef.current?.measureInWindow(
-      (pageX: number, pageY: number, width: number, height: number) => {
-        const post: ImageOverlayPost | undefined =
-          overlayEvent && overlayMetrics
-            ? {
-                event: {
-                  id: overlayEvent.id,
-                  pubkey: overlayEvent.pubkey,
-                  content: overlayEvent.content,
-                  created_at: overlayEvent.created_at,
-                },
-                metrics: {
-                  replyCount: overlayMetrics.replyCount,
-                  repostCount: overlayMetrics.repostCount,
-                  likeCount: overlayMetrics.likeCount,
-                  satsZapped: overlayMetrics.satsZapped,
-                },
-                profile: overlayProfile ?? null,
-                reposted,
-                liked,
-                repostPending,
-                likePending,
-                repostPendingDirection,
-                likePendingDirection,
-                onCommentPress,
-                onRepostPress,
-                onLikePress,
-                onActionPressIn,
-                onActionPressOut,
-              }
+    const node = measureSourceRef();
+    if (!node) return;
+    node.measureInWindow((pageX: number, pageY: number, width: number, height: number) => {
+      const post: ImageOverlayPost | undefined =
+        overlayEvent && overlayMetrics
+          ? {
+              event: {
+                id: overlayEvent.id,
+                pubkey: overlayEvent.pubkey,
+                content: overlayEvent.content,
+                created_at: overlayEvent.created_at,
+              },
+              metrics: {
+                replyCount: overlayMetrics.replyCount,
+                repostCount: overlayMetrics.repostCount,
+                likeCount: overlayMetrics.likeCount,
+                satsZapped: overlayMetrics.satsZapped,
+              },
+              profile: overlayProfile ?? null,
+              reposted,
+              liked,
+              repostPending,
+              likePending,
+              repostPendingDirection,
+              likePendingDirection,
+              onCommentPress,
+              onRepostPress,
+              onLikePress,
+              onActionPressIn,
+              onActionPressOut,
+            }
+          : undefined;
+      const urls =
+        allMediaUrls && allMediaUrls.length > 0
+          ? allMediaUrls
+          : allImageUrls && allImageUrls.length > 1
+            ? allImageUrls
             : undefined;
-        const urls =
-          allMediaUrls && allMediaUrls.length > 0
-            ? allMediaUrls
-            : allImageUrls && allImageUrls.length > 1
-              ? allImageUrls
-              : undefined;
-        imageOverlay.open({
-          url,
-          aspectRatio,
-          pageX,
-          pageY,
-          width,
-          height,
-          urls: urls && urls.length > 1 ? urls : undefined,
-          mediaTypes:
-            mediaTypes && urls && mediaTypes.length === urls.length ? mediaTypes : undefined,
-          initialIndex: mediaIndex ?? imageIndex ?? 0,
-          post: post ?? null,
-        });
-      }
-    );
+      imageOverlay.open({
+        url,
+        aspectRatio,
+        pageX,
+        pageY,
+        width,
+        height,
+        urls: urls && urls.length > 1 ? urls : undefined,
+        mediaTypes:
+          mediaTypes && urls && mediaTypes.length === urls.length ? mediaTypes : undefined,
+        initialIndex: mediaIndex ?? imageIndex ?? 0,
+        post: post ?? null,
+      });
+    });
   }, [
     imageOverlay,
+    measureSourceRef,
     url,
     aspectRatio,
     allImageUrls,
@@ -188,6 +199,7 @@ export const ImageBlock = React.memo(function ImageBlock({
 
   const image = (
     <Image
+      ref={imageRef}
       source={{ uri: url }}
       style={{ width: '100%', aspectRatio, borderRadius: 12 }}
       contentFit="cover"

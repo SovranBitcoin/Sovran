@@ -63,9 +63,14 @@ export type ThumbnailLayout = { pageX: number; pageY: number; width: number; hei
 export type ImageOverlayContextValue = {
   scrollHandler: ReturnType<typeof useScrollViewOffset>['scrollHandler'];
   scrollOffsetY: ReturnType<typeof useScrollViewOffset>['scrollOffsetY'];
+  /** Scroll Y when overlay was opened; used to compute close target in screen coords (targetY = pageY - scrollY + scrollAtOpen). */
+  scrollOffsetAtOpen: ReturnType<typeof useSharedValue<number>>;
   open: (layout: ImageOverlayLayout) => void;
   /** Replace overlay content in-place (no open animation). Used when swiping up to next video post. */
-  openReplace: (layout: ImageOverlayReplaceLayout) => void;
+  openReplace: (
+    layout: ImageOverlayReplaceLayout,
+    options?: { preserveCloseTarget?: boolean }
+  ) => void;
   /** Close overlay. Pass current pager index when multiple images so dismiss animates to the visible thumbnail. */
   close: (dismissedPageIndex?: number) => void;
   openToCenter: () => void;
@@ -102,10 +107,14 @@ export type ImageOverlayContextValue = {
     | (() => { layouts: ImageOverlayReplaceLayout[]; initialIndex: number } | null)
     | null;
   imageState: ReturnType<typeof useSharedValue<'open' | 'close'>>;
+  /** True while close animation is running; overlay uses normal rect so wrap shrinks with dismiss. */
+  isClosing: ReturnType<typeof useSharedValue<boolean>>;
   imageXCoord: ReturnType<typeof useSharedValue<number>>;
   imageYCoord: ReturnType<typeof useSharedValue<number>>;
   imageWidth: ReturnType<typeof useSharedValue<number>>;
   imageHeight: ReturnType<typeof useSharedValue<number>>;
+  closeTargetPageX: ReturnType<typeof useSharedValue<number>>;
+  closeTargetPageY: ReturnType<typeof useSharedValue<number>>;
   /** Target thumbnail size for close animation; overlay clamps size to never go below this during dismiss. */
   closeTargetWidth: ReturnType<typeof useSharedValue<number>>;
   closeTargetHeight: ReturnType<typeof useSharedValue<number>>;

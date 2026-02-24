@@ -339,9 +339,12 @@ export function ImageOverlayProvider({
     (minPanelHeight: number) => {
       // openAnimationInProgressSv already set to 1 in open() when hasPanel so reaction skips from first frame
       const availableHeight = imageViewportHeight - minPanelHeight;
-      // Max viewport so each image fits independently (contentFit="contain")
-      const expW = screenWidth;
-      const expH = availableHeight;
+      // Use thumbnail aspect ratio so overlay image rect matches the feed image; shared-element close animates correctly.
+      const { width: expW, height: expH } = computeExpandedSize(
+        screenWidth,
+        availableHeight,
+        activeAspectRatio
+      );
       const centerY = safeTop + availableHeight / 2;
       centerYSv.value = centerY;
       expandedWidthSv.value = expW;
@@ -370,9 +373,12 @@ export function ImageOverlayProvider({
       const hasPanel = !!layout.post;
       // When hasPanel we start with sheet closed: image centered in viewport (below notch to bottom); absolute overlay sits on top.
       const availableHeight = imageViewportHeight;
-      // Max viewport so each image fits independently (contentFit="contain"); not tied to clicked image aspect ratio
-      const expW = screenWidth;
-      const expH = availableHeight;
+      // Use actual thumbnail aspect ratio so overlay image rect matches the feed image; shared-element close animates correctly.
+      const { width: expW, height: expH } = computeExpandedSize(
+        screenWidth,
+        availableHeight,
+        aspectRatio
+      );
       const imageAreaCenterY = safeTop + availableHeight / 2;
 
       const urls = layout.urls && layout.urls.length > 1 ? layout.urls : [layout.url];
@@ -518,14 +524,19 @@ export function ImageOverlayProvider({
 
   /** Replace overlay content in-place (e.g. next video post). No open animation; image stays expanded. */
   const openReplace = useCallback(
-    (layout: ImageOverlayReplaceLayout) => {
+    (layout: ImageOverlayReplaceLayout, options?: { preserveCloseTarget?: boolean }) => {
+      const preserveCloseTarget = options?.preserveCloseTarget === true;
       safeTopSv.value = safeTop;
       safeBottomSv.value = safeBottom;
+      // Replace layout has no pageX/pageY/width/height; use aspectRatio only.
       const aspectRatio = layout.aspectRatio ?? 16 / 9;
       const hasPanel = !!layout.post;
       const availableHeight = imageViewportHeight;
-      const expW = screenWidth;
-      const expH = availableHeight;
+      const { width: expW, height: expH } = computeExpandedSize(
+        screenWidth,
+        availableHeight,
+        aspectRatio
+      );
       const imageAreaCenterY = safeTop + availableHeight / 2;
       const centerX = screenWidth / 2;
       const toCenterY = hasPanel ? imageAreaCenterY : screenCenterY;
@@ -556,29 +567,33 @@ export function ImageOverlayProvider({
 
       const targetX = centerX - expW / 2;
       const targetY = toCenterY - expH / 2;
-      closeTargetPageX.value = targetX;
-      closeTargetPageY.value = targetY;
-      closeTargetWidth.value = expW;
-      closeTargetHeight.value = expH;
+      if (!preserveCloseTarget) {
+        closeTargetPageX.value = targetX;
+        closeTargetPageY.value = targetY;
+        closeTargetWidth.value = expW;
+        closeTargetHeight.value = expH;
+      }
       centerXSv.value = centerX;
       centerYSv.value = toCenterY;
       expandedWidthSv.value = expW;
       expandedHeightSv.value = expH;
 
-      const eventId = layout.post?.event?.id;
-      const keyForIndex = (i: number, u: string) => (eventId != null ? `${eventId}-${i}` : u);
-      const centerLayout: ThumbnailLayout = {
-        pageX: targetX,
-        pageY: targetY,
-        width: expW,
-        height: expH,
-      };
-      openSessionInitialLayoutRef.current = centerLayout;
-      openSessionInitialIndexRef.current = initialIndex;
-      openSessionLayoutsByIndexRef.current = urls.map(() => centerLayout);
-      urls.forEach((url, i) => {
-        thumbnailLayoutsRef.current[keyForIndex(i, url)] = centerLayout;
-      });
+      if (!preserveCloseTarget) {
+        const eventId = layout.post?.event?.id;
+        const keyForIndex = (i: number, u: string) => (eventId != null ? `${eventId}-${i}` : u);
+        const centerLayout: ThumbnailLayout = {
+          pageX: targetX,
+          pageY: targetY,
+          width: expW,
+          height: expH,
+        };
+        openSessionInitialLayoutRef.current = centerLayout;
+        openSessionInitialIndexRef.current = initialIndex;
+        openSessionLayoutsByIndexRef.current = urls.map(() => centerLayout);
+        urls.forEach((url, i) => {
+          thumbnailLayoutsRef.current[keyForIndex(i, url)] = centerLayout;
+        });
+      }
 
       scheduleOnUI(() => {
         'worklet';
@@ -646,7 +661,8 @@ export function ImageOverlayProvider({
       setVideoFeedLayoutIndexState(initialIndex);
       if (layouts != null && layouts.length > 0) {
         const layout = layouts[initialIndex] ?? layouts[0];
-        openReplace(layout);
+        // Keep the original tapped-card close target when enabling vertical feed.
+        openReplace(layout, { preserveCloseTarget: true });
       }
     },
     [openReplace]
@@ -678,7 +694,8 @@ export function ImageOverlayProvider({
     const y = closeTargetPageY.value - scrollY + scrollAtOpen;
     const w = closeTargetWidth.value;
     const h = closeTargetHeight.value;
-
+    // Animate from current overlay rect to target; do not snap to target aspect first
+    // (that caused a visible jump when dismissing after a pan).
     closeSpringsDoneCount.value = 0;
 
     const maybeFinishClose = () => {
@@ -694,26 +711,30 @@ export function ImageOverlayProvider({
       duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
       easing: Easing.out(Easing.cubic),
     });
-    imageXCoord.value = withSpring(x, CLOSE_SPRING, () => {
+    const onXFinish = () => {
       'worklet';
       imageXCoord.value = x;
       maybeFinishClose();
-    });
-    imageYCoord.value = withSpring(y, CLOSE_SPRING, () => {
+    };
+    const onYFinish = () => {
       'worklet';
       imageYCoord.value = y;
       maybeFinishClose();
-    });
-    imageWidth.value = withSpring(w, CLOSE_SPRING, () => {
+    };
+    const onWFinish = () => {
       'worklet';
       imageWidth.value = w;
       maybeFinishClose();
-    });
-    imageHeight.value = withSpring(h, CLOSE_SPRING, () => {
+    };
+    const onHFinish = () => {
       'worklet';
       imageHeight.value = h;
       maybeFinishClose();
-    });
+    };
+    imageXCoord.value = withSpring(x, CLOSE_SPRING, onXFinish);
+    imageYCoord.value = withSpring(y, CLOSE_SPRING, onYFinish);
+    imageWidth.value = withSpring(w, CLOSE_SPRING, onWFinish);
+    imageHeight.value = withSpring(h, CLOSE_SPRING, onHFinish);
     closeBtnOpacity.value = withTiming(0, {
       duration: CLOSE_BLUR_AND_BTN_DURATION_MS,
       easing: Easing.out(Easing.cubic),
@@ -744,23 +765,35 @@ export function ImageOverlayProvider({
    */
   const close = useCallback(
     (dismissedPageIndex?: number) => {
-      if (activeUrls.length > 1 && typeof dismissedPageIndex === 'number') {
-        const eventId = activeOverlayPost?.event?.id;
-        const url = activeUrls[dismissedPageIndex];
-        const refKey = eventId != null ? `${eventId}-${dismissedPageIndex}` : url;
-        const layout =
-          openSessionLayoutsByIndexRef.current[dismissedPageIndex] ??
-          (url ? thumbnailLayoutsRef.current[refKey] : undefined);
-        if (layout) {
-          closeTargetPageX.value = layout.pageX;
-          closeTargetPageY.value = layout.pageY;
-          closeTargetWidth.value = layout.width;
-          closeTargetHeight.value = layout.height;
-        }
+      const closeIndex =
+        typeof dismissedPageIndex === 'number'
+          ? dismissedPageIndex
+          : Math.max(0, Math.min(activeIndex, Math.max(0, activeUrls.length - 1)));
+      const eventId = activeOverlayPost?.event?.id;
+      const urlAtIndex = activeUrls[closeIndex];
+      const refKey =
+        urlAtIndex != null
+          ? eventId != null
+            ? `${eventId}-${closeIndex}`
+            : urlAtIndex
+          : undefined;
+      const sessionLayout = openSessionLayoutsByIndexRef.current[closeIndex] ?? null;
+      const keyedLayout = refKey ? thumbnailLayoutsRef.current[refKey] : undefined;
+      const initialLayout = openSessionInitialLayoutRef.current;
+      const layout =
+        eventId != null
+          ? (keyedLayout ?? sessionLayout ?? initialLayout ?? undefined)
+          : (sessionLayout ?? keyedLayout ?? initialLayout ?? undefined);
+      if (layout) {
+        closeTargetPageX.value = layout.pageX;
+        closeTargetPageY.value = layout.pageY;
+        closeTargetWidth.value = layout.width;
+        closeTargetHeight.value = layout.height;
       }
       scheduleOnUI(closeAnimationWorklet);
     },
     [
+      activeIndex,
       activeUrls,
       activeOverlayPost?.event?.id,
       closeTargetPageX,
@@ -850,6 +883,7 @@ export function ImageOverlayProvider({
     return {
       scrollHandler,
       scrollOffsetY,
+      scrollOffsetAtOpen,
       open,
       openReplace,
       close,
@@ -864,10 +898,13 @@ export function ImageOverlayProvider({
       setVideoFeedIndex,
       getVideoFeedLayoutsAndIndex: getVideoFeedLayoutsAndIndex ?? null,
       imageState,
+      isClosing,
       imageXCoord,
       imageYCoord,
       imageWidth,
       imageHeight,
+      closeTargetPageX,
+      closeTargetPageY,
       closeTargetWidth,
       closeTargetHeight,
       blurIntensity,
@@ -884,6 +921,7 @@ export function ImageOverlayProvider({
   }, [
     scrollHandler,
     scrollOffsetY,
+    scrollOffsetAtOpen,
     open,
     openReplace,
     close,
@@ -899,10 +937,13 @@ export function ImageOverlayProvider({
     setVideoFeedIndex,
     getVideoFeedLayoutsAndIndex,
     imageState,
+    isClosing,
     imageXCoord,
     imageYCoord,
     imageWidth,
     imageHeight,
+    closeTargetPageX,
+    closeTargetPageY,
     closeTargetWidth,
     closeTargetHeight,
     blurIntensity,
