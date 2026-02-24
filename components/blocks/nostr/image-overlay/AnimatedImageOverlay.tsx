@@ -8,15 +8,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  Platform,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import {
   type GestureType,
   Gesture,
@@ -58,7 +50,6 @@ import {
   DISMISS_CLOSE_BTN_FADE_DURATION_MS,
   DISMISS_DRAG_FOLLOW,
   DISMISS_DRAG_RANGE_FRACTION,
-  DISMISS_FAIL_OFFSET_X,
   DISMISS_MIN_DISTANCE,
   DISMISS_SCALE_AT_DRAG,
   DISMISS_THRESHOLD_FRACTION,
@@ -149,9 +140,15 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   const hasMultipleMedia = activeUrls.length > 1;
   const maxPagerIndex = Math.max(0, activeUrls.length - 1);
   const isCurrentPageVideo = activeMediaTypes[hasMultipleMedia ? activeIndex : 0] === 'video';
+  const isVerticalFeed = !!(videoFeedLayouts && videoFeedLayouts.length > 1);
+  const verticalFeedPageCount = videoFeedLayouts?.length ?? 0;
+  const DEBUG_PANEL = __DEV__ && true;
+  const DEBUG_GESTURE_HITBOXES = __DEV__ && true;
 
   const pagerOffsetSv = useSharedValue(activeIndex);
   const startPagerOffsetSv = useSharedValue(activeIndex);
+  const verticalPagerOffsetSv = useSharedValue(videoFeedLayoutIndex);
+  const startVerticalPagerOffsetSv = useSharedValue(videoFeedLayoutIndex);
   /** 1 when current pager page is video (for swipe-up-to-next-post). Updated from JS when activeIndex/activeMediaTypes change. */
   const isCurrentPageVideoSv = useSharedValue(0);
   useEffect(() => {
@@ -163,6 +160,10 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   useEffect(() => {
     pagerOffsetSv.value = activeIndex;
   }, [activeIndex, pagerOffsetSv]);
+
+  useEffect(() => {
+    verticalPagerOffsetSv.value = videoFeedLayoutIndex;
+  }, [videoFeedLayoutIndex, verticalPagerOffsetSv]);
 
   useEffect(() => {
     if (activeUrl) overlayUIVisible.value = 1;
@@ -230,6 +231,16 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
       });
     },
     [screenHeight, setPanelContentMinHeight, panelHeightSv]
+  );
+
+  const onVerticalPagerSnap = useCallback(
+    (index: number) => {
+      if (!videoFeedLayouts || !videoFeedLayouts.length) return;
+      const clamped = Math.max(0, Math.min(index, videoFeedLayouts.length - 1));
+      const layout = videoFeedLayouts[clamped];
+      if (layout) setVideoFeedIndex(clamped, layout);
+    },
+    [videoFeedLayouts, setVideoFeedIndex]
   );
 
   const onReplyPress = useCallback(() => {
@@ -342,6 +353,55 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     };
   }, [screenHeight, panelHeightSv]);
 
+  const logPanelMetrics = useCallback(
+    (metrics: { x: number; y: number; width: number; height: number; opacity: number }) => {
+      if (!DEBUG_PANEL) return;
+      // Include minimal context to correlate image vs video overlay.
+      console.log('[ImageOverlay:Panel]', {
+        ...metrics,
+        sheetOpen,
+        isVerticalFeed,
+        url: activeUrl,
+      });
+    },
+    [DEBUG_PANEL, sheetOpen, isVerticalFeed, activeUrl]
+  );
+
+  useAnimatedReaction(
+    () => {
+      if (!DEBUG_PANEL) return null;
+      const h = panelHeightSv.value;
+      const y = screenHeight - h;
+      const opacity = closeBtnOpacity.value * overlayUIVisible.value;
+      return { h, y, opacity };
+    },
+    (next, prev) => {
+      if (!next) return;
+      if (prev) {
+        const dh = Math.abs(next.h - prev.h);
+        const dy = Math.abs(next.y - prev.y);
+        const dOpacity = Math.abs(next.opacity - prev.opacity);
+        if (dh < 2 && dy < 2 && dOpacity < 0.03) return;
+      }
+      runOnJS(logPanelMetrics)({
+        x: 0,
+        y: next.y,
+        width: screenWidth,
+        height: next.h,
+        opacity: next.opacity,
+      });
+    },
+    [
+      DEBUG_PANEL,
+      screenHeight,
+      screenWidth,
+      panelHeightSv,
+      closeBtnOpacity,
+      overlayUIVisible,
+      logPanelMetrics,
+    ]
+  );
+
   /** When true, dismiss pan was active; skip image tap-to-toggle so drag-to-dismiss doesn't trigger toggle. */
   const dismissPanActiveRef = useRef(false);
   const clearDismissPanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -378,13 +438,31 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     [hasMultipleMedia, pagerOffsetSv, imageScale]
   );
 
-  /** Dismiss only on downward drag; upward swipes go to vertical scroll. activeOffsetY = range where we do NOT activate, so [-1e6, 14] means activate only when translationY > 14. */
+  /**
+   * Dismiss gesture by mode:
+   * - image/single media: any direction
+   * - multi-image (horizontal pager): vertical dismiss only
+   * - vertical video feed (vertical pager): horizontal dismiss only
+   */
   const pan = useMemo(
-    () =>
-      Gesture.Pan()
-        .minDistance(DISMISS_MIN_DISTANCE)
-        .activeOffsetY([-1e6, DISMISS_ACTIVE_OFFSET_Y])
-        .failOffsetX([-DISMISS_FAIL_OFFSET_X, DISMISS_FAIL_OFFSET_X])
+    () => {
+      const gesture = Gesture.Pan().minDistance(DISMISS_MIN_DISTANCE);
+      if (isVerticalFeed) {
+        // Vertical pager owns Y axis; dismiss should activate only on horizontal intent.
+        gesture
+          .activeOffsetX([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
+          .failOffsetY([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X]);
+      } else if (hasMultipleMedia) {
+        // Horizontal pager owns X axis; dismiss should activate only on vertical intent.
+        gesture
+          .activeOffsetY([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
+          .failOffsetX([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X]);
+      } else {
+        gesture
+          .activeOffsetX([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
+          .activeOffsetY([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y]);
+      }
+      return gesture
         .onStart(() => {
           dismissPanActive.value = 1;
           runOnJS(setDismissPanActive)(true);
@@ -432,9 +510,12 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             openToCenter();
           }
         })
-        .withRef(dismissPanRef),
+        .withRef(dismissPanRef);
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- shared values are stable refs
     [
+      isVerticalFeed,
+      hasMultipleMedia,
       expandedWidth,
       expandedHeight,
       expandedWidthSv,
@@ -592,7 +673,6 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
    */
   const scrollAreaPanRef = useRef<GestureType | undefined>(undefined);
   const dismissPanRef = useRef<GestureType | undefined>(undefined);
-  const verticalFeedScrollRef = useRef<React.ComponentRef<typeof GHScrollView>>(null);
   const scrollAreaPan = useMemo(
     () =>
       Gesture.Pan()
@@ -716,28 +796,80 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     );
   }, [onSwipeUpToNextPost, openReplace, screenHeight, swipeUpTranslateY, triggerSwipeUpToNext]);
 
-  /** In vertical feed mode, scroll to next page instead of slide animation. */
-  const _scrollToNextFeedPage = useCallback(() => {
-    if (!videoFeedLayouts || videoFeedLayouts.length <= 1) return;
-    const next = Math.min(videoFeedLayoutIndex + 1, videoFeedLayouts.length - 1);
-    if (next === videoFeedLayoutIndex) return;
-    verticalFeedScrollRef.current?.scrollTo({
-      y: next * screenHeight,
-      animated: true,
-    });
-  }, [videoFeedLayouts, videoFeedLayoutIndex, screenHeight]);
+  /** Vertical pager gesture for video feed, mirrors horizontal image pager behavior. */
+  const verticalFeedPan = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(isVerticalFeed && !sheetOpen)
+        .activeOffsetY([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X])
+        .failOffsetX([-PAGER_FAIL_OFFSET_Y, PAGER_FAIL_OFFSET_Y])
+        .minDistance(PAGER_MIN_DISTANCE)
+        .onStart(() => {
+          if (imageState.value !== 'open') return;
+          runOnJS(setPagerDragActive)(true);
+          startVerticalPagerOffsetSv.value = verticalPagerOffsetSv.value;
+        })
+        .onChange((e) => {
+          if (imageState.value !== 'open') return;
+          const delta = -e.translationY / screenHeight;
+          const next = startVerticalPagerOffsetSv.value + delta;
+          verticalPagerOffsetSv.value = Math.max(0, Math.min(verticalFeedPageCount - 1, next));
+        })
+        .onEnd((e) => {
+          if (imageState.value !== 'open') return;
+          const delta = -e.translationY / screenHeight;
+          const current = startVerticalPagerOffsetSv.value + delta;
+          const velocity = -e.velocityY / screenHeight;
+          const effective = current + velocity * PAGER_VELOCITY_WEIGHT;
+          let snapTo = Math.max(0, Math.min(verticalFeedPageCount - 1, Math.round(effective)));
+          const startIndex = Math.round(startVerticalPagerOffsetSv.value);
+          if (
+            velocity >= PAGER_FLICK_VELOCITY_THRESHOLD &&
+            startIndex < verticalFeedPageCount - 1
+          ) {
+            snapTo = startIndex + 1;
+          } else if (velocity <= -PAGER_FLICK_VELOCITY_THRESHOLD && startIndex > 0) {
+            snapTo = startIndex - 1;
+          }
+          const didChangePage = snapTo !== startIndex;
+          const initialVelocity = didChangePage
+            ? 0
+            : Math.max(-PAGER_VELOCITY_CLAMP, Math.min(PAGER_VELOCITY_CLAMP, velocity));
+          const springConfig = didChangePage ? SNAP_SPRING_PAGE_CHANGE : SNAP_SPRING_SAME_PAGE;
+          verticalPagerOffsetSv.value = withSpring(
+            snapTo,
+            {
+              ...springConfig,
+              velocity: initialVelocity,
+            },
+            (finished) => {
+              if (finished && didChangePage) {
+                runOnJS(onVerticalPagerSnap)(snapTo);
+              }
+            }
+          );
+          runOnJS(setPagerDragActive)(false);
+        }),
+    [
+      isVerticalFeed,
+      sheetOpen,
+      imageState,
+      setPagerDragActive,
+      startVerticalPagerOffsetSv,
+      verticalPagerOffsetSv,
+      screenHeight,
+      verticalFeedPageCount,
+      onVerticalPagerSnap,
+    ]
+  );
 
-  /** Sync active index when vertical feed scroll snaps. */
-  const onVerticalFeedScrollEnd = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      if (!videoFeedLayouts?.length) return;
-      const y = e.nativeEvent.contentOffset.y;
-      const page = Math.round(y / screenHeight);
-      const index = Math.max(0, Math.min(page, videoFeedLayouts.length - 1));
-      const layout = videoFeedLayouts[index];
-      if (layout) setVideoFeedIndex(index, layout);
-    },
-    [videoFeedLayouts, screenHeight, setVideoFeedIndex]
+  const rVerticalFeedPagerStyle = useAnimatedStyle(
+    () => ({
+      width: screenWidth,
+      height: screenHeight * Math.max(1, verticalFeedPageCount),
+      transform: [{ translateY: -verticalPagerOffsetSv.value * screenHeight }],
+    }),
+    [screenWidth, screenHeight, verticalFeedPageCount, verticalPagerOffsetSv]
   );
 
   useEffect(() => {
@@ -854,13 +986,92 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   );
 
   const composed = useMemo(() => {
+    if (isVerticalFeed) {
+      return Gesture.Exclusive(verticalFeedPan, pan, tapBackdrop);
+    }
     return hasMultipleMedia
       ? Gesture.Exclusive(horizontalPan, pan, tapBackdrop)
       : Gesture.Exclusive(pan, tapBackdrop);
-  }, [hasMultipleMedia, horizontalPan, pan, tapBackdrop]);
+  }, [isVerticalFeed, hasMultipleMedia, verticalFeedPan, horizontalPan, pan, tapBackdrop]);
 
-  /** No-op so bar doesn't steal vertical scroll in feed mode; bar is same position as image overlay. */
-  const noopBarGesture = useMemo(() => Gesture.Pan().enabled(false), []);
+  /** Bar-area dismiss pan in vertical feed mode, using the same drag animation path as overlay dismiss. */
+  const barDismissPan = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(isVerticalFeed && !sheetOpen)
+        .activeOffsetX([-DISMISS_ACTIVE_OFFSET_Y, DISMISS_ACTIVE_OFFSET_Y])
+        .failOffsetY([-PAGER_ACTIVE_OFFSET_X, PAGER_ACTIVE_OFFSET_X])
+        .minDistance(DISMISS_MIN_DISTANCE)
+        .onStart(() => {
+          dismissPanActive.value = 1;
+          runOnJS(setDismissPanActive)(true);
+          panStartX.value = imageXCoord.value;
+          panStartY.value = imageYCoord.value;
+          closeBtnOpacity.value = withTiming(0, {
+            duration: DISMISS_CLOSE_BTN_FADE_DURATION_MS,
+          });
+        })
+        .onChange((event) => {
+          if (imageState.value === 'close') return;
+          imageXCoord.value += event.changeX * DISMISS_DRAG_FOLLOW;
+          imageYCoord.value += event.changeY * DISMISS_DRAG_FOLLOW;
+          const deltaX = imageXCoord.value - panStartX.value;
+          const deltaY = imageYCoord.value - panStartY.value;
+          const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+          const dragRange = screenWidth * DISMISS_DRAG_RANGE_FRACTION;
+          const scale = interpolate(distance, [0, dragRange], [1, DISMISS_SCALE_AT_DRAG], {
+            extrapolateRight: 'clamp',
+          });
+          const blur = interpolate(distance, [0, dragRange], [DISMISS_BLUR_AT_REST, 0], {
+            extrapolateRight: 'clamp',
+          });
+          imageScale.value = scale;
+          blurIntensity.value = blur;
+        })
+        .onFinalize(() => {
+          const wasActive = dismissPanActive.value === 1;
+          dismissPanActive.value = 0;
+          const deltaX = imageXCoord.value - panStartX.value;
+          const deltaY = imageYCoord.value - panStartY.value;
+          const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+          const ew = expandedWidthSv.value || expandedWidth;
+          const eh = expandedHeightSv.value || expandedHeight;
+          const threshold = Math.max(ew, eh) * DISMISS_THRESHOLD_FRACTION;
+          const dismissed = distance > threshold;
+          runOnJS(setDismissPanActive)(false);
+          imageScale.value = withTiming(1, IMAGE_OVERLAY_TIMING_CONFIG);
+          if (!wasActive) return;
+          if (dismissed) {
+            cancelAnimation(pagerOffsetSv);
+            pagerOffsetSv.value = Math.round(pagerOffsetSv.value);
+            runOnJS(triggerClose)(Math.round(pagerOffsetSv.value));
+          } else {
+            openToCenter();
+          }
+        }),
+    [
+      isVerticalFeed,
+      sheetOpen,
+      dismissPanActive,
+      setDismissPanActive,
+      panStartX,
+      panStartY,
+      imageXCoord,
+      imageYCoord,
+      closeBtnOpacity,
+      imageState,
+      screenWidth,
+      imageScale,
+      blurIntensity,
+      expandedWidthSv,
+      expandedHeightSv,
+      expandedWidth,
+      expandedHeight,
+      pagerOffsetSv,
+      triggerClose,
+      openToCenter,
+    ]
+  );
 
   return (
     <View
@@ -868,7 +1079,12 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
       pointerEvents={activeUrl ? 'auto' : 'none'}>
       <Animated.View style={[StyleSheet.absoluteFill, rSwipeUpWrapperStyle]}>
         <GestureDetector gesture={composed}>
-          <AnimatedPressable style={[StyleSheet.absoluteFill, rContainerStyle]}>
+          <AnimatedPressable
+            style={[
+              StyleSheet.absoluteFill,
+              rContainerStyle,
+              DEBUG_GESTURE_HITBOXES && overlayStyles.debugComposedGesture,
+            ]}>
             {/* box-none so taps on the blur fall through to the gesture (tapBackdrop → triggerClose); overlay root still blocks content behind */}
             <View style={StyleSheet.absoluteFill} pointerEvents="box-none" />
             <AnimatedBlurView
@@ -888,40 +1104,31 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
               </Pressable>
             </Animated.View>
             {activeUrl ? (
-              <Animated.View style={[overlayStyles.imageWrap, rImageStyle]}>
+              <Animated.View
+                style={[
+                  overlayStyles.imageWrap,
+                  rImageStyle,
+                  DEBUG_GESTURE_HITBOXES && overlayStyles.debugImageGesture,
+                ]}>
                 {videoFeedLayouts && videoFeedLayouts.length > 1 ? (
-                  <GHScrollView
-                    ref={verticalFeedScrollRef}
-                    waitFor={dismissPanRef}
-                    style={StyleSheet.absoluteFill}
-                    contentContainerStyle={{ height: videoFeedLayouts.length * screenHeight }}
-                    showsVerticalScrollIndicator={false}
-                    snapToInterval={screenHeight}
-                    snapToAlignment="start"
-                    decelerationRate="fast"
-                    onMomentumScrollEnd={onVerticalFeedScrollEnd}
-                    onScrollEndDrag={onVerticalFeedScrollEnd}
-                    onLayout={() => {
-                      verticalFeedScrollRef.current?.scrollTo({
-                        y: videoFeedLayoutIndex * screenHeight,
-                        animated: false,
-                      });
-                    }}>
-                    {videoFeedLayouts.map((layout, index) => (
-                      <View
-                        key={`${layout.url}-${index}`}
-                        style={{ width: screenWidth, height: screenHeight }}>
-                        <MemoizedMediaPagerPage
-                          url={layout.url}
-                          mediaType={layout.mediaTypes?.[0] ?? 'image'}
-                          index={0}
-                          isActive={index === videoFeedLayoutIndex}
-                          expandedWidthSv={expandedWidthSv}
-                          expandedHeightSv={expandedHeightSv}
-                        />
-                      </View>
-                    ))}
-                  </GHScrollView>
+                  <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                    <Animated.View style={rVerticalFeedPagerStyle} pointerEvents="none">
+                      {videoFeedLayouts.map((layout, index) => (
+                        <View
+                          key={`${layout.url}-${index}`}
+                          style={{ width: screenWidth, height: screenHeight }}>
+                          <MemoizedMediaPagerPage
+                            url={layout.url}
+                            mediaType={layout.mediaTypes?.[0] ?? 'image'}
+                            index={0}
+                            isActive={index === videoFeedLayoutIndex}
+                            expandedWidthSv={expandedWidthSv}
+                            expandedHeightSv={expandedHeightSv}
+                          />
+                        </View>
+                      ))}
+                    </Animated.View>
+                  </View>
                 ) : hasMultipleMedia ? (
                   <>
                     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
@@ -966,21 +1173,30 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
                     />
                   </View>
                 )}
+                {(isVerticalFeed || isCurrentPageVideo) && (
+                  <View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      DEBUG_GESTURE_HITBOXES && overlayStyles.debugVideoCaptureGesture,
+                    ]}
+                    pointerEvents="auto"
+                    collapsable={false}
+                  />
+                )}
               </Animated.View>
             ) : null}
           </AnimatedPressable>
         </GestureDetector>
         {activeOverlayPost ? (
-          <GestureDetector
-            gesture={
-              videoFeedLayouts && videoFeedLayouts.length > 1 ? noopBarGesture : overlayBarSwipeUp
-            }>
+          <GestureDetector gesture={isVerticalFeed ? barDismissPan : overlayBarSwipeUp}>
             <Animated.View
               style={[
                 overlayStyles.absoluteOverlayBar,
                 rAbsoluteOverlayBarOpacityStyle,
+                DEBUG_GESTURE_HITBOXES && overlayStyles.debugOverlayBarGesture,
                 {
                   bottom: 0,
+                  minHeight: BOTTOM_PANEL_ABSOLUTE_OVERLAY_HEIGHT,
                   paddingBottom: insets.bottom + BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
                 },
               ]}
@@ -996,6 +1212,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             overlayStyles.bottomPanel,
             rBottomPanelStyle,
             rBottomPanelLayoutStyle,
+            DEBUG_GESTURE_HITBOXES && overlayStyles.debugBottomPanel,
             {
               paddingBottom: insets.bottom + BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
             },
@@ -1003,12 +1220,21 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
           pointerEvents="auto">
           <View style={overlayStyles.panelContentWrap} collapsable={false}>
             <GestureDetector gesture={handlePan}>
-              <View style={overlayStyles.panelHandle} collapsable={false}>
+              <View
+                style={[
+                  overlayStyles.panelHandle,
+                  DEBUG_GESTURE_HITBOXES && overlayStyles.debugPanelHandleGesture,
+                ]}
+                collapsable={false}>
                 <View style={overlayStyles.panelHandleBar} />
               </View>
             </GestureDetector>
             <GestureDetector gesture={scrollAreaPan}>
-              <View style={overlayStyles.panelScrollAndReplyWrap}>
+              <View
+                style={[
+                  overlayStyles.panelScrollAndReplyWrap,
+                  DEBUG_GESTURE_HITBOXES && overlayStyles.debugPanelScrollGesture,
+                ]}>
                 <GHScrollView
                   waitFor={scrollAreaPanRef}
                   onScroll={panelScrollHandler}
@@ -1086,6 +1312,7 @@ const overlayStyles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1,
+    justifyContent: 'flex-end',
     backgroundColor: 'transparent',
   },
   bottomPanel: {
@@ -1128,5 +1355,39 @@ const overlayStyles = StyleSheet.create({
     paddingHorizontal: BOTTOM_PANEL_PADDING_HORIZONTAL,
     paddingTop: 8,
     paddingBottom: 0,
+  },
+  debugComposedGesture: {
+    // borderWidth: 2,
+    // borderColor: 'rgba(79, 195, 247, 0.9)',
+    // backgroundColor: 'rgba(79, 195, 247, 0.08)',
+  },
+  debugImageGesture: {
+    // borderWidth: 2,
+    // borderColor: 'rgba(102, 187, 106, 0.95)',
+    // backgroundColor: 'rgba(102, 187, 106, 0.08)',
+  },
+  debugVideoCaptureGesture: {
+    // borderWidth: 2,
+    // borderColor: 'rgba(236, 64, 122, 0.95)',
+    // backgroundColor: 'rgba(236, 64, 122, 0.08)',
+  },
+  debugOverlayBarGesture: {
+    // borderTopWidth: 2,
+    // borderColor: 'rgba(255, 167, 38, 0.95)',
+    // backgroundColor: 'rgba(255, 167, 38, 0.12)',
+  },
+  debugBottomPanel: {
+    // borderTopWidth: 2,
+    // borderColor: 'rgba(255, 238, 88, 0.95)',
+  },
+  debugPanelHandleGesture: {
+    // borderWidth: 2,
+    // borderColor: 'rgba(171, 71, 188, 0.95)',
+    // backgroundColor: 'rgba(171, 71, 188, 0.15)',
+  },
+  debugPanelScrollGesture: {
+    // borderWidth: 2,
+    // borderColor: 'rgba(255, 241, 118, 0.95)',
+    // backgroundColor: 'rgba(255, 241, 118, 0.08)',
   },
 });

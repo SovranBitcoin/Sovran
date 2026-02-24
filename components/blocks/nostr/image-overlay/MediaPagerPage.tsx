@@ -54,12 +54,13 @@ function MediaPageAnimated({
 
   if (mediaType === 'video') {
     return (
-      <Animated.View style={animatedStyle} pointerEvents="none">
+      <Animated.View style={animatedStyle} pointerEvents="none" collapsable={false}>
         <VideoView
           player={player}
           style={StyleSheet.absoluteFill}
           contentFit="contain"
           nativeControls={false}
+          pointerEvents="none"
         />
       </Animated.View>
     );
