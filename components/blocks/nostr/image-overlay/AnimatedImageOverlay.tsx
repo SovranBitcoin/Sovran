@@ -1187,8 +1187,48 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
             ) : null}
           </AnimatedPressable>
         </GestureDetector>
-        {activeOverlayPost ? (
-          <GestureDetector gesture={isVerticalFeed ? barDismissPan : overlayBarSwipeUp}>
+        {isVerticalFeed && videoFeedLayouts && videoFeedLayouts.length > 1 ? (
+          <Animated.View
+            style={[overlayStyles.verticalOverlayBarPager, rVerticalFeedPagerStyle]}
+            pointerEvents="box-none">
+            {videoFeedLayouts.map((layout, index) => {
+              const pagePost =
+                index === videoFeedLayoutIndex
+                  ? (activeOverlayPost ?? layout.post ?? null)
+                  : (layout.post ?? null);
+              return (
+                <View
+                  key={`${layout.url}-${index}-bar`}
+                  style={{ width: screenWidth, height: screenHeight }}
+                  pointerEvents="box-none">
+                  {pagePost ? (
+                    <GestureDetector gesture={barDismissPan}>
+                      <Animated.View
+                        style={[
+                          overlayStyles.absoluteOverlayBar,
+                          rAbsoluteOverlayBarOpacityStyle,
+                          DEBUG_GESTURE_HITBOXES && overlayStyles.debugOverlayBarGesture,
+                          {
+                            bottom: 0,
+                            minHeight: BOTTOM_PANEL_ABSOLUTE_OVERLAY_HEIGHT,
+                            paddingBottom: insets.bottom + BOTTOM_PANEL_PADDING_BOTTOM_EXTRA,
+                          },
+                        ]}
+                        pointerEvents={
+                          sheetOpen || index !== videoFeedLayoutIndex || !activeOverlayPost
+                            ? 'none'
+                            : 'auto'
+                        }>
+                        <ImageOverlayAbsoluteBar post={pagePost} onOpenSheet={openSheet} />
+                      </Animated.View>
+                    </GestureDetector>
+                  ) : null}
+                </View>
+              );
+            })}
+          </Animated.View>
+        ) : activeOverlayPost ? (
+          <GestureDetector gesture={overlayBarSwipeUp}>
             <Animated.View
               style={[
                 overlayStyles.absoluteOverlayBar,
@@ -1314,6 +1354,13 @@ const overlayStyles = StyleSheet.create({
     zIndex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'transparent',
+  },
+  verticalOverlayBarPager: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    zIndex: 1,
   },
   bottomPanel: {
     position: 'absolute',
