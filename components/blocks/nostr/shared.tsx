@@ -680,16 +680,18 @@ const IOSVideoBlock = React.memo(function IOSVideoBlock({
   );
 
   const hasTap = !!(openOverlay && overlayLayout) || !!onTap;
+  const aspectRatio = overlayLayout?.aspectRatio ?? 16 / 9;
 
   const content = (
-    <View
-      ref={containerRef}
-      collapsable={false}
-      style={[sharedStyles.videoBlockOuter, { backgroundColor: getPrimaryColor('900') }]}>
-      <View pointerEvents={hasTap ? 'none' : 'auto'}>
+    <View style={[sharedStyles.videoBlockOuter, { backgroundColor: getPrimaryColor('900') }]}>
+      <View
+        ref={containerRef}
+        collapsable={false}
+        style={{ aspectRatio }}
+        pointerEvents={hasTap ? 'none' : 'auto'}>
         <VideoView
           player={player}
-          style={{ width: CONTENT_WIDTH - 32, aspectRatio: 16 / 9 }}
+          style={StyleSheet.absoluteFill}
           contentFit="contain"
           nativeControls={!hasTap}
         />
@@ -726,6 +728,10 @@ const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
   const { getPrimaryColor } = useTheme();
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   const openInBrowser = useCallback(() => Linking.openURL(url).catch(() => {}), [url]);
+  const player = useVideoPlayer(url, (p) => {
+    p.loop = false;
+    p.muted = true;
+  });
 
   const handleTap = useCallback(() => {
     if (openOverlay && overlayLayout && containerRef.current) {
@@ -755,39 +761,34 @@ const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
     [handleTap]
   );
 
-  return (
-    <GestureDetector gesture={tapGesture}>
+  const hasTap = !!(openOverlay && overlayLayout) || !!onTap;
+  const aspectRatio = overlayLayout?.aspectRatio ?? 16 / 9;
+
+  const content = (
+    <View style={[sharedStyles.videoBlockOuter, { backgroundColor: getPrimaryColor('900') }]}>
       <View
         ref={containerRef}
         collapsable={false}
-        style={[
-          sharedStyles.mediaCard,
-          { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
-        ]}>
-        <HStack align="center" gap={8}>
-          <Icon name="mingcute:play-fill" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
-          <VStack style={sharedStyles.flex1}>
-            <Text bold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
-              Video
-            </Text>
-            <Text
-              size={11}
-              numberOfLines={1}
-              style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
-              {(openOverlay && overlayLayout) || onTap ? 'Tap to watch' : 'Open in browser'}
-            </Text>
-          </VStack>
-          <Icon
-            name={
-              (openOverlay && overlayLayout) || onTap ? 'mingcute:play-fill' : 'mdi:open-in-new'
-            }
-            size={16}
-            color={opacity(getPrimaryColor('0'), 0.33)}
-          />
-        </HStack>
+        style={{ aspectRatio }}
+        pointerEvents={hasTap ? 'none' : 'auto'}>
+        <VideoView
+          player={player}
+          style={StyleSheet.absoluteFill}
+          contentFit="contain"
+          nativeControls={!hasTap}
+        />
       </View>
-    </GestureDetector>
+      {hasTap && (
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+          <Icon name="mingcute:play-fill" size={48} color="rgba(255,255,255,0.75)" />
+        </View>
+      )}
+    </View>
   );
+
+  return <GestureDetector gesture={tapGesture}>{content}</GestureDetector>;
 });
 
 export const VideoBlock = React.memo(function VideoBlock({
