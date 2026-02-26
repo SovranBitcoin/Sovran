@@ -26,6 +26,7 @@ declare module "@monicon/icon-loader" {
 	| "mdi:brain"
 	| "mdi:help-circle"
 	| "mdi:check-circle"
+	| "line-md:confirm-circle"
 	| "mdi-light:check"
 	| "lucide:arrow-down-left"
 	| "fluent:filter-16-filled"
