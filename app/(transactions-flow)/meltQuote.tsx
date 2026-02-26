@@ -20,7 +20,12 @@ function ModalScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Send Lightning' }} />
+      <Stack.Screen
+        options={{
+          title: 'Send Lightning',
+          headerBackButtonMenuEnabled: false,
+        }}
+      />
       <MeltQuoteScreen
         meltHistoryEntry={meltHistoryEntry}
         invoice={invoice}

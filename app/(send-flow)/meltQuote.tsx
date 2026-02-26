@@ -22,7 +22,13 @@ function ModalScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Send Lightning' }} />
+      <Stack.Screen
+        options={{
+          title: 'Send Lightning',
+          // So native-stack back goes through JS and usePreventRemove can run cleanup (free reserved proofs).
+          headerBackButtonMenuEnabled: false,
+        }}
+      />
       <MeltQuoteScreen
         meltHistoryEntry={meltHistoryEntry}
         invoice={invoice}
