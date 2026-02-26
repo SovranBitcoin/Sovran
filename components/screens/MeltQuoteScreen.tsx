@@ -45,6 +45,7 @@ import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
 import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
+import { useBeforeRemoveCleanup } from '@/hooks/useBeforeRemoveCleanup';
 
 interface MeltQuoteScreenProps {
   /** For viewing existing transaction - either parsed entry or JSON string */
@@ -149,6 +150,7 @@ export function MeltQuoteScreen({
     cancelMeltQuote,
   } = useMeltWithHistory();
   const [isCancelling, setIsCancelling] = useState(false);
+  const successRef = useRef(false);
 
   // Local state for quote creation flow
   const [resolvedInvoice, setResolvedInvoice] = useState<string | null>(null);
@@ -190,6 +192,20 @@ export function MeltQuoteScreen({
       : null);
 
   const [unit, setUnit] = useState(currentTransaction?.unit || 'sat');
+
+  // On back/swipe/hardware back: roll back the melt so reserved proofs are freed.
+  // active: prevent leave when we have an operation (usePreventRemove works with native-stack).
+  // shouldCleanup: only run rollback if we didn't just succeed; coco rejects if already finalized.
+  useBeforeRemoveCleanup({
+    active: !!createdOperationId,
+    shouldCleanup: () => !successRef.current && !!createdOperationId,
+    cleanup: () =>
+      cancelMeltQuote({
+        operationId: createdOperationId ?? undefined,
+        mintUrl: currentTransaction?.mintUrl,
+        quoteId: currentTransaction?.quoteId,
+      }),
+  });
 
   // Load mint info
   useEffect(() => {
@@ -401,6 +417,7 @@ export function MeltQuoteScreen({
       await manager.quotes.executeMeltByQuote(mintUrlForPayment, currentTransaction.quoteId);
     }
 
+    successRef.current = true;
     // Show success popup and close modal after
     popup({
       message: 'funds_sent',
@@ -463,15 +480,7 @@ export function MeltQuoteScreen({
               onPress: async () => onCancel(),
               condition: isPaid,
             },
-            // ── UNPAID (not expired): Cancel | Send | Cancel ──
-            // {
-            //   text: isCancelling ? 'Cancelling...' : 'Cancel',
-            //   icon: isCancelling ? 'ri:loader-line' : 'ri:close-circle-line',
-            //   variant: 'secondary',
-            //   onPress: async () => handleCancelMelt(),
-            //   condition: isUnpaid && !isExpired,
-            //   disabled: isBusy,
-            // },
+            // ── UNPAID (not expired): Send only; back/swipe runs cleanup via useBeforeRemoveCleanup ──
             {
               text: isPaying ? 'Sending...' : isCreating ? 'Updating...' : 'Send',
               icon: isPaying || isCreating ? 'ri:loader-line' : 'ri:send-plane-2-fill',

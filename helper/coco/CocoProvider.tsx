@@ -163,6 +163,16 @@ export function CocoProvider({ children }: CocoProviderProps) {
         stage.log('Initializing default mints...');
         await initializeDefaultMints(mgr, currentPubkey, currentSetSelectedMint);
 
+        // Recover pending operations and free any stale reserved proofs (CocoManager uses new Manager(), not initializeCoco)
+        try {
+          stage.log('Recovering pending operations...');
+          await mgr.recoverPendingSendOperations();
+          await mgr.recoverPendingMeltOperations();
+          await CocoManager.freeAllReservedProofs();
+        } catch (recoveryErr) {
+          console.warn('Recovery / freeAllReservedProofs failed (non-fatal):', recoveryErr);
+        }
+
         setIsReady(true);
         stage.complete();
       } catch (error) {

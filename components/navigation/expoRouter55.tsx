@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   InteractionManager,
   Pressable,
@@ -62,12 +62,16 @@ type HeaderIconButtonProps = {
   style?: StyleProp<ViewStyle>;
 };
 
+/** Minimum 44pt touch target; hitSlop extends so taps near the edge still register. */
+const HEADER_BUTTON_HIT_SLOP = { top: 12, bottom: 12, left: 12, right: 12 };
+
 function HeaderIconButton({ icon, color, onPress, size, style }: HeaderIconButtonProps) {
   if (Platform.OS === 'android') {
     const androidIconName = ANDROID_HEADER_ICON_MAP[icon];
     return (
       <Pressable
         onPress={onPress}
+        hitSlop={HEADER_BUTTON_HIT_SLOP}
         style={[
           {
             width: 44,
@@ -89,7 +93,7 @@ function HeaderIconButton({ icon, color, onPress, size, style }: HeaderIconButto
   }
 
   return (
-    <Pressable onPress={onPress} style={[{ margin: 2 }, style]}>
+    <Pressable onPress={onPress} hitSlop={HEADER_BUTTON_HIT_SLOP} style={[{ margin: 2 }, style]}>
       <IconSymbol name={icon as any} size={size} color={color} />
     </Pressable>
   );
@@ -102,6 +106,9 @@ type AndroidLiquidHeaderButtonProps = {
   size?: number;
 };
 
+/** Debounce ms so one tap doesn't fire both Pressable and LiquidButtonView. */
+const LIQUID_BUTTON_DEBOUNCE_MS = 400;
+
 function AndroidLiquidHeaderButton({
   icon,
   color,
@@ -109,10 +116,20 @@ function AndroidLiquidHeaderButton({
   size = 22,
 }: AndroidLiquidHeaderButtonProps) {
   const canMountLiquid = useDeferredLiquidMount();
+  const lastPressAt = useRef(0);
+
+  const handlePress = useCallback(() => {
+    const now = Date.now();
+    if (now - lastPressAt.current < LIQUID_BUTTON_DEBOUNCE_MS) return;
+    lastPressAt.current = now;
+    onPress();
+  }, [onPress]);
 
   const androidIconName = ANDROID_HEADER_ICON_MAP[icon] ?? 'mdi:menu';
   return (
-    <View
+    <Pressable
+      onPress={handlePress}
+      hitSlop={HEADER_BUTTON_HIT_SLOP}
       style={{
         width: 44,
         height: 44,
@@ -121,27 +138,38 @@ function AndroidLiquidHeaderButton({
         alignItems: 'center',
         justifyContent: 'center',
       }}>
-      {canMountLiquid ? (
-        <LiquidButtonView
-          title={INVISIBLE_TITLE_SHORT}
-          enabled
-          tint="transparent"
-          // useRealtimeCapture
-          onPress={onPress}
-          blurRadius={2}
-          lensX={12}
-          lensY={24}
-          style={StyleSheet.absoluteFillObject}
-        />
-      ) : (
-        <View
-          style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,255,255,0.12)' }}
-        />
-      )}
+      <View
+        style={{
+          ...StyleSheet.absoluteFillObject,
+          overflow: 'hidden',
+          borderRadius: 22,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        {canMountLiquid ? (
+          <LiquidButtonView
+            title={INVISIBLE_TITLE_SHORT}
+            enabled
+            tint="transparent"
+            onPress={handlePress}
+            blurRadius={2}
+            lensX={12}
+            lensY={24}
+            style={StyleSheet.absoluteFillObject}
+          />
+        ) : (
+          <View
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              backgroundColor: 'rgba(255,255,255,0.12)',
+            }}
+          />
+        )}
+      </View>
       <View pointerEvents="none" style={{ elevation: 1 }}>
         <Icon name={androidIconName} size={size} color={color} />
       </View>
-    </View>
+    </Pressable>
   );
 }
 

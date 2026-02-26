@@ -12,7 +12,16 @@
     "eNuts/**",
     "node_modules/**"
   ],
-  "ignoreDependencies": ["buffer", "process", "cashu-kym", "@babel/core", "@monicon/metro", "@monicon/core", "number-flow-react-native", "@expo/config-plugins"],
+  "ignoreDependencies": [
+    "buffer",
+    "process",
+    "cashu-kym",
+    "@babel/core",
+    "@monicon/metro",
+    "@monicon/core",
+    "number-flow-react-native",
+    "@expo/config-plugins"
+  ],
   "ignoreBinaries": ["eas", "maestro"],
   "ignoreIssues": {
     "components/blocks/nostr/**": ["exports", "types", "duplicates"],
