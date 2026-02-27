@@ -6,6 +6,7 @@ import {
 import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { HeroUINativeProvider } from 'heroui-native/provider';
 import 'global.css';
 import 'intl';
 import 'intl/locale-data/jsonp/en';
@@ -65,6 +66,7 @@ const OuterProviders = compose([
   [PersistGate, { loading: null, persistor }],
   [Provider, { store }],
   ThemeProvider,
+  HeroUINativeProvider,
   HeroTransitionProvider,
 ]);
 

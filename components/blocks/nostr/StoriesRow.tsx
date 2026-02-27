@@ -29,6 +29,7 @@ import {
   parseProfileFromRaw,
 } from './shared';
 import type { StoryUser } from './StoriesCarousel';
+import { prefetchImages } from '@/helper/imageCache';
 
 // ============================================================================
 // Gradient Ring
@@ -129,6 +130,10 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
   const { getPrimaryColor } = useTheme();
   const [storyUsers, setStoryUsers] = useState<StoryUser[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    prefetchImages(storyUsers.map((user) => user.profile?.picture));
+  }, [storyUsers]);
 
   useEffect(() => {
     if (!userPubkey) {

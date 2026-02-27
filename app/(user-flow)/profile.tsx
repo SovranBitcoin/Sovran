@@ -9,15 +9,8 @@
  */
 
 import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  Dimensions,
-  Linking,
-} from 'react-native';
+import { Animated, Easing, StyleSheet, TouchableOpacity, Dimensions, Linking } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -52,9 +45,10 @@ import { formatDate } from '@/helper/time';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { UserFeed } from 'components/blocks/UserFeed';
-import { GradientRing } from 'components/blocks/nostr/StoriesRow';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { selectIsFollowingPubkey, useNostrSocialStore } from '@/stores/nostrSocialStore';
+import { getUsername } from '@/helper/username';
+import { generateSeededGradient } from '@/helper/avatarGradient';
 import type { VideoPostRecord } from 'components/blocks/nostr/shared';
 import type { StoryUser } from 'components/blocks/nostr/StoriesCarousel';
 
@@ -86,68 +80,8 @@ function buildUpdatedContactTags(
   return deduped;
 }
 
-// ============================================================================
-// Gradient Generation from Seed (same algorithm as Avatar)
-// ============================================================================
-function Mash() {
-  let n = 0xefc8249d;
-  const mash = function (data: string) {
-    for (let i = 0; i < data.length; i++) {
-      n += data.charCodeAt(i);
-      let h = 0.02519603282416938 * n;
-      n = h >>> 0;
-      h -= n;
-      h *= n;
-      n = h >>> 0;
-      h -= n;
-      n += h * 0x100000000;
-    }
-    return (n >>> 0) * 2.3283064365386963e-10;
-  };
-  return mash;
-}
-
-function Alea(this: any, seed: string) {
-  const me: any = this;
-  const mash = Mash();
-  me.c = 1;
-  me.s0 = mash(' ');
-  me.s1 = mash(' ');
-  me.s2 = mash(' ');
-  me.s0 -= mash(seed);
-  if (me.s0 < 0) me.s0 += 1;
-  me.s1 -= mash(seed);
-  if (me.s1 < 0) me.s1 += 1;
-  me.s2 -= mash(seed);
-  if (me.s2 < 0) me.s2 += 1;
-  me.next = function () {
-    const t = 2091639 * me.s0 + me.c * 2.3283064365386963e-10;
-    me.s0 = me.s1;
-    me.s1 = me.s2;
-    return (me.s2 = t - (me.c = t | 0));
-  };
-}
-
-function generateBannerGradient(seed: string): [string, string] {
-  const xg = new (Alea as any)(seed);
-  const random = () => xg.next();
-
-  // Generate two HSL colors for gradient
-  const h1 = Math.floor(random() * 360);
-  const s1 = 40 + Math.floor(random() * 30); // 40-70% saturation
-  const l1 = 25 + Math.floor(random() * 20); // 25-45% lightness (darker for banner)
-
-  const h2 = (h1 + 30 + Math.floor(random() * 60)) % 360; // Offset hue
-  const s2 = 40 + Math.floor(random() * 30);
-  const l2 = 20 + Math.floor(random() * 20); // Slightly darker
-
-  return [`hsl(${h1}, ${s1}%, ${l1}%)`, `hsl(${h2}, ${s2}%, ${l2}%)`];
-}
 const AVATAR_SIZE = 90;
 const AVATAR_OVERFLOW = AVATAR_SIZE / 4; // 1/4 overflows below banner
-
-// Ring size for the profile avatar gradient (avatar + padding + stroke)
-const PROFILE_RING_SIZE = AVATAR_SIZE + 10;
 
 // ============================================================================
 // Profile Stats Grid
@@ -458,8 +392,11 @@ function BannerWithAvatarComponent({
   const [bannerLoaded, setBannerLoaded] = useState(false);
   const [bannerError, setBannerError] = useState(false);
 
-  // Generate gradient colors from pubkey for fallback banner
-  const gradientColors = useMemo(() => generateBannerGradient(pubkey || 'default'), [pubkey]);
+  // Reuse the same layered seeded gradient algorithm as Avatar fallback.
+  const bannerGradientTheme = useMemo(
+    () => generateSeededGradient(`${pubkey || 'default'}:person`, 'person'),
+    [pubkey]
+  );
 
   // Reset banner states when URL changes
   useEffect(() => {
@@ -476,44 +413,39 @@ function BannerWithAvatarComponent({
     }).start();
   }, [fadeAnim]);
 
-  // Determine what to show:
-  // - If still loading API data, show skeleton
-  // - If banner URL exists and not errored, try to load image (show skeleton while loading)
-  // - If no banner URL or image errored, show gradient
-  const showSkeleton = isLoading || (bannerUrl && !bannerLoaded && !bannerError);
-  const showGradient = !isLoading && (!bannerUrl || bannerError);
-
   return (
     <View>
       {/* Banner */}
       <View style={[styles.bannerContainer, { backgroundColor: getPrimaryColor('800') }]}>
         {/* Hidden image to trigger load/error callbacks */}
         {bannerUrl && !bannerError && (
-          <Image
+          <ExpoImage
             source={{ uri: bannerUrl }}
             style={[styles.bannerImage, !bannerLoaded && { opacity: 0, position: 'absolute' }]}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="disk"
+            recyclingKey={bannerUrl}
+            transition={200}
             onLoad={() => setBannerLoaded(true)}
             onError={() => setBannerError(true)}
           />
         )}
 
-        {/* Skeleton while loading */}
-        {showSkeleton && (
-          <Skeleton
-            style={[styles.bannerPlaceholder, { backgroundColor: getPrimaryColor('700') }]}
-          />
-        )}
-
-        {/* Gradient fallback */}
-        {showGradient && (
+        {/* Always render deterministic fallback gradient first paint. */}
+        <View style={styles.bannerPlaceholder}>
           <LinearGradient
-            colors={gradientColors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.bannerPlaceholder}
+            colors={bannerGradientTheme.primaryColors}
+            start={bannerGradientTheme.primaryStart}
+            end={bannerGradientTheme.primaryEnd}
+            style={StyleSheet.absoluteFill}
           />
-        )}
+          <LinearGradient
+            colors={bannerGradientTheme.overlayColors}
+            start={bannerGradientTheme.overlayStart}
+            end={bannerGradientTheme.overlayEnd}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
       </View>
 
       {/* Avatar - positioned to overlap */}
@@ -521,16 +453,20 @@ function BannerWithAvatarComponent({
         style={[styles.avatarContainer, { opacity: fadeAnim, transform: [{ scale: fadeAnim }] }]}>
         {hasStories ? (
           <TouchableOpacity activeOpacity={0.8} onPress={onAvatarPress}>
-            <GradientRing size={PROFILE_RING_SIZE}>
+            <View
+              style={[
+                styles.avatarBorder,
+                { borderColor: getPrimaryColor('950'), backgroundColor: getPrimaryColor('950') },
+              ]}>
               <Avatar
                 picture={pictureUrl}
                 seed={pubkey}
                 size={AVATAR_SIZE}
                 variant="person"
                 name={displayName}
-                loading={isLoading}
+                loading={false}
               />
-            </GradientRing>
+            </View>
           </TouchableOpacity>
         ) : (
           <View
@@ -544,7 +480,7 @@ function BannerWithAvatarComponent({
               size={AVATAR_SIZE}
               variant="person"
               name={displayName}
-              loading={isLoading}
+              loading={false}
             />
           </View>
         )}
@@ -658,6 +594,8 @@ function UserProfileScreen() {
     return '';
   }, [npubParam, pubkey]);
 
+  const isOwnProfile = !!nostrKeys?.pubkey && nostrKeys.pubkey === pubkey;
+
   // ===========================
   // NOSTR SUBSCRIPTIONS & API
   // ===========================
@@ -725,7 +663,9 @@ function UserProfileScreen() {
   // DERIVED STATE
   // ===========================
   const userInfo = metadataEvents?.[0] ? JSON.parse(metadataEvents[0].content) : null;
-  const displayName = userInfo?.display_name || userInfo?.name || truncateMiddle(npub, 8);
+  const displayName = isOwnProfile
+    ? getUsername(pubkey || '')
+    : userInfo?.display_name || userInfo?.name || truncateMiddle(npub, 8);
   const isMetadataLoading = !metadataEose;
 
   // Follower count from API
@@ -767,7 +707,6 @@ function UserProfileScreen() {
     clearSettledFollowOptimistic();
   }, [latestContactListEvent, setContactsFromRelay, clearSettledFollowOptimistic]);
 
-  const isOwnProfile = !!nostrKeys?.pubkey && nostrKeys.pubkey === pubkey;
   const followingCount = isOwnProfile ? ownFollowingCount : profileData?.follows;
   const isFollowingProfile = useNostrSocialStore(
     useMemo(() => selectIsFollowingPubkey(pubkey || ''), [pubkey])

@@ -34,6 +34,7 @@ import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useSearchHistoryStore } from '@/stores/searchHistoryStore';
 import { BlurCardFrame } from 'components/ui/BlurCardFrame';
 import opacity from 'hex-color-opacity';
+import { prefetchImages } from '@/helper/imageCache';
 
 // Define proper types
 interface SearchResultData {
@@ -47,6 +48,11 @@ interface PlaceholderResult {
 }
 
 type DisplayResult = SearchResultData | PlaceholderResult;
+
+const LOG_PREFIX = '[Page.Payments]';
+const logPayments = (...args: any[]) => {
+  console.log(LOG_PREFIX, ...args);
+};
 
 // Memoized ContactItem to prevent unnecessary re-renders
 const RenderItem = React.memo(({ item }: { item: any }) => {
@@ -158,6 +164,35 @@ const PaymentsContent = () => {
 
   const { events: giftWrapEvents } = useSubscribe({ filters: giftWrapFilters });
 
+  useEffect(() => {
+    logPayments('mounted');
+    return () => {
+      logPayments('unmounted');
+    };
+  }, []);
+
+  useEffect(() => {
+    logPayments('search state changed', {
+      searchQuery,
+      isSearching,
+      selectedTab,
+    });
+  }, [isSearching, searchQuery, selectedTab]);
+
+  useEffect(() => {
+    logPayments('nostr key state changed', {
+      hasPubkey: !!nostrKeys?.pubkey,
+      hasPrivateKey: !!nostrKeys?.privateKey,
+    });
+  }, [nostrKeys?.privateKey, nostrKeys?.pubkey]);
+
+  useEffect(() => {
+    logPayments('subscription events updated', {
+      dmEvents: dmEvents?.length ?? 0,
+      giftWrapEvents: giftWrapEvents?.length ?? 0,
+    });
+  }, [dmEvents, giftWrapEvents]);
+
   // Unwrap NIP-17 gift-wrapped events to extract sender and content
   const unwrappedDMs = useMemo(() => {
     if (!giftWrapEvents?.length || !nostrKeys?.privateKey) return [];
@@ -230,6 +265,12 @@ const PaymentsContent = () => {
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [dmEvents, unwrappedDMs, nostrKeys?.pubkey]);
 
+  useEffect(() => {
+    logPayments('recent activity contacts computed', {
+      count: recentActivityContacts.length,
+    });
+  }, [recentActivityContacts]);
+
   // Merge default contacts with recent activity contacts
   const contactsWithDefaults = useMemo(() => {
     // Create a set of existing pubkeys from recent activity
@@ -251,11 +292,47 @@ const PaymentsContent = () => {
     return [...recentActivityContacts, ...defaultsToAdd];
   }, [recentActivityContacts, defaultContactPubkeys]);
 
+  useEffect(() => {
+    const defaultsInList = contactsWithDefaults.filter((c: any) => c.isDefault).length;
+    logPayments('contacts merged with defaults', {
+      total: contactsWithDefaults.length,
+      defaultsInList,
+      recentContacts: recentActivityContacts.length,
+    });
+  }, [contactsWithDefaults, recentActivityContacts.length]);
+
   // Decrypt DM events for contacts
   useEffect(() => {
     const decryptContacts = async () => {
-      if (!contactsWithDefaults.length || !nostrKeys?.pubkey) {
+      logPayments('decryptContacts:start', {
+        contactsWithDefaults: contactsWithDefaults.length,
+        hasPubkey: !!nostrKeys?.pubkey,
+        hasPrivateKey: !!nostrKeys?.privateKey,
+      });
+
+      if (!contactsWithDefaults.length) {
+        logPayments('decryptContacts:empty contacts, clearing list');
         setDecryptedContacts([]);
+        return;
+      }
+
+      // Keep default contacts visible even before keys are available.
+      // In this state we cannot decrypt DMs, so pass through available content.
+      if (!nostrKeys?.pubkey || !nostrKeys?.privateKey) {
+        const fallbackContacts = contactsWithDefaults.map((contact) => {
+          if (contact.nip17Content !== undefined) {
+            return {
+              ...contact,
+              dmEvent: { content: contact.nip17Content },
+            };
+          }
+          return contact;
+        });
+        logPayments('decryptContacts:fallback (no keys)', {
+          fallbackCount: fallbackContacts.length,
+        });
+        setDecryptedContacts(fallbackContacts);
+        setIsDecrypting(false);
         return;
       }
 
@@ -312,8 +389,12 @@ const PaymentsContent = () => {
         }
 
         setDecryptedContacts(decryptedResults);
+        logPayments('decryptContacts:success', {
+          decryptedCount: decryptedResults.length,
+        });
       } catch (err) {
         console.error('Error decrypting contacts:', err);
+        logPayments('decryptContacts:error, using fallback contacts');
         setDecryptedContacts(contactsWithDefaults);
       } finally {
         setIsDecrypting(false);
@@ -323,14 +404,24 @@ const PaymentsContent = () => {
     decryptContacts();
   }, [contactsWithDefaults, nostrKeys?.pubkey, nostrKeys?.privateKey]);
 
+  useEffect(() => {
+    logPayments('decrypted contacts updated', {
+      count: decryptedContacts.length,
+      isDecrypting,
+    });
+  }, [decryptedContacts, isDecrypting]);
+
   // Load mints and their info on component mount
   useEffect(() => {
     const loadMintsData = async () => {
       try {
         setMintsLoadingInfo(true);
+        logPayments('loadMints:start');
         await loadMints();
+        logPayments('loadMints:success');
       } catch (error) {
         console.error('Failed to load mints:', error);
+        logPayments('loadMints:error');
       } finally {
         setMintsLoadingInfo(false);
       }
@@ -346,6 +437,7 @@ const PaymentsContent = () => {
 
       try {
         setMintsLoadingInfo(true);
+        logPayments('loadMintInfo:start', { mints: mints.length });
         const mintsWithInfo = await Promise.all(
           mints.map(async (mint) => {
             try {
@@ -367,8 +459,12 @@ const PaymentsContent = () => {
         });
 
         setMintsWithInfo(mintsWithNostr);
+        logPayments('loadMintInfo:success', {
+          withNostrContacts: mintsWithNostr.length,
+        });
       } catch (error) {
         console.error('Failed to load mint info:', error);
+        logPayments('loadMintInfo:error');
       } finally {
         setMintsLoadingInfo(false);
       }
@@ -432,6 +528,10 @@ const PaymentsContent = () => {
   useEffect(() => {
     const decryptMints = async () => {
       if (!mintsWithMetadata.length || !nostrKeys?.pubkey) {
+        logPayments('decryptMints:empty or missing pubkey', {
+          mintsWithMetadata: mintsWithMetadata.length,
+          hasPubkey: !!nostrKeys?.pubkey,
+        });
         setDecryptedMints([]);
         return;
       }
@@ -474,8 +574,10 @@ const PaymentsContent = () => {
         }
 
         setDecryptedMints(decryptedResults);
+        logPayments('decryptMints:success', { decryptedMints: decryptedResults.length });
       } catch (error) {
         console.error('Error decrypting mints:', error);
+        logPayments('decryptMints:error, using fallback metadata');
         setDecryptedMints(mintsWithMetadata);
       } finally {
         setIsDecryptingMints(false);
@@ -484,6 +586,14 @@ const PaymentsContent = () => {
 
     decryptMints();
   }, [mintsWithMetadata, nostrKeys?.pubkey, nostrKeys?.privateKey]);
+
+  useEffect(() => {
+    logPayments('decrypted mints updated', {
+      count: decryptedMints.length,
+      isDecryptingMints,
+      mintsLoadingInfo,
+    });
+  }, [decryptedMints, isDecryptingMints, mintsLoadingInfo]);
 
   const pagerRef = useRef<PagerView>(null);
 
@@ -692,6 +802,10 @@ const PaymentsContent = () => {
     const pageIndex = event.nativeEvent.position;
     const tabNames = ['Recent activity', 'Mints'];
     setSelectedTab(tabNames[pageIndex]);
+    logPayments('pager page selected', {
+      pageIndex,
+      tab: tabNames[pageIndex],
+    });
   }, []);
 
   const handleTabPress = (tab: string, index: number) => {
@@ -729,6 +843,14 @@ const PaymentsContent = () => {
     filters: profileFilters,
   });
 
+  useEffect(() => {
+    logPayments('profile subscription updated', {
+      filtersAuthorsCount: profileFilters?.[0]?.authors?.length ?? 0,
+      profileEvents: profileEvents?.length ?? 0,
+      profilesEose,
+    });
+  }, [profileEvents, profileFilters, profilesEose]);
+
   // Loading state for profiles: true until we receive EOSE
   const isLoadingProfiles = !profilesEose;
 
@@ -746,6 +868,14 @@ const PaymentsContent = () => {
     return map;
   }, [profileEvents]);
 
+  useEffect(() => {
+    prefetchImages(Array.from(profilesMap.values()).map((profile: any) => profile?.picture));
+  }, [profilesMap]);
+
+  useEffect(() => {
+    prefetchImages(mintsWithInfo.map(({ mintInfo }) => mintInfo?.icon_url));
+  }, [mintsWithInfo]);
+
   // Use dynamic window dimensions for responsive layout
   const { height: windowHeight } = useWindowDimensions();
 
@@ -755,19 +885,18 @@ const PaymentsContent = () => {
   // Header height accounts for the transparent header with search bar + safe area
   // Standard iOS nav bar (44px) + small buffer (12px) + top safe area inset
   const HEADER_HEIGHT = 56 + insets.top;
-
   return (
     <LayoutDebugWrapper scrollable={false}>
       {/* Gradient overlay for the entire page */}
       <ScrollableGradientOverlay contentHeight={windowHeight * 1.5} />
 
-      <SafeAreaView className="flex-1" edges={['bottom']}>
+      <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
         <SkeletonContainer
           backgroundColor={skeletonConfig.backgroundColor}
           highlightColor={skeletonConfig.highlightColor}
           speed={skeletonConfig.speed}
           animation={skeletonConfig.animation}>
-          <View className="relative flex-1" style={{ paddingTop: HEADER_HEIGHT }}>
+          <View style={{ position: 'relative', flex: 1, paddingTop: HEADER_HEIGHT }}>
             {/* Tabs - Always render but hide with height when searching */}
             <View
               style={{
@@ -832,10 +961,10 @@ const PaymentsContent = () => {
                 <PagerView
                   ref={pagerRef}
                   onPageSelected={onPageSelected}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, minHeight: 1 }}
                   initialPage={0}
                   scrollEnabled={true}>
-                  <View key="1" style={{ flex: 1 }}>
+                  <View key="1" collapsable={false} style={{ flex: 1 }}>
                     <DraggableContactsList
                       data={decryptedContacts}
                       profilesMap={profilesMap}
@@ -844,7 +973,7 @@ const PaymentsContent = () => {
                       emptyMessage="No recent conversations found"
                     />
                   </View>
-                  <View key="2" style={{ flex: 1 }}>
+                  <View key="2" collapsable={false} style={{ flex: 1 }}>
                     <DraggableContactsList
                       data={decryptedMints}
                       profilesMap={profilesMap}

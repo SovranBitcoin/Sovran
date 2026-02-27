@@ -71,6 +71,7 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
           {/* Profile list */}
           {profiles.map((profile) => {
             const isActive = profile.accountIndex === activeAccountIndex;
+            const username = getUsername(profile.pubkey);
             return (
               <TouchableOpacity
                 key={profile.accountIndex}
@@ -92,7 +93,7 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
                       borderColor: isActive ? getPrimaryColor('400') : 'transparent',
                       padding: 2,
                     }}>
-                    <Avatar seed={profile.pubkey} size={40} variant="person" />
+                    <Avatar seed={profile.pubkey} name={username} size={40} variant="person" />
                   </View>
                   <VStack spacing={2} style={{ flex: 1 }}>
                     <Text
@@ -101,7 +102,7 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
                       }}
                       size={16}
                       weight="bold">
-                      {getUsername(profile.pubkey)}
+                      {username}
                     </Text>
                     {profile.cachedBalanceSats != null ? (
                       <AmountFormatter

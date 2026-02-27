@@ -203,7 +203,7 @@ export const ImageBlock = React.memo(function ImageBlock({
       source={{ uri: url }}
       style={{ width: '100%', aspectRatio, borderRadius: 12 }}
       contentFit="cover"
-      cachePolicy="memory-disk"
+      cachePolicy="disk"
       recyclingKey={url}
       transition={300}
       onLoad={(e) => {

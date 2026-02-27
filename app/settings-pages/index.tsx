@@ -64,7 +64,12 @@ const ProfileButton = () => {
             backgroundColor: getPrimaryColor('900'),
           }}>
           <HStack spacing={12} flex={1}>
-            <Avatar seed={nostrKeys?.pubkey} variant="person" size={60} />
+            <Avatar
+              seed={nostrKeys?.pubkey}
+              name={getUsername(nostrKeys?.pubkey || '')}
+              variant="person"
+              size={60}
+            />
             <VStack spacing={2} flex={1}>
               <Text
                 size={18}

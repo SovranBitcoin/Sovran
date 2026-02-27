@@ -72,11 +72,7 @@
         {
           "image": "./assets/images/production.png",
           "backgroundColor": "#000000",
-          "imageWidth": 500,
-          "dark": {
-            "image": "./assets/images/production.png",
-            "backgroundColor": "#000000"
-          }
+          "resizeMode": "cover"
         }
       ],
       "expo-build-properties",

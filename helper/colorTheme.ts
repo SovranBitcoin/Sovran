@@ -1,4 +1,3 @@
-import { vars } from 'nativewind';
 import { THEMES } from '../themes';
 import {
   backgroundThemeDominantColors,
@@ -6,33 +5,35 @@ import {
   isBackgroundImageTheme,
 } from '../config/backgroundImageThemes';
 
+type ThemeVariables = Record<string, string | number>;
+
 /**
  * Shade colors that persist across all themes
  */
 const shadeColors = {
-  '--color-shade-100': '#FF5841',
-  '--color-shade-200': '#FF353C',
-  '--color-shade-300': '#ED0C46',
-  '--color-shade-400': '#CF014E',
-  '--color-shade-500': '#BF004E',
+  '--app-shade-100': '#FF5841',
+  '--app-shade-200': '#FF353C',
+  '--app-shade-300': '#ED0C46',
+  '--app-shade-400': '#CF014E',
+  '--app-shade-500': '#BF004E',
   // Red colors
-  '--color-red-100': '#F8E0E6',
-  '--color-red-200': '#E4A3B4',
-  '--color-red-300': '#ED0C46',
-  '--color-red-400': '#BF0A39',
-  '--color-red-500': '#9A082E',
+  '--app-red-100': '#F8E0E6',
+  '--app-red-200': '#E4A3B4',
+  '--app-red-300': '#ED0C46',
+  '--app-red-400': '#BF0A39',
+  '--app-red-500': '#9A082E',
   // Green colors
-  '--color-green-100': '#E0F8E0',
-  '--color-green-200': '#A3E4A3',
-  '--color-green-300': '#0CED3E',
-  '--color-green-400': '#0ABF35',
-  '--color-green-500': '#089A2C',
+  '--app-green-100': '#E0F8E0',
+  '--app-green-200': '#A3E4A3',
+  '--app-green-300': '#0CED3E',
+  '--app-green-400': '#0ABF35',
+  '--app-green-500': '#089A2C',
   // Purple colors
-  '--color-purple-100': '#E0E0F8',
-  '--color-purple-200': '#A3A3E4',
-  '--color-purple-300': '#8A2BE2',
-  '--color-purple-400': '#6A0DAD',
-  '--color-purple-500': '#4B0082',
+  '--app-purple-100': '#E0E0F8',
+  '--app-purple-200': '#A3A3E4',
+  '--app-purple-300': '#8A2BE2',
+  '--app-purple-400': '#6A0DAD',
+  '--app-purple-500': '#4B0082',
 };
 
 /**
@@ -40,17 +41,17 @@ const shadeColors = {
  * Uses neutral grays as fallback
  */
 const defaultDominantColors = {
-  '--color-dominant-100': '#666666',
-  '--color-dominant-200': '#555555',
-  '--color-dominant-300': '#444444',
-  '--color-dominant-400': '#333333',
-  '--color-dominant-500': '#222222',
+  '--app-dominant-100': '#666666',
+  '--app-dominant-200': '#555555',
+  '--app-dominant-300': '#444444',
+  '--app-dominant-400': '#333333',
+  '--app-dominant-500': '#222222',
 };
 
 const defaultGradientColors = {
-  '--color-gradient-100': '#888888', // light
-  '--color-gradient-200': '#555555', // mid
-  '--color-gradient-300': '#222222', // dark
+  '--app-gradient-100': '#888888', // light
+  '--app-gradient-200': '#555555', // mid
+  '--app-gradient-300': '#222222', // dark
 };
 
 /**
@@ -68,11 +69,11 @@ function getDominantColorVars(themeName: string): Record<string, string> {
   }
 
   return {
-    '--color-dominant-100': dominantColors[0]?.hex || '#666666',
-    '--color-dominant-200': dominantColors[1]?.hex || '#555555',
-    '--color-dominant-300': dominantColors[2]?.hex || '#444444',
-    '--color-dominant-400': dominantColors[3]?.hex || '#333333',
-    '--color-dominant-500': dominantColors[4]?.hex || '#222222',
+    '--app-dominant-100': dominantColors[0]?.hex || '#666666',
+    '--app-dominant-200': dominantColors[1]?.hex || '#555555',
+    '--app-dominant-300': dominantColors[2]?.hex || '#444444',
+    '--app-dominant-400': dominantColors[3]?.hex || '#333333',
+    '--app-dominant-500': dominantColors[4]?.hex || '#222222',
   };
 }
 
@@ -96,40 +97,40 @@ function getGradientColorVars(themeName: string): Record<string, string> {
   const dark = gradientColors.find((c) => c.position === 'dark') || gradientColors[2];
 
   return {
-    '--color-gradient-100': light?.hex || '#888888',
-    '--color-gradient-200': mid?.hex || '#555555',
-    '--color-gradient-300': dark?.hex || '#222222',
+    '--app-gradient-100': light?.hex || '#888888',
+    '--app-gradient-200': mid?.hex || '#555555',
+    '--app-gradient-300': dark?.hex || '#222222',
   };
 }
 
 /**
- * Convert a palette object to NativeWind CSS variables
+ * Convert a palette object to runtime CSS variables for Uniwind.
  */
-function createThemeVars(themeName: string, palette: Record<number, string>) {
-  return vars({
-    '--color-primary-950': palette[950],
-    '--color-primary-900': palette[900],
-    '--color-primary-800': palette[800],
-    '--color-primary-700': palette[700],
-    '--color-primary-600': palette[600],
-    '--color-primary-500': palette[500],
-    '--color-primary-400': palette[400],
-    '--color-primary-300': palette[300],
-    '--color-primary-200': palette[200],
-    '--color-primary-100': palette[100],
-    '--color-primary-50': palette[50],
-    '--color-primary-0': palette[0],
+function createThemeVars(themeName: string, palette: Record<number, string>): ThemeVariables {
+  return {
+    '--app-primary-950': palette[950],
+    '--app-primary-900': palette[900],
+    '--app-primary-800': palette[800],
+    '--app-primary-700': palette[700],
+    '--app-primary-600': palette[600],
+    '--app-primary-500': palette[500],
+    '--app-primary-400': palette[400],
+    '--app-primary-300': palette[300],
+    '--app-primary-200': palette[200],
+    '--app-primary-100': palette[100],
+    '--app-primary-50': palette[50],
+    '--app-primary-0': palette[0],
     ...shadeColors,
     ...getDominantColorVars(themeName),
     ...getGradientColorVars(themeName),
-  });
+  };
 }
 
 /**
  * Theme variables using CSS variables for dynamic theming.
  * Dynamically generated from THEMES - all themes use their exact name from themes.js
  */
-export const colorThemes: Record<string, ReturnType<typeof vars>> = {};
+export const colorThemes: Record<string, ThemeVariables> = {};
 
 // Generate colorThemes for all themes in THEMES
 for (const [themeName, palette] of Object.entries(THEMES)) {

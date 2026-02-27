@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useSettingsStore } from 'stores/settingsStore';
 import { colorThemes } from '../helper/colorTheme';
 import { THEMES, THEME_NAMES } from '../themes';
+import { Uniwind } from 'uniwind';
 
 const ThemeContext = createContext<{
   currentTheme: string;
@@ -185,6 +186,13 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
     return colorThemes['dark'];
   };
 
+  useEffect(() => {
+    const variables = getThemeVariables(currentTheme);
+    // Keep both adaptive roots in sync so custom variables resolve in all modes.
+    Uniwind.updateCSSVariables('light', variables);
+    Uniwind.updateCSSVariables('dark', variables);
+  }, [currentTheme]);
+
   return (
     <ThemeContext.Provider
       value={{
@@ -200,9 +208,7 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
         getYellowColor: getYellowColorForShade,
         primaryColors,
       }}>
-      <View style={getThemeVariables(currentTheme)} className="flex-1">
-        {children}
-      </View>
+      <View className="flex-1">{children}</View>
     </ThemeContext.Provider>
   );
 }

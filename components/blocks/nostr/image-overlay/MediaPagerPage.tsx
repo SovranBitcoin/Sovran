@@ -87,7 +87,7 @@ function MediaPageAnimated({
         source={{ uri: url }}
         style={StyleSheet.absoluteFill}
         contentFit="contain"
-        cachePolicy="memory-disk"
+        cachePolicy="disk"
       />
     </Animated.View>
   );

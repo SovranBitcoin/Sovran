@@ -14,6 +14,7 @@ import { Skeleton } from 'components/ui/Skeleton';
 import { Avatar } from 'components/ui/Avatar';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import opacity from 'hex-color-opacity';
+import { getUsername } from '@/helper/username';
 
 const Profile = () => {
   const { getPrimaryColor } = useTheme();
@@ -163,7 +164,12 @@ const Profile = () => {
           </Text>
 
           <VStack align="center" style={{ marginBottom: 16, marginTop: 16 }}>
-            <Avatar seed={nostrKeys?.pubkey} variant="person" size={100} />
+            <Avatar
+              seed={nostrKeys?.pubkey}
+              name={getUsername(nostrKeys?.pubkey || '')}
+              variant="person"
+              size={100}
+            />
           </VStack>
 
           {renderCopyableDetail(

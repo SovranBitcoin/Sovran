@@ -637,7 +637,14 @@ const ConferenceCard = ({ conference }: { conference: (typeof BITCOIN_CONFERENCE
 
   return (
     <TouchableOpacity activeOpacity={0.9} style={styles.conferenceCard} onPress={handlePress}>
-      <Image source={{ uri: conference.image }} style={styles.conferenceImage} contentFit="cover" />
+      <Image
+        source={{ uri: conference.image }}
+        style={styles.conferenceImage}
+        contentFit="cover"
+        cachePolicy="disk"
+        recyclingKey={conference.image}
+        transition={200}
+      />
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.9)']}
         style={[StyleSheet.absoluteFillObject, { top: '40%' }]}

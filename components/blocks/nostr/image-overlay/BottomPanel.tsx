@@ -155,14 +155,14 @@ function InlinePanelImage({ uri }: { uri: string }) {
             source={{ uri }}
             style={[StyleSheet.absoluteFill, { borderRadius: 8 }]}
             contentFit="cover"
-            cachePolicy="memory-disk"
+            cachePolicy="disk"
           />
           <BlurView style={StyleSheet.absoluteFill} tint="dark" intensity={80} />
           <Image
             source={{ uri }}
             style={imageStyle}
             contentFit="contain"
-            cachePolicy="memory-disk"
+            cachePolicy="disk"
             onLoad={onLoad}
           />
         </>
@@ -171,7 +171,7 @@ function InlinePanelImage({ uri }: { uri: string }) {
           source={{ uri }}
           style={imageStyle}
           contentFit="contain"
-          cachePolicy="memory-disk"
+          cachePolicy="disk"
           onLoad={onLoad}
         />
       )}

@@ -186,7 +186,12 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
                   borderWidth: 2,
                 },
               ]}>
-              <Avatar seed={profile.pubkey} size={30} variant="person" />
+              <Avatar
+                seed={profile.pubkey}
+                name={getUsername(profile.pubkey)}
+                size={30}
+                variant="person"
+              />
             </TouchableOpacity>
           );
         })}
@@ -242,7 +247,12 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
         <TouchableOpacity style={styles.profileTouchable} onPress={handlePress}>
           {nostrKeys?.pubkey && (
             <VStack align="center" spacing={16}>
-              <Avatar seed={nostrKeys?.pubkey} size={64} variant="person" />
+              <Avatar
+                seed={nostrKeys?.pubkey}
+                name={getUsername(nostrKeys?.pubkey)}
+                size={64}
+                variant="person"
+              />
               <VStack align="center" spacing={8}>
                 <Text bold size={20} style={{ textAlign: 'center', color: getPrimaryColor('0') }}>
                   {getUsername(nostrKeys?.pubkey)}
