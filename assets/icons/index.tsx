@@ -180,6 +180,7 @@ export const icons: string[] = [
   'mdi:anonymous-off',
   'mdi:anonymous',
   'ph:coins',
+  'mingcute:home-4-fill',
 
   // Explore page icons
   'mdi:chevron-right',

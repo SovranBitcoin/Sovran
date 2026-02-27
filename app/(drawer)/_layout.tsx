@@ -169,7 +169,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
   if (profiles.length === 0) return null;
 
   return (
-    <HStack align="center" spacing={8} style={styles.profileSelector}>
+    <HStack align="center" spacing={4} style={styles.profileSelector}>
       {profiles
         .filter((profile: ProfileEntry) => profile.accountIndex !== activeAccountIndex)
         .slice(0, 3)
@@ -186,7 +186,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
                   borderWidth: 2,
                 },
               ]}>
-              <Avatar seed={profile.pubkey} size={36} variant="person" />
+              <Avatar seed={profile.pubkey} size={30} variant="person" />
             </TouchableOpacity>
           );
         })}
@@ -195,11 +195,12 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
         style={[
           styles.profileAvatarButton,
           {
-            borderColor: getPrimaryColor('400'),
+            borderColor: getPrimaryColor('600'),
             borderWidth: 2,
+            backgroundColor: getPrimaryColor('600'),
           },
         ]}>
-        <Icon name="tabler:dots" size={32} color={opacity(getPrimaryColor('0'), 0.5)} />
+        <Icon name="tabler:dots" size={24} color={getPrimaryColor('0')} />
       </TouchableOpacity>
     </HStack>
   );
@@ -272,10 +273,14 @@ function MenuButton({
 
   return (
     <GesturePressable
+      disabled={isActive}
       onPress={onPress}
       style={({ pressed }) => [
         styles.menuButton,
-        isActive && { backgroundColor: opacity(getPrimaryColor('700'), 0.5) },
+        isActive && {
+          backgroundColor: opacity(getPrimaryColor('700'), 0.72),
+          borderColor: opacity(getPrimaryColor('500'), 0.5),
+        },
         pressed && { opacity: 0.6 },
       ]}>
       <HStack align="center" spacing={12}>
@@ -298,44 +303,57 @@ function MenuButton({
 function CustomDrawerContent(props: DrawerContentComponentProps) {
   const { getPrimaryColor } = useTheme();
   const pathname = usePathname();
+  const navInProgressRef = useRef(false);
+
+  const isRouteActive = useCallback(
+    (route: string) => {
+      // Wallet is (drawer)/(tabs) - the index tab (no "wallet" in path, it's index)
+      if (route === '(drawer)/(tabs)') {
+        return (
+          pathname === '/' ||
+          pathname === '/index' ||
+          pathname === '/(drawer)/(tabs)' ||
+          pathname === '/(drawer)/(tabs)/' ||
+          pathname.includes('(tabs)/index') ||
+          (pathname.includes('(tabs)') &&
+            !pathname.includes('payments') &&
+            !pathname.includes('explore') &&
+            !pathname.includes('feed'))
+        );
+      }
+      if (route.includes('(tabs)/feed') && pathname.includes('feed')) {
+        return true;
+      }
+      if (route.includes('(tabs)/payments') && pathname.includes('payments')) {
+        return true;
+      }
+      if (route.includes('(tabs)/explore') && pathname.includes('explore')) {
+        return true;
+      }
+      if (route.includes('settings') && pathname.includes('settings')) {
+        return true;
+      }
+      return false;
+    },
+    [pathname]
+  );
 
   const handleNavigation = useCallback(
     (route: string) => {
+      if (navInProgressRef.current) return;
+      if (isRouteActive(route)) {
+        props.navigation.closeDrawer();
+        return;
+      }
+      navInProgressRef.current = true;
       router.navigate(`/${route}` as any);
       props.navigation.closeDrawer();
+      setTimeout(() => {
+        navInProgressRef.current = false;
+      }, 400);
     },
-    [props.navigation]
+    [isRouteActive, props.navigation]
   );
-
-  const isRouteActive = (route: string) => {
-    // Wallet is (drawer)/(tabs) - the index tab (no "wallet" in path, it's index)
-    if (route === '(drawer)/(tabs)') {
-      return (
-        pathname === '/' ||
-        pathname === '/index' ||
-        pathname === '/(drawer)/(tabs)' ||
-        pathname === '/(drawer)/(tabs)/' ||
-        pathname.includes('(tabs)/index') ||
-        (pathname.includes('(tabs)') &&
-          !pathname.includes('payments') &&
-          !pathname.includes('explore') &&
-          !pathname.includes('feed'))
-      );
-    }
-    if (route.includes('(tabs)/feed') && pathname.includes('feed')) {
-      return true;
-    }
-    if (route.includes('(tabs)/payments') && pathname.includes('payments')) {
-      return true;
-    }
-    if (route.includes('(tabs)/explore') && pathname.includes('explore')) {
-      return true;
-    }
-    if (route.includes('settings') && pathname.includes('settings')) {
-      return true;
-    }
-    return false;
-  };
 
   return (
     <ScrollView
@@ -405,13 +423,17 @@ const styles = StyleSheet.create({
   },
   profileSelector: {
     marginBottom: 16,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    borderRadius: 20,
     justifyContent: 'flex-end',
   },
   profileAvatarButton: {
-    borderRadius: 20,
+    borderRadius: 18,
     padding: 2,
     borderWidth: 2,
     borderColor: 'transparent',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   moreProfilesButton: {
     width: 36,
@@ -424,11 +446,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   menuButton: {
-    padding: 20,
-    paddingHorizontal: 32,
-    borderRadius: 12,
+    padding: 18,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'transparent',
     marginHorizontal: 8,
-    marginVertical: 2,
+    marginVertical: 4,
   },
   scrollContent: {
     flexGrow: 1,

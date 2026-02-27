@@ -114,6 +114,7 @@ declare module "@monicon/icon-loader" {
 	| "mdi:anonymous-off"
 	| "mdi:anonymous"
 	| "ph:coins"
+	| "mingcute:home-4-fill"
 	| "mdi:chevron-right"
 	| "mdi:map-marker"
 	| "mdi:sim"

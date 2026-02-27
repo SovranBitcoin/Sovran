@@ -934,8 +934,8 @@ function HomeFeedInner() {
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
     useNostrEngagement(actionableEvents, getMetrics);
 
-  // listData = [stories, tabs, ...feedItems] so feed item at list index i has feedItems index i - 2
-  const FEED_ITEM_OFFSET = 2;
+  // listData = [tabs, ...feedItems] when stories are hidden, otherwise [stories, tabs, ...feedItems].
+  const FEED_ITEM_OFFSET = SHOW_STORIES_ROW ? 2 : 1;
   const overlaySourceIndexRef = useRef(-1);
   const feedIndicesWithVideo = useMemo(() => {
     const out: number[] = [];
@@ -999,7 +999,7 @@ function HomeFeedInner() {
           repostPendingDirection: engagement.repostPendingDirection,
           likePendingDirection: engagement.likePendingDirection,
           onCommentPress: () =>
-            router.push({
+            router.navigate({
               pathname: '/(user-flow)/thread' as any,
               params: { eventId: event.id },
             }),
@@ -1074,7 +1074,7 @@ function HomeFeedInner() {
           repostPendingDirection: engagement.repostPendingDirection,
           likePendingDirection: engagement.likePendingDirection,
           onCommentPress: () =>
-            router.push({
+            router.navigate({
               pathname: '/(user-flow)/thread' as any,
               params: { eventId: event.id },
             }),
@@ -1223,6 +1223,7 @@ function HomeFeedInner() {
       );
     },
     [
+      FEED_ITEM_OFFSET,
       getDisplayMetrics,
       getEngagementState,
       getMetrics,
@@ -1245,10 +1246,10 @@ function HomeFeedInner() {
     [isRefreshing, handleRefresh, refreshTintColor]
   );
 
-  // Stories (index 0) and Tabs (index 1) are prepended as data items.
-  // stickyHeaderIndices={[1]} makes tabs pin to the top when scrolled past.
+  // Tabs are always prepended; stories are currently feature-flagged off.
+  // stickyHeaderIndices pins the tabs row at the top while scrolling.
   const listData = useMemo<HomeFeedListItem[]>(
-    () => [STORIES_ITEM, TABS_ITEM, ...feedItems],
+    () => (SHOW_STORIES_ROW ? [STORIES_ITEM, TABS_ITEM, ...feedItems] : [TABS_ITEM, ...feedItems]),
     [feedItems]
   );
 
@@ -1345,7 +1346,8 @@ export const HomeFeed = React.memo(HomeFeedComponent);
 
 const STORIES_ITEM: HomeFeedListItem = { type: 'stories' };
 const TABS_ITEM: HomeFeedListItem = { type: 'tabs' };
-const STICKY_INDICES = [1]; // tabs item at index 1
+const SHOW_STORIES_ROW = false;
+const STICKY_INDICES = [SHOW_STORIES_ROW ? 1 : 0];
 const LIST_CONTENT_STYLE = { paddingBottom: 120 };
 
 const listKeyExtractor = (item: HomeFeedListItem) => {
