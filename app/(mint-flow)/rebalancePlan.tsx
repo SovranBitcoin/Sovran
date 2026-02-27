@@ -71,9 +71,6 @@ interface StepState {
   };
   // Auto-routing state
   routingDetail?: string;
-  routingChainPath?: string[];
-  routingChainPathNames?: string[];
-  routingHopIndex?: number;
 }
 
 function RebalancePlanScreen() {
@@ -499,6 +496,7 @@ function RebalancePlanScreen() {
         setLegLocalStatus('creatingInvoice');
 
         let transferAmount = originalAmount;
+        let finalAutoRouteStepId: string | null = null;
         let invoice: string;
         let preparedMeltOp: { id: string } | null = null;
 
@@ -863,8 +861,6 @@ function RebalancePlanScreen() {
 
             updateStepState(id, {
               routeSuggestion: { status: 'found', path: chainPath, pathNames: chainPathNames },
-              routingChainPath: chainPath,
-              routingChainPathNames: chainPathNames,
               routingDetail:
                 candidateRoutes.length > 1
                   ? `Trying route ${candidateIdx + 1}/${candidateRoutes.length}: via ${chainPathNames.slice(1, -1).join(' → ')}…`
@@ -892,8 +888,51 @@ function RebalancePlanScreen() {
               }
             }
 
-            // Execute chain hops sequentially
-            const chainId = `chain-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+            // Insert one visible row per hop immediately (swap-like grouped chain UX)
+            const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+            const chainId = `chain-${uniqueSuffix}`;
+            const autoRouteSteps: TransferStep[] = [];
+            for (let i = 0; i < chainPath.length - 1; i++) {
+              autoRouteSteps.push({
+                ...step,
+                id: `auto-route-${id}-${candidateIdx}-${i}-${uniqueSuffix}`,
+                fromMintUrl: chainPath[i],
+                toMintUrl: chainPath[i + 1],
+                chainId,
+                chainPath,
+                chainHopIndex: i,
+              });
+            }
+
+            setRunPlan((prev) => {
+              if (!prev) return prev;
+              const idx = prev.steps.findIndex((s) => s.id === id);
+              if (idx === -1) return prev;
+              return {
+                ...prev,
+                steps: [
+                  ...prev.steps.slice(0, idx + 1),
+                  ...autoRouteSteps,
+                  ...prev.steps.slice(idx + 1),
+                ],
+              };
+            });
+
+            const nextStates = { ...stepStatesRef.current };
+            nextStates[id] = {
+              ...nextStates[id],
+              status: 'skipped',
+              routingDetail:
+                candidateRoutes.length > 1
+                  ? `Trying route ${candidateIdx + 1}/${candidateRoutes.length}: via ${chainPathNames.slice(1, -1).join(' → ')}…`
+                  : `Routing via ${chainPathNames.slice(1, -1).join(' → ')}…`,
+            };
+            for (const hopStep of autoRouteSteps) {
+              nextStates[hopStep.id] = { status: 'pending' };
+            }
+            stepStatesRef.current = nextStates;
+            setStepStates(nextStates);
+
             let chainSuccess = true;
 
             try {
@@ -906,10 +945,13 @@ function RebalancePlanScreen() {
                 const hopFrom = chainPath[hopIdx];
                 const hopTo = chainPath[hopIdx + 1];
                 const hopLabel = `${extractDomain(hopFrom)} → ${extractDomain(hopTo)}`;
-
-                updateStepState(id, {
+                const hopStep = autoRouteSteps[hopIdx];
+                const hopStepId = hopStep.id;
+                finalAutoRouteStepId = hopStepId;
+                updateStepState(hopStepId, {
+                  status: 'creatingInvoice',
+                  errorMessage: undefined,
                   routingDetail: `Hop ${hopIdx + 1}/${chainPath.length - 1}: ${hopLabel}`,
-                  routingHopIndex: hopIdx,
                 });
 
                 // Get fresh balance for this hop's source
@@ -963,6 +1005,7 @@ function RebalancePlanScreen() {
                 // Create invoice on receiving mint
                 let hopMq = await requestLightningInvoice(hopTo, hopAmount);
                 let hopInvoice = hopMq.request;
+                updateStepState(hopStepId, { status: 'invoiceReady', invoice: hopInvoice });
 
                 // ── Probe melt quote for this hop's actual fee_reserve ──
                 try {
@@ -999,6 +1042,7 @@ function RebalancePlanScreen() {
                         hopAmount = cappedHop;
                         hopMq = await requestLightningInvoice(hopTo, hopAmount);
                         hopInvoice = hopMq.request;
+                        updateStepState(hopStepId, { status: 'invoiceReady', invoice: hopInvoice });
                       }
                     }
                   }
@@ -1045,6 +1089,7 @@ function RebalancePlanScreen() {
                       if (hopTransferAmt < minTransferThreshold) throw pErr;
                       const retryMq = await requestLightningInvoice(hopTo, hopTransferAmt);
                       hopInvoice = retryMq.request;
+                      updateStepState(hopStepId, { status: 'invoiceReady', invoice: hopInvoice });
                       continue;
                     }
                     throw pErr;
@@ -1052,6 +1097,7 @@ function RebalancePlanScreen() {
                 }
 
                 // Execute melt
+                updateStepState(hopStepId, { status: 'melting' });
                 const hopResult = (await manager.quotes.executeMelt(hopPrepared.id)) as unknown as
                   | { state?: string; id?: string }
                   | undefined;
@@ -1076,10 +1122,14 @@ function RebalancePlanScreen() {
                     quoteId: String(qId),
                     operationId: String(hopPrepared.id),
                   });
-                  useSwapTransactionsStore
-                    .getState()
-                    .setLegStatus(groupId, hopLegId, { localStatus: 'done' });
+                  useSwapTransactionsStore.getState().setLegStatus(groupId, hopLegId, {
+                    localStatus: 'verifying',
+                  });
                 }
+                updateStepState(hopStepId, {
+                  status: 'verifying',
+                  operationId: String(hopPrepared.id),
+                });
 
                 appendDebug({
                   event: 'chain_hop_done',
@@ -1093,6 +1143,12 @@ function RebalancePlanScreen() {
                 // Wait for balance on the receiving mint before next hop
                 if (hopIdx < chainPath.length - 2) {
                   await waitForBalanceIncrease(hopTo, hopTransferAmt, 12000);
+                  updateStepState(hopStepId, { status: 'done', routingDetail: undefined });
+                  if (groupId && hopLegId) {
+                    useSwapTransactionsStore
+                      .getState()
+                      .setLegStatus(groupId, hopLegId, { localStatus: 'done' });
+                  }
                 }
               }
             } catch (hopErr) {
@@ -1108,6 +1164,21 @@ function RebalancePlanScreen() {
               for (const url of chainPath) {
                 await CocoManager.restoreInflightProofsForMint(url);
               }
+              const failedHopMessage = hopErr instanceof Error ? hopErr.message : String(hopErr);
+              if (finalAutoRouteStepId) {
+                updateStepState(finalAutoRouteStepId, {
+                  status: 'failed',
+                  errorMessage: failedHopMessage,
+                });
+              }
+              const cleanupStates = { ...stepStatesRef.current };
+              for (const hopStep of autoRouteSteps) {
+                if (cleanupStates[hopStep.id]?.status === 'pending') {
+                  cleanupStates[hopStep.id] = { ...cleanupStates[hopStep.id], status: 'skipped' };
+                }
+              }
+              stepStatesRef.current = cleanupStates;
+              setStepStates(cleanupStates);
               chainSuccess = false;
               lastCandidateError = hopErr;
             }
@@ -1163,8 +1234,12 @@ function RebalancePlanScreen() {
 
         // Step 4: Verify - wait for balance to increase on receiving mint
         // The MintQuoteProcessor runs every 5 seconds to claim paid quotes
-        updateStepState(id, { status: 'verifying', routingDetail: undefined });
-        setLegLocalStatus('verifying');
+        if (finalAutoRouteStepId) {
+          updateStepState(finalAutoRouteStepId, { status: 'verifying', routingDetail: undefined });
+        } else {
+          updateStepState(id, { status: 'verifying', routingDetail: undefined });
+          setLegLocalStatus('verifying');
+        }
 
         // Poll for up to 15 seconds for the balance to update
         const balanceUpdated = await waitForBalanceIncrease(toMintUrl, transferAmount, 15000);
@@ -1181,12 +1256,18 @@ function RebalancePlanScreen() {
         }
 
         // Mark as done
-        updateStepState(id, {
-          status: 'done',
-          routingDetail: undefined,
-          routingHopIndex: undefined,
-        });
-        setLegLocalStatus('done');
+        if (finalAutoRouteStepId) {
+          updateStepState(finalAutoRouteStepId, {
+            status: 'done',
+            routingDetail: undefined,
+          });
+        } else {
+          updateStepState(id, {
+            status: 'done',
+            routingDetail: undefined,
+          });
+          setLegLocalStatus('done');
+        }
 
         appendDebug({
           event: 'step_done',
@@ -1240,7 +1321,6 @@ function RebalancePlanScreen() {
           status: 'failed',
           errorMessage,
           routingDetail: undefined,
-          routingHopIndex: undefined,
         });
         setLegLocalStatus('failed', errorMessage);
         return false;
@@ -1756,9 +1836,6 @@ function RebalancePlanScreen() {
                   errorMessage={state.errorMessage}
                   routeSuggestion={state.routeSuggestion}
                   routingDetail={state.routingDetail}
-                  routingChainPath={state.routingChainPath}
-                  routingChainPathNames={state.routingChainPathNames}
-                  routingHopIndex={state.routingHopIndex}
                   onRouteThrough={
                     runStatus !== 'running' ? () => handleRouteThrough(step) : undefined
                   }

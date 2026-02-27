@@ -72,7 +72,7 @@
         {
           "image": "./assets/images/production.png",
           "backgroundColor": "#000000",
-          "imageWidth": 800,
+          "imageWidth": 500,
           "dark": {
             "image": "./assets/images/production.png",
             "backgroundColor": "#000000"

@@ -20,13 +20,23 @@
  * Used by RebalanceStepRow between the two TransferEntryRow components.
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { useTheme } from 'providers/ThemeProvider';
 import { View } from 'components/ui/View/View';
 import { UntranslatedText } from 'components/ui/Text';
 import Icon from 'assets/icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  Easing,
+  cancelAnimation,
+  useAnimatedProps,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 
 // Step status values from the rebalancer
 type StepStatus =
@@ -45,6 +55,10 @@ interface TransferStepChainProps {
   status: StepStatus;
   /** Optional routing detail text shown below the chain when routing */
   routingDetail?: string;
+  /** Optional middle step label override (default: Send) */
+  middleLabel?: string;
+  /** Progress accent variant for animated connector */
+  progressVariant?: 'default' | 'swap';
 }
 
 // ---------- internal types ----------
@@ -63,8 +77,8 @@ function isCompleteish(type: NodeType): boolean {
 }
 
 /** Map a rebalancer StepStatus to a chain of 3 nodes. */
-function buildChain(status: StepStatus): ChainNode[] {
-  const labels = ['Invoice', 'Send', 'Done'];
+function buildChain(status: StepStatus, middleLabel: string): ChainNode[] {
+  const labels = ['Invoice', middleLabel, 'Done'];
 
   let currentIdx: number;
   switch (status) {
@@ -124,6 +138,41 @@ const DOT_CONTAINER = 20;
 const ICON_SIZE = 14;
 const SMALL_DOT = ICON_SIZE / 2; // 7 — matches HistoryEntryTimeline's future-small
 const LINE_THICKNESS = 3;
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
+function ChainLine({
+  isAnimated,
+  greenColor,
+  progressAccentColor,
+  greyColor,
+  animationStop,
+}: {
+  isAnimated: boolean;
+  greenColor: string;
+  progressAccentColor: string;
+  greyColor: string;
+  animationStop: SharedValue<number>;
+}) {
+  const animatedProps = useAnimatedProps(() => ({
+    locations: [0, animationStop.get(), 1] as [number, number, number],
+  }));
+
+  if (!isAnimated) {
+    return <View style={[styles.line, { backgroundColor: greyColor }]} />;
+  }
+
+  return (
+    <View style={styles.line}>
+      <AnimatedLinearGradient
+        animatedProps={animatedProps}
+        colors={[greenColor, progressAccentColor, greyColor]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+    </View>
+  );
+}
 
 // ---------- sub-components ----------
 
@@ -205,69 +254,119 @@ function ChainDot({
 
 // ---------- main component ----------
 
-export const TransferStepChain = React.memo(({ status, routingDetail }: TransferStepChainProps) => {
-  const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
+export const TransferStepChain = React.memo(
+  ({
+    status,
+    routingDetail,
+    middleLabel = 'Send',
+    progressVariant = 'default',
+  }: TransferStepChainProps) => {
+    const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
 
-  const greenColor = useMemo(() => getGreenColor('300'), [getGreenColor]);
-  const redColor = useMemo(() => getRedColor('300'), [getRedColor]);
-  const greyColor = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
-  const labelColor = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
+    const greenColor = useMemo(() => getGreenColor('300'), [getGreenColor]);
+    const orangeColor = '#fb923c';
+    const progressAccentColor = progressVariant === 'swap' ? orangeColor : greenColor;
+    const redColor = useMemo(() => getRedColor('300'), [getRedColor]);
+    const greyColor = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
+    const labelColor = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
 
-  const chain = useMemo(() => buildChain(status), [status]);
+    const chain = useMemo(() => buildChain(status, middleLabel), [middleLabel, status]);
+    const animationStop = useSharedValue(0.3);
+    const currentIdx = useMemo(() => chain.findIndex((item) => item.type === 'current'), [chain]);
+    const animatedLineIdx = useMemo(() => {
+      if (currentIdx < 0) return -1;
+      if (currentIdx >= chain.length - 1) return -1;
+      return currentIdx;
+    }, [chain.length, currentIdx]);
 
-  const isRouting = status === 'routing';
+    const isRouting = status === 'routing';
+    const isInProgress =
+      status === 'creatingInvoice' ||
+      status === 'invoiceReady' ||
+      status === 'melting' ||
+      status === 'verifying' ||
+      status === 'routing';
 
-  return (
-    <View style={styles.container}>
-      {/* Row of [node-col] [line] [node-col] [line] [node-col]
+    useEffect(() => {
+      if (!isInProgress) {
+        cancelAnimation(animationStop);
+        animationStop.set(0.3);
+        return;
+      }
+
+      animationStop.set(
+        withRepeat(
+          withTiming(0.6, {
+            duration: 900,
+            easing: Easing.inOut(Easing.quad),
+          }),
+          -1,
+          true
+        )
+      );
+
+      return () => {
+        cancelAnimation(animationStop);
+      };
+    }, [animationStop, isInProgress]);
+
+    return (
+      <View style={styles.container}>
+        {/* Row of [node-col] [line] [node-col] [line] [node-col]
           Each node-col is a VStack so the label sits directly under its dot. */}
-      <View style={styles.chainRow}>
-        {chain.map((node, idx) => {
-          const isLast = idx === chain.length - 1;
-          const nextNode = !isLast ? chain[idx + 1] : null;
-          const lineComplete =
-            nextNode != null && isCompleteish(node.type) && isCompleteish(nextNode.type);
-          const isActive = isCompleteish(node.type);
+        <View style={styles.chainRow}>
+          {chain.map((node, idx) => {
+            const isLast = idx === chain.length - 1;
+            const nextNode = !isLast ? chain[idx + 1] : null;
+            const lineComplete =
+              nextNode != null && isCompleteish(node.type) && isCompleteish(nextNode.type);
+            const isActive = isCompleteish(node.type);
+            const isAnimatedLine = idx === animatedLineIdx;
 
-          return (
-            <React.Fragment key={node.label}>
-              {/* Node column: dot + label stacked vertically */}
-              <View style={styles.nodeColumn}>
-                <ChainDot
-                  type={node.type}
-                  greenColor={greenColor}
-                  redColor={redColor}
-                  greyColor={greyColor}
-                />
-                <UntranslatedText
-                  size={9}
-                  bold={node.type === 'current'}
-                  color={isActive ? labelColor : opacity(labelColor, 0.5)}
-                  style={styles.label}>
-                  {node.label}
-                </UntranslatedText>
-              </View>
+            return (
+              <React.Fragment key={node.label}>
+                {/* Node column: dot + label stacked vertically */}
+                <View style={styles.nodeColumn}>
+                  <ChainDot
+                    type={node.type}
+                    greenColor={greenColor}
+                    redColor={redColor}
+                    greyColor={greyColor}
+                  />
+                  <UntranslatedText
+                    size={9}
+                    bold={node.type === 'current'}
+                    color={isActive ? labelColor : opacity(labelColor, 0.5)}
+                    style={styles.label}>
+                    {node.label}
+                  </UntranslatedText>
+                </View>
 
-              {/* Line between nodes — vertically centered with the dot */}
-              {!isLast && (
-                <View
-                  style={[styles.line, { backgroundColor: lineComplete ? greenColor : greyColor }]}
-                />
-              )}
-            </React.Fragment>
-          );
-        })}
+                {/* Line between nodes — vertically centered with the dot */}
+                {!isLast && (
+                  <ChainLine
+                    isAnimated={isInProgress && isAnimatedLine}
+                    greenColor={greenColor}
+                    progressAccentColor={progressAccentColor}
+                    greyColor={lineComplete ? greenColor : greyColor}
+                    animationStop={animationStop}
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </View>
+
+        {/* Routing detail subtitle */}
+        {isRouting && routingDetail ? (
+          <UntranslatedText size={10} color="#c084fc" style={styles.routingDetail}>
+            {routingDetail}
+          </UntranslatedText>
+        ) : null}
       </View>
-
-      {/* Routing detail subtitle */}
-      {isRouting && routingDetail ? (
-        <UntranslatedText size={10} color="#c084fc" style={styles.routingDetail}>
-          {routingDetail}
-        </UntranslatedText>
-      ) : null}
-    </View>
-  );
-});
+    );
+  }
+);
 TransferStepChain.displayName = 'TransferStepChain';
 
 const styles = StyleSheet.create({
@@ -294,6 +393,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: LINE_THICKNESS,
     borderRadius: LINE_THICKNESS / 2,
+    overflow: 'hidden',
     marginHorizontal: 4,
     // Center the line vertically with the dot:
     // (DOT_CONTAINER - LINE_THICKNESS) / 2 = (20 - 3) / 2 = 8.5
