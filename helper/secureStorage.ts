@@ -6,7 +6,20 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 // Keys for secure storage
 const STORAGE_KEYS = {
   USER_MNEMONIC: 'user_mnemonic',
+  MIGRATIONS_COMPLETE_PREFIX: 'migrations_complete_',
+  // Legacy key (pre per-account migration) — still checked for backward compat
+  MIGRATIONS_COMPLETE_LEGACY: 'migrations_complete',
+  DERIVED_KEYS_PREFIX: 'derived_keys_',
+  CASHU_MNEMONIC_PREFIX: 'cashu_mnemonic_',
 } as const;
+
+export interface CachedDerivedKeys {
+  npub: string;
+  nsec: string;
+  pubkey: string;
+  privateKeyHex: string;
+  mnemonicHash: string;
+}
 
 // iOS-specific options for enhanced security
 const IOS_SECURE_OPTIONS = {
@@ -114,16 +127,25 @@ export async function ensureMnemonicExists(): Promise<string | null> {
 }
 
 /**
- * Clears all data from secure storage
+ * Clears all data from secure storage including per-account keys.
+ * @param maxAccountIndex Upper bound of account indexes to clear (default 10).
  * @returns Promise<boolean> True if cleared successfully, false otherwise
  */
-export async function clearAllSecureData(): Promise<boolean> {
+export async function clearAllSecureData(maxAccountIndex: number = 10): Promise<boolean> {
   try {
     const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
 
-    // Clear all known storage keys
-    const keys = Object.values(STORAGE_KEYS);
-    const clearPromises = keys.map((key) =>
+    const keysToDelete: string[] = [
+      STORAGE_KEYS.USER_MNEMONIC,
+      STORAGE_KEYS.MIGRATIONS_COMPLETE_LEGACY,
+    ];
+
+    // Per-account keys for every possible account index
+    for (let i = 0; i <= maxAccountIndex; i++) {
+      keysToDelete.push(migrationsCompleteKey(i), derivedKeysKey(i), cashuMnemonicKey(i));
+    }
+
+    const clearPromises = keysToDelete.map((key) =>
       SecureStore.deleteItemAsync(key, options).catch((error) => {
         console.warn(`Failed to clear ${key}:`, error);
         return false;
@@ -136,6 +158,133 @@ export async function clearAllSecureData(): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('Failed to clear secure storage:', error);
+    return false;
+  }
+}
+
+// ── Derived Keys Cache ──────────────────────────────────────────
+
+function derivedKeysKey(accountIndex: number): string {
+  return `${STORAGE_KEYS.DERIVED_KEYS_PREFIX}${accountIndex}`;
+}
+
+function cashuMnemonicKey(accountIndex: number): string {
+  return `${STORAGE_KEYS.CASHU_MNEMONIC_PREFIX}${accountIndex}`;
+}
+
+/**
+ * Simple hash of a mnemonic string used to detect if the mnemonic changed.
+ * Not cryptographic — just a fast fingerprint for cache invalidation.
+ */
+export function hashMnemonic(mnemonic: string): string {
+  let hash = 0;
+  for (let i = 0; i < mnemonic.length; i++) {
+    hash = (hash * 31 + mnemonic.charCodeAt(i)) | 0;
+  }
+  return hash.toString(36);
+}
+
+export async function storeDerivedKeys(
+  accountIndex: number,
+  keys: CachedDerivedKeys
+): Promise<boolean> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+    await SecureStore.setItemAsync(derivedKeysKey(accountIndex), JSON.stringify(keys), options);
+    return true;
+  } catch (error) {
+    console.error('Failed to store derived keys:', error);
+    return false;
+  }
+}
+
+export async function retrieveDerivedKeys(accountIndex: number): Promise<CachedDerivedKeys | null> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+    const raw = await SecureStore.getItemAsync(derivedKeysKey(accountIndex), options);
+    if (!raw) return null;
+    return JSON.parse(raw) as CachedDerivedKeys;
+  } catch (error) {
+    console.error('Failed to retrieve derived keys:', error);
+    return null;
+  }
+}
+
+export async function storeCashuMnemonic(
+  accountIndex: number,
+  cashuMnemonicValue: string,
+  mnemonicHash: string
+): Promise<boolean> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+    const payload = JSON.stringify({ value: cashuMnemonicValue, mnemonicHash });
+    await SecureStore.setItemAsync(cashuMnemonicKey(accountIndex), payload, options);
+    return true;
+  } catch (error) {
+    console.error('Failed to store cashu mnemonic:', error);
+    return false;
+  }
+}
+
+export async function retrieveCashuMnemonic(
+  accountIndex: number
+): Promise<{ value: string; mnemonicHash: string } | null> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+    const raw = await SecureStore.getItemAsync(cashuMnemonicKey(accountIndex), options);
+    if (!raw) return null;
+    return JSON.parse(raw) as { value: string; mnemonicHash: string };
+  } catch (error) {
+    console.error('Failed to retrieve cashu mnemonic:', error);
+    return null;
+  }
+}
+
+// ── Migrations Complete Flag (per-account) ──────────────────────
+
+function migrationsCompleteKey(accountIndex: number): string {
+  return `${STORAGE_KEYS.MIGRATIONS_COMPLETE_PREFIX}${accountIndex}`;
+}
+
+/**
+ * Check whether Redux migrations have already completed for the given account.
+ * Falls back to the legacy global key for accounts that migrated before the
+ * per-account key was introduced.
+ */
+export async function isMigrationsComplete(accountIndex: number = 0): Promise<boolean> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+    // Check per-account key first
+    const perAccount = await SecureStore.getItemAsync(migrationsCompleteKey(accountIndex), options);
+    if (perAccount === 'true') return true;
+
+    // Backward compat: check legacy global key (only trust it for account 0)
+    if (accountIndex === 0) {
+      const legacy = await SecureStore.getItemAsync(
+        STORAGE_KEYS.MIGRATIONS_COMPLETE_LEGACY,
+        options
+      );
+      if (legacy === 'true') {
+        // Promote to per-account key so we don't check legacy again
+        await SecureStore.setItemAsync(migrationsCompleteKey(0), 'true', options);
+        return true;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Failed to check migrations complete flag:', error);
+    return false;
+  }
+}
+
+export async function setMigrationsComplete(accountIndex: number = 0): Promise<boolean> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+    await SecureStore.setItemAsync(migrationsCompleteKey(accountIndex), 'true', options);
+    return true;
+  } catch (error) {
+    console.error('Failed to set migrations complete flag:', error);
     return false;
   }
 }

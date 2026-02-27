@@ -10,6 +10,7 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
+import { initLog } from '@/helper/initTiming';
 
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
@@ -37,6 +38,8 @@ export class CocoManager {
   private static instance: Manager | null = null;
   private static isInitializing = false;
   private static cashuMnemonic: string | null = null;
+  private static signerKey: Uint8Array | null = null;
+  private static npcPlugin: NPCPlugin | null = null;
   private static isFreeingReservedProofs = false;
   /** Current account index — controls which DB file and NPC signer to use */
   private static accountIndex = 0;
@@ -64,109 +67,85 @@ export class CocoManager {
   }
 
   /**
-   * Initialize the Coco Manager with database and seed management
-   * This should be called once at app startup
+   * Set the Nostr private key so getCurrentProfileSigner() can skip derivation.
+   * Called from CocoProvider with the key already derived by NostrKeysProvider.
+   */
+  static setSignerKey(sk: Uint8Array): void {
+    this.signerKey = sk;
+  }
+
+  /**
+   * Initialize the Coco Manager with database and seed management.
+   * This creates the Manager instance only — no network calls, no watchers.
+   * Call {@link enableWatchersAndSync} separately (in a non-blocking phase)
+   * to start watchers, processors, and the initial NPC sync.
    */
   static async initialize(): Promise<Manager> {
     if (this.instance) {
-      console.log('Manager already initialized, returning existing instance');
+      initLog('CocoManager', 'already initialized, returning existing instance');
       return this.instance;
     }
 
     if (this.isInitializing) {
-      console.log('Manager initialization in progress, waiting...');
-      // Wait for ongoing initialization with timeout
+      initLog('CocoManager', 'initialization in progress, waiting...');
       let attempts = 0;
       while (this.isInitializing && attempts < 50) {
-        // 5 second timeout
         await new Promise((resolve) => setTimeout(resolve, 100));
         attempts++;
       }
-      if (this.instance) {
-        return this.instance;
-      }
-      if (attempts >= 50) {
-        throw new Error('Manager initialization timeout');
-      }
+      if (this.instance) return this.instance;
+      if (attempts >= 50) throw new Error('Manager initialization timeout');
     }
 
-    console.log('Starting Manager initialization...');
     this.isInitializing = true;
-
-    // Reset any existing instance to ensure clean start
     this.instance = null;
 
     try {
-      // Initialize SQLite database (per-profile: account 0 = coco.db, N>0 = coco-N.db)
+      // 1. SQLite database
       const dbName = this.getDbName();
-      console.log(`Opening Coco database: ${dbName} (account index: ${this.accountIndex})`);
+      initLog('CocoManager', `opening DB: ${dbName}`);
       const db = SQLite.openDatabaseSync(dbName);
       const repositories = new ExpoSqliteRepositories({ database: db });
       await repositories.init();
+      initLog('CocoManager', 'DB + repos initialized');
 
-      // Seed management - use precomputed cashu mnemonic if available
+      // 2. Seed getter (lazy — no crypto work until first call)
       const seedGetter = async (): Promise<Uint8Array> => {
         if (this.cashuMnemonic) {
-          // Use precomputed cashu mnemonic from NostrKeysProvider
           return bip39.mnemonicToSeedSync(this.cashuMnemonic, '');
         }
-
-        // Fallback to computing from main mnemonic (for backward compatibility)
         const mnemonic = await retrieveMnemonic();
-        if (!mnemonic) {
-          throw new Error('No mnemonic found in secure storage');
-        }
-
-        // Derive cashu mnemonic using the same logic as useCashuMnemonic hook
+        if (!mnemonic) throw new Error('No mnemonic found in secure storage');
         const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic, ''));
-        const DERIVATION_PATH = `m/44'/129372'`;
-        const path = `${DERIVATION_PATH}/0'/${this.accountIndex}'/0/0`;
+        const path = `m/44'/129372'/0'/${this.accountIndex}'/0/0`;
         const seed = root.derive(path);
         const derivedCashuMnemonic = bip39.entropyToMnemonic(
           seed.privateKey as Uint8Array,
           wordlist
         );
-
         return bip39.mnemonicToSeedSync(derivedCashuMnemonic, '');
       };
 
-      // Prepare plugins array
+      // 3. NPC plugin (constructor only — no network call)
       const plugins: any[] = [];
-
-      // Add NPC plugin if current profile is available
+      initLog('CocoManager', 'creating signer...');
       const nsecSigner = await this.getCurrentProfileSigner();
-      if (nsecSigner) {
-        console.log('NsecSigner created:', typeof nsecSigner, nsecSigner);
+      initLog('CocoManager', `signer created: ${!!nsecSigner}`);
 
-        // Create a signer function that the NPCPlugin expects
+      if (nsecSigner) {
         const signerFunction = async (eventTemplate: any) => {
-          console.log(
-            'NPCPlugin signer function called with:',
-            typeof eventTemplate,
-            eventTemplate
-          );
           return await nsecSigner.signEvent(eventTemplate);
         };
-
-        console.log('Creating NPCPlugin with signer function:', typeof signerFunction);
-
-        const npcPlugin = new NPCPlugin(
-          'https://npubx.cash', // NPC server base URL
-          signerFunction,
-          {
-            syncIntervalMs: 30000, // Sync every 30 seconds
-            useWebsocket: true, // Enable real-time updates
-            // logger: new ConsoleLogger('NPCPlugin', { level: 'debug' }),
-          }
-        );
-        plugins.push(npcPlugin);
-        console.log('NPC plugin prepared for registration');
-      } else {
-        console.warn('NPC plugin not prepared - no current profile signer available');
+        this.npcPlugin = new NPCPlugin('https://npubx.cash', signerFunction, {
+          syncIntervalMs: 30000,
+          useWebsocket: true,
+        });
+        plugins.push(this.npcPlugin);
+        initLog('CocoManager', 'NPC plugin created');
       }
 
-      // Create manager with repositories, seed, and plugins
-      console.log('Creating Manager with plugins:', plugins.length, plugins);
+      // 4. Create Manager
+      initLog('CocoManager', 'creating Manager instance...');
       this.instance = new Manager(
         repositories,
         seedGetter,
@@ -174,70 +153,75 @@ export class CocoManager {
         undefined,
         plugins
       );
-      console.log('Manager created successfully');
+      initLog('CocoManager', 'Manager created');
 
-      // Trigger initial sync for NPC plugin if available
-      if (nsecSigner && plugins.length > 0) {
-        try {
-          const npcPlugin = plugins[0] as NPCPlugin;
-          await npcPlugin.sync();
-          console.log('Initial NPC sync completed');
-        } catch (error) {
-          console.error('Initial NPC sync failed:', error);
-        }
-      }
-
-      // Enable watchers and processors for real-time updates
-      // Add longer delays between watcher initializations to prevent transaction conflicts
-      try {
-        await this.instance.enableMintQuoteWatcher({
-          watchExistingPendingOnStart: true,
-        });
-
-        console.log('Mint quote watcher enabled');
-        await new Promise((resolve) => setTimeout(resolve, 500)); // Longer delay
-      } catch (error) {
-        console.warn('Failed to enable mint quote watcher:', error);
-      }
-
-      try {
-        await this.instance.enableMintQuoteProcessor({
-          processIntervalMs: 5000, // Check every 5 seconds
-          maxRetries: 3,
-          baseRetryDelayMs: 1000,
-          initialEnqueueDelayMs: 2000,
-        });
-        console.log('Mint quote processor enabled');
-        await new Promise((resolve) => setTimeout(resolve, 500)); // Longer delay
-      } catch (error) {
-        console.warn('Failed to enable mint quote processor:', error);
-      }
-
-      // Enable ProofStateWatcher with proper error handling and retry logic
-      try {
-        // Add a longer delay before enabling proof state watcher to ensure
-        // all previous database operations are complete
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        await this.instance.enableProofStateWatcher();
-        console.log('Proof state watcher enabled');
-      } catch (error) {
-        console.warn('Failed to enable proof state watcher:', error);
-        // Try again after a longer delay
-        try {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          await this.instance.enableProofStateWatcher();
-          console.log('Proof state watcher enabled on retry');
-        } catch (retryError) {
-          console.error('Failed to enable proof state watcher after retry:', retryError);
-        }
-      }
       return this.instance;
     } catch (error) {
       console.error('Failed to initialize Coco Manager:', error);
       throw error;
     } finally {
       this.isInitializing = false;
+    }
+  }
+
+  /**
+   * Enable watchers, processors, and run initial NPC sync.
+   * Safe to call from a non-blocking background phase — these involve
+   * network I/O and DB transactions that don't need to block app startup.
+   */
+  static async enableWatchersAndSync(): Promise<void> {
+    if (!this.instance) {
+      throw new Error('Manager not initialized. Call initialize() first.');
+    }
+
+    // NPC initial sync
+    if (this.npcPlugin) {
+      try {
+        initLog('CocoManager', 'NPC sync starting...');
+        await this.npcPlugin.sync();
+        initLog('CocoManager', 'NPC sync done');
+      } catch (error) {
+        console.warn('Initial NPC sync failed (non-fatal):', error);
+      }
+    }
+
+    // Mint quote watcher
+    try {
+      initLog('CocoManager', 'enabling mint quote watcher...');
+      await this.instance.enableMintQuoteWatcher({ watchExistingPendingOnStart: true });
+      initLog('CocoManager', 'mint quote watcher enabled');
+    } catch (error) {
+      console.warn('Failed to enable mint quote watcher:', error);
+    }
+
+    // Mint quote processor
+    try {
+      initLog('CocoManager', 'enabling mint quote processor...');
+      await this.instance.enableMintQuoteProcessor({
+        processIntervalMs: 5000,
+        maxRetries: 3,
+        baseRetryDelayMs: 1000,
+        initialEnqueueDelayMs: 2000,
+      });
+      initLog('CocoManager', 'mint quote processor enabled');
+    } catch (error) {
+      console.warn('Failed to enable mint quote processor:', error);
+    }
+
+    // Proof state watcher
+    try {
+      initLog('CocoManager', 'enabling proof state watcher...');
+      await this.instance.enableProofStateWatcher();
+      initLog('CocoManager', 'proof state watcher enabled');
+    } catch (error) {
+      console.warn('Failed to enable proof state watcher:', error);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await this.instance.enableProofStateWatcher();
+        initLog('CocoManager', 'proof state watcher enabled on retry');
+      } catch (retryError) {
+        console.error('Proof state watcher retry failed:', retryError);
+      }
     }
   }
 
@@ -301,22 +285,25 @@ export class CocoManager {
   }
 
   /**
-   * Get the current profile's signer for NPC plugin
-   * This creates a signer from the current profile's nsec
+   * Get the current profile's signer for NPC plugin.
+   * Uses the pre-set signerKey when available (fast path), falling back
+   * to deriving from the mnemonic if setSignerKey() was never called.
    */
   private static async getCurrentProfileSigner(): Promise<NsecSigner | null> {
     try {
-      // Get mnemonic from secure storage
-      const mnemonic = await retrieveMnemonic();
+      if (this.signerKey) {
+        initLog('CocoManager', 'using pre-set signerKey (fast path)');
+        return new NsecSigner(this.signerKey);
+      }
 
+      initLog('CocoManager', 'signerKey not set — deriving from mnemonic (slow path)');
+      const mnemonic = await retrieveMnemonic();
       if (!mnemonic) {
         console.warn('No mnemonic found for NPC plugin');
         return null;
       }
 
-      // Derive Nostr keys using NIP-06 for the current account
       const { privateKey: sk } = nip06.accountFromSeedWords(mnemonic, undefined, this.accountIndex);
-
       return new NsecSigner(sk);
     } catch (error) {
       console.error('Failed to create signer for NPC plugin:', error);
@@ -434,6 +421,8 @@ export class CocoManager {
   static async reset(): Promise<void> {
     await this.disableWatchers();
     this.instance = null;
+    this.npcPlugin = null;
+    this.signerKey = null;
     this.isInitializing = false;
   }
 

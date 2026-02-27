@@ -5,7 +5,6 @@ import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
 const profileStorage = createProfileScopedStorage();
 
 interface MintState {
-  // Map of pubkey to selectedMint
   selectedMints: Record<string, string | undefined>;
 }
 
@@ -23,10 +22,8 @@ type MintStore = MintState & MintActions;
 export const useMintStore = create<MintStore>()(
   persist(
     (set, get) => ({
-      // Initial state
       selectedMints: {},
 
-      // Actions
       setSelectedMint: (pubkey: string, mintUrl: string) => {
         console.log('MintStore: setSelectedMint called with:', { pubkey, mintUrl });
         set((state) => {
@@ -70,7 +67,6 @@ export const useMintStore = create<MintStore>()(
         return currentState.selectedMints;
       },
 
-      // Debug method to check what's actually stored in AsyncStorage
       debugStorage: async () => {
         try {
           const stored = await profileStorage.getItem('mint-store');
@@ -90,7 +86,6 @@ export const useMintStore = create<MintStore>()(
           console.log('MintStore: clearAllData called');
           // Clear from profile-scoped AsyncStorage
           await profileStorage.removeItem('mint-store');
-          // Reset state to initial values
           set({
             selectedMints: {},
           });
@@ -104,8 +99,9 @@ export const useMintStore = create<MintStore>()(
     {
       name: 'mint-store',
       storage: createJSONStorage(() => createProfileScopedStorage()),
-      // Only persist the selectedMints
-      partialize: (state) => ({ selectedMints: state.selectedMints }),
+      partialize: (state) => ({
+        selectedMints: state.selectedMints,
+      }),
       // Add error handling for storage issues
       onRehydrateStorage: () => (state, error) => {
         console.log('MintStore: onRehydrateStorage called with state:', state, 'error:', error);

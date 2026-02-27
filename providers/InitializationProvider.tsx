@@ -8,7 +8,8 @@ import React, {
   useRef,
   memo,
 } from 'react';
-import { Animated, Easing, Dimensions } from 'react-native';
+import { initLog } from '@/helper/initTiming';
+import { Dimensions } from 'react-native';
 import { View } from 'components/ui/View/View';
 import { Text } from '@/components/ui/Text';
 import Icon from '@/assets/icons';
@@ -22,20 +23,48 @@ import Svg, {
   LinearGradient as SvgLinearGradient,
   Stop,
 } from 'react-native-svg';
-import {
+import Animated, {
   useSharedValue,
   useAnimatedProps,
+  useAnimatedStyle,
   withTiming,
   withDelay,
   withSequence,
   withRepeat,
   Easing as REasing,
   createAnimatedComponent,
+  runOnJS,
 } from 'react-native-reanimated';
 
+/**
+ * Initialization stage system
+ *
+ * Each provider registers one or more stages via `useInitializationStage`.
+ * Stages can declare dependencies (`dependsOn`) and whether they are
+ * **blocking** (default) or **non-blocking**.
+ *
+ *  - **Blocking** stages (`blocking: true`, the default) keep the splash
+ *    screen visible. The app renders only after every blocking stage completes.
+ *  - **Non-blocking** stages (`blocking: false`) run in the background.
+ *    They still appear in the log UI for debugging but do not prevent the
+ *    app from rendering.
+ *
+ * Current stage map:
+ *
+ *  | Stage ID         | Blocking | Depends On | Provider            |
+ *  |------------------|----------|------------|---------------------|
+ *  | migrations       | yes      | —          | MigrationGate       |
+ *  | nostr            | yes      | migrations | NostrKeysProvider   |
+ *  | coco             | yes      | nostr      | CocoProvider        |
+ *  | nostr-ndk        | no       | coco       | NostrNDKProvider    |
+ *  | coco-background  | no       | coco       | CocoProvider        |
+ */
+
 // ── Initialization display type ──────────────────────────────
-// 'text' = scrolling text steps, 'logo' = animated S logo
-const INITIALIZATION_DISPLAY_TYPE: 'text' | 'logo' = 'logo';
+// 'text'   = scrolling text steps (custom React overlay)
+// 'logo'   = animated S logo (custom React overlay)
+// 'splash' = keep the native Expo splash screen visible until init completes
+export const INITIALIZATION_DISPLAY_TYPE: 'text' | 'logo' | 'splash' = 'splash';
 
 // ── Animated Logo SVG Constants ──────────────────────────────
 const PATH1_LENGTH = 850;
@@ -58,11 +87,27 @@ const AnimatedSvgPath = createAnimatedComponent(SvgPath);
 
 type StageStatus = 'pending' | 'loading' | 'complete' | 'error';
 
+/** Configuration passed when registering a new initialization stage. */
+export interface StageConfig {
+  /** Human-readable message shown in the splash log. */
+  message?: string;
+  /** IDs of stages that must complete before this one can start. */
+  dependsOn?: string[];
+  /**
+   * When `true` (the default), the splash screen stays visible until this
+   * stage completes. Set to `false` for work that can happen after the app
+   * is already visible (e.g. relay connections, recovery operations).
+   */
+  blocking?: boolean;
+}
+
 interface Stage {
   id: string;
   message: string;
   status: StageStatus;
   dependsOn?: string[];
+  /** When true (the default), this stage must complete before the app renders. */
+  blocking: boolean;
   error?: string;
   timestamp: number;
 }
@@ -72,10 +117,7 @@ interface InitializationContextValue {
   logHistory: { message: string; timestamp: number; stageId: string }[];
   currentStage: Stage | null;
   isInitializing: boolean;
-  registerStage: (
-    id: string,
-    config: { message?: string; dependsOn?: string[]; blocking?: boolean }
-  ) => void;
+  registerStage: (id: string, config: StageConfig) => void;
   updateStage: (
     id: string,
     updates: { message?: string; status?: StageStatus; error?: string }
@@ -105,6 +147,11 @@ const useInitializationContext = () => {
   return useContext(InitializationContext);
 };
 
+export function useInitializationState() {
+  const { isInitializing } = useInitializationContext();
+  return { isInitializing };
+}
+
 interface InitializationProviderProps {
   children: ReactNode;
   forceVisible?: boolean;
@@ -123,36 +170,43 @@ export function InitializationProvider({
   const [isTestMode, setIsTestMode] = useState(testMode);
   // When true, forces isInitializing=true until real stages register
   const [forceReinitialize, setForceReinitialize] = useState(false);
+  // Synchronous map of stage id → blocking flag. Updated immediately in
+  // registerStage so updateStage can check it before the next React render.
+  const blockingFlagsRef = useRef<Map<string, boolean>>(new Map());
   // Track pending log updates per stage to debounce rapid calls
   const pendingLogUpdates = useRef<Map<string, { message: string; timeout: NodeJS.Timeout }>>(
     new Map()
   );
 
-  const registerStage = useCallback(
-    (id: string, config: { message?: string; dependsOn?: string[]; blocking?: boolean }) => {
-      setStages((prev) => {
-        if (prev.has(id)) {
-          return prev;
-        }
-        console.log(`[InitializationProvider] Registering stage: ${id}`, config);
-        const newStages = new Map(prev);
-        newStages.set(id, {
-          id,
-          message: config.message || `Initializing ${id}...`,
-          status: 'pending',
-          dependsOn: config.dependsOn,
-          timestamp: Date.now(),
-        });
-        console.log(`[InitializationProvider] Stage ${id} registered as pending`);
-        return newStages;
+  const registerStage = useCallback((id: string, config: StageConfig) => {
+    const isBlocking = config.blocking !== false;
+    blockingFlagsRef.current.set(id, isBlocking);
+
+    initLog(
+      'registerStage',
+      `${id} (blocking=${isBlocking}, dependsOn=${config.dependsOn?.join(',') ?? 'none'})`
+    );
+
+    setStages((prev) => {
+      if (prev.has(id)) {
+        return prev;
+      }
+      const newStages = new Map(prev);
+      newStages.set(id, {
+        id,
+        message: config.message || `Initializing ${id}...`,
+        status: 'pending',
+        dependsOn: config.dependsOn,
+        blocking: isBlocking,
+        timestamp: Date.now(),
       });
-    },
-    []
-  );
+      return newStages;
+    });
+  }, []);
 
   const updateStage = useCallback(
     (id: string, updates: { message?: string; status?: StageStatus; error?: string }) => {
-      console.log(`[InitializationProvider] Updating stage: ${id}`, updates);
+      initLog('updateStage', `${id} status=${updates.status ?? '-'} msg=${updates.message ?? '-'}`);
 
       // Always update stage status immediately (for status changes like 'complete', 'error')
       setStages((prev) => {
@@ -169,7 +223,12 @@ export function InitializationProvider({
         return newStages;
       });
 
-      // Handle log history updates
+      // Non-blocking stages run in the background — don't add their
+      // messages to the visible log history so they can't hold up the
+      // splash fade-out animation.
+      if (blockingFlagsRef.current.get(id) === false) return;
+
+      // Handle log history updates (blocking stages only)
       if (updates.message || updates.status === 'complete') {
         // If status is 'complete', flush any pending log for this stage immediately
         if (updates.status === 'complete') {
@@ -177,7 +236,6 @@ export function InitializationProvider({
           if (pending) {
             clearTimeout(pending.timeout);
             pendingLogUpdates.current.delete(id);
-            // Add the pending message immediately
             setLogHistory((prevLog) => {
               const recentEntry = prevLog.find(
                 (entry) => entry.stageId === id && entry.message === pending.message
@@ -192,16 +250,13 @@ export function InitializationProvider({
         // For message updates, add immediately but dedupe rapid identical messages
         if (updates.message) {
           const message = updates.message;
-          // Clear any pending update for this stage
           const pending = pendingLogUpdates.current.get(id);
           if (pending) {
             clearTimeout(pending.timeout);
           }
 
-          // Add to log immediately (no debounce) for better visual feedback
           const now = Date.now();
           setLogHistory((prevLog) => {
-            // Dedupe: don't add if same message was added very recently for this stage
             const recentEntry = prevLog.find(
               (entry) =>
                 entry.stageId === id && entry.message === message && now - entry.timestamp < 100
@@ -238,14 +293,24 @@ export function InitializationProvider({
   const canStageStart = useCallback(
     (id: string): boolean => {
       const stage = stages.get(id);
-      if (!stage || !stage.dependsOn || stage.dependsOn.length === 0) {
+      // Stage not registered yet — don't allow it to start prematurely.
+      // This prevents isInitializing from flickering false→true when a
+      // blocking stage registers one render after its dependency completes.
+      if (!stage) return false;
+
+      if (!stage.dependsOn || stage.dependsOn.length === 0) {
         return true;
       }
 
-      return stage.dependsOn.every((depId) => {
+      const result = stage.dependsOn.every((depId) => {
         const depStage = stages.get(depId);
         return depStage && depStage.status === 'complete';
       });
+
+      if (result && stage.status === 'pending') {
+        initLog('canStageStart', `${id} → true (deps satisfied)`);
+      }
+      return result;
     },
     [stages]
   );
@@ -285,8 +350,22 @@ export function InitializationProvider({
     isTestMode ||
     forceReinitialize ||
     Array.from(stages.values()).some(
-      (stage) => stage.status === 'loading' || stage.status === 'pending'
+      (stage) => stage.blocking && (stage.status === 'loading' || stage.status === 'pending')
     );
+
+  // Log isInitializing transitions
+  const prevInitializing = useRef<boolean | null>(null);
+  if (prevInitializing.current !== isInitializing) {
+    const blockingStages = Array.from(stages.values())
+      .filter((s) => s.blocking)
+      .map((s) => `${s.id}=${s.status}`)
+      .join(', ');
+    initLog(
+      'isInitializing',
+      `${String(prevInitializing.current)} → ${String(isInitializing)} | blocking=[${blockingStages}]`
+    );
+    prevInitializing.current = isInitializing;
+  }
 
   // Clear forceReinitialize once real stages have registered (they'll keep isInitializing true)
   useEffect(() => {
@@ -301,6 +380,7 @@ export function InitializationProvider({
     setForceReinitialize(true);
     // Clear all stages so inner providers can re-register fresh
     setStages(new Map());
+    blockingFlagsRef.current.clear();
     // Clear log history so the animation starts from scratch
     setLogHistory([]);
     // Clear any pending log updates
@@ -363,6 +443,7 @@ export function InitializationProvider({
             id: `test-${index}`,
             message: step.message,
             status: 'loading',
+            blocking: true,
             timestamp: Date.now(),
           });
           return newStages;
@@ -429,7 +510,7 @@ export function InitializationProvider({
   return (
     <InitializationContext.Provider value={contextValue}>
       {children}
-      {INITIALIZATION_DISPLAY_TYPE === 'logo' ? (
+      {INITIALIZATION_DISPLAY_TYPE === 'splash' ? null : INITIALIZATION_DISPLAY_TYPE === 'logo' ? (
         <LogoInitializationScreen />
       ) : (
         <InitializationScreenInternal />
@@ -438,7 +519,6 @@ export function InitializationProvider({
   );
 }
 
-// Animated checkmark icon that fades in when complete
 function AnimatedCheckmark({
   isCompleted,
   color,
@@ -447,62 +527,59 @@ function AnimatedCheckmark({
   isActive: boolean;
   color: string;
 }) {
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const opacity = useSharedValue(0);
 
   useEffect(() => {
-    Animated.timing(opacityAnim, {
-      toValue: isCompleted ? 1 : 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [isCompleted, opacityAnim]);
+    opacity.set(withTiming(isCompleted ? 1 : 0, { duration: 300 }));
+  }, [isCompleted, opacity]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.get(),
+    marginRight: 4,
+  }));
 
   return (
-    <Animated.View style={{ opacity: opacityAnim, marginRight: 4 }}>
+    <Animated.View style={animStyle}>
       <Icon name="mdi-light:check" size={20} color={color} />
     </Animated.View>
   );
 }
 
-// Pulsing text for active loading step
 function PulsingText({ children }: { children: string }) {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulse = useSharedValue(1);
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 0.5,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [pulseAnim]);
+    pulse.set(
+      withRepeat(
+        withSequence(withTiming(0.5, { duration: 1000 }), withTiming(1, { duration: 1000 })),
+        -1
+      )
+    );
+  }, [pulse]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: pulse.get(),
+  }));
 
   return (
     <Animated.Text
       numberOfLines={1}
-      style={{
-        color: 'rgba(255, 255, 255, 1)',
-        fontSize: 14,
-        fontWeight: '500',
-        lineHeight: 20,
-        textAlign: 'center',
-        opacity: pulseAnim,
-        flexShrink: 1,
-      }}>
+      style={[
+        {
+          color: 'rgba(255, 255, 255, 1)',
+          fontSize: 14,
+          fontWeight: '500',
+          lineHeight: 20,
+          textAlign: 'center',
+          flexShrink: 1,
+        },
+        animStyle,
+      ]}>
       {children}
     </Animated.Text>
   );
 }
 
-// Animated Step Item with fade-in
 const AnimatedStepItem = memo(function AnimatedStepItem({
   height,
   entry,
@@ -516,39 +593,31 @@ const AnimatedStepItem = memo(function AnimatedStepItem({
   isCompleted: boolean;
   shouldAnimate: boolean;
 }) {
-  const fadeAnim = useRef(new Animated.Value(shouldAnimate ? 0 : 1)).current;
-  const translateYAnim = useRef(new Animated.Value(shouldAnimate ? 15 : 0)).current;
+  const fade = useSharedValue(shouldAnimate ? 0 : 1);
 
   useEffect(() => {
     if (shouldAnimate) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateYAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      fade.set(withTiming(1, { duration: 300 }));
     }
-  }, [shouldAnimate, fadeAnim, translateYAnim]);
+  }, [shouldAnimate, fade]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: fade.get(),
+  }));
 
   return (
     <Animated.View
-      style={{
-        height: height,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 24,
-        backgroundColor: 'transparent',
-        opacity: fadeAnim,
-        // transform: [{ translateY: translateYAnim }],
-      }}>
-      {/* Icon - always present, fades in when complete, no spacing */}
+      style={[
+        {
+          height: height,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: 24,
+          backgroundColor: 'transparent',
+        },
+        animStyle,
+      ]}>
       <AnimatedCheckmark
         isCompleted={isCompleted}
         isActive={isActive}
@@ -560,7 +629,6 @@ const AnimatedStepItem = memo(function AnimatedStepItem({
               : 'rgba(255, 255, 255, 0.5)'
         }
       />
-      {/* Text - right next to icon with no spacing */}
       {isActive ? (
         <PulsingText>{entry.message}</PulsingText>
       ) : (
@@ -589,32 +657,27 @@ function AnimatedLogoSplash() {
   const logoSize = Math.min(screenW, screenH) * 1.25;
 
   useEffect(() => {
-    // Slight-overlap sequence:
-    // 1) path1 in (2.0s)
-    // 2) path2 in starts earlier before path1 in completes (~0.7s overlap)
-    // 3) hold (0.8s)
-    // 4) path1 out (2.0s, same travel direction via negative dash offset)
-    // 5) path2 out starts shortly before path1 out completes (0.5s overlap)
-    // 6) hold (0.4s) then hard reset for next loop
-    // Total loop: 5.2s
+    // Fast overlap sequence (1s loop, tuned for ~131ms blocking init):
+    //   0–400ms   path1 in      | path2 in starts at 280ms (70% overlap)
+    // 400–480ms   hold
+    // 480–880ms   path1 out     | path2 out starts at 760ms (70% overlap)
+    // 880–1000ms  hold → reset
 
-    // Path1 defines the main timeline: in → hold → out → hold → reset
     dash1.value = withRepeat(
       withSequence(
-        withTiming(0, { duration: 2000, easing: LOGO_EASE }),
-        withDelay(800, withTiming(0, { duration: 0 })),
-        withTiming(-PATH1_LENGTH, { duration: 2000, easing: LOGO_EASE }),
-        withDelay(400, withTiming(PATH1_LENGTH, { duration: 0 }))
+        withTiming(0, { duration: 400, easing: LOGO_EASE }),
+        withDelay(80, withTiming(0, { duration: 0 })),
+        withTiming(-PATH1_LENGTH, { duration: 400, easing: LOGO_EASE }),
+        withDelay(120, withTiming(PATH1_LENGTH, { duration: 0 }))
       ),
       -1
     );
 
-    // Path2: delayed in (overlaps end of path1 in) → delayed out (overlaps end of path1 out)
     dash2.value = withRepeat(
       withSequence(
-        withDelay(1300, withTiming(0, { duration: 600, easing: LOGO_EASE })),
-        withDelay(2300, withTiming(-PATH2_LENGTH, { duration: 600, easing: LOGO_EASE })),
-        withDelay(300, withTiming(PATH2_LENGTH, { duration: 0 }))
+        withDelay(280, withTiming(0, { duration: 120, easing: LOGO_EASE })),
+        withDelay(360, withTiming(-PATH2_LENGTH, { duration: 120, easing: LOGO_EASE })),
+        withDelay(120, withTiming(PATH2_LENGTH, { duration: 0 }))
       ),
       -1
     );
@@ -673,23 +736,25 @@ function AnimatedLogoSplash() {
 function LogoInitializationScreen() {
   const { isInitializing } = useInitializationContext();
   const [shouldRender, setShouldRender] = useState(true);
-  const screenOpacity = useRef(new Animated.Value(1)).current;
+  const opacity = useSharedValue(1);
 
   useEffect(() => {
     if (!isInitializing && shouldRender) {
-      Animated.timing(screenOpacity, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-        easing: Easing.out(Easing.ease),
-      }).start(() => {
-        setShouldRender(false);
-      });
+      opacity.set(
+        withTiming(0, { duration: 500, easing: REasing.out(REasing.ease) }, () => {
+          runOnJS(setShouldRender)(false);
+        })
+      );
     } else if (isInitializing) {
-      screenOpacity.setValue(1);
+      opacity.set(1);
       setShouldRender(true);
     }
-  }, [isInitializing, shouldRender, screenOpacity]);
+  }, [isInitializing, shouldRender, opacity]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.get(),
+    pointerEvents: opacity.get() > 0 ? ('auto' as const) : ('none' as const),
+  }));
 
   if (!shouldRender && !isInitializing) return null;
   if (!shouldRender) return null;
@@ -706,19 +771,20 @@ function LogoInitializationScreen() {
         backgroundColor: '#000',
       }}>
       <Animated.View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 9999,
-          backgroundColor: '#000',
-          justifyContent: 'center',
-          alignItems: 'center',
-          opacity: screenOpacity,
-          pointerEvents: isInitializing ? 'auto' : 'none',
-        }}>
+        style={[
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999,
+            backgroundColor: '#000',
+            justifyContent: 'center',
+            alignItems: 'center',
+          },
+          animStyle,
+        ]}>
         <AnimatedLogoSplash />
       </Animated.View>
     </View>
@@ -729,39 +795,26 @@ function InitializationScreenInternal() {
   const { logHistory, currentStage, isInitializing } = useInitializationContext();
   const [seenTimestamps, setSeenTimestamps] = useState<Set<number>>(new Set());
   const [shouldRender, setShouldRender] = useState(true);
-  // Track visual active index separately - ensures minimum visibility time
   const [visualActiveIndex, setVisualActiveIndex] = useState(0);
   const activeTransitionTimeout = useRef<NodeJS.Timeout | null>(null);
   const rafId = useRef<number | null>(null);
   const lastTransitionTime = useRef<number>(Date.now());
-  const MINIMUM_ACTIVE_TIME = 200; // Minimum ms each step stays visually active (reduced for snappier feel)
+  const MINIMUM_ACTIVE_TIME = 200;
 
-  // Animated value for translating the entire list
-  // Start at 0 - items are initially centered by the container
-  const translateY = useRef(new Animated.Value(0)).current;
-  // Animated opacity for fade out
-  const screenOpacity = useRef(new Animated.Value(1)).current;
-  const ITEM_HEIGHT = 64; // Height of each step item
+  const listTranslateY = useSharedValue(0);
+  const screenOpacity = useSharedValue(1);
+  const ITEM_HEIGHT = 64;
   const containerHeight = Dimensions.get('window').height;
 
-  // Calculate if we've finished showing all steps visually
   const hasShownAllSteps = logHistory.length === 0 || visualActiveIndex >= logHistory.length - 1;
-  // Track if we're ready to fade (has shown all steps for minimum time)
   const [readyToFade, setReadyToFade] = useState(false);
   const fadeDelayTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Wait for minimum time on last step before allowing fade
   const fadeRafId = useRef<number | null>(null);
   useEffect(() => {
     if (hasShownAllSteps && !isInitializing && logHistory.length > 0) {
-      // Clear any existing timeout
-      if (fadeDelayTimeout.current) {
-        clearTimeout(fadeDelayTimeout.current);
-      }
-      if (fadeRafId.current) {
-        cancelAnimationFrame(fadeRafId.current);
-      }
-      // Wait minimum time before allowing fade, use rAF for smooth transition
+      if (fadeDelayTimeout.current) clearTimeout(fadeDelayTimeout.current);
+      if (fadeRafId.current) cancelAnimationFrame(fadeRafId.current);
       fadeDelayTimeout.current = setTimeout(() => {
         fadeRafId.current = requestAnimationFrame(() => {
           setReadyToFade(true);
@@ -780,32 +833,22 @@ function InitializationScreenInternal() {
     }
 
     return () => {
-      if (fadeDelayTimeout.current) {
-        clearTimeout(fadeDelayTimeout.current);
-      }
-      if (fadeRafId.current) {
-        cancelAnimationFrame(fadeRafId.current);
-      }
+      if (fadeDelayTimeout.current) clearTimeout(fadeDelayTimeout.current);
+      if (fadeRafId.current) cancelAnimationFrame(fadeRafId.current);
     };
   }, [hasShownAllSteps, isInitializing, logHistory.length]);
 
-  // Fade out when initialization completes AND we've shown all steps for minimum time
+  // Fade out when done; runs entirely on UI thread via Reanimated
   useEffect(() => {
-    // Only fade out when initialization is done AND we've shown all steps AND waited minimum time
     const canFade = !isInitializing && hasShownAllSteps && (readyToFade || logHistory.length === 0);
     if (canFade && shouldRender) {
-      Animated.timing(screenOpacity, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-        easing: Easing.out(Easing.ease),
-      }).start(() => {
-        // Hide the screen after fade out completes
-        setShouldRender(false);
-      });
+      screenOpacity.set(
+        withTiming(0, { duration: 500, easing: REasing.out(REasing.ease) }, () => {
+          runOnJS(setShouldRender)(false);
+        })
+      );
     } else if (isInitializing) {
-      // Reset opacity when initialization starts again
-      screenOpacity.setValue(1);
+      screenOpacity.set(1);
       setShouldRender(true);
     }
   }, [
@@ -817,11 +860,8 @@ function InitializationScreenInternal() {
     logHistory.length,
   ]);
 
-  // Track completed stages for visual feedback
   const [visuallyCompletedStages, setVisuallyCompletedStages] = useState<Set<string>>(new Set());
 
-  // Update visually completed stages based on visual active index
-  // A stage is visually complete when its index is less than the visual active index
   useEffect(() => {
     if (logHistory.length === 0) return;
 
@@ -847,17 +887,14 @@ function InitializationScreenInternal() {
     });
 
     if (newTimestamps.size > 0) {
-      // Use requestAnimationFrame for smoother state updates
       requestAnimationFrame(() => {
         setSeenTimestamps((prev) => new Set([...prev, ...newTimestamps]));
       });
     }
   }, [logHistory, seenTimestamps]);
 
-  // The target active index is the last log entry (most recent)
   const targetActiveIndex = logHistory.length - 1;
 
-  // Manage visual active index with minimum visibility time using requestAnimationFrame
   useEffect(() => {
     if (logHistory.length === 0) {
       setVisualActiveIndex(0);
@@ -865,77 +902,54 @@ function InitializationScreenInternal() {
       return;
     }
 
-    // If the target is ahead of visual, transition with minimum time
     if (targetActiveIndex > visualActiveIndex) {
-      // Clear any pending transitions
-      if (activeTransitionTimeout.current) {
-        clearTimeout(activeTransitionTimeout.current);
-      }
-      if (rafId.current) {
-        cancelAnimationFrame(rafId.current);
-      }
+      if (activeTransitionTimeout.current) clearTimeout(activeTransitionTimeout.current);
+      if (rafId.current) cancelAnimationFrame(rafId.current);
 
-      // Calculate how long since last transition
       const timeSinceLastTransition = Date.now() - lastTransitionTime.current;
       const remainingTime = Math.max(0, MINIMUM_ACTIVE_TIME - timeSinceLastTransition);
 
-      // Schedule transition using setTimeout + requestAnimationFrame for smoother updates
       activeTransitionTimeout.current = setTimeout(() => {
-        // Use requestAnimationFrame to sync with display refresh
         rafId.current = requestAnimationFrame(() => {
           lastTransitionTime.current = Date.now();
-          setVisualActiveIndex((prev) => {
-            // Move one step at a time to ensure each gets minimum visibility
-            const next = Math.min(prev + 1, targetActiveIndex);
-            return next;
-          });
+          setVisualActiveIndex((prev) => Math.min(prev + 1, targetActiveIndex));
         });
       }, remainingTime);
     }
 
     return () => {
-      if (activeTransitionTimeout.current) {
-        clearTimeout(activeTransitionTimeout.current);
-      }
-      if (rafId.current) {
-        cancelAnimationFrame(rafId.current);
-      }
+      if (activeTransitionTimeout.current) clearTimeout(activeTransitionTimeout.current);
+      if (rafId.current) cancelAnimationFrame(rafId.current);
     };
   }, [targetActiveIndex, visualActiveIndex, logHistory.length]);
 
-  // Use visual active index for display
   const activeIndex = visualActiveIndex;
 
-  // Animate translateY to keep active item centered
+  // Scroll the list via UI-thread animation
   useEffect(() => {
     if (activeIndex >= 0 && logHistory.length > 0) {
-      // When container uses justifyContent: 'center', items start centered
-      // The first item (index 0) is already at the center, so offset = 0
-      // For each subsequent item, we need to move up by (activeIndex * ITEM_HEIGHT)
-      // to bring that item to the center position
-      Animated.timing(translateY, {
-        toValue: -(activeIndex * 32),
-        duration: 400,
-        useNativeDriver: true,
-        easing: Easing.out(Easing.cubic),
-      }).start();
+      listTranslateY.set(
+        withTiming(-(activeIndex * 32), {
+          duration: 400,
+          easing: REasing.out(REasing.cubic),
+        })
+      );
     } else if (logHistory.length === 0) {
-      // Reset to center when list is empty
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 0,
-        useNativeDriver: true,
-      }).start();
+      listTranslateY.set(0);
     }
-  }, [activeIndex, logHistory.length, translateY]);
+  }, [activeIndex, logHistory.length, listTranslateY]);
 
-  if (!shouldRender && !isInitializing) {
-    return null;
-  }
+  const screenAnimStyle = useAnimatedStyle(() => ({
+    opacity: screenOpacity.get(),
+    pointerEvents: screenOpacity.get() > 0 ? ('auto' as const) : ('none' as const),
+  }));
 
-  if (!shouldRender) {
-    return null;
-  }
+  const listAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: listTranslateY.get() }],
+  }));
+
+  if (!shouldRender && !isInitializing) return null;
+  if (!shouldRender) return null;
 
   return (
     <View
@@ -949,20 +963,20 @@ function InitializationScreenInternal() {
         backgroundColor: '#000',
       }}>
       <Animated.View
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 9999,
-          backgroundColor: '#000',
-          justifyContent: 'center',
-          alignItems: 'center',
-          opacity: screenOpacity,
-          // Ensure black background stays during fade
-          pointerEvents: isInitializing ? 'auto' : 'none',
-        }}>
+        style={[
+          {
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999,
+            backgroundColor: '#000',
+            justifyContent: 'center',
+            alignItems: 'center',
+          },
+          screenAnimStyle,
+        ]}>
         <View
           style={{
             width: '100%',
@@ -973,16 +987,9 @@ function InitializationScreenInternal() {
             overflow: 'hidden',
             backgroundColor: '#000',
           }}>
-          {/* Container that starts in the middle */}
-          <Animated.View
-            style={{
-              width: '100%',
-              backgroundColor: 'transparent',
-              transform: [{ translateY }],
-            }}>
+          <Animated.View style={[{ width: '100%', backgroundColor: 'transparent' }, listAnimStyle]}>
             {logHistory.map((entry, index) => {
               const stageId = entry.stageId;
-              // Use visual states for smooth transitions
               const isVisuallyActive = index === visualActiveIndex;
               const isVisuallyCompleted =
                 visuallyCompletedStages.has(stageId) && index < visualActiveIndex;
@@ -1001,7 +1008,6 @@ function InitializationScreenInternal() {
             })}
           </Animated.View>
 
-          {/* Top gradient overlay - fades steps as they go up */}
           <LinearGradient
             colors={['rgba(0, 0, 0, 1)', 'rgba(0, 0, 0, 0)']}
             locations={[0, 0.8]}
@@ -1016,7 +1022,6 @@ function InitializationScreenInternal() {
             }}
           />
 
-          {/* Error message */}
           {currentStage?.error && (
             <View
               style={{
@@ -1058,10 +1063,7 @@ export function useInitializationReset() {
   return { resetStages, cancelResetStages };
 }
 
-export function useInitializationStage(
-  stageId: string,
-  config: { message?: string; dependsOn?: string[]; blocking?: boolean } = {}
-) {
+export function useInitializationStage(stageId: string, config: StageConfig = {}) {
   const { registerStage, updateStage, canStageStart } = useInitializationContext();
   const hasRegistered = useRef(false);
 
@@ -1092,6 +1094,14 @@ export function useInitializationStage(
   );
 
   const canStart = canStageStart(stageId);
+
+  // Track canStart transitions so we can see the gap between a dependency
+  // completing and this stage actually receiving canStart=true.
+  const prevCanStart = useRef(false);
+  if (canStart && !prevCanStart.current) {
+    initLog('useStage', `${stageId} canStart flipped to true`);
+  }
+  prevCanStart.current = canStart;
 
   return {
     log,

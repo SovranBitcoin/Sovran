@@ -8,7 +8,15 @@ import React, {
   useRef,
 } from 'react';
 import { useMnemonic } from 'hooks/useSecureStore';
-import { ensureMnemonicExists } from 'helper/secureStorage';
+import {
+  ensureMnemonicExists,
+  retrieveDerivedKeys,
+  storeDerivedKeys,
+  retrieveCashuMnemonic,
+  storeCashuMnemonic,
+  hashMnemonic,
+  type CachedDerivedKeys,
+} from 'helper/secureStorage';
 import * as nip06 from 'nostr-tools/nip06';
 import { nip19 } from 'nostr-tools';
 import { HDKey } from '@scure/bip32';
@@ -17,6 +25,7 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 import { CocoManager } from 'helper/coco/manager';
 import { useInitializationStage } from './InitializationProvider';
 import { useProfileStore } from '@/stores/profileStore';
+import { initLog } from '@/helper/initTiming';
 
 /**
  * Check if mnemonic exists in Redux store (profile 0) as fallback
@@ -56,6 +65,20 @@ function getMnemonicFromRedux(): string | null {
     console.error('Failed to get mnemonic from Redux store:', error);
     return null;
   }
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes;
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 interface NostrKeys {
@@ -266,119 +289,144 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
   // Initialize default keys when mnemonic is available, or generate one if none exists
   useEffect(() => {
     if (mnemonicLoading) return;
-    if (!stage.canStart) return; // Wait for migrations to complete
-    if (hasStarted.current) return; // Only run once
+    if (!stage.canStart) return;
+    if (hasStarted.current) return;
     hasStarted.current = true;
 
     const initializeKeys = async () => {
       try {
+        initLog('NostrKeys', 'initializeKeys starting');
         setIsLoading(true);
         setError(null);
 
         let mnemonicToUse = mnemonic;
-        console.log('Initial mnemonic from secure storage:', mnemonic ? 'exists' : 'null');
+        initLog('NostrKeys', `mnemonic from SecureStore: ${mnemonic ? 'exists' : 'null'}`);
 
         // If no mnemonic from secure storage, try Redux fallback first
         if (!mnemonicToUse) {
           stage.log('Checking for existing wallet...');
-          console.log('No mnemonic in secure storage, checking Redux store...');
+          initLog('NostrKeys', 'checking Redux for mnemonic...');
           mnemonicToUse = getMnemonicFromRedux();
 
           if (mnemonicToUse) {
-            console.log(
-              'Found mnemonic in Redux store, migrating to secure storage...',
-              mnemonicToUse.split(' ').length,
-              'words'
-            );
+            initLog('NostrKeys', 'found mnemonic in Redux — migrating to SecureStore');
             stage.log('Migrating wallet to secure storage...');
 
-            // Store the Redux mnemonic to secure storage for future use
             try {
               const { storeMnemonic } = await import('../helper/secureStorage');
               const stored = await storeMnemonic(mnemonicToUse);
-              if (stored) {
-                console.log('Successfully migrated mnemonic from Redux to secure storage');
-              } else {
-                console.warn('Failed to store mnemonic to secure storage');
-              }
+              initLog('NostrKeys', `storeMnemonic result: ${stored}`);
             } catch (error) {
-              console.error('Error storing mnemonic to secure storage:', error);
+              initLog('NostrKeys', `storeMnemonic error: ${error}`);
             }
           } else {
-            console.log('No mnemonic in Redux either, will generate new one...');
+            initLog('NostrKeys', 'no mnemonic in Redux either');
           }
         } else {
-          console.log('Using mnemonic from secure storage');
           stage.log('Initializing keys...');
         }
 
-        // If still no mnemonic, generate a new one (this handles both Redux and secure storage)
         if (!mnemonicToUse) {
           stage.log('Generating new wallet...');
-          console.log('Generating new mnemonic...');
+          initLog('NostrKeys', 'generating new mnemonic...');
           mnemonicToUse = await ensureMnemonicExists();
+          initLog('NostrKeys', `ensureMnemonicExists done: ${!!mnemonicToUse}`);
 
           if (!mnemonicToUse) {
             throw new Error('Failed to generate or retrieve mnemonic');
           }
         }
 
+        initLog('NostrKeys', 'hashing mnemonic...');
+        const mHash = hashMnemonic(mnemonicToUse);
+        initLog('NostrKeys', 'mnemonic hashed');
         let defaultKeys: NostrKeys | null = null;
         let defaultCashuMnemonic: string | null = null;
 
-        // Check if we got mnemonic from Redux (different from secure storage)
-        const originalMnemonic = mnemonic;
-        const isFromRedux = mnemonicToUse !== originalMnemonic;
+        // Try loading cached keys from SecureStore (fast path)
+        initLog('NostrKeys', 'reading cached keys from SecureStore...');
+        const [cachedDerived, cachedCashu] = await Promise.all([
+          retrieveDerivedKeys(defaultAccountIndex),
+          retrieveCashuMnemonic(defaultAccountIndex),
+        ]);
+        initLog('NostrKeys', `cache read done — derived=${!!cachedDerived} cashu=${!!cachedCashu}`);
 
-        if (isFromRedux) {
-          stage.log('Deriving keys from migrated wallet...');
-          console.log('Using mnemonic from Redux, deriving keys manually...');
-          // We need to derive keys with the Redux mnemonic since it's not in the hook's cache
+        const cacheValid =
+          cachedDerived?.mnemonicHash === mHash && cachedCashu?.mnemonicHash === mHash;
+        initLog('NostrKeys', `cache valid: ${cacheValid}`);
+
+        if (cacheValid && cachedDerived && cachedCashu) {
+          stage.log('Loading cached keys...');
+          initLog('NostrKeys', 'using cached keys (fast path)');
+          defaultKeys = {
+            npub: cachedDerived.npub,
+            nsec: cachedDerived.nsec,
+            pubkey: cachedDerived.pubkey,
+            privateKey: hexToBytes(cachedDerived.privateKeyHex),
+          };
+          defaultCashuMnemonic = cachedCashu.value;
+        } else {
+          // Derive from scratch and persist to SecureStore
+          stage.log('Deriving keys...');
+          initLog('NostrKeys', 'cache miss — deriving NIP-06 keys...');
+
           const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
             mnemonicToUse,
             undefined,
             defaultAccountIndex
           );
+          initLog('NostrKeys', 'NIP-06 accountFromSeedWords done');
           const nsec = nip19.nsecEncode(sk);
           const npub = nip19.npubEncode(pk);
           defaultKeys = { npub, nsec, pubkey: pk, privateKey: sk };
+          initLog('NostrKeys', 'nip19 encode done');
 
-          // Derive cashu mnemonic
+          initLog('NostrKeys', 'deriving Cashu mnemonic (BIP32)...');
           const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonicToUse));
           const DERIVATION_PATH = `m/44'/129372'`;
           const path = `${DERIVATION_PATH}/0'/${defaultAccountIndex}'/0/0`;
           const seed = root.derive(path);
           defaultCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Buffer, wordlist);
-        } else {
-          stage.log('Deriving keys...');
-          console.log('Using mnemonic from secure storage, deriving keys normally...');
-          // Use the normal derivation process
-          defaultKeys = await deriveKeys(defaultAccountIndex);
-          defaultCashuMnemonic = await deriveCashuMnemonic(defaultAccountIndex);
+          initLog('NostrKeys', 'Cashu mnemonic derived');
+
+          // Persist to SecureStore in the background (don't block)
+          const cachePayload: CachedDerivedKeys = {
+            npub,
+            nsec,
+            pubkey: pk,
+            privateKeyHex: bytesToHex(sk),
+            mnemonicHash: mHash,
+          };
+          Promise.all([
+            storeDerivedKeys(defaultAccountIndex, cachePayload),
+            storeCashuMnemonic(defaultAccountIndex, defaultCashuMnemonic, mHash),
+          ]).catch((e) => initLog('NostrKeys', `cache write failed: ${e}`));
         }
 
+        initLog('NostrKeys', 'setting keys in state...');
         setKeys(defaultKeys);
         setCashuMnemonic(defaultCashuMnemonic);
 
-        // Set the account index and cashu mnemonic in CocoManager before it initializes
+        initLog('NostrKeys', 'setting CocoManager account index & cashu mnemonic...');
         CocoManager.setAccountIndex(defaultAccountIndex);
         if (defaultCashuMnemonic) {
           CocoManager.setCashuMnemonic(defaultCashuMnemonic);
         }
+        initLog('NostrKeys', 'CocoManager configured');
 
-        // Seed the profile store with this profile's pubkey (idempotent)
         if (defaultKeys?.pubkey) {
+          initLog('NostrKeys', 'adding profile to profileStore...');
           useProfileStore.getState().addProfile(defaultAccountIndex, defaultKeys.pubkey);
         }
 
         setIsReady(true);
         stage.complete();
-        console.log('NostrKeysProvider initialization complete');
+        initLog('NostrKeys', 'stage complete');
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to initialize keys';
         setError(errorMessage);
         stage.error(errorMessage);
-        console.error('Failed to initialize Nostr keys:', err);
+        initLog('NostrKeys', `ERROR: ${err}`);
       } finally {
         setIsLoading(false);
       }
