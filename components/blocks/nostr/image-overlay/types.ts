@@ -84,8 +84,8 @@ export type ImageOverlayContextValue = {
   setPanelHeight: (height: number) => void;
   /** Report measured min content height so overlay can use it for snap points. */
   setPanelContentMinHeight: (height: number) => void;
-  /** Start image open animation to final position (for min panel). Call from overlay onLayout when has panel. */
-  startOpenPanelImageAnimation: (minPanelHeight: number) => void;
+  /** Start image open animation to final position (for min panel). */
+  startOpenPanelImageAnimation: (minPanelHeight: number, aspectRatio?: number) => void;
   activeUrl: string | null;
   /** All media urls when overlay shows multiple (images + videos). Same as [activeUrl] when single. */
   activeUrls: string[];

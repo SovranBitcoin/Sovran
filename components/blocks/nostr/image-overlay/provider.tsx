@@ -154,6 +154,7 @@ export function ImageOverlayProvider({
     null
   );
   const [videoFeedLayoutIndex, setVideoFeedLayoutIndexState] = useState(0);
+
   const onSwipeUpToNextPostRef = useRef<
     ((openNext: (layout: ImageOverlayReplaceLayout) => void) => void) | undefined
   >(onSwipeUpToNextPost);
@@ -336,31 +337,31 @@ export function ImageOverlayProvider({
   }, []);
 
   const startOpenPanelImageAnimation = useCallback(
-    (minPanelHeight: number) => {
+    (minPanelHeight: number, aspectRatioOverride?: number) => {
       // openAnimationInProgressSv already set to 1 in open() when hasPanel so reaction skips from first frame
       const availableHeight = imageViewportHeight - minPanelHeight;
+      const targetAspectRatio = aspectRatioOverride ?? aspectRatioSv.value;
       // Use thumbnail aspect ratio so overlay image rect matches the feed image; shared-element close animates correctly.
       const { width: expW, height: expH } = computeExpandedSize(
         screenWidth,
         availableHeight,
-        activeAspectRatio
+        targetAspectRatio
       );
       const centerY = safeTop + availableHeight / 2;
       centerYSv.value = centerY;
       expandedWidthSv.value = expW;
       expandedHeightSv.value = expH;
-      aspectRatioSv.value = activeAspectRatio;
+      aspectRatioSv.value = targetAspectRatio;
       scheduleOnUI(openPanelImageToFinal);
     },
     [
       screenWidth,
       safeTop,
       imageViewportHeight,
-      activeAspectRatio,
+      aspectRatioSv,
       centerYSv,
       expandedWidthSv,
       expandedHeightSv,
-      aspectRatioSv,
       openPanelImageToFinal,
     ]
   );
@@ -468,18 +469,32 @@ export function ImageOverlayProvider({
         expandedWidthSv.value = expW;
         expandedHeightSv.value = expH;
 
-        // 3. Start the expand animation — runs in the same UI frame.
+        // 3. Start the expand animation in the same UI scheduling block.
         if (hasPanel) {
           openRevealUi();
+          // Keep panel-open initial expand fully on UI thread.
+          // Relying on a JS setTimeout here could intermittently miss and leave
+          // the image at thumbnail size.
+          openAnimationInProgressSv.value = 1;
+          const targetX = centerXSv.value - expandedWidthSv.value / 2;
+          const targetY = centerYSv.value - expandedHeightSv.value / 2;
+          imageXCoord.value = withDelay(OPEN_START_DELAY_MS, withSpring(targetX, CLOSE_SPRING));
+          imageYCoord.value = withDelay(OPEN_START_DELAY_MS, withSpring(targetY, CLOSE_SPRING));
+          imageWidth.value = withDelay(
+            OPEN_START_DELAY_MS,
+            withSpring(expandedWidthSv.value, CLOSE_SPRING)
+          );
+          imageHeight.value = withDelay(
+            OPEN_START_DELAY_MS,
+            withSpring(expandedHeightSv.value, CLOSE_SPRING, () => {
+              'worklet';
+              openAnimationInProgressSv.value = 0;
+            })
+          );
         } else {
           openToCenter();
         }
       });
-
-      // For panel mode, delay image-to-final so overlay can paint thumbnail first.
-      if (hasPanel) {
-        setTimeout(() => startOpenPanelImageAnimation(0), OPEN_START_DELAY_MS);
-      }
     },
     [
       screenWidth,
@@ -512,7 +527,6 @@ export function ImageOverlayProvider({
       isClosing,
       openToCenter,
       openRevealUi,
-      startOpenPanelImageAnimation,
       hasPanelSv,
       openAnimationInProgressSv,
       panelHeightSv,
@@ -616,7 +630,7 @@ export function ImageOverlayProvider({
       });
 
       if (hasPanel) {
-        setTimeout(() => startOpenPanelImageAnimation(0), OPEN_START_DELAY_MS);
+        setTimeout(() => startOpenPanelImageAnimation(0, aspectRatio), OPEN_START_DELAY_MS);
       }
     },
     [
