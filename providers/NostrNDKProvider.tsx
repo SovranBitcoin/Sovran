@@ -3,6 +3,7 @@ import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-k
 import { relays } from 'components/ndk';
 import { useInitializationStage } from './InitializationProvider';
 import { useNostrKeysContext } from './NostrKeysProvider';
+import { initLog } from '@/helper/initTiming';
 
 // Cache adapter at module level
 const cacheAdapter = new NDKCacheAdapterSqlite('nostr');
@@ -25,10 +26,12 @@ export function NostrNDKProvider({ children }: NostrNDKProviderProps) {
   const hasInitialized = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Register with initialization system, depends on NostrKeysProvider
+  // Non-blocking: starts after all blocking stages complete so it doesn't
+  // compete for the JS thread during splash. App is already visible.
   const stage = useInitializationStage('nostr-ndk', {
     message: 'Initializing Nostr...',
-    dependsOn: ['nostr'], // Depends on NostrKeysProvider
+    dependsOn: ['coco'],
+    blocking: false,
   });
 
   useEffect(() => {
@@ -37,6 +40,7 @@ export function NostrNDKProvider({ children }: NostrNDKProviderProps) {
     if (!nostrKeys?.privateKey) return;
 
     hasInitialized.current = true;
+    initLog('NDK', 'starting NDK initialization...');
 
     stage.log('Initializing NDK with signer...');
 
@@ -48,9 +52,11 @@ export function NostrNDKProvider({ children }: NostrNDKProviderProps) {
       signer: new NDKPrivateKeySigner(nostrKeys.privateKey),
     });
 
+    initLog('NDK', 'initializeNDK() returned');
     setIsInitialized(true);
     stage.log('Nostr initialized');
     stage.complete();
+    initLog('NDK', 'stage complete');
   }, [stage.canStart, initializeNDK, nostrKeys?.privateKey, stage]);
 
   return <NostrNDKContext.Provider value={{ isInitialized }}>{children}</NostrNDKContext.Provider>;

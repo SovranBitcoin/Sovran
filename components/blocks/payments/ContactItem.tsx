@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Pressable } from 'react-native';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -10,6 +10,7 @@ import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { PUBLIC_KEYS } from '@/helper/constants';
 import { getMintDisplayName } from '@/helper/url';
+import { prefetchImage } from '@/helper/imageCache';
 
 interface ContactItemProps {
   item: {
@@ -83,6 +84,10 @@ export const ContactItem = React.memo(function ContactItem({
       isMint: false,
     };
   }, [item.type, item.mint?.mintUrl, item.mintInfo, item.pubkey, item.dmEvent?.content, profile]);
+
+  useEffect(() => {
+    prefetchImage(displayInfo.picture);
+  }, [displayInfo.picture]);
 
   // Format date (kept for future use when date display is re-enabled)
   const _formattedDate = useMemo(() => {

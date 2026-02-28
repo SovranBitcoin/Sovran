@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["shim.js", "polyfills.js", "app/**/*.{ts,tsx}", "scripts/*.js"],
+  "entry": ["shim.js", "polyfills.js", "app/**/*.{ts,tsx}", "scripts/*.js", "plugins/**/*.js"],
   "project": ["**/*.{ts,tsx,js,jsx}"],
   "ignore": [
     ".agents/**",
@@ -9,8 +9,25 @@
     "dist/**",
     "ios/**",
     "coco/**",
+    "eNuts/**",
     "node_modules/**"
   ],
-  "ignoreDependencies": ["buffer", "process", "cashu-kym", "@babel/core", "@monicon/metro"],
-  "ignoreBinaries": ["eas", "maestro"]
+  "ignoreDependencies": [
+    "buffer",
+    "process",
+    "cashu-kym",
+    "@monicon/metro",
+    "@monicon/core",
+    "number-flow-react-native",
+    "@expo/config-plugins"
+  ],
+  "ignoreBinaries": ["eas", "maestro"],
+  "ignoreIssues": {
+    "components/blocks/nostr/**": ["exports", "types", "duplicates"],
+    "components/blocks/UserFeed.tsx": ["exports", "types"],
+    "constants/wallet-header.ts": ["exports"],
+    "helper/nfc/**": ["exports", "types"],
+    "helper/nfc.ts": ["exports", "types"],
+    "stores/nostrSocialStore.ts": ["exports"]
+  }
 }

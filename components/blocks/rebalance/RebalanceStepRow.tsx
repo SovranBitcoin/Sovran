@@ -5,7 +5,7 @@
  * visual language as the SwapTransactionScreen expanded view:
  * - TransferCard (BlurCardFrame wrapper)
  * - TransferEntryRow for send/receive rows (avatar + badge + colored amount)
- * - TransferStepChain: horizontal timeline (Invoice → Send → Done)
+ * - TransferStepChain: horizontal timeline (Invoice → Swap → Done)
  * - TransferErrorBanner for error display (only shown on failure)
  *
  * When a step is part of a middleman chain, shows the full route path
@@ -96,12 +96,6 @@ interface RebalanceStepRowProps {
   chainInfo?: ChainInfo;
   /** Sub-status detail during auto-routing (e.g. "Hop 1/2: Sending…") */
   routingDetail?: string;
-  /** Chain path being auto-routed through (shown during routing) */
-  routingChainPath?: string[];
-  /** Human-readable names for routingChainPath */
-  routingChainPathNames?: string[];
-  /** Current hop index during auto-routing */
-  routingHopIndex?: number;
 }
 
 function extractDomain(url: string): string {
@@ -133,9 +127,6 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   // stepNumber, isCurrent — kept in interface for API compat but no longer used
   chainInfo,
   routingDetail,
-  routingChainPath,
-  routingChainPathNames,
-  routingHopIndex,
 }) => {
   const { getPrimaryColor } = useTheme();
   const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
@@ -148,7 +139,6 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
 
   const isDone = status === 'done';
   const isFailed = status === 'failed';
-  const isRouting = status === 'routing';
 
   // Build the "via X" subtitle for the retry button
   const routeViaLabel = useMemo(() => {
@@ -221,65 +211,6 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
           </VStack>
         ) : null}
 
-        {/* Auto-routing chain path (shown during or after routing) */}
-        {isRouting && routingChainPath && routingChainPath.length >= 3 && (
-          <VStack gap={4} style={styles.routingSection}>
-            <HStack align="center" gap={4} style={{ flexWrap: 'wrap', rowGap: 4 }}>
-              {routingChainPath.map((url, idx) => {
-                const name = routingChainPathNames?.[idx] || extractDomain(url);
-                const isActiveNode =
-                  routingHopIndex != null &&
-                  (idx === routingHopIndex || idx === routingHopIndex + 1);
-                const isIntermediary = idx > 0 && idx < routingChainPath.length - 1;
-
-                return (
-                  <React.Fragment key={url + idx}>
-                    {idx > 0 && (
-                      <Icon
-                        name="mdi:chevron-right"
-                        size={14}
-                        color={
-                          routingHopIndex != null && idx === routingHopIndex + 1
-                            ? '#c084fc'
-                            : primaryColor400
-                        }
-                      />
-                    )}
-                    <HStack
-                      align="center"
-                      gap={3}
-                      style={[
-                        styles.chainMintSection,
-                        routingHopIndex != null && !isActiveNode && styles.chainDimmed,
-                        { flexShrink: 1 },
-                      ]}>
-                      <Avatar
-                        picture={undefined}
-                        size={18}
-                        variant="mint"
-                        name={name}
-                        alt={`${name} icon`}
-                      />
-                      <Text
-                        size={10}
-                        numberOfLines={1}
-                        bold={isIntermediary}
-                        style={{ color: isActiveNode ? '#c084fc' : primaryColor0 }}>
-                        {name}
-                      </Text>
-                    </HStack>
-                  </React.Fragment>
-                );
-              })}
-            </HStack>
-            {routingHopIndex != null && (
-              <Text size={10} style={{ color: '#c084fc' }}>
-                Hop {routingHopIndex + 1} of {routingChainPath.length - 1}
-              </Text>
-            )}
-          </VStack>
-        )}
-
         {/* Send row (from source mint) */}
         <TransferEntryRow
           type="send"
@@ -289,8 +220,13 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
           unit={unit}
         />
 
-        {/* Step chain: ● Invoice ── ● Send ── ● Done */}
-        <TransferStepChain status={status} routingDetail={routingDetail} />
+        {/* Step chain: ● Invoice ── ● Send/Swap ── ● Done */}
+        <TransferStepChain
+          status={status}
+          routingDetail={routingDetail}
+          middleLabel={chainInfo ? 'Swap' : 'Send'}
+          progressVariant={chainInfo ? 'swap' : 'default'}
+        />
 
         {/* Receive row (to destination mint) */}
         <TransferEntryRow
@@ -381,10 +317,6 @@ const styles = StyleSheet.create({
   },
   chainSection: {
     paddingTop: 16,
-    paddingHorizontal: 16,
-  },
-  routingSection: {
-    paddingTop: 8,
     paddingHorizontal: 16,
   },
   chainMintSection: {

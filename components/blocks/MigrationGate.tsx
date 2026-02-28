@@ -1,64 +1,82 @@
 import React, { useState, useEffect, ReactNode, useRef } from 'react';
-// Note: We don't need to use Redux hooks here since we're checking the store directly
 import { store } from 'redux/store';
 import { useInitializationStage } from '@/providers/InitializationProvider';
+import { isMigrationsComplete, setMigrationsComplete } from '@/helper/secureStorage';
+import { initLog } from '@/helper/initTiming';
+import { useProfileStore } from '@/stores/profileStore';
 
 interface MigrationGateProps {
   children: ReactNode;
 }
 
 /**
- * MigrationGate ensures all Redux migrations complete before rendering children
- * This prevents race conditions where providers try to access data before migrations finish
+ * MigrationGate ensures all Redux migrations complete before rendering children.
+ *
+ * On the first launch (or after a cache clear) it waits for Redux rehydration
+ * and async migration polling, then persists a completion flag to SecureStore.
+ * On subsequent launches the flag is found immediately and children render
+ * with zero delay.
  */
 export default function MigrationGate({ children }: MigrationGateProps) {
-  const stage = useInitializationStage('migrations', { message: 'Running migrations...' });
-  const [migrationsComplete, setMigrationsComplete] = useState(false);
+  const stage = useInitializationStage('migrations', {
+    message: 'Running migrations...',
+    blocking: true,
+  });
+  const [migrationsComplete, setMigrationsCompleteDone] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const hasStarted = useRef(false);
 
   useEffect(() => {
-    // Only run once
     if (hasStarted.current) return;
     hasStarted.current = true;
 
     const checkMigrationsComplete = async () => {
       try {
         setIsChecking(true);
-        stage.log('Running migrations...');
+        const accountIndex = useProfileStore.getState().activeAccountIndex;
+        initLog('MigrationGate', `starting migration check for account ${accountIndex}`);
 
-        console.log('MigrationGate: Starting migration check...');
+        // Fast path: if migrations already ran on a previous launch, skip everything
+        initLog('MigrationGate', 'reading SecureStore flag...');
+        const alreadyDone = await isMigrationsComplete(accountIndex);
+        initLog('MigrationGate', `SecureStore flag = ${alreadyDone}`);
+        if (alreadyDone) {
+          setMigrationsCompleteDone(true);
+          stage.log('Migrations already complete');
+          stage.complete();
+          initLog('MigrationGate', 'fast-path complete');
+          return;
+        }
+
+        stage.log('Running migrations...');
+        initLog('MigrationGate', 'no cached flag — running full migration flow');
 
         // Wait for Redux store to be rehydrated
         stage.log('Rehydrating Redux store...');
+        initLog('MigrationGate', 'waiting for Redux rehydration...');
         await new Promise<void>((resolve) => {
           const unsubscribe = store.subscribe(() => {
             const state = store.getState();
-            // Check if persist has finished rehydrating
             if (state._persist && state._persist.rehydrated) {
-              console.log('MigrationGate: Redux store rehydrated');
               unsubscribe();
               resolve();
             }
           });
 
-          // If already rehydrated, resolve immediately
           const currentState = store.getState();
           if (currentState._persist && currentState._persist.rehydrated) {
-            console.log('MigrationGate: Redux store already rehydrated');
             unsubscribe();
             resolve();
           }
         });
+        initLog('MigrationGate', 'Redux store rehydrated');
 
-        // Wait for async migrations to complete by checking for completion flags
-        console.log('MigrationGate: Waiting for async migrations to complete...');
         stage.log('Waiting for migrations to complete...');
+        initLog('MigrationGate', 'polling for async migration status...');
 
-        // Poll for migration completion by checking completion flags in state
         let attempts = 0;
-        const maxAttempts = 60; // 30 seconds max wait time
-        const pollInterval = 500; // Check every 500ms
+        const maxAttempts = 60;
+        const pollInterval = 500;
 
         while (attempts < maxAttempts) {
           await new Promise((resolve) => setTimeout(resolve, pollInterval));
@@ -66,39 +84,38 @@ export default function MigrationGate({ children }: MigrationGateProps) {
           const currentState = store.getState();
           const migrationStatus = (currentState as any)?._migrationStatus;
 
-          // Check if all async migrations are complete
           const allMigrationsComplete =
-            !migrationStatus || migrationStatus.migration250Complete !== false; // undefined or true means complete
+            !migrationStatus || migrationStatus.migration250Complete !== false;
 
           if (allMigrationsComplete) {
-            console.log('MigrationGate: ✅ All async migrations completed');
+            initLog('MigrationGate', `async migrations done after ${attempts} polls`);
             break;
           }
 
           attempts++;
 
           if (attempts % 10 === 0) {
-            // Log every 5 seconds
-            console.log(
-              `MigrationGate: Still waiting for async operations... ${(attempts * pollInterval) / 1000}s elapsed`
-            );
-            console.log('MigrationGate: Migration status:', migrationStatus);
+            initLog('MigrationGate', `still polling... attempt ${attempts}/${maxAttempts}`);
           }
         }
 
         if (attempts >= maxAttempts) {
-          console.warn('MigrationGate: ⚠️ Migration timeout reached, proceeding anyway');
+          initLog('MigrationGate', 'TIMEOUT — proceeding anyway');
         }
 
-        setMigrationsComplete(true);
+        // Persist the flag so we skip on future launches
+        initLog('MigrationGate', `persisting completion flag for account ${accountIndex}...`);
+        await setMigrationsComplete(accountIndex);
+        initLog('MigrationGate', 'flag persisted');
+
+        setMigrationsCompleteDone(true);
         stage.complete();
-        console.log('✅ MigrationGate: All migrations completed, rendering app');
+        initLog('MigrationGate', 'stage complete — rendering children');
       } catch (error) {
-        console.error('MigrationGate: Migration check failed:', error);
+        initLog('MigrationGate', `ERROR: ${error}`);
         const errorMessage = error instanceof Error ? error.message : 'Migration check failed';
         stage.error(errorMessage);
-        // Still allow the app to continue - don't block on migration errors
-        setMigrationsComplete(true);
+        setMigrationsCompleteDone(true);
       } finally {
         setIsChecking(false);
       }
@@ -108,8 +125,6 @@ export default function MigrationGate({ children }: MigrationGateProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Render children once migrations are complete
-  // Loading UI is now handled by InitializationScreen
   if (!migrationsComplete || isChecking) {
     return null;
   }

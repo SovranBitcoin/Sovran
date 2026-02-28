@@ -12,9 +12,8 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import type { NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
-import { LegendList } from '@legendapp/list';
+import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';

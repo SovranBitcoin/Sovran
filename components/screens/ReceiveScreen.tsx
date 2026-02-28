@@ -15,7 +15,7 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { decode, isEncoded } from 'helper/third-party/emoji';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { View } from 'components/ui/View/View';
-import { RowButton, Section } from 'app/settings-pages';
+import { Section } from 'app/settings-pages';
 import Icon from 'assets/icons';
 import { getDecodedToken, type ReceiveHistoryEntry, type Keypair } from 'coco-cashu-core';
 import { Text } from 'components/ui/Text';
@@ -34,6 +34,7 @@ import { ModalScreenLayout } from 'components/layouts/ModalScreenLayout';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useMintStore } from 'stores/mintStore';
 import { useNpcMintStore } from 'stores/npcMintStore';
+import { ListGroup, PressableFeedback } from 'heroui-native';
 
 interface ReceiveScreenProps {
   unit: string;
@@ -209,7 +210,7 @@ export function ReceiveScreen({
     await EnhancedHaptics.copyHaptic();
     hasOpenedMintSelector.current = true;
     previousSelectedMintRef.current = selectedMint;
-    router.push({
+    router.navigate({
       pathname: '/list',
       params: {
         onSelectAction: 'goBack',
@@ -241,25 +242,34 @@ export function ReceiveScreen({
       {showLightningAddress && (
         <View style={{ marginHorizontal: 16 }}>
           <Section title="RECEIVE ADDRESS">
-            <RowButton
-              label={
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Icon
-                    name="mingcute:lightning-fill"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                  <Text style={{ marginLeft: 8 }} color={opacity(getPrimaryColor('0'), 0.9)} bold>
-                    {truncateMiddle(nostrKeys?.npub || '', 7)}@npubx.cash
-                  </Text>
-                </View>
-              }
-              isFirst
-              onPress={handleCopyLightningAddress}
-              rightIcon={
-                <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
-              }
-            />
+            <ListGroup variant="secondary">
+              <PressableFeedback animation={false} onPress={handleCopyLightningAddress}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>
+                      <Icon
+                        name="mingcute:lightning-fill"
+                        size={20}
+                        color={opacity(getPrimaryColor('0'), 0.4)}
+                      />
+                    </ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>
+                        {`${truncateMiddle(nostrKeys?.npub || '', 7)}@npubx.cash`}
+                      </ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <Icon
+                        name="lets-icons:copy"
+                        size={20}
+                        color={opacity(getPrimaryColor('0'), 0.4)}
+                      />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            </ListGroup>
           </Section>
         </View>
       )}
@@ -285,29 +295,34 @@ export function ReceiveScreen({
           <PaymentInfo data={latestKeypair.publicKeyHex} popupMessage="p2pk_copied" unit="p2pk" />
           <View style={{ marginHorizontal: 16 }}>
             <Section title="P2PK PUBLIC KEY">
-              <RowButton
-                label={
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Icon
-                      name="solar:key-bold"
-                      size={20}
-                      color={opacity(getPrimaryColor('0'), 0.4)}
-                    />
-                    <Text style={{ marginLeft: 8 }} color={opacity(getPrimaryColor('0'), 0.9)} bold>
-                      {truncateMiddle(latestKeypair.publicKeyHex, 10)}
-                    </Text>
-                  </View>
-                }
-                isFirst
-                onPress={handleCopyP2PKKey}
-                rightIcon={
-                  <Icon
-                    name="lets-icons:copy"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                }
-              />
+              <ListGroup variant="secondary">
+                <PressableFeedback animation={false} onPress={handleCopyP2PKKey}>
+                  <PressableFeedback.Scale>
+                    <ListGroup.Item disabled>
+                      <ListGroup.ItemPrefix>
+                        <Icon
+                          name="solar:key-bold"
+                          size={20}
+                          color={opacity(getPrimaryColor('0'), 0.4)}
+                        />
+                      </ListGroup.ItemPrefix>
+                      <ListGroup.ItemContent>
+                        <ListGroup.ItemTitle>
+                          {truncateMiddle(latestKeypair.publicKeyHex, 10)}
+                        </ListGroup.ItemTitle>
+                      </ListGroup.ItemContent>
+                      <ListGroup.ItemSuffix>
+                        <Icon
+                          name="lets-icons:copy"
+                          size={20}
+                          color={opacity(getPrimaryColor('0'), 0.4)}
+                        />
+                      </ListGroup.ItemSuffix>
+                    </ListGroup.Item>
+                  </PressableFeedback.Scale>
+                  <PressableFeedback.Ripple />
+                </PressableFeedback>
+              </ListGroup>
             </Section>
           </View>
         </>

@@ -10,7 +10,7 @@ import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
 import { TOTAL_BASIS_POINTS, useMintDistributionStore } from 'stores/mintDistributionStore';
-import { RowButton, Section } from 'app/settings-pages';
+import { ROW_ICON_SIZE, Section } from 'app/settings-pages';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -22,6 +22,7 @@ import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurr
 import type { HealthCta } from './walletHealth';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
 import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
+import { ListGroup, PressableFeedback } from 'heroui-native';
 
 const HERO_PADDING = 18;
 const HEART_RING_SIZE = 72;
@@ -301,7 +302,8 @@ export function WalletHealthModalContent({
   const actionRows = useMemo(() => {
     const rows: {
       key: string;
-      label: React.ReactElement;
+      leftIcon?: React.ReactNode;
+      label: string;
       value?: string;
       onPress?: () => void;
     }[] = [];
@@ -311,14 +313,8 @@ export function WalletHealthModalContent({
       const driftValue = needsRebalance ? `~${formatPctFromBp(maxDriftBp)}` : 'OK';
       rows.push({
         key: 'rebalance',
-        label: (
-          <HStack align="center" gap={10}>
-            <Icon name="mdi:swap-horizontal" size={18} color={primary400} />
-            <Text style={{ color: primary50 }} bold>
-              Rebalance now
-            </Text>
-          </HStack>
-        ),
+        leftIcon: <Icon name="mdi:swap-horizontal" size={ROW_ICON_SIZE} color={primary400} />,
+        label: 'Rebalance now',
         value: driftValue,
         onPress: handleRebalancePress,
       });
@@ -326,14 +322,10 @@ export function WalletHealthModalContent({
 
     rows.push({
       key: 'split',
-      label: (
-        <HStack align="center" gap={10}>
-          <Icon name="fluent:split-vertical-24-filled" size={18} color={primary400} />
-          <Text style={{ color: primary50 }} bold>
-            {hasDesired ? 'Edit balance split' : 'Set balance split'}
-          </Text>
-        </HStack>
+      leftIcon: (
+        <Icon name="fluent:split-vertical-24-filled" size={ROW_ICON_SIZE} color={primary400} />
       ),
+      label: hasDesired ? 'Edit balance split' : 'Set balance split',
       value: !hasDesired ? 'Not set' : undefined,
       onPress: handleSplitPress,
     });
@@ -469,16 +461,25 @@ export function WalletHealthModalContent({
     <Animated.View style={bodyAnimStyle}>
       <View style={{ paddingHorizontal: 16 }}>
         <Section title="Actions">
-          {actionRows.map((r, i) => (
-            <RowButton
-              key={r.key}
-              isFirst={i === 0}
-              isLast={i === actionRows.length - 1}
-              label={r.label}
-              value={r.value}
-              onPress={r.onPress}
-            />
-          ))}
+          <ListGroup variant="secondary">
+            {actionRows.map((r) => (
+              <PressableFeedback key={r.key} animation={false} onPress={r.onPress}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>{r.leftIcon}</ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>{r.label}</ListGroup.ItemTitle>
+                      {r.value ? (
+                        <ListGroup.ItemDescription>{r.value}</ListGroup.ItemDescription>
+                      ) : null}
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix />
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            ))}
+          </ListGroup>
         </Section>
       </View>
     </Animated.View>

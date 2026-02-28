@@ -1,10 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import { TouchableOpacity } from 'react-native';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
-import { RowButton, Section } from 'app/settings-pages';
+import { Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
-import { Text } from 'components/ui/Text';
-import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { popup } from '@/helper/popup';
@@ -15,6 +13,7 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { Tabs } from 'components/ui/Tabs';
+import { ListGroup, PressableFeedback } from 'heroui-native';
 
 // Configuration for different share types
 const SHARE_CONFIGS = {
@@ -125,25 +124,32 @@ function ShareModal() {
         />
 
         <Section title={config.sectionTitle}>
-          <RowButton
-            isFirst
-            onPress={handleCopy}
-            rightIcon={
-              <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
-            }
-            label={
-              <HStack align="center" gap={8}>
-                <CurrencyIcon
-                  colors={[opacity(getPrimaryColor('0'), 0.4)]}
-                  width={20}
-                  currency={config.iconCurrency}
-                />
-                <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                  {truncateMiddle(activeData, 10)}
-                </Text>
-              </HStack>
-            }
-          />
+          <ListGroup variant="secondary">
+            <PressableFeedback animation={false} onPress={handleCopy}>
+              <PressableFeedback.Scale>
+                <ListGroup.Item disabled>
+                  <ListGroup.ItemPrefix>
+                    <CurrencyIcon
+                      colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                      width={20}
+                      currency={config.iconCurrency}
+                    />
+                  </ListGroup.ItemPrefix>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>{truncateMiddle(activeData, 10)}</ListGroup.ItemTitle>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix>
+                    <Icon
+                      name="lets-icons:copy"
+                      size={20}
+                      color={opacity(getPrimaryColor('0'), 0.4)}
+                    />
+                  </ListGroup.ItemSuffix>
+                </ListGroup.Item>
+              </PressableFeedback.Scale>
+              <PressableFeedback.Ripple />
+            </PressableFeedback>
+          </ListGroup>
         </Section>
       </ModalLayoutWrapper>
     </>

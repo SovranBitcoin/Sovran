@@ -32,7 +32,7 @@ import { npubToPubkey } from 'components/blocks/Transaction';
 import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { useKYMMint } from 'hooks/coco/useKYMMint';
 import { Card } from 'components/ui/Card';
-import { RowButton, Section } from 'app/settings-pages';
+import { Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from 'components/ui/Avatar';
 import { Badge } from 'components/ui/Badge';
@@ -46,6 +46,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useReceive } from 'coco-cashu-react';
 import opacity from 'hex-color-opacity';
+import { ListGroup, PressableFeedback } from 'heroui-native';
 
 // ============================================================================
 // Simple Progress Ring using SVG - Static (no animation for better performance)
@@ -794,49 +795,49 @@ function MintInfoModal() {
         {/* Contact Section */}
         {mintInfo?.contact && mintInfo.contact.length > 0 && (
           <Section title="Contact">
-            {mintInfo.contact.map((contact: any, index: number) => (
-              <RowButton
-                isFirst={index === 0}
-                key={index}
-                label={
-                  contact.method.toUpperCase() === 'NOSTR' ? (
-                    <HStack align="center" gap={8}>
-                      <CurrencyIcon
-                        colors={[opacity(getPrimaryColor('0'), 0.4)]}
-                        width={20}
-                        currency="nostr"
-                      />
-                      <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                        {truncateMiddle(contact.info, 10)}
-                      </Text>
-                    </HStack>
-                  ) : ['X', 'TWITTER'].includes(contact.method.toUpperCase()) ? (
-                    <HStack align="center" gap={8}>
-                      <Icon
-                        name="hugeicons:new-twitter"
-                        size={20}
-                        color={opacity(getPrimaryColor('0'), 0.4)}
-                      />
-                      <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                        {contact.info}
-                      </Text>
-                    </HStack>
-                  ) : contact.method.toUpperCase() === 'EMAIL' ? (
-                    <HStack align="center" gap={8}>
-                      <Icon name="mdi:at" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
-                      <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                        {contact.info}
-                      </Text>
-                    </HStack>
-                  ) : (
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      {contact.info}
-                    </Text>
-                  )
-                }
-                onPress={() => handleContactPress(contact.method, contact.info)}
-              />
-            ))}
+            <ListGroup variant="secondary">
+              {mintInfo.contact.map((contact: any, index: number) => (
+                <PressableFeedback
+                  key={index}
+                  animation={false}
+                  onPress={() => handleContactPress(contact.method, contact.info)}>
+                  <PressableFeedback.Scale>
+                    <ListGroup.Item disabled>
+                      <ListGroup.ItemPrefix>
+                        {contact.method.toUpperCase() === 'NOSTR' ? (
+                          <CurrencyIcon
+                            colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                            width={20}
+                            currency="nostr"
+                          />
+                        ) : ['X', 'TWITTER'].includes(contact.method.toUpperCase()) ? (
+                          <Icon
+                            name="hugeicons:new-twitter"
+                            size={20}
+                            color={opacity(getPrimaryColor('0'), 0.4)}
+                          />
+                        ) : contact.method.toUpperCase() === 'EMAIL' ? (
+                          <Icon
+                            name="mdi:at"
+                            size={20}
+                            color={opacity(getPrimaryColor('0'), 0.4)}
+                          />
+                        ) : undefined}
+                      </ListGroup.ItemPrefix>
+                      <ListGroup.ItemContent>
+                        <ListGroup.ItemTitle>
+                          {contact.method.toUpperCase() === 'NOSTR'
+                            ? truncateMiddle(contact.info, 10)
+                            : contact.info}
+                        </ListGroup.ItemTitle>
+                      </ListGroup.ItemContent>
+                      <ListGroup.ItemSuffix />
+                    </ListGroup.Item>
+                  </PressableFeedback.Scale>
+                  <PressableFeedback.Ripple />
+                </PressableFeedback>
+              ))}
+            </ListGroup>
           </Section>
         )}
 
@@ -844,24 +845,29 @@ function MintInfoModal() {
             We only show this for known/added mints (not random scanned mints). */}
         {isKnownMintState && fromAccepter !== '1' && (
           <Section title="Settings">
-            <RowButton
-              isFirst
-              isLast
-              label={
-                <HStack align="center" gap={8}>
-                  <Icon
-                    name="fluent:split-vertical-24-filled"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                  <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                    Balance split
-                  </Text>
-                </HStack>
-              }
-              // Route into the balance split editor (mint-flow modal).
-              onPress={() => router.navigate('/distribution')}
-            />
+            <ListGroup variant="secondary">
+              <PressableFeedback
+                animation={false}
+                // Route into the balance split editor (mint-flow modal).
+                onPress={() => router.navigate('/distribution')}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>
+                      <Icon
+                        name="fluent:split-vertical-24-filled"
+                        size={20}
+                        color={opacity(getPrimaryColor('0'), 0.4)}
+                      />
+                    </ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Balance split</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix />
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            </ListGroup>
           </Section>
         )}
       </ScrollView>

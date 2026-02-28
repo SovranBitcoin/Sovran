@@ -29,6 +29,8 @@ interface ProfileState {
   activeAccountIndex: number;
   /** All known profiles */
   profiles: ProfileEntry[];
+  /** Per-account flag: true once the Redux-to-Coco migration has run (or been confirmed unnecessary). */
+  cocoMigrationComplete: Record<number, boolean>;
 }
 
 interface ProfileActions {
@@ -42,6 +44,10 @@ interface ProfileActions {
   getNextAccountIndex: () => number;
   /** Update the cached balance for a profile (called by ProfileBalanceSync) */
   updateProfileBalance: (accountIndex: number, balanceSats: number) => void;
+  /** Check whether the Redux-to-Coco migration has already been handled for an account. */
+  isCocoMigrationComplete: (accountIndex: number) => boolean;
+  /** Mark the Redux-to-Coco migration as done for an account. */
+  markCocoMigrationComplete: (accountIndex: number) => void;
 }
 
 type ProfileStore = ProfileState & ProfileActions;
@@ -49,9 +55,9 @@ type ProfileStore = ProfileState & ProfileActions;
 export const useProfileStore = create<ProfileStore>()(
   persist(
     (set, get) => ({
-      // Initial state
       activeAccountIndex: 0,
       profiles: [],
+      cocoMigrationComplete: {},
 
       addProfile: (accountIndex: number, pubkey: string) => {
         set((state) => {
@@ -114,6 +120,19 @@ export const useProfileStore = create<ProfileStore>()(
           ),
         }));
       },
+
+      isCocoMigrationComplete: (accountIndex: number) => {
+        return !!get().cocoMigrationComplete[accountIndex];
+      },
+
+      markCocoMigrationComplete: (accountIndex: number) => {
+        set((state) => ({
+          cocoMigrationComplete: {
+            ...state.cocoMigrationComplete,
+            [accountIndex]: true,
+          },
+        }));
+      },
     }),
     {
       name: 'profile-store',
@@ -121,6 +140,7 @@ export const useProfileStore = create<ProfileStore>()(
       partialize: (state) => ({
         activeAccountIndex: state.activeAccountIndex,
         profiles: state.profiles,
+        cocoMigrationComplete: state.cocoMigrationComplete,
       }),
     }
   )

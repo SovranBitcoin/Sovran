@@ -2,15 +2,10 @@
   "expo": {
     "name": "Sovran",
     "slug": "sovran",
-    "version": "0.0.60",
+    "version": "0.0.61",
     "orientation": "portrait",
     "scheme": ["sovran", "cashu"],
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/images/splash.png",
-      "backgroundColor": "#000000",
-      "resizeMode": "contain"
-    },
     "icon": "./assets/images/production.png",
     "assetBundlePatterns": ["**/*"],
     "ios": {
@@ -72,6 +67,14 @@
         }
       ],
       "expo-system-ui",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/production.png",
+          "backgroundColor": "#000000",
+          "resizeMode": "cover"
+        }
+      ],
       "expo-build-properties",
       "expo-font",
       "expo-router",

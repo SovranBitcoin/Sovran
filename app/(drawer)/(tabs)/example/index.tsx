@@ -292,7 +292,7 @@ const ExampleScreen = () => {
   useBackgroundConfig({ blurMode: 'full' });
 
   const handleItemPress = (itemId: number, debug = false) => {
-    router.push({
+    router.navigate({
       pathname: '/debugModal',
       params: { itemId: String(itemId), debug: String(debug) },
     });

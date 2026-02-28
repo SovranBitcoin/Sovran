@@ -102,7 +102,7 @@ export default function WalletHeaderTitle({
   );
 
   const handleShowAllMints = useCallback(() => {
-    router.push({
+    router.navigate({
       pathname: '/list',
       params: {
         requireBalance: 'false',
@@ -115,7 +115,7 @@ export default function WalletHeaderTitle({
   }, [allowedMints]);
 
   const handleAddMint = useCallback(() => {
-    router.push('/add');
+    router.navigate('/add');
   }, []);
 
   // Get window dimensions for width calculations

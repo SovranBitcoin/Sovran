@@ -7,10 +7,8 @@
 
 import React, { useCallback, useState } from 'react';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
-import { RowButton, Section } from 'app/settings-pages';
+import { Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
-import { Text } from 'components/ui/Text';
-import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { popup } from '@/helper/popup';
@@ -19,6 +17,7 @@ import { truncateMiddle } from 'helper/strings';
 import opacity from 'hex-color-opacity';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { Tabs } from 'components/ui/Tabs';
+import { ListGroup, PressableFeedback } from 'heroui-native';
 
 // Configuration for different share types
 export const SHARE_CONFIGS = {
@@ -150,29 +149,40 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
       <PaymentInfo popupMessage={config.popupMessage} data={activeData} unit={config.unit} />
 
       <Section title={config.sectionTitle}>
-        <RowButton
-          isFirst
-          onPress={handleCopy}
-          rightIcon={
-            <Icon name="lets-icons:copy" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
-          }
-          label={
-            <HStack align="center" gap={8}>
-              {config.iconCurrency ? (
-                <CurrencyIcon
-                  colors={[opacity(getPrimaryColor('0'), 0.4)]}
-                  width={20}
-                  currency={config.iconCurrency}
-                />
-              ) : config.iconName ? (
-                <Icon name={config.iconName} size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
-              ) : null}
-              <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                {truncateMiddle(activeData, 10)}
-              </Text>
-            </HStack>
-          }
-        />
+        <ListGroup variant="secondary">
+          <PressableFeedback animation={false} onPress={handleCopy}>
+            <PressableFeedback.Scale>
+              <ListGroup.Item disabled>
+                <ListGroup.ItemPrefix>
+                  {config.iconCurrency ? (
+                    <CurrencyIcon
+                      colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                      width={20}
+                      currency={config.iconCurrency}
+                    />
+                  ) : config.iconName ? (
+                    <Icon
+                      name={config.iconName}
+                      size={20}
+                      color={opacity(getPrimaryColor('0'), 0.4)}
+                    />
+                  ) : undefined}
+                </ListGroup.ItemPrefix>
+                <ListGroup.ItemContent>
+                  <ListGroup.ItemTitle>{truncateMiddle(activeData, 10)}</ListGroup.ItemTitle>
+                </ListGroup.ItemContent>
+                <ListGroup.ItemSuffix>
+                  <Icon
+                    name="lets-icons:copy"
+                    size={20}
+                    color={opacity(getPrimaryColor('0'), 0.4)}
+                  />
+                </ListGroup.ItemSuffix>
+              </ListGroup.Item>
+            </PressableFeedback.Scale>
+            <PressableFeedback.Ripple />
+          </PressableFeedback>
+        </ListGroup>
       </Section>
     </ModalLayoutWrapper>
   );

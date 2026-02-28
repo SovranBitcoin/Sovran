@@ -77,7 +77,7 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
 
   return (
     <ScrollView
-      className="mt-3 flex-1"
+      style={{ marginTop: 12, flex: 1 }}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ flexGrow: 0, paddingBottom: 120 }}>
       <RNView style={[styles.card, { borderColor }]}>

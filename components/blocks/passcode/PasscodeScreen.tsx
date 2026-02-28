@@ -109,7 +109,12 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
           <AnimatedSpriteBackground backgroundColor={getPrimaryColor('950')} />
 
           <View style={avatarShadow}>
-            <Avatar seed={nostrKeys?.pubkey} size={AVATAR_SIZE} />
+            <Avatar
+              seed={nostrKeys?.pubkey}
+              name={getUsername(nostrKeys?.pubkey || '')}
+              size={AVATAR_SIZE}
+              variant="person"
+            />
           </View>
 
           <Text

@@ -28,6 +28,7 @@ export default function App({
       source={source}
       placeholder={{ blurhash: BLUR_HASH }}
       contentFit="cover"
+      cachePolicy="disk"
       transition={transitionDuration}
     />
   );

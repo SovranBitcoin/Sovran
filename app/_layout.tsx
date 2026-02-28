@@ -6,22 +6,28 @@ import {
 import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { HeroUINativeProvider } from 'heroui-native/provider';
 import 'global.css';
 import 'intl';
 import 'intl/locale-data/jsonp/en';
-import 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { registerAllSheets } from '@/components/blocks/sheets/registerSheets';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFonts } from '@/hooks/useFonts';
+import { initLog } from '@/helper/initTiming';
 import Icon from 'assets/icons';
-import { LogBox, TouchableOpacity, Platform } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Image, LogBox, TouchableOpacity, Platform, View } from 'react-native';
 import { supportsLiquidGlass } from '@/helper/version';
 
 import AppGate from '@/components/blocks/AppGate';
 import MigrationGate from '@/components/blocks/MigrationGate';
-import { InitializationProvider } from '@/providers/InitializationProvider';
+import {
+  InitializationProvider,
+  INITIALIZATION_DISPLAY_TYPE,
+  useInitializationState,
+} from '@/providers/InitializationProvider';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
 import { compose } from 'helper/utils';
@@ -29,7 +35,7 @@ import { NostrKeysProvider, useNostrKeysContext } from 'providers/NostrKeysProvi
 import { NostrNDKProvider } from 'providers/NostrNDKProvider';
 import { PricelistProvider } from 'providers/PricelistProvider';
 import { ThemeProvider, useTheme } from 'providers/ThemeProvider';
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { SheetProvider } from 'react-native-actions-sheet';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { Provider } from 'react-redux';
@@ -41,22 +47,28 @@ import { CocoProvider } from '@/helper/coco/CocoProvider';
 import { HeroTransitionProvider } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { useProfileStore } from '@/stores/profileStore';
 import { useAppBalance } from '@/hooks/useAppBalance';
+import PopupHost from '@/components/blocks/popup/PopupHost';
 
 // Prevent splash screen from auto-hiding until fonts are loaded
 SplashScreen.preventAutoHideAsync();
+
+initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called');
 
 registerAllSheets({ context: 'global' });
 
 LogBox.ignoreAllLogs();
 
-// Outer providers — stable across profile switches, never remount
+// Outer providers — stable across profile switches, never remount.
+// InitializationProvider is first so the splash screen renders immediately
+// while PersistGate waits for Redux rehydration (avoids blank screen gap).
 const OuterProviders = compose([
   KeyboardProvider,
+  [InitializationProvider, { forceVisible: false }],
   [PersistGate, { loading: null, persistor }],
   [Provider, { store }],
   ThemeProvider,
+  HeroUINativeProvider,
   HeroTransitionProvider,
-  [InitializationProvider, { forceVisible: false }],
 ]);
 
 // Inner providers — remounted on profile switch via React key change
@@ -67,6 +79,7 @@ function AccountScopedProviders({
   accountIndex: number;
   children: React.ReactNode;
 }) {
+  initLog('AccountScoped', `render — accountIndex=${accountIndex}`);
   const InnerProviders = useMemo(
     () =>
       compose([
@@ -197,7 +210,73 @@ function RootLayoutContent() {
           <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
         ))}
       </Stack>
+      <PopupHost />
     </NavigationThemeProvider>
+  );
+}
+
+function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
+  const { isInitializing } = useInitializationState();
+  const hasRootLaidOut = useRef(false);
+  const hasBeenInitializing = useRef(false);
+  const hasHiddenSplash = useRef(false);
+  const showReinitSplash =
+    INITIALIZATION_DISPLAY_TYPE === 'splash' && hasHiddenSplash.current && isInitializing;
+
+  const maybeHideNativeSplash = useCallback(() => {
+    if (INITIALIZATION_DISPLAY_TYPE !== 'splash') return;
+    if (
+      isInitializing ||
+      !hasBeenInitializing.current ||
+      !hasRootLaidOut.current ||
+      hasHiddenSplash.current
+    )
+      return;
+
+    hasHiddenSplash.current = true;
+    initLog('NativeSplashLayoutGate', 'root laid out + init complete — hiding native splash');
+    SplashScreen.hideAsync();
+  }, [isInitializing]);
+
+  const onLayoutRootView = useCallback(() => {
+    hasRootLaidOut.current = true;
+    maybeHideNativeSplash();
+  }, [maybeHideNativeSplash]);
+
+  useEffect(() => {
+    if (isInitializing) {
+      hasBeenInitializing.current = true;
+    }
+  }, [isInitializing]);
+
+  useEffect(() => {
+    maybeHideNativeSplash();
+  }, [maybeHideNativeSplash]);
+
+  return (
+    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+      {children}
+      {showReinitSplash ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: '#000000',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999,
+          }}>
+          <Image
+            source={require('../assets/images/splash.png')}
+            resizeMode="contain"
+            style={{ width: 800, height: 800 }}
+          />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -205,25 +284,39 @@ export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts();
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
 
-  // Hide splash screen once fonts are loaded
+  initLog(
+    'RootLayout',
+    `render — fontsLoaded=${fontsLoaded} fontError=${!!fontError} account=${activeAccountIndex}`
+  );
+
+  // In 'splash' mode the native splash stays visible until initialization
+  // finishes and the root view has produced a layout (NativeSplashLayoutGate).
+  // For 'text' and 'logo' modes we hide it as soon as fonts are ready so
+  // the custom React overlay can take over.
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    if ((fontsLoaded || fontError) && INITIALIZATION_DISPLAY_TYPE !== 'splash') {
+      initLog('RootLayout', 'fonts ready — calling SplashScreen.hideAsync');
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
   // Don't render anything until fonts are loaded
   if (!fontsLoaded && !fontError) {
+    initLog('RootLayout', 'waiting for fonts — returning null');
     return null;
   }
 
   return (
-    <OuterProviders>
-      <AccountScopedProviders
-        key={`account-${activeAccountIndex}`}
-        accountIndex={activeAccountIndex}>
-        <RootLayoutContent />
-      </AccountScopedProviders>
-    </OuterProviders>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <OuterProviders>
+        <NativeSplashLayoutGate>
+          <AccountScopedProviders
+            key={`account-${activeAccountIndex}`}
+            accountIndex={activeAccountIndex}>
+            <RootLayoutContent />
+          </AccountScopedProviders>
+        </NativeSplashLayoutGate>
+      </OuterProviders>
+    </GestureHandlerRootView>
   );
 }

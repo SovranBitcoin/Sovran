@@ -107,7 +107,7 @@ function ModalScreen() {
         }}
         onMeltQuoteReady={(lnUrlOrAddress, amount) => {
           // meltQuote is a separate flow, navigate to root-level screen
-          router.push({
+          router.navigate({
             pathname: `/${params.to}` as any,
             params: {
               lnUrlOrAddress,
@@ -116,7 +116,7 @@ function ModalScreen() {
           });
         }}
         onCameraPress={(unit) => {
-          router.push({
+          router.navigate({
             pathname: '/camera',
             params: { unit },
           });

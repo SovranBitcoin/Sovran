@@ -528,7 +528,7 @@ function MapScreen() {
         }
       } else if (clusterMarker.placeId) {
         // Navigate to the detail screen within the flow
-        router.push({
+        router.navigate({
           pathname: '/(map-flow)/detail',
           params: { placeId: clusterMarker.placeId.toString() },
         });

@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import { BackgroundProvider } from 'providers/BackgroundProvider';
 import { DynamicColorIOS, Platform, StyleSheet, View } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Colors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { OfflineProvider } from '@/providers/OfflineProvider';
@@ -27,54 +27,61 @@ export default function TabLayout() {
     return (
       <BackgroundProvider>
         <OfflineProvider>
-          <Expo55NativeTabs
-            labelStyle={{
-              color: Platform.select({
-                ios: DynamicColorIOS({
-                  dark: Colors.dark.text,
-                  light: Colors.light.text,
+          <View style={{ flex: 1 }}>
+            <Expo55NativeTabs
+              labelStyle={{
+                color: Platform.select({
+                  ios: DynamicColorIOS({
+                    dark: Colors.dark.text,
+                    light: Colors.light.text,
+                  }),
                 }),
-              }),
-            }}
-            tintColor={Platform.select({
-              ios: DynamicColorIOS({
-                dark: Colors.dark.tint,
-                light: Colors.light.tint,
-              }),
-            })}
-            disableTransparentOnScrollEdge>
-            <Expo55NativeTabs.Trigger name="payments">
-              <Expo55NativeTabs.Trigger.Icon
-                sf={{
-                  default: 'arrow.up.arrow.down',
-                  selected: 'arrow.up.arrow.down',
-                }}
-              />
-              <Expo55NativeTabs.Trigger.Label>Payments</Expo55NativeTabs.Trigger.Label>
-            </Expo55NativeTabs.Trigger>
+              }}
+              tintColor={Platform.select({
+                ios: DynamicColorIOS({
+                  dark: Colors.dark.tint,
+                  light: Colors.light.tint,
+                }),
+              })}
+              disableTransparentOnScrollEdge>
+              <Expo55NativeTabs.Trigger name="feed">
+                <Expo55NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />
+                <Expo55NativeTabs.Trigger.Label>Feed</Expo55NativeTabs.Trigger.Label>
+              </Expo55NativeTabs.Trigger>
 
-            <Expo55NativeTabs.Trigger name="index">
-              <Expo55NativeTabs.Trigger.Icon
-                sf={{
-                  default: 'wallet.bifold',
-                  selected: 'wallet.bifold',
-                }}
-              />
-              <Expo55NativeTabs.Trigger.Label>Wallet</Expo55NativeTabs.Trigger.Label>
-            </Expo55NativeTabs.Trigger>
+              <Expo55NativeTabs.Trigger name="payments">
+                <Expo55NativeTabs.Trigger.Icon
+                  sf={{
+                    default: 'arrow.up.arrow.down',
+                    selected: 'arrow.up.arrow.down',
+                  }}
+                />
+                <Expo55NativeTabs.Trigger.Label>Contacts</Expo55NativeTabs.Trigger.Label>
+              </Expo55NativeTabs.Trigger>
 
-            <Expo55NativeTabs.Trigger name="explore">
-              <Expo55NativeTabs.Trigger.Icon
-                sf={{ default: 'paperplane', selected: 'paperplane.fill' }}
-              />
-              <Expo55NativeTabs.Trigger.Label>Explore</Expo55NativeTabs.Trigger.Label>
-            </Expo55NativeTabs.Trigger>
+              <Expo55NativeTabs.Trigger name="index">
+                <Expo55NativeTabs.Trigger.Icon
+                  sf={{
+                    default: 'wallet.bifold',
+                    selected: 'wallet.bifold',
+                  }}
+                />
+                <Expo55NativeTabs.Trigger.Label>Wallet</Expo55NativeTabs.Trigger.Label>
+              </Expo55NativeTabs.Trigger>
 
-            {/* <Expo55NativeTabs.Trigger name="example">
+              <Expo55NativeTabs.Trigger name="explore">
+                <Expo55NativeTabs.Trigger.Icon
+                  sf={{ default: 'paperplane', selected: 'paperplane.fill' }}
+                />
+                <Expo55NativeTabs.Trigger.Label>Explore</Expo55NativeTabs.Trigger.Label>
+              </Expo55NativeTabs.Trigger>
+
+              {/* <Expo55NativeTabs.Trigger name="example">
           <Expo55NativeTabs.Trigger.Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
           <Expo55NativeTabs.Trigger.Label>Example</Expo55NativeTabs.Trigger.Label>
         </Expo55NativeTabs.Trigger> */}
-          </Expo55NativeTabs>
+            </Expo55NativeTabs>
+          </View>
         </OfflineProvider>
       </BackgroundProvider>
     );
@@ -100,6 +107,13 @@ export default function TabLayout() {
               tabBarActiveTintColor: Colors.dark.tint,
               tabBarInactiveTintColor: Colors.dark.text,
             }}>
+            <Tabs.Screen
+              name="feed"
+              options={{
+                title: 'Feed',
+                tabBarIcon: ({ color }) => <IconSymbol name="house" color={color} size={24} />,
+              }}
+            />
             <Tabs.Screen
               name="payments"
               options={{
@@ -127,7 +141,7 @@ export default function TabLayout() {
             <Tabs.Screen
               name="example"
               options={{
-                href: null, // Hide from tab bar
+                href: null,
               }}
             />
           </Tabs>

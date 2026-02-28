@@ -9,15 +9,8 @@
  */
 
 import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  Dimensions,
-  Linking,
-} from 'react-native';
+import { Animated, Easing, StyleSheet, TouchableOpacity, Dimensions, Linking } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
@@ -27,7 +20,7 @@ import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { npubToPubkey } from 'components/blocks/Transaction';
 import { Card } from 'components/ui/Card';
-import { RowButton, Section } from 'app/settings-pages';
+import { Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from 'components/ui/Avatar';
 import { truncateMiddle } from 'helper/strings';
@@ -37,8 +30,8 @@ import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { Metadata } from 'nostr-tools/kinds';
+import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { Contacts, Metadata } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
 import { popup } from '@/helper/popup';
 import {
@@ -52,67 +45,42 @@ import { formatDate } from '@/helper/time';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 import { UserFeed } from 'components/blocks/UserFeed';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { selectIsFollowingPubkey, useNostrSocialStore } from '@/stores/nostrSocialStore';
+import { getUsername } from '@/helper/username';
+import { generateSeededGradient } from '@/helper/avatarGradient';
+import type { VideoPostRecord } from 'components/blocks/nostr/shared';
+import type { StoryUser } from 'components/blocks/nostr/StoriesCarousel';
+import { ListGroup, PressableFeedback } from 'heroui-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 150;
 
-// ============================================================================
-// Gradient Generation from Seed (same algorithm as Avatar)
-// ============================================================================
-function Mash() {
-  let n = 0xefc8249d;
-  const mash = function (data: string) {
-    for (let i = 0; i < data.length; i++) {
-      n += data.charCodeAt(i);
-      let h = 0.02519603282416938 * n;
-      n = h >>> 0;
-      h -= n;
-      h *= n;
-      n = h >>> 0;
-      h -= n;
-      n += h * 0x100000000;
+function buildUpdatedContactTags(
+  existingTags: string[][],
+  targetPubkey: string,
+  shouldFollow: boolean
+): string[][] {
+  const nextTags = existingTags.filter((tag) => !(tag[0] === 'p' && tag[1] === targetPubkey));
+  if (shouldFollow) {
+    nextTags.push(['p', targetPubkey]);
+  }
+  // Keep one p-tag per pubkey while preserving order for NIP-02 contact lists.
+  const seenP = new Set<string>();
+  const deduped: string[][] = [];
+  for (const tag of nextTags) {
+    if (tag[0] !== 'p') {
+      deduped.push(tag);
+      continue;
     }
-    return (n >>> 0) * 2.3283064365386963e-10;
-  };
-  return mash;
+    const pk = tag[1];
+    if (!pk || seenP.has(pk)) continue;
+    seenP.add(pk);
+    deduped.push(tag);
+  }
+  return deduped;
 }
 
-function Alea(this: any, seed: string) {
-  const me: any = this;
-  const mash = Mash();
-  me.c = 1;
-  me.s0 = mash(' ');
-  me.s1 = mash(' ');
-  me.s2 = mash(' ');
-  me.s0 -= mash(seed);
-  if (me.s0 < 0) me.s0 += 1;
-  me.s1 -= mash(seed);
-  if (me.s1 < 0) me.s1 += 1;
-  me.s2 -= mash(seed);
-  if (me.s2 < 0) me.s2 += 1;
-  me.next = function () {
-    const t = 2091639 * me.s0 + me.c * 2.3283064365386963e-10;
-    me.s0 = me.s1;
-    me.s1 = me.s2;
-    return (me.s2 = t - (me.c = t | 0));
-  };
-}
-
-function generateBannerGradient(seed: string): [string, string] {
-  const xg = new (Alea as any)(seed);
-  const random = () => xg.next();
-
-  // Generate two HSL colors for gradient
-  const h1 = Math.floor(random() * 360);
-  const s1 = 40 + Math.floor(random() * 30); // 40-70% saturation
-  const l1 = 25 + Math.floor(random() * 20); // 25-45% lightness (darker for banner)
-
-  const h2 = (h1 + 30 + Math.floor(random() * 60)) % 360; // Offset hue
-  const s2 = 40 + Math.floor(random() * 30);
-  const l2 = 20 + Math.floor(random() * 20); // Slightly darker
-
-  return [`hsl(${h1}, ${s1}%, ${l1}%)`, `hsl(${h2}, ${s2}%, ${l2}%)`];
-}
 const AVATAR_SIZE = 90;
 const AVATAR_OVERFLOW = AVATAR_SIZE / 4; // 1/4 overflows below banner
 
@@ -312,7 +280,7 @@ function TopFollowersComponent({
   }
 
   const handleFollowerPress = (follower: TopFollower) => {
-    router.push({
+    router.navigate({
       pathname: '/(user-flow)/profile' as any,
       params: { npub: follower.npub },
     });
@@ -398,6 +366,12 @@ function BannerWithAvatarComponent({
   displayName,
   nip05,
   isLoading,
+  showFollowButton,
+  isFollowing,
+  isFollowLoading,
+  onToggleFollow,
+  hasStories,
+  onAvatarPress,
 }: {
   bannerUrl?: string;
   pictureUrl?: string;
@@ -405,6 +379,12 @@ function BannerWithAvatarComponent({
   displayName: string;
   nip05?: string;
   isLoading: boolean;
+  showFollowButton: boolean;
+  isFollowing: boolean;
+  isFollowLoading: boolean;
+  onToggleFollow: () => void;
+  hasStories?: boolean;
+  onAvatarPress?: () => void;
 }) {
   const { getPrimaryColor } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -413,8 +393,11 @@ function BannerWithAvatarComponent({
   const [bannerLoaded, setBannerLoaded] = useState(false);
   const [bannerError, setBannerError] = useState(false);
 
-  // Generate gradient colors from pubkey for fallback banner
-  const gradientColors = useMemo(() => generateBannerGradient(pubkey || 'default'), [pubkey]);
+  // Reuse the same layered seeded gradient algorithm as Avatar fallback.
+  const bannerGradientTheme = useMemo(
+    () => generateSeededGradient(`${pubkey || 'default'}:person`, 'person'),
+    [pubkey]
+  );
 
   // Reset banner states when URL changes
   useEffect(() => {
@@ -431,63 +414,77 @@ function BannerWithAvatarComponent({
     }).start();
   }, [fadeAnim]);
 
-  // Determine what to show:
-  // - If still loading API data, show skeleton
-  // - If banner URL exists and not errored, try to load image (show skeleton while loading)
-  // - If no banner URL or image errored, show gradient
-  const showSkeleton = isLoading || (bannerUrl && !bannerLoaded && !bannerError);
-  const showGradient = !isLoading && (!bannerUrl || bannerError);
-
   return (
     <View>
       {/* Banner */}
       <View style={[styles.bannerContainer, { backgroundColor: getPrimaryColor('800') }]}>
         {/* Hidden image to trigger load/error callbacks */}
         {bannerUrl && !bannerError && (
-          <Image
+          <ExpoImage
             source={{ uri: bannerUrl }}
             style={[styles.bannerImage, !bannerLoaded && { opacity: 0, position: 'absolute' }]}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="disk"
+            recyclingKey={bannerUrl}
+            transition={200}
             onLoad={() => setBannerLoaded(true)}
             onError={() => setBannerError(true)}
           />
         )}
 
-        {/* Skeleton while loading */}
-        {showSkeleton && (
-          <Skeleton
-            style={[styles.bannerPlaceholder, { backgroundColor: getPrimaryColor('700') }]}
-          />
-        )}
-
-        {/* Gradient fallback */}
-        {showGradient && (
+        {/* Always render deterministic fallback gradient first paint. */}
+        <View style={styles.bannerPlaceholder}>
           <LinearGradient
-            colors={gradientColors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.bannerPlaceholder}
+            colors={bannerGradientTheme.primaryColors}
+            start={bannerGradientTheme.primaryStart}
+            end={bannerGradientTheme.primaryEnd}
+            style={StyleSheet.absoluteFill}
           />
-        )}
+          <LinearGradient
+            colors={bannerGradientTheme.overlayColors}
+            start={bannerGradientTheme.overlayStart}
+            end={bannerGradientTheme.overlayEnd}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
       </View>
 
       {/* Avatar - positioned to overlap */}
       <Animated.View
         style={[styles.avatarContainer, { opacity: fadeAnim, transform: [{ scale: fadeAnim }] }]}>
-        <View
-          style={[
-            styles.avatarBorder,
-            { borderColor: getPrimaryColor('950'), backgroundColor: getPrimaryColor('950') },
-          ]}>
-          <Avatar
-            picture={pictureUrl}
-            seed={pubkey}
-            size={AVATAR_SIZE}
-            variant="person"
-            name={displayName}
-            loading={isLoading}
-          />
-        </View>
+        {hasStories ? (
+          <TouchableOpacity activeOpacity={0.8}>
+            <View
+              style={[
+                styles.avatarBorder,
+                { borderColor: getPrimaryColor('950'), backgroundColor: getPrimaryColor('950') },
+              ]}>
+              <Avatar
+                picture={pictureUrl}
+                seed={pubkey}
+                size={AVATAR_SIZE}
+                variant="person"
+                name={displayName}
+                loading={isLoading}
+              />
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <View
+            style={[
+              styles.avatarBorder,
+              { borderColor: getPrimaryColor('950'), backgroundColor: getPrimaryColor('950') },
+            ]}>
+            <Avatar
+              picture={pictureUrl}
+              seed={pubkey}
+              size={AVATAR_SIZE}
+              variant="person"
+              name={displayName}
+              loading={isLoading}
+            />
+          </View>
+        )}
       </Animated.View>
 
       {/* Name and NIP-05 */}
@@ -529,6 +526,34 @@ function BannerWithAvatarComponent({
                 </Text>
               </HStack>
             )}
+            {showFollowButton ? (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={onToggleFollow}
+                disabled={isFollowLoading}
+                style={[
+                  styles.followButton,
+                  {
+                    backgroundColor: isFollowing
+                      ? opacity(getPrimaryColor('0'), 0.12)
+                      : getPrimaryColor('0'),
+                    borderColor: isFollowing
+                      ? opacity(getPrimaryColor('0'), 0.25)
+                      : getPrimaryColor('0'),
+                  },
+                  isFollowLoading && styles.followButtonDisabled,
+                ]}>
+                <Text
+                  bold
+                  overpass
+                  size={13}
+                  style={{
+                    color: isFollowing ? getPrimaryColor('0') : getPrimaryColor('950'),
+                  }}>
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </>
         )}
       </VStack>
@@ -542,6 +567,8 @@ const BannerWithAvatar = React.memo(BannerWithAvatarComponent);
 // ============================================================================
 function UserProfileScreen() {
   const { getPrimaryColor } = useTheme();
+  const { ndk } = useNDK();
+  const { keys: nostrKeys } = useNostrKeysContext();
   const _insets = useSafeAreaInsets();
   const { npub: npubParam, pubkey: pubkeyParam } = useLocalSearchParams<{
     npub?: string;
@@ -568,6 +595,8 @@ function UserProfileScreen() {
     return '';
   }, [npubParam, pubkey]);
 
+  const isOwnProfile = !!nostrKeys?.pubkey && nostrKeys.pubkey === pubkey;
+
   // ===========================
   // NOSTR SUBSCRIPTIONS & API
   // ===========================
@@ -590,6 +619,44 @@ function UserProfileScreen() {
     filters: metadataFilters,
   });
 
+  const contactListFilters = useMemo(
+    () =>
+      nostrKeys?.pubkey
+        ? [
+            {
+              authors: [nostrKeys.pubkey],
+              kinds: [Contacts],
+              limit: 20,
+            },
+          ]
+        : null,
+    [nostrKeys?.pubkey]
+  );
+  const { events: contactListEvents } = useSubscribe({ filters: contactListFilters });
+
+  const contactsTags = useNostrSocialStore((state) => state.contactsTags);
+  const contactsContent = useNostrSocialStore((state) => state.contactsContent);
+  const setContactsFromRelay = useNostrSocialStore((state) => state.setContactsFromRelay);
+  const setFollowOptimistic = useNostrSocialStore((state) => state.setFollowOptimistic);
+  const clearFollowOptimistic = useNostrSocialStore((state) => state.clearFollowOptimistic);
+  const clearSettledFollowOptimistic = useNostrSocialStore(
+    (state) => state.clearSettledFollowOptimistic
+  );
+  const followOptimisticEntry = useNostrSocialStore((state) =>
+    pubkey ? state.optimisticFollowsByPubkey[pubkey] : undefined
+  );
+  const ownFollowingCount = useNostrSocialStore((state) => {
+    let count = Object.keys(state.followingPubkeys).length;
+
+    for (const [followedPubkey, optimistic] of Object.entries(state.optimisticFollowsByPubkey)) {
+      const baseIsFollowing = !!state.followingPubkeys[followedPubkey];
+      if (optimistic.value === baseIsFollowing) continue;
+      count += optimistic.value ? 1 : -1;
+    }
+
+    return Math.max(0, count);
+  });
+
   // Fetch profile stats from Sovran API (followers, following, top followers, rank)
   const { data: profileData, isLoading: isProfileApiLoading } = useNostrProfile(pubkey || null);
 
@@ -597,11 +664,10 @@ function UserProfileScreen() {
   // DERIVED STATE
   // ===========================
   const userInfo = metadataEvents?.[0] ? JSON.parse(metadataEvents[0].content) : null;
-  const displayName = userInfo?.display_name || userInfo?.name || truncateMiddle(npub, 8);
+  const displayName = isOwnProfile
+    ? getUsername(pubkey || '')
+    : userInfo?.display_name || userInfo?.name || truncateMiddle(npub, 8);
   const isMetadataLoading = !metadataEose;
-
-  // Following count from API
-  const followingCount = profileData?.follows;
 
   // Follower count from API
   const followerCount = profileData?.followers;
@@ -613,6 +679,66 @@ function UserProfileScreen() {
   const joinedDate = formatDate((profileData?.created_at || 0) * 1000);
 
   const isStatsLoading = isProfileApiLoading;
+
+  const latestContactListEvent = useMemo(() => {
+    if (!nostrKeys?.pubkey) return null;
+    const candidates = (contactListEvents || []).filter(
+      (event) => event.kind === Contacts && event.pubkey === nostrKeys.pubkey
+    );
+    if (candidates.length === 0) return null;
+    return [...candidates].sort((a, b) => {
+      const byCreatedAt = (b.created_at || 0) - (a.created_at || 0);
+      if (byCreatedAt !== 0) return byCreatedAt;
+      return (b.id || '').localeCompare(a.id || '');
+    })[0];
+  }, [contactListEvents, nostrKeys?.pubkey]);
+
+  useEffect(() => {
+    if (!latestContactListEvent) return;
+    const tags = Array.isArray(latestContactListEvent.tags)
+      ? (latestContactListEvent.tags as string[][])
+      : [];
+    const content =
+      typeof latestContactListEvent.content === 'string' ? latestContactListEvent.content : '';
+    setContactsFromRelay({
+      tags,
+      content,
+      createdAt: latestContactListEvent.created_at || 0,
+    });
+    clearSettledFollowOptimistic();
+  }, [latestContactListEvent, setContactsFromRelay, clearSettledFollowOptimistic]);
+
+  const followingCount = isOwnProfile ? ownFollowingCount : profileData?.follows;
+  const isFollowingProfile = useNostrSocialStore(
+    useMemo(() => selectIsFollowingPubkey(pubkey || ''), [pubkey])
+  );
+  const followInFlight = !!followOptimisticEntry?.pending;
+
+  // ===========================
+  // VIDEO STORIES STATE
+  // ===========================
+  const [userVideoPosts, setUserVideoPosts] = useState<VideoPostRecord[]>([]);
+  const hasStories = userVideoPosts.length > 0;
+
+  const handleVideoPostsReady = useCallback((videoPosts: VideoPostRecord[]) => {
+    setUserVideoPosts(videoPosts);
+  }, []);
+
+  const handleAvatarStoryPress = useCallback(() => {
+    if (userVideoPosts.length === 0) return;
+    const storyUser: StoryUser = {
+      pubkey,
+      profile: userInfo ? { name: displayName, picture: userInfo.picture } : undefined,
+      videoPosts: userVideoPosts,
+    };
+    router.navigate({
+      pathname: '/(stories-flow)/stories' as any,
+      params: {
+        startIndex: '0',
+        storyUsersJson: JSON.stringify([storyUser]),
+      },
+    });
+  }, [userVideoPosts, pubkey, userInfo, displayName]);
 
   // ===========================
   // HANDLERS
@@ -634,6 +760,49 @@ function UserProfileScreen() {
       popup({ message: 'Failed to open link', type: 'error' });
     }
   }, []);
+
+  const handleToggleFollow = useCallback(async () => {
+    if (!pubkey || !nostrKeys?.pubkey || !ndk) {
+      popup({ message: 'Unable to update follow right now', type: 'error' });
+      return;
+    }
+    if (nostrKeys.pubkey === pubkey || followInFlight) return;
+
+    const shouldFollow = !isFollowingProfile;
+    setFollowOptimistic(pubkey, shouldFollow, true);
+
+    const sourceTags = contactsTags.map((tag) => [...tag]);
+    const sourceContent = contactsContent;
+
+    const nextTags = buildUpdatedContactTags(sourceTags, pubkey, shouldFollow);
+
+    const createdAt = Math.floor(Date.now() / 1000);
+
+    try {
+      const contactEvent = new NDKEvent(ndk);
+      contactEvent.kind = Contacts;
+      contactEvent.tags = nextTags;
+      contactEvent.content = sourceContent;
+      contactEvent.created_at = createdAt;
+      await contactEvent.publish();
+      setContactsFromRelay({ tags: nextTags, content: sourceContent, createdAt });
+      clearFollowOptimistic(pubkey);
+    } catch {
+      clearFollowOptimistic(pubkey);
+      popup({ message: 'Failed to update follow. Please try again.', type: 'error' });
+    }
+  }, [
+    pubkey,
+    nostrKeys?.pubkey,
+    ndk,
+    followInFlight,
+    isFollowingProfile,
+    contactsTags,
+    contactsContent,
+    setFollowOptimistic,
+    setContactsFromRelay,
+    clearFollowOptimistic,
+  ]);
 
   return (
     <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
@@ -678,6 +847,8 @@ function UserProfileScreen() {
           pubkey={pubkey}
           authorName={displayName}
           authorPicture={userInfo?.picture}
+          isOwnProfile={isOwnProfile}
+          onVideoPostsReady={handleVideoPostsReady}
           ListHeaderComponent={
             <View>
               {/* Banner with Overlapping Avatar */}
@@ -688,6 +859,12 @@ function UserProfileScreen() {
                 displayName={displayName}
                 nip05={userInfo?.nip05}
                 isLoading={isMetadataLoading}
+                showFollowButton={!isOwnProfile && !!pubkey}
+                isFollowing={isFollowingProfile}
+                isFollowLoading={followInFlight}
+                onToggleFollow={handleToggleFollow}
+                hasStories={hasStories}
+                onAvatarPress={handleAvatarStoryPress}
               />
 
               <Spacer size={16} />
@@ -722,27 +899,33 @@ function UserProfileScreen() {
               {/* Actions Section */}
               <View style={{ paddingHorizontal: 16 }}>
                 <Section title="Actions">
-                  <RowButton
-                    isFirst
-                    label={
-                      <HStack align="center" gap={8}>
-                        <Icon
-                          name="mdi:message-text"
-                          size={20}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
-                        />
-                        <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                          Message User
-                        </Text>
-                      </HStack>
-                    }
-                    onPress={() => {
-                      router.push({
-                        pathname: '/(user-flow)/userMessages' as any,
-                        params: { pubkey },
-                      });
-                    }}
-                  />
+                  <ListGroup variant="secondary">
+                    <PressableFeedback
+                      animation={false}
+                      onPress={() => {
+                        router.navigate({
+                          pathname: '/(user-flow)/userMessages' as any,
+                          params: { pubkey },
+                        });
+                      }}>
+                      <PressableFeedback.Scale>
+                        <ListGroup.Item disabled>
+                          <ListGroup.ItemPrefix>
+                            <Icon
+                              name="mdi:message-text"
+                              size={20}
+                              color={opacity(getPrimaryColor('0'), 0.4)}
+                            />
+                          </ListGroup.ItemPrefix>
+                          <ListGroup.ItemContent>
+                            <ListGroup.ItemTitle>Message User</ListGroup.ItemTitle>
+                          </ListGroup.ItemContent>
+                          <ListGroup.ItemSuffix />
+                        </ListGroup.Item>
+                      </PressableFeedback.Scale>
+                      <PressableFeedback.Ripple />
+                    </PressableFeedback>
+                  </ListGroup>
                 </Section>
               </View>
 
@@ -751,102 +934,121 @@ function UserProfileScreen() {
               {/* Profile Info Section */}
               <View style={{ paddingHorizontal: 16 }}>
                 <Section title="Profile Info">
-                  <RowButton
-                    isFirst
-                    onPress={() => handleCopy(npub, 'npub_copied')}
-                    rightIcon={
-                      <Icon
-                        name="lets-icons:copy"
-                        size={20}
-                        color={opacity(getPrimaryColor('0'), 0.4)}
-                      />
-                    }
-                    label={
-                      <HStack align="center" gap={8}>
-                        <CurrencyIcon
-                          colors={[opacity(getPrimaryColor('0'), 0.4)]}
-                          width={20}
-                          currency="nostr"
-                        />
-                        <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                          {truncateMiddle(npub, 10)}
-                        </Text>
-                      </HStack>
-                    }
-                  />
-                  {userInfo?.nip05 && (
-                    <RowButton
-                      onPress={() => handleCopy(userInfo.nip05, 'nip05_copied')}
-                      rightIcon={
-                        <Icon
-                          name="lets-icons:copy"
-                          size={20}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
-                        />
-                      }
-                      label={
-                        <HStack align="center" gap={8}>
-                          <Icon
-                            name="mdi:check-decagram"
-                            size={20}
-                            color={opacity(getPrimaryColor('0'), 0.4)}
-                          />
-                          <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                            {userInfo.nip05}
-                          </Text>
-                        </HStack>
-                      }
-                    />
-                  )}
-                  {userInfo?.lud16 && (
-                    <RowButton
-                      onPress={() => handleCopy(userInfo.lud16, 'lud16_copied')}
-                      rightIcon={
-                        <Icon
-                          name="lets-icons:copy"
-                          size={20}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
-                        />
-                      }
-                      label={
-                        <HStack align="center" gap={8}>
-                          <Icon
-                            name="mdi:lightning-bolt"
-                            size={20}
-                            color={opacity(getPrimaryColor('0'), 0.4)}
-                          />
-                          <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                            {userInfo.lud16}
-                          </Text>
-                        </HStack>
-                      }
-                    />
-                  )}
-                  {userInfo?.website && (
-                    <RowButton
-                      isLast
-                      onPress={() => handleOpenLink(userInfo.website)}
-                      rightIcon={
-                        <Icon
-                          name="mdi:open-in-new"
-                          size={20}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
-                        />
-                      }
-                      label={
-                        <HStack align="center" gap={8}>
-                          <Icon
-                            name="mdi:web"
-                            size={20}
-                            color={opacity(getPrimaryColor('0'), 0.4)}
-                          />
-                          <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                            {userInfo.website}
-                          </Text>
-                        </HStack>
-                      }
-                    />
-                  )}
+                  <ListGroup variant="secondary">
+                    <PressableFeedback
+                      animation={false}
+                      onPress={() => handleCopy(npub, 'npub_copied')}>
+                      <PressableFeedback.Scale>
+                        <ListGroup.Item disabled>
+                          <ListGroup.ItemPrefix>
+                            <CurrencyIcon
+                              colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                              width={20}
+                              currency="nostr"
+                            />
+                          </ListGroup.ItemPrefix>
+                          <ListGroup.ItemContent>
+                            <ListGroup.ItemTitle>{truncateMiddle(npub, 10)}</ListGroup.ItemTitle>
+                          </ListGroup.ItemContent>
+                          <ListGroup.ItemSuffix>
+                            <Icon
+                              name="lets-icons:copy"
+                              size={20}
+                              color={opacity(getPrimaryColor('0'), 0.4)}
+                            />
+                          </ListGroup.ItemSuffix>
+                        </ListGroup.Item>
+                      </PressableFeedback.Scale>
+                      <PressableFeedback.Ripple />
+                    </PressableFeedback>
+
+                    {userInfo?.nip05 && (
+                      <PressableFeedback
+                        animation={false}
+                        onPress={() => handleCopy(userInfo.nip05, 'nip05_copied')}>
+                        <PressableFeedback.Scale>
+                          <ListGroup.Item disabled>
+                            <ListGroup.ItemPrefix>
+                              <Icon
+                                name="mdi:check-decagram"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemPrefix>
+                            <ListGroup.ItemContent>
+                              <ListGroup.ItemTitle>{userInfo.nip05}</ListGroup.ItemTitle>
+                            </ListGroup.ItemContent>
+                            <ListGroup.ItemSuffix>
+                              <Icon
+                                name="lets-icons:copy"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemSuffix>
+                          </ListGroup.Item>
+                        </PressableFeedback.Scale>
+                        <PressableFeedback.Ripple />
+                      </PressableFeedback>
+                    )}
+
+                    {userInfo?.lud16 && (
+                      <PressableFeedback
+                        animation={false}
+                        onPress={() => handleCopy(userInfo.lud16, 'lud16_copied')}>
+                        <PressableFeedback.Scale>
+                          <ListGroup.Item disabled>
+                            <ListGroup.ItemPrefix>
+                              <Icon
+                                name="mdi:lightning-bolt"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemPrefix>
+                            <ListGroup.ItemContent>
+                              <ListGroup.ItemTitle>{userInfo.lud16}</ListGroup.ItemTitle>
+                            </ListGroup.ItemContent>
+                            <ListGroup.ItemSuffix>
+                              <Icon
+                                name="lets-icons:copy"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemSuffix>
+                          </ListGroup.Item>
+                        </PressableFeedback.Scale>
+                        <PressableFeedback.Ripple />
+                      </PressableFeedback>
+                    )}
+
+                    {userInfo?.website && (
+                      <PressableFeedback
+                        animation={false}
+                        onPress={() => handleOpenLink(userInfo.website)}>
+                        <PressableFeedback.Scale>
+                          <ListGroup.Item disabled>
+                            <ListGroup.ItemPrefix>
+                              <Icon
+                                name="mdi:web"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemPrefix>
+                            <ListGroup.ItemContent>
+                              <ListGroup.ItemTitle>{userInfo.website}</ListGroup.ItemTitle>
+                            </ListGroup.ItemContent>
+                            <ListGroup.ItemSuffix>
+                              <Icon
+                                name="mdi:open-in-new"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemSuffix>
+                          </ListGroup.Item>
+                        </PressableFeedback.Scale>
+                        <PressableFeedback.Ripple />
+                      </PressableFeedback>
+                    )}
+                  </ListGroup>
                 </Section>
               </View>
 
@@ -863,7 +1065,7 @@ function UserProfileScreen() {
               text: 'Send Message',
               variant: 'primary',
               onPress: async () => {
-                router.push({
+                router.navigate({
                   pathname: '/(user-flow)/userMessages' as any,
                   params: { pubkey },
                 });
@@ -944,6 +1146,19 @@ const styles = StyleSheet.create({
   },
   topFollowerAvatar: {
     borderRadius: 32,
+  },
+  followButton: {
+    marginTop: 10,
+    minWidth: 108,
+    height: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  followButtonDisabled: {
+    opacity: 0.6,
   },
 });
 

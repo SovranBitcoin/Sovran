@@ -204,36 +204,19 @@ export function useMeltWithHistory() {
    * For pending operations it first checks with the mint — if the quote is
    * still UNPAID the proofs are released; if it's PAID or still in-flight
    * the cancel is rejected.
-   *
-   * Uses the internal meltOperationService.rollback() which is not part of
-   * the public QuotesApi, so we access it via an unsafe cast (same pattern
-   * used by CocoManager.freeAllReservedProofs).
    */
   const cancelMeltQuote = useCallback(
     async (opts: { operationId?: string; mintUrl?: string; quoteId?: string }): Promise<void> => {
-      // Access the private meltOperationService via unsafe cast
-      const unsafeManager = manager as unknown as {
-        meltOperationService?: {
-          rollback?: (operationId: string, reason?: string) => Promise<void>;
-          getOperationByQuote?: (
-            mintUrl: string,
-            quoteId: string
-          ) => Promise<{ id: string } | null>;
-        };
-      };
-
-      const svc = unsafeManager.meltOperationService;
-      if (!svc?.rollback) {
-        throw new Error('Melt rollback is unavailable on this version of coco');
-      }
-
-      // Resolve the operationId: use directly if provided, otherwise look up by quote
       let resolvedId = opts.operationId;
       if (!resolvedId && opts.mintUrl && opts.quoteId) {
-        if (!svc.getOperationByQuote) {
-          throw new Error('Operation lookup by quote is unavailable');
-        }
-        const op = await svc.getOperationByQuote(opts.mintUrl, opts.quoteId);
+        const [prepared, pending] = await Promise.all([
+          manager.quotes.getPreparedMeltOperations(),
+          manager.quotes.getPendingMeltOperations(),
+        ]);
+        const all = [...prepared, ...pending];
+        const op = all.find(
+          (o) => o.mintUrl === opts.mintUrl && 'quoteId' in o && o.quoteId === opts.quoteId
+        );
         if (!op) {
           throw new Error('No melt operation found for this quote');
         }
@@ -244,7 +227,7 @@ export function useMeltWithHistory() {
         throw new Error('No operation ID or quote ID provided');
       }
 
-      await svc.rollback(resolvedId, 'User cancelled');
+      await manager.quotes.rollbackMelt(resolvedId, 'User cancelled');
 
       // Update local state so the UI reflects the cancellation
       if (data && data.operationId === resolvedId) {

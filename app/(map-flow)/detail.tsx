@@ -11,7 +11,7 @@ import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
-import { RowButton, Section } from 'app/settings-pages';
+import { Section } from 'app/settings-pages';
 import * as Linking from 'expo-linking';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useTheme } from 'providers/ThemeProvider';
@@ -21,6 +21,7 @@ import opacity from 'hex-color-opacity';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBTCMapStore, BTCMapPlaceDetails } from 'stores/btcMapStore';
 import { useShallow } from 'zustand/react/shallow';
+import { ListGroup, PressableFeedback } from 'heroui-native';
 
 // Category definitions for marker colors
 const CATEGORIES = {
@@ -257,95 +258,92 @@ export default function MerchantDetailScreen() {
         {/* Payment Methods - only show accepted methods */}
         {(supportsOnchain || supportsLightning || supportsContactless) && (
           <Section title="Payment Methods">
-            {supportsOnchain && (
-              <RowButton
-                isFirst
-                isLast={!supportsLightning && !supportsContactless}
-                label={
-                  <HStack align="center" gap={8}>
+            <ListGroup variant="secondary">
+              {supportsOnchain && (
+                <ListGroup.Item>
+                  <ListGroup.ItemPrefix>
                     <Icon name="mdi:bitcoin" size={20} color="#F7931A" />
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      On-chain
-                    </Text>
-                  </HStack>
-                }
-                rightIcon={
-                  <Icon
-                    name="mdi:check-circle"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                }
-              />
-            )}
-            {supportsLightning && (
-              <RowButton
-                isFirst={!supportsOnchain}
-                isLast={!supportsContactless}
-                label={
-                  <HStack align="center" gap={8}>
-                    <Icon name="mingcute:lightning-fill" size={20} color="#F7931A" />
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      Lightning
-                    </Text>
-                  </HStack>
-                }
-                rightIcon={
-                  <Icon
-                    name="mdi:check-circle"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                }
-              />
-            )}
-            {supportsContactless && (
-              <RowButton
-                isFirst={!supportsOnchain && !supportsLightning}
-                isLast
-                label={
-                  <HStack align="center" gap={8}>
-                    <Icon name="ph:contactless-payment-fill" size={20} color="#F7931A" />
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      Contactless
-                    </Text>
-                  </HStack>
-                }
-                rightIcon={
-                  <Icon
-                    name="mdi:check-circle"
-                    size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                }
-              />
-            )}
-          </Section>
-        )}
-
-        {/* Contact Section - using RowButton like in info.tsx */}
-        {contactItems.length > 0 && (
-          <Section title="Contact">
-            {contactItems.map((contact, index) => (
-              <RowButton
-                key={contact.method}
-                isFirst={index === 0}
-                isLast={index === contactItems.length - 1}
-                label={
-                  <HStack align="center" gap={8}>
+                  </ListGroup.ItemPrefix>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>On-chain</ListGroup.ItemTitle>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix>
                     <Icon
-                      name={contact.icon}
+                      name="mdi:check-circle"
                       size={20}
                       color={opacity(getPrimaryColor('0'), 0.4)}
                     />
-                    <Text style={{ color: opacity(getPrimaryColor('0'), 0.9) }} bold>
-                      {contact.info}
-                    </Text>
-                  </HStack>
-                }
-                onPress={() => handleContactPress(contact.method, contact.info, contact.fullInfo)}
-              />
-            ))}
+                  </ListGroup.ItemSuffix>
+                </ListGroup.Item>
+              )}
+              {supportsLightning && (
+                <ListGroup.Item>
+                  <ListGroup.ItemPrefix>
+                    <Icon name="mingcute:lightning-fill" size={20} color="#F7931A" />
+                  </ListGroup.ItemPrefix>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>Lightning</ListGroup.ItemTitle>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix>
+                    <Icon
+                      name="mdi:check-circle"
+                      size={20}
+                      color={opacity(getPrimaryColor('0'), 0.4)}
+                    />
+                  </ListGroup.ItemSuffix>
+                </ListGroup.Item>
+              )}
+              {supportsContactless && (
+                <ListGroup.Item>
+                  <ListGroup.ItemPrefix>
+                    <Icon name="ph:contactless-payment-fill" size={20} color="#F7931A" />
+                  </ListGroup.ItemPrefix>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>Contactless</ListGroup.ItemTitle>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix>
+                    <Icon
+                      name="mdi:check-circle"
+                      size={20}
+                      color={opacity(getPrimaryColor('0'), 0.4)}
+                    />
+                  </ListGroup.ItemSuffix>
+                </ListGroup.Item>
+              )}
+            </ListGroup>
+          </Section>
+        )}
+
+        {/* Contact Section */}
+        {contactItems.length > 0 && (
+          <Section title="Contact">
+            <ListGroup variant="secondary">
+              {contactItems.map((contact) => (
+                <PressableFeedback
+                  key={contact.method}
+                  animation={false}
+                  onPress={() =>
+                    handleContactPress(contact.method, contact.info, contact.fullInfo)
+                  }>
+                  <PressableFeedback.Scale>
+                    <ListGroup.Item disabled>
+                      <ListGroup.ItemPrefix>
+                        <Icon
+                          name={contact.icon}
+                          size={20}
+                          color={opacity(getPrimaryColor('0'), 0.4)}
+                        />
+                      </ListGroup.ItemPrefix>
+                      <ListGroup.ItemContent>
+                        <ListGroup.ItemTitle>{contact.info}</ListGroup.ItemTitle>
+                      </ListGroup.ItemContent>
+                      <ListGroup.ItemSuffix />
+                    </ListGroup.Item>
+                  </PressableFeedback.Scale>
+                  <PressableFeedback.Ripple />
+                </PressableFeedback>
+              ))}
+            </ListGroup>
           </Section>
         )}
 
