@@ -5,7 +5,7 @@ import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { Text } from '@/components/ui/Text';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { useTheme } from '@/providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 type OfflineContextValue = {
   isOffline: boolean;
@@ -57,14 +57,14 @@ function isOfflineFromState(state: Network.NetworkState): boolean {
 
 export function OfflineProvider({ children }: OfflineProviderProps) {
   const [networkOffline, setNetworkOffline] = useState(false);
-  const { getBlueColor, getPrimaryColor } = useTheme();
+  const [foreground, info] = useThemeColor(['foreground', 'blue-300'] as const);
   const insets = useSafeAreaInsets();
   const frame = useSafeAreaFrame();
   const isCheckingRef = useRef(false);
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || networkOffline;
-  const offlineAccentColor = useMemo(() => getBlueColor('300'), [getBlueColor]);
-  const offlineTextColor = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const offlineAccentColor = info;
+  const offlineTextColor = foreground;
   const screenCornerRadius = useMemo(
     () => getIosCornerRadius(frame.width, frame.height),
     [frame.height, frame.width]

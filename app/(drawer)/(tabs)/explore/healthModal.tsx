@@ -3,7 +3,7 @@ import { StyleSheet, View as RNView } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
 import { ModalLayoutWrapper } from 'app/debugModal';
@@ -39,7 +39,7 @@ function HealthModalScreen() {
   const params = useLocalSearchParams<{ unit?: string }>();
   const initialUnit = (params.unit || 'sat').toLowerCase();
 
-  const { getPrimaryColor } = useTheme();
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const hero = useHeroTransition();
   const insets = useSafeAreaInsets();
   const nativeHeaderHeight = useHeaderHeight();
@@ -92,12 +92,12 @@ function HealthModalScreen() {
           headerShadowVisible: false,
           headerTitle: '',
           headerBackVisible: false,
-          headerTintColor: getPrimaryColor('0'),
+          headerTintColor: foreground,
           headerBlurEffect: 'none',
           headerBackground: () => null,
           headerLeft: () => (
             <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
-              <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+              <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
             </TouchableOpacity>
           ),
         }}
@@ -146,11 +146,11 @@ function HealthModalScreen() {
                 <RNView
                   style={[
                     StyleSheet.absoluteFill,
-                    { backgroundColor: getPrimaryColor('950'), bottom: HEADER_OVERLAP },
+                    { backgroundColor: background, bottom: HEADER_OVERLAP },
                   ]}
                 />
                 <LinearGradient
-                  colors={[getPrimaryColor('950'), opacity(getPrimaryColor('950'), 0)]}
+                  colors={[background, opacity(background, 0)]}
                   style={styles.headerGradient}
                   pointerEvents="none"
                 />

@@ -21,11 +21,10 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from 'providers/ThemeProvider';
 import { useTransactionLocationSection } from '@/hooks/useTransactionLocationSection';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 interface TransactionLocationSectionProps {
   /** The transaction's history entry ID */
   transactionId: string | undefined;
@@ -54,7 +53,7 @@ const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KE
  * Reusable grayscale + vignette overlay for maps
  */
 function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
-  const { getPrimaryColor } = useTheme();
+  const surfaceSecondary = useThemeColor('surface-secondary');
 
   return (
     <>
@@ -70,7 +69,7 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
         style={[
           StyleSheet.absoluteFillObject,
           {
-            backgroundColor: opacity(getPrimaryColor('800'), 0.35),
+            backgroundColor: opacity(surfaceSecondary, 0.35),
             // @ts-ignore - mixBlendMode works on iOS
             mixBlendMode: 'overlay',
           },
@@ -81,7 +80,7 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
         style={[
           StyleSheet.absoluteFillObject,
           {
-            backgroundColor: opacity(getPrimaryColor('800'), 1),
+            backgroundColor: opacity(surfaceSecondary, 1),
             // @ts-ignore - mixBlendMode works on iOS
             mixBlendMode: 'color',
           },
@@ -92,10 +91,10 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
       {/* Vignette gradients - edges opaque, center transparent */}
       <LinearGradient
         colors={[
-          getPrimaryColor('800'),
-          opacity(getPrimaryColor('800'), 0.1),
-          opacity(getPrimaryColor('800'), 0.1),
-          getPrimaryColor('800'),
+          surfaceSecondary,
+          opacity(surfaceSecondary, 0.1),
+          opacity(surfaceSecondary, 0.1),
+          surfaceSecondary,
         ]}
         locations={[0, 0.3, 0.7, 1]}
         start={{ x: 0, y: 0.5 }}
@@ -105,10 +104,10 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
       />
       <LinearGradient
         colors={[
-          getPrimaryColor('800'),
-          opacity(getPrimaryColor('800'), 0.1),
-          opacity(getPrimaryColor('800'), 0.1),
-          getPrimaryColor('800'),
+          surfaceSecondary,
+          opacity(surfaceSecondary, 0.1),
+          opacity(surfaceSecondary, 0.1),
+          surfaceSecondary,
         ]}
         locations={[0, 0.25, 0.75, 1]}
         start={{ x: 0.5, y: 0 }}
@@ -125,7 +124,7 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
  * Shows a blurred, grayscale preview of a fake location to hint it's a map
  */
 function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const isIOS = Platform.OS === 'ios';
 
   // Fake location (somewhere generic) for the blurred preview
@@ -166,8 +165,8 @@ function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
         {/* Content - centered overlay */}
         <View style={StyleSheet.absoluteFill}>
           <VStack align="center" justify="center" gap={6} style={{ flex: 1 }}>
-            <Icon name="mdi:map-marker" size={24} color={opacity(getPrimaryColor('0'), 0.75)} />
-            <Text heavy size={13} style={{ color: opacity(getPrimaryColor('0'), 0.75) }}>
+            <Icon name="mdi:map-marker" size={24} color={opacity(foreground, 0.75)} />
+            <Text heavy size={13} style={{ color: opacity(foreground, 0.75) }}>
               Tap to reveal location
             </Text>
           </VStack>
@@ -190,14 +189,14 @@ function TransactionLocationMap({
   longitude: number;
   grayscale?: boolean;
 }) {
-  const { getShadeColor } = useTheme();
   const isIOS = Platform.OS === 'ios';
+  const shade300 = useThemeColor('shade-300');
 
   const markerConfig = [
     {
       id: 'transaction-location',
       coordinates: { latitude, longitude },
-      tintColor: grayscale ? '#FFFFFF' : getShadeColor('300'),
+      tintColor: grayscale ? '#FFFFFF' : shade300,
       title: 'Transaction location',
     },
   ];

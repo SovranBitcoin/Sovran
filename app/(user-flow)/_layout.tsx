@@ -12,14 +12,14 @@
  */
 
 import { Stack } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 export default function UserFlowLayout() {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
   return (
-    <Stack screenOptions={createFlowLayoutScreenOptions(getPrimaryColor)}>
+    <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
       <Stack.Screen name="profile" options={{ title: 'Profile' }} />
       <Stack.Screen name="userMessages" options={{ headerShown: false }} />
       <Stack.Screen name="share" options={{ title: 'Share Profile' }} />

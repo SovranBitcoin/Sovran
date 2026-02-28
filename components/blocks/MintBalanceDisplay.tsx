@@ -3,7 +3,6 @@ import { StyleProp, View, ViewStyle } from 'react-native';
 import { Link } from 'expo-router';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { HStack } from 'components/ui/View/HStack';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
@@ -18,6 +17,7 @@ import { extractDomain } from '@/helper/url';
 import { Skeleton } from '../ui/Skeleton';
 import { Avatar } from '../ui/Avatar';
 import { Text } from '../ui/Text';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface MintBalanceDisplayProps {
   unit: string;
@@ -53,7 +53,11 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   contentHeight,
   style,
 }) => {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, defaultColor, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'default',
+    'surface-secondary',
+  ] as const);
 
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
@@ -150,7 +154,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
           <>
             <View style={{ marginRight: 4 }}>
               {isLoadingMintInfo ? (
-                <Skeleton className="h-[32px] w-[32px] bg-primary-700" />
+                <Skeleton className="h-[32px] w-[32px] bg-surface-tertiary" />
               ) : (
                 <Avatar
                   picture={mintInfo?.icon_url || undefined}
@@ -164,15 +168,15 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
             <VStack align="flex-start">
               {isLoadingMintInfo ? (
                 <>
-                  <Skeleton className="h-[14px] w-[60px] bg-primary-700" />
+                  <Skeleton className="h-[14px] w-[60px] bg-surface-tertiary" />
                   <Spacer size={4} />
-                  <Skeleton className="h-[14px] w-[60px] bg-primary-700" />
+                  <Skeleton className="h-[14px] w-[60px] bg-surface-tertiary" />
                 </>
               ) : (
                 <>
                   <Text
                     style={{
-                      color: getPrimaryColor('0'),
+                      color: foreground,
                     }}
                     size={12}
                     bold
@@ -192,10 +196,10 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
           </>
         ) : (
           <HStack align="center" gap={8}>
-            <Icon name="fluent:add-24-filled" size={20} color={getPrimaryColor('0')} />
+            <Icon name="fluent:add-24-filled" size={20} color={foreground} />
             <Text
               style={{
-                color: opacity(getPrimaryColor('0'), 0.9),
+                color: opacity(foreground, 0.9),
               }}
               className="ml-[-2px]"
               size={12}
@@ -209,7 +213,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
 
       {/* Right side: Chevron */}
       <View style={{ marginRight: 8 }}>
-        <Icon name="fluent:chevron-down-12-filled" size={12} color={getPrimaryColor('0')} />
+        <Icon name="fluent:chevron-down-12-filled" size={12} color={foreground} />
       </View>
     </HStack>
   );
@@ -245,11 +249,11 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
               width: '100%',
               padding: 8,
               borderWidth: 0.2,
-              borderColor: getPrimaryColor('600'),
+              borderColor: defaultColor,
               marginVertical: 0,
               marginHorizontal: 0,
               alignSelf: 'center',
-              backgroundColor: getPrimaryColor('800'),
+              backgroundColor: surfaceSecondary,
             },
             style,
           ]}>

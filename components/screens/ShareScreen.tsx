@@ -12,12 +12,12 @@ import Icon, { CurrencyIcon } from 'assets/icons';
 import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { popup } from '@/helper/popup';
-import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
 import opacity from 'hex-color-opacity';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { Tabs } from 'components/ui/Tabs';
 import { ListGroup, PressableFeedback } from 'heroui-native';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // Configuration for different share types
 export const SHARE_CONFIGS = {
@@ -75,7 +75,7 @@ export interface ShareScreenProps {
 }
 
 export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScreenProps) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   // Determine if we should show tabs
   const showP2pkTabs = type === 'p2pk' && npub;
@@ -156,7 +156,7 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
                 <ListGroup.ItemPrefix>
                   {config.iconCurrency ? (
                     <CurrencyIcon
-                      colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                      colors={[opacity(foreground, 0.4)]}
                       width={20}
                       currency={config.iconCurrency}
                     />
@@ -164,7 +164,7 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
                     <Icon
                       name={config.iconName}
                       size={20}
-                      color={opacity(getPrimaryColor('0'), 0.4)}
+                      color={opacity(foreground, 0.4)}
                     />
                   ) : undefined}
                 </ListGroup.ItemPrefix>
@@ -175,7 +175,7 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
                   <Icon
                     name="lets-icons:copy"
                     size={20}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
+                    color={opacity(foreground, 0.4)}
                   />
                 </ListGroup.ItemSuffix>
               </ListGroup.Item>

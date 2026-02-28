@@ -14,7 +14,7 @@ import { View } from 'components/ui/View/View';
 import { Section } from 'app/settings-pages';
 import * as Linking from 'expo-linking';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
@@ -60,7 +60,7 @@ const getMarkerColor = (icon: string): string => {
 };
 
 export default function MerchantDetailScreen() {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, defaultColor, surfaceSecondary, background] = useThemeColor(['foreground', 'default', 'surface-secondary', 'background'] as const);
   const insets = useSafeAreaInsets();
   const { placeId } = useLocalSearchParams<{ placeId: string }>();
   const { fetchPlaceDetails, getCachedPlaceDetails } = useBTCMapStore(
@@ -191,10 +191,10 @@ export default function MerchantDetailScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
+      <View style={[styles.container, { backgroundColor: background }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#F7931A" />
-          <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginTop: 12 }}>
+          <Text size={14} style={{ color: opacity(foreground, 0.5), marginTop: 12 }}>
             Loading merchant details...
           </Text>
         </View>
@@ -204,10 +204,10 @@ export default function MerchantDetailScreen() {
 
   if (!place) {
     return (
-      <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
+      <View style={[styles.container, { backgroundColor: background }]}>
         <View style={styles.loadingContainer}>
-          <Icon name="mdi:alert-circle" size={48} color={opacity(getPrimaryColor('0'), 0.4)} />
-          <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginTop: 12 }}>
+          <Icon name="mdi:alert-circle" size={48} color={opacity(foreground, 0.4)} />
+          <Text size={14} style={{ color: opacity(foreground, 0.5), marginTop: 12 }}>
             No merchant data available
           </Text>
         </View>
@@ -216,7 +216,7 @@ export default function MerchantDetailScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
+    <View style={[styles.container, { backgroundColor: background }]}>
       <Stack.Screen
         options={{
           title: place.name || 'Merchant Details',
@@ -237,11 +237,11 @@ export default function MerchantDetailScreen() {
             <Icon name="mdi:store" size={28} color="#fff" />
           </View>
           <VStack style={{ flex: 1, marginLeft: 16 }}>
-            <Text size={20} heavy style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
+            <Text size={20} heavy style={{ color: opacity(foreground, 0.9) }}>
               {place.name || 'Unknown Merchant'}
             </Text>
             {place.address && (
-              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 4 }}>
+              <Text size={13} style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
                 {place.address}
               </Text>
             )}
@@ -271,7 +271,7 @@ export default function MerchantDetailScreen() {
                     <Icon
                       name="mdi:check-circle"
                       size={20}
-                      color={opacity(getPrimaryColor('0'), 0.4)}
+                      color={opacity(foreground, 0.4)}
                     />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
@@ -288,7 +288,7 @@ export default function MerchantDetailScreen() {
                     <Icon
                       name="mdi:check-circle"
                       size={20}
-                      color={opacity(getPrimaryColor('0'), 0.4)}
+                      color={opacity(foreground, 0.4)}
                     />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
@@ -305,7 +305,7 @@ export default function MerchantDetailScreen() {
                     <Icon
                       name="mdi:check-circle"
                       size={20}
-                      color={opacity(getPrimaryColor('0'), 0.4)}
+                      color={opacity(foreground, 0.4)}
                     />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
@@ -331,7 +331,7 @@ export default function MerchantDetailScreen() {
                         <Icon
                           name={contact.icon}
                           size={20}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
+                          color={opacity(foreground, 0.4)}
                         />
                       </ListGroup.ItemPrefix>
                       <ListGroup.ItemContent>
@@ -352,13 +352,13 @@ export default function MerchantDetailScreen() {
           <Section title="Opening Hours">
             <View
               style={{
-                backgroundColor: getPrimaryColor('800'),
+                backgroundColor: surfaceSecondary,
                 padding: 16,
                 borderRadius: 12,
               }}>
               <Text
                 size={14}
-                style={{ color: opacity(getPrimaryColor('0'), 0.66), lineHeight: 22 }}>
+                style={{ color: opacity(foreground, 0.66), lineHeight: 22 }}>
                 {place.opening_hours}
               </Text>
             </View>
@@ -370,13 +370,13 @@ export default function MerchantDetailScreen() {
           <Section title="About">
             <View
               style={{
-                backgroundColor: getPrimaryColor('800'),
+                backgroundColor: surfaceSecondary,
                 padding: 16,
                 borderRadius: 12,
               }}>
               <Text
                 size={14}
-                style={{ color: opacity(getPrimaryColor('0'), 0.66), lineHeight: 22 }}>
+                style={{ color: opacity(foreground, 0.66), lineHeight: 22 }}>
                 {place.description}
               </Text>
             </View>
@@ -385,7 +385,7 @@ export default function MerchantDetailScreen() {
 
         {/* Source Info */}
         <View style={styles.sourceInfo}>
-          <Text size={11} style={{ color: getPrimaryColor('600'), textAlign: 'center' }}>
+          <Text size={11} style={{ color: defaultColor, textAlign: 'center' }}>
             Data from BTCMap.org • Last updated {new Date(place.updated_at).toLocaleDateString()}
           </Text>
         </View>

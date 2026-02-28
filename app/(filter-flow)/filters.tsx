@@ -13,7 +13,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { Avatar } from 'components/ui/Avatar';
-import { useTheme } from '@/providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { ModalScreenLayout } from 'components/layouts/ModalScreenLayout';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -38,7 +38,7 @@ interface ChipProps {
 }
 
 const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress }) => {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   return (
     <Pressable
@@ -47,24 +47,24 @@ const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress }) => {
         styles.chip,
         {
           backgroundColor: isSelected
-            ? opacity(getPrimaryColor('0'), 0.15)
-            : opacity(getPrimaryColor('0'), 0.05),
+            ? opacity(foreground, 0.15)
+            : opacity(foreground, 0.05),
           borderColor: isSelected
-            ? opacity(getPrimaryColor('0'), 0.25)
-            : opacity(getPrimaryColor('0'), 0.08),
+            ? opacity(foreground, 0.25)
+            : opacity(foreground, 0.08),
         },
       ]}>
       {icon ? (
         <Icon
           name={icon}
           size={16}
-          color={isSelected ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.4)}
+          color={isSelected ? foreground : opacity(foreground, 0.4)}
         />
       ) : null}
       <Text
         size={14}
         style={{
-          color: isSelected ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.4),
+          color: isSelected ? foreground : opacity(foreground, 0.4),
           fontFamily: 'OverpassSemibold',
         }}>
         {label}
@@ -79,14 +79,14 @@ interface SectionProps {
 }
 
 const Section: React.FC<SectionProps> = ({ title, children }) => {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   return (
     <View style={styles.section}>
       <Text
         size={13}
         style={{
-          color: opacity(getPrimaryColor('0'), 0.33),
+          color: opacity(foreground, 0.33),
           fontFamily: 'OverpassSemibold',
           textTransform: 'uppercase',
           letterSpacing: 1,
@@ -114,7 +114,7 @@ const MintSelectorChip: React.FC<MintSelectorChipProps> = ({
   isSelected,
   onPress,
 }) => {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   return (
     <Pressable
@@ -123,11 +123,11 @@ const MintSelectorChip: React.FC<MintSelectorChipProps> = ({
         styles.mintChip,
         {
           backgroundColor: isSelected
-            ? opacity(getPrimaryColor('0'), 0.15)
-            : opacity(getPrimaryColor('0'), 0.05),
+            ? opacity(foreground, 0.15)
+            : opacity(foreground, 0.05),
           borderColor: isSelected
-            ? opacity(getPrimaryColor('0'), 0.25)
-            : opacity(getPrimaryColor('0'), 0.08),
+            ? opacity(foreground, 0.25)
+            : opacity(foreground, 0.08),
         },
       ]}>
       {showIcon ? (
@@ -137,7 +137,7 @@ const MintSelectorChip: React.FC<MintSelectorChipProps> = ({
         size={13}
         numberOfLines={1}
         style={{
-          color: isSelected ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.7),
+          color: isSelected ? foreground : opacity(foreground, 0.7),
           fontFamily: 'OverpassSemibold',
           maxWidth: 140,
         }}>
@@ -148,7 +148,7 @@ const MintSelectorChip: React.FC<MintSelectorChipProps> = ({
 };
 
 export default function FiltersScreen() {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const { trustedMints } = useMints();
   const { history } = useHistoryWithMelts();
   const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
@@ -304,7 +304,7 @@ export default function FiltersScreen() {
             style={[styles.resetButton, { opacity: hasActiveFilters ? 1 : 0 }]}>
             <Text
               size={14}
-              style={{ color: opacity(getPrimaryColor('0'), 0.4), fontFamily: 'OverpassMedium' }}>
+              style={{ color: opacity(foreground, 0.4), fontFamily: 'OverpassMedium' }}>
               Reset
             </Text>
           </Pressable>

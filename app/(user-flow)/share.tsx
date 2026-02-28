@@ -7,12 +7,12 @@
 
 import React, { useCallback, useState } from 'react';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { ShareScreen, SHARE_CONFIGS, ShareType } from 'components/screens/ShareScreen';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 function SharePage() {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const params = useLocalSearchParams<{
     type?: ShareType;
     data: string;
@@ -34,7 +34,7 @@ function SharePage() {
       <Stack.Screen
         options={{
           title: headerTitle,
-          headerTitleStyle: { color: getPrimaryColor('0') },
+          headerTitleStyle: { color: foreground },
         }}
       />
       <ShareScreen

@@ -3,7 +3,6 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
 import { convertTime } from 'helper/time';
 import { StyleSheet } from 'react-native';
 import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
@@ -18,7 +17,7 @@ import type {
 import { mintHistoryEntryExpired, getMintHistoryEntryTimeUntilExpiry } from 'helper/utils';
 import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import opacity from 'hex-color-opacity';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 interface HistoryEntryTimelineProps {
   historyEntry: HistoryEntry;
   meltQuote?: MeltQuoteBolt11Response;
@@ -696,17 +695,19 @@ export function HistoryEntryTimeline({
   tokenCreated,
   nostrSent,
 }: HistoryEntryTimelineProps) {
-  const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
+  const [foreground, muted, greenColor, redColor] = useThemeColor([
+    'foreground',
+    'muted',
+    'success',
+    'danger',
+  ] as const);
   const [currentTime, setCurrentTime] = useState(Date.now());
 
-  // Colors
-  const greenColor = getGreenColor('300');
-  const redColor = getRedColor('300');
-  const orangeColor = '#fb923c'; // accent-orange from spec
-  const greyColor = getPrimaryColor('400');
-  const primaryWhite = getPrimaryColor('0');
-  const primaryGrey200 = opacity(getPrimaryColor('0'), 0.66);
-  const primaryGrey300 = opacity(getPrimaryColor('0'), 0.5);
+  const orangeColor = '#fb923c';
+  const greyColor = muted;
+  const primaryWhite = foreground;
+  const primaryGrey200 = opacity(foreground, 0.66);
+  const primaryGrey300 = opacity(foreground, 0.5);
 
   // Update time every second for real-time countdown
   useEffect(() => {
@@ -802,7 +803,7 @@ export function HistoryEntryTimeline({
   return (
     <View
       // blur
-      className="bg-primary-800"
+      className="bg-surface-secondary"
       style={styles.card}>
       {/* Card Label */}
       <Text size={11} bold style={[styles.cardLabel, { color: primaryGrey300 }]}>

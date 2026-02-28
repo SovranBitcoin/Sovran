@@ -15,7 +15,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
 import { HStack } from 'components/ui/View/HStack';
@@ -30,6 +29,7 @@ import {
   TransferErrorBanner,
 } from 'components/ui/TransferLegCard';
 import Icon from 'assets/icons';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 export type StepStatus =
   | 'pending'
@@ -128,11 +128,11 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   chainInfo,
   routingDetail,
 }) => {
-  const { getPrimaryColor } = useTheme();
-  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primaryColor300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
-  const primaryColor400 = useMemo(() => opacity(getPrimaryColor('0'), 0.4), [getPrimaryColor]);
-  const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
+  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
+  const primaryColor0 = foreground;
+  const primaryColor300 = useMemo(() => opacity(foreground, 0.5), [foreground]);
+  const primaryColor400 = useMemo(() => opacity(foreground, 0.4), [foreground]);
+  const primaryColor700 = surfaceTertiary;
 
   const fromName = fromMintInfo?.name || extractDomain(fromMintUrl);
   const toName = toMintInfo?.name || extractDomain(toMintUrl);

@@ -48,7 +48,7 @@ import { HStack } from 'components/ui/View/HStack';
 import { Text } from './Text';
 import { cn } from 'helper/utils';
 import Icon from 'assets/icons';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 
 /**
@@ -133,58 +133,63 @@ interface BadgeProps extends VariantProps<typeof badgeVariants> {
  * <Badge variant="success" icon="fluent:checkmark-16-filled" size={12} />
  */
 function Badge({ className, variant, icon, size = 12, color, children }: BadgeProps) {
-  const { getPrimaryColor, getRedColor, getGreenColor, getYellowColor } = useTheme();
+  const [
+    foreground,
+    defaultForeground,
+    surfaceSecondary,
+    surface,
+    danger,
+    success,
+    warning,
+    red500,
+    green500,
+  ] = useThemeColor([
+    'foreground',
+    'default-foreground',
+    'surface-secondary',
+    'surface',
+    'danger',
+    'success',
+    'yellow-300',
+    'red-500',
+    'green-500',
+  ] as const);
 
-  /**
-   * Gets background and border styles based on variant
-   *
-   * @description
-   * Maps badge variants to theme-aware background colors and border styles.
-   * Uses opacity for subtle background colors that work well with text overlays.
-   *
-   * **Process:** Switch on variant → return theme color with opacity → set transparent border
-   * **Effects:** Provides consistent visual styling across all badge variants
-   *
-   * @returns {ViewStyle} Style object with backgroundColor and borderColor
-   *
-   * @example
-   * getVariantStyles() // Returns { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'transparent' }
-   */
   const getVariantStyles = (): ViewStyle => {
     switch (variant) {
       case 'primary':
         return {
-          backgroundColor: opacity(getPrimaryColor('100'), 0.2),
+          backgroundColor: opacity(defaultForeground, 0.2),
           borderColor: 'transparent',
         };
       case 'secondary':
         return {
-          backgroundColor: opacity(getPrimaryColor('200'), 0.2),
+          backgroundColor: opacity(defaultForeground, 0.2),
           borderColor: 'transparent',
         };
       case 'warning':
         return {
-          backgroundColor: opacity(getRedColor('300'), 0.2),
+          backgroundColor: opacity(danger, 0.2),
           borderColor: 'transparent',
         };
       case 'error':
         return {
-          backgroundColor: opacity(getRedColor('300'), 0.2),
+          backgroundColor: opacity(danger, 0.2),
           borderColor: 'transparent',
         };
       case 'success':
         return {
-          backgroundColor: opacity(getGreenColor('500'), 0.2),
+          backgroundColor: opacity(green500, 0.2),
           borderColor: 'transparent',
         };
       case 'star':
         return {
-          backgroundColor: opacity(getYellowColor('300'), 0.2),
+          backgroundColor: opacity(warning, 0.2),
           borderColor: 'transparent',
         };
       default:
         return {
-          backgroundColor: opacity(getPrimaryColor('100'), 0.2),
+          backgroundColor: opacity(defaultForeground, 0.2),
           borderColor: 'transparent',
         };
     }
@@ -214,19 +219,19 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
 
     switch (variant) {
       case 'primary':
-        return getPrimaryColor('0');
+        return foreground;
       case 'secondary':
-        return getPrimaryColor('800');
+        return surfaceSecondary;
       case 'warning':
-        return getRedColor('500');
+        return red500;
       case 'error':
-        return getRedColor('500');
+        return red500;
       case 'success':
-        return getGreenColor('300');
+        return success;
       case 'star':
-        return getYellowColor('300');
+        return warning;
       default:
-        return getPrimaryColor('900');
+        return surface;
     }
   };
 

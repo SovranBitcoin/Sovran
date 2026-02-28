@@ -12,7 +12,7 @@
 
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import { View } from 'components/ui/View/View';
 import { Spinner } from 'components/ui/Spinner';
 import Icon from 'assets/icons';
@@ -26,17 +26,16 @@ interface TransferSeparatorProps {
 }
 
 export const TransferSeparator = React.memo(({ failed, status }: TransferSeparatorProps) => {
-  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
+  const [accent, green500, red500] = useThemeColor(['accent', 'green-500', 'red-500'] as const);
 
-  // Derive effective status from props (status takes priority over boolean)
   const effectiveStatus = status ?? (failed ? 'failed' : 'idle');
 
   const bgColor =
     effectiveStatus === 'done'
-      ? getGreenColor('500')
+      ? green500
       : effectiveStatus === 'failed'
-        ? getRedColor('500')
-        : getPrimaryColor('500');
+        ? red500
+        : accent;
 
   const renderIcon = () => {
     switch (effectiveStatus) {

@@ -16,7 +16,6 @@ import { useSharedValue } from 'react-native-reanimated';
 import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
@@ -31,6 +30,7 @@ import { ButtonHandler } from 'components/ui/ButtonHandler';
 import _ from 'lodash';
 import { useMints } from 'coco-cashu-react';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // Height constant for currency tabs
 const CURRENCY_TABS_HEIGHT = 48;
@@ -73,7 +73,7 @@ export function MintListScreen({
   allowedCurrencies = ['SAT', 'USD', 'EUR', 'GBP'],
   allowedMints,
 }: MintListScreenProps) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   // Scroll tracking for animated currency tabs
   const scrollY = useSharedValue(0);
@@ -295,7 +295,7 @@ export function MintListScreen({
   );
 
   // Memoize colors
-  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const primaryColor0 = foreground;
 
   // Sticky currency tabs component
   const currencyTabs = useMemo(

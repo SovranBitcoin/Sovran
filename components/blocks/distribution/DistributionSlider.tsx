@@ -27,8 +27,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
 import { TOTAL_BASIS_POINTS } from 'stores/mintDistributionStore';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // Slider dimensions
 const SLIDER_HEIGHT = 40;
@@ -66,14 +66,18 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
   customBorderColor,
   isLoadingColors = false,
 }) => {
-  const { getPrimaryColor } = useTheme();
-  const primaryColor600 = useMemo(() => getPrimaryColor('600'), [getPrimaryColor]);
-  const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
-  const primaryColor800 = useMemo(() => getPrimaryColor('800'), [getPrimaryColor]);
+  const [defaultColor, surfaceTertiary, surfaceSecondary, accent] = useThemeColor([
+    'default',
+    'surface-tertiary',
+    'surface-secondary',
+    'accent',
+  ] as const);
+  const primaryColor600 = defaultColor;
+  const primaryColor700 = surfaceTertiary;
+  const primaryColor800 = surfaceSecondary;
 
-  // Skeleton colors for loading state - subtle animated placeholder
-  const skeletonColor1 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
-  const skeletonColor2 = useMemo(() => getPrimaryColor('600'), [getPrimaryColor]);
+  const skeletonColor1 = surfaceTertiary;
+  const skeletonColor2 = defaultColor;
 
   // Use custom colors if provided, skeleton colors when loading, otherwise fall back to theme colors
   const gradientColors = useMemo(() => {
@@ -86,14 +90,14 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
       return customGradientColors;
     }
     // Default: theme gradient with convex highlight
-    return [primaryColor600, getPrimaryColor('500'), primaryColor600] as const;
+    return [primaryColor600, accent, primaryColor600] as const;
   }, [
     isLoadingColors,
     customGradientColors,
     skeletonColor1,
     skeletonColor2,
     primaryColor600,
-    getPrimaryColor,
+    accent,
   ]);
 
   // Border color: skeleton when loading, custom, or fall back to subtle white

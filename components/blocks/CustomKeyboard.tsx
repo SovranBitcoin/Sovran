@@ -34,8 +34,8 @@ import React, { useState, useCallback, memo } from 'react';
 import { View, TouchableOpacity } from 'react-native';
 import Icon from 'assets/icons';
 import { EnhancedHaptics } from 'components/ui/Haptics';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface CustomKeyboardProps {
   onKeyPress: (value: string) => void;
@@ -53,7 +53,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   compact = false,
 }) => {
   const [, setInputValue] = useState<string>('');
-  const { getPrimaryColor } = useTheme();
+  const background = useThemeColor('background');
 
   const handlePress = useCallback(
     (value: KeyboardValue) => {
@@ -117,7 +117,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
         key={String(value)}
         className="mx-0.5 w-1/3 items-center justify-center overflow-hidden"
         style={{
-          backgroundColor: getPrimaryColor('950'),
+          backgroundColor: background,
           opacity: loading ? 0.5 : 1,
         }}
         disabled={loading}
@@ -139,7 +139,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
         )}
       </TouchableOpacity>
     ),
-    [compact, handlePress, loading, getPrimaryColor]
+    [compact, handlePress, loading, background]
   );
 
   const buttons: KeyboardValue[][] = [

@@ -2,7 +2,6 @@ import { UntranslatedText } from 'components/ui/Text';
 import { formatAmount } from 'helper/currency';
 import { convertTime } from 'helper/time';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import TransactionIcon from 'components/blocks/TransactionIcon';
 import { nip19 } from 'nostr-tools';
@@ -14,7 +13,7 @@ import { HistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-
 import { router } from 'expo-router';
 import { useScanHistoryStore, ScanSource } from 'stores/scanHistoryStore';
 import Icon from 'assets/icons';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 export function npubToPubkey(npub: string): string {
   if (!npub) return '';
 
@@ -121,7 +120,7 @@ interface TransactionProps {
 }
 
 export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: TransactionProps) => {
-  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
+  const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
 
   const {
     isSend,
@@ -156,14 +155,11 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
 
         <VStack spacing={0} flex={1}>
           <HStack justify="space-between" align="flex-end">
-            <UntranslatedText color={getPrimaryColor('0')} bold size={14}>
+            <UntranslatedText color={foreground} bold size={14}>
               {displayLabel}
             </UntranslatedText>
             <HStack align="center" spacing={0}>
-              <UntranslatedText
-                color={isSend ? getRedColor('300') : getGreenColor('300')}
-                bold
-                size={16}>
+              <UntranslatedText color={isSend ? danger : success} bold size={16}>
                 {isSend ? '- ' : isReceive ? '+ ' : ''}
               </UntranslatedText>
               <AmountFormatter
@@ -171,14 +167,14 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
                 unit={historyEntry.unit}
                 size={16}
                 weight="heavy"
-                color={isSend ? getRedColor('300') : getGreenColor('300')}
+                color={isSend ? danger : success}
               />
             </HStack>
           </HStack>
 
           <HStack justify="space-between" align="center">
             <HStack align="center" spacing={4}>
-              <UntranslatedText regular size={10} color={opacity(getPrimaryColor('0'), 0.8)}>
+              <UntranslatedText regular size={10} color={opacity(foreground, 0.8)}>
                 {historyEntry?.createdAt
                   ? convertTime(new Date(historyEntry.createdAt))
                   : 'Unconfirmed'}
@@ -195,14 +191,14 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
                           : 'stash:qr-code'
                   }
                   size={10}
-                  color={opacity(getPrimaryColor('0'), 0.8)}
+                  color={opacity(foreground, 0.8)}
                 />
               )}
             </HStack>
             <UntranslatedText
               bold
               size={10}
-              color={opacity(getPrimaryColor('0'), 0.8)}
+              color={opacity(foreground, 0.8)}
               style={{
                 alignSelf: 'flex-end',
                 textAlign: 'right',

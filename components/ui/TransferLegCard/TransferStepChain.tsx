@@ -23,7 +23,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import { View } from 'components/ui/View/View';
 import { UntranslatedText } from 'components/ui/Text';
 import Icon from 'assets/icons';
@@ -261,14 +261,14 @@ export const TransferStepChain = React.memo(
     middleLabel = 'Send',
     progressVariant = 'default',
   }: TransferStepChainProps) => {
-    const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
+    const [foreground, muted, successColor, dangerColor] = useThemeColor(['foreground', 'muted', 'success', 'danger'] as const);
 
-    const greenColor = useMemo(() => getGreenColor('300'), [getGreenColor]);
+    const greenColor = successColor;
     const orangeColor = '#fb923c';
     const progressAccentColor = progressVariant === 'swap' ? orangeColor : greenColor;
-    const redColor = useMemo(() => getRedColor('300'), [getRedColor]);
-    const greyColor = useMemo(() => getPrimaryColor('400'), [getPrimaryColor]);
-    const labelColor = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
+    const redColor = dangerColor;
+    const greyColor = muted;
+    const labelColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
 
     const chain = useMemo(() => buildChain(status, middleLabel), [middleLabel, status]);
     const animationStop = useSharedValue(0.3);

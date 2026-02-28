@@ -1,7 +1,6 @@
 import React, { useRef, useCallback } from 'react';
 import { ScrollView, Linking, Alert } from 'react-native';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
 import { useSettingsStore } from 'stores/settingsStore';
 
 import { ActionSheetProvider, connectActionSheet } from '@expo/react-native-action-sheet';
@@ -23,6 +22,7 @@ import { popup } from '@/helper/popup';
 import opacity from 'hex-color-opacity';
 import { Avatar } from 'components/ui/Avatar';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -33,7 +33,7 @@ export const Section: React.FC<{
   children: React.ReactNode;
   isDanger?: boolean;
 }> = ({ title, children, isDanger }) => {
-  const { getPrimaryColor, getRedColor } = useTheme();
+  const [foreground, danger] = useThemeColor(['foreground', 'danger']);
 
   return (
     <View className="py-3">
@@ -43,7 +43,7 @@ export const Section: React.FC<{
         medium
         overpass
         style={{
-          color: isDanger ? getRedColor('300') : opacity(getPrimaryColor('0'), 0.5),
+          color: isDanger ? danger : opacity(foreground, 0.5),
         }}>
         {title}
       </Text>
@@ -94,14 +94,19 @@ export const RowButton: React.FC<{
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
 }> = ({ label, value, onPress, href, isFirst, isLast, isDanger, leftIcon, rightIcon }) => {
-  const { getPrimaryColor, getRedColor } = useTheme();
+  const [foreground, surfaceSecondary, surfaceTertiary, danger] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'surface-tertiary',
+    'danger',
+  ] as const);
 
   const content = (
     <View
       className={`p-3 ${isFirst ? 'rounded-t-xl' : ''} ${isLast ? 'rounded-b-xl' : ''} bg-transparent`}
       style={{
-        backgroundColor: getPrimaryColor('800'),
-        borderColor: getPrimaryColor('700'),
+        backgroundColor: surfaceSecondary,
+        borderColor: surfaceTertiary,
         borderTopWidth: !isFirst ? 1 : 0,
       }}>
       <HStack align="center" gap={8} style={{ paddingRight: 4 }}>
@@ -112,7 +117,7 @@ export const RowButton: React.FC<{
           bold
           style={{
             flex: 1,
-            color: isDanger ? getRedColor('300') : getPrimaryColor('0'),
+            color: isDanger ? danger : foreground,
             includeFontPadding: false,
             lineHeight: ROW_ICON_SIZE - 4,
           }}>
@@ -125,7 +130,7 @@ export const RowButton: React.FC<{
             bold
             size={ROW_ICON_SIZE}
             style={{
-              color: isDanger ? getRedColor('300') : opacity(getPrimaryColor('0'), 0.4),
+              color: isDanger ? danger : opacity(foreground, 0.4),
               includeFontPadding: false,
               lineHeight: ROW_ICON_SIZE,
             }}>
@@ -136,7 +141,7 @@ export const RowButton: React.FC<{
           (rightIcon ?? (
             <Icon
               name="fa6-solid:chevron-right"
-              color={isDanger ? getRedColor('300') : opacity(getPrimaryColor('0'), 0.4)}
+              color={isDanger ? danger : opacity(foreground, 0.4)}
               size={ROW_ICON_SIZE}
             />
           ))
@@ -170,15 +175,14 @@ const SettingsListLinkItem: React.FC<{
   description?: string;
   isDanger?: boolean;
 }> = ({ href, title, description, isDanger }) => {
-  const { getRedColor } = useTheme();
-
+  const danger = useThemeColor('danger');
   return (
     <PressableFeedback animation={false} onPress={() => router.navigate(href as any)}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled>
           <ListGroup.ItemContent>
             <ListGroup.ItemTitle>
-              {isDanger ? <Text style={{ color: getRedColor('300') }}>{title}</Text> : title}
+              {isDanger ? <Text style={{ color: danger }}>{title}</Text> : title}
             </ListGroup.ItemTitle>
             {description ? (
               <ListGroup.ItemDescription>{description}</ListGroup.ItemDescription>
@@ -216,7 +220,7 @@ const SettingsListActionItem: React.FC<{
 };
 
 const ModalScreen = () => {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
   const setSendLocationEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
   const devMode = useSettingsStore((state) => state.experimental);
@@ -421,7 +425,7 @@ const ModalScreen = () => {
               bold
               size={13}
               style={{
-                color: opacity(getPrimaryColor('0'), 0.5),
+                color: opacity(foreground, 0.5),
               }}>
               {name}
             </Text>
@@ -431,7 +435,7 @@ const ModalScreen = () => {
               overpass
               medium
               style={{
-                color: opacity(getPrimaryColor('0'), 0.5),
+                color: opacity(foreground, 0.5),
               }}>
               App Version {version} ({buildNumber})
             </Text>

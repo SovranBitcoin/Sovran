@@ -8,11 +8,11 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
 import { UntranslatedText } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
 import { HStack } from 'components/ui/View/HStack';
 import Icon from 'assets/icons';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface TransferErrorBannerProps {
   /** Error message to display */
@@ -20,8 +20,7 @@ interface TransferErrorBannerProps {
 }
 
 export const TransferErrorBanner = React.memo(({ message }: TransferErrorBannerProps) => {
-  const { getRedColor } = useTheme();
-  const redColor = getRedColor('400');
+  const redColor = useThemeColor('red-400');
 
   return (
     <View style={[styles.errorBanner, { backgroundColor: opacity(redColor, 0.15) }]}>

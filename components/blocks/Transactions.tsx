@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { VStack } from 'components/ui/View/VStack';
@@ -18,6 +17,7 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import opacity from 'hex-color-opacity';
 import { BlurCardFrame } from 'components/ui/BlurCardFrame';
 import { useSwapTransactionsStore, type SwapGroup } from 'stores/swapTransactionsStore';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // ---------------------------------------------------------------------------
 // Timeline item: a discriminated union so transactions and swap groups can
@@ -99,10 +99,9 @@ export const Transactions = React.memo(
     onScroll,
     disableContentInsetAdjustment = false,
   }: Props) => {
-    const { getPrimaryColor } = useTheme();
+    const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
 
-    // Theme colors for the card frame (matching payments style)
-    const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+    const accentColor = muted;
     const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
     const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
@@ -303,12 +302,12 @@ export const Transactions = React.memo(
                 <Icon
                   name="fluent:clock-12-filled"
                   size={36}
-                  color={opacity(getPrimaryColor('0'), 0.33)}
+                  color={opacity(foreground, 0.33)}
                 />
                 <Text
                   size={16}
                   style={{
-                    color: opacity(getPrimaryColor('0'), 0.66),
+                    color: opacity(foreground, 0.66),
                     fontFamily: 'OverpassSemibold',
                     textAlign: 'center',
                   }}>
@@ -317,7 +316,7 @@ export const Transactions = React.memo(
                 <Text
                   size={14}
                   style={{
-                    color: opacity(getPrimaryColor('0'), 0.4),
+                    color: opacity(foreground, 0.4),
                     textAlign: 'center',
                   }}>
                   Try adjusting your filters or check back later
@@ -327,7 +326,7 @@ export const Transactions = React.memo(
           </View>
         </View>
       ),
-      [accentColor, borderColor, getPrimaryColor]
+      [accentColor, borderColor, foreground]
     );
 
     if (showMore) {
@@ -342,7 +341,7 @@ export const Transactions = React.memo(
             <Icon
               name="ant-design:loading-outlined"
               size={32}
-              color={opacity(getPrimaryColor('0'), 0.33)}
+              color={opacity(foreground, 0.33)}
               spin={{
                 duration: 1000,
                 outputRange: ['0deg', '360deg'],
@@ -350,10 +349,10 @@ export const Transactions = React.memo(
                 easing: 'linear',
               }}
             />
-            <Text heavy size={16} style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
+            <Text heavy size={16} style={{ color: opacity(foreground, 0.66) }}>
               Loading Transactions...
             </Text>
-            <Text color={opacity(getPrimaryColor('0'), 0.4)} size={16}>
+            <Text color={opacity(foreground, 0.4)} size={16}>
               Please wait while we fetch your history
             </Text>
           </View>
@@ -370,12 +369,12 @@ export const Transactions = React.memo(
                   <Icon
                     name="fluent:clock-12-filled"
                     size={36}
-                    color={opacity(getPrimaryColor('0'), 0.33)}
+                    color={opacity(foreground, 0.33)}
                   />
                   <Text
                     size={16}
                     style={{
-                      color: opacity(getPrimaryColor('0'), 0.66),
+                      color: opacity(foreground, 0.66),
                       fontFamily: 'OverpassSemibold',
                       textAlign: 'center',
                     }}>
@@ -384,7 +383,7 @@ export const Transactions = React.memo(
                   <Text
                     size={14}
                     style={{
-                      color: opacity(getPrimaryColor('0'), 0.4),
+                      color: opacity(foreground, 0.4),
                       textAlign: 'center',
                     }}>
                     Your history will show up here
@@ -408,10 +407,10 @@ export const Transactions = React.memo(
                       <BlurCardFrame accentColor={accentColor}>
                         <View style={styles.content}>
                           <View style={styles.sectionHeader}>
-                            <Text heavy size={16} color={getPrimaryColor('0')}>
+                            <Text heavy size={16} color={foreground}>
                               {label}
                             </Text>
-                            <Text size={12} color={opacity(getPrimaryColor('0'), 0.66)}>
+                            <Text size={12} color={opacity(foreground, 0.66)}>
                               {section.title}
                             </Text>
                           </View>
@@ -482,7 +481,7 @@ export const Transactions = React.memo(
             <Text
               size={14}
               heavy
-              color={opacity(getPrimaryColor('0'), 0.33)}
+              color={opacity(foreground, 0.33)}
               style={{ height: HEADER_HEIGHT }}>
               {section.title}
             </Text>

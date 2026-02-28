@@ -12,14 +12,14 @@
  */
 
 import { Stack } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 export default function MintFlowLayout() {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
   return (
-    <Stack screenOptions={createFlowLayoutScreenOptions(getPrimaryColor)}>
+    <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
       <Stack.Screen name="list" options={{ title: 'Select Mint' }} />
       <Stack.Screen name="add" options={{ title: 'Add Mints' }} />
       <Stack.Screen name="info" options={{ title: 'Mint Details' }} />

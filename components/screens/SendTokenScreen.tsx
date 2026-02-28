@@ -53,9 +53,9 @@ import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 import { useNostrDirectMessage } from '@/hooks/useNostrDirectMessage';
 import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
 import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // Default relay for payment requests
 const DEFAULT_PAYMENT_RELAY = 'wss://relay.vertexlab.io';
@@ -118,11 +118,11 @@ interface SendTokenScreenProps {
 
 /** Error screen shown when transaction data is missing or invalid */
 function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBack: () => void }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   return (
     <ModalLayoutWrapper>
       <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-        <Text color={opacity(getPrimaryColor('0'), 0.66)}>{message}</Text>
+        <Text color={opacity(foreground, 0.66)}>{message}</Text>
         <ButtonHandler
           buttons={[
             {
@@ -140,13 +140,13 @@ function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBa
 
 /** Loading state while fetching profile */
 function LoadingState() {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   return (
     <ModalLayoutWrapper>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={opacity(getPrimaryColor('0'), 0.4)} />
+        <ActivityIndicator size="large" color={opacity(foreground, 0.4)} />
         <Spacer size={16} />
-        <Text color={opacity(getPrimaryColor('0'), 0.5)}>Loading payment request...</Text>
+        <Text color={opacity(foreground, 0.5)}>Loading payment request...</Text>
       </View>
     </ModalLayoutWrapper>
   );

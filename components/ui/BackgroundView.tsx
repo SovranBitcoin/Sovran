@@ -1,7 +1,7 @@
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import { useBackgroundContext } from 'providers/BackgroundProvider';
 import React, { memo, ReactNode, useMemo } from 'react';
 import { Dimensions, StyleSheet, ViewStyle } from 'react-native';
@@ -100,8 +100,8 @@ function ScrollableGradientOverlayComponent({
   showGradientOverlay = true,
   gradientOverlayOpacity = 0.33,
 }: ScrollableGradientOverlayProps) {
-  const { getPrimaryColor } = useTheme();
-  const primaryColor950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
+  const background = useThemeColor('background');
+  const primaryColor950 = useMemo(() => background, [background]);
 
   const viewportHeight = Dimensions.get('window').height;
 
@@ -215,8 +215,8 @@ function AnimatedBackgroundViewComponent({
   blurTint = 'dark',
   style,
 }: AnimatedBackgroundViewProps) {
-  const { getPrimaryColor } = useTheme();
-  const primaryColor900 = useMemo(() => getPrimaryColor('900'), [getPrimaryColor]);
+  const surface = useThemeColor('surface');
+  const primaryColor900 = useMemo(() => surface, [surface]);
 
   // Get gradient colors for background image themes
   const currentTheme = useSettingsStore((state) => state.getTheme());

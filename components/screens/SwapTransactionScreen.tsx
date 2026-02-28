@@ -22,7 +22,6 @@ import Animated, {
   LinearTransition,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { useTheme } from 'providers/ThemeProvider';
 import { View } from 'components/ui/View/View';
 import { Text, UntranslatedText } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
@@ -49,6 +48,7 @@ import Icon from 'assets/icons';
 import { router } from 'expo-router';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { IconSymbol } from 'components/ui/icon-symbol';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface Props {
   groupId: string | undefined;
@@ -159,7 +159,7 @@ interface CollapsedLegGroupProps {
 }
 
 const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGroupProps) => {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   // Source = first leg's from, Destination = last leg's to
   const firstLeg = legGroup.legs[0];
@@ -180,14 +180,13 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           <UntranslatedText
             bold
             size={13}
-            color={opacity(getPrimaryColor('0'), 0.9)}
+            color={opacity(foreground, 0.9)}
             numberOfLines={1}
             style={{ flex: 1 }}>
             {srcName}
           </UntranslatedText>
         </HStack>
-        <View
-          style={[styles.collapsedArrow, { backgroundColor: opacity(getPrimaryColor('0'), 0.33) }]}>
+        <View style={[styles.collapsedArrow, { backgroundColor: opacity(foreground, 0.33) }]}>
           <Icon name="mdi:arrow-right" size={10} color="#fff" />
         </View>
         <HStack spacing={8} align="center" flex={1}>
@@ -195,7 +194,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           <UntranslatedText
             bold
             size={13}
-            color={opacity(getPrimaryColor('0'), 0.9)}
+            color={opacity(foreground, 0.9)}
             numberOfLines={1}
             style={{ flex: 1 }}>
             {dstName}
@@ -212,8 +211,13 @@ CollapsedLegGroup.displayName = 'CollapsedLegGroup';
 // -----------------------------------------------------------------------
 
 export function SwapTransactionScreen({ groupId }: Props) {
-  const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
-  const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const [foreground, muted, danger, success] = useThemeColor([
+    'foreground',
+    'muted',
+    'danger',
+    'success',
+  ] as const);
+  const accentColor = muted;
   const group = useSwapTransactionsStore((state) => (groupId ? state.groups[groupId] : undefined));
   const { history } = useHistoryWithMelts();
   const { getMintInfo } = useMintManagement();
@@ -346,7 +350,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
     return (
       <ModalLayoutWrapper>
         <View style={styles.center}>
-          <Text color={opacity(getPrimaryColor('0'), 0.66)}>Swap not found.</Text>
+          <Text color={opacity(foreground, 0.66)}>Swap not found.</Text>
         </View>
       </ModalLayoutWrapper>
     );
@@ -354,7 +358,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
   const unit = group.unit || 'sat';
   const isFailed = group.state === 'cancelled';
-  const headerColor = isFailed ? getRedColor('300') : getGreenColor('300');
+  const headerColor = isFailed ? danger : success;
   const fiatAmount = formatAmount(
     { amount: totalReceived || totalSent, unit },
     {
@@ -379,8 +383,8 @@ export function SwapTransactionScreen({ groupId }: Props) {
                 color={headerColor}
               />
             </HStack>
-            <Text size={18} color={opacity(getPrimaryColor('0'), 0.9)} bold>
-              <Text size={18} color={opacity(getPrimaryColor('0'), 0.9)} style={{ marginLeft: 8 }}>
+            <Text size={18} color={opacity(foreground, 0.9)} bold>
+              <Text size={18} color={opacity(foreground, 0.9)} style={{ marginLeft: 8 }}>
                 {fiatAmount}
               </Text>
             </Text>
@@ -388,21 +392,21 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
           {/* Swap icon — same style as TransactionIcon in HistoryEntryHeader */}
           <View className="scale-125 transform bg-transparent p-4">
-            <Icon name="mdi:swap-horizontal" size={28} color={opacity(getPrimaryColor('0'), 0.9)} />
+            <Icon name="mdi:swap-horizontal" size={28} color={opacity(foreground, 0.9)} />
           </View>
         </HStack>
 
         {/* ── Disclosure toggle (animated chevron, like SwiftUI DisclosureGroup) ── */}
         <TouchableOpacity onPress={toggleExpanded} style={{ marginHorizontal: 16 }}>
           <HStack align="center" justify="space-between" style={styles.toggleHeader}>
-            <UntranslatedText bold size={13} color={opacity(getPrimaryColor('0'), 0.66)}>
+            <UntranslatedText bold size={13} color={opacity(foreground, 0.66)}>
               Transactions
             </UntranslatedText>
             <Animated.View style={chevronAnimatedStyle}>
               <IconSymbol
                 name="chevron.down"
                 size={14}
-                color={opacity(getPrimaryColor('0'), 0.5)}
+                color={opacity(foreground, 0.5)}
                 weight="semibold"
               />
             </Animated.View>
@@ -508,7 +512,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
                       <View
                         style={{
                           height: StyleSheet.hairlineWidth,
-                          backgroundColor: opacity(getPrimaryColor('0'), 0.1),
+                          backgroundColor: opacity(foreground, 0.1),
                           marginHorizontal: 16,
                         }}
                       />

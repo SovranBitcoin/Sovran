@@ -97,7 +97,7 @@ export function PaymentInfo({
   if (!selectedValue) {
     return (
       <HStack align="center" justify="center">
-        <Skeleton className="h-64 w-64 bg-primary-800" />
+        <Skeleton className="h-64 w-64 bg-surface-secondary" />
       </HStack>
     );
   }

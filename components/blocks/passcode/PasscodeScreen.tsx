@@ -8,9 +8,9 @@ import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import AnimatedSpriteBackground from 'components/ui/SpriteView';
-import { useTheme } from 'providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { getUsername } from '@/helper/username';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface Props {
   passcode: string;
@@ -26,7 +26,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   const [keyIdx, setKeyIdx] = useState(0);
   const opacity = useRef(new Animated.Value(1)).current;
   const shake = useRef(new Animated.Value(0)).current;
-  const { getPrimaryColor } = useTheme();
+  const background = useThemeColor('background');
 
   // Shadow styles - cannot be fully replicated with Tailwind in React Native
   const textShadow = {
@@ -98,15 +98,15 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   };
 
   return (
-    <BlurView className="flex-1 bg-primary-950">
+    <BlurView className="flex-1 bg-background">
       <Animated.View
-        className="flex-1 bg-primary-950"
+        className="flex-1 bg-background"
         style={{
           opacity,
           transform: [{ translateX: shake }],
         }}>
         <VStack align="center" justify="center" flex={1} spacing={SPACING}>
-          <AnimatedSpriteBackground backgroundColor={getPrimaryColor('950')} />
+          <AnimatedSpriteBackground backgroundColor={background} />
 
           <View style={avatarShadow}>
             <Avatar
@@ -120,7 +120,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
           <Text
             size={18}
             weight="bold"
-            className="text-primary-0"
+            className="text-foreground"
             style={{
               ...textShadow,
             }}>

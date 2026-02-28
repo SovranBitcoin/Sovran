@@ -71,7 +71,6 @@ import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { checkBalance, createWalletFromToken, topUpBalance } from 'helper/routstr/api';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -86,6 +85,7 @@ import { useNostrDirectMessage } from '@/hooks/useNostrDirectMessage';
 import { useBalanceContext, useManager, useMints } from 'coco-cashu-react';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 import { FiatCurrencyPill } from 'components/blocks/FiatCurrencyPill';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // Currency display configuration
 const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }> = {
@@ -218,7 +218,11 @@ export function CurrencyScreen({
   onInsufficientBalance,
   onSendModeChange,
 }: CurrencyScreenProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, background, danger] = useThemeColor([
+    'foreground',
+    'background',
+    'danger',
+  ] as const);
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
   const isCompactPhone = screenHeight <= 760;
@@ -754,7 +758,7 @@ export function CurrencyScreen({
   if (!params) return null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
+    <View style={{ flex: 1, backgroundColor: background }}>
       <View style={{ flex: 1, paddingTop: topPadding, paddingHorizontal: 16 }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <VStack align="center" spacing={centerSpacing}>
@@ -780,14 +784,12 @@ export function CurrencyScreen({
                 activeColor={
                   rawFiatInput
                     ? params?.to === 'sendToken' || params?.to === 'meltQuote'
-                      ? getShadeColor('300')
-                      : getPrimaryColor('0')
-                    : opacity(getPrimaryColor('0'), 0.4)
+                      ? danger
+                      : foreground
+                    : opacity(foreground, 0.4)
                 }
                 placeholderColor={opacity(
-                  params?.to === 'sendToken' || params?.to === 'meltQuote'
-                    ? getShadeColor('300')
-                    : getPrimaryColor('0'),
+                  params?.to === 'sendToken' || params?.to === 'meltQuote' ? danger : foreground,
                   0.35
                 )}
               />

@@ -15,7 +15,7 @@ import Icon from 'assets/icons';
 import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 const HEADER_LAYOUT = {
   TOOLBAR_BUTTON_WIDTH: 44,
@@ -71,7 +71,7 @@ function ModalScreen() {
   });
 
   const { keys } = useNostrKeysContext();
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
   const [sendMode, setSendMode] = useState<SendMode | null>(null);
@@ -143,12 +143,12 @@ function ModalScreen() {
                           : 'fluent:clock-12-filled'
                     }
                     size={22}
-                    color={getPrimaryColor('0')}
+                    color={foreground}
                   />
                 </TouchableOpacity>
               )
             : undefined,
-          headerTintColor: getPrimaryColor('0'),
+          headerTintColor: foreground,
         }}
       />
       <CurrencyScreen

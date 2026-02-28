@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity } from './TouchableOpacity';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -16,25 +16,25 @@ interface CardProps {
 }
 
 export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, surfaceSecondary, danger] = useThemeColor(['foreground', 'surface-secondary', 'danger'] as const);
 
   const getBorderColor = () => {
     switch (variant) {
       case 'warning':
-        return getShadeColor('300');
+        return danger;
       case 'info':
       default:
-        return opacity(getPrimaryColor('0'), 0.8);
+        return opacity(foreground, 0.8);
     }
   };
 
   const getTextColor = () => {
     switch (variant) {
       case 'warning':
-        return getShadeColor('300');
+        return danger;
       case 'info':
       default:
-        return opacity(getPrimaryColor('0'), 0.8);
+        return opacity(foreground, 0.8);
     }
   };
 
@@ -43,7 +43,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
       <View
         className="rounded-lg border-l-[5px] shadow-sm"
         style={{
-          backgroundColor: getPrimaryColor('800'),
+          backgroundColor: surfaceSecondary,
           borderLeftColor: getBorderColor(),
         }}
         blur>
@@ -54,7 +54,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
               overpass
               className="text-base"
               style={{
-                color: opacity(getPrimaryColor('0'), 0.5),
+                color: opacity(foreground, 0.5),
                 paddingLeft: 16,
                 paddingRight: 4,
                 paddingTop: 16,

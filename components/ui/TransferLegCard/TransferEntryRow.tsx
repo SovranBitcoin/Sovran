@@ -14,7 +14,7 @@
 
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { UntranslatedText } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
@@ -64,18 +64,18 @@ export const TransferEntryRow = React.memo(
     onPress,
     statusIcon,
   }: TransferEntryRowProps) => {
-    const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
+    const [foreground, accent, danger, success] = useThemeColor(['foreground', 'accent', 'danger', 'success'] as const);
 
     const isSend = type === 'send';
-    const amountColor = isSend ? getRedColor('300') : getGreenColor('300');
-    const defaultSubtitleColor = opacity(getPrimaryColor('0'), 0.8);
+    const amountColor = isSend ? danger : success;
+    const defaultSubtitleColor = opacity(foreground, 0.8);
 
     const content = (
       <HStack spacing={12} flex={1}>
         {/* Avatar with small arrow overlay */}
         <View style={styles.avatarWrapper}>
           <Avatar picture={mintIconUrl} size={36} variant="mint" name={mintName} />
-          <View style={[styles.arrowBadge, { backgroundColor: getPrimaryColor('500') }]}>
+          <View style={[styles.arrowBadge, { backgroundColor: accent }]}>
             <Icon
               name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}
               size={10}
@@ -86,7 +86,7 @@ export const TransferEntryRow = React.memo(
 
         <VStack spacing={0} flex={1}>
           <HStack justify="space-between" align="flex-end">
-            <UntranslatedText color={getPrimaryColor('0')} bold size={14} numberOfLines={1}>
+            <UntranslatedText color={foreground} bold size={14} numberOfLines={1}>
               {mintName}
             </UntranslatedText>
             <HStack align="center" spacing={0}>

@@ -26,10 +26,9 @@
 import React from 'react';
 import ActionSheet, { registerSheet } from 'react-native-actions-sheet';
 import { sheetName, routes } from './routes';
-import { useTheme } from 'providers/ThemeProvider';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 function SheetWithRouter() {
-  const { getPrimaryColor } = useTheme();
+  const surfaceSecondary = useThemeColor('surface-secondary');
 
   return (
     <ActionSheet
@@ -49,7 +48,7 @@ function SheetWithRouter() {
       routes={routes}
       initialRoute="profile-list"
       containerStyle={{
-        backgroundColor: getPrimaryColor('800'),
+        backgroundColor: surfaceSecondary,
         flexShrink: 1,
         flexGrow: 0,
         flexBasis: 'auto',

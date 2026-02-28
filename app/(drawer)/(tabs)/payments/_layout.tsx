@@ -1,12 +1,11 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { Stack } from 'expo-router';
 import { Pressable, Platform, useWindowDimensions, TextInput } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
 import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { View } from 'components/ui/View/View';
 import { buildExpoRouterHeaderOptions } from '@/components/navigation/expoRouter55';
@@ -31,7 +30,7 @@ export const usePaymentsSearch = () => {
 
 // Native search header component for iOS
 function NativeSearchHeader({ width, clearKey }: { width: number; clearKey: number }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const { onSearchChange } = usePaymentsSearch();
 
   return (
@@ -51,7 +50,7 @@ function NativeSearchHeader({ width, clearKey }: { width: number; clearKey: numb
             keyboardType="web-search"
             autocorrection={false}
             modifiers={[
-              foregroundStyle(getPrimaryColor('0')),
+              foregroundStyle(foreground),
               frame({ maxWidth: Infinity, height: 28, alignment: 'leading' }),
             ]}
           />
@@ -63,7 +62,7 @@ function NativeSearchHeader({ width, clearKey }: { width: number; clearKey: numb
 
 // Fallback search header for Android - uses uncontrolled pattern for better responsiveness
 function FallbackSearchHeader({ clearKey }: { clearKey: number }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceSecondary] = useThemeColor(['foreground', 'surface-secondary'] as const);
   const { onSearchChange } = usePaymentsSearch();
   const inputRef = useRef<TextInput>(null);
 
@@ -73,7 +72,7 @@ function FallbackSearchHeader({ clearKey }: { clearKey: number }) {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: getPrimaryColor('800'),
+        backgroundColor: surfaceSecondary,
         borderRadius: 12,
         paddingHorizontal: 12,
         paddingVertical: 8,
@@ -85,10 +84,10 @@ function FallbackSearchHeader({ clearKey }: { clearKey: number }) {
         defaultValue=""
         onChangeText={onSearchChange}
         placeholder="Search contacts..."
-        placeholderTextColor={opacity(getPrimaryColor('0'), 0.33)}
+        placeholderTextColor={opacity(foreground, 0.33)}
         style={{
           flex: 1,
-          color: getPrimaryColor('0'),
+          color: foreground,
           fontSize: 16,
           fontFamily: 'OverpassRegular',
         }}
@@ -100,7 +99,7 @@ function FallbackSearchHeader({ clearKey }: { clearKey: number }) {
 }
 
 export default function PaymentsLayout() {
-  const iconColor = useThemeColor({}, 'text');
+  const iconColor = useThemeColor('foreground');
   const navigation = useNavigation();
   // Search state
   const [searchQuery, setSearchQuery] = useState('');

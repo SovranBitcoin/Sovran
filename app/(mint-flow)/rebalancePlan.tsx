@@ -14,7 +14,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { ScrollView, StyleSheet } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
 import { VStack } from 'components/ui/View/VStack';
@@ -74,14 +74,15 @@ interface StepState {
 }
 
 function RebalancePlanScreen() {
-  const { getPrimaryColor, getGreenColor } = useTheme();
-  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primaryColor300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
-  const primaryColor400 = useMemo(() => opacity(getPrimaryColor('0'), 0.4), [getPrimaryColor]);
-  const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
-  const primaryColor800 = useMemo(() => getPrimaryColor('800'), [getPrimaryColor]);
-  const primaryColor950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
-  const greenColor = useMemo(() => getGreenColor('400'), [getGreenColor]);
+  const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor(['foreground', 'surface-tertiary', 'surface-secondary', 'background'] as const);
+  const [danger, green400] = useThemeColor(['danger', 'green-400'] as const);
+  const primaryColor0 = foreground;
+  const primaryColor300 = opacity(foreground, 0.5);
+  const primaryColor400 = opacity(foreground, 0.4);
+  const primaryColor700 = surfaceTertiary;
+  const primaryColor800 = surfaceSecondary;
+  const primaryColor950 = background;
+  const greenColor = green400;
 
   // Get params
   const params = useLocalSearchParams<{ unit: string }>();
@@ -1729,7 +1730,7 @@ function RebalancePlanScreen() {
                     styles.progressFill,
                     {
                       width: `${progressPct * 100}%`,
-                      backgroundColor: failedCount > 0 ? '#ef4444' : greenColor,
+                      backgroundColor: failedCount > 0 ? danger : greenColor,
                     },
                   ]}
                 />
@@ -1774,7 +1775,7 @@ function RebalancePlanScreen() {
                   bold
                   overpass
                   size={18}
-                  style={{ color: failedCount > 0 ? '#ef4444' : primaryColor0 }}>
+                  style={{ color: failedCount > 0 ? danger : primaryColor0 }}>
                   {failedCount}
                 </Text>
               </HStack>

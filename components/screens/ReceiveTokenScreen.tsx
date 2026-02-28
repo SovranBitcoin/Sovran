@@ -19,7 +19,6 @@ import { VStack } from 'components/ui/View/VStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { BottomButtons } from 'components/ui/BottomButtons';
@@ -32,6 +31,7 @@ import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
 import { useSettingsStore } from 'stores/settingsStore';
 import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface ReceiveTokenScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
@@ -42,11 +42,11 @@ interface ReceiveTokenScreenProps {
 
 /** Error screen shown when transaction data is missing or invalid */
 function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBack: () => void }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   return (
     <ModalLayoutWrapper>
       <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-        <Text color={opacity(getPrimaryColor('0'), 0.66)}>{message}</Text>
+        <Text color={opacity(foreground, 0.66)}>{message}</Text>
         <ButtonHandler
           buttons={[
             {

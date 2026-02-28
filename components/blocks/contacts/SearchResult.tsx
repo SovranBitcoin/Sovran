@@ -3,10 +3,10 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { UserProfile } from 'helper/apiClient';
 import { ProfileImage } from './ProfileImage';
+import { useThemeColor } from 'hooks/useThemeColor';
 interface SearchResultProps {
   result: {
     pubkey: string;
@@ -17,7 +17,7 @@ interface SearchResultProps {
 }
 
 export function SearchResult({ result, onPress, loading }: SearchResultProps) {
-  const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
+  const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
   const title =
     result.profile?.displayName ||
     result.profile?.name ||
@@ -30,12 +30,7 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
       <HStack spacing={8} align="center">
         <ProfileImage loading={loading} profile={result.profile} />
         <VStack spacing={4} className="flex-1">
-          <Text
-            loading={loading}
-            overpass
-            bold
-            size={16}
-            color={opacity(getPrimaryColor('0'), 0.9)}>
+          <Text loading={loading} overpass bold size={16} color={opacity(foreground, 0.9)}>
             {title}
           </Text>
           {result.profile?.nip05 && (
@@ -45,7 +40,7 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
               regular
               size={12}
               style={{
-                color: result.profile.nip05Valid ? getGreenColor('300') : getRedColor('300'),
+                color: result.profile.nip05Valid ? success : danger,
               }}>
               {result.profile.nip05Valid ? '✓ ' : '✗ '}
               {result.profile.nip05}

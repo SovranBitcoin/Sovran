@@ -1,6 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
 import { router } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { UntranslatedText } from 'components/ui/Text';
@@ -10,21 +9,21 @@ import { VStack } from 'components/ui/View/VStack';
 import { View } from 'components/ui/View/View';
 import { convertTime } from 'helper/time';
 import type { SwapGroup } from 'stores/swapTransactionsStore';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface Props {
   group: SwapGroup;
 }
 
 export const SwapTransactionRow = React.memo(({ group }: Props) => {
-  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
+  const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
 
   const aggregate = useMemo(() => {
     const anyFailed = group.legs.some((l) => l.localStatus === 'failed');
-    if (anyFailed) return { text: 'Failed', color: getRedColor('300') };
-    if (group.state === 'running')
-      return { text: 'Pending', color: opacity(getPrimaryColor('0'), 0.5) };
-    return { text: 'Completed', color: getGreenColor('300') };
-  }, [group.legs, group.state, getPrimaryColor, getRedColor, getGreenColor]);
+    if (anyFailed) return { text: 'Failed', color: danger };
+    if (group.state === 'running') return { text: 'Pending', color: opacity(foreground, 0.5) };
+    return { text: 'Completed', color: success };
+  }, [group.legs, group.state, foreground, danger, success]);
 
   const handlePress = useCallback(() => {
     router.navigate({
@@ -47,12 +46,12 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
       onPress={handlePress}>
       <HStack spacing={12} flex={1}>
         <View className="relative h-7 w-7 items-center justify-center bg-transparent">
-          <Icon name="mdi:swap-horizontal" color={opacity(getPrimaryColor('0'), 0.9)} size={28} />
+          <Icon name="mdi:swap-horizontal" color={opacity(foreground, 0.9)} size={28} />
         </View>
 
         <VStack spacing={0} flex={1}>
           <HStack justify="space-between" align="flex-end">
-            <UntranslatedText color={getPrimaryColor('0')} bold size={14}>
+            <UntranslatedText color={foreground} bold size={14}>
               Swap
             </UntranslatedText>
             <UntranslatedText bold size={14} color={aggregate.color}>
@@ -61,10 +60,10 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
           </HStack>
 
           <HStack justify="space-between" align="center">
-            <UntranslatedText regular size={10} color={opacity(getPrimaryColor('0'), 0.8)}>
+            <UntranslatedText regular size={10} color={opacity(foreground, 0.8)}>
               {convertTime(new Date(group.createdAt))}
             </UntranslatedText>
-            <UntranslatedText bold size={10} color={opacity(getPrimaryColor('0'), 0.8)}>
+            <UntranslatedText bold size={10} color={opacity(foreground, 0.8)}>
               {group.legs.length} {group.legs.length === 1 ? 'step' : 'steps'}
             </UntranslatedText>
           </HStack>

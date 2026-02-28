@@ -14,7 +14,6 @@ import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
-import { useTheme } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { RouteScreenProps, ScrollView, useSheetPayload } from 'react-native-actions-sheet';
@@ -24,9 +23,15 @@ import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { getUsername } from 'helper/username';
 import { useProfileStore } from '@/stores/profileStore';
 import { useWindowDimensions } from 'react-native';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-list'>) => {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, muted, surfaceSecondary, surfaceTertiary] = useThemeColor([
+    'foreground',
+    'muted',
+    'surface-secondary',
+    'surface-tertiary',
+  ] as const);
   const payload = useSheetPayload('profile-switcher');
   const profiles = useProfileStore((s) => s.profiles);
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
@@ -54,14 +59,14 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
         marginBottom: 12,
         borderRadius: 20,
         overflow: 'hidden',
-        backgroundColor: getPrimaryColor('800'),
+        backgroundColor: surfaceSecondary,
         borderWidth: 1,
-        borderColor: opacity(getPrimaryColor('400'), 0.2),
+        borderColor: opacity(muted, 0.2),
       }}>
       <ScrollView
         style={{
           maxHeight: screenHeight * 0.6,
-          backgroundColor: getPrimaryColor('700'),
+          backgroundColor: surfaceTertiary,
         }}
         contentContainerStyle={{
           padding: 16,
@@ -81,7 +86,7 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
                   borderRadius: 14,
                   paddingHorizontal: 8,
                   paddingVertical: 8,
-                  backgroundColor: isActive ? opacity(getPrimaryColor('400'), 0.16) : 'transparent',
+                  backgroundColor: isActive ? opacity(muted, 0.16) : 'transparent',
                 }}
                 onPress={() => handleSwitch(profile.accountIndex)}
                 disabled={isActive}>
@@ -90,7 +95,7 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
                     style={{
                       borderRadius: 24,
                       borderWidth: 2,
-                      borderColor: isActive ? getPrimaryColor('400') : 'transparent',
+                      borderColor: isActive ? muted : 'transparent',
                       padding: 2,
                     }}>
                     <Avatar seed={profile.pubkey} name={username} size={40} variant="person" />
@@ -98,7 +103,7 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
                   <VStack spacing={2} style={{ flex: 1 }}>
                     <Text
                       style={{
-                        color: getPrimaryColor('0'),
+                        color: foreground,
                       }}
                       size={16}
                       weight="bold">
@@ -110,10 +115,10 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
                         unit="sat"
                         size={14}
                         weight="heavy"
-                        color={opacity(getPrimaryColor('0'), 0.4)}
+                        color={opacity(foreground, 0.4)}
                       />
                     ) : (
-                      <Text style={{ color: opacity(getPrimaryColor('0'), 0.4) }} size={12}>
+                      <Text style={{ color: opacity(foreground, 0.4) }} size={12}>
                         —
                       </Text>
                     )}
@@ -122,7 +127,7 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
                     <Icon
                       name="mdi:check-circle"
                       size={22}
-                      color={opacity(getPrimaryColor('0'), 0.4)}
+                      color={opacity(foreground, 0.4)}
                     />
                   )}
                 </HStack>
@@ -133,7 +138,7 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
       </ScrollView>
       <View
         style={{
-          backgroundColor: getPrimaryColor('700'),
+          backgroundColor: surfaceTertiary,
           paddingHorizontal: 16,
           paddingTop: 8,
           paddingBottom: 16,
@@ -141,7 +146,7 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
         <View
           style={{
             height: 1,
-            backgroundColor: opacity(getPrimaryColor('400'), 0.15),
+            backgroundColor: opacity(muted, 0.15),
             marginBottom: 12,
           }}
         />
@@ -149,18 +154,18 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
           <HStack align="center" spacing={12}>
             <View
               style={{
-                backgroundColor: opacity(getPrimaryColor('400'), 0.2),
+                backgroundColor: opacity(muted, 0.2),
                 borderRadius: 24,
                 width: 44,
                 height: 44,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              <Icon name="fluent:add-24-filled" size={24} color={getPrimaryColor('0')} />
+              <Icon name="fluent:add-24-filled" size={24} color={foreground} />
             </View>
             <Text
               style={{
-                color: getPrimaryColor('0'),
+                color: foreground,
               }}
               size={16}
               weight="bold">

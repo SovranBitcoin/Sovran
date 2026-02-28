@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text as DefaultText, TextStyle, ColorValue } from 'react-native';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { Skeleton } from 'react-native-skeleton-component';
@@ -14,8 +14,7 @@ interface GradientTextProps extends TextProps {
 }
 
 const GradientText = ({ children, style, gradientColors, ...rest }: GradientTextProps) => {
-  const { getShadeColor } = useTheme();
-
+  const [shade200, shade300] = useThemeColor(['shade-200', 'shade-300'] as const);
   return (
     <MaskedView
       maskElement={
@@ -25,7 +24,7 @@ const GradientText = ({ children, style, gradientColors, ...rest }: GradientText
       }>
       <LinearGradient
         colors={
-          (gradientColors || [getShadeColor('200'), getShadeColor('300')]) as readonly [
+          (gradientColors || [shade200, shade300]) as readonly [
             ColorValue,
             ColorValue,
             ...ColorValue[],
@@ -59,7 +58,7 @@ export const StyledText = ({
   children,
   ...props
 }: StyledTextProps) => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [muted, accent, danger] = useThemeColor(['muted', 'accent', 'danger'] as const);
 
   if (primary) {
     return (
@@ -69,13 +68,13 @@ export const StyledText = ({
     );
   } else if (secondary) {
     return (
-      <GradientText gradientColors={[getPrimaryColor('400'), getPrimaryColor('500')]} style={style}>
+      <GradientText gradientColors={[muted, accent]} style={style}>
         {children}
       </GradientText>
     );
   } else if (negative) {
     return (
-      <GradientText gradientColors={[getShadeColor('300'), getShadeColor('300')]} style={style}>
+      <GradientText gradientColors={[danger, danger]} style={style}>
         {children}
       </GradientText>
     );
@@ -158,7 +157,7 @@ export function UntranslatedText({
   lineGap = 0,
   ...props
 }: CustomTextProps) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const { style, children, ...otherProps } = props;
 
   const weight = getWeightFromProps(props);
@@ -262,7 +261,7 @@ export function UntranslatedText({
 
   // Build base style
   const baseStyle: TextStyle = {
-    color: getPrimaryColor('0'),
+    color: foreground,
     fontFamily: fontFamily,
   };
 

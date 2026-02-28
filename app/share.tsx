@@ -6,7 +6,6 @@ import Icon, { CurrencyIcon } from 'assets/icons';
 import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { popup } from '@/helper/popup';
-import { useTheme } from 'providers/ThemeProvider';
 import { truncateMiddle } from 'helper/strings';
 import opacity from 'hex-color-opacity';
 import { withSheetProvider } from 'hocs/withSheetProvider';
@@ -14,6 +13,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { Tabs } from 'components/ui/Tabs';
 import { ListGroup, PressableFeedback } from 'heroui-native';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 // Configuration for different share types
 const SHARE_CONFIGS = {
@@ -51,7 +51,7 @@ function ShareModal() {
   }>();
 
   const { type = 'profile', data, npub } = params;
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   // Determine if we should show tabs (when both p2pk and npub are available)
   const showTabs = type === 'p2pk' && npub;
@@ -88,7 +88,7 @@ function ShareModal() {
 
   const CloseButton = () => (
     <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+      <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
     </TouchableOpacity>
   );
 
@@ -104,8 +104,8 @@ function ShareModal() {
       <Stack.Screen
         options={{
           headerTitle,
-          headerTitleStyle: { color: getPrimaryColor('0') },
-          headerTintColor: getPrimaryColor('0'),
+          headerTitleStyle: { color: foreground },
+          headerTintColor: foreground,
           headerLeft: () => <CloseButton />,
         }}
       />
@@ -130,7 +130,7 @@ function ShareModal() {
                 <ListGroup.Item disabled>
                   <ListGroup.ItemPrefix>
                     <CurrencyIcon
-                      colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                      colors={[opacity(foreground, 0.4)]}
                       width={20}
                       currency={config.iconCurrency}
                     />
@@ -142,7 +142,7 @@ function ShareModal() {
                     <Icon
                       name="lets-icons:copy"
                       size={20}
-                      color={opacity(getPrimaryColor('0'), 0.4)}
+                      color={opacity(foreground, 0.4)}
                     />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>

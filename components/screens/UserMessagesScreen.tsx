@@ -37,7 +37,6 @@ import { LegendList } from '@legendapp/list';
 
 // Custom hooks and providers
 import { Message } from 'redux/nostr';
-import { useTheme } from 'providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 
 // Components
@@ -88,6 +87,7 @@ import {
 import opacity from 'hex-color-opacity';
 import { truncateMiddle } from '@/helper/strings';
 import { getUsername } from 'helper/username';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 export type TimelineItemType = Message;
 
@@ -242,7 +242,16 @@ interface CashuTokenBubbleProps {
 }
 
 function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, defaultColor, surfaceTertiary, surfaceSecondary, surface, shade200, shade300] =
+    useThemeColor([
+      'foreground',
+      'default',
+      'surface-tertiary',
+      'surface-secondary',
+      'surface',
+      'shade-200',
+      'shade-300',
+    ] as const);
 
   let decoded;
   let amount = 0;
@@ -300,12 +309,12 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
   }
 
   const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isMe
-    ? [getShadeColor('200'), getShadeColor('300')]
-    : [getPrimaryColor('600'), getPrimaryColor('700')];
+    ? [shade200, shade300]
+    : [defaultColor, surfaceTertiary];
 
   const innerGradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isMe
-    ? [opacity(getPrimaryColor('0'), 0.2), opacity(getPrimaryColor('0'), 0.175)]
-    : [getPrimaryColor('800'), getPrimaryColor('900')];
+    ? [opacity(foreground, 0.2), opacity(foreground, 0.175)]
+    : [surfaceSecondary, surface];
 
   return (
     <View
@@ -328,7 +337,7 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
               <Text
                 size={12}
                 style={{
-                  color: getPrimaryColor('0'),
+                  color: foreground,
                   opacity: 0.75,
                 }}>
                 {mintUrl}
@@ -347,13 +356,13 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
                   unit={unit}
                   size={32}
                   weight="heavy"
-                  color={getPrimaryColor('0')}
+                  color={foreground}
                 />
                 {usdAmount && (
                   <Text
                     size={14}
                     style={{
-                      color: getPrimaryColor('0'),
+                      color: foreground,
                       opacity: 0.9,
                     }}>
                     {usdAmount}
@@ -368,23 +377,19 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
                 marginTop: 8,
                 paddingVertical: 10,
                 paddingHorizontal: 16,
-                backgroundColor: getPrimaryColor('0'),
+                backgroundColor: foreground,
                 borderRadius: 8,
                 alignItems: 'center',
               }}>
               <HStack align="center" spacing={6}>
                 {!isMe && (
-                  <Icon
-                    name="material-symbols:arrow-downward"
-                    size={16}
-                    color={getPrimaryColor('600')}
-                  />
+                  <Icon name="material-symbols:arrow-downward" size={16} color={defaultColor} />
                 )}
                 <Text
                   size={14}
                   bold
                   style={{
-                    color: getPrimaryColor('600'),
+                    color: defaultColor,
                   }}>
                   {isMe ? 'Cancel' : 'Redeem'}
                 </Text>
@@ -437,7 +442,13 @@ function MessageBubble({
   isLoadingMetadata,
   isStreaming,
 }: MessageBubbleProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, defaultColor, surfaceTertiary, shade400, shade500] = useThemeColor([
+    'foreground',
+    'default',
+    'surface-tertiary',
+    'shade-400',
+    'shade-500',
+  ] as const);
 
   const content = Array.isArray(message.content)
     ? message.content.join('')
@@ -498,7 +509,7 @@ function MessageBubble({
           {(displayContent || shouldShowSkeleton) && (
             <View
               style={{
-                backgroundColor: isMe ? getPrimaryColor('600') : getPrimaryColor('700'),
+                backgroundColor: isMe ? defaultColor : surfaceTertiary,
                 borderRadius: 18,
                 borderTopLeftRadius: isMe ? 18 : 4,
                 borderTopRightRadius: isMe ? 4 : 18,
@@ -518,7 +529,7 @@ function MessageBubble({
                     style={{
                       width: 60,
                       height: 16,
-                      backgroundColor: getPrimaryColor('600'),
+                      backgroundColor: defaultColor,
                       borderRadius: 8,
                       opacity: 0.6,
                     }}
@@ -528,7 +539,7 @@ function MessageBubble({
                 <Text
                   size={16}
                   style={{
-                    color: getPrimaryColor('0'),
+                    color: foreground,
                     lineHeight: 20,
                     paddingHorizontal: 16,
                     paddingVertical: 12,
@@ -545,19 +556,19 @@ function MessageBubble({
             <Text
               size={12}
               style={{
-                color: getShadeColor('400'),
+                color: shade400,
                 marginLeft: isMe ? 0 : 8,
               }}>
               {message.timestamp}
             </Text>
             {isMe &&
               (message.isSending ? (
-                <Icon name="svg-spinners:90-ring-with-bg" size={14} color={getShadeColor('500')} />
+                <Icon name="svg-spinners:90-ring-with-bg" size={14} color={shade500} />
               ) : (
                 <Icon
                   name={message.isRead ? 'ion:checkmark-done' : 'simple-line-icons:check'}
                   size={14}
-                  color={message.isRead ? opacity(getPrimaryColor('0'), 0.4) : getShadeColor('500')}
+                  color={message.isRead ? opacity(foreground, 0.4) : shade500}
                 />
               ))}
           </HStack>
@@ -579,7 +590,7 @@ interface ModelListItemProps {
 }
 
 const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, shade400] = useThemeColor(['foreground', 'shade-400'] as const);
   const { provider, modelName } = extractModelName(model);
 
   const pricePerToken = model.sats_pricing?.completion || 0;
@@ -613,7 +624,7 @@ const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
             }),
           ]}>
           <SwiftUIVStack alignment="leading" modifiers={[frame({ width: 24, height: 24 })]}>
-            <Icon name={getProviderIcon(provider)} size={24} color={getPrimaryColor('0')} />
+            <Icon name={getProviderIcon(provider)} size={24} color={foreground} />
           </SwiftUIVStack>
 
           <SwiftUIVStack
@@ -621,13 +632,10 @@ const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
             alignment="leading"
             modifiers={[frame({ maxWidth: Infinity, alignment: 'leading' })]}>
             <SwiftUIText
-              modifiers={[
-                font({ size: 16, weight: 'semibold' }),
-                foregroundStyle(getPrimaryColor('0')),
-              ]}>
+              modifiers={[font({ size: 16, weight: 'semibold' }), foregroundStyle(foreground)]}>
               {modelName}
             </SwiftUIText>
-            <SwiftUIText modifiers={[font({ size: 14 }), foregroundStyle(getShadeColor('400'))]}>
+            <SwiftUIText modifiers={[font({ size: 14 }), foregroundStyle(shade400)]}>
               {provider}
             </SwiftUIText>
             <SwiftUIHStack alignment="center" spacing={8}>
@@ -635,16 +643,16 @@ const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
                 <Icon
                   name={'material-symbols:account-balance-wallet'}
                   size={16}
-                  color={getPrimaryColor('0')}
+                  color={foreground}
                 />
               </SwiftUIVStack>
-              <SwiftUIText modifiers={[font({ size: 12 }), foregroundStyle(getShadeColor('400'))]}>
+              <SwiftUIText modifiers={[font({ size: 12 }), foregroundStyle(shade400)]}>
                 {`${minAmount} sats`}
               </SwiftUIText>
               <SwiftUIVStack alignment="leading" modifiers={[frame({ width: 16, height: 16 })]}>
-                <Icon name={'solar:tag-price-bold'} size={16} color={getPrimaryColor('0')} />
+                <Icon name={'solar:tag-price-bold'} size={16} color={foreground} />
               </SwiftUIVStack>
-              <SwiftUIText modifiers={[font({ size: 12 }), foregroundStyle(getShadeColor('400'))]}>
+              <SwiftUIText modifiers={[font({ size: 12 }), foregroundStyle(shade400)]}>
                 {tokensPerSat > 0 ? `${tokensPerSat.toLocaleString()} tok/sat` : 'Free'}
               </SwiftUIText>
             </SwiftUIHStack>
@@ -682,7 +690,27 @@ export function UserMessagesScreen({
   const scrollViewRef = useRef<ScrollView>(null);
   const pendingMessageRef = useRef<string | null>(null);
 
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [
+    foreground,
+    muted,
+    accent,
+    defaultColor,
+    surfaceTertiary,
+    surfaceSecondary,
+    surface,
+    shade400,
+    shade500,
+  ] = useThemeColor([
+    'foreground',
+    'muted',
+    'accent',
+    'default',
+    'surface-tertiary',
+    'surface-secondary',
+    'surface',
+    'shade-400',
+    'shade-500',
+  ] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
   const { ndk } = useNDK();
 
@@ -1723,10 +1751,10 @@ export function UserMessagesScreen({
         options={{
           headerShown: true,
           headerTransparent: false,
-          headerStyle: { backgroundColor: getPrimaryColor('800') },
+          headerStyle: { backgroundColor: surfaceSecondary },
           headerShadowVisible: false,
           headerBackVisible: false,
-          headerTintColor: getPrimaryColor('0'),
+          headerTintColor: foreground,
           headerLeft: () =>
             isRoutstrMode ? (
               <Pressable
@@ -1736,15 +1764,11 @@ export function UserMessagesScreen({
                     : () => setIsSessionsPanelOpen(true)
                 }
                 style={{ padding: 8 }}>
-                <Icon name={'mdi:menu'} size={24} color={getPrimaryColor('0')} />
+                <Icon name={'mdi:menu'} size={24} color={foreground} />
               </Pressable>
             ) : (
               <Pressable onPress={handleBack} style={{ padding: 8 }}>
-                <Icon
-                  name="material-symbols:arrow-back-rounded"
-                  size={24}
-                  color={getPrimaryColor('0')}
-                />
+                <Icon name="material-symbols:arrow-back-rounded" size={24} color={foreground} />
               </Pressable>
             ),
           headerTitle: () =>
@@ -1765,7 +1789,7 @@ export function UserMessagesScreen({
                       keyboardType="web-search"
                       autocorrection={false}
                       modifiers={[
-                        foregroundStyle(getPrimaryColor('0')),
+                        foregroundStyle(foreground),
                         frame({ maxWidth: Infinity, height: 28, alignment: 'leading' }),
                       ]}
                     />
@@ -1777,7 +1801,7 @@ export function UserMessagesScreen({
                     width: headerTitleWidth,
                     flexDirection: 'row',
                     alignItems: 'center',
-                    backgroundColor: getPrimaryColor('700'),
+                    backgroundColor: surfaceTertiary,
                     borderRadius: 12,
                     paddingHorizontal: 12,
                     paddingVertical: 8,
@@ -1787,10 +1811,10 @@ export function UserMessagesScreen({
                     defaultValue=""
                     onChangeText={handleSessionSearchChange}
                     placeholder="Search sessions..."
-                    placeholderTextColor={opacity(getPrimaryColor('0'), 0.33)}
+                    placeholderTextColor={opacity(foreground, 0.33)}
                     style={{
                       flex: 1,
-                      color: getPrimaryColor('0'),
+                      color: foreground,
                       fontSize: 16,
                       fontFamily: 'OverpassRegular',
                     }}
@@ -1859,7 +1883,7 @@ export function UserMessagesScreen({
                               width: 132,
                               height: 18,
                               borderRadius: 4,
-                              backgroundColor: getPrimaryColor('700'),
+                              backgroundColor: surfaceTertiary,
                             }}
                           />
                         ) : (
@@ -1867,7 +1891,7 @@ export function UserMessagesScreen({
                             size={16}
                             bold
                             style={{
-                              color: getPrimaryColor('0'),
+                              color: foreground,
                               textAlign: 'left',
                             }}>
                             {displayName}
@@ -1882,21 +1906,21 @@ export function UserMessagesScreen({
                             <Icon
                               name="mdi:anonymous"
                               size={14}
-                              color={getShadeColor('400')}
+                              color={shade400}
                               className="border-r-[1.5px] border-r-shade-300 pr-1"
                             />
                           )}
                           <Icon
                             name="material-symbols:account-balance-wallet"
                             size={14}
-                            color={getShadeColor('400')}
+                            color={shade400}
                           />
-                          <Text size={12} style={{ color: getShadeColor('400') }}>
+                          <Text size={12} style={{ color: shade400 }}>
                             {formatBalance(balance)}
                           </Text>
                           <Spacer size={4} />
-                          <Icon name="mdi:robot" size={14} color={getShadeColor('400')} />
-                          <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
+                          <Icon name="mdi:robot" size={14} color={shade400} />
+                          <Text size={12} style={{ color: shade400 }} numberOfLines={1}>
                             {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
                           </Text>
                         </HStack>
@@ -1936,7 +1960,7 @@ export function UserMessagesScreen({
                         width: 132,
                         height: 18,
                         borderRadius: 4,
-                        backgroundColor: getPrimaryColor('700'),
+                        backgroundColor: surfaceTertiary,
                       }}
                     />
                   ) : (
@@ -1944,7 +1968,7 @@ export function UserMessagesScreen({
                       size={16}
                       bold
                       style={{
-                        color: getPrimaryColor('0'),
+                        color: foreground,
                         textAlign: 'left',
                       }}
                       numberOfLines={1}>
@@ -1956,13 +1980,13 @@ export function UserMessagesScreen({
                       <Icon
                         name="material-symbols:account-balance-wallet"
                         size={14}
-                        color={getShadeColor('400')}
+                        color={shade400}
                       />
-                      <Text size={12} style={{ color: getShadeColor('400') }}>
+                      <Text size={12} style={{ color: shade400 }}>
                         {formatBalance(balance)}
                       </Text>
-                      <Icon name="mdi:robot" size={14} color={getShadeColor('400')} />
-                      <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
+                      <Icon name="mdi:robot" size={14} color={shade400} />
+                      <Text size={12} style={{ color: shade400 }} numberOfLines={1}>
                         {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
                       </Text>
                     </HStack>
@@ -1970,7 +1994,7 @@ export function UserMessagesScreen({
                     <Text
                       size={12}
                       style={{
-                        color: getShadeColor('400'),
+                        color: shade400,
                         marginTop: 2,
                         textAlign: 'left',
                       }}
@@ -1984,23 +2008,19 @@ export function UserMessagesScreen({
           headerRight: () =>
             isSessionsPanelOpen && isRoutstrMode && isSessionSearchFocused ? (
               <Pressable onPress={handleDismissSessionSearch} style={{ padding: 8 }}>
-                <Icon
-                  name="material-symbols:close-rounded"
-                  size={20}
-                  color={getPrimaryColor('0')}
-                />
+                <Icon name="material-symbols:close-rounded" size={20} color={foreground} />
               </Pressable>
             ) : isRoutstrMode ? (
               messages.length > 0 && !getAnonymousMode() ? (
                 <Pressable onPress={handleNewSession} style={{ padding: 8 }}>
-                  <Icon name="lucide:square-pen" size={20} color={getPrimaryColor('0')} />
+                  <Icon name="lucide:square-pen" size={20} color={foreground} />
                 </Pressable>
               ) : (
                 <Pressable onPress={toggleAnonymousMode} style={{ padding: 8 }}>
                   <Icon
                     name={getAnonymousMode() ? 'mdi:anonymous' : 'mdi:anonymous-off'}
                     size={20}
-                    color={getPrimaryColor('0')}
+                    color={foreground}
                   />
                 </Pressable>
               )
@@ -2016,13 +2036,13 @@ export function UserMessagesScreen({
                   })
                 }
                 style={{ padding: 8 }}>
-                <Icon name="stash:qr-code" size={20} color={getPrimaryColor('0')} />
+                <Icon name="stash:qr-code" size={20} color={foreground} />
               </Pressable>
             ),
         }}
       />
-      <StatusBar barStyle="light-content" backgroundColor={getPrimaryColor('800')} />
-      <View style={{ flex: 1, backgroundColor: getPrimaryColor('900') }}>
+      <StatusBar barStyle="light-content" backgroundColor={surfaceSecondary} />
+      <View style={{ flex: 1, backgroundColor: surface }}>
         {/* Attachments Bottom Sheet */}
         {isRoutstrMode && Platform.OS === 'ios' && (
           <Host
@@ -2047,11 +2067,11 @@ export function UserMessagesScreen({
                     flexDirection: 'row',
                     alignItems: 'center',
                     padding: 16,
-                    backgroundColor: getPrimaryColor('800'),
+                    backgroundColor: surfaceSecondary,
                     borderRadius: 12,
                   }}>
-                  <Icon name="proicons:photo" size={24} color={getPrimaryColor('0')} />
-                  <Text size={16} style={{ color: getPrimaryColor('0'), marginLeft: 12 }} bold>
+                  <Icon name="proicons:photo" size={24} color={foreground} />
+                  <Text size={16} style={{ color: foreground, marginLeft: 12 }} bold>
                     Camera
                   </Text>
                 </Pressable>
@@ -2064,11 +2084,11 @@ export function UserMessagesScreen({
                     flexDirection: 'row',
                     alignItems: 'center',
                     padding: 16,
-                    backgroundColor: getPrimaryColor('800'),
+                    backgroundColor: surfaceSecondary,
                     borderRadius: 12,
                   }}>
-                  <Icon name="proicons:photo" size={24} color={getPrimaryColor('0')} />
-                  <Text size={16} style={{ color: getPrimaryColor('0'), marginLeft: 12 }} bold>
+                  <Icon name="proicons:photo" size={24} color={foreground} />
+                  <Text size={16} style={{ color: foreground, marginLeft: 12 }} bold>
                     Photos
                   </Text>
                 </Pressable>
@@ -2081,11 +2101,11 @@ export function UserMessagesScreen({
                     flexDirection: 'row',
                     alignItems: 'center',
                     padding: 16,
-                    backgroundColor: getPrimaryColor('800'),
+                    backgroundColor: surfaceSecondary,
                     borderRadius: 12,
                   }}>
-                  <Icon name="lucide:square-pen" size={24} color={getPrimaryColor('0')} />
-                  <Text size={16} style={{ color: getPrimaryColor('0'), marginLeft: 12 }} bold>
+                  <Icon name="lucide:square-pen" size={24} color={foreground} />
+                  <Text size={16} style={{ color: foreground, marginLeft: 12 }} bold>
                     New Session
                   </Text>
                 </Pressable>
@@ -2109,7 +2129,7 @@ export function UserMessagesScreen({
               isPresented={isModelSwitchBottomSheetOpen}
               onIsPresentedChange={setIsModelSwitchBottomSheetOpen}>
               <VStack spacing={16} style={{ paddingTop: 20, paddingBottom: 40, flex: 1 }}>
-                <Text size={20} bold style={{ color: getPrimaryColor('0'), paddingHorizontal: 16 }}>
+                <Text size={20} bold style={{ color: foreground, paddingHorizontal: 16 }}>
                   Select Model
                 </Text>
 
@@ -2127,11 +2147,7 @@ export function UserMessagesScreen({
                           modifiers={[
                             buttonStyle('plain'),
                             padding({ horizontal: 12, vertical: 8 }),
-                            background(
-                              selectedProvider === provider
-                                ? getPrimaryColor('400')
-                                : getPrimaryColor('500')
-                            ),
+                            background(selectedProvider === provider ? muted : accent),
                             cornerRadius(8),
                             fixedSize({ horizontal: true, vertical: false }),
                           ]}
@@ -2160,19 +2176,19 @@ export function UserMessagesScreen({
                     spacing={12}
                     align="center"
                     style={{ padding: 20, justifyContent: 'center', alignItems: 'center' }}>
-                    <Text size={14} style={{ color: getShadeColor('400') }}>
+                    <Text size={14} style={{ color: shade400 }}>
                       {apiKey ? 'Loading models...' : 'No API key configured'}
                     </Text>
                     <Pressable
                       onPress={loadModels}
                       style={{
                         marginTop: 12,
-                        backgroundColor: getPrimaryColor('600'),
+                        backgroundColor: defaultColor,
                         borderRadius: 8,
                         paddingVertical: 8,
                         paddingHorizontal: 16,
                       }}>
-                      <Text size={14} bold style={{ color: getPrimaryColor('0') }}>
+                      <Text size={14} bold style={{ color: foreground }}>
                         Retry
                       </Text>
                     </Pressable>
@@ -2206,7 +2222,7 @@ export function UserMessagesScreen({
                   alignItems: 'center',
                   paddingTop: 50,
                 }}>
-                <Text size={16} style={{ color: getShadeColor('400') }}>
+                <Text size={16} style={{ color: shade400 }}>
                   Loading messages...
                 </Text>
               </View>
@@ -2218,7 +2234,7 @@ export function UserMessagesScreen({
                   alignItems: 'center',
                   paddingTop: 50,
                 }}>
-                <Text size={16} style={{ color: getShadeColor('400') }}>
+                <Text size={16} style={{ color: shade400 }}>
                   No messages yet. Start the conversation!
                 </Text>
               </View>
@@ -2242,12 +2258,12 @@ export function UserMessagesScreen({
         {/* Input Area */}
         <View
           style={{
-            backgroundColor: getPrimaryColor('800'),
+            backgroundColor: surfaceSecondary,
             paddingHorizontal: 16,
             paddingTop: 12,
             paddingBottom: insets.bottom,
             borderTopWidth: 1,
-            borderTopColor: getPrimaryColor('700'),
+            borderTopColor: surfaceTertiary,
           }}>
           <HStack align="center" spacing={12}>
             {isRoutstrMode ? (
@@ -2257,11 +2273,11 @@ export function UserMessagesScreen({
                   width: 40,
                   height: 40,
                   borderRadius: 20,
-                  backgroundColor: getPrimaryColor('700'),
+                  backgroundColor: surfaceTertiary,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                <Icon name="fluent:add-24-filled" size={24} color={getPrimaryColor('0')} />
+                <Icon name="fluent:add-24-filled" size={24} color={foreground} />
               </Pressable>
             ) : (
               <Avatar size={40} seed={nostrKeys?.pubkey} name={myName} variant="person" />
@@ -2273,7 +2289,7 @@ export function UserMessagesScreen({
               placeholder="Type a message..."
               style={{
                 flex: 1,
-                backgroundColor: getPrimaryColor('700'),
+                backgroundColor: surfaceTertiary,
                 borderRadius: 20,
                 paddingHorizontal: 16,
                 paddingVertical: 12,
@@ -2291,9 +2307,7 @@ export function UserMessagesScreen({
               <Icon
                 name="iconamoon:send-fill"
                 size={24}
-                color={
-                  messageText.trim() && !isSending ? getPrimaryColor('0') : getShadeColor('500')
-                }
+                color={messageText.trim() && !isSending ? foreground : shade500}
               />
             </Pressable>
           </HStack>
@@ -2321,7 +2335,7 @@ export function UserMessagesScreen({
                 <Button
                   variant="primary"
                   text="Top Up Balance"
-                  icon={<Icon name="solar:wallet-bold" size={20} color={getPrimaryColor('950')} />}
+                  icon={<Icon name="solar:wallet-bold" size={20} color={surface} />}
                   onPress={handleTopUp}
                   style={{ paddingHorizontal: 16 }}
                 />
@@ -2330,9 +2344,7 @@ export function UserMessagesScreen({
                 <Button
                   variant="primary"
                   text="Send Money"
-                  icon={
-                    <Icon name="mingcute:lightning-fill" size={20} color={getPrimaryColor('950')} />
-                  }
+                  icon={<Icon name="mingcute:lightning-fill" size={20} color={surface} />}
                   onPress={handleSendMoney}
                   style={{ paddingHorizontal: 16 }}
                 />

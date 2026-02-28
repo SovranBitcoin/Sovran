@@ -14,7 +14,6 @@ import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { Badge } from 'components/ui/Badge';
 import Icon from 'assets/icons';
-import { useTheme } from 'providers/ThemeProvider';
 import { useManager } from 'coco-cashu-react';
 import { popup } from '@/helper/popup';
 import { truncateMiddle } from 'helper/strings';
@@ -27,6 +26,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { Tabs } from 'components/ui/Tabs';
 import opacity from 'hex-color-opacity';
 import { Button, Card, ListGroup, Separator, Switch as HeroSwitch } from 'heroui-native';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 /**
  * CurrentKeyItem - Featured display for the active/most recent key
@@ -35,7 +35,7 @@ const CurrentKeyItem: React.FC<{
   keypair: Keypair;
   onCopy: (publicKey: string) => void;
 }> = ({ keypair, onCopy }) => {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceTertiary, surfaceSecondary, surface] = useThemeColor(['foreground', 'surface-tertiary', 'surface-secondary', 'surface'] as const);
   const [selectedTab, setSelectedTab] = useState('P2PK');
 
   const isDerived = keypair.derivationIndex !== undefined;
@@ -74,7 +74,7 @@ const CurrentKeyItem: React.FC<{
   return (
     <View
       style={{
-        backgroundColor: getPrimaryColor('900'),
+        backgroundColor: surface,
         borderRadius: 16,
         marginBottom: 16,
         overflow: 'hidden',
@@ -82,7 +82,7 @@ const CurrentKeyItem: React.FC<{
       {/* Elevated key card */}
       <View
         style={{
-          backgroundColor: getPrimaryColor('700'),
+          backgroundColor: surfaceTertiary,
           borderRadius: 14,
           padding: 16,
         }}>
@@ -104,15 +104,15 @@ const CurrentKeyItem: React.FC<{
               alignItems: 'center',
               marginBottom: 16,
               padding: 12,
-              backgroundColor: getPrimaryColor('0'),
+              backgroundColor: foreground,
               borderRadius: 12,
               alignSelf: 'center',
             }}>
             <QRCode
               value={activeData}
               size={120}
-              color={getPrimaryColor('900')}
-              backgroundColor={getPrimaryColor('0')}
+              color={surface}
+              backgroundColor={foreground}
             />
           </View>
         </TouchableOpacity>
@@ -143,7 +143,7 @@ const CurrentKeyItem: React.FC<{
           <View
             style={{
               flex: 1,
-              backgroundColor: getPrimaryColor('800'),
+              backgroundColor: surfaceSecondary,
               borderRadius: 10,
               paddingVertical: 12,
               paddingHorizontal: 14,
@@ -152,8 +152,8 @@ const CurrentKeyItem: React.FC<{
               mono
               size={12}
               style={{
-                color: getPrimaryColor('0'),
-                flexShrink: 0,
+              color: foreground,
+              flexShrink: 0,
               }}>
               {displayKey}
             </Text>
@@ -183,7 +183,7 @@ const KeyItem: React.FC<{
   keypair: Keypair;
   onCopy: (publicKey: string) => void;
 }> = ({ keypair, onCopy }) => {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, defaultColor, surfaceTertiary] = useThemeColor(['foreground', 'default', 'surface-tertiary'] as const);
 
   const isDerived = keypair.derivationIndex !== undefined;
 
@@ -212,7 +212,7 @@ const KeyItem: React.FC<{
     <HStack
       align="center"
       style={{
-        backgroundColor: getPrimaryColor('700'),
+        backgroundColor: surfaceTertiary,
         borderRadius: 12,
         marginBottom: 8,
         padding: 8,
@@ -220,7 +220,7 @@ const KeyItem: React.FC<{
       {/* Type indicator */}
       <View
         style={{
-          backgroundColor: getPrimaryColor('600'),
+          backgroundColor: defaultColor,
           padding: 8,
           borderRadius: 8,
           marginRight: 10,
@@ -228,7 +228,7 @@ const KeyItem: React.FC<{
         <Icon
           name={isDerived ? 'mdi:key-arrow-right' : 'ph:user-bold'}
           size={16}
-          color={opacity(getPrimaryColor('0'), 0.5)}
+          color={opacity(foreground, 0.5)}
         />
       </View>
 
@@ -238,11 +238,11 @@ const KeyItem: React.FC<{
           mono
           size={11}
           style={{
-            color: opacity(getPrimaryColor('0'), 0.8),
+            color: opacity(foreground, 0.8),
           }}>
           {truncateMiddle(displayKey, 7)}
         </Text>
-        <Text size={10} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 2 }}>
+        <Text size={10} style={{ color: opacity(foreground, 0.4), marginTop: 2 }}>
           {isDerived ? `Derived Key ${keypair.derivationIndex}` : `Imported`}
         </Text>
       </VStack>
@@ -266,7 +266,7 @@ const KeyItem: React.FC<{
  * KeyringSettings - P2PK key management page
  */
 const KeyringSettings: React.FC = () => {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
   const manager = useManager();
 
   const [keypairs, setKeypairs] = useState<Keypair[]>([]);
@@ -420,16 +420,16 @@ const KeyringSettings: React.FC = () => {
                 onPress={handleImportNsec}
                 style={{ padding: 8 }}
                 disabled={isGenerating}>
-                <Icon name="mdi:key-arrow-right" size={22} color={getPrimaryColor('0')} />
+                <Icon name="mdi:key-arrow-right" size={22} color={foreground} />
               </RNTouchableOpacity>
               <RNTouchableOpacity
                 onPress={handleGenerateKey}
                 style={{ padding: 8 }}
                 disabled={isGenerating}>
                 {isGenerating ? (
-                  <ActivityIndicator size="small" color={getPrimaryColor('0')} />
+                  <ActivityIndicator size="small" color={foreground} />
                 ) : (
-                  <Icon name="mdi:key-plus" size={22} color={getPrimaryColor('0')} />
+                  <Icon name="mdi:key-plus" size={22} color={foreground} />
                 )}
               </RNTouchableOpacity>
             </HStack>
@@ -480,20 +480,20 @@ const KeyringSettings: React.FC = () => {
               <View style={{ padding: 4 }}>
                 {isLoading ? (
                   <VStack align="center" style={{ padding: 24 }}>
-                    <ActivityIndicator size="small" color={opacity(getPrimaryColor('0'), 0.4)} />
+                    <ActivityIndicator size="small" color={opacity(foreground, 0.4)} />
                     <Text
                       size={14}
-                      style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 8 }}>
+                      style={{ color: opacity(foreground, 0.4), marginTop: 8 }}>
                       Loading keys...
                     </Text>
                   </VStack>
                 ) : keypairs.length === 0 ? (
                   <VStack align="center" style={{ padding: 24 }}>
-                    <Icon name="mdi:key-variant" size={40} color={getPrimaryColor('600')} />
+                    <Icon name="mdi:key-variant" size={40} color={defaultColor} />
                     <Text
                       size={14}
                       style={{
-                        color: opacity(getPrimaryColor('0'), 0.4),
+                        color: opacity(foreground, 0.4),
                         marginTop: 12,
                         textAlign: 'center',
                       }}>

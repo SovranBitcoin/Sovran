@@ -14,7 +14,7 @@ This project has several important rules that should be followed. Always check a
 - **Key Points**:
   - Always use the custom `<Icon>` component from `assets/icons`
   - Icons must be pre-configured in `metro.config.js`
-  - Use theme colors with `getPrimaryColor()` instead of hardcoded colors
+  - Use semantic Tailwind classes or `useThemeColor()` from `heroui-native` instead of hardcoded colors
   - Available icon libraries: Material Symbols, Fluent UI, Lucide, Font Awesome 6, etc.
 - **When to follow**: Whenever using icons in components
 

@@ -12,7 +12,6 @@ import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react'
 import { Animated, Easing, StyleSheet, TouchableOpacity, Dimensions, Linking } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -52,6 +51,7 @@ import { generateSeededGradient } from '@/helper/avatarGradient';
 import type { VideoPostRecord } from 'components/blocks/nostr/shared';
 import type { StoryUser } from 'components/blocks/nostr/StoriesCarousel';
 import { ListGroup, PressableFeedback } from 'heroui-native';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 150;
@@ -100,7 +100,7 @@ function ProfileStatsGridComponent({
   joinedDate?: string;
   isLoading: boolean;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceTertiary, surfaceSecondary] = useThemeColor(['foreground', 'surface-tertiary', 'surface-secondary'] as const);
 
   const displayValues = useMemo(
     () => ({
@@ -187,13 +187,13 @@ function ProfileStatsGridComponent({
       <View
         style={[
           styles.statCard,
-          { backgroundColor: getPrimaryColor('800'), borderColor: getPrimaryColor('700') },
+          { backgroundColor: surfaceSecondary, borderColor: surfaceTertiary },
         ]}>
         {showSkeleton ? (
           <>
-            <Skeleton style={[styles.skeletonLabel, { backgroundColor: getPrimaryColor('700') }]} />
-            <Skeleton style={[styles.skeletonValue, { backgroundColor: getPrimaryColor('700') }]} />
-            <Skeleton style={[styles.skeletonDesc, { backgroundColor: getPrimaryColor('700') }]} />
+            <Skeleton style={[styles.skeletonLabel, { backgroundColor: surfaceTertiary }]} />
+            <Skeleton style={[styles.skeletonValue, { backgroundColor: surfaceTertiary }]} />
+            <Skeleton style={[styles.skeletonDesc, { backgroundColor: surfaceTertiary }]} />
           </>
         ) : (
           <Animated.View style={{ opacity: fadeAnims[index] }}>
@@ -201,21 +201,21 @@ function ProfileStatsGridComponent({
               bold
               overpass
               size={12}
-              style={{ color: opacity(getPrimaryColor('0'), 0.66), marginBottom: 4 }}>
+              style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
               {stat.label.toUpperCase()}
             </Text>
             <Text
               bold
               overpass
               size={stat.smallValue ? 16 : 20}
-              style={{ color: getPrimaryColor('0'), marginBottom: 2 }}>
+              style={{ color: foreground, marginBottom: 2 }}>
               {stat.value}
             </Text>
             <Text
               bold
               overpass
               size={12}
-              style={{ color: opacity(getPrimaryColor('0'), 0.5), opacity: 0.8 }}>
+              style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
               {stat.description}
             </Text>
           </Animated.View>
@@ -246,7 +246,7 @@ function TopFollowersComponent({
   topFollowers: TopFollower[];
   isLoading: boolean;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   // Calculate responsive avatar size for 3-column grid
@@ -304,7 +304,7 @@ function TopFollowersComponent({
         bold
         numberOfLines={1}
         style={{
-          color: opacity(getPrimaryColor('0'), 0.66),
+          color: opacity(foreground, 0.66),
           marginTop: 6,
           textAlign: 'center',
           width: itemWidth - 8,
@@ -319,7 +319,7 @@ function TopFollowersComponent({
       <Skeleton
         style={[
           styles.topFollowerAvatar,
-          { width: avatarSize, height: avatarSize, backgroundColor: getPrimaryColor('700') },
+          { width: avatarSize, height: avatarSize, backgroundColor: surfaceTertiary },
         ]}
       />
       <Skeleton
@@ -328,7 +328,7 @@ function TopFollowersComponent({
           height: 12,
           borderRadius: 4,
           marginTop: 6,
-          backgroundColor: getPrimaryColor('700'),
+          backgroundColor: surfaceTertiary,
         }}
       />
     </View>
@@ -340,7 +340,7 @@ function TopFollowersComponent({
         bold
         overpass
         size={12}
-        style={{ color: opacity(getPrimaryColor('0'), 0.4), marginBottom: 12, marginLeft: 4 }}>
+        style={{ color: opacity(foreground, 0.4), marginBottom: 12, marginLeft: 4 }}>
         TOP FOLLOWERS
       </Text>
       {isLoading ? (
@@ -386,7 +386,7 @@ function BannerWithAvatarComponent({
   hasStories?: boolean;
   onAvatarPress?: () => void;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor(['foreground', 'surface-tertiary', 'surface-secondary', 'background'] as const);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   // Banner image loading state
@@ -417,7 +417,7 @@ function BannerWithAvatarComponent({
   return (
     <View>
       {/* Banner */}
-      <View style={[styles.bannerContainer, { backgroundColor: getPrimaryColor('800') }]}>
+      <View style={[styles.bannerContainer, { backgroundColor: surfaceSecondary }]}>
         {/* Hidden image to trigger load/error callbacks */}
         {bannerUrl && !bannerError && (
           <ExpoImage
@@ -457,7 +457,7 @@ function BannerWithAvatarComponent({
             <View
               style={[
                 styles.avatarBorder,
-                { borderColor: getPrimaryColor('950'), backgroundColor: getPrimaryColor('950') },
+                { borderColor: background, backgroundColor: background },
               ]}>
               <Avatar
                 picture={pictureUrl}
@@ -473,7 +473,7 @@ function BannerWithAvatarComponent({
           <View
             style={[
               styles.avatarBorder,
-              { borderColor: getPrimaryColor('950'), backgroundColor: getPrimaryColor('950') },
+              { borderColor: background, backgroundColor: background },
             ]}>
             <Avatar
               picture={pictureUrl}
@@ -496,7 +496,7 @@ function BannerWithAvatarComponent({
                 width: 150,
                 height: 24,
                 borderRadius: 4,
-                backgroundColor: getPrimaryColor('700'),
+                backgroundColor: surfaceTertiary,
               }}
             />
             <Spacer size={8} />
@@ -505,13 +505,13 @@ function BannerWithAvatarComponent({
                 width: 100,
                 height: 16,
                 borderRadius: 4,
-                backgroundColor: getPrimaryColor('700'),
+                backgroundColor: surfaceTertiary,
               }}
             />
           </>
         ) : (
           <>
-            <Text bold size={22} style={{ color: getPrimaryColor('0') }}>
+            <Text bold size={22} style={{ color: foreground }}>
               {displayName}
             </Text>
             {nip05 && (
@@ -519,9 +519,9 @@ function BannerWithAvatarComponent({
                 <Icon
                   name="mdi:check-decagram"
                   size={16}
-                  color={opacity(getPrimaryColor('0'), 0.4)}
+                  color={opacity(foreground, 0.4)}
                 />
-                <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
+                <Text size={14} style={{ color: opacity(foreground, 0.4) }}>
                   {nip05}
                 </Text>
               </HStack>
@@ -535,11 +535,11 @@ function BannerWithAvatarComponent({
                   styles.followButton,
                   {
                     backgroundColor: isFollowing
-                      ? opacity(getPrimaryColor('0'), 0.12)
-                      : getPrimaryColor('0'),
+                      ? opacity(foreground, 0.12)
+                      : foreground,
                     borderColor: isFollowing
-                      ? opacity(getPrimaryColor('0'), 0.25)
-                      : getPrimaryColor('0'),
+                      ? opacity(foreground, 0.25)
+                      : foreground,
                   },
                   isFollowLoading && styles.followButtonDisabled,
                 ]}>
@@ -548,7 +548,7 @@ function BannerWithAvatarComponent({
                   overpass
                   size={13}
                   style={{
-                    color: isFollowing ? getPrimaryColor('0') : getPrimaryColor('950'),
+                    color: isFollowing ? foreground : background,
                   }}>
                   {isFollowing ? 'Following' : 'Follow'}
                 </Text>
@@ -566,7 +566,7 @@ const BannerWithAvatar = React.memo(BannerWithAvatarComponent);
 // Main Component
 // ============================================================================
 function UserProfileScreen() {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
   const _insets = useSafeAreaInsets();
@@ -805,7 +805,7 @@ function UserProfileScreen() {
   ]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
+    <View style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: isMetadataLoading ? 'Profile' : displayName,
@@ -819,7 +819,7 @@ function UserProfileScreen() {
                   }}
                   asChild>
                   <TouchableOpacity style={{ padding: 8 }}>
-                    <Icon name="mdi:bank" size={24} color={getPrimaryColor('0')} />
+                    <Icon name="mdi:bank" size={24} color={foreground} />
                   </TouchableOpacity>
                 </Link>
               )}
@@ -834,7 +834,7 @@ function UserProfileScreen() {
                 }}
                 asChild>
                 <TouchableOpacity style={{ padding: 8 }}>
-                  <Icon name="mdi:qrcode" size={24} color={getPrimaryColor('0')} />
+                  <Icon name="mdi:qrcode" size={24} color={foreground} />
                 </TouchableOpacity>
               </Link>
             </HStack>
@@ -914,7 +914,7 @@ function UserProfileScreen() {
                             <Icon
                               name="mdi:message-text"
                               size={20}
-                              color={opacity(getPrimaryColor('0'), 0.4)}
+                              color={opacity(foreground, 0.4)}
                             />
                           </ListGroup.ItemPrefix>
                           <ListGroup.ItemContent>
@@ -942,7 +942,7 @@ function UserProfileScreen() {
                         <ListGroup.Item disabled>
                           <ListGroup.ItemPrefix>
                             <CurrencyIcon
-                              colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                              colors={[opacity(foreground, 0.4)]}
                               width={20}
                               currency="nostr"
                             />
@@ -954,7 +954,7 @@ function UserProfileScreen() {
                             <Icon
                               name="lets-icons:copy"
                               size={20}
-                              color={opacity(getPrimaryColor('0'), 0.4)}
+                              color={opacity(foreground, 0.4)}
                             />
                           </ListGroup.ItemSuffix>
                         </ListGroup.Item>
@@ -972,7 +972,7 @@ function UserProfileScreen() {
                               <Icon
                                 name="mdi:check-decagram"
                                 size={20}
-                                color={opacity(getPrimaryColor('0'), 0.4)}
+                                color={opacity(foreground, 0.4)}
                               />
                             </ListGroup.ItemPrefix>
                             <ListGroup.ItemContent>
@@ -982,7 +982,7 @@ function UserProfileScreen() {
                               <Icon
                                 name="lets-icons:copy"
                                 size={20}
-                                color={opacity(getPrimaryColor('0'), 0.4)}
+                                color={opacity(foreground, 0.4)}
                               />
                             </ListGroup.ItemSuffix>
                           </ListGroup.Item>
@@ -1001,7 +1001,7 @@ function UserProfileScreen() {
                               <Icon
                                 name="mdi:lightning-bolt"
                                 size={20}
-                                color={opacity(getPrimaryColor('0'), 0.4)}
+                                color={opacity(foreground, 0.4)}
                               />
                             </ListGroup.ItemPrefix>
                             <ListGroup.ItemContent>
@@ -1011,7 +1011,7 @@ function UserProfileScreen() {
                               <Icon
                                 name="lets-icons:copy"
                                 size={20}
-                                color={opacity(getPrimaryColor('0'), 0.4)}
+                                color={opacity(foreground, 0.4)}
                               />
                             </ListGroup.ItemSuffix>
                           </ListGroup.Item>
@@ -1030,7 +1030,7 @@ function UserProfileScreen() {
                               <Icon
                                 name="mdi:web"
                                 size={20}
-                                color={opacity(getPrimaryColor('0'), 0.4)}
+                                color={opacity(foreground, 0.4)}
                               />
                             </ListGroup.ItemPrefix>
                             <ListGroup.ItemContent>
@@ -1040,7 +1040,7 @@ function UserProfileScreen() {
                               <Icon
                                 name="mdi:open-in-new"
                                 size={20}
-                                color={opacity(getPrimaryColor('0'), 0.4)}
+                                color={opacity(foreground, 0.4)}
                               />
                             </ListGroup.ItemSuffix>
                           </ListGroup.Item>

@@ -18,12 +18,11 @@ import { formatTimestamp, formatCount, formatSats, parseContent } from '../share
 import type { ContentSegment } from '../shared';
 import type { ImageOverlayPost } from './types';
 import { BOTTOM_PANEL_PADDING_HORIZONTAL, BOTTOM_PANEL_PADDING_TOP } from './config';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 const PANEL_BG = 'rgba(0,0,0,0.9)';
 const PANEL_TEXT = 'rgba(255,255,255,0.95)';
 const PANEL_TEXT_MUTED = 'rgba(255,255,255,0.6)';
 const LIKED_COLOR = '#ff5a7a';
-const REPOSTED_COLOR = '#4cd964';
 
 const PANEL_CONTENT_TRUNCATE_LIMIT = 120;
 const PANEL_INLINE_IMAGE_MAX_HEIGHT = 200;
@@ -191,6 +190,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   /** Called after applying initialContentExpanded so caller can clear the flag. */
   onConsumedExpand?: () => void;
 }) {
+  const repostedColor = useThemeColor('success');
   const [contentExpanded, setContentExpanded] = useState(initialContentExpanded ?? false);
 
   useEffect(() => {
@@ -310,9 +310,9 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
           <Icon
             name="garden:arrow-retweet-fill-16"
             size={17}
-            color={reposted ? REPOSTED_COLOR : PANEL_TEXT_MUTED}
+            color={reposted ? repostedColor : PANEL_TEXT_MUTED}
           />
-          <Text size={13} style={{ color: reposted ? REPOSTED_COLOR : PANEL_TEXT_MUTED }}>
+          <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
             {formatCount(metrics.repostCount)}
           </Text>
         </Pressable>
@@ -372,6 +372,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   /** Called when user taps comment or show more. Pass { expandContent: true } when opening via "show more" so the sheet opens with content expanded. */
   onOpenSheet: (options?: ImageOverlayOpenSheetOptions) => void;
 }) {
+  const repostedColor = useThemeColor('success');
   const { event, metrics, profile, reposted, liked, onRepostPress, onLikePress } = post;
   const displayName = profile?.name ?? `${event.pubkey.slice(0, 8)}…`;
   const shortTime = formatTimestamp(event.created_at);
@@ -449,9 +450,9 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
           <Icon
             name="garden:arrow-retweet-fill-16"
             size={17}
-            color={reposted ? REPOSTED_COLOR : PANEL_TEXT_MUTED}
+            color={reposted ? repostedColor : PANEL_TEXT_MUTED}
           />
-          <Text size={13} style={{ color: reposted ? REPOSTED_COLOR : PANEL_TEXT_MUTED }}>
+          <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
             {formatCount(metrics.repostCount)}
           </Text>
         </Pressable>

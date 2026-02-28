@@ -17,7 +17,6 @@ import {
   Image as SwiftUIImage,
 } from '@expo/ui/swift-ui';
 import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
 import { popup } from '@/helper/popup';
@@ -27,6 +26,7 @@ import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 const { width: screenWidth } = Dimensions.get('window');
 const scanBoxSize = screenWidth * 0.8;
@@ -46,7 +46,7 @@ interface CameraScreenProps {
 }
 
 export function CameraScreen({ onScan, onReset }: CameraScreenProps) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const insets = useSafeAreaInsets();
   const [progress, setProgress] = useState<number>(0);
   const [flashlightOn, setFlashlightOn] = useState<boolean | null>(null);
@@ -259,15 +259,15 @@ export function CameraScreen({ onScan, onReset }: CameraScreenProps) {
         {/* Progress text */}
         <View className="absolute bottom-0 self-center rounded-lg bg-black/50 p-2">
           {progress > 0 ? (
-            <Text className="text-primary-0" size={16}>
+            <Text className="text-foreground" size={16}>
               Progress: {Math.round(progress * 100)}%
             </Text>
           ) : loading ? (
-            <Text className="text-primary-0" size={16}>
+            <Text className="text-foreground" size={16}>
               Loading...
             </Text>
           ) : (
-            <Text className="text-primary-0" size={16}>
+            <Text className="text-foreground" size={16}>
               Scanning...
             </Text>
           )}
@@ -356,21 +356,21 @@ export function CameraScreen({ onScan, onReset }: CameraScreenProps) {
             {/* Android fallback — blur buttons */}
             <Button
               onPress={handleClipboardPress}
-              icon={<Icon name="lets-icons:copy" color={getPrimaryColor('0')} />}
+              icon={<Icon name="lets-icons:copy" color={foreground} />}
               blur
             />
             <Button
               onPress={handleGalleryPress}
-              icon={<Icon name="proicons:photo" color={getPrimaryColor('0')} />}
+              icon={<Icon name="proicons:photo" color={foreground} />}
               blur
             />
             <Button
               onPress={toggleFlashlight}
               icon={
                 !flashlightOn ? (
-                  <Icon name="mdi:lightbulb-on-outline" color={getPrimaryColor('0')} />
+                  <Icon name="mdi:lightbulb-on-outline" color={foreground} />
                 ) : (
-                  <Icon name="mdi:lightbulb-on" color={getPrimaryColor('0')} />
+                  <Icon name="mdi:lightbulb-on" color={foreground} />
                 )
               }
               blur

@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { BlurCardFrame } from 'components/ui/BlurCardFrame';
 import opacity from 'hex-color-opacity';
@@ -18,7 +18,7 @@ interface TabProps {
 }
 
 function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
 
   const handlePress = useCallback(() => {
     onPress(tab, index);
@@ -37,7 +37,7 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
           <View
             blur
             blurTint="light"
-            style={[StyleSheet.absoluteFillObject, { backgroundColor: getPrimaryColor('400') }]}
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: muted }]}
           />
         )}
 
@@ -45,8 +45,8 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
           <Text
             className="text-center text-sm"
             style={{
-              color: isSelected ? getPrimaryColor('0') : getPrimaryColor('0'),
-              fontFamily: isSelected ? 'OverpassHeavy' : 'OverpassHeavy',
+              color: foreground,
+              fontFamily: 'OverpassHeavy',
             }}>
             {tab}
           </Text>
@@ -55,7 +55,7 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
               className="text-xs"
               style={{
                 fontFamily: 'OverpassBold',
-                color: isSelected ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.8),
+                color: isSelected ? foreground : opacity(foreground, 0.8),
               }}>
               {`(${amount})`}
             </Text>
@@ -74,12 +74,12 @@ interface TabsProps {
 }
 
 export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) {
-  const { getPrimaryColor } = useTheme();
+  const muted = useThemeColor('muted');
   const [containerWidth, setContainerWidth] = useState(0);
   const [contentWidth, setContentWidth] = useState(0);
   const isScrollable = contentWidth ? contentWidth > containerWidth && containerWidth > 0 : true;
 
-  const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const accentColor = useMemo(() => muted, [muted]);
   const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
 
   const onTabPress = useCallback(

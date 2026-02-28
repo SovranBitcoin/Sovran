@@ -8,7 +8,7 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { FlatList, StyleSheet } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -35,7 +35,7 @@ const StarRating = React.memo(function StarRating({
   score: number;
   size?: number;
 }) {
-  const { getPrimaryColor, getYellowColor } = useTheme();
+  const [defaultColor, warning] = useThemeColor(['default', 'yellow-300'] as const);
   const filledStars = Math.round(score);
 
   return (
@@ -45,7 +45,7 @@ const StarRating = React.memo(function StarRating({
           key={i}
           name="ic:round-star"
           size={size}
-          color={i < filledStars ? getYellowColor('300') : getPrimaryColor('600')}
+          color={i < filledStars ? warning : defaultColor}
         />
       ))}
     </HStack>
@@ -62,7 +62,7 @@ const ReviewItem = React.memo(function ReviewItem({
   review: any;
   isLast: boolean;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceSecondary] = useThemeColor(['foreground', 'surface-secondary'] as const);
 
   // Extract review data
   const reviewText = review.comment?.split(']')[1] || review.comment;
@@ -93,26 +93,24 @@ const ReviewItem = React.memo(function ReviewItem({
             <Text
               size={15}
               bold
-              style={{ color: getPrimaryColor('0'), flex: 1 }}
+              style={{ color: foreground, flex: 1 }}
               numberOfLines={1}
               ellipsizeMode="tail">
               {displayName}
             </Text>
             {formattedDate && (
-              <Text size={12} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
+              <Text size={12} style={{ color: opacity(foreground, 0.4) }}>
                 {formattedDate}
               </Text>
             )}
           </HStack>
 
-          {/* Star rating */}
           <StarRating score={reviewScore} size={16} />
 
-          {/* Review text */}
           {reviewText && (
             <Text
               size={14}
-              style={{ color: opacity(getPrimaryColor('0'), 0.66), lineHeight: 20 }}
+              style={{ color: opacity(foreground, 0.66), lineHeight: 20 }}
               numberOfLines={10}>
               {reviewText.trim()}
             </Text>
@@ -120,8 +118,7 @@ const ReviewItem = React.memo(function ReviewItem({
         </VStack>
       </HStack>
 
-      {/* Divider */}
-      {!isLast && <View style={[styles.divider, { backgroundColor: getPrimaryColor('800') }]} />}
+      {!isLast && <View style={[styles.divider, { backgroundColor: surfaceSecondary }]} />}
     </View>
   );
 });
@@ -134,33 +131,30 @@ const ReviewSkeleton = React.memo(function ReviewSkeleton({
 }: {
   isLast?: boolean;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const surfaceSecondary = useThemeColor('surface-secondary');
 
   return (
     <View style={styles.reviewItem}>
       <HStack align="flex-start" gap={12} style={{ flex: 1 }}>
-        {/* Avatar skeleton */}
         <View style={{ flexShrink: 0 }}>
           <Skeleton
             style={{
               width: 48,
               height: 48,
               borderRadius: 24,
-              backgroundColor: getPrimaryColor('800'),
+              backgroundColor: surfaceSecondary,
             }}
           />
         </View>
 
-        {/* Content skeleton */}
         <VStack spacing={6} style={{ flex: 1, minWidth: 0 }}>
-          {/* Name and date row */}
           <HStack align="center" justify="space-between" style={{ flex: 1 }}>
             <Skeleton
               style={{
                 width: 120,
                 height: 15,
                 borderRadius: 4,
-                backgroundColor: getPrimaryColor('800'),
+                backgroundColor: surfaceSecondary,
               }}
             />
             <Skeleton
@@ -168,12 +162,11 @@ const ReviewSkeleton = React.memo(function ReviewSkeleton({
                 width: 70,
                 height: 12,
                 borderRadius: 4,
-                backgroundColor: getPrimaryColor('800'),
+                backgroundColor: surfaceSecondary,
               }}
             />
           </HStack>
 
-          {/* Star rating skeleton */}
           <HStack gap={2}>
             {[0, 1, 2, 3, 4].map((i) => (
               <Skeleton
@@ -182,20 +175,19 @@ const ReviewSkeleton = React.memo(function ReviewSkeleton({
                   width: 16,
                   height: 16,
                   borderRadius: 2,
-                  backgroundColor: getPrimaryColor('800'),
+                  backgroundColor: surfaceSecondary,
                 }}
               />
             ))}
           </HStack>
 
-          {/* Review text skeleton */}
           <VStack spacing={4}>
             <Skeleton
               style={{
                 width: '100%',
                 height: 14,
                 borderRadius: 4,
-                backgroundColor: getPrimaryColor('800'),
+                backgroundColor: surfaceSecondary,
               }}
             />
             <Skeleton
@@ -203,15 +195,14 @@ const ReviewSkeleton = React.memo(function ReviewSkeleton({
                 width: '80%',
                 height: 14,
                 borderRadius: 4,
-                backgroundColor: getPrimaryColor('800'),
+                backgroundColor: surfaceSecondary,
               }}
             />
           </VStack>
         </VStack>
       </HStack>
 
-      {/* Divider */}
-      {!isLast && <View style={[styles.divider, { backgroundColor: getPrimaryColor('800') }]} />}
+      {!isLast && <View style={[styles.divider, { backgroundColor: surfaceSecondary }]} />}
     </View>
   );
 });
@@ -220,20 +211,20 @@ const ReviewSkeleton = React.memo(function ReviewSkeleton({
 // Empty State
 // ============================================================================
 const EmptyState = React.memo(function EmptyState() {
-  const { getPrimaryColor, getYellowColor } = useTheme();
+  const [foreground, yellow500] = useThemeColor(['foreground', 'yellow-500'] as const);
 
   return (
     <VStack align="center" justify="center" style={styles.emptyState}>
-      <Icon name="ic:round-star" size={64} color={getYellowColor('500')} />
+      <Icon name="ic:round-star" size={64} color={yellow500} />
       <Spacer size={16} />
-      <Text size={18} bold style={{ color: getPrimaryColor('0'), textAlign: 'center' }}>
+      <Text size={18} bold style={{ color: foreground, textAlign: 'center' }}>
         No Reviews Yet
       </Text>
       <Spacer size={8} />
       <Text
         size={14}
         style={{
-          color: opacity(getPrimaryColor('0'), 0.4),
+          color: opacity(foreground, 0.4),
           textAlign: 'center',
           paddingHorizontal: 32,
         }}>
@@ -255,7 +246,7 @@ const HeaderStats = React.memo(function HeaderStats({
   totalReviews: number;
   loading: boolean;
 }) {
-  const { getPrimaryColor, getYellowColor } = useTheme();
+  const [foreground, surfaceSecondary, warning] = useThemeColor(['foreground', 'surface-secondary', 'yellow-300'] as const);
 
   const displayScore = score !== null ? score.toFixed(1) : '0.0';
   const hasScore = score !== null && score >= 0;
@@ -263,23 +254,21 @@ const HeaderStats = React.memo(function HeaderStats({
   return (
     <View style={styles.headerStats}>
       <VStack align="center" spacing={4}>
-        {/* Large score */}
         {loading && !hasScore ? (
           <Skeleton
             style={{
               width: 80,
               height: 48,
               borderRadius: 8,
-              backgroundColor: getPrimaryColor('800'),
+              backgroundColor: surfaceSecondary,
             }}
           />
         ) : (
-          <Text heavy size={48} style={{ color: getYellowColor('300'), lineHeight: 52 }}>
+          <Text heavy size={48} style={{ color: warning, lineHeight: 52 }}>
             {displayScore}
           </Text>
         )}
 
-        {/* Star rating */}
         {loading && !hasScore ? (
           <HStack gap={4}>
             {[0, 1, 2, 3, 4].map((i) => (
@@ -289,7 +278,7 @@ const HeaderStats = React.memo(function HeaderStats({
                   width: 24,
                   height: 24,
                   borderRadius: 4,
-                  backgroundColor: getPrimaryColor('800'),
+                  backgroundColor: surfaceSecondary,
                 }}
               />
             ))}
@@ -298,7 +287,6 @@ const HeaderStats = React.memo(function HeaderStats({
           <StarRating score={score} size={24} />
         ) : null}
 
-        {/* Review count */}
         {loading && totalReviews === 0 ? (
           <Skeleton
             style={{
@@ -306,11 +294,11 @@ const HeaderStats = React.memo(function HeaderStats({
               height: 14,
               borderRadius: 4,
               marginTop: 4,
-              backgroundColor: getPrimaryColor('800'),
+              backgroundColor: surfaceSecondary,
             }}
           />
         ) : (
-          <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 4 }}>
+          <Text size={14} style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
             {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
           </Text>
         )}
@@ -323,7 +311,7 @@ const HeaderStats = React.memo(function HeaderStats({
 // Main Component
 // ============================================================================
 function MintReviewsModal() {
-  const { getPrimaryColor } = useTheme();
+  const background = useThemeColor('background');
   const insets = useSafeAreaInsets();
   const { mintUrl } = useLocalSearchParams<{ mintUrl: string }>();
 
@@ -391,7 +379,7 @@ function MintReviewsModal() {
   const showEmptyState = !isLoading && totalReviews === 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
+    <View style={[styles.container, { backgroundColor: background }]}>
       <Stack.Screen options={{ title: 'Reviews' }} />
 
       {showEmptyState ? (

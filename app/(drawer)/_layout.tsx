@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useInitializationReset } from 'providers/InitializationProvider';
 import { Text } from 'components/ui/Text';
@@ -73,7 +73,7 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, defaultColor, shade400] = useThemeColor(['foreground', 'default', 'shade-400'] as const);
   const { getKeysForAccount } = useNostrKeysContext();
   const { resetStages, cancelResetStages } = useInitializationReset();
   const devMode = useSettingsStore((s) => s.experimental);
@@ -182,7 +182,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
               style={[
                 styles.profileAvatarButton,
                 isActive && {
-                  borderColor: getShadeColor('400'),
+                  borderColor: shade400,
                   borderWidth: 2,
                 },
               ]}>
@@ -200,12 +200,12 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
         style={[
           styles.profileAvatarButton,
           {
-            borderColor: getPrimaryColor('600'),
-            borderWidth: 2,
-            backgroundColor: getPrimaryColor('600'),
+              borderColor: defaultColor,
+              borderWidth: 2,
+              backgroundColor: defaultColor,
           },
         ]}>
-        <Icon name="tabler:dots" size={24} color={getPrimaryColor('0')} />
+        <Icon name="tabler:dots" size={24} color={foreground} />
       </TouchableOpacity>
     </HStack>
   );
@@ -213,7 +213,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
 
 function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
   const { keys: nostrKeys } = useNostrKeysContext();
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const insets = useSafeAreaInsets();
 
   const handlePress = useCallback(() => {
@@ -231,13 +231,13 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
   return (
     <LinearGradient
       colors={[
-        getPrimaryColor('900'),
-        getPrimaryColor('900'),
-        getPrimaryColor('900'),
-        getPrimaryColor('900'),
-        getPrimaryColor('900'),
-        getPrimaryColor('900'),
-        opacity(getPrimaryColor('900'), 0),
+        surface,
+        surface,
+        surface,
+        surface,
+        surface,
+        surface,
+        opacity(surface, 0),
       ]}
       style={[styles.gradientContainer, { paddingTop: insets.top + 16 }]}
       start={{ x: 0, y: 0 }}
@@ -254,10 +254,10 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
                 variant="person"
               />
               <VStack align="center" spacing={8}>
-                <Text bold size={20} style={{ textAlign: 'center', color: getPrimaryColor('0') }}>
+                <Text bold size={20} style={{ textAlign: 'center', color: foreground }}>
                   {getUsername(nostrKeys?.pubkey)}
                 </Text>
-                <Icon size={42} name="stash:qr-code" color={getPrimaryColor('0')} />
+                <Icon size={42} name="stash:qr-code" color={foreground} />
               </VStack>
             </VStack>
           )}
@@ -279,7 +279,7 @@ function MenuButton({
   onPress: () => void;
   isActive: boolean;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, accent, surfaceTertiary] = useThemeColor(['foreground', 'accent', 'surface-tertiary'] as const);
 
   return (
     <GesturePressable
@@ -288,21 +288,21 @@ function MenuButton({
       style={({ pressed }) => [
         styles.menuButton,
         isActive && {
-          backgroundColor: opacity(getPrimaryColor('700'), 0.72),
-          borderColor: opacity(getPrimaryColor('500'), 0.5),
+          backgroundColor: opacity(surfaceTertiary, 0.72),
+          borderColor: opacity(accent, 0.5),
         },
         pressed && { opacity: 0.6 },
       ]}>
       <HStack align="center" spacing={12}>
         <Icon
           name={icon}
-          color={isActive ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.5)}
+          color={isActive ? foreground : opacity(foreground, 0.5)}
           size={24}
         />
         <Text
           size={18}
           bold
-          style={{ color: isActive ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.5) }}>
+          style={{ color: isActive ? foreground : opacity(foreground, 0.5) }}>
           {label}
         </Text>
       </HStack>
@@ -311,7 +311,7 @@ function MenuButton({
 }
 
 function CustomDrawerContent(props: DrawerContentComponentProps) {
-  const { getPrimaryColor } = useTheme();
+  const surface = useThemeColor('surface');
   const pathname = usePathname();
   const navInProgressRef = useRef(false);
 
@@ -368,7 +368,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      style={{ backgroundColor: getPrimaryColor('900'), flex: 1 }}
+      style={{ backgroundColor: surface, flex: 1 }}
       contentContainerStyle={styles.scrollContent}>
       <ProfileHeader closeDrawer={() => props.navigation.closeDrawer()} />
       <VStack spacing={0} style={{ marginTop: -16 }}>
@@ -388,7 +388,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 }
 
 export default function DrawerLayout() {
-  const { getPrimaryColor } = useTheme();
+  const surface = useThemeColor('surface');
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -398,7 +398,7 @@ export default function DrawerLayout() {
           drawerType: 'slide',
           drawerStyle: {
             width: DRAWER_WIDTH,
-            backgroundColor: getPrimaryColor('900'),
+            backgroundColor: surface,
             borderTopRightRadius: 24,
             borderBottomRightRadius: 24,
           },

@@ -21,7 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { G, Path } from 'react-native-svg';
 import { formatAmount } from 'helper/currency';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 const AnimatedPath = createAnimatedComponent(Path);
 
 /** line-md:confirm-circle paths from .monicon; circle then check, stroke-dash animation via Reanimated. */
@@ -86,7 +86,6 @@ const CHECKMARK_SPRING_DURATION_MS = 450;
 const HOLD_MS = 1700;
 const FADE_OUT_MS = 280;
 
-const SUCCESS_GREEN = '#22c55e';
 const CHECK_WHITE = '#ffffff';
 
 const CONFIRM_ICON_SIZE = 96;
@@ -99,6 +98,7 @@ interface NfcSuccessOverlayProps {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars, unused-imports/no-unused-vars
 function NfcSuccessOverlay({ onComplete, amountSats }: NfcSuccessOverlayProps) {
+  const successGreen = useThemeColor('success');
   const bgOpacity = useSharedValue(0);
   const checkScale = useSharedValue(0.4);
   const checkOpacity = useSharedValue(0);
@@ -143,7 +143,9 @@ function NfcSuccessOverlay({ onComplete, amountSats }: NfcSuccessOverlayProps) {
   }));
 
   const content = (
-    <Animated.View style={[styles.overlay, bgStyle]} pointerEvents="none">
+    <Animated.View
+      style={[styles.overlay, { backgroundColor: successGreen }, bgStyle]}
+      pointerEvents="none">
       <Animated.View style={[styles.checkWrap, checkStyle]}>
         <NfcSuccessConfirmCircleIcon
           color={CHECK_WHITE}
@@ -162,7 +164,7 @@ function NfcSuccessOverlay({ onComplete, amountSats }: NfcSuccessOverlayProps) {
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: SUCCESS_GREEN,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,

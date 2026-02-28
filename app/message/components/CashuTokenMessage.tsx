@@ -6,7 +6,7 @@ import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getDecodedToken, type Proof } from '@cashu/cashu-ts';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { Button } from 'components/ui/Button';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { useReceive } from 'coco-cashu-react';
@@ -18,7 +18,8 @@ interface Props {
 }
 
 const CashuTokenComponent = ({ token, isReceived }: Props) => {
-  const { getPrimaryColor, getShadeColor, getRedColor } = useTheme();
+  const [accent, foreground, danger] = useThemeColor(['accent', 'foreground', 'danger'] as const);
+  const brandGradient = useThemeColor(['shade-200', 'shade-300', 'shade-400'] as const);
   const { receive } = useReceive();
 
   const decoded = getDecodedToken(token);
@@ -49,18 +50,18 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
   };
 
   const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isReceived
-    ? [getPrimaryColor('500'), getPrimaryColor('500')]
-    : [getShadeColor('200'), getShadeColor('300')];
+    ? [accent, accent]
+    : [brandGradient[0], brandGradient[1]];
 
   return (
     <View
       className={`relative my-2 w-full ${isReceived ? 'self-start' : 'self-end'}`}
-      style={{ minHeight: 120 }} // Ensure minimum height for token messages
+      style={{ minHeight: 120 }}
     >
       <View
         className="absolute -bottom-1 h-2 w-2"
         style={{
-          backgroundColor: isReceived ? getPrimaryColor('500') : getRedColor('300'),
+          backgroundColor: isReceived ? accent : danger,
           left: isReceived ? 16 : 'auto',
           right: isReceived ? 'auto' : 16,
           transform: [{ rotate: '45deg' }],
@@ -73,9 +74,9 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
             borderRadius: 16,
             padding: 16,
             maxWidth: '75%',
-            minHeight: 100, // Ensure minimum height for content
+            minHeight: 100,
           }}>
-          <Text className="text-xs font-bold text-primary-0 opacity-75">{decoded.mint}</Text>
+          <Text className="text-xs font-bold text-foreground opacity-75">{decoded.mint}</Text>
 
           <HStack justify="space-between" className="mt-2">
             <VStack>
@@ -85,11 +86,11 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
                   unit={unit}
                   size={24}
                   weight="heavy"
-                  color={getPrimaryColor('0')}
+                  color={foreground}
                 />
               )}
               {decoded.memo && (
-                <Text className="bg-primary-0/10 mt-2 rounded-lg p-4 text-xs text-primary-0">
+                <Text className="mt-2 rounded-lg bg-foreground/10 p-4 text-xs text-foreground">
                   {decoded.memo}
                 </Text>
               )}

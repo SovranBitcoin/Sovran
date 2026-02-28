@@ -7,7 +7,8 @@ import Icon from 'assets/icons';
 import { popup } from '@/helper/popup';
 import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
-import { Button, Card, Description, Input, Label, TextField, useThemeColor } from 'heroui-native';
+import { Button, Card, Description, Input, Label, TextField } from 'heroui-native';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { getUsername } from '@/helper/username';
 
 const Profile = () => {

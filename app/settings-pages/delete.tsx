@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react';
 import { ScrollView, StyleSheet, Dimensions } from 'react-native';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
 import { VStack } from 'components/ui/View/VStack';
 import { View } from 'components/ui/View/View';
@@ -22,6 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 import { Button, Card } from 'heroui-native';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 const SLIDER_WIDTH = Dimensions.get('window').width - 48; // Account for padding
 const THUMB_SIZE = 56;
@@ -131,7 +131,8 @@ const styles = StyleSheet.create({
 });
 
 const DeleteScreen: React.FC = () => {
-  const { getPrimaryColor, getRedColor } = useTheme();
+  const foreground = useThemeColor('foreground');
+  const [danger, red400] = useThemeColor(['danger', 'red-400'] as const);
   const dispatch = useDispatch();
 
   const handleDeleteProfile = useCallback(async () => {
@@ -149,7 +150,7 @@ const DeleteScreen: React.FC = () => {
         <VStack spacing={24} className="flex-1 items-center justify-center px-6">
           <View
             style={{
-              backgroundColor: getRedColor('900'),
+              backgroundColor: danger,
               width: 96,
               height: 96,
               borderRadius: 48,
@@ -157,17 +158,17 @@ const DeleteScreen: React.FC = () => {
               justifyContent: 'center',
               alignSelf: 'center',
             }}>
-            <Icon name="mdi:trash-can-outline" size={48} color={getRedColor('400')} />
+            <Icon name="mdi:trash-can-outline" size={48} color={red400} />
           </View>
 
           <VStack spacing={8} className="items-center">
-            <Text size={24} bold style={{ color: getPrimaryColor('0'), textAlign: 'center' }}>
+            <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
               Delete Account
             </Text>
             <Text
               size={16}
               style={{
-                color: opacity(getPrimaryColor('0'), 0.5),
+                color: opacity(foreground, 0.5),
                 textAlign: 'center',
                 lineHeight: 24,
               }}>
@@ -198,10 +199,10 @@ const DeleteScreen: React.FC = () => {
           <VStack spacing={12} className="w-full items-center">
             <SlideToDelete
               onComplete={handleDeleteProfile}
-              trackColor={getRedColor('900')}
-              thumbColor={getPrimaryColor('0')}
-              textColor={getPrimaryColor('0')}
-              iconColor={getRedColor('300')}
+              trackColor={danger}
+              thumbColor={foreground}
+              textColor={foreground}
+              iconColor={danger}
             />
             <Button variant="secondary" className="w-full" onPress={handleCancel}>
               <Button.Label>Cancel</Button.Label>

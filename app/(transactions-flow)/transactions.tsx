@@ -16,12 +16,12 @@ import { HistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { useTransactionsFilter } from 'components/screens/TransactionsFilterContext';
 import opacity from 'hex-color-opacity';
 
 function FilterButton() {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
   const { openFilterSheet, hasActiveFilters, activeFilterCount } = useTransactionsFilter();
 
   return (
@@ -29,7 +29,7 @@ function FilterButton() {
       <Icon
         name="fluent:filter-16-filled"
         size={22}
-        color={hasActiveFilters ? opacity(getPrimaryColor('0'), 0.4) : getPrimaryColor('0')}
+        color={hasActiveFilters ? opacity(foreground, 0.4) : foreground}
       />
       {hasActiveFilters && (
         <View
@@ -37,7 +37,7 @@ function FilterButton() {
             position: 'absolute',
             top: 4,
             right: 4,
-            backgroundColor: getPrimaryColor('500'),
+            backgroundColor: accent,
             borderRadius: 10,
             minWidth: 16,
             height: 16,
@@ -47,7 +47,7 @@ function FilterButton() {
           <Text
             size={10}
             style={{
-              color: getPrimaryColor('0'),
+              color: foreground,
               fontFamily: 'OverpassBold',
             }}>
             {activeFilterCount}

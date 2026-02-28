@@ -2,8 +2,8 @@ import React from 'react';
 import { ActivityIndicator } from 'react-native';
 import { View } from 'components/ui/View/View';
 import Icon from 'assets/icons';
-import { useTheme } from 'providers/ThemeProvider';
 import { HistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface TransactionIconProps {
   historyEntry: HistoryEntry;
@@ -15,7 +15,7 @@ export default function TransactionIcon({
   historyEntry,
   isLoading,
 }: TransactionIconProps): React.ReactNode {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   const getIconName = () => {
     // Check if this is a rolled back send transaction
@@ -43,9 +43,9 @@ export default function TransactionIcon({
   return (
     <View className="relative h-7 w-7 items-center justify-center bg-transparent">
       {isLoading ? (
-        <ActivityIndicator size="small" color={getPrimaryColor('0')} />
+        <ActivityIndicator size="small" color={foreground} />
       ) : (
-        <Icon name={getIconName()} color={getPrimaryColor('0')} size={28} />
+        <Icon name={getIconName()} color={foreground} size={28} />
       )}
     </View>
   );
