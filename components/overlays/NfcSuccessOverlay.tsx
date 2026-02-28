@@ -33,7 +33,7 @@ const CHECK_D = 'M8 12l3 3l5 -5';
 const CIRCLE_DRAW_MS = 1100;
 const CHECK_DRAW_MS = 200;
 
-function ConfirmCircleIcon({
+export function NfcSuccessConfirmCircleIcon({
   color,
   size,
   startDelayMs,
@@ -97,7 +97,8 @@ interface NfcSuccessOverlayProps {
   amountSats?: number;
 }
 
-export function NfcSuccessOverlay({ onComplete, amountSats }: NfcSuccessOverlayProps) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars, unused-imports/no-unused-vars
+function NfcSuccessOverlay({ onComplete, amountSats }: NfcSuccessOverlayProps) {
   const bgOpacity = useSharedValue(0);
   const checkScale = useSharedValue(0.4);
   const checkOpacity = useSharedValue(0);
@@ -144,7 +145,11 @@ export function NfcSuccessOverlay({ onComplete, amountSats }: NfcSuccessOverlayP
   const content = (
     <Animated.View style={[styles.overlay, bgStyle]} pointerEvents="none">
       <Animated.View style={[styles.checkWrap, checkStyle]}>
-        <ConfirmCircleIcon color={CHECK_WHITE} size={CONFIRM_ICON_SIZE} startDelayMs={0} />
+        <NfcSuccessConfirmCircleIcon
+          color={CHECK_WHITE}
+          size={CONFIRM_ICON_SIZE}
+          startDelayMs={0}
+        />
         {amountLabel != null ? <Text style={styles.amountText}>You sent {amountLabel}</Text> : null}
       </Animated.View>
     </Animated.View>

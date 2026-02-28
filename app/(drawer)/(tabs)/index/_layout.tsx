@@ -18,21 +18,16 @@ import {
   isAndroidLiquidHeaderSupported,
 } from '@/components/navigation/expoRouter55';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
-import { NfcSuccessOverlay } from '@/components/overlays/NfcSuccessOverlay';
 import {
   getHeaderTitleWidthFromWidth,
   getHeaderTitleHeight,
   getHeaderContentWidthFromWidth,
   getHeaderContentHeight,
-  MOCK_NFC_SUCCESS_SATS,
 } from '@/constants/wallet-header';
-import { NfcSuccessOverlayContext } from '@/contexts/NfcSuccessOverlayContext';
 import { useWalletHeaderState } from '@/hooks/useWalletHeaderState';
 import { useNfcEcashPayment } from '@/hooks/useNfcEcashPayment';
 
-// Re-export for consumers that imported from this layout (e.g. index.tsx)
 export { HEADER_LAYOUT, MOCK_NFC_SUCCESS_SATS } from '@/constants/wallet-header';
-export { useNfcSuccessOverlayMock } from '@/contexts/NfcSuccessOverlayContext';
 
 export default function HomeLayout() {
   const iconColor = useThemeColor({}, 'text');
@@ -86,72 +81,59 @@ export default function HomeLayout() {
     navigation.dispatch(DrawerActions.openDrawer());
   }, [navigation]);
 
-  const nfcOverlayContextValue = useMemo(
-    () => ({ triggerMock: nfc.triggerNfcSuccessOverlayMock }),
-    [nfc.triggerNfcSuccessOverlayMock]
-  );
-
   return (
-    <NfcSuccessOverlayContext.Provider value={nfcOverlayContextValue}>
-      <View style={{ flex: 1 }}>
-        <Stack
-          screenOptions={{
-            contentStyle: { backgroundColor: 'transparent' },
-          }}>
-          <Stack.Screen
-            name="index"
-            options={buildExpoRouterHeaderOptions({
-              iconColor,
-              headerLeftIcon: 'line.3.horizontal',
-              onHeaderLeftPress: openDrawer,
-              headerRightIcon: 'wave.3.right',
-              onHeaderRightPress: nfc.handleNfcPaymentAlert,
-              options: {
-                headerShown: !useAndroidLiquidHeader,
-                headerTransparent: true,
-                headerTitleAlign: 'center',
-                headerTitle: () => (
-                  <WalletHeaderTitle
-                    liquidGlass
-                    style={{ width: headerTitleWidth, height: getHeaderTitleHeight() }}
-                    contentWidth={headerContentWidth}
-                    contentHeight={getHeaderContentHeight()}
-                  />
-                ),
-              },
-            })}
-          />
-        </Stack>
-        {useAndroidLiquidHeader ? (
-          <AndroidLiquidHeaderOverlay
-            topInset={insets.top}
-            iconColor={iconColor}
-            leftIcon="line.3.horizontal"
-            onLeftPress={openDrawer}
-            rightIcon="wave.3.right"
-            onRightPress={nfc.handleNfcPaymentAlert}
-            centerWidth={headerTitleWidth}
-            center={
-              <AndroidLiquidHeaderTitleButton
-                width={headerTitleWidth}
-                lineOneText={header.headerMintName}
-                lineTwoText={header.headerAmountLabel}
-                avatarName={header.headerMintName}
-                avatarPicture={header.headerMintInfo?.icon_url}
-                onPress={() => {
-                  router.navigate('/(mint-flow)/list' as any);
-                }}
-              />
-            }
-          />
-        ) : null}
-        {nfc.nfcSuccessEntry || nfc.showNfcSuccessOverlayMock ? (
-          <NfcSuccessOverlay
-            onComplete={nfc.handleNfcSuccessOverlayComplete}
-            amountSats={nfc.nfcSuccessEntry?.amount ?? MOCK_NFC_SUCCESS_SATS}
-          />
-        ) : null}
-      </View>
-    </NfcSuccessOverlayContext.Provider>
+    <View style={{ flex: 1 }}>
+      <Stack
+        screenOptions={{
+          contentStyle: { backgroundColor: 'transparent' },
+        }}>
+        <Stack.Screen
+          name="index"
+          options={buildExpoRouterHeaderOptions({
+            iconColor,
+            headerLeftIcon: 'line.3.horizontal',
+            onHeaderLeftPress: openDrawer,
+            headerRightIcon: 'wave.3.right',
+            onHeaderRightPress: nfc.handleNfcPaymentAlert,
+            options: {
+              headerShown: !useAndroidLiquidHeader,
+              headerTransparent: true,
+              headerTitleAlign: 'center',
+              headerTitle: () => (
+                <WalletHeaderTitle
+                  liquidGlass
+                  style={{ width: headerTitleWidth, height: getHeaderTitleHeight() }}
+                  contentWidth={headerContentWidth}
+                  contentHeight={getHeaderContentHeight()}
+                />
+              ),
+            },
+          })}
+        />
+      </Stack>
+      {useAndroidLiquidHeader ? (
+        <AndroidLiquidHeaderOverlay
+          topInset={insets.top}
+          iconColor={iconColor}
+          leftIcon="line.3.horizontal"
+          onLeftPress={openDrawer}
+          rightIcon="wave.3.right"
+          onRightPress={nfc.handleNfcPaymentAlert}
+          centerWidth={headerTitleWidth}
+          center={
+            <AndroidLiquidHeaderTitleButton
+              width={headerTitleWidth}
+              lineOneText={header.headerMintName}
+              lineTwoText={header.headerAmountLabel}
+              avatarName={header.headerMintName}
+              avatarPicture={header.headerMintInfo?.icon_url}
+              onPress={() => {
+                router.navigate('/(mint-flow)/list' as any);
+              }}
+            />
+          }
+        />
+      ) : null}
+    </View>
   );
 }

@@ -19,6 +19,10 @@ import { useManager } from 'coco-cashu-react';
 import type { SendHistoryEntry } from 'coco-cashu-core';
 import { PAYMENT_TIERS } from '@/constants/wallet-header';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
+import { popup } from '@/helper/popup';
+import { NfcSuccessConfirmCircleIcon } from '@/components/overlays/NfcSuccessOverlay';
+import { AmountFormatter } from '@/components/ui/AmountFormatter';
+import { Text } from '@/components/ui/Text';
 
 export type NfcPaymentStatus = 'idle' | 'paying' | 'error';
 
@@ -48,15 +52,9 @@ export function useNfcEcashPayment({
   const [error, setError] = useState<NfcErrorMessage | null>(null);
 
   const lastNfcSendEntryRef = useRef<SendHistoryEntry | null>(null);
-  const [nfcSuccessEntry, setNfcSuccessEntry] = useState<SendHistoryEntry | null>(null);
-  const [showNfcSuccessOverlayMock, setShowNfcSuccessOverlayMock] = useState(false);
   const [pendingNfcFinalizationOperationId, setPendingNfcFinalizationOperationId] = useState<
     string | null
   >(null);
-
-  const triggerNfcSuccessOverlayMock = useCallback(() => {
-    setShowNfcSuccessOverlayMock(true);
-  }, []);
 
   useEffect(() => {
     if (!manager || !pendingNfcFinalizationOperationId) return;
@@ -66,16 +64,32 @@ export function useNfcEcashPayment({
         entry.operationId === pendingNfcFinalizationOperationId &&
         entry.state === 'finalized'
       ) {
-        setNfcSuccessEntry(entry as SendHistoryEntry);
+        const sendEntry = entry as SendHistoryEntry;
+        popup({
+          message: 'Payment sent',
+          text: (
+            <Text style={{ alignItems: 'center' }}>
+              <AmountFormatter size={12} weight="heavy" amount={sendEntry.amount} unit="sat" />
+              <Text size={12} weight="heavy">
+                {' sent'}
+              </Text>
+            </Text>
+          ),
+          variant: 'sheet',
+          duration: 2600,
+          icon: <NfcSuccessConfirmCircleIcon color="#22c55e" size={88} startDelayMs={0} />,
+          onClose: () => {
+            router.navigate({
+              pathname: '/(send-flow)/sendToken' as any,
+              params: { sendHistoryEntry: JSON.stringify(sendEntry) },
+            });
+          },
+        });
         setPendingNfcFinalizationOperationId(null);
       }
     });
     return () => unsubscribe();
   }, [manager, pendingNfcFinalizationOperationId]);
-
-  const showErrorAlert = useCallback((err: NfcErrorMessage) => {
-    Alert.alert(err.title, err.message);
-  }, []);
 
   const startPayment = useCallback(
     async (usdLimit?: number) => {
@@ -84,7 +98,7 @@ export function useNfcEcashPayment({
       if (!send || !manager) {
         setError({ title: 'Error', message: 'Wallet not ready. Please try again.' });
         setStatus('error');
-        showErrorAlert({ title: 'Error', message: 'Wallet not ready. Please try again.' });
+        popup({ message: 'Error', text: 'Wallet not ready. Please try again.', type: 'error' });
         return;
       }
 
@@ -161,7 +175,7 @@ export function useNfcEcashPayment({
         const resolved = getNfcErrorMessage(code, errorMessage, { maxAmountSats });
         setError(resolved);
         setStatus('error');
-        showErrorAlert(resolved);
+        popup({ message: resolved.title, text: resolved.message, type: 'error' });
       }
     },
     [
@@ -174,7 +188,6 @@ export function useNfcEcashPayment({
       pubkey,
       addScan,
       linkTransaction,
-      showErrorAlert,
     ]
   );
 
@@ -182,18 +195,6 @@ export function useNfcEcashPayment({
     setError(null);
     if (status === 'error') setStatus('idle');
   }, [status]);
-
-  const handleNfcSuccessOverlayComplete = useCallback(() => {
-    if (nfcSuccessEntry) {
-      router.navigate({
-        pathname: '/(send-flow)/sendToken' as any,
-        params: { sendHistoryEntry: JSON.stringify(nfcSuccessEntry) },
-      });
-      setNfcSuccessEntry(null);
-    } else {
-      setShowNfcSuccessOverlayMock(false);
-    }
-  }, [nfcSuccessEntry]);
 
   const handleNfcPaymentAlert = useCallback(() => {
     Alert.alert('NFC Payment Limit', 'Select your payment limit', [
@@ -212,24 +213,10 @@ export function useNfcEcashPayment({
       resetError,
       startPayment,
       handleNfcPaymentAlert,
-      nfcSuccessEntry,
-      showNfcSuccessOverlayMock,
-      handleNfcSuccessOverlayComplete,
-      triggerNfcSuccessOverlayMock,
       isIdle: status === 'idle',
       isPaying: status === 'paying',
       isError: status === 'error',
     }),
-    [
-      status,
-      error,
-      resetError,
-      startPayment,
-      handleNfcPaymentAlert,
-      nfcSuccessEntry,
-      showNfcSuccessOverlayMock,
-      handleNfcSuccessOverlayComplete,
-      triggerNfcSuccessOverlayMock,
-    ]
+    [status, error, resetError, startPayment, handleNfcPaymentAlert]
   );
 }
