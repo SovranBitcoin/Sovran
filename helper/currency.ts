@@ -1,65 +1,26 @@
 /**
- * @fileoverview Currency formatting utilities for the Sovran application
+ * Currency formatting and conversion utilities.
  *
- * This module provides comprehensive currency formatting functionality including
- * unit conversion, precision handling, and display formatting for various
- * cryptocurrency and fiat currencies. It integrates with the Redux store for
- * real-time price data and user preferences.
+ * All rates are fetched from pricelistStore (Zustand) at call time.
+ * Fiat amounts are stored as cents (÷100 before conversion).
+ * Conversions route through BTC as the base unit.
  */
 
 import { usePricelistStore } from 'stores/pricelistStore';
 import { useSettingsStore } from 'stores/settingsStore';
 
-/**
- * Represents an amount with its associated currency unit
- *
- * This interface aligns with Coco's HistoryEntry structure and is used
- * throughout the application for consistent amount handling.
- *
- * @interface AmountWithUnit
- * @property {number} amount - The numeric amount value
- * @property {string} unit - The currency unit (e.g., 'sats', 'usd', 'btc')
- *
- * @example
- * const amount: AmountWithUnit = { amount: 1000, unit: 'sats' };
- * const usdAmount: AmountWithUnit = { amount: 25.50, unit: 'usd' };
- */
 interface AmountWithUnit {
   amount: number;
   unit: string;
 }
 
-/**
- * Configuration options for currency amount formatting
- *
- * @interface FormatAmountOptions
- * @property {string} [displayAs] - Target unit to convert to (e.g., 'usd', 'sats', 'btc')
- * @property {'symbol'|'name'|'none'} [currencyDisplay] - How to display the currency
- *   - 'symbol': Show currency symbol (e.g., '$', '₿', 'ṩ')
- *   - 'name': Show currency name (e.g., 'USD', 'sats')
- *   - 'none': Show only the formatted number
- * @property {boolean} [useUserPreference] - Use user's display preference for sats (BTC vs sats display)
- *
- * @example
- * const options: FormatAmountOptions = {
- *   displayAs: 'usd',
- *   currencyDisplay: 'symbol',
- *   useUserPreference: true
- * };
- */
 interface FormatAmountOptions {
   displayAs?: string;
   currencyDisplay?: 'symbol' | 'name' | 'none';
+  /** When true and unit is sats, respects user's BTC/sats display preference. */
   useUserPreference?: boolean;
 }
 
-/**
- * Currency symbols mapping for display formatting
- *
- * Maps currency unit codes to their respective display symbols.
- * Used when currencyDisplay is set to 'symbol'.
- * Only includes currencies actually used in the application.
- */
 const SYMBOLS: Record<string, string> = {
   usd: '$',
   eur: '€',
@@ -68,32 +29,9 @@ const SYMBOLS: Record<string, string> = {
   sats: 'ṩ',
 };
 
-/**
- * List of fiat currency units that require special handling
- *
- * These currencies are treated differently in conversion calculations
- * and display formatting compared to cryptocurrency units.
- * Only includes currencies actually used in the application.
- */
 const FIAT_UNITS = ['usd', 'eur', 'gbp'];
 
-/**
- * Retrieves the current exchange rate for a given currency unit
- *
- * This function fetches real-time exchange rates from the Redux store
- * and provides fallback rates for currencies not available in the pricelist.
- * All rates are normalized to BTC as the base currency.
- *
- * @param {string} unit - The currency unit to get the rate for
- * @returns {number} The exchange rate relative to BTC
- *
- * @example
- * const btcRate = getRate('btc'); // Returns 1
- * const satsRate = getRate('sats'); // Returns 100_000_000
- * const usdRate = getRate('usd'); // Returns current USD/BTC rate
- *
- * @private
- */
+/** Exchange rate relative to BTC. Falls back to hardcoded estimates if pricelist is empty. */
 function getRate(unit: string): number {
   const pricelist = usePricelistStore.getState().pricelist;
   const rates: Record<string, number> = {
@@ -105,36 +43,6 @@ function getRate(unit: string): number {
   };
   return rates[unit] ?? 1;
 }
-
-/**
- * Formats a monetary amount with appropriate currency display
- *
- * This is the main function for formatting currency amounts throughout the application.
- * It handles unit conversion, precision formatting, and various display modes.
- * Supports both cryptocurrency (BTC, sats) and fiat currencies (USD, EUR, etc.).
- *
- * @param {AmountWithUnit} input - The amount and unit to format
- * @param {FormatAmountOptions} [options={}] - Formatting options
- * @returns {string} The formatted currency string
- *
- * @example
- * // Basic formatting
- * formatAmount({ amount: 1000, unit: 'sats' }); // "1,000"
- *
- * // With user preference (respects user's BTC/sats display setting)
- * formatAmount({ amount: 1000, unit: 'sats' }, { useUserPreference: true });
- *
- * // Convert to different unit
- * formatAmount({ amount: 1000, unit: 'sats' }, { displayAs: 'usd' }); // "$0.01"
- *
- * // With currency symbol
- * formatAmount({ amount: 25.50, unit: 'usd' }, { currencyDisplay: 'symbol' }); // "$25.50"
- *
- * // With currency name
- * formatAmount({ amount: 1000, unit: 'sats' }, { currencyDisplay: 'name' }); // "1,000 sats"
- *
- * @throws {Error} May throw errors if invalid units are provided or conversion fails
- */
 export function formatAmount(input: AmountWithUnit, options: FormatAmountOptions = {}): string {
   // Normalize input unit (handle 'sat' -> 'sats' conversion)
   const inputUnit = input.unit.toLowerCase() === 'sat' ? 'sats' : input.unit.toLowerCase();

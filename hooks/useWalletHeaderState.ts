@@ -1,9 +1,13 @@
 /**
  * Wallet tab header state: mint info and balance label.
- * Layout uses getHeaderTitleWidth/getHeaderTitleHeight from @/constants/wallet-header.
+ *
+ * headerAmountLabel uses formatAmount with useUserPreference, which already
+ * appends the correct unit suffix when displayBtc === 2. The label is returned
+ * as-is to avoid a double "sats sats" suffix.
  */
 
 import { useEffect, useMemo, useState } from 'react';
+
 import { formatAmount } from 'helper/currency';
 import { getMintDisplayName } from '@/helper/url';
 
@@ -47,10 +51,10 @@ export function useWalletHeaderState({
     ? getMintDisplayName(selectedMint, { name: headerMintInfo?.name })
     : 'Change Mint';
 
-  const headerAmountLabel = useMemo(() => {
-    const val = formatAmount({ amount: balanceForMint, unit: 'sat' }, { useUserPreference: true });
-    return `${val} sats`;
-  }, [balanceForMint]);
+  const headerAmountLabel = useMemo(
+    () => formatAmount({ amount: balanceForMint, unit: 'sat' }, { useUserPreference: true }),
+    [balanceForMint]
+  );
 
   return {
     headerMintName,
