@@ -122,14 +122,14 @@ export const PostCard = React.memo(function PostCard({
   }));
 
   const navigateToThread = useCallback(() => {
-    router.push({
+    router.navigate({
       pathname: '/(user-flow)/thread' as any,
       params: { eventId: event.id },
     });
   }, [event.id]);
 
   const navigateToProfile = useCallback(() => {
-    router.push({
+    router.navigate({
       pathname: '/(user-flow)/profile' as any,
       params: { pubkey: event.pubkey },
     });

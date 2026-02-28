@@ -56,7 +56,7 @@ export default function TabLayout() {
                     selected: 'arrow.up.arrow.down',
                   }}
                 />
-                <Expo55NativeTabs.Trigger.Label>Payments</Expo55NativeTabs.Trigger.Label>
+                <Expo55NativeTabs.Trigger.Label>Contacts</Expo55NativeTabs.Trigger.Label>
               </Expo55NativeTabs.Trigger>
 
               <Expo55NativeTabs.Trigger name="index">

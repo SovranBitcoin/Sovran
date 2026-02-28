@@ -242,7 +242,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
 
   const onReplyPress = useCallback(() => {
     if (!activeOverlayPost) return;
-    router.push({
+    router.navigate({
       pathname: '/(user-flow)/thread' as any,
       params: { eventId: activeOverlayPost.event.id },
     });

@@ -11,7 +11,6 @@ import { useDispatch } from 'react-redux';
 import type { AppThunk } from 'redux/store/reducer';
 import { resetApp } from '@/redux/store';
 import * as Updates from 'expo-updates';
-import { Card } from 'components/ui/Card';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
@@ -22,6 +21,7 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
+import { Button, Card } from 'heroui-native';
 
 const SLIDER_WIDTH = Dimensions.get('window').width - 48; // Account for padding
 const THUMB_SIZE = 56;
@@ -139,7 +139,7 @@ const DeleteScreen: React.FC = () => {
     await Updates.reloadAsync();
   }, [dispatch]);
 
-  const _handleCancel = useCallback(() => {
+  const handleCancel = useCallback(() => {
     router.back();
   }, []);
 
@@ -175,24 +175,25 @@ const DeleteScreen: React.FC = () => {
             </Text>
           </VStack>
 
-          <Card
-            variant="warning"
-            message="There is no guarantee that your mnemonic phrase will allow you to recover your funds. If you were a TestFlight user it's possible your recovery phrase won't restore all your funds."
-          />
+          <Card variant="secondary" className="w-full">
+            <Card.Body className="gap-2">
+              <Card.Title>Important</Card.Title>
+              <Card.Description>
+                There is no guarantee that your mnemonic phrase will recover your funds. If you were
+                a TestFlight user, recovery may not restore all funds.
+              </Card.Description>
+            </Card.Body>
+          </Card>
 
-          <View
-            className="w-full rounded-xl p-4"
-            style={{ backgroundColor: getPrimaryColor('900') }}>
-            <VStack spacing={8}>
-              <Text size={14} medium style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
-                Before deleting, make sure you have:
-              </Text>
-              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4), lineHeight: 20 }}>
-                • Backed up your mnemonic phrase{'\n'}• Transferred any remaining funds{'\n'}•
+          <Card variant="secondary" className="w-full">
+            <Card.Body className="gap-2">
+              <Card.Title>Before deleting, make sure you have:</Card.Title>
+              <Card.Description>
+                - Backed up your mnemonic phrase{'\n'}- Transferred any remaining funds{'\n'}-
                 Exported any important data
-              </Text>
-            </VStack>
-          </View>
+              </Card.Description>
+            </Card.Body>
+          </Card>
 
           <VStack spacing={12} className="w-full items-center">
             <SlideToDelete
@@ -202,6 +203,9 @@ const DeleteScreen: React.FC = () => {
               textColor={getPrimaryColor('0')}
               iconColor={getRedColor('300')}
             />
+            <Button variant="secondary" className="w-full" onPress={handleCancel}>
+              <Button.Label>Cancel</Button.Label>
+            </Button>
           </VStack>
         </VStack>
       </ScrollView>

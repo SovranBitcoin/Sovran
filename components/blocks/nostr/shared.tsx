@@ -584,7 +584,7 @@ export const InlineMention = React.memo(function InlineMention({
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => {
-        router.push({ pathname: '/(user-flow)/profile' as any, params: { pubkey } });
+        router.navigate({ pathname: '/(user-flow)/profile' as any, params: { pubkey } });
       }}>
       @{label}
     </Text>
@@ -833,7 +833,7 @@ export const LightningBlock = React.memo(function LightningBlock({ invoice }: { 
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={() => {
-        router.push({ pathname: '/(send-flow)/meltQuote' as any, params: { invoice } });
+        router.navigate({ pathname: '/(send-flow)/meltQuote' as any, params: { invoice } });
       }}
       style={[
         sharedStyles.mediaCard,
@@ -1031,7 +1031,7 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
 
   const handleOpenQuotedThread = useCallback(() => {
     if (!event) return;
-    router.push({
+    router.navigate({
       pathname: '/(user-flow)/thread' as any,
       params: { eventId: event.id },
     });

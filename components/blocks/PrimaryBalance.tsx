@@ -268,7 +268,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
   const displayText = `≈ ${currencyConfig.symbol}${fiatValue}`;
   const handlePendingPress = useCallback(() => {
-    router.push({
+    router.navigate({
       pathname: '/transactions',
       params: {
         account: JSON.stringify(account),

@@ -1,25 +1,27 @@
 import React, { useCallback } from 'react';
-import { ScrollView, Switch, StyleSheet } from 'react-native';
-import { Host, Picker, Stepper as ExpoStepper, Text as ExpoText } from '@expo/ui/swift-ui';
-import { pickerStyle, tag } from '@expo/ui/swift-ui/modifiers';
-import { useTheme } from 'providers/ThemeProvider';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSettingsStore, type MiddlemanRoutingSettings } from 'stores/settingsStore';
 import Container from 'components/blocks/Container';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { Text } from 'components/ui/Text';
-import { View } from 'components/ui/View/View';
 import { VStack } from 'components/ui/View/VStack';
-import { HStack } from 'components/ui/View/HStack';
 import { Section } from './index';
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
+import {
+  Card,
+  Label,
+  ListGroup,
+  RadioGroup,
+  Separator,
+  Slider,
+  Switch as HeroSwitch,
+} from 'heroui-native';
 
 // ---------------------------------------------------------------------------
 // Main screen
 // ---------------------------------------------------------------------------
 
 function RoutingSettingsScreen() {
-  const { getPrimaryColor, getShadeColor } = useTheme();
   const middlemanRouting = useSettingsStore((state) => state.middlemanRouting);
   const setMiddlemanRouting = useSettingsStore((state) => state.setMiddlemanRouting);
   const minTransferThreshold = useSettingsStore((state) => state.minTransferThreshold);
@@ -32,6 +34,8 @@ function RoutingSettingsScreen() {
     [setMiddlemanRouting]
   );
 
+  const asNumber = (value: number | number[]) => (Array.isArray(value) ? (value[0] ?? 0) : value);
+
   return (
     <Container>
       <ScrollView
@@ -40,197 +44,148 @@ function RoutingSettingsScreen() {
         contentContainerStyle={styles.scrollContent}>
         <Section title="Rebalancing">
           <VStack gap={12}>
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: getPrimaryColor('900'),
-                },
-              ]}>
-              <VStack gap={8}>
-                <Text size={16} style={{ color: getPrimaryColor('0') }}>
-                  Min transfer amount
-                </Text>
-                <Host matchContents>
-                  <ExpoStepper
-                    label={`${minTransferThreshold} sat`}
-                    defaultValue={minTransferThreshold}
-                    min={1}
-                    max={50}
-                    step={1}
-                    onValueChanged={setMinTransferThreshold}
-                  />
-                </Host>
-                <Text
-                  size={13}
-                  style={[styles.description, { color: opacity(getPrimaryColor('0'), 0.4) }]}>
+            <Card variant="secondary">
+              <Card.Body className="gap-2">
+                <View className="flex-row items-center justify-between">
+                  <Label>Min transfer amount</Label>
+                  <Text>{`${minTransferThreshold} sat`}</Text>
+                </View>
+                <Slider
+                  value={minTransferThreshold}
+                  minValue={1}
+                  maxValue={50}
+                  step={1}
+                  onChangeEnd={(value) => setMinTransferThreshold(asNumber(value))}>
+                  <Slider.Track>
+                    <Slider.Fill />
+                    <Slider.Thumb />
+                  </Slider.Track>
+                </Slider>
+                <Card.Description>
                   Transfers below this amount are skipped during rebalancing to avoid noisy,
                   fee-inefficient steps.
-                </Text>
-              </VStack>
-            </View>
+                </Card.Description>
+              </Card.Body>
+            </Card>
           </VStack>
         </Section>
 
         <Section title="Middleman Routing">
           <VStack gap={12}>
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: getPrimaryColor('900'),
-                },
-              ]}>
-              <VStack gap={8}>
-                <Text size={16} style={{ color: getPrimaryColor('0') }}>
-                  Max intermediaries
-                </Text>
-                <Host matchContents>
-                  <ExpoStepper
-                    label={`${middlemanRouting.maxHops}`}
-                    defaultValue={middlemanRouting.maxHops}
-                    min={1}
-                    max={3}
-                    step={1}
-                    onValueChanged={(v) => update({ maxHops: v })}
-                  />
-                </Host>
-                <Text
-                  size={13}
-                  style={[styles.description, { color: opacity(getPrimaryColor('0'), 0.4) }]}>
+            <Card variant="secondary">
+              <Card.Body className="gap-2">
+                <View className="flex-row items-center justify-between">
+                  <Label>Max intermediaries</Label>
+                  <Text>{middlemanRouting.maxHops}</Text>
+                </View>
+                <Slider
+                  value={middlemanRouting.maxHops}
+                  minValue={1}
+                  maxValue={3}
+                  step={1}
+                  onChangeEnd={(value) => update({ maxHops: asNumber(value) })}>
+                  <Slider.Track>
+                    <Slider.Fill />
+                    <Slider.Thumb />
+                  </Slider.Track>
+                </Slider>
+                <Card.Description>
                   How many middleman mints can be chained together (1 = A→via→B, 2 = A→via1→via2→B).
-                </Text>
-              </VStack>
-            </View>
+                </Card.Description>
+              </Card.Body>
+            </Card>
 
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: getPrimaryColor('900'),
-                },
-              ]}>
-              <VStack gap={8}>
-                <Text size={16} style={{ color: getPrimaryColor('0') }}>
-                  Max fee
-                </Text>
-                <Host matchContents>
-                  <ExpoStepper
-                    label={`${middlemanRouting.maxFee} sat`}
-                    defaultValue={middlemanRouting.maxFee}
-                    min={1}
-                    max={50}
-                    step={1}
-                    onValueChanged={(v) => update({ maxFee: v })}
-                  />
-                </Host>
-                <Text
-                  size={13}
-                  style={[styles.description, { color: opacity(getPrimaryColor('0'), 0.4) }]}>
+            <Card variant="secondary">
+              <Card.Body className="gap-2">
+                <View className="flex-row items-center justify-between">
+                  <Label>Max fee</Label>
+                  <Text>{`${middlemanRouting.maxFee} sat`}</Text>
+                </View>
+                <Slider
+                  value={middlemanRouting.maxFee}
+                  minValue={1}
+                  maxValue={50}
+                  step={1}
+                  onChangeEnd={(value) => update({ maxFee: asNumber(value) })}>
+                  <Slider.Track>
+                    <Slider.Fill />
+                    <Slider.Thumb />
+                  </Slider.Track>
+                </Slider>
+                <Card.Description>
                   Maximum total fee (in sats) allowed across all hops of an intermediary route.
-                </Text>
-              </VStack>
-            </View>
+                </Card.Description>
+              </Card.Body>
+            </Card>
 
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: getPrimaryColor('900'),
-                },
-              ]}>
-              <VStack gap={8}>
-                <Text size={16} style={{ color: getPrimaryColor('0') }}>
-                  Min success rate
-                </Text>
-                <Host matchContents>
-                  <ExpoStepper
-                    label={`${Math.round(middlemanRouting.minSuccessRate * 100)}%`}
-                    defaultValue={Math.round(middlemanRouting.minSuccessRate * 100)}
-                    min={50}
-                    max={100}
-                    step={5}
-                    onValueChanged={(v) => update({ minSuccessRate: v / 100 })}
-                  />
-                </Host>
-                <Text
-                  size={13}
-                  style={[styles.description, { color: opacity(getPrimaryColor('0'), 0.4) }]}>
+            <Card variant="secondary">
+              <Card.Body className="gap-2">
+                <View className="flex-row items-center justify-between">
+                  <Label>Min success rate</Label>
+                  <Text>{`${Math.round(middlemanRouting.minSuccessRate * 100)}%`}</Text>
+                </View>
+                <Slider
+                  value={Math.round(middlemanRouting.minSuccessRate * 100)}
+                  minValue={50}
+                  maxValue={100}
+                  step={5}
+                  onChangeEnd={(value) => update({ minSuccessRate: asNumber(value) / 100 })}>
+                  <Slider.Track>
+                    <Slider.Fill />
+                    <Slider.Thumb />
+                  </Slider.Track>
+                </Slider>
+                <Card.Description>
                   Minimum percentage of successful swaps required for each edge in the route.
-                </Text>
-              </VStack>
-            </View>
+                </Card.Description>
+              </Card.Body>
+            </Card>
 
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: getPrimaryColor('900'),
-                },
-              ]}>
-              <HStack align="center" justify="space-between">
-                <VStack flex={1} style={styles.labelContainer}>
-                  <Text size={16} style={{ color: getPrimaryColor('0') }}>
-                    Last swap must be OK
-                  </Text>
-                  <Text
-                    size={13}
-                    style={[styles.description, { color: opacity(getPrimaryColor('0'), 0.4) }]}>
+            <ListGroup variant="secondary">
+              <ListGroup.Item>
+                <ListGroup.ItemContent>
+                  <ListGroup.ItemTitle>Last swap must be OK</ListGroup.ItemTitle>
+                  <ListGroup.ItemDescription>
                     Require the most recent swap on each edge to have been successful.
-                  </Text>
-                </VStack>
-                <Switch
-                  value={middlemanRouting.requireLastOk}
-                  onValueChange={(v) => update({ requireLastOk: v })}
-                  trackColor={{
-                    false: getPrimaryColor('700'),
-                    true: getShadeColor('300'),
-                  }}
-                  thumbColor={getPrimaryColor('0')}
-                />
-              </HStack>
-            </View>
+                  </ListGroup.ItemDescription>
+                </ListGroup.ItemContent>
+                <ListGroup.ItemSuffix>
+                  <HeroSwitch
+                    isSelected={middlemanRouting.requireLastOk}
+                    onSelectedChange={(v) => update({ requireLastOk: v })}
+                  />
+                </ListGroup.ItemSuffix>
+              </ListGroup.Item>
+            </ListGroup>
           </VStack>
         </Section>
 
         <Section title="Mint Trust">
           <VStack gap={12}>
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: getPrimaryColor('900'),
-                },
-              ]}>
-              <VStack gap={12}>
+            <Card variant="secondary">
+              <Card.Body className="gap-3">
                 <VStack>
-                  <Text size={16} style={{ color: getPrimaryColor('0') }}>
-                    Intermediary trust policy
-                  </Text>
-                  <Text
-                    size={13}
-                    style={[styles.description, { color: opacity(getPrimaryColor('0'), 0.4) }]}>
+                  <Text size={16}>Intermediary trust policy</Text>
+                  <Card.Description>
                     Controls which mints can act as middlemen. Trusted mints are always preferred
                     regardless of this setting.
-                  </Text>
+                  </Card.Description>
                 </VStack>
 
-                <Host matchContents>
-                  <Picker
-                    selection={middlemanRouting.trustMode}
-                    onSelectionChange={(value) => {
-                      if (value === 'trusted_only' || value === 'allow_untrusted') {
-                        update({ trustMode: value });
-                      }
-                    }}
-                    modifiers={[pickerStyle('segmented')]}>
-                    <ExpoText modifiers={[tag('trusted_only')]}>Trusted only</ExpoText>
-                    <ExpoText modifiers={[tag('allow_untrusted')]}>Allow untrusted</ExpoText>
-                  </Picker>
-                </Host>
+                <RadioGroup
+                  value={middlemanRouting.trustMode}
+                  onValueChange={(value) => {
+                    if (value === 'trusted_only' || value === 'allow_untrusted') {
+                      update({ trustMode: value });
+                    }
+                  }}>
+                  <RadioGroup.Item value="trusted_only">Trusted only</RadioGroup.Item>
+                  <Separator className="my-1" />
+                  <RadioGroup.Item value="allow_untrusted">Allow untrusted</RadioGroup.Item>
+                </RadioGroup>
 
                 {middlemanRouting.trustMode === 'allow_untrusted' ? (
-                  <HStack gap={8} align="flex-start">
+                  <View className="flex-row items-start gap-2">
                     <Icon
                       name="mdi:alert-circle-outline"
                       size={16}
@@ -242,10 +197,10 @@ function RoutingSettingsScreen() {
                       afterward. Your ecash passes through mints you have not verified. Only use
                       this with small amounts.
                     </Text>
-                  </HStack>
+                  </View>
                 ) : null}
-              </VStack>
-            </View>
+              </Card.Body>
+            </Card>
           </VStack>
         </Section>
       </ScrollView>
@@ -264,12 +219,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderCurve: 'continuous',
     padding: 16,
-  },
-  labelContainer: {
-    marginRight: 12,
-  },
-  description: {
-    marginTop: 4,
   },
   warningIcon: {
     marginTop: 2,

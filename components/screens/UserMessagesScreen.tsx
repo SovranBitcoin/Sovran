@@ -46,6 +46,7 @@ import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
+import { Skeleton } from 'components/ui/Skeleton';
 import { Avatar } from 'components/ui/Avatar';
 import TextInput from 'components/ui/TextInput';
 import Icon from 'assets/icons';
@@ -86,6 +87,7 @@ import {
 } from '@expo/ui/swift-ui/modifiers';
 import opacity from 'hex-color-opacity';
 import { truncateMiddle } from '@/helper/strings';
+import { getUsername } from 'helper/username';
 
 export type TimelineItemType = Message;
 
@@ -399,6 +401,8 @@ interface MessageBubbleProps {
   message: any;
   isMe: boolean;
   userPicture?: string;
+  userName: string;
+  myName: string;
   isLoadingMetadata?: boolean;
   isStreaming?: boolean;
 }
@@ -428,6 +432,8 @@ function MessageBubble({
   message,
   isMe,
   userPicture,
+  userName,
+  myName,
   isLoadingMetadata,
   isStreaming,
 }: MessageBubbleProps) {
@@ -479,7 +485,8 @@ function MessageBubble({
             size={32}
             picture={userPicture}
             seed={message.pubkey}
-            name={message.sender === 'other' ? 'Other User' : 'Me'}
+            name={isMe ? myName : userName}
+            variant="person"
             loading={isLoadingMetadata}
           />
         )}
@@ -556,7 +563,7 @@ function MessageBubble({
           </HStack>
         </VStack>
 
-        {isMe && <Avatar size={32} seed={message.pubkey} name="Me" loading={false} />}
+        {isMe && <Avatar size={32} seed={message.pubkey} name={myName} variant="person" />}
       </HStack>
     </VStack>
   );
@@ -821,9 +828,10 @@ export function UserMessagesScreen({
   const userInfo = metadataEvents?.[0] ? JSON.parse(metadataEvents[0].content) : null;
   const displayName = isRoutstrMode
     ? userInfo?.display_name || userInfo?.name || 'routstr'
-    : userInfo?.display_name || userInfo?.name || 'Unknown User';
+    : userInfo?.display_name || userInfo?.name || getUsername(pubkey);
   const userPicture = userInfo?.picture;
   const lud16 = userInfo?.lud16;
+  const myName = getUsername(nostrKeys?.pubkey || '');
   const isMetadataLoading = !metadataEose;
   const shouldShowAvatarLoading = !isRoutstrMode && isMetadataLoading && !userInfo;
 
@@ -1834,6 +1842,7 @@ export function UserMessagesScreen({
                         picture={userPicture}
                         seed={pubkey}
                         name={displayName}
+                        variant="person"
                         loading={shouldShowAvatarLoading}
                       />
                       <View
@@ -1844,16 +1853,26 @@ export function UserMessagesScreen({
                           justifyContent: 'flex-start',
                           alignItems: 'flex-start',
                         }}>
-                        <Text
-                          loading={shouldShowAvatarLoading}
-                          size={16}
-                          bold
-                          style={{
-                            color: getPrimaryColor('0'),
-                            textAlign: 'left',
-                          }}>
-                          {displayName}
-                        </Text>
+                        {shouldShowAvatarLoading ? (
+                          <Skeleton
+                            style={{
+                              width: 132,
+                              height: 18,
+                              borderRadius: 4,
+                              backgroundColor: getPrimaryColor('700'),
+                            }}
+                          />
+                        ) : (
+                          <Text
+                            size={16}
+                            bold
+                            style={{
+                              color: getPrimaryColor('0'),
+                              textAlign: 'left',
+                            }}>
+                            {displayName}
+                          </Text>
+                        )}
                         <HStack
                           align="center"
                           justify="flex-start"
@@ -1899,6 +1918,7 @@ export function UserMessagesScreen({
                   picture={userPicture}
                   seed={pubkey}
                   name={displayName}
+                  variant="person"
                   loading={shouldShowAvatarLoading}
                 />
                 <VStack
@@ -1910,17 +1930,27 @@ export function UserMessagesScreen({
                     justifyContent: 'flex-start',
                     alignItems: 'flex-start',
                   }}>
-                  <Text
-                    loading={shouldShowAvatarLoading}
-                    size={16}
-                    bold
-                    style={{
-                      color: getPrimaryColor('0'),
-                      textAlign: 'left',
-                    }}
-                    numberOfLines={1}>
-                    {displayName}
-                  </Text>
+                  {shouldShowAvatarLoading ? (
+                    <Skeleton
+                      style={{
+                        width: 132,
+                        height: 18,
+                        borderRadius: 4,
+                        backgroundColor: getPrimaryColor('700'),
+                      }}
+                    />
+                  ) : (
+                    <Text
+                      size={16}
+                      bold
+                      style={{
+                        color: getPrimaryColor('0'),
+                        textAlign: 'left',
+                      }}
+                      numberOfLines={1}>
+                      {displayName}
+                    </Text>
+                  )}
                   {isRoutstrMode ? (
                     <HStack align="center" justify="flex-start">
                       <Icon
@@ -2199,6 +2229,8 @@ export function UserMessagesScreen({
                   message={message}
                   isMe={message.sender === 'me'}
                   userPicture={message.sender === 'other' ? userPicture : undefined}
+                  userName={displayName}
+                  myName={myName}
                   isLoadingMetadata={shouldShowAvatarLoading}
                   isStreaming={streamingMessageId === message.id}
                 />
@@ -2232,7 +2264,7 @@ export function UserMessagesScreen({
                 <Icon name="fluent:add-24-filled" size={24} color={getPrimaryColor('0')} />
               </Pressable>
             ) : (
-              <Avatar size={40} seed={nostrKeys?.pubkey} loading={false} />
+              <Avatar size={40} seed={nostrKeys?.pubkey} name={myName} variant="person" />
             )}
 
             <TextInput

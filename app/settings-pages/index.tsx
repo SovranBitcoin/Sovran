@@ -1,12 +1,11 @@
 import React, { useRef, useCallback } from 'react';
-import { ScrollView, Linking, Alert, Switch } from 'react-native';
+import { ScrollView, Linking, Alert } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { useTheme } from 'providers/ThemeProvider';
-import { Avatar } from 'components/ui/Avatar';
 import { useSettingsStore } from 'stores/settingsStore';
 
 import { ActionSheetProvider, connectActionSheet } from '@expo/react-native-action-sheet';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { truncateMiddle } from 'helper/strings';
 import Container from 'components/blocks/Container';
 import * as Application from 'expo-application';
@@ -22,6 +21,8 @@ import { getUsername } from '@/helper/username';
 import { CocoManager } from 'helper/coco/manager';
 import { popup } from '@/helper/popup';
 import opacity from 'hex-color-opacity';
+import { Avatar } from 'components/ui/Avatar';
+import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -53,50 +54,30 @@ export const Section: React.FC<{
 
 const ProfileButton = () => {
   const { keys: nostrKeys } = useNostrKeysContext();
-  const { getPrimaryColor } = useTheme();
+  const username = getUsername(nostrKeys?.pubkey || '');
 
   return (
-    <Link href="/settings-pages/profile" asChild>
-      <TouchableOpacity>
-        <View
-          className="flex-row items-center justify-start bg-transparent p-3"
-          style={{
-            backgroundColor: getPrimaryColor('900'),
-          }}>
-          <HStack spacing={12} flex={1}>
-            <Avatar
-              seed={nostrKeys?.pubkey}
-              name={getUsername(nostrKeys?.pubkey || '')}
-              variant="person"
-              size={60}
-            />
-            <VStack spacing={2} flex={1}>
-              <Text
-                size={18}
-                bold
-                overpass
-                style={{
-                  color: getPrimaryColor('0'),
-                }}>
-                {getUsername(nostrKeys?.pubkey || '')}
-              </Text>
-              <Text
-                size={16}
-                style={{
-                  color: opacity(getPrimaryColor('0'), 0.4),
-                }}>
-                {truncateMiddle(nostrKeys?.npub || '', 8)}
-              </Text>
-            </VStack>
-          </HStack>
-          <Icon
-            name="fa6-solid:chevron-right"
-            color={opacity(getPrimaryColor('0'), 0.4)}
-            size={22}
-          />
-        </View>
-      </TouchableOpacity>
-    </Link>
+    <ListGroup variant="secondary">
+      <PressableFeedback
+        animation={false}
+        onPress={() => router.navigate('/settings-pages/profile')}>
+        <PressableFeedback.Scale>
+          <ListGroup.Item disabled>
+            <ListGroup.ItemPrefix>
+              <Avatar seed={nostrKeys?.pubkey || ''} name={username} size={40} variant="person" />
+            </ListGroup.ItemPrefix>
+            <ListGroup.ItemContent>
+              <ListGroup.ItemTitle>{username}</ListGroup.ItemTitle>
+              <ListGroup.ItemDescription>
+                {truncateMiddle(nostrKeys?.npub || '', 14)}
+              </ListGroup.ItemDescription>
+            </ListGroup.ItemContent>
+            <ListGroup.ItemSuffix />
+          </ListGroup.Item>
+        </PressableFeedback.Scale>
+        <PressableFeedback.Ripple />
+      </PressableFeedback>
+    </ListGroup>
   );
 };
 
@@ -183,8 +164,59 @@ export const RowButton: React.FC<{
 
 const TRIPLE_TAP_WINDOW_MS = 1500;
 
+const SettingsListLinkItem: React.FC<{
+  href: string;
+  title: string;
+  description?: string;
+  isDanger?: boolean;
+}> = ({ href, title, description, isDanger }) => {
+  const { getRedColor } = useTheme();
+
+  return (
+    <PressableFeedback animation={false} onPress={() => router.navigate(href as any)}>
+      <PressableFeedback.Scale>
+        <ListGroup.Item disabled>
+          <ListGroup.ItemContent>
+            <ListGroup.ItemTitle>
+              {isDanger ? <Text style={{ color: getRedColor('300') }}>{title}</Text> : title}
+            </ListGroup.ItemTitle>
+            {description ? (
+              <ListGroup.ItemDescription>{description}</ListGroup.ItemDescription>
+            ) : null}
+          </ListGroup.ItemContent>
+          <ListGroup.ItemSuffix />
+        </ListGroup.Item>
+      </PressableFeedback.Scale>
+      <PressableFeedback.Ripple />
+    </PressableFeedback>
+  );
+};
+
+const SettingsListActionItem: React.FC<{
+  title: string;
+  description?: string;
+  onPress: () => void;
+}> = ({ title, description, onPress }) => {
+  return (
+    <PressableFeedback animation={false} onPress={onPress}>
+      <PressableFeedback.Scale>
+        <ListGroup.Item disabled>
+          <ListGroup.ItemContent>
+            <ListGroup.ItemTitle>{title}</ListGroup.ItemTitle>
+            {description ? (
+              <ListGroup.ItemDescription>{description}</ListGroup.ItemDescription>
+            ) : null}
+          </ListGroup.ItemContent>
+          <ListGroup.ItemSuffix />
+        </ListGroup.Item>
+      </PressableFeedback.Scale>
+      <PressableFeedback.Ripple />
+    </PressableFeedback>
+  );
+};
+
 const ModalScreen = () => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const { getPrimaryColor } = useTheme();
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
   const setSendLocationEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
   const devMode = useSettingsStore((state) => state.experimental);
@@ -267,125 +299,118 @@ const ModalScreen = () => {
           <ProfileButton />
         </Section>
         <Section title="Preferences">
-          <RowButton label="Theme" href="/settings-pages/theme" isFirst />
-          <RowButton label="Swap Routing" href="/settings-pages/routing" isLast />
+          <ListGroup variant="secondary">
+            <SettingsListLinkItem href="/settings-pages/theme" title="Theme" />
+            <Separator className="mx-4" />
+            <SettingsListLinkItem href="/settings-pages/routing" title="Swap Routing" />
+          </ListGroup>
         </Section>
         <Section title="App Information">
-          <RowButton
-            label="View Source on GitHub"
-            onPress={() => {
-              Linking.openURL('https://github.com/SovranBitcoin/Sovran');
-            }}
-          />
-          <RowButton
-            label="Contact the Developer"
-            onPress={() => {
-              Linking.openURL('https://x.com/KevinKelbie');
-            }}
-          />
+          <ListGroup variant="secondary">
+            <SettingsListActionItem
+              title="View Source on GitHub"
+              onPress={() => {
+                Linking.openURL('https://github.com/SovranBitcoin/Sovran');
+              }}
+            />
+            <Separator className="mx-4" />
+            <SettingsListActionItem
+              title="Contact the Developer"
+              onPress={() => {
+                Linking.openURL('https://x.com/KevinKelbie');
+              }}
+            />
+          </ListGroup>
         </Section>
         <Section title="Security">
           {/* <RowButton label="Passcode" href="/settings-pages/passcode" isFirst /> */}
-          <RowButton label="P2PK Keys" href="/settings-pages/keyring" isLast />
+          <ListGroup variant="secondary">
+            <SettingsListLinkItem href="/settings-pages/keyring" title="P2PK Keys" />
+          </ListGroup>
         </Section>
 
         <Section title="Privacy">
-          <View
-            style={{
-              backgroundColor: getPrimaryColor('900'),
-              borderRadius: 12,
-              padding: 16,
-            }}>
-            <HStack align="center" justify="space-between">
-              <VStack flex={1} style={{ marginRight: 12 }}>
-                <Text size={16} style={{ color: getPrimaryColor('0') }}>
-                  Location Stamps
-                </Text>
-                <Text
-                  size={13}
-                  style={{
-                    color: opacity(getPrimaryColor('0'), 0.4),
-                    marginTop: 4,
-                  }}>
-                  Attach your approximate location when making transactions. (metadata only stored
-                  on your device)
-                </Text>
-              </VStack>
-              <Switch
-                value={sendLocationEnabled ?? false}
-                onValueChange={setSendLocationEnabled}
-                trackColor={{
-                  false: getPrimaryColor('700'),
-                  true: getShadeColor('300'),
-                }}
-                thumbColor={getPrimaryColor('0')}
-              />
-            </HStack>
-          </View>
+          <ListGroup variant="secondary">
+            <PressableFeedback
+              animation={false}
+              onPress={() => setSendLocationEnabled(!(sendLocationEnabled ?? false))}>
+              <PressableFeedback.Scale>
+                <ListGroup.Item disabled>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>Location Stamps</ListGroup.ItemTitle>
+                    <ListGroup.ItemDescription>
+                      Attach your approximate location when making transactions. (metadata only
+                      stored on your device)
+                    </ListGroup.ItemDescription>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix>
+                    <HeroSwitch
+                      isSelected={sendLocationEnabled ?? false}
+                      onSelectedChange={setSendLocationEnabled}
+                    />
+                  </ListGroup.ItemSuffix>
+                </ListGroup.Item>
+              </PressableFeedback.Scale>
+              <PressableFeedback.Ripple />
+            </PressableFeedback>
+          </ListGroup>
         </Section>
 
         {devMode ? (
           <Section title="Recovery">
-            <RowButton label="Recover Wallet" href="/settings-pages/recovery" isFirst isLast />
+            <ListGroup variant="secondary">
+              <SettingsListLinkItem href="/settings-pages/recovery" title="Recover Wallet" />
+            </ListGroup>
           </Section>
         ) : null}
 
         {devMode ? (
           <Section title="Developer">
-            <RowButton label="Export Database" onPress={handleExportDatabase} isFirst />
-            <RowButton label="Free Reserved Proofs" onPress={handleFreeReservedProofs} />
-            <RowButton label="Storage Inspector" href="/settings-pages/storage" />
-            <View
-              style={{
-                backgroundColor: getPrimaryColor('800'),
-                borderColor: getPrimaryColor('700'),
-                borderTopWidth: 1,
-                padding: 12,
-              }}>
-              <HStack align="center" justify="space-between">
-                <Text size={16} style={{ color: getPrimaryColor('0') }}>
-                  Mock Mode
-                </Text>
-                <Switch
-                  value={mockMode}
-                  onValueChange={setMockMode}
-                  trackColor={{
-                    false: getPrimaryColor('700'),
-                    true: getShadeColor('300'),
-                  }}
-                  thumbColor={getPrimaryColor('0')}
-                />
-              </HStack>
-            </View>
-            <View
-              style={{
-                backgroundColor: getPrimaryColor('800'),
-                borderColor: getPrimaryColor('700'),
-                borderTopWidth: 1,
-                borderBottomLeftRadius: 12,
-                borderBottomRightRadius: 12,
-                padding: 12,
-              }}>
-              <HStack align="center" justify="space-between">
-                <Text size={16} style={{ color: getPrimaryColor('0') }}>
-                  Mock Offline
-                </Text>
-                <Switch
-                  value={mockOffline}
-                  onValueChange={setMockOffline}
-                  trackColor={{
-                    false: getPrimaryColor('700'),
-                    true: getShadeColor('300'),
-                  }}
-                  thumbColor={getPrimaryColor('0')}
-                />
-              </HStack>
-            </View>
+            <ListGroup variant="secondary">
+              <SettingsListActionItem title="Export Database" onPress={handleExportDatabase} />
+              <Separator className="mx-4" />
+              <SettingsListActionItem
+                title="Free Reserved Proofs"
+                onPress={handleFreeReservedProofs}
+              />
+              <Separator className="mx-4" />
+              <SettingsListLinkItem href="/settings-pages/storage" title="Storage Inspector" />
+              <Separator className="mx-4" />
+              <PressableFeedback animation={false} onPress={() => setMockMode(!mockMode)}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Mock Mode</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <HeroSwitch isSelected={mockMode} onSelectedChange={setMockMode} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+              <Separator className="mx-4" />
+              <PressableFeedback animation={false} onPress={() => setMockOffline(!mockOffline)}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Mock Offline</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <HeroSwitch isSelected={mockOffline} onSelectedChange={setMockOffline} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            </ListGroup>
           </Section>
         ) : null}
 
         <Section title="Danger Zone" isDanger>
-          <RowButton label="Delete Account" href="/settings-pages/delete" isFirst isLast isDanger />
+          <ListGroup variant="secondary">
+            <SettingsListLinkItem href="/settings-pages/delete" title="Delete Account" isDanger />
+          </ListGroup>
         </Section>
 
         <TouchableOpacity onPress={handleVersionPress}>

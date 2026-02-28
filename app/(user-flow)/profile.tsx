@@ -20,7 +20,7 @@ import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { npubToPubkey } from 'components/blocks/Transaction';
 import { Card } from 'components/ui/Card';
-import { RowButton, ROW_ICON_SIZE, Section } from 'app/settings-pages';
+import { Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from 'components/ui/Avatar';
 import { truncateMiddle } from 'helper/strings';
@@ -51,6 +51,7 @@ import { getUsername } from '@/helper/username';
 import { generateSeededGradient } from '@/helper/avatarGradient';
 import type { VideoPostRecord } from 'components/blocks/nostr/shared';
 import type { StoryUser } from 'components/blocks/nostr/StoriesCarousel';
+import { ListGroup, PressableFeedback } from 'heroui-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 150;
@@ -279,7 +280,7 @@ function TopFollowersComponent({
   }
 
   const handleFollowerPress = (follower: TopFollower) => {
-    router.push({
+    router.navigate({
       pathname: '/(user-flow)/profile' as any,
       params: { npub: follower.npub },
     });
@@ -452,7 +453,7 @@ function BannerWithAvatarComponent({
       <Animated.View
         style={[styles.avatarContainer, { opacity: fadeAnim, transform: [{ scale: fadeAnim }] }]}>
         {hasStories ? (
-          <TouchableOpacity activeOpacity={0.8} onPress={onAvatarPress}>
+          <TouchableOpacity activeOpacity={0.8}>
             <View
               style={[
                 styles.avatarBorder,
@@ -464,7 +465,7 @@ function BannerWithAvatarComponent({
                 size={AVATAR_SIZE}
                 variant="person"
                 name={displayName}
-                loading={false}
+                loading={isLoading}
               />
             </View>
           </TouchableOpacity>
@@ -480,7 +481,7 @@ function BannerWithAvatarComponent({
               size={AVATAR_SIZE}
               variant="person"
               name={displayName}
-              loading={false}
+              loading={isLoading}
             />
           </View>
         )}
@@ -730,7 +731,7 @@ function UserProfileScreen() {
       profile: userInfo ? { name: displayName, picture: userInfo.picture } : undefined,
       videoPosts: userVideoPosts,
     };
-    router.push({
+    router.navigate({
       pathname: '/(stories-flow)/stories' as any,
       params: {
         startIndex: '0',
@@ -898,23 +899,33 @@ function UserProfileScreen() {
               {/* Actions Section */}
               <View style={{ paddingHorizontal: 16 }}>
                 <Section title="Actions">
-                  <RowButton
-                    isFirst
-                    leftIcon={
-                      <Icon
-                        name="mdi:message-text"
-                        size={ROW_ICON_SIZE}
-                        color={opacity(getPrimaryColor('0'), 0.4)}
-                      />
-                    }
-                    label="Message User"
-                    onPress={() => {
-                      router.push({
-                        pathname: '/(user-flow)/userMessages' as any,
-                        params: { pubkey },
-                      });
-                    }}
-                  />
+                  <ListGroup variant="secondary">
+                    <PressableFeedback
+                      animation={false}
+                      onPress={() => {
+                        router.navigate({
+                          pathname: '/(user-flow)/userMessages' as any,
+                          params: { pubkey },
+                        });
+                      }}>
+                      <PressableFeedback.Scale>
+                        <ListGroup.Item disabled>
+                          <ListGroup.ItemPrefix>
+                            <Icon
+                              name="mdi:message-text"
+                              size={20}
+                              color={opacity(getPrimaryColor('0'), 0.4)}
+                            />
+                          </ListGroup.ItemPrefix>
+                          <ListGroup.ItemContent>
+                            <ListGroup.ItemTitle>Message User</ListGroup.ItemTitle>
+                          </ListGroup.ItemContent>
+                          <ListGroup.ItemSuffix />
+                        </ListGroup.Item>
+                      </PressableFeedback.Scale>
+                      <PressableFeedback.Ripple />
+                    </PressableFeedback>
+                  </ListGroup>
                 </Section>
               </View>
 
@@ -923,86 +934,121 @@ function UserProfileScreen() {
               {/* Profile Info Section */}
               <View style={{ paddingHorizontal: 16 }}>
                 <Section title="Profile Info">
-                  <RowButton
-                    isFirst
-                    onPress={() => handleCopy(npub, 'npub_copied')}
-                    rightIcon={
-                      <Icon
-                        name="lets-icons:copy"
-                        size={ROW_ICON_SIZE}
-                        color={opacity(getPrimaryColor('0'), 0.4)}
-                      />
-                    }
-                    leftIcon={
-                      <CurrencyIcon
-                        colors={[opacity(getPrimaryColor('0'), 0.4)]}
-                        width={ROW_ICON_SIZE}
-                        currency="nostr"
-                      />
-                    }
-                    label={truncateMiddle(npub, 10)}
-                  />
-                  {userInfo?.nip05 && (
-                    <RowButton
-                      onPress={() => handleCopy(userInfo.nip05, 'nip05_copied')}
-                      rightIcon={
-                        <Icon
-                          name="lets-icons:copy"
-                          size={ROW_ICON_SIZE}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
-                        />
-                      }
-                      leftIcon={
-                        <Icon
-                          name="mdi:check-decagram"
-                          size={ROW_ICON_SIZE}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
-                        />
-                      }
-                      label={userInfo.nip05}
-                    />
-                  )}
-                  {userInfo?.lud16 && (
-                    <RowButton
-                      onPress={() => handleCopy(userInfo.lud16, 'lud16_copied')}
-                      rightIcon={
-                        <Icon
-                          name="lets-icons:copy"
-                          size={ROW_ICON_SIZE}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
-                        />
-                      }
-                      leftIcon={
-                        <Icon
-                          name="mdi:lightning-bolt"
-                          size={ROW_ICON_SIZE}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
-                        />
-                      }
-                      label={userInfo.lud16}
-                    />
-                  )}
-                  {userInfo?.website && (
-                    <RowButton
-                      isLast
-                      onPress={() => handleOpenLink(userInfo.website)}
-                      rightIcon={
-                        <Icon
-                          name="mdi:open-in-new"
-                          size={ROW_ICON_SIZE}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
-                        />
-                      }
-                      leftIcon={
-                        <Icon
-                          name="mdi:web"
-                          size={ROW_ICON_SIZE}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
-                        />
-                      }
-                      label={userInfo.website}
-                    />
-                  )}
+                  <ListGroup variant="secondary">
+                    <PressableFeedback
+                      animation={false}
+                      onPress={() => handleCopy(npub, 'npub_copied')}>
+                      <PressableFeedback.Scale>
+                        <ListGroup.Item disabled>
+                          <ListGroup.ItemPrefix>
+                            <CurrencyIcon
+                              colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                              width={20}
+                              currency="nostr"
+                            />
+                          </ListGroup.ItemPrefix>
+                          <ListGroup.ItemContent>
+                            <ListGroup.ItemTitle>{truncateMiddle(npub, 10)}</ListGroup.ItemTitle>
+                          </ListGroup.ItemContent>
+                          <ListGroup.ItemSuffix>
+                            <Icon
+                              name="lets-icons:copy"
+                              size={20}
+                              color={opacity(getPrimaryColor('0'), 0.4)}
+                            />
+                          </ListGroup.ItemSuffix>
+                        </ListGroup.Item>
+                      </PressableFeedback.Scale>
+                      <PressableFeedback.Ripple />
+                    </PressableFeedback>
+
+                    {userInfo?.nip05 && (
+                      <PressableFeedback
+                        animation={false}
+                        onPress={() => handleCopy(userInfo.nip05, 'nip05_copied')}>
+                        <PressableFeedback.Scale>
+                          <ListGroup.Item disabled>
+                            <ListGroup.ItemPrefix>
+                              <Icon
+                                name="mdi:check-decagram"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemPrefix>
+                            <ListGroup.ItemContent>
+                              <ListGroup.ItemTitle>{userInfo.nip05}</ListGroup.ItemTitle>
+                            </ListGroup.ItemContent>
+                            <ListGroup.ItemSuffix>
+                              <Icon
+                                name="lets-icons:copy"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemSuffix>
+                          </ListGroup.Item>
+                        </PressableFeedback.Scale>
+                        <PressableFeedback.Ripple />
+                      </PressableFeedback>
+                    )}
+
+                    {userInfo?.lud16 && (
+                      <PressableFeedback
+                        animation={false}
+                        onPress={() => handleCopy(userInfo.lud16, 'lud16_copied')}>
+                        <PressableFeedback.Scale>
+                          <ListGroup.Item disabled>
+                            <ListGroup.ItemPrefix>
+                              <Icon
+                                name="mdi:lightning-bolt"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemPrefix>
+                            <ListGroup.ItemContent>
+                              <ListGroup.ItemTitle>{userInfo.lud16}</ListGroup.ItemTitle>
+                            </ListGroup.ItemContent>
+                            <ListGroup.ItemSuffix>
+                              <Icon
+                                name="lets-icons:copy"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemSuffix>
+                          </ListGroup.Item>
+                        </PressableFeedback.Scale>
+                        <PressableFeedback.Ripple />
+                      </PressableFeedback>
+                    )}
+
+                    {userInfo?.website && (
+                      <PressableFeedback
+                        animation={false}
+                        onPress={() => handleOpenLink(userInfo.website)}>
+                        <PressableFeedback.Scale>
+                          <ListGroup.Item disabled>
+                            <ListGroup.ItemPrefix>
+                              <Icon
+                                name="mdi:web"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemPrefix>
+                            <ListGroup.ItemContent>
+                              <ListGroup.ItemTitle>{userInfo.website}</ListGroup.ItemTitle>
+                            </ListGroup.ItemContent>
+                            <ListGroup.ItemSuffix>
+                              <Icon
+                                name="mdi:open-in-new"
+                                size={20}
+                                color={opacity(getPrimaryColor('0'), 0.4)}
+                              />
+                            </ListGroup.ItemSuffix>
+                          </ListGroup.Item>
+                        </PressableFeedback.Scale>
+                        <PressableFeedback.Ripple />
+                      </PressableFeedback>
+                    )}
+                  </ListGroup>
                 </Section>
               </View>
 
@@ -1019,7 +1065,7 @@ function UserProfileScreen() {
               text: 'Send Message',
               variant: 'primary',
               onPress: async () => {
-                router.push({
+                router.navigate({
                   pathname: '/(user-flow)/userMessages' as any,
                   params: { pubkey },
                 });

@@ -1,5 +1,5 @@
 import { Avatar as HeroAvatar } from 'heroui-native/avatar';
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -28,7 +28,6 @@ function getGradientTextColor(gradientColor: string): string {
   if (!match) return 'rgba(17, 24, 39, 0.92)';
 
   const hue = Number(match[1]);
-  // Keep text tied to gradient hue, but with strong dark contrast.
   return `hsla(${hue}, 34%, 14%, 0.92)`;
 }
 
@@ -36,7 +35,6 @@ function getFallbackText(name: string | undefined, seed: string | undefined, siz
   if (name && name.trim().length > 0) {
     const cleaned = name.trim().replace(/[_-]+/g, ' ');
     if (size >= 52) {
-      // Large avatars can show the first name/word instead of initials.
       return cleaned.split(/\s+/)[0] ?? cleaned;
     }
     return cleaned
@@ -66,6 +64,20 @@ export const Avatar = ({
   useEffect(() => {
     prefetchImage(picture);
   }, [picture]);
+
+  // Track whether the current picture has finished loading (or erroring).
+  // Resets synchronously when the picture URL changes so the skeleton
+  // persists seamlessly across metadata-loading → image-loading.
+  const [imageSettled, setImageSettled] = useState(!picture);
+  const prevPicRef = useRef(picture);
+  if (picture !== prevPicRef.current) {
+    prevPicRef.current = picture;
+    setImageSettled(!picture);
+  }
+
+  const handleImageSettled = useCallback(() => setImageSettled(true), []);
+
+  const showSkeleton = loading || !imageSettled;
 
   const borderRadius = variant === 'person' ? size / 2 : Math.round(size * 0.25);
   const statusIconSize = size * 0.33;
@@ -104,9 +116,15 @@ export const Avatar = ({
         alt={alt || defaultAlt}
         variant="soft"
         color="accent"
-        animation={loading ? 'disable-all' : undefined}
+        animation={showSkeleton ? 'disable-all' : undefined}
         style={avatarStyle}>
-        {picture ? <HeroAvatar.Image source={{ uri: picture }} style={avatarStyle} /> : null}
+        {picture ? (
+          <HeroAvatar.Image
+            source={{ uri: picture }}
+            style={avatarStyle}
+            onLoadEnd={handleImageSettled}
+          />
+        ) : null}
         <HeroAvatar.Fallback
           delayMs={0}
           styles={{
@@ -160,7 +178,7 @@ export const Avatar = ({
         </HeroAvatar.Fallback>
       </HeroAvatar>
 
-      {loading ? (
+      {showSkeleton ? (
         <Skeleton
           style={{
             ...avatarStyle,

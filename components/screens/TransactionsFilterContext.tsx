@@ -60,7 +60,7 @@ export function TransactionsFilterProvider({
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const openFilterSheet = useCallback(() => {
-    router.push({
+    router.navigate({
       pathname: '/filters',
       params: {
         currency,

@@ -239,7 +239,7 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
 
   const handleStoryPress = useCallback(
     (index: number) => {
-      router.push({
+      router.navigate({
         pathname: '/(stories-flow)/stories' as any,
         params: {
           startIndex: String(index),
@@ -269,7 +269,13 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
               onPress={() => handleStoryPress(index)}
               activeOpacity={0.7}>
               <GradientRing>
-                <Avatar picture={user.profile?.picture} seed={user.pubkey} size={AVATAR_SIZE} />
+                <Avatar
+                  picture={user.profile?.picture}
+                  seed={user.pubkey}
+                  name={user.profile?.name}
+                  size={AVATAR_SIZE}
+                  variant="person"
+                />
               </GradientRing>
               <Text
                 size={11}

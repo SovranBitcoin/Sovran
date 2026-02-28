@@ -7,12 +7,12 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import Icon from 'assets/icons';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { CocoManager } from 'helper/coco/manager';
 import { useMintManagement } from 'hooks/coco/useMintManagement';
 import { useNavigation, router } from 'expo-router';
 import { Mint } from 'coco-cashu-core';
 import opacity from 'hex-color-opacity';
+import { Button, Card } from 'heroui-native';
 
 type RecoveryState = 'idle' | 'recovering' | 'complete' | 'error';
 
@@ -135,39 +135,28 @@ const RecoveryScreen: React.FC = () => {
         </Text>
       </VStack>
 
-      <View className="w-full rounded-xl p-4" style={{ backgroundColor: getPrimaryColor('900') }}>
-        <HStack spacing={12} className="items-start">
-          <Icon name="mdi:information" size={24} color={opacity(getPrimaryColor('0'), 0.4)} />
-          <VStack spacing={4} className="flex-1">
-            <Text size={14} medium style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
-              What happens during recovery?
-            </Text>
-            <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4), lineHeight: 20 }}>
-              • Contacts each mint to restore proofs{'\n'}• Recovers any interrupted transactions
-              {'\n'}• This may take several minutes
-            </Text>
-          </VStack>
-        </HStack>
-      </View>
+      <Card variant="secondary" className="w-full">
+        <Card.Body>
+          <HStack spacing={12} className="items-start">
+            <Icon name="mdi:information" size={24} color={opacity(getPrimaryColor('0'), 0.4)} />
+            <VStack spacing={4} className="flex-1">
+              <Card.Title>What happens during recovery?</Card.Title>
+              <Card.Description>
+                - Contacts each mint to restore proofs{'\n'}- Recovers interrupted transactions
+                {'\n'}- This may take several minutes
+              </Card.Description>
+            </VStack>
+          </HStack>
+        </Card.Body>
+      </Card>
 
       <VStack spacing={12} className="w-full">
-        <TouchableOpacity
-          onPress={handleStartRecovery}
-          className="w-full items-center rounded-xl p-4"
-          style={{ backgroundColor: getPrimaryColor('0') }}>
-          <Text size={16} bold style={{ color: getPrimaryColor('950') }}>
-            Start Recovery
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handleClose}
-          className="w-full items-center rounded-xl p-4"
-          style={{ backgroundColor: getPrimaryColor('800') }}>
-          <Text size={16} medium style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
-            Cancel
-          </Text>
-        </TouchableOpacity>
+        <Button variant="primary" className="w-full" onPress={handleStartRecovery}>
+          <Button.Label>Start Recovery</Button.Label>
+        </Button>
+        <Button variant="secondary" className="w-full" onPress={handleClose}>
+          <Button.Label>Cancel</Button.Label>
+        </Button>
       </VStack>
     </VStack>
   );
@@ -184,45 +173,47 @@ const RecoveryScreen: React.FC = () => {
         </Text>
       </VStack>
 
-      <View className="w-full rounded-xl p-4" style={{ backgroundColor: getPrimaryColor('900') }}>
-        <VStack spacing={16}>
-          {mints.map((mint, index) => (
-            <MintRecoveryRow
-              key={mint.mintUrl}
-              mint={mint}
-              index={index}
-              currentIndex={currentMintIndex}
-              result={results[index]}
-            />
-          ))}
+      <Card variant="secondary" className="w-full">
+        <Card.Body>
+          <VStack spacing={16}>
+            {mints.map((mint, index) => (
+              <MintRecoveryRow
+                key={mint.mintUrl}
+                mint={mint}
+                index={index}
+                currentIndex={currentMintIndex}
+                result={results[index]}
+              />
+            ))}
 
-          {/* Pending transactions row */}
-          <HStack spacing={12} className="items-center">
-            <View className="h-6 w-6 items-center justify-center">
-              {currentMintIndex === mints.length ? (
-                <ActivityIndicator size="small" color={getPrimaryColor('0')} />
-              ) : currentMintIndex > mints.length ? (
-                <Icon name="mdi:check-circle" size={24} color={getGreenColor('400')} />
-              ) : (
-                <View
-                  className="h-4 w-4 rounded-full"
-                  style={{ backgroundColor: getPrimaryColor('600') }}
-                />
-              )}
-            </View>
-            <Text
-              size={14}
-              style={{
-                color:
-                  currentMintIndex >= mints.length
-                    ? getPrimaryColor('0')
-                    : opacity(getPrimaryColor('0'), 0.33),
-              }}>
-              Recovering pending transactions
-            </Text>
-          </HStack>
-        </VStack>
-      </View>
+            {/* Pending transactions row */}
+            <HStack spacing={12} className="items-center">
+              <View className="h-6 w-6 items-center justify-center">
+                {currentMintIndex === mints.length ? (
+                  <ActivityIndicator size="small" color={getPrimaryColor('0')} />
+                ) : currentMintIndex > mints.length ? (
+                  <Icon name="mdi:check-circle" size={24} color={getGreenColor('400')} />
+                ) : (
+                  <View
+                    className="h-4 w-4 rounded-full"
+                    style={{ backgroundColor: getPrimaryColor('600') }}
+                  />
+                )}
+              </View>
+              <Text
+                size={14}
+                style={{
+                  color:
+                    currentMintIndex >= mints.length
+                      ? getPrimaryColor('0')
+                      : opacity(getPrimaryColor('0'), 0.33),
+                }}>
+                Recovering pending transactions
+              </Text>
+            </HStack>
+          </VStack>
+        </Card.Body>
+      </Card>
     </VStack>
   );
 
@@ -259,39 +250,36 @@ const RecoveryScreen: React.FC = () => {
 
       {/* Results summary */}
       <ScrollView className="max-h-48 w-full" contentContainerStyle={{ paddingVertical: 8 }}>
-        <View className="w-full rounded-xl p-4" style={{ backgroundColor: getPrimaryColor('900') }}>
-          <VStack spacing={12}>
-            {results.map((result, index) => (
-              <HStack key={index} spacing={12} className="items-start">
-                <Icon
-                  name={result.success ? 'mdi:check-circle' : 'mdi:close-circle'}
-                  size={20}
-                  color={result.success ? getGreenColor('400') : getRedColor('400')}
-                />
-                <VStack spacing={2} className="flex-1">
-                  <Text size={13} numberOfLines={1} style={{ color: getPrimaryColor('0') }}>
-                    {new URL(result.mint).hostname}
-                  </Text>
-                  {result.error && (
-                    <Text size={12} style={{ color: getRedColor('400') }}>
-                      {result.error}
+        <Card variant="secondary" className="w-full">
+          <Card.Body>
+            <VStack spacing={12}>
+              {results.map((result, index) => (
+                <HStack key={index} spacing={12} className="items-start">
+                  <Icon
+                    name={result.success ? 'mdi:check-circle' : 'mdi:close-circle'}
+                    size={20}
+                    color={result.success ? getGreenColor('400') : getRedColor('400')}
+                  />
+                  <VStack spacing={2} className="flex-1">
+                    <Text size={13} numberOfLines={1} style={{ color: getPrimaryColor('0') }}>
+                      {new URL(result.mint).hostname}
                     </Text>
-                  )}
-                </VStack>
-              </HStack>
-            ))}
-          </VStack>
-        </View>
+                    {result.error && (
+                      <Text size={12} style={{ color: getRedColor('400') }}>
+                        {result.error}
+                      </Text>
+                    )}
+                  </VStack>
+                </HStack>
+              ))}
+            </VStack>
+          </Card.Body>
+        </Card>
       </ScrollView>
 
-      <TouchableOpacity
-        onPress={handleClose}
-        className="w-full items-center rounded-xl p-4"
-        style={{ backgroundColor: getPrimaryColor('0') }}>
-        <Text size={16} bold style={{ color: getPrimaryColor('950') }}>
-          Done
-        </Text>
-      </TouchableOpacity>
+      <Button variant="primary" className="w-full" onPress={handleClose}>
+        <Button.Label>Done</Button.Label>
+      </Button>
     </VStack>
   );
 
@@ -319,23 +307,12 @@ const RecoveryScreen: React.FC = () => {
       </VStack>
 
       <VStack spacing={12} className="w-full">
-        <TouchableOpacity
-          onPress={handleStartRecovery}
-          className="w-full items-center rounded-xl p-4"
-          style={{ backgroundColor: getPrimaryColor('0') }}>
-          <Text size={16} bold style={{ color: getPrimaryColor('950') }}>
-            Try Again
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={handleClose}
-          className="w-full items-center rounded-xl p-4"
-          style={{ backgroundColor: getPrimaryColor('800') }}>
-          <Text size={16} medium style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
-            Close
-          </Text>
-        </TouchableOpacity>
+        <Button variant="primary" className="w-full" onPress={handleStartRecovery}>
+          <Button.Label>Try Again</Button.Label>
+        </Button>
+        <Button variant="secondary" className="w-full" onPress={handleClose}>
+          <Button.Label>Close</Button.Label>
+        </Button>
       </VStack>
     </VStack>
   );

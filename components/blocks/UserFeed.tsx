@@ -401,7 +401,7 @@ export const RepostCard = React.memo(function RepostCard({
   const threadEventId = originalEvent?.id || _repostEvent.id;
 
   const navigateToThread = useCallback(() => {
-    router.push({
+    router.navigate({
       pathname: '/(user-flow)/thread' as any,
       params: { eventId: threadEventId },
     });
@@ -442,7 +442,7 @@ export const RepostCard = React.memo(function RepostCard({
           onPressIn={suppressThreadTapStart}
           onPressOut={suppressThreadTapEnd}
           onPress={() =>
-            router.push({
+            router.navigate({
               pathname: '/(user-flow)/profile' as any,
               params: { pubkey: reposterPubkey },
             })
@@ -1033,7 +1033,7 @@ function UserFeedInner({
           repostPendingDirection: engagement.repostPendingDirection,
           likePendingDirection: engagement.likePendingDirection,
           onCommentPress: () =>
-            router.push({
+            router.navigate({
               pathname: '/(user-flow)/thread' as any,
               params: { eventId: event.id },
             }),
@@ -1251,7 +1251,7 @@ function UserFeedInner({
           repostPendingDirection: engagement.repostPendingDirection,
           likePendingDirection: engagement.likePendingDirection,
           onCommentPress: () =>
-            router.push({
+            router.navigate({
               pathname: '/(user-flow)/thread' as any,
               params: { eventId: event.id },
             }),

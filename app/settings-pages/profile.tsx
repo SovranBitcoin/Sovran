@@ -1,26 +1,20 @@
 import React, { useState } from 'react';
-import { SafeAreaView, Clipboard, ScrollView } from 'react-native';
-import { useTheme } from 'providers/ThemeProvider';
+import { SafeAreaView, Clipboard, ScrollView, View } from 'react-native';
 import { useMnemonic, useCashuMnemonic } from 'hooks/useSecureStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import Container from 'components/blocks/Container';
 import Icon from 'assets/icons';
 import { popup } from '@/helper/popup';
-import { VStack } from 'components/ui/View/VStack';
-import { HStack } from 'components/ui/View/HStack';
-import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
-import { Skeleton } from 'components/ui/Skeleton';
 import { Avatar } from 'components/ui/Avatar';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import opacity from 'hex-color-opacity';
+import { Button, Card, Description, Input, Label, TextField, useThemeColor } from 'heroui-native';
 import { getUsername } from '@/helper/username';
 
 const Profile = () => {
-  const { getPrimaryColor } = useTheme();
   const { value: mnemonic, loading: mnemonicLoading } = useMnemonic();
   const { value: cashuMnemonic, loading: cashuMnemonicLoading } = useCashuMnemonic();
   const { keys: nostrKeys, isLoading: nostrKeysLoading } = useNostrKeysContext();
+  const mutedColor = useThemeColor('muted');
   const [visibleFields, setVisibleFields] = useState({
     mnemonic: false,
     nsec: false,
@@ -30,7 +24,7 @@ const Profile = () => {
   const handleCopy = (text: string, messageKey: string) => {
     if (text) {
       Clipboard.setString(text);
-      popup({ message: messageKey, type: 'success' });
+      popup({ message: messageKey, type: 'success', duration: 1000 });
     }
   };
 
@@ -40,6 +34,8 @@ const Profile = () => {
       [field]: !prev[field],
     }));
   };
+
+  const username = getUsername(nostrKeys?.pubkey || '');
 
   const renderCopyableDetail = (
     label: string,
@@ -51,98 +47,55 @@ const Profile = () => {
   ) => {
     const showEyeIcon = fieldKey !== null;
     const isVisible = fieldKey ? visibleFields[fieldKey] : true;
+    const resolvedValue = isLoading ? 'Loading...' : value || 'N/A';
+    const shouldObscure = showEyeIcon && !isVisible;
+    const multiline = !shouldObscure && resolvedValue.length > 56;
 
     return (
-      <VStack
-        blur
-        className="rounded-lg"
-        style={{
-          backgroundColor: getPrimaryColor('800'),
-          marginBottom: 8,
-          marginTop: 8,
-          padding: 8,
-        }}>
-        <Text
-          bold
-          overpass
-          size={14}
-          style={{
-            color: opacity(getPrimaryColor('0'), 0.4),
-          }}>
-          {label}
-        </Text>
-        <HStack align="center" justify="space-between">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexShrink: 1 }}>
-            {isLoading ? (
-              <Skeleton
-                style={{
-                  height: 32,
-                  width: 100,
-                  backgroundColor: getPrimaryColor('700'),
-                }}
-              />
-            ) : (
-              <Text
-                size={16}
-                style={{
-                  color: getPrimaryColor('0'),
-                }}>
-                {showEyeIcon && !isVisible ? '••••••••' : value || 'N/A'}
-              </Text>
-            )}
-          </ScrollView>
-          <HStack align="center" style={{ marginLeft: 8 }}>
-            {showEyeIcon && !isLoading && (
-              <TouchableOpacity onPress={() => toggleFieldVisibility(fieldKey)}>
-                <View
-                  blur
-                  className="rounded"
-                  style={{
-                    backgroundColor: getPrimaryColor('700'),
-                    padding: 8,
-                    marginLeft: 4,
-                  }}>
-                  <Icon
-                    name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
-                    size={16}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                </View>
-              </TouchableOpacity>
-            )}
-            {!isLoading && (
-              <TouchableOpacity onPress={() => handleCopy(value, messageKey)}>
-                <View
-                  blur
-                  className="rounded"
-                  style={{
-                    backgroundColor: getPrimaryColor('700'),
-                    padding: 8,
-                    marginLeft: 4,
-                  }}>
-                  <Icon
-                    name="lets-icons:copy"
-                    size={16}
-                    color={opacity(getPrimaryColor('0'), 0.4)}
-                  />
-                </View>
-              </TouchableOpacity>
-            )}
-          </HStack>
-        </HStack>
-        {description && (
-          <Text
-            italic
-            overpass
-            size={12}
-            style={{
-              color: opacity(getPrimaryColor('0'), 0.66),
-              marginTop: 4,
-            }}>
-            {description}
-          </Text>
-        )}
-      </VStack>
+      <Card variant="secondary" className="mb-3">
+        <Card.Body className="gap-2">
+          <TextField>
+            <Label>{label}</Label>
+            <Input
+              value={resolvedValue}
+              editable={false}
+              secureTextEntry={shouldObscure}
+              multiline={multiline}
+              numberOfLines={multiline ? 3 : 1}
+              className="w-full"
+            />
+            {!isLoading ? (
+              <View className="mt-2 w-full flex-row gap-2">
+                {showEyeIcon ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1"
+                    onPress={() => toggleFieldVisibility(fieldKey)}>
+                    <Icon
+                      name={isVisible ? 'majesticons:eye-off' : 'majesticons:eye'}
+                      size={15}
+                      color={mutedColor}
+                    />
+                    <Button.Label style={{ color: mutedColor }}>
+                      {isVisible ? 'Hide' : 'Show'}
+                    </Button.Label>
+                  </Button>
+                ) : null}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className={showEyeIcon ? 'flex-1' : 'w-full'}
+                  onPress={() => handleCopy(value, messageKey)}>
+                  <Icon name="lets-icons:copy" size={15} color={mutedColor} />
+                  <Button.Label style={{ color: mutedColor }}>Copy</Button.Label>
+                </Button>
+              </View>
+            ) : null}
+            {description ? <Description>{description}</Description> : null}
+          </TextField>
+        </Card.Body>
+      </Card>
     );
   };
 
@@ -150,27 +103,18 @@ const Profile = () => {
     <Container>
       <ScrollView className="px-4">
         <SafeAreaView>
-          <Text
-            bold
-            overpass
-            size={13}
-            className="uppercase tracking-wide"
-            style={{
-              color: opacity(getPrimaryColor('0'), 0.5),
-              marginBottom: 8,
-              marginLeft: 8,
-            }}>
+          <Text bold overpass size={13} className="mb-2 ml-2 uppercase tracking-wide">
             Profile Details
           </Text>
-
-          <VStack align="center" style={{ marginBottom: 16, marginTop: 16 }}>
-            <Avatar
-              seed={nostrKeys?.pubkey}
-              name={getUsername(nostrKeys?.pubkey || '')}
-              variant="person"
-              size={100}
-            />
-          </VStack>
+          <Card variant="secondary" className="mb-4">
+            <Card.Body className="items-center py-5">
+              <Avatar seed={nostrKeys?.pubkey || ''} name={username} size={72} variant="person" />
+              <Card.Title className="mt-3">{username}</Card.Title>
+              <Card.Description className="mt-1">
+                {nostrKeysLoading ? 'Loading public key...' : nostrKeys?.npub || 'N/A'}
+              </Card.Description>
+            </Card.Body>
+          </Card>
 
           {renderCopyableDetail(
             'NIP06:',
@@ -182,7 +126,7 @@ const Profile = () => {
           )}
 
           {renderCopyableDetail(
-            'Npub:',
+            'NPUB:',
             nostrKeys?.npub || '',
             'npub_copied',
             null,
@@ -191,7 +135,7 @@ const Profile = () => {
           )}
 
           {renderCopyableDetail(
-            'Nsec:',
+            'NSEC:',
             nostrKeys?.nsec || '',
             'nsec_copied',
             'nsec',

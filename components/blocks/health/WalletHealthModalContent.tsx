@@ -10,7 +10,7 @@ import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
 import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
 import { TOTAL_BASIS_POINTS, useMintDistributionStore } from 'stores/mintDistributionStore';
-import { RowButton, ROW_ICON_SIZE, Section } from 'app/settings-pages';
+import { ROW_ICON_SIZE, Section } from 'app/settings-pages';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -22,6 +22,7 @@ import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurr
 import type { HealthCta } from './walletHealth';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
 import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
+import { ListGroup, PressableFeedback } from 'heroui-native';
 
 const HERO_PADDING = 18;
 const HEART_RING_SIZE = 72;
@@ -460,17 +461,25 @@ export function WalletHealthModalContent({
     <Animated.View style={bodyAnimStyle}>
       <View style={{ paddingHorizontal: 16 }}>
         <Section title="Actions">
-          {actionRows.map((r, i) => (
-            <RowButton
-              key={r.key}
-              isFirst={i === 0}
-              isLast={i === actionRows.length - 1}
-              leftIcon={r.leftIcon}
-              label={r.label}
-              value={r.value}
-              onPress={r.onPress}
-            />
-          ))}
+          <ListGroup variant="secondary">
+            {actionRows.map((r) => (
+              <PressableFeedback key={r.key} animation={false} onPress={r.onPress}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemPrefix>{r.leftIcon}</ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>{r.label}</ListGroup.ItemTitle>
+                      {r.value ? (
+                        <ListGroup.ItemDescription>{r.value}</ListGroup.ItemDescription>
+                      ) : null}
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix />
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            ))}
+          </ListGroup>
         </Section>
       </View>
     </Animated.View>

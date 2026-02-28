@@ -66,15 +66,15 @@ function HealthModalScreen() {
 
   const handleAction = useCallback((action: HealthCta) => {
     if (action.type === 'openPendingEcash') {
-      router.push('/pendingEcash');
+      router.navigate('/pendingEcash');
       return;
     }
     if (action.type === 'openBalanceSplit') {
-      router.push({ pathname: '/(mint-flow)/distribution', params: { unit: action.unit } });
+      router.navigate({ pathname: '/(mint-flow)/distribution', params: { unit: action.unit } });
       return;
     }
     if (action.type === 'openRebalancePlan') {
-      router.push({ pathname: '/(mint-flow)/rebalancePlan', params: { unit: action.unit } });
+      router.navigate({ pathname: '/(mint-flow)/rebalancePlan', params: { unit: action.unit } });
       return;
     }
   }, []);
