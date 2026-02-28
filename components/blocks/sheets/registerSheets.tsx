@@ -1,4 +1,3 @@
-import { default as registerPopup } from 'components/blocks/sheets/popup';
 import { default as registerButtonHandler } from 'components/blocks/sheets/buttonHandler';
 import { default as registerEmojiPicker } from 'components/blocks/sheets/emoji-picker';
 import { default as registerProfileSwitcher } from 'components/blocks/sheets/profileSwitcher';
@@ -33,7 +32,6 @@ import { default as registerProfileSwitcher } from 'components/blocks/sheets/pro
  * @see {@link https://github.com/ammarahm-ed/react-native-actions-sheet}
  */
 export function registerAllSheets({ context }: { context?: 'global' }) {
-  registerPopup({ context });
   registerButtonHandler({ context });
   registerEmojiPicker({ context });
   registerProfileSwitcher({ context });

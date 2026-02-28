@@ -47,6 +47,7 @@ import { CocoProvider } from '@/helper/coco/CocoProvider';
 import { HeroTransitionProvider } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { useProfileStore } from '@/stores/profileStore';
 import { useAppBalance } from '@/hooks/useAppBalance';
+import PopupHost from '@/components/blocks/popup/PopupHost';
 
 // Prevent splash screen from auto-hiding until fonts are loaded
 SplashScreen.preventAutoHideAsync();
@@ -209,6 +210,7 @@ function RootLayoutContent() {
           <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
         ))}
       </Stack>
+      <PopupHost />
     </NavigationThemeProvider>
   );
 }
