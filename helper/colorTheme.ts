@@ -6,6 +6,85 @@ import {
 } from '../config/backgroundImageThemes';
 
 type ThemeVariables = Record<string, string | number>;
+const SHADE_300_HEX = '#ED0C46';
+
+/**
+ * Perceived brightness of a hex color (0 = black, 1 = white).
+ * Uses the ITU-R BT.601 luma formula.
+ */
+function hexLuminance(hex: string): number {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.slice(0, 2), 16) / 255;
+  const g = parseInt(c.slice(2, 4), 16) / 255;
+  const b = parseInt(c.slice(4, 6), 16) / 255;
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+/**
+ * Map a 0-950 palette to HeroUI Native's semantic theme variables.
+ *
+ * Convention in themes.js:
+ *   950 = background end   (darkest for dark themes, lightest for light themes)
+ *   0   = foreground end   (lightest for dark themes, darkest for light themes)
+ */
+function getHeroUISemanticVars(palette: Record<number, string>): Record<string, string> {
+  const bgIsDark = hexLuminance(palette[950]) < 0.5;
+  const accentIsDark = hexLuminance(SHADE_300_HEX) < 0.5;
+
+  return {
+    '--background': palette[950],
+    '--foreground': palette[0],
+
+    '--surface': palette[900],
+    '--surface-foreground': palette[50],
+    '--surface-secondary': palette[800],
+    '--surface-secondary-foreground': palette[50],
+    '--surface-tertiary': palette[700],
+    '--surface-tertiary-foreground': palette[100],
+
+    '--overlay': palette[800],
+    '--overlay-foreground': palette[50],
+
+    '--muted': palette[400],
+
+    '--default': palette[800],
+    '--default-foreground': palette[100],
+
+    // Keep interactive "active" states on the shared shade scale.
+    '--accent': palette[500],
+    '--accent-foreground': accentIsDark ? palette[0] : palette[950],
+
+    '--segment': palette[900],
+    '--segment-foreground': palette[50],
+
+    '--field-background': palette[800],
+    '--field-foreground': palette[0],
+    '--field-placeholder': palette[400],
+    '--field-border': 'transparent',
+
+    '--border': 'transparent',
+    '--separator': palette[700],
+    '--focus': palette[500],
+    '--link': palette[400],
+
+    '--success': '#0CED3E',
+    '--success-foreground': bgIsDark ? '#E0F8E0' : '#089A2C',
+    '--warning': '#F0C800',
+    '--warning-foreground': bgIsDark ? '#FFF8DB' : '#7A6500',
+    '--danger': '#ED0C46',
+    '--danger-foreground': bgIsDark ? '#F8E0E6' : '#9A082E',
+
+    '--surface-shadow': bgIsDark
+      ? '0 0 0 0 transparent inset'
+      : '0 2px 4px 0 rgba(0,0,0,0.04), 0 1px 2px 0 rgba(0,0,0,0.06), 0 0 1px 0 rgba(0,0,0,0.06)',
+    '--overlay-shadow': bgIsDark
+      ? '0 0 1px 0 rgba(255,255,255,0.2) inset'
+      : '0 2px 8px 0 rgba(0,0,0,0.02), 0 -6px 12px 0 rgba(0,0,0,0.01), 0 14px 28px 0 rgba(0,0,0,0.03)',
+    '--field-shadow': bgIsDark
+      ? '0 0 0 0 transparent inset'
+      : '0 2px 4px 0 rgba(0,0,0,0.04), 0 1px 2px 0 rgba(0,0,0,0.06), 0 0 1px 0 rgba(0,0,0,0.06)',
+  };
+}
 
 /**
  * Shade colors that persist across all themes
@@ -13,7 +92,7 @@ type ThemeVariables = Record<string, string | number>;
 const shadeColors = {
   '--app-shade-100': '#FF5841',
   '--app-shade-200': '#FF353C',
-  '--app-shade-300': '#ED0C46',
+  '--app-shade-300': SHADE_300_HEX,
   '--app-shade-400': '#CF014E',
   '--app-shade-500': '#BF004E',
   // Red colors
@@ -123,6 +202,7 @@ function createThemeVars(themeName: string, palette: Record<number, string>): Th
     ...shadeColors,
     ...getDominantColorVars(themeName),
     ...getGradientColorVars(themeName),
+    ...getHeroUISemanticVars(palette),
   };
 }
 
