@@ -2,265 +2,159 @@
 
 ## Project Overview
 
-This is a React Native/Expo app using NativeWind + Tailwind CSS with a comprehensive theming system. The app supports 30+ themes with dynamic color switching and background image themes.
+React Native/Expo app using Uniwind (Tailwind CSS v4) + HeroUI Native for theming. Supports 40+ themes with dynamic runtime switching and 6 background image (wallpaper) themes.
 
 ## Directory Structure
 
 - `components/ui/` - Basic UI components (Text, View, Button, Card, etc.)
 - `components/blocks/` - Complex components (sheets, feeds, transactions, etc.)
-- `providers/ThemeProvider.tsx` - Theme context and functions
-- `themes.js` - Theme definitions with 0-950 color scales
-- `helper/colorTheme.ts` - CSS variable mappings for NativeWind
-- `redux/settings/` - Theme state management
+- `providers/ThemeProvider.tsx` - Thin theme context (name + setter only)
+- `themes.ts` - Typed theme palette definitions (0-950 color scales)
+- `helper/themeEngine.ts` - Single entry point: maps palettes to HeroUI semantic CSS vars
+- `config/backgroundImageThemes.ts` - Wallpaper image themes (auto-generated)
+- `global.css` - Static color tokens + wallpaper vars
+- `stores/settingsStore.ts` - Theme persistence (Zustand + AsyncStorage)
 - `app/settings-pages/theme.tsx` - Theme selection UI
 
-## Theme Architecture
+## Theme Architecture (Single Source of Truth)
 
-### 1. Theme Definition System
+### How It Works
 
-- **Theme Files**: `themes.js` contains all theme definitions with 0-950 color scales
-- **Color Variables**: `helper/colorTheme.ts` maps themes to CSS variables using NativeWind's `vars()`
-- **Tailwind Config**: `tailwind.config.js` extends colors with dynamic CSS variables
-- **Available Themes**: 30+ themes including named themes (navy, coral, ice, etc.) and background image themes (deepocean, cosmicpurple, etc.)
+1. `themes.ts` defines 40+ palettes as 0-950 shade objects.
+2. `helper/themeEngine.ts` maps each palette to **HeroUI semantic CSS variables** (`--background`, `--foreground`, `--surface`, `--accent`, etc.).
+3. `ThemeProvider` calls `Uniwind.updateCSSVariables()` when the theme changes — this is the ONLY place CSS vars are written.
+4. `heroui-native/styles` (imported in `global.css`) automatically generates Tailwind tokens (`--color-background`, `--color-surface`, etc.) from those semantic vars.
+5. Components use **Tailwind classes** (`bg-background`, `text-foreground`, `bg-surface-secondary`) or `useThemeColor()` from `heroui-native` for runtime hex values.
 
-### 2. Theme Provider System
+### Semantic Color Tokens (HeroUI)
 
-- **Provider**: `providers/ThemeProvider.tsx` manages theme state and provides theme functions
-- **Redux Integration**: Theme state persisted in Redux store (`redux/settings/`)
-- **CSS Variables**: Dynamic theming via CSS variables applied at root level
+| Token | Purpose | Tailwind class |
+|-------|---------|---------------|
+| `background` | App background | `bg-background` |
+| `foreground` | Primary text | `text-foreground` |
+| `surface` | Card/section bg | `bg-surface` |
+| `surface-secondary` | Elevated surface | `bg-surface-secondary` |
+| `surface-tertiary` | Tertiary surface | `bg-surface-tertiary` |
+| `overlay` | Modal/popover bg | `bg-overlay` |
+| `default` | Default component bg | `bg-default` |
+| `accent` | Interactive accent | `bg-accent`, `text-accent` |
+| `muted` | Muted/placeholder | `text-muted` |
+| `separator` | Dividers | `border-separator` |
+| `danger` | Error/destructive | `text-danger`, `bg-danger` |
+| `success` | Success states | `text-success`, `bg-success` |
+| `warning` | Warning states | `text-warning`, `bg-warning` |
+| `link` | Link text | `text-link` |
 
-## Color System Patterns
+Each token has a `-foreground` variant for text on that background (e.g., `text-surface-foreground`).
 
-### 1. Primary Color Scale (0-950)
+### Static Colors (Never Change With Theme)
 
-```typescript
-// Use getPrimaryColor(shade) for theme-aware colors
-const { getPrimaryColor } = useTheme();
-backgroundColor: getPrimaryColor('800'); // Dark background
-color: getPrimaryColor('0'); // Light text
-borderColor: getPrimaryColor('100'); // Subtle border
-```
+Defined directly in `global.css @theme` — no CSS variable indirection:
 
-### 2. Specialized Color Functions
+- `shade-100..500` — Brand accent reds (`#FF5841` → `#BF004E`)
+- `red-100..500` — Error states (`#F8E0E6` → `#9A082E`)
+- `green-100..500` — Success states (`#E0F8E0` → `#089A2C`)
+- `purple-100..500` — Purple scale (`#E0E0F8` → `#4B0082`)
+- `blue-100..500` — Info states (`#DBEAFE` → `#1D4ED8`)
+- `yellow-100..500` — Warning states (`#F8F8E0` → `#9A9A00`)
 
-```typescript
-const { getShadeColor, getRedColor, getGreenColor, getPurpleColor } = useTheme();
-// Shade colors (accent/primary brand colors)
-backgroundColor: getShadeColor('300'); // Brand accent
-// Semantic colors
-color: getRedColor('500'); // Error states
-color: getGreenColor('300'); // Success states
-```
+Use as: `text-shade-300`, `bg-red-100`, `text-green-300`, etc.
 
-### 3. Tailwind ClassName Patterns
+### Wallpaper-Only Variables
 
-```typescript
-// Use Tailwind classes with CSS variables
-className = 'bg-primary-800 text-primary-0 border-primary-100';
-className = 'text-primary-400'; // Muted text
-className = 'bg-primary-700/75'; // Semi-transparent
-```
+Background image themes provide extra vars (dominant/gradient) extracted from images. These are the only dynamic CSS vars besides HeroUI semantics:
+
+- `dominant-100..500` — 5 visually distinct colors from the image
+- `gradient-100..300` — Light/mid/dark gradient colors
+
+Use as: `bg-dominant-300`, `text-gradient-100`, etc.
 
 ## Component Theming Guidelines
 
-### 1. Always Use Theme Functions
+### 1. Use Tailwind Classes (Preferred)
 
 ```typescript
-// ✅ CORRECT - Theme-aware
-const { getPrimaryColor } = useTheme();
-<View style={{ backgroundColor: getPrimaryColor('800') }} />
-
-// ❌ WRONG - Hardcoded colors
-<View style={{ backgroundColor: '#1a1a1a' }} />
-```
-
-### 2. Text Component Theming
-
-```typescript
-// Use the custom Text component with theme integration
-<Text
-  size={16}
-  bold
-  overpass
-  style={{ color: getPrimaryColor('0') }}
->
-  Content
-</Text>
-
-// For gradient text
-<StyledText primary>Gradient Text</StyledText>
-<StyledText secondary>Secondary Gradient</StyledText>
-<StyledText negative>Error Text</StyledText>
-```
-
-### 3. View Component Theming
-
-```typescript
-// Use View, VStack, HStack with blur support
-<View
-  className="rounded-lg border-primary-100"
-  style={{ backgroundColor: getPrimaryColor('800') }}
-  blur={true}
-  blurIntensity={70}
->
-  Content
+// ✅ CORRECT — Semantic Tailwind classes
+<View className="bg-surface-secondary rounded-lg">
+  <Text className="text-foreground">Content</Text>
+  <Text className="text-muted">Secondary text</Text>
 </View>
 
-// Stack components with spacing
-<VStack spacing={16} align="center">
-  <HStack spacing={8} justify="space-between">
-    Content
-  </HStack>
-</VStack>
+// ❌ WRONG — Old approach
+<View style={{ backgroundColor: getPrimaryColor('800') }}>
 ```
 
-### 4. Button Component Theming
+### 2. When You Need Runtime Hex Values
+
+For Reanimated shared values, SVG fills, Icon color props, LinearGradient, or conditional style logic:
 
 ```typescript
-// Use Button with variants
-<Button
-  variant="primary"     // primary | secondary | dangerous
-  text="Click me"
-  onPress={handlePress}
-  ripple={true}         // Optional ripple effect
-  blur={true}           // Optional blur background
-/>
+import { useThemeColor } from 'hooks/useThemeColor';
+
+function MyComponent() {
+  // Single token
+  const foreground = useThemeColor('foreground');
+
+  // Array form (preferred for 2+ colors)
+  const [danger, success, brandAccent] = useThemeColor(['danger', 'success', 'shade-300'] as const);
+
+  // Brand gradient
+  const brandGradient = useThemeColor(['shade-200', 'shade-300', 'shade-400'] as const);
+
+  return (
+    <Icon color={opacity(foreground, 0.9)} />
+  );
+}
 ```
 
-## Common Theming Patterns
+### 3. Text Component
 
-### 1. Background Colors
+The `Text` component defaults to `text-foreground`. No need to explicitly set text color for primary content.
 
 ```typescript
-// Main backgrounds
-backgroundColor: getPrimaryColor('900'); // Darkest
-backgroundColor: getPrimaryColor('800'); // Dark
-backgroundColor: getPrimaryColor('700'); // Medium dark
-
-// Card backgrounds
-backgroundColor: getPrimaryColor('800');
-backgroundColor: getPrimaryColor('700');
+<Text size={16} bold>This is foreground-colored by default</Text>
+<Text className="text-muted" size={14}>Muted secondary text</Text>
+<Text className="text-danger" size={14}>Error text</Text>
 ```
 
-### 2. Text Colors
+### 4. Button Variants
+
+Use HeroUI semantic variants instead of manual color styling:
 
 ```typescript
-// Primary text
-color: getPrimaryColor('0'); // Lightest (white/light)
-color: getPrimaryColor('100'); // Very light
-color: getPrimaryColor('200'); // Light
-
-// Secondary text
-color: getPrimaryColor('300'); // Muted
-color: getPrimaryColor('400'); // More muted
+<Button variant="primary" text="Confirm" onPress={handlePress} />
+<Button variant="dangerous" text="Delete" onPress={handleDelete} />
 ```
 
-### 3. Border Colors
+### 5. Opacity
+
+Use Tailwind opacity syntax in classNames:
 
 ```typescript
-// Subtle borders
-borderColor: getPrimaryColor('100');
-borderColor: getPrimaryColor('200');
-
-// Accent borders
-borderColor: getShadeColor('300');
-borderColor: getPrimaryColor('500');
+className="bg-surface-secondary/75"  // 75% opacity
+className="text-foreground/90"        // 90% opacity
 ```
 
-### 4. Interactive States
+## How To Add a New Theme
 
-```typescript
-// Hover/pressed states
-backgroundColor: getPrimaryColor('600');
-backgroundColor: getPrimaryColor('500');
+1. Add the palette to `themes.ts` as a `ThemePalette` record (shades 0, 50, 100-950).
+2. That's it — `themeEngine.ts` auto-generates HeroUI semantic vars and the theme appears in the settings UI.
 
-// Disabled states
-opacity: 0.5;
-color: getPrimaryColor('400');
-```
+For background image themes, run `npm run build:themes` to generate palettes + dominant/gradient colors from the image.
 
-## Background Image Themes
+## How Wallpaper Themes Differ
 
-### 1. Background Image Support
+Wallpaper themes have the same 0-950 palette + semantic vars as regular themes, but additionally provide:
+- A background image asset (from `config/backgroundImageThemes.ts`)
+- `--dominant-*` and `--gradient-*` CSS vars extracted from the image
 
-```typescript
-// Background image themes use the same color system
-// but are applied via Redux state
-const { setBackgroundImage } = useSettings();
-setBackgroundImage('deepocean'); // deepocean, cosmicpurple, mysticblue, royalpurple
-```
-
-### 2. Background Image Integration
-
-```typescript
-// Background images are handled in the root layout
-// Colors automatically adjust to match the background
-<View style={getThemeVariables(currentTheme)} className="flex-1">
-  {children}
-</View>
-```
-
-## Best Practices
-
-### 1. Always Import useTheme
-
-```typescript
-import { useTheme } from 'providers/ThemeProvider';
-const { getPrimaryColor, getShadeColor } = useTheme();
-```
-
-### 2. Use Semantic Color Names
-
-```typescript
-// Good - semantic meaning
-const errorColor = getRedColor('500');
-const successColor = getGreenColor('300');
-const brandColor = getShadeColor('300');
-
-// Avoid - generic numbers
-const someColor = getPrimaryColor('500');
-```
-
-### 3. Combine Style Props and className
-
-```typescript
-// Use className for layout, style for theme colors
-<View
-  className="flex-1 p-4 rounded-lg"
-  style={{ backgroundColor: getPrimaryColor('800') }}
->
-```
-
-### 4. Handle Theme Changes
-
-```typescript
-// Components automatically re-render when theme changes
-// No additional work needed for theme switching
-```
-
-### 5. Test Multiple Themes
-
-```typescript
-// Always test components with different themes
-// Use the theme selector in settings to verify
-```
+The `BackgroundProvider` and `BackgroundView` handle rendering the image + blur effects. Semantic colors still come from the palette, not from the image.
 
 ## Common Mistakes to Avoid
 
-1. **Don't hardcode colors** - Always use theme functions
-2. **Don't use static Tailwind colors** - Use CSS variable classes
-3. **Don't forget to import useTheme** - Required for theme functions
-4. **Don't mix style and className incorrectly** - Use className for layout, style for colors
-5. **Don't assume color meanings** - Check the theme definitions for actual colors
-
-## Directory Structure for Theming
-
-- `themes.js` - Theme definitions
-- `helper/colorTheme.ts` - CSS variable mappings
-- `providers/ThemeProvider.tsx` - Theme context and functions
-- `components/ui/` - Basic themed components
-- `components/blocks/` - Complex themed components
-- `redux/settings/` - Theme state management
-- `app/settings-pages/theme.tsx` - Theme selection UI
-
-This theming system provides a comprehensive, dynamic, and maintainable approach to styling throughout the Sovran application.
+1. **Don't use `getPrimaryColor` / `getShadeColor`** — These are deleted. Use Tailwind classes or `useColor`.
+2. **Don't hardcode hex colors** — Use `className` or `useColor('token-name')` from `hooks/useColor`.
+3. **Don't create custom `--app-*` CSS variables** — Use HeroUI semantic tokens.
+4. **Don't import `useTheme` for colors** — `useTheme` only provides `currentTheme` / `setTheme` / `availableThemes`. Use `useThemeColor` from `hooks/useThemeColor` for color values.
+5. **Don't use `bg-primary-*` / `text-primary-*`** Tailwind classes — Use semantic names (`bg-surface-secondary`, `text-foreground`, etc.).
+6. **Don't create color constant files** — `themeEngine.ts` is the single source of truth for hex values. Access via className or `useThemeColor`.

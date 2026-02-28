@@ -2,7 +2,6 @@ import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { BackgroundProvider } from 'providers/BackgroundProvider';
 import { DynamicColorIOS, Platform, StyleSheet, View } from 'react-native';
-import { Colors } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { OfflineProvider } from '@/providers/OfflineProvider';
 import {
@@ -32,15 +31,15 @@ export default function TabLayout() {
               labelStyle={{
                 color: Platform.select({
                   ios: DynamicColorIOS({
-                    dark: Colors.dark.text,
-                    light: Colors.light.text,
+                    dark: '#ECEDEE',
+                    light: '#11181C',
                   }),
                 }),
               }}
               tintColor={Platform.select({
                 ios: DynamicColorIOS({
-                  dark: Colors.dark.tint,
-                  light: Colors.light.tint,
+                  dark: '#fff',
+                  light: '#0a7ea4',
                 }),
               })}
               disableTransparentOnScrollEdge>
@@ -104,8 +103,8 @@ export default function TabLayout() {
                     borderTopColor: 'transparent',
                     elevation: 0,
                   },
-              tabBarActiveTintColor: Colors.dark.tint,
-              tabBarInactiveTintColor: Colors.dark.text,
+              tabBarActiveTintColor: '#fff',
+              tabBarInactiveTintColor: '#ECEDEE',
             }}>
             <Tabs.Screen
               name="feed"

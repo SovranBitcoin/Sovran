@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, ActivityIndicator } from 'react-native';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
 import Container from 'components/blocks/Container';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -13,6 +12,7 @@ import { useNavigation, router } from 'expo-router';
 import { Mint } from 'coco-cashu-core';
 import opacity from 'hex-color-opacity';
 import { Button, Card } from 'heroui-native';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 type RecoveryState = 'idle' | 'recovering' | 'complete' | 'error';
 
@@ -23,7 +23,8 @@ interface RecoveryResult {
 }
 
 const RecoveryScreen: React.FC = () => {
-  const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
+  const [foreground, surfaceSecondary, accent, defaultColor] = useThemeColor(['foreground', 'surface-secondary', 'accent', 'default'] as const);
+  const [danger, success, green400, red400] = useThemeColor(['danger', 'success', 'green-400', 'red-400'] as const);
   const navigation = useNavigation();
   const { mints, restoreMint, loadMints } = useMintManagement();
 
@@ -115,18 +116,18 @@ const RecoveryScreen: React.FC = () => {
     <VStack spacing={24} className="flex-1 items-center justify-center px-6">
       <View
         className="h-24 w-24 items-center justify-center rounded-full"
-        style={{ backgroundColor: getPrimaryColor('800') }}>
-        <Icon name="mdi:shield-refresh" size={48} color={getPrimaryColor('0')} />
+        style={{ backgroundColor: surfaceSecondary }}>
+        <Icon name="mdi:shield-refresh" size={48} color={foreground} />
       </View>
 
       <VStack spacing={8} className="items-center">
-        <Text size={24} bold style={{ color: getPrimaryColor('0'), textAlign: 'center' }}>
+        <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
           Recover Wallet
         </Text>
         <Text
           size={16}
           style={{
-            color: opacity(getPrimaryColor('0'), 0.5),
+            color: opacity(foreground, 0.5),
             textAlign: 'center',
             lineHeight: 24,
           }}>
@@ -138,7 +139,7 @@ const RecoveryScreen: React.FC = () => {
       <Card variant="secondary" className="w-full">
         <Card.Body>
           <HStack spacing={12} className="items-start">
-            <Icon name="mdi:information" size={24} color={opacity(getPrimaryColor('0'), 0.4)} />
+            <Icon name="mdi:information" size={24} color={opacity(foreground, 0.4)} />
             <VStack spacing={4} className="flex-1">
               <Card.Title>What happens during recovery?</Card.Title>
               <Card.Description>
@@ -164,11 +165,11 @@ const RecoveryScreen: React.FC = () => {
   const renderRecoveringState = () => (
     <VStack spacing={24} className="flex-1 px-6 pt-8">
       <VStack spacing={8} className="items-center">
-        <ActivityIndicator size="large" color={getPrimaryColor('0')} />
-        <Text size={20} bold style={{ color: getPrimaryColor('0'), textAlign: 'center' }}>
+        <ActivityIndicator size="large" color={foreground} />
+        <Text size={20} bold style={{ color: foreground, textAlign: 'center' }}>
           Recovering...
         </Text>
-        <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.5), textAlign: 'center' }}>
+        <Text size={14} style={{ color: opacity(foreground, 0.5), textAlign: 'center' }}>
           Please do not close this screen
         </Text>
       </VStack>
@@ -190,13 +191,13 @@ const RecoveryScreen: React.FC = () => {
             <HStack spacing={12} className="items-center">
               <View className="h-6 w-6 items-center justify-center">
                 {currentMintIndex === mints.length ? (
-                  <ActivityIndicator size="small" color={getPrimaryColor('0')} />
+                  <ActivityIndicator size="small" color={foreground} />
                 ) : currentMintIndex > mints.length ? (
-                  <Icon name="mdi:check-circle" size={24} color={getGreenColor('400')} />
+                  <Icon name="mdi:check-circle" size={24} color={green400} />
                 ) : (
                   <View
                     className="h-4 w-4 rounded-full"
-                    style={{ backgroundColor: getPrimaryColor('600') }}
+                    style={{ backgroundColor: defaultColor }}
                   />
                 )}
               </View>
@@ -205,8 +206,8 @@ const RecoveryScreen: React.FC = () => {
                 style={{
                   color:
                     currentMintIndex >= mints.length
-                      ? getPrimaryColor('0')
-                      : opacity(getPrimaryColor('0'), 0.33),
+                      ? foreground
+                      : opacity(foreground, 0.33),
                 }}>
                 Recovering pending transactions
               </Text>
@@ -222,23 +223,23 @@ const RecoveryScreen: React.FC = () => {
       <View
         className="h-24 w-24 items-center justify-center rounded-full"
         style={{
-          backgroundColor: failureCount === 0 ? getGreenColor('900') : getPrimaryColor('800'),
+          backgroundColor: failureCount === 0 ? success : surfaceSecondary,
         }}>
         <Icon
           name={failureCount === 0 ? 'mdi:check-circle' : 'mdi:alert-circle'}
           size={48}
-          color={failureCount === 0 ? getGreenColor('400') : getPrimaryColor('0')}
+          color={failureCount === 0 ? green400 : foreground}
         />
       </View>
 
       <VStack spacing={8} className="items-center">
-        <Text size={24} bold style={{ color: getPrimaryColor('0'), textAlign: 'center' }}>
+        <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
           {failureCount === 0 ? 'Recovery Complete' : 'Recovery Partial'}
         </Text>
         <Text
           size={16}
           style={{
-            color: opacity(getPrimaryColor('0'), 0.5),
+            color: opacity(foreground, 0.5),
             textAlign: 'center',
             lineHeight: 24,
           }}>
@@ -258,14 +259,14 @@ const RecoveryScreen: React.FC = () => {
                   <Icon
                     name={result.success ? 'mdi:check-circle' : 'mdi:close-circle'}
                     size={20}
-                    color={result.success ? getGreenColor('400') : getRedColor('400')}
+                    color={result.success ? green400 : red400}
                   />
                   <VStack spacing={2} className="flex-1">
-                    <Text size={13} numberOfLines={1} style={{ color: getPrimaryColor('0') }}>
+                    <Text size={13} numberOfLines={1} style={{ color: foreground }}>
                       {new URL(result.mint).hostname}
                     </Text>
                     {result.error && (
-                      <Text size={12} style={{ color: getRedColor('400') }}>
+                      <Text size={12} style={{ color: red400 }}>
                         {result.error}
                       </Text>
                     )}
@@ -287,18 +288,18 @@ const RecoveryScreen: React.FC = () => {
     <VStack spacing={24} className="flex-1 items-center justify-center px-6">
       <View
         className="h-24 w-24 items-center justify-center rounded-full"
-        style={{ backgroundColor: getRedColor('900') }}>
-        <Icon name="mdi:alert-circle" size={48} color={getRedColor('400')} />
+        style={{ backgroundColor: danger }}>
+        <Icon name="mdi:alert-circle" size={48} color={red400} />
       </View>
 
       <VStack spacing={8} className="items-center">
-        <Text size={24} bold style={{ color: getPrimaryColor('0'), textAlign: 'center' }}>
+        <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
           Recovery Failed
         </Text>
         <Text
           size={16}
           style={{
-            color: opacity(getPrimaryColor('0'), 0.5),
+            color: opacity(foreground, 0.5),
             textAlign: 'center',
             lineHeight: 24,
           }}>
@@ -339,7 +340,8 @@ const MintRecoveryRow: React.FC<{
   currentIndex: number;
   result?: RecoveryResult;
 }> = ({ mint, index, currentIndex, result }) => {
-  const { getPrimaryColor, getGreenColor, getRedColor } = useTheme();
+  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
+  const [green400, red400] = useThemeColor(['green-400', 'red-400'] as const);
 
   const isActive = index === currentIndex;
   const isComplete = index < currentIndex;
@@ -355,17 +357,17 @@ const MintRecoveryRow: React.FC<{
   return (
     <HStack spacing={12} className="items-center">
       <View className="h-6 w-6 items-center justify-center">
-        {isActive && <ActivityIndicator size="small" color={getPrimaryColor('0')} />}
+        {isActive && <ActivityIndicator size="small" color={foreground} />}
         {isComplete && result?.success && (
-          <Icon name="mdi:check-circle" size={24} color={getGreenColor('400')} />
+          <Icon name="mdi:check-circle" size={24} color={green400} />
         )}
         {isComplete && !result?.success && (
-          <Icon name="mdi:close-circle" size={24} color={getRedColor('400')} />
+          <Icon name="mdi:close-circle" size={24} color={red400} />
         )}
         {isPending && (
           <View
             className="h-4 w-4 rounded-full"
-            style={{ backgroundColor: getPrimaryColor('600') }}
+            style={{ backgroundColor: defaultColor }}
           />
         )}
       </View>
@@ -374,12 +376,12 @@ const MintRecoveryRow: React.FC<{
           size={14}
           numberOfLines={1}
           style={{
-            color: isPending ? opacity(getPrimaryColor('0'), 0.33) : getPrimaryColor('0'),
+            color: isPending ? opacity(foreground, 0.33) : foreground,
           }}>
           {hostname}
         </Text>
         {isComplete && !result?.success && result?.error && (
-          <Text size={12} numberOfLines={1} style={{ color: getRedColor('400') }}>
+          <Text size={12} numberOfLines={1} style={{ color: red400 }}>
             {result.error}
           </Text>
         )}

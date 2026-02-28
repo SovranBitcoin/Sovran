@@ -5,7 +5,7 @@ import {
   StyleProp,
   TextStyle,
 } from 'react-native';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 
 /**
@@ -17,14 +17,14 @@ interface TextInputProps extends Omit<RNTextInputProps, 'placeholderTextColor'> 
 }
 
 const TextInput: FC<TextInputProps> = ({ style, placeholderTextColor, ...props }) => {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
   return (
     <RNTextInput
-      className="mb-0 rounded-[32px] border border-primary-600 bg-primary-800 p-2.5 pl-4 font-bold text-primary-0"
+      className="mb-0 rounded-[32px] border border-default bg-surface-secondary p-2.5 pl-4 font-bold text-foreground"
       style={[
         {
-          shadowColor: getPrimaryColor('950'),
+          shadowColor: background,
           shadowOffset: { width: 1, height: 4 },
           shadowOpacity: 0.25,
           shadowRadius: 6,
@@ -33,7 +33,7 @@ const TextInput: FC<TextInputProps> = ({ style, placeholderTextColor, ...props }
         },
         style,
       ]}
-      placeholderTextColor={placeholderTextColor || opacity(getPrimaryColor('0'), 0.5)}
+      placeholderTextColor={placeholderTextColor || opacity(foreground, 0.5)}
       {...props}
     />
   );

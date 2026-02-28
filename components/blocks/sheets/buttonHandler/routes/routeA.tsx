@@ -28,12 +28,11 @@ import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
-import { useTheme } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 /**
  * RouteA Component
  *
@@ -42,7 +41,13 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
  * @returns {JSX.Element}
  */
 const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
-  const { getPrimaryColor, getRedColor } = useTheme();
+  const [foreground, muted, surfaceSecondary, surfaceTertiary, danger] = useThemeColor([
+    'foreground',
+    'muted',
+    'surface-secondary',
+    'surface-tertiary',
+    'danger',
+  ] as const);
   const payload = useSheetPayload('button-handler');
 
   const [processingButtonIndex, setProcessingButtonIndex] = useState<number>();
@@ -93,11 +98,11 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
         marginBottom: 0,
         borderRadius: 16,
         overflow: 'hidden',
-        backgroundColor: getPrimaryColor('800'),
+        backgroundColor: surfaceSecondary,
       }}>
       <VStack
         style={{
-          backgroundColor: getPrimaryColor('700'),
+          backgroundColor: surfaceTertiary,
           padding: 16,
           borderRadius: 16,
         }}>
@@ -119,21 +124,17 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
               <HStack align="center" spacing={16}>
                 <View
                   style={{
-                    backgroundColor: opacity(getPrimaryColor('400'), 0.25),
+                    backgroundColor: opacity(muted, 0.25),
                     borderRadius: 1000,
                     padding: 4,
                   }}>
                   {button.icon && (
-                    <Icon
-                      color={isDangerous ? getRedColor('300') : getPrimaryColor('0')}
-                      name={button.icon}
-                      size={32}
-                    />
+                    <Icon color={isDangerous ? danger : foreground} name={button.icon} size={32} />
                   )}
                 </View>
                 <Text
                   style={{
-                    color: isDangerous ? getRedColor('300') : getPrimaryColor('0'),
+                    color: isDangerous ? danger : foreground,
                   }}
                   size={18}
                   weight="bold">

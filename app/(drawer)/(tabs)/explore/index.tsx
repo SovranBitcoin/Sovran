@@ -1,3 +1,4 @@
+import { useThemeColor } from '@/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { Text } from 'components/ui/Text';
@@ -17,7 +18,6 @@ import { getModels, RoutstrModel } from 'helper/routstr/api';
 import opacity from 'hex-color-opacity';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useTheme } from 'providers/ThemeProvider';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -364,26 +364,23 @@ const SectionHeader = ({
   action?: string;
   onAction?: () => void;
 }) => {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   return (
     <HStack align="center" style={{ paddingHorizontal: 20, marginBottom: 16 }}>
       <VStack style={{ flex: 1 }}>
-        <Text
-          size={22}
-          heavy
-          style={{ color: opacity(getPrimaryColor('0'), 0.9), letterSpacing: -0.5 }}>
+        <Text size={22} heavy style={{ color: opacity(foreground, 0.9), letterSpacing: -0.5 }}>
           {title}
         </Text>
         {subtitle && (
-          <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.66), marginTop: 2 }}>
+          <Text size={13} style={{ color: opacity(foreground, 0.66), marginTop: 2 }}>
             {subtitle}
           </Text>
         )}
       </VStack>
       {action && (
         <TouchableOpacity onPress={onAction} activeOpacity={0.7}>
-          <Text size={14} heavy style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+          <Text size={14} heavy style={{ color: opacity(foreground, 0.5) }}>
             {action}
           </Text>
         </TouchableOpacity>
@@ -448,7 +445,7 @@ const AIModelCard = ({ model }: { model: RoutstrModel }) => {
 
 // Map Teaser Card
 const MapTeaserCard = () => {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceSecondary] = useThemeColor(['foreground', 'surface-secondary'] as const);
   const { placesCache, fetchPlaces } = useBTCMapStore(
     useShallow((s) => ({ placesCache: s.placesCache, fetchPlaces: s.fetchPlaces }))
   );
@@ -514,22 +511,19 @@ const MapTeaserCard = () => {
         </View>
 
         {/* Text section */}
-        <View style={[styles.mapTextSection, { backgroundColor: getPrimaryColor('800') }]}>
+        <View style={[styles.mapTextSection, { backgroundColor: surfaceSecondary }]}>
           <VStack>
-            <Text
-              size={18}
-              heavy
-              style={{ color: opacity(getPrimaryColor('0'), 0.9), marginBottom: 4 }}>
+            <Text size={18} heavy style={{ color: opacity(foreground, 0.9), marginBottom: 4 }}>
               Find Bitcoin Merchants
             </Text>
-            <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+            <Text size={13} style={{ color: opacity(foreground, 0.5) }}>
               Discover shops, restaurants & services accepting Bitcoin
             </Text>
           </VStack>
           <View
             style={[
               styles.mapButton,
-              { backgroundColor: opacity(getPrimaryColor('0'), 0.15), marginTop: 12 },
+              { backgroundColor: opacity(foreground, 0.15), marginTop: 12 },
             ]}>
             <Text size={14} heavy style={{ color: '#fff' }}>
               Explore Map
@@ -553,7 +547,7 @@ const CategoryPill = ({
   isActive: boolean;
   onPress: () => void;
 }) => {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   return (
     <TouchableOpacity
@@ -562,24 +556,20 @@ const CategoryPill = ({
       style={[
         styles.categoryPill,
         {
-          backgroundColor: isActive
-            ? opacity(getPrimaryColor('0'), 0.12)
-            : opacity(getPrimaryColor('0'), 0.06),
-          borderColor: isActive ? opacity(getPrimaryColor('0'), 0.25) : 'transparent',
+          backgroundColor: isActive ? opacity(foreground, 0.12) : opacity(foreground, 0.06),
+          borderColor: isActive ? opacity(foreground, 0.25) : 'transparent',
         },
       ]}>
       <Icon
         name={icon}
         size={16}
-        color={isActive ? opacity(getPrimaryColor('0'), 0.5) : opacity(getPrimaryColor('0'), 0.4)}
+        color={isActive ? opacity(foreground, 0.5) : opacity(foreground, 0.4)}
       />
       <Text
         size={13}
         heavy
         style={{
-          color: isActive
-            ? opacity(getPrimaryColor('0'), 0.66)
-            : opacity(getPrimaryColor('0'), 0.4),
+          color: isActive ? opacity(foreground, 0.66) : opacity(foreground, 0.4),
           marginLeft: 6,
         }}>
         {name}
@@ -590,7 +580,7 @@ const CategoryPill = ({
 
 // Product Card with Image
 const ProductCard = ({ product }: { product: (typeof BITREFILL_PRODUCTS)[0] }) => {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   return (
     <TouchableOpacity
@@ -610,14 +600,10 @@ const ProductCard = ({ product }: { product: (typeof BITREFILL_PRODUCTS)[0] }) =
         </View>
       </View>
       <VStack style={styles.productInfo}>
-        <Text
-          size={15}
-          heavy
-          style={{ color: opacity(getPrimaryColor('0'), 0.9) }}
-          numberOfLines={1}>
+        <Text size={15} heavy style={{ color: opacity(foreground, 0.9) }} numberOfLines={1}>
           {product.name}
         </Text>
-        <Text size={12} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 2 }}>
+        <Text size={12} style={{ color: opacity(foreground, 0.4), marginTop: 2 }}>
           {product.category}
         </Text>
       </VStack>
@@ -627,7 +613,7 @@ const ProductCard = ({ product }: { product: (typeof BITREFILL_PRODUCTS)[0] }) =
 
 // Conference Card
 const ConferenceCard = ({ conference }: { conference: (typeof BITCOIN_CONFERENCES)[0] }) => {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   const handlePress = useCallback(() => {
     if (conference.website) {
@@ -672,14 +658,14 @@ const ConferenceCard = ({ conference }: { conference: (typeof BITCOIN_CONFERENCE
         </HStack>
         <HStack align="center" style={{ marginTop: 8, gap: 12 }}>
           <HStack align="center">
-            <Icon name="mdi:calendar" size={12} color={opacity(getPrimaryColor('0'), 0.5)} />
-            <Text size={11} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginLeft: 4 }}>
+            <Icon name="mdi:calendar" size={12} color={opacity(foreground, 0.5)} />
+            <Text size={11} style={{ color: opacity(foreground, 0.5), marginLeft: 4 }}>
               {conference.date}
             </Text>
           </HStack>
           <HStack align="center">
-            <Icon name="mdi:account-group" size={12} color={opacity(getPrimaryColor('0'), 0.4)} />
-            <Text size={11} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginLeft: 4 }}>
+            <Icon name="mdi:account-group" size={12} color={opacity(foreground, 0.4)} />
+            <Text size={11} style={{ color: opacity(foreground, 0.4), marginLeft: 4 }}>
               {conference.attendees}
             </Text>
           </HStack>
@@ -691,12 +677,10 @@ const ConferenceCard = ({ conference }: { conference: (typeof BITCOIN_CONFERENCE
 
 // Lightning Address Card - Custom username purchase
 const LightningAddressCard = () => {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
   const hero = useHeroTransition();
   const cardRef = useRef<any>(null);
-
-  const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
 
   const currentAddress = nostrKeys?.npub
     ? `${truncateMiddle(nostrKeys.npub, 5)}@npubx.cash`
@@ -742,8 +726,8 @@ const LightningAddressCard = () => {
             style={{ opacity: hero.isHidden('claimUsername', 'source') ? 0 : 1 }}>
             <ClaimUsernameCardFrame
               accentColor={accentColor}
-              backgroundColor={primary950}
-              highlightColor={opacity(getPrimaryColor('0'), 0.9)}>
+              backgroundColor={background}
+              highlightColor={opacity(foreground, 0.9)}>
               <VStack style={{ padding: 20, zIndex: 1 }}>
                 {/* Header */}
                 <HStack align="center" style={{ marginBottom: 16 }}>
@@ -755,7 +739,7 @@ const LightningAddressCard = () => {
                     <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
                   </View>
                   <VStack style={{ flex: 1, marginLeft: 12 }}>
-                    <Text size={18} heavy style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
+                    <Text size={18} heavy style={{ color: opacity(foreground, 0.9) }}>
                       Claim Your Address
                     </Text>
                     <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
@@ -848,7 +832,7 @@ const LightningAddressCard = () => {
                         color="#22c55e"
                         style={{ marginRight: 8 }}
                       />
-                      <Text size={14} mono style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
+                      <Text size={14} mono style={{ color: opacity(foreground, 0.9) }}>
                         satoshi
                       </Text>
                       <Text size={14} mono style={{ color: opacity(accentColor, 0.7) }}>
@@ -896,15 +880,11 @@ const LightningAddressCard = () => {
                         size={16}
                         color={opacity(accentColor, 0.9)}
                       />
-                      <Text size={12} heavy style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
+                      <Text size={12} heavy style={{ color: opacity(foreground, 0.9) }}>
                         Get your username
                       </Text>
                     </HStack>
-                    <Icon
-                      name="mdi:arrow-right"
-                      size={18}
-                      color={opacity(getPrimaryColor('0'), 0.9)}
-                    />
+                    <Icon name="mdi:arrow-right" size={18} color={opacity(foreground, 0.9)} />
                   </HStack>
                 </View>
               </VStack>
@@ -919,15 +899,13 @@ const LightningAddressCard = () => {
 // Pending Ecash Card - Shows pending send operations that can be reclaimed
 // Styled to match WalletHealthCard with a green color scheme + hero transition
 const PendingEcashCard = () => {
-  const { getPrimaryColor, getGreenColor } = useTheme();
+  const [foreground, background, green400] = useThemeColor(['foreground', 'background', 'green-400'] as const);
   const { history } = usePaginatedHistory();
   const hero = useHeroTransition();
   const cardRef = useRef<any>(null);
 
-  const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
-  const primary0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primary50 = useMemo(() => opacity(primary0, 0.9), [primary0]);
-  const accentColor = useMemo(() => getGreenColor('400'), [getGreenColor]);
+  const primary50 = useMemo(() => opacity(foreground, 0.9), [foreground]);
+  const accentColor = green400;
 
   // Filter pending send transactions
   const pendingSends = useMemo(() => {
@@ -990,7 +968,7 @@ const PendingEcashCard = () => {
           ]}>
           <PendingEcashCardFrame
             accentColor={accentColor}
-            backgroundColor={primary950}
+            backgroundColor={background}
             highlightColor={primary50}>
             <VStack style={{ padding: 18 }}>
               <HStack align="center" justify="space-between">
@@ -1081,7 +1059,7 @@ const PendingEcashCard = () => {
 
 const ExploreScreen = () => {
   useBackgroundConfig({ blurMode: 'full' });
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const [contentHeight, setContentHeight] = useState(0);
   const [activeCategory, setActiveCategory] = useState('All');
   const devMode = useSettingsStore((state) => state.experimental);
@@ -1194,8 +1172,8 @@ const ExploreScreen = () => {
           contentContainerStyle={{ paddingHorizontal: 20, gap: 12, minHeight: 140 }}>
           {modelsLoading ? (
             <View style={styles.modelsLoadingContainer}>
-              <ActivityIndicator size="small" color={opacity(getPrimaryColor('0'), 0.5)} />
-              <Text size={12} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 8 }}>
+              <ActivityIndicator size="small" color={opacity(foreground, 0.5)} />
+              <Text size={12} style={{ color: opacity(foreground, 0.4), marginTop: 8 }}>
                 Loading models...
               </Text>
             </View>
@@ -1203,8 +1181,8 @@ const ExploreScreen = () => {
             displayModels.map((model) => <AIModelCard key={model.id} model={model} />)
           ) : (
             <View style={styles.modelsEmptyContainer}>
-              <Icon name="mdi:robot" size={32} color={opacity(getPrimaryColor('0'), 0.33)} />
-              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 8 }}>
+              <Icon name="mdi:robot" size={32} color={opacity(foreground, 0.33)} />
+              <Text size={13} style={{ color: opacity(foreground, 0.4), marginTop: 8 }}>
                 No models available
               </Text>
             </View>

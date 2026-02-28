@@ -5,54 +5,56 @@
 @source './node_modules/heroui-native/lib';
 
 @theme {
-  --color-primary-950: var(--app-primary-950);
-  --color-primary-900: var(--app-primary-900);
-  --color-primary-800: var(--app-primary-800);
-  --color-primary-700: var(--app-primary-700);
-  --color-primary-600: var(--app-primary-600);
-  --color-primary-500: var(--app-primary-500);
-  --color-primary-400: var(--app-primary-400);
-  --color-primary-300: var(--app-primary-300);
-  --color-primary-200: var(--app-primary-200);
-  --color-primary-100: var(--app-primary-100);
-  --color-primary-50: var(--app-primary-50);
-  --color-primary-0: var(--app-primary-0);
+  /* Static scales — var() references resolved at runtime via Uniwind.
+     Hex values live in helper/themeEngine.ts STATIC_COLORS (single source of truth). */
+  --color-shade-100: var(--shade-100);
+  --color-shade-200: var(--shade-200);
+  --color-shade-300: var(--shade-300);
+  --color-shade-400: var(--shade-400);
+  --color-shade-500: var(--shade-500);
 
-  --color-shade-100: var(--app-shade-100);
-  --color-shade-200: var(--app-shade-200);
-  --color-shade-300: var(--app-shade-300);
-  --color-shade-400: var(--app-shade-400);
-  --color-shade-500: var(--app-shade-500);
+  --color-red-100: var(--red-100);
+  --color-red-200: var(--red-200);
+  --color-red-300: var(--red-300);
+  --color-red-400: var(--red-400);
+  --color-red-500: var(--red-500);
 
-  --color-red-100: var(--app-red-100);
-  --color-red-200: var(--app-red-200);
-  --color-red-300: var(--app-red-300);
-  --color-red-400: var(--app-red-400);
-  --color-red-500: var(--app-red-500);
+  --color-green-100: var(--green-100);
+  --color-green-200: var(--green-200);
+  --color-green-300: var(--green-300);
+  --color-green-400: var(--green-400);
+  --color-green-500: var(--green-500);
 
-  --color-green-100: var(--app-green-100);
-  --color-green-200: var(--app-green-200);
-  --color-green-300: var(--app-green-300);
-  --color-green-400: var(--app-green-400);
-  --color-green-500: var(--app-green-500);
+  --color-purple-100: var(--purple-100);
+  --color-purple-200: var(--purple-200);
+  --color-purple-300: var(--purple-300);
+  --color-purple-400: var(--purple-400);
+  --color-purple-500: var(--purple-500);
 
-  --color-purple-100: var(--app-purple-100);
-  --color-purple-200: var(--app-purple-200);
-  --color-purple-300: var(--app-purple-300);
-  --color-purple-400: var(--app-purple-400);
-  --color-purple-500: var(--app-purple-500);
+  --color-blue-100: var(--blue-100);
+  --color-blue-200: var(--blue-200);
+  --color-blue-300: var(--blue-300);
+  --color-blue-400: var(--blue-400);
+  --color-blue-500: var(--blue-500);
 
-  --color-dominant-100: var(--app-dominant-100);
-  --color-dominant-200: var(--app-dominant-200);
-  --color-dominant-300: var(--app-dominant-300);
-  --color-dominant-400: var(--app-dominant-400);
-  --color-dominant-500: var(--app-dominant-500);
+  --color-yellow-100: var(--yellow-100);
+  --color-yellow-200: var(--yellow-200);
+  --color-yellow-300: var(--yellow-300);
+  --color-yellow-400: var(--yellow-400);
+  --color-yellow-500: var(--yellow-500);
 
-  --color-gradient-100: var(--app-gradient-100);
-  --color-gradient-200: var(--app-gradient-200);
-  --color-gradient-300: var(--app-gradient-300);
+  /* Wallpaper-specific vars (overridden at runtime by themeEngine) */
+  --color-dominant-100: var(--dominant-100);
+  --color-dominant-200: var(--dominant-200);
+  --color-dominant-300: var(--dominant-300);
+  --color-dominant-400: var(--dominant-400);
+  --color-dominant-500: var(--dominant-500);
 
-  /* Backward-compat aliases for shadcn class names → HeroUI tokens */
+  --color-gradient-100: var(--gradient-100);
+  --color-gradient-200: var(--gradient-200);
+  --color-gradient-300: var(--gradient-300);
+
+  /* Backward-compat aliases for shadcn class names -> HeroUI tokens */
   --color-card: var(--surface);
   --color-card-foreground: var(--surface-foreground);
   --color-popover: var(--overlay);
@@ -69,53 +71,5 @@
 @layer base {
   :root {
     color-scheme: dark;
-
-    /* Default app palette (dark theme) – overridden at runtime by Uniwind.updateCSSVariables */
-    --app-primary-950: #080808;
-    --app-primary-900: #121212;
-    --app-primary-800: #181818;
-    --app-primary-700: #1c1c1c;
-    --app-primary-600: #202020;
-    --app-primary-500: #2c2c2c;
-    --app-primary-400: #525252;
-    --app-primary-300: #787878;
-    --app-primary-200: #a8a8a8;
-    --app-primary-100: #c7c7c7;
-    --app-primary-50: #e8eaed;
-    --app-primary-0: #ffffff;
-
-    --app-shade-100: #ff5841;
-    --app-shade-200: #ff353c;
-    --app-shade-300: #ed0c46;
-    --app-shade-400: #cf014e;
-    --app-shade-500: #bf004e;
-
-    --app-red-100: #f8e0e6;
-    --app-red-200: #e4a3b4;
-    --app-red-300: #ed0c46;
-    --app-red-400: #bf0a39;
-    --app-red-500: #9a082e;
-
-    --app-green-100: #e0f8e0;
-    --app-green-200: #a3e4a3;
-    --app-green-300: #0ced3e;
-    --app-green-400: #0abf35;
-    --app-green-500: #089a2c;
-
-    --app-purple-100: #e0e0f8;
-    --app-purple-200: #a3a3e4;
-    --app-purple-300: #8a2be2;
-    --app-purple-400: #6a0dad;
-    --app-purple-500: #4b0082;
-
-    --app-dominant-100: #666666;
-    --app-dominant-200: #555555;
-    --app-dominant-300: #444444;
-    --app-dominant-400: #333333;
-    --app-dominant-500: #222222;
-
-    --app-gradient-100: #888888;
-    --app-gradient-200: #555555;
-    --app-gradient-300: #222222;
   }
 }

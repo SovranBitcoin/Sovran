@@ -29,7 +29,6 @@ import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntry
 import { MeltHistoryEntry } from 'coco-cashu-core';
 import { getLightningTimestamp, requestInvoiceFromLnurl } from '@/helper/coco/utils';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { Spinner } from 'components/ui/Spinner';
 import { convertTime } from 'helper/time';
@@ -46,6 +45,7 @@ import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
 import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
 import { useBeforeRemoveCleanup } from '@/hooks/useBeforeRemoveCleanup';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface MeltQuoteScreenProps {
   /** For viewing existing transaction - either parsed entry or JSON string */
@@ -63,7 +63,7 @@ interface MeltQuoteScreenProps {
 
 /** Error screen shown when transaction data is missing or invalid */
 function ErrorState({ message, onCancel }: { message: string; onCancel: () => void }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   return (
     <ModalLayoutWrapper>
@@ -72,7 +72,7 @@ function ErrorState({ message, onCancel }: { message: string; onCancel: () => vo
           size={18}
           bold
           style={{
-            color: opacity(getPrimaryColor('0'), 0.9),
+            color: opacity(foreground, 0.9),
             marginBottom: 16,
             textAlign: 'center',
           }}>
@@ -81,7 +81,7 @@ function ErrorState({ message, onCancel }: { message: string; onCancel: () => vo
         <Text
           size={14}
           style={{
-            color: opacity(getPrimaryColor('0'), 0.5),
+            color: opacity(foreground, 0.5),
             marginBottom: 24,
             textAlign: 'center',
           }}>
@@ -104,13 +104,13 @@ function ErrorState({ message, onCancel }: { message: string; onCancel: () => vo
 
 /** Loading screen shown while creating quote */
 function LoadingState({ message }: { message: string }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   return (
     <ModalLayoutWrapper>
       <VStack style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <Spinner size={32} />
-        <Text size={16} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginTop: 16 }}>
+        <Text size={16} style={{ color: opacity(foreground, 0.5), marginTop: 16 }}>
           {message}
         </Text>
       </VStack>

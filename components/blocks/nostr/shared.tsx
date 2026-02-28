@@ -11,7 +11,6 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -22,6 +21,7 @@ import opacity from 'hex-color-opacity';
 import { nip19 } from 'nostr-tools';
 import { ImageBlock, useImageOverlay } from './image-overlay';
 import type { ImageOverlayLayout, ImageOverlayPost } from './image-overlay';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // ============================================================================
 // Types
@@ -572,7 +572,7 @@ export const InlineMention = React.memo(function InlineMention({
   onPressIn?: () => void;
   onPressOut?: () => void;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const profile = profiles.get(pubkey);
   const label = profile?.name || `${bech32.slice(0, 12)}…`;
 
@@ -580,7 +580,7 @@ export const InlineMention = React.memo(function InlineMention({
     <Text
       bold
       size={15}
-      style={{ color: opacity(getPrimaryColor('0'), 0.5) }}
+      style={{ color: opacity(foreground, 0.5) }}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => {
@@ -592,9 +592,9 @@ export const InlineMention = React.memo(function InlineMention({
 });
 
 export const InlineHashtag = React.memo(function InlineHashtag({ tag }: { tag: string }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   return (
-    <Text bold size={15} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+    <Text bold size={15} style={{ color: opacity(foreground, 0.5) }}>
       #{tag}
     </Text>
   );
@@ -609,11 +609,11 @@ export const InlineLink = React.memo(function InlineLink({
   onPressIn?: () => void;
   onPressOut?: () => void;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   return (
     <Text
       size={15}
-      style={{ color: opacity(getPrimaryColor('0'), 0.5) }}
+      style={{ color: opacity(foreground, 0.5) }}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => Linking.openURL(url).catch(() => {})}>
@@ -642,7 +642,7 @@ const IOSVideoBlock = React.memo(function IOSVideoBlock({
   openOverlay?: (layout: ImageOverlayLayout) => void;
   overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   const player = useVideoPlayer(url, (p) => {
     p.loop = false;
@@ -683,7 +683,7 @@ const IOSVideoBlock = React.memo(function IOSVideoBlock({
   const aspectRatio = overlayLayout?.aspectRatio ?? 16 / 9;
 
   const content = (
-    <View style={[sharedStyles.videoBlockOuter, { backgroundColor: getPrimaryColor('900') }]}>
+    <View style={[sharedStyles.videoBlockOuter, { backgroundColor: surface }]}>
       <View
         ref={containerRef}
         collapsable={false}
@@ -725,7 +725,7 @@ const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
   openOverlay?: (layout: ImageOverlayLayout) => void;
   overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
   const openInBrowser = useCallback(() => Linking.openURL(url).catch(() => {}), [url]);
   const player = useVideoPlayer(url, (p) => {
@@ -765,7 +765,7 @@ const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
   const aspectRatio = overlayLayout?.aspectRatio ?? 16 / 9;
 
   const content = (
-    <View style={[sharedStyles.videoBlockOuter, { backgroundColor: getPrimaryColor('900') }]}>
+    <View style={[sharedStyles.videoBlockOuter, { backgroundColor: surface }]}>
       <View
         ref={containerRef}
         collapsable={false}
@@ -827,7 +827,11 @@ export const VideoBlock = React.memo(function VideoBlock({
 });
 
 export const LightningBlock = React.memo(function LightningBlock({ invoice }: { invoice: string }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surface, surfaceTertiary] = useThemeColor([
+    'foreground',
+    'surface',
+    'surface-tertiary',
+  ] as const);
 
   return (
     <TouchableOpacity
@@ -835,21 +839,18 @@ export const LightningBlock = React.memo(function LightningBlock({ invoice }: { 
       onPress={() => {
         router.navigate({ pathname: '/(send-flow)/meltQuote' as any, params: { invoice } });
       }}
-      style={[
-        sharedStyles.mediaCard,
-        { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
-      ]}>
+      style={[sharedStyles.mediaCard, { backgroundColor: surface, borderColor: surfaceTertiary }]}>
       <HStack align="center" gap={8}>
-        <Icon name="mingcute:lightning-fill" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+        <Icon name="mingcute:lightning-fill" size={20} color={opacity(foreground, 0.4)} />
         <VStack style={sharedStyles.flex1}>
-          <Text bold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.66) }}>
+          <Text bold size={13} style={{ color: opacity(foreground, 0.66) }}>
             Lightning Invoice
           </Text>
-          <Text size={11} numberOfLines={1} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
+          <Text size={11} numberOfLines={1} style={{ color: opacity(foreground, 0.33) }}>
             {invoice.slice(0, 30)}…
           </Text>
         </VStack>
-        <Icon name="mdi:chevron-right" size={18} color={opacity(getPrimaryColor('0'), 0.33)} />
+        <Icon name="mdi:chevron-right" size={18} color={opacity(foreground, 0.33)} />
       </HStack>
     </TouchableOpacity>
   );
@@ -922,10 +923,10 @@ export const MetricsFooter = React.memo(function MetricsFooter({
   onActionPressIn?: () => void;
   onActionPressOut?: () => void;
 }) {
+  const repostedColor = useThemeColor('success');
   const iconColor = opacity(borderColor, 0.57);
   const textColor = opacity(borderColor, 0.57);
   const likedColor = '#ff5a7a';
-  const repostedColor = '#4cd964';
   const iconSize = compact ? 13 : 16;
   const textSize = compact ? 11 : 13;
 
@@ -1019,7 +1020,11 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
   onPressIn?: () => void;
   onPressOut?: () => void;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surface, surfaceTertiary] = useThemeColor([
+    'foreground',
+    'surface',
+    'surface-tertiary',
+  ] as const);
 
   const suppressQuotedTapStart = useCallback(() => {
     onPressIn?.();
@@ -1042,11 +1047,11 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
       <View
         style={[
           sharedStyles.quotedCard,
-          { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
+          { backgroundColor: surface, borderColor: surfaceTertiary },
         ]}>
         <HStack align="center" gap={6}>
-          <Icon name="mdi:message-text" size={14} color={opacity(getPrimaryColor('0'), 0.33)} />
-          <Text size={13} italic style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
+          <Icon name="mdi:message-text" size={14} color={opacity(foreground, 0.33)} />
+          <Text size={13} italic style={{ color: opacity(foreground, 0.33) }}>
             Quoted post
           </Text>
         </HStack>
@@ -1067,7 +1072,7 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
       <View
         style={[
           sharedStyles.quotedCard,
-          { backgroundColor: getPrimaryColor('900'), borderColor: getPrimaryColor('700') },
+          { backgroundColor: surface, borderColor: surfaceTertiary },
         ]}>
         <HStack align="center" gap={8} style={sharedStyles.mb6}>
           <Avatar
@@ -1080,19 +1085,16 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
           <Text
             bold
             size={13}
-            style={{ color: opacity(getPrimaryColor('0'), 0.66), flex: 1 }}
+            style={{ color: opacity(foreground, 0.66), flex: 1 }}
             numberOfLines={1}>
             {displayName}
           </Text>
           {timestamp ? (
             <>
-              <Text
-                bold
-                size={11}
-                style={{ color: opacity(getPrimaryColor('0'), 0.25), marginRight: 4 }}>
+              <Text bold size={11} style={{ color: opacity(foreground, 0.25), marginRight: 4 }}>
                 {'•'}
               </Text>
-              <Text size={11} style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
+              <Text size={11} style={{ color: opacity(foreground, 0.33) }}>
                 {timestamp}
               </Text>
             </>
@@ -1187,7 +1189,7 @@ export const NoteContent = React.memo(function NoteContent({
   onActionPressIn?: () => void;
   onActionPressOut?: () => void;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const [expanded, setExpanded] = useState(false);
   const imageOverlay = useImageOverlay();
 
@@ -1316,8 +1318,8 @@ export const NoteContent = React.memo(function NoteContent({
 
   const activeSegments = expanded ? inlineSegments : displaySegments;
 
-  const textColor = { color: opacity(getPrimaryColor('0'), 0.9) };
-  const accentColor = { color: opacity(getPrimaryColor('0'), 0.5) };
+  const textColor = { color: opacity(foreground, 0.9) };
+  const accentColor = { color: opacity(foreground, 0.5) };
 
   const renderSegment = (seg: ContentSegment, i: number) => {
     switch (seg.kind) {

@@ -9,7 +9,7 @@ const getColors = require('get-image-colors');
 const chroma = require('chroma-js');
 const path = require('path');
 const fs = require('fs');
-const { THEMES } = require('../themes.js');
+const { THEMES } = require('../themes');
 
 // Background image themes and their images
 const BACKGROUND_THEMES = {

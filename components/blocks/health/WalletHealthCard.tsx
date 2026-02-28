@@ -1,7 +1,6 @@
 import React, { useMemo, useCallback, useRef } from 'react';
 import { StyleSheet, View as RNView } from 'react-native';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
 import { View } from 'components/ui/View/View';
 import { HStack } from 'components/ui/View/HStack';
 import { VStack } from 'components/ui/View/VStack';
@@ -20,6 +19,7 @@ import Animated, {
   interpolate,
   runOnJS,
 } from 'react-native-reanimated';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 function getMintsForUnit(trustedMints: any[], unit: string) {
   const u = unit.toLowerCase();
@@ -47,11 +47,15 @@ function chipIconName(label: string): string {
 }
 
 export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string }) {
-  const { getPrimaryColor, getRedColor } = useTheme();
-  const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
-  const primary0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const [background, foreground, shade300] = useThemeColor([
+    'background',
+    'foreground',
+    'shade-300',
+  ] as const);
+  const primary950 = background;
+  const primary0 = foreground;
   const primary50 = useMemo(() => opacity(primary0, 0.9), [primary0]);
-  const accentColor = useMemo(() => getRedColor('300'), [getRedColor]);
+  const accentColor = shade300;
   const hero = useHeroTransition();
 
   const { trustedMints } = useMints();

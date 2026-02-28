@@ -15,7 +15,7 @@ function HistoryEntryDebugCode({ historyEntry }: HistoryEntryDebugCodeProps) {
     <ScrollView horizontal>
       <View
         blur
-        className="bg-primary-800"
+        className="bg-surface-secondary"
         style={{
           padding: 16,
           marginHorizontal: 16,

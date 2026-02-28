@@ -30,11 +30,10 @@ import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { Avatar } from 'components/ui/Avatar';
 import opacity from 'hex-color-opacity';
-import { useTheme } from '@/providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useRoutstrStore, RoutstrSession } from 'stores/routstrStore';
 import { getUsername } from 'helper/username';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 interface SessionsPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -86,7 +85,12 @@ const SessionItem: React.FC<{
   isCurrent: boolean;
   onPress: () => void;
 }> = ({ session, isCurrent, onPress }) => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, accent, surfaceSecondary, shade400] = useThemeColor([
+    'foreground',
+    'accent',
+    'surface-secondary',
+    'shade-400',
+  ] as const);
 
   // Format date/time
   const formatDate = (timestamp: number): string => {
@@ -109,33 +113,29 @@ const SessionItem: React.FC<{
     <TouchableOpacity
       onPress={onPress}
       style={{
-        backgroundColor: isCurrent ? getPrimaryColor('800') : getPrimaryColor('800'),
+        backgroundColor: surfaceSecondary,
         borderRadius: 12,
         padding: 16,
         marginBottom: 8,
         borderLeftWidth: isCurrent ? 3 : 0,
-        borderLeftColor: isCurrent ? getPrimaryColor('500') : 'transparent',
+        borderLeftColor: isCurrent ? accent : 'transparent',
       }}>
       <HStack align="center" justify="space-between">
         <VStack flex={1} spacing={4}>
           <HStack align="center" spacing={8}>
-            <Text
-              weight="heavy"
-              size={16}
-              style={{ color: getPrimaryColor('0') }}
-              numberOfLines={1}>
+            <Text weight="heavy" size={16} style={{ color: foreground }} numberOfLines={1}>
               {session.title}
             </Text>
             {isCurrent && (
-              <Icon name="mdi:check-circle" size={20} color={opacity(getPrimaryColor('0'), 0.4)} />
+              <Icon name="mdi:check-circle" size={20} color={opacity(foreground, 0.4)} />
             )}
           </HStack>
-          <Text size={12} style={{ color: opacity(getPrimaryColor('0'), 0.5) }} numberOfLines={2}>
+          <Text size={12} style={{ color: opacity(foreground, 0.5) }} numberOfLines={2}>
             {session.messages.length > 0
               ? `${session.messages.length} message${session.messages.length !== 1 ? 's' : ''}`
               : 'No messages yet'}
           </Text>
-          <Text size={10} style={{ color: getShadeColor('400') }}>
+          <Text size={10} style={{ color: shade400 }}>
             {formatDate(session.createdAt)}
           </Text>
         </VStack>
@@ -156,7 +156,13 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
 }) => {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, surface, surfaceSecondary, surfaceTertiary, shade400] = useThemeColor([
+    'foreground',
+    'surface',
+    'surface-secondary',
+    'surface-tertiary',
+    'shade-400',
+  ] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
   const {
     getAllSessions,
@@ -359,7 +365,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                   left: 0,
                   bottom: 0,
                   width: width,
-                  backgroundColor: getPrimaryColor('900'),
+                  backgroundColor: surface,
                   paddingTop: 0,
                   paddingBottom: insets.bottom,
                   shadowColor: '#000',
@@ -393,86 +399,86 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                         <TouchableOpacity
                           onPress={handleNewSession}
                           style={{
-                            backgroundColor: getPrimaryColor('800'),
+                            backgroundColor: surfaceSecondary,
                             padding: 12,
                             borderTopLeftRadius: 12,
                             borderTopRightRadius: 12,
                           }}>
                           <HStack align="center" spacing={8}>
-                            <Icon name="lucide:square-pen" size={18} color={getPrimaryColor('0')} />
-                            <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                            <Icon name="lucide:square-pen" size={18} color={foreground} />
+                            <Text size={16} style={{ color: foreground }}>
                               New Session
                             </Text>
                             <View style={{ flex: 1 }} />
                             <Icon
                               name="fa6-solid:chevron-right"
                               size={14}
-                              color={opacity(getPrimaryColor('0'), 0.4)}
+                              color={opacity(foreground, 0.4)}
                             />
                           </HStack>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={onRefreshBalance}
                           style={{
-                            backgroundColor: getPrimaryColor('800'),
+                            backgroundColor: surfaceSecondary,
                             padding: 12,
                             borderTopWidth: 1,
-                            borderTopColor: getPrimaryColor('700'),
+                            borderTopColor: surfaceTertiary,
                           }}>
                           <HStack align="center" spacing={8}>
-                            <Icon name="ic:round-refresh" size={18} color={getPrimaryColor('0')} />
-                            <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                            <Icon name="ic:round-refresh" size={18} color={foreground} />
+                            <Text size={16} style={{ color: foreground }}>
                               Refresh Balance
                             </Text>
                             <View style={{ flex: 1 }} />
                             <Icon
                               name="fa6-solid:chevron-right"
                               size={14}
-                              color={opacity(getPrimaryColor('0'), 0.4)}
+                              color={opacity(foreground, 0.4)}
                             />
                           </HStack>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={onTopUp}
                           style={{
-                            backgroundColor: getPrimaryColor('800'),
+                            backgroundColor: surfaceSecondary,
                             padding: 12,
                             borderTopWidth: 1,
-                            borderTopColor: getPrimaryColor('700'),
+                            borderTopColor: surfaceTertiary,
                           }}>
                           <HStack align="center" spacing={8}>
-                            <Icon name="ph:coins" size={18} color={getPrimaryColor('0')} />
-                            <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                            <Icon name="ph:coins" size={18} color={foreground} />
+                            <Text size={16} style={{ color: foreground }}>
                               Top Up Balance
                             </Text>
                             <View style={{ flex: 1 }} />
                             <Icon
                               name="fa6-solid:chevron-right"
                               size={14}
-                              color={opacity(getPrimaryColor('0'), 0.4)}
+                              color={opacity(foreground, 0.4)}
                             />
                           </HStack>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={onSwitchModel}
                           style={{
-                            backgroundColor: getPrimaryColor('800'),
+                            backgroundColor: surfaceSecondary,
                             padding: 12,
                             borderTopWidth: 1,
-                            borderTopColor: getPrimaryColor('700'),
+                            borderTopColor: surfaceTertiary,
                             borderBottomLeftRadius: 12,
                             borderBottomRightRadius: 12,
                           }}>
                           <HStack align="center" spacing={8}>
-                            <Icon name="mdi:robot" size={18} color={getPrimaryColor('0')} />
-                            <Text size={16} style={{ color: getPrimaryColor('0') }}>
+                            <Icon name="mdi:robot" size={18} color={foreground} />
+                            <Text size={16} style={{ color: foreground }}>
                               Switch Model
                             </Text>
                             <View style={{ flex: 1 }} />
                             <Icon
                               name="fa6-solid:chevron-right"
                               size={14}
-                              color={opacity(getPrimaryColor('0'), 0.4)}
+                              color={opacity(foreground, 0.4)}
                             />
                           </HStack>
                         </TouchableOpacity>
@@ -484,7 +490,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                           medium
                           overpass
                           style={{
-                            color: opacity(getPrimaryColor('0'), 0.5),
+                            color: opacity(foreground, 0.5),
                             marginBottom: 8,
                             marginLeft: 4,
                             textTransform: 'uppercase',
@@ -500,7 +506,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                       <VStack align="center" justify="center" style={{ paddingTop: 32 }}>
                         <Text
                           style={{
-                            color: opacity(getPrimaryColor('0'), 0.4),
+                            color: opacity(foreground, 0.4),
                             textAlign: 'center',
                           }}>
                           No sessions found
@@ -525,7 +531,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                       paddingBottom: insets.bottom,
                       paddingHorizontal: 16,
                       borderTopWidth: 1,
-                      borderTopColor: getPrimaryColor('700'),
+                      borderTopColor: surfaceTertiary,
                       marginBottom: -insets.bottom,
                     }}>
                     <HStack align="center" spacing={12}>
@@ -542,7 +548,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                           size={16}
                           bold
                           style={{
-                            color: getPrimaryColor('0'),
+                            color: foreground,
                           }}
                           numberOfLines={1}>
                           {username}
@@ -551,14 +557,14 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                           <Icon
                             name="material-symbols:account-balance-wallet"
                             size={14}
-                            color={getShadeColor('400')}
+                            color={shade400}
                           />
-                          <Text size={12} style={{ color: getShadeColor('400') }}>
+                          <Text size={12} style={{ color: shade400 }}>
                             {formatBalance(balance)}
                           </Text>
                           <Spacer size={4} />
-                          <Icon name="mdi:robot" size={14} color={getShadeColor('400')} />
-                          <Text size={12} style={{ color: getShadeColor('400') }} numberOfLines={1}>
+                          <Icon name="mdi:robot" size={14} color={shade400} />
+                          <Text size={12} style={{ color: shade400 }} numberOfLines={1}>
                             {selectedModelName}
                           </Text>
                         </HStack>

@@ -30,13 +30,13 @@ import { EnhancedHaptics } from 'components/ui/Haptics';
 import { Button } from 'components/ui/Button';
 
 import { useMintStore } from 'stores/mintStore';
-import { useTheme } from 'providers/ThemeProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Account } from './Account';
 import { router } from 'expo-router';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { LiquidButtonView } from 'expo-liquid-glass-native';
 import { hasAndroidLiquidButtonView } from '@/components/navigation/expoRouter55';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // Invisible figure-space titles to give LiquidButtonView intrinsic width
 const INVISIBLE_TITLE_WIDE = '\u2007'.repeat(12);
@@ -151,9 +151,11 @@ export function AccountPagerView({
   account,
 }: AccountPagerViewProps): React.ReactElement {
   const { height: windowHeight } = useWindowDimensions();
-  const { getPrimaryColor, getShadeColor } = useTheme();
-  const shadeColor100 = useMemo(() => getShadeColor('100'), [getShadeColor]);
-  const shadeColor300 = useMemo(() => getShadeColor('300'), [getShadeColor]);
+  const [foreground, shadeColor100, shadeColor300] = useThemeColor([
+    'foreground',
+    'shade-100',
+    'shade-300',
+  ] as const);
 
   // Calculate 50% of screen height for the pager view
   const pagerHeight = Math.max(windowHeight * 0.3, 250);
@@ -225,8 +227,8 @@ export function AccountPagerView({
   }, [getBalances, selectedMintUrl, account.unit]);
 
   // Button components
-  const liquidGlassForeground = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const qrGlassTint = useMemo(() => getShadeColor('300'), [getShadeColor]);
+  const liquidGlassForeground = foreground;
+  const qrGlassTint = shadeColor300;
   const useAndroidLiquidButtons = Platform.OS === 'android' && hasAndroidLiquidButtonView();
 
   function LiquidCapsuleButton({
@@ -476,7 +478,7 @@ export function AccountPagerView({
             ) : (
               <Button
                 text="Receive"
-                icon={<Icon name="lucide:arrow-down-left" size={16} color={getPrimaryColor('0')} />}
+                icon={<Icon name="lucide:arrow-down-left" size={16} color={foreground} />}
                 onPress={handleReceive}
                 variant="secondary"
                 blur={{ intensity: 70, tint: 'dark' }}
@@ -504,7 +506,7 @@ export function AccountPagerView({
             ) : (
               <Button
                 text="Send"
-                icon={<Icon name="lucide:arrow-up-right" size={16} color={getPrimaryColor('0')} />}
+                icon={<Icon name="lucide:arrow-up-right" size={16} color={foreground} />}
                 onPress={handleSend}
                 variant="secondary"
                 blur={{ intensity: 70, tint: 'dark' }}
@@ -568,7 +570,7 @@ export function AccountPagerView({
                   justifyContent: 'center',
                 }}
                 colors={[shadeColor100, shadeColor300]}>
-                <Icon name="stash:qr-code" size={24} color={getPrimaryColor('0')} />
+                <Icon name="stash:qr-code" size={24} color={foreground} />
               </LinearGradient>
             </TouchableOpacity>
           )}

@@ -21,7 +21,6 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { VStack } from 'components/ui/View/VStack';
@@ -47,6 +46,7 @@ import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useReceive } from 'coco-cashu-react';
 import opacity from 'hex-color-opacity';
 import { ListGroup, PressableFeedback } from 'heroui-native';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 // ============================================================================
 // Simple Progress Ring using SVG - Static (no animation for better performance)
@@ -208,9 +208,8 @@ function StatsGridComponent({
   totalMelts?: number;
   isLoading: boolean;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceSecondary, surfaceTertiary] = useThemeColor(['foreground', 'surface-secondary', 'surface-tertiary'] as const);
 
-  // Final display values (no counting animation - better performance)
   const displayValues = useMemo(
     () => ({
       successRate: successRate !== undefined ? (successRate * 100).toFixed(1) : '0.0',
@@ -306,26 +305,26 @@ function StatsGridComponent({
                     styles.statCard,
                     styles.statCardStretch,
                     {
-                      backgroundColor: getPrimaryColor('800'),
-                      borderColor: getPrimaryColor('700'),
+                      backgroundColor: surfaceSecondary,
+                      borderColor: surfaceTertiary,
                     },
                   ]}>
                   {showSkeleton ? (
                     <>
                       <Skeleton
-                        style={[styles.skeletonLabel, { backgroundColor: getPrimaryColor('700') }]}
+                        style={[styles.skeletonLabel, { backgroundColor: surfaceTertiary }]}
                       />
                       <Skeleton
                         style={[
                           styles.skeletonValue,
                           {
-                            backgroundColor: getPrimaryColor('700'),
+                            backgroundColor: surfaceTertiary,
                             width: stat.accent ? 100 : 60,
                           },
                         ]}
                       />
                       <Skeleton
-                        style={[styles.skeletonDesc, { backgroundColor: getPrimaryColor('700') }]}
+                        style={[styles.skeletonDesc, { backgroundColor: surfaceTertiary }]}
                       />
                     </>
                   ) : (
@@ -334,21 +333,21 @@ function StatsGridComponent({
                         bold
                         overpass
                         size={12}
-                        style={{ color: opacity(getPrimaryColor('0'), 0.66), marginBottom: 4 }}>
+                        style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
                         {stat.label.toUpperCase()}
                       </Text>
                       <Text
                         bold
                         overpass
                         size={stat.accent ? 24 : 20}
-                        style={{ color: getPrimaryColor('0'), marginBottom: 2 }}>
+                        style={{ color: foreground, marginBottom: 2 }}>
                         {stat.value}
                       </Text>
                       <Text
                         bold
                         overpass
                         size={12}
-                        style={{ color: opacity(getPrimaryColor('0'), 0.5), opacity: 0.8 }}>
+                        style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
                         {stat.description}
                       </Text>
                     </Animated.View>
@@ -375,20 +374,17 @@ function RatingDisplayComponent({
   recommendations?: any[];
   isLoading: boolean;
 }) {
-  const { getPrimaryColor, getYellowColor } = useTheme();
+  const [foreground, defaultColor, surfaceTertiary, warning] = useThemeColor(['foreground', 'default', 'surface-tertiary', 'yellow-300'] as const);
 
-  // All animations use native driver
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const barScaleAnim = useRef(new Animated.Value(0)).current;
 
-  // Check if we have valid data - score of -1 means not loaded
   const isValidScore = score >= 0;
   const showSkeleton = !isValidScore;
 
   const targetRow = isValidScore ? Math.max(1, Math.min(5, Math.ceil(score))) : 0;
   const goldPercentage = isValidScore && targetRow > 0 ? Math.min(1, score / targetRow) : 0;
 
-  // Final formatted score (no counting animation - direct display)
   const formattedScore = isValidScore ? score.toFixed(1) : '0.0';
 
   // Trigger animation when score loads - all native driver
@@ -419,7 +415,6 @@ function RatingDisplayComponent({
     }
   }, [isValidScore, goldPercentage, fadeAnim, barScaleAnim]);
 
-  // Show skeleton when loading or no valid score
   if (showSkeleton) {
     return (
       <HStack align="center" gap={16} style={{ width: '100%', paddingHorizontal: 16 }}>
@@ -429,7 +424,7 @@ function RatingDisplayComponent({
               width: 48,
               height: 32,
               borderRadius: 4,
-              backgroundColor: getPrimaryColor('700'),
+              backgroundColor: surfaceTertiary,
             }}
           />
           <Skeleton
@@ -438,7 +433,7 @@ function RatingDisplayComponent({
               height: 14,
               marginTop: 8,
               borderRadius: 4,
-              backgroundColor: getPrimaryColor('700'),
+              backgroundColor: surfaceTertiary,
             }}
           />
         </VStack>
@@ -447,14 +442,14 @@ function RatingDisplayComponent({
             <HStack key={stars} align="center" gap={8}>
               <HStack gap={2}>
                 {Array.from({ length: stars }).map((_, i) => (
-                  <Icon key={i} name="ic:round-star" size={12} color={getPrimaryColor('600')} />
+                  <Icon key={i} name="ic:round-star" size={12} color={defaultColor} />
                 ))}
               </HStack>
               <View
                 style={{
                   flex: 1,
                   height: 8,
-                  backgroundColor: getPrimaryColor('700'),
+                  backgroundColor: surfaceTertiary,
                   borderRadius: 4,
                 }}
               />
@@ -467,19 +462,17 @@ function RatingDisplayComponent({
 
   return (
     <HStack align="center" gap={16} style={{ width: '100%', paddingHorizontal: 16 }}>
-      {/* Score display */}
       <VStack align="center" style={{ width: 60 }}>
         <Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
-          <Text heavy size={28} style={{ color: getPrimaryColor('0') }}>
+          <Text heavy size={28} style={{ color: foreground }}>
             {formattedScore}
           </Text>
-          <Text size={12} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+          <Text size={12} style={{ color: opacity(foreground, 0.5) }}>
             out of 5
           </Text>
         </Animated.View>
       </VStack>
 
-      {/* Star distribution */}
       <VStack gap={4} style={{ flex: 1 }}>
         {[5, 4, 3, 2, 1].map((stars) => {
           const isTargetRow = stars === targetRow;
@@ -491,9 +484,7 @@ function RatingDisplayComponent({
                     <Icon
                       name="ic:round-star"
                       size={12}
-                      color={
-                        isTargetRow ? getYellowColor('300') : opacity(getPrimaryColor('0'), 0.4)
-                      }
+                      color={isTargetRow ? warning : opacity(foreground, 0.4)}
                     />
                   </Animated.View>
                 ))}
@@ -502,7 +493,7 @@ function RatingDisplayComponent({
                 style={{
                   flex: 1,
                   height: 8,
-                  backgroundColor: getPrimaryColor('700'),
+                  backgroundColor: surfaceTertiary,
                   borderRadius: 4,
                   overflow: 'hidden',
                 }}>
@@ -511,7 +502,7 @@ function RatingDisplayComponent({
                     style={{
                       width: '100%',
                       height: '100%',
-                      backgroundColor: getYellowColor('300'),
+                      backgroundColor: warning,
                       borderRadius: 4,
                       // Use scaleX with left origin instead of width animation
                       transform: [{ scaleX: barScaleAnim }],
@@ -552,7 +543,8 @@ const getMintDisplayName = (
 // Main Component
 // ============================================================================
 function MintInfoModal() {
-  const { getPrimaryColor, getRedColor, getGreenColor, getYellowColor } = useTheme();
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const [danger, success, warning] = useThemeColor(['danger', 'success', 'yellow-300'] as const);
   const insets = useSafeAreaInsets();
   const { mintUrl, fromScan, fromAccepter, token } = useLocalSearchParams<{
     mintUrl: string;
@@ -701,7 +693,7 @@ function MintInfoModal() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('950') }}>
+    <View style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: fromAccepter === '1' ? 'Verify Mint' : isLoading ? 'Mint Details' : displayName,
@@ -716,7 +708,7 @@ function MintInfoModal() {
                     }}
                     asChild>
                     <TouchableOpacity style={{ padding: 8 }}>
-                      <Icon name="ic:round-star" size={24} color={getYellowColor('300')} />
+                      <Icon name="ic:round-star" size={24} color={warning} />
                     </TouchableOpacity>
                   </Link>
                 ),
@@ -737,8 +729,8 @@ function MintInfoModal() {
           <ProgressRing
             size={84}
             progress={successRate ?? 0.5}
-            successColor={getGreenColor('300')}
-            errorColor={getRedColor('300')}>
+            successColor={success}
+            errorColor={danger}>
             <AnimatedAvatar
               picture={mintInfo?.icon_url || auditMintInfo?.icon_url}
               name={displayName}
@@ -806,7 +798,7 @@ function MintInfoModal() {
                       <ListGroup.ItemPrefix>
                         {contact.method.toUpperCase() === 'NOSTR' ? (
                           <CurrencyIcon
-                            colors={[opacity(getPrimaryColor('0'), 0.4)]}
+                            colors={[opacity(foreground, 0.4)]}
                             width={20}
                             currency="nostr"
                           />
@@ -814,13 +806,13 @@ function MintInfoModal() {
                           <Icon
                             name="hugeicons:new-twitter"
                             size={20}
-                            color={opacity(getPrimaryColor('0'), 0.4)}
+                            color={opacity(foreground, 0.4)}
                           />
                         ) : contact.method.toUpperCase() === 'EMAIL' ? (
                           <Icon
                             name="mdi:at"
                             size={20}
-                            color={opacity(getPrimaryColor('0'), 0.4)}
+                            color={opacity(foreground, 0.4)}
                           />
                         ) : undefined}
                       </ListGroup.ItemPrefix>
@@ -856,7 +848,7 @@ function MintInfoModal() {
                       <Icon
                         name="fluent:split-vertical-24-filled"
                         size={20}
-                        color={opacity(getPrimaryColor('0'), 0.4)}
+                        color={opacity(foreground, 0.4)}
                       />
                     </ListGroup.ItemPrefix>
                     <ListGroup.ItemContent>

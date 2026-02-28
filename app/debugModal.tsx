@@ -9,8 +9,8 @@ import Animated, {
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
 import { BlurView } from 'expo-blur';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 
@@ -109,7 +109,7 @@ export const ModalLayoutWrapper = ({
 }: ModalLayoutWrapperProps) => {
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
-  const { getPrimaryColor } = useTheme();
+  const background = useThemeColor('background');
 
   // Internal scroll tracking for debug mode
   const [adjustedInsets, setAdjustedInsets] = useState({ top: 0, bottom: 0, left: 0, right: 0 });
@@ -153,7 +153,7 @@ export const ModalLayoutWrapper = ({
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: getPrimaryColor('950') }}>
+    <View className="flex-1" style={{ backgroundColor: background }}>
       {/* 
         LAYOUT FIX: Always render an invisible absolutely positioned element.
         This fixes a React Native quirk where scroll height breaks without it.
@@ -183,7 +183,7 @@ export const ModalLayoutWrapper = ({
             }>
             <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
             <LinearGradient
-              colors={[getPrimaryColor('950'), 'transparent']}
+              colors={[background, 'transparent']}
               locations={[0.5, 1]}
               style={StyleSheet.absoluteFill}
             />
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
 // =============================================================================
 
 export default function DebugModal() {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const params = useLocalSearchParams<{ itemId?: string; debug?: string }>();
   const itemId = params.itemId ?? 'unknown';
   const showDebug = params.debug === 'true';
@@ -330,8 +330,8 @@ export default function DebugModal() {
       <Stack.Screen
         options={{
           headerTitle: `Item ${itemId}`,
-          headerTitleStyle: { color: getPrimaryColor('0') },
-          headerTintColor: getPrimaryColor('0'),
+          headerTitleStyle: { color: foreground },
+          headerTintColor: foreground,
         }}
       />
       <ModalLayoutWrapper debug={showDebug}>

@@ -16,9 +16,9 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-na
 import { LinearGradient } from 'expo-linear-gradient';
 import { getColors } from 'react-native-image-colors';
 import { Avatar } from 'components/ui/Avatar';
-import { useTheme } from 'providers/ThemeProvider';
 import { TOTAL_BASIS_POINTS } from 'stores/mintDistributionStore';
 import { darken, lighten } from 'polished';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // Bar configuration
 const BAR_HEIGHT = 32;
@@ -254,13 +254,12 @@ const AnimatedSegment: React.FC<SegmentProps> = ({
   isFirst,
   activeCount,
 }) => {
-  const { getPrimaryColor } = useTheme();
+  const [defaultColor, surfaceTertiary] = useThemeColor(['default', 'surface-tertiary'] as const);
   const mintName = mintInfo?.name || 'Mint';
   const mintIcon = mintInfo?.icon_url;
 
-  // Theme colors for skeleton/fallback
-  const primaryColor600 = useMemo(() => getPrimaryColor('600'), [getPrimaryColor]);
-  const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
+  const primaryColor600 = defaultColor;
+  const primaryColor700 = surfaceTertiary;
 
   // Extract dominant color (Spotify-style)
   const { baseColors, baseColor, hasLoaded } = useDominantColor(mintIcon, colorIndex);

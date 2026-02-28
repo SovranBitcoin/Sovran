@@ -25,7 +25,7 @@ import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { useDebouncedMintValidation } from 'hooks/coco/useDebouncedMintValidation';
 import { useNostrDiscoveredMints } from 'hooks/coco/useNostrDiscoveredMints';
 import { useSovranDiscoveredMints } from 'hooks/coco/useSovranDiscoveredMints';
@@ -88,18 +88,15 @@ const NativeSearchHeader = memo(function NativeSearchHeader({
   onSearchChange: (text: string) => void;
   clearKey: number;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const onSearchChangeRef = useRef(onSearchChange);
   const latestTextRef = useRef('');
 
-  // Keep ref updated without causing re-renders
   useEffect(() => {
     onSearchChangeRef.current = onSearchChange;
   }, [onSearchChange]);
 
-  // Debounced change handler - waits for interaction to complete before updating parent
-  // This prevents parent re-renders from stealing focus during typing
   const handleTextChange = useCallback((text: string) => {
     latestTextRef.current = text;
 
@@ -107,7 +104,6 @@ const NativeSearchHeader = memo(function NativeSearchHeader({
       clearTimeout(debounceRef.current);
     }
 
-    // Use a longer debounce (500ms) and wait for interactions to complete
     debounceRef.current = setTimeout(() => {
       InteractionManager.runAfterInteractions(() => {
         onSearchChangeRef.current(latestTextRef.current);
@@ -115,7 +111,6 @@ const NativeSearchHeader = memo(function NativeSearchHeader({
     }, 500);
   }, []);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (debounceRef.current) {
@@ -141,7 +136,7 @@ const NativeSearchHeader = memo(function NativeSearchHeader({
             keyboardType="url"
             autocorrection={false}
             modifiers={[
-              foregroundStyle(getPrimaryColor('0')),
+              foregroundStyle(foreground),
               frame({ maxWidth: Infinity, height: 28, alignment: 'leading' }),
             ]}
           />
@@ -169,13 +164,14 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
   onFocus?: () => void;
   onBlur?: () => void;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, defaultColor, surfaceSecondary] = useThemeColor(['foreground', 'default', 'surface-secondary'] as const);
+  const [green400, danger] = useThemeColor(['green-400', 'danger'] as const);
 
   const getStatusColor = () => {
-    if (validationState.isLoading) return opacity(getPrimaryColor('0'), 0.4);
-    if (validationState.isValid === true) return '#10B981';
-    if (validationState.isValid === false) return '#EF4444';
-    return getPrimaryColor('600');
+    if (validationState.isLoading) return opacity(foreground, 0.4);
+    if (validationState.isValid === true) return green400;
+    if (validationState.isValid === false) return danger;
+    return defaultColor;
   };
 
   return (
@@ -184,7 +180,7 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: getPrimaryColor('800'),
+        backgroundColor: surfaceSecondary,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: getStatusColor(),
@@ -198,10 +194,10 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
         onFocus={onFocus}
         onBlur={onBlur}
         placeholder="Search mints or enter URL..."
-        placeholderTextColor={opacity(getPrimaryColor('0'), 0.33)}
+        placeholderTextColor={opacity(foreground, 0.33)}
         style={{
           flex: 1,
-          color: getPrimaryColor('0'),
+          color: foreground,
           fontSize: 16,
           fontFamily: 'OverpassRegular',
         }}
@@ -210,15 +206,15 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
         autoCapitalize="none"
       />
       {validationState.isLoading && (
-        <ActivityIndicator size="small" color={opacity(getPrimaryColor('0'), 0.4)} />
+        <ActivityIndicator size="small" color={opacity(foreground, 0.4)} />
       )}
       {!validationState.isLoading && validationState.isValid === true && (
-        <Text size={16} style={{ color: '#10B981' }}>
+        <Text size={16} style={{ color: green400 }}>
           ✓
         </Text>
       )}
       {!validationState.isLoading && validationState.isValid === false && (
-        <Text size={16} style={{ color: '#EF4444' }}>
+        <Text size={16} style={{ color: danger }}>
           ✗
         </Text>
       )}
@@ -233,22 +229,22 @@ const LoadingMintsList = memo(function LoadingMintsList({ count = 5 }: { count?:
       {Array.from({ length: count }).map((_, index) => (
         <View
           key={index}
-          className="bg-primary-900"
+          className="bg-surface"
           style={{ padding: 16, marginBottom: 4, borderRadius: 16 }}>
           <VStack gap={12}>
             <View className="flex-row items-center gap-3">
               <Skeleton
-                className="h-[42px] w-[42px] bg-primary-700"
+                className="h-[42px] w-[42px] bg-surface-tertiary"
                 style={{ borderRadius: 42 * 0.25 }}
               />
               <VStack flex={1} gap={8}>
-                <Skeleton className="h-[16px] bg-primary-700" style={{ width: 150 }} />
-                <Skeleton className="h-[20px] rounded-full bg-primary-700" style={{ width: 80 }} />
+                <Skeleton className="h-[16px] bg-surface-tertiary" style={{ width: 150 }} />
+                <Skeleton className="h-[20px] rounded-full bg-surface-tertiary" style={{ width: 80 }} />
               </VStack>
             </View>
             <View className="flex-row gap-2">
-              <Skeleton className="h-[24px] rounded-full bg-primary-700" style={{ width: 56 }} />
-              <Skeleton className="h-[24px] rounded-full bg-primary-700" style={{ width: 60 }} />
+              <Skeleton className="h-[24px] rounded-full bg-surface-tertiary" style={{ width: 56 }} />
+              <Skeleton className="h-[24px] rounded-full bg-surface-tertiary" style={{ width: 60 }} />
             </View>
           </VStack>
         </View>
@@ -275,7 +271,8 @@ const MintItem = memo(function MintItem({
   auditData: AuditedMintData;
   globalLoading: boolean;
 }) {
-  const { getPrimaryColor, getYellowColor, getGreenColor } = useTheme();
+  const foreground = useThemeColor('foreground');
+  const [warning, success] = useThemeColor(['yellow-300', 'success'] as const);
 
   const displayName = useMemo(
     () => getMintDisplayName(mint.url, mint.mintInfo),
@@ -319,7 +316,7 @@ const MintItem = memo(function MintItem({
 
   return (
     <TouchableOpacity
-      className="bg-primary-900"
+      className="bg-surface"
       style={{
         padding: 16,
         marginBottom: 4,
@@ -342,12 +339,12 @@ const MintItem = memo(function MintItem({
           </View>
 
           <VStack flex={1}>
-            <Text className="text-primary-0" size={16} bold overpass>
+            <Text className="text-foreground" size={16} bold overpass>
               {displayName}
             </Text>
 
             <View style={{ alignSelf: 'flex-start' }}>
-              <Text heavy size={14} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+              <Text heavy size={14} style={{ color: opacity(foreground, 0.5) }}>
                 {extractDomain(mint.url)}
               </Text>
             </View>
@@ -371,7 +368,7 @@ const MintItem = memo(function MintItem({
           ) : kymLoading ? (
             <Skeleton
               className="h-[24px] w-[56px] rounded-full"
-              style={{ backgroundColor: opacityColor(getYellowColor('300'), 0.2) }}
+              style={{ backgroundColor: opacityColor(warning, 0.2) }}
             />
           ) : null}
 
@@ -387,7 +384,7 @@ const MintItem = memo(function MintItem({
           ) : auditLoading ? (
             <Skeleton
               className="h-[24px] w-[60px] rounded-full"
-              style={{ backgroundColor: opacityColor(getGreenColor('300'), 0.2) }}
+              style={{ backgroundColor: opacityColor(success, 0.2) }}
             />
           ) : null}
         </HStack>
@@ -397,7 +394,7 @@ const MintItem = memo(function MintItem({
 });
 
 function AddMintsScreen() {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const { width: windowWidth } = useWindowDimensions();
 
   // Scroll tracking for animated currency tabs
@@ -727,8 +724,7 @@ function AddMintsScreen() {
   // Calculate header width for search input
   const headerWidth = windowWidth - 124 - 24;
 
-  // Memoize colors
-  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const primaryColor0 = foreground;
 
   // Sticky currency tabs component (same as MintListScreen)
   const currencyTabs = useMemo(
@@ -821,10 +817,10 @@ function AddMintsScreen() {
     () =>
       showCancelButton ? (
         <TouchableOpacity onPress={handleClearSearch} style={{ padding: 8 }}>
-          <IconSymbol name="xmark" size={20} color={getPrimaryColor('0')} />
+          <IconSymbol name="xmark" size={20} color={foreground} />
         </TouchableOpacity>
       ) : null,
-    [showCancelButton, handleClearSearch, getPrimaryColor]
+    [showCancelButton, handleClearSearch, foreground]
   );
 
   // Memoize header callbacks to prevent React Navigation from re-rendering

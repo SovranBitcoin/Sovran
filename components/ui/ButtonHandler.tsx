@@ -62,7 +62,7 @@ import { SheetManager } from 'react-native-actions-sheet';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import Icon from '@/assets/icons';
 
@@ -152,7 +152,7 @@ export function ButtonHandler({
   className,
 }: ButtonHandlerProps) {
   const [loading, setLoading] = useState(false);
-  const { getPrimaryColor } = useTheme();
+  const background = useThemeColor('background');
 
   // Filter buttons based on condition
   const visibleButtons = buttons.filter((button) => button.condition !== false);
@@ -218,8 +218,8 @@ export function ButtonHandler({
       style={[style]}>
       <LinearGradient
         colors={[
-          opacity(gradientColor || getPrimaryColor('950'), 0.75),
-          opacity(gradientColor || getPrimaryColor('950'), 0),
+          opacity(gradientColor || background, 0.75),
+          opacity(gradientColor || background, 0),
         ]}
         start={{ x: 0, y: 1 }}
         end={{ x: 0, y: 0 }}

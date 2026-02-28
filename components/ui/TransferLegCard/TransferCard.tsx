@@ -13,7 +13,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import { View } from 'components/ui/View/View';
 import { BlurCardFrame } from 'components/ui/BlurCardFrame';
 
@@ -26,12 +26,9 @@ interface TransferCardProps {
 
 export const TransferCard = React.memo(
   ({ accentColor: accentColorProp, children }: TransferCardProps) => {
-    const { getPrimaryColor } = useTheme();
+    const muted = useThemeColor('muted');
 
-    const accentColor = useMemo(
-      () => accentColorProp ?? getPrimaryColor('300'),
-      [accentColorProp, getPrimaryColor]
-    );
+    const accentColor = useMemo(() => accentColorProp ?? muted, [accentColorProp, muted]);
 
     // Always show the tinted border — matches Transactions component exactly.
     const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);

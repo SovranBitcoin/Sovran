@@ -1,6 +1,8 @@
-// themes.js - Complete theme definitions for NativeWind
+export type ThemeShade = 0 | 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950;
+
+export type ThemePalette = Record<ThemeShade, string>;
+
 export const THEMES = {
-  // Existing themes from colors.tsx
   'coral-sunrise': {
     950: '#ffb7b0',
     900: '#ff9f96',
@@ -71,7 +73,6 @@ export const THEMES = {
     50: '#303030',
     0: '#131313',
   },
-  // === BACKGROUND IMAGE THEMES (AUTO-GENERATED) ===
   cosmicpurple: {
     950: '#06000F',
     900: '#0D041B',
@@ -156,9 +157,6 @@ export const THEMES = {
     50: '#EBE9EC',
     0: '#FFFFFF',
   },
-  // === END BACKGROUND IMAGE THEMES ===
-
-  // Additional existing themes from your colors.tsx
   'neon-dream': {
     950: '#0B0033',
     900: '#0D0055',
@@ -523,6 +521,8 @@ export const THEMES = {
     900: '#121212',
     950: '#080808',
   },
-};
+} as const satisfies Record<string, ThemePalette>;
 
-export const THEME_NAMES = Object.keys(THEMES);
+export type ThemeName = keyof typeof THEMES;
+
+export const THEME_NAMES = Object.keys(THEMES) as ThemeName[];

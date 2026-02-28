@@ -15,8 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon, { CurrencyIcon } from 'assets/icons';
-import { useTheme } from '@/providers/ThemeProvider';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 // Size constants
 const LARGE_ICON_SIZE = 28;
 const SMALL_ICON_SIZE = 22;
@@ -210,10 +209,7 @@ export function MintCurrencyTabs({
   onCurrencyChange,
   scrollY,
 }: MintCurrencyTabsProps) {
-  const { getPrimaryColor } = useTheme();
-  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
-  const primaryColor900 = useMemo(() => getPrimaryColor('900'), [getPrimaryColor]);
+  const [primaryColor0, primaryColor700, primaryColor900] = useThemeColor(['foreground', 'surface-tertiary', 'surface'] as const);
 
   const handleCurrencyChange = useCallback(
     (currency: string) => {

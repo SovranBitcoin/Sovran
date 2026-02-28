@@ -17,7 +17,7 @@ import { StyleSheet, Alert } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useSharedValue } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
 import { VStack } from 'components/ui/View/VStack';
@@ -41,9 +41,9 @@ const CURRENCY_TABS_HEIGHT = 48;
 const STICKY_CONTENT_HEIGHT = DISTRIBUTION_BAR_HEIGHT + CURRENCY_TABS_HEIGHT;
 
 function DistributionScreen() {
-  const { getPrimaryColor, getShadeColor } = useTheme();
-  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primaryColor950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
+  const [foreground, background, danger] = useThemeColor(['foreground', 'background', 'danger'] as const);
+  const primaryColor0 = foreground;
+  const primaryColor950 = background;
 
   // Get params
   const params = useLocalSearchParams<{ unit?: string }>();
@@ -300,7 +300,7 @@ function DistributionScreen() {
         {/* Distribution summary */}
         <View style={styles.summaryContainer}>
           <HStack justify="space-between" align="center" style={{ paddingHorizontal: 16 }}>
-            <Text size={14} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+            <Text size={14} style={{ color: opacity(foreground, 0.5) }}>
               Total distribution
             </Text>
             <Text
@@ -308,7 +308,7 @@ function DistributionScreen() {
               overpass
               size={14}
               style={{
-                color: totalBp === TOTAL_BASIS_POINTS ? getPrimaryColor('0') : getShadeColor('300'),
+                color: totalBp === TOTAL_BASIS_POINTS ? foreground : danger,
               }}>
               {(totalBp / 100).toFixed(1)}%{totalBp !== TOTAL_BASIS_POINTS && ' ⚠️'}
             </Text>
@@ -342,9 +342,7 @@ function DistributionScreen() {
 
         {/* Info text */}
         <View style={styles.infoContainer}>
-          <Text
-            size={12}
-            style={{ color: opacity(getPrimaryColor('0'), 0.4), textAlign: 'center' }}>
+          <Text size={12} style={{ color: opacity(foreground, 0.4), textAlign: 'center' }}>
             {hasActiveMints
               ? 'Adjusting one mint redistributes among active mints only'
               : 'Tap Equalize to distribute evenly across all mints'}

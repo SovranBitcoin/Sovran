@@ -27,8 +27,8 @@ import { Text } from 'components/ui/Text';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { ModalLayoutWrapper } from 'app/debugModal';
-import { useTheme } from 'providers/ThemeProvider';
 import { withSheetProvider } from 'hocs/withSheetProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
@@ -94,7 +94,7 @@ function UsernameInput({
   isChecking: boolean;
   accentColor: string;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   const handleChange = useCallback(
     (text: string) => {
@@ -119,7 +119,7 @@ function UsernameInput({
         onChangeText={handleChange}
         placeholder="username"
         placeholderTextColor={opacity(accentColor, 0.45)}
-        style={[styles.input, { color: opacity(getPrimaryColor('0'), 0.9) }]}
+        style={[styles.input, { color: opacity(foreground, 0.9) }]}
         autoCorrect={false}
         autoCapitalize="none"
         autoFocus
@@ -146,18 +146,19 @@ function DomainOption({
   onSelect: () => void;
   availabilityResult?: AvailabilityResult;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, muted, accent, defaultColor, surfaceSecondary, surface] = useThemeColor(['foreground', 'muted', 'accent', 'default', 'surface-secondary', 'surface'] as const);
+  const [danger, success] = useThemeColor(['danger', 'success'] as const);
 
   const getStatusInfo = () => {
     if (!availabilityResult) return null;
     if (availabilityResult.loading)
-      return { color: opacity(getPrimaryColor('0'), 0.33), text: 'Checking...' };
+      return { color: opacity(foreground, 0.33), text: 'Checking...' };
     if (availabilityResult.error)
-      return { color: '#ef4444', text: availabilityResult.error, icon: 'mdi:close-circle' };
+      return { color: danger, text: availabilityResult.error, icon: 'mdi:close-circle' };
     if (availabilityResult.available === true)
-      return { color: '#22c55e', text: 'Available', icon: 'mdi:check-circle' };
+      return { color: success, text: 'Available', icon: 'mdi:check-circle' };
     if (availabilityResult.available === false)
-      return { color: '#ef4444', text: 'Taken', icon: 'mdi:close-circle' };
+      return { color: danger, text: 'Taken', icon: 'mdi:close-circle' };
     return null;
   };
 
@@ -171,9 +172,9 @@ function DomainOption({
         styles.domainOption,
         {
           backgroundColor: isSelected
-            ? opacity(getPrimaryColor('500'), 0.15)
-            : getPrimaryColor('900'),
-          borderColor: isSelected ? getPrimaryColor('500') : getPrimaryColor('800'),
+            ? opacity(accent, 0.15)
+            : surface,
+          borderColor: isSelected ? accent : surfaceSecondary,
         },
       ]}>
       <HStack align="center" style={{ flex: 1 }}>
@@ -182,15 +183,15 @@ function DomainOption({
             styles.domainIcon,
             {
               backgroundColor: isSelected
-                ? opacity(getPrimaryColor('400'), 0.2)
-                : getPrimaryColor('800'),
+                ? opacity(muted, 0.2)
+                : surfaceSecondary,
             },
           ]}>
           <Icon
             name="mingcute:lightning-fill"
             size={16}
             color={
-              isSelected ? opacity(getPrimaryColor('0'), 0.4) : opacity(getPrimaryColor('0'), 0.33)
+              isSelected ? opacity(foreground, 0.4) : opacity(foreground, 0.33)
             }
           />
         </View>
@@ -199,8 +200,8 @@ function DomainOption({
           heavy={isSelected}
           style={{
             color: isSelected
-              ? opacity(getPrimaryColor('0'), 0.9)
-              : opacity(getPrimaryColor('0'), 0.5),
+              ? opacity(foreground, 0.9)
+              : opacity(foreground, 0.5),
           }}>
           @{domain.label}
         </Text>
@@ -225,10 +226,10 @@ function DomainOption({
         <View
           style={[
             styles.radioOuter,
-            { borderColor: isSelected ? getPrimaryColor('500') : getPrimaryColor('600') },
+            { borderColor: isSelected ? accent : defaultColor },
           ]}>
           {isSelected && (
-            <View style={[styles.radioInner, { backgroundColor: getPrimaryColor('500') }]} />
+            <View style={[styles.radioInner, { backgroundColor: accent }]} />
           )}
         </View>
       )}
@@ -264,7 +265,7 @@ function generateNip98Auth(url: string, method: string, privateKey: Uint8Array):
 }
 
 function ClaimUsernameScreen() {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceForeground, accent, surface, background] = useThemeColor(['foreground', 'surface-foreground', 'accent', 'surface', 'background'] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
   const hero = useHeroTransition();
   const insets = useSafeAreaInsets();
@@ -283,10 +284,10 @@ function ClaimUsernameScreen() {
   const CloseButton = useCallback(
     () => (
       <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
-        <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+        <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
       </TouchableOpacity>
     ),
-    [getPrimaryColor, handleClose]
+    [foreground, handleClose]
   );
 
   const handleHeroLayout = useCallback(() => {
@@ -444,7 +445,7 @@ function ClaimUsernameScreen() {
           animation: 'fade',
           headerShown: true,
           headerTitle: '',
-          headerTintColor: getPrimaryColor('0'),
+          headerTintColor: foreground,
           headerLeft: CloseButton,
           headerTransparent: true,
           headerBlurEffect: 'none',
@@ -477,8 +478,8 @@ function ClaimUsernameScreen() {
             ]}>
             <ClaimUsernameCardFrame
               accentColor={accentColor}
-              backgroundColor={getPrimaryColor('950')}
-              highlightColor={getPrimaryColor('50')}>
+                backgroundColor={background}
+                highlightColor={surfaceForeground}>
               <VStack style={{ paddingHorizontal: 20, paddingBottom: 20, zIndex: 1 }}>
                 <HStack align="center" style={{ marginBottom: 14 }}>
                   <View
@@ -486,7 +487,7 @@ function ClaimUsernameScreen() {
                     <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
                   </View>
                   <VStack style={{ flex: 1, marginLeft: 12 }}>
-                    <Text size={18} heavy style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
+                    <Text size={18} heavy style={{ color: opacity(foreground, 0.9) }}>
                       Claim Your Address
                     </Text>
                     <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
@@ -497,7 +498,7 @@ function ClaimUsernameScreen() {
 
                 <Text
                   size={14}
-                  style={{ color: opacity(getPrimaryColor('0'), 0.5), marginBottom: 14 }}>
+                  style={{ color: opacity(foreground, 0.5), marginBottom: 14 }}>
                   Choose a memorable username for receiving Bitcoin.
                 </Text>
 
@@ -519,7 +520,7 @@ function ClaimUsernameScreen() {
                   size={12}
                   heavy
                   style={{
-                    color: opacity(getPrimaryColor('0'), 0.33),
+                    color: opacity(foreground, 0.33),
                     marginLeft: 4,
                     marginBottom: 4,
                   }}>
@@ -539,11 +540,11 @@ function ClaimUsernameScreen() {
               </VStack>
 
               {username.length === 0 && (
-                <View style={[styles.guidelinesBox, { backgroundColor: getPrimaryColor('900') }]}>
+                <View style={[styles.guidelinesBox, { backgroundColor: surface }]}>
                   <Text
                     size={13}
                     heavy
-                    style={{ color: opacity(getPrimaryColor('0'), 0.5), marginBottom: 12 }}>
+                    style={{ color: opacity(foreground, 0.5), marginBottom: 12 }}>
                     Username Guidelines
                   </Text>
                   <VStack style={{ gap: 10 }}>
@@ -556,11 +557,11 @@ function ClaimUsernameScreen() {
                         <Icon
                           name={item.icon}
                           size={16}
-                          color={opacity(getPrimaryColor('0'), 0.33)}
+                          color={opacity(foreground, 0.33)}
                         />
                         <Text
                           size={13}
-                          style={{ color: opacity(getPrimaryColor('0'), 0.4), marginLeft: 10 }}>
+                          style={{ color: opacity(foreground, 0.4), marginLeft: 10 }}>
                           {item.text}
                         </Text>
                       </HStack>
@@ -575,15 +576,15 @@ function ClaimUsernameScreen() {
                   style={[
                     styles.previewBox,
                     {
-                      backgroundColor: opacity(getPrimaryColor('500'), 0.08),
-                      borderColor: opacity(getPrimaryColor('500'), 0.2),
+                      backgroundColor: opacity(accent, 0.08),
+                      borderColor: opacity(accent, 0.2),
                     },
                   ]}>
                   <Text
                     size={11}
                     heavy
                     style={{
-                      color: opacity(getPrimaryColor('0'), 0.33),
+                      color: opacity(foreground, 0.33),
                       marginBottom: 8,
                       letterSpacing: 1,
                     }}>
@@ -592,7 +593,7 @@ function ClaimUsernameScreen() {
                   <Text
                     size={18}
                     heavy
-                    style={{ color: opacity(getPrimaryColor('0'), 0.9), fontFamily: 'monospace' }}>
+                    style={{ color: opacity(foreground, 0.9), fontFamily: 'monospace' }}>
                     {username}@{selectedDomainLabel}
                   </Text>
                 </View>

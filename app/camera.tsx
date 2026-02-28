@@ -12,14 +12,14 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import Icon from 'assets/icons';
 import { useMintStore } from 'stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useTheme } from 'providers/ThemeProvider';
 import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { CameraScreen, ScanningData } from 'components/screens/CameraScreen';
 
 const Camera: React.FC = () => {
   const { unit } = useLocalSearchParams<{ unit: string }>();
   const { keys } = useNostrKeysContext();
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 
@@ -46,11 +46,11 @@ const Camera: React.FC = () => {
           title: 'Scan QR',
           headerTransparent: true,
           headerStyle: { backgroundColor: 'transparent' },
-          headerTintColor: getPrimaryColor('0'),
-          headerTitleStyle: { color: getPrimaryColor('0') },
+          headerTintColor: foreground,
+          headerTitleStyle: { color: foreground },
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-              <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+              <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
             </TouchableOpacity>
           ),
         }}

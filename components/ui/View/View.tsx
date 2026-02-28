@@ -19,7 +19,7 @@
  * **Usage:**
  * ```typescript
  * // Basic usage
- * <View className="p-4 bg-primary-800">
+ * <View className="p-4 bg-surface-secondary">
  *   <Text>Content</Text>
  * </View>
  *
@@ -76,7 +76,7 @@ export interface ViewProps extends RNViewProps {
  * @returns Cleaned className string with background classes removed
  *
  * @example
- * stripBackgroundClasses('p-4 bg-primary-800 bg-gradient-to-r') // 'p-4'
+ * stripBackgroundClasses('p-4 bg-surface-secondary bg-gradient-to-r') // 'p-4'
  * stripBackgroundClasses('text-white') // 'text-white'
  * stripBackgroundClasses(undefined) // ''
  *
@@ -110,7 +110,7 @@ const stripBackgroundClasses = (className?: string): string => {
  *
  * @example
  * // Standard view
- * <View className="p-4 bg-primary-800">
+ * <View className="p-4 bg-surface-secondary">
  *   <Text>Normal content</Text>
  * </View>
  *

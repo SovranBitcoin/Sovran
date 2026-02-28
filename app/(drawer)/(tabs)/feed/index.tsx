@@ -1,11 +1,11 @@
 import { View } from 'react-native';
 import { HomeFeed } from 'components/blocks/HomeFeed';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 export default function FeedScreen() {
-  const { getPrimaryColor } = useTheme();
+  const surface = useThemeColor('surface');
   return (
-    <View style={{ flex: 1, backgroundColor: getPrimaryColor('900') }}>
+    <View style={{ flex: 1, backgroundColor: surface }}>
       <HomeFeed />
     </View>
   );

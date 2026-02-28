@@ -23,8 +23,7 @@
 import React from 'react';
 import ActionSheet, { registerSheet } from 'react-native-actions-sheet';
 import { sheetName, routes } from './routes';
-import { useTheme } from 'providers/ThemeProvider';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 /**
  * EmojiPickerSheet Component
  *
@@ -32,14 +31,14 @@ import { useTheme } from 'providers/ThemeProvider';
  * @description Main wrapper - do NOT render directly, use SheetManager.show()
  */
 function EmojiPickerSheet(props: any) {
-  const { getPrimaryColor } = useTheme();
+  const background = useThemeColor('background');
 
   return (
     <ActionSheet
       enableRouterBackNavigation={true}
       routes={routes}
       initialRoute="emoji-grid"
-      containerStyle={{ backgroundColor: getPrimaryColor('950') }}
+      containerStyle={{ backgroundColor: background }}
       {...props}
     />
   );

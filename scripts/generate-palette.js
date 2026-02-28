@@ -244,7 +244,7 @@ console.log('\n' + '='.repeat(60));
 console.log('COMPARISON: Generated vs Existing Themes');
 console.log('='.repeat(60));
 
-const { THEMES } = require('../themes.js');
+const { THEMES } = require('../themes');
 
 const comparisons = [
   { generated: 'test-blue', existing: 'deepocean' },

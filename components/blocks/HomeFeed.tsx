@@ -14,7 +14,6 @@ import {
   ScrollView,
   useWindowDimensions,
 } from 'react-native';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
 import { View } from 'components/ui/View/View';
@@ -66,6 +65,7 @@ import {
 } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/hooks/useNostrEngagement';
 import { StoriesRow } from './nostr/StoriesRow';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // ============================================================================
 // Types
@@ -339,13 +339,13 @@ function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): Phase1Result {
 // ============================================================================
 
 function EmptyFeed() {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
 
   return (
     <VStack align="center" style={styles.emptyState}>
-      <Icon name="mdi:message-text" size={40} color={getPrimaryColor('600')} />
+      <Icon name="mdi:message-text" size={40} color={defaultColor} />
       <Spacer size={8} />
-      <Text bold size={16} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+      <Text bold size={16} style={{ color: opacity(foreground, 0.5) }}>
         No posts yet
       </Text>
       <Spacer size={4} />
@@ -362,7 +362,7 @@ function EmptyFeed() {
 
 function HomeFeedInner() {
   useBackgroundConfig(BG_CONFIG);
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const imageOverlay = useImageOverlay();
   const { keys: nostrKeys } = useNostrKeysContext();
   const userPubkey = nostrKeys?.pubkey;
@@ -1102,16 +1102,16 @@ function HomeFeedInner() {
     width: indicatorWidth.get(),
   }));
 
-  const tabLabelActiveColor = useMemo(() => opacity(getPrimaryColor('0'), 0.95), [getPrimaryColor]);
+  const tabLabelActiveColor = useMemo(() => opacity(foreground, 0.95), [foreground]);
   const tabLabelInactiveColor = useMemo(
-    () => opacity(getPrimaryColor('0'), 0.45),
-    [getPrimaryColor]
+    () => opacity(foreground, 0.45),
+    [foreground]
   );
 
   const tabsBar = useMemo(
     () =>
       feedSpecs.length > 1 ? (
-        <View style={[styles.feedTabsContainer, { backgroundColor: getPrimaryColor('900') }]}>
+        <View style={[styles.feedTabsContainer, { backgroundColor: surface }]}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1142,7 +1142,7 @@ function HomeFeedInner() {
               pointerEvents="none"
               style={[
                 styles.feedTabIndicator,
-                { backgroundColor: getPrimaryColor('0') },
+                { backgroundColor: foreground },
                 indicatorStyle,
               ]}
             />
@@ -1152,7 +1152,8 @@ function HomeFeedInner() {
     [
       activeSpecIndex,
       feedSpecs,
-      getPrimaryColor,
+      foreground,
+      surface,
       handleSpecChange,
       handleTabLayout,
       indicatorStyle,
@@ -1233,7 +1234,7 @@ function HomeFeedInner() {
     ]
   );
 
-  const refreshTintColor = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
+  const refreshTintColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
 
   const refreshControl = useMemo(
     () => (

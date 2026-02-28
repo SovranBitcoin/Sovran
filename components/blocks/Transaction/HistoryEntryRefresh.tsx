@@ -5,8 +5,8 @@ import Icon from 'assets/icons';
 import { HistoryEntry } from 'coco-cashu-core';
 import { GetInfoResponse } from '@cashu/cashu-ts';
 import { ListGroup, PressableFeedback } from 'heroui-native';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface HistoryEntryRefreshProps {
   mintInfo: GetInfoResponse;
@@ -16,7 +16,7 @@ interface HistoryEntryRefreshProps {
 }
 
 export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: HistoryEntryRefreshProps) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   const statusLabel =
     historyEntry.type === 'send'
@@ -48,7 +48,7 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
       </ListGroup.ItemContent>
       {onPress && (
         <ListGroup.ItemSuffix>
-          <Icon name="lucide:pencil-line" size={16} color={opacity(getPrimaryColor('0'), 0.4)} />
+          <Icon name="lucide:pencil-line" size={16} color={opacity(foreground, 0.4)} />
         </ListGroup.ItemSuffix>
       )}
     </ListGroup.Item>

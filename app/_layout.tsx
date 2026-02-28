@@ -35,6 +35,7 @@ import { NostrKeysProvider, useNostrKeysContext } from 'providers/NostrKeysProvi
 import { NostrNDKProvider } from 'providers/NostrNDKProvider';
 import { PricelistProvider } from 'providers/PricelistProvider';
 import { ThemeProvider, useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { SheetProvider } from 'react-native-actions-sheet';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -114,21 +115,22 @@ function ProfileBalanceSync() {
 // Inner component that can access theme context
 function RootLayoutContent() {
   const colorScheme = useColorScheme();
-  const { getPrimaryColor, currentTheme } = useTheme();
+  const { currentTheme } = useTheme();
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
 
   // Close button component for modal presentations
   const CloseButton = () => (
     <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+      <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
     </TouchableOpacity>
   );
 
   // Screen options builder
   const getScreenOptions = (screen: ModalConfig) => {
     // Base header styling options from shared config
-    const backgroundColor = nostrKeys?.pubkey ? getPrimaryColor('950') : 'transparent';
-    const baseHeaderOptions = getBaseModalHeaderOptions(getPrimaryColor, backgroundColor);
+    const backgroundColor = nostrKeys?.pubkey ? background : 'transparent';
+    const baseHeaderOptions = getBaseModalHeaderOptions(foreground, backgroundColor);
 
     // Check if this is a modal/formSheet presentation
     const isModalPresentation =
@@ -184,13 +186,13 @@ function RootLayoutContent() {
 
   // For iOS 26+ with Liquid Glass, use transparent background to enable glass effects
   const useLiquidGlass = Platform.OS === 'ios' && supportsLiquidGlass();
-  const contentBackgroundColor = useLiquidGlass ? 'transparent' : getPrimaryColor('950');
+  const contentBackgroundColor = useLiquidGlass ? 'transparent' : background;
 
   return (
     <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <ProfileBalanceSync />
       <StatusBar
-        backgroundColor={getPrimaryColor('950')}
+        backgroundColor={background}
         style={currentTheme.includes('light') ? 'dark' : 'light'}
       />
       <Stack

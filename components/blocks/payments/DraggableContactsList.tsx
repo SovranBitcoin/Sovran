@@ -1,11 +1,11 @@
 import React, { FC, useCallback, useMemo } from 'react';
 import { View as RNView, ScrollView, StyleSheet } from 'react-native';
 import { ContactItem } from './ContactItem';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
 import { ProfilesCardFrame } from './ProfilesCardFrame';
 import opacity from 'hex-color-opacity';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // Memoized wrapper component that receives pre-resolved profile
 const RenderItem = React.memo(
@@ -42,13 +42,10 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   isLoadingProfiles = false,
   emptyMessage,
 }) => {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceForeground, muted] = useThemeColor(['foreground', 'surface-foreground', 'muted'] as const);
 
-  // Theme colors for the card frame
-  const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
-  // Primary accent color for neutral look
-  const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
-  // Border color with opacity for accent-style border effect
+  const primary50 = surfaceForeground;
+  const accentColor = muted;
   const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
 
   const keyExtractor = useCallback((item: any) => {
@@ -58,7 +55,7 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   if (isDecrypting) {
     return (
       <RNView style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
-        <Text style={{ color: opacity(getPrimaryColor('0'), 0.4), textAlign: 'center' }}>
+        <Text style={{ color: opacity(foreground, 0.4), textAlign: 'center' }}>
           Decrypting messages...
         </Text>
       </RNView>
@@ -68,7 +65,7 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   if (data.length === 0) {
     return (
       <RNView style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
-        <Text style={{ color: opacity(getPrimaryColor('0'), 0.4), textAlign: 'center' }}>
+        <Text style={{ color: opacity(foreground, 0.4), textAlign: 'center' }}>
           {emptyMessage}
         </Text>
       </RNView>

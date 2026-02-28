@@ -26,7 +26,6 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
 import { StyleSheet, InteractionManager, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -88,6 +87,7 @@ import {
 } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/hooks/useNostrEngagement';
 import { useNostrSocialStore } from '@/stores/nostrSocialStore';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // ============================================================================
 // Re-exports for backward compatibility (ThreadView imports from './UserFeed')
@@ -380,7 +380,11 @@ export const RepostCard = React.memo(function RepostCard({
   onRepostPress?: () => void;
   skipAnimation?: boolean;
 }) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surface, surfaceTertiary] = useThemeColor([
+    'foreground',
+    'surface',
+    'surface-tertiary',
+  ] as const);
   const progress = useSharedValue(skipAnimation ? 1 : 0);
 
   useEffect(() => {
@@ -454,9 +458,9 @@ export const RepostCard = React.memo(function RepostCard({
             <Icon
               name="garden:arrow-retweet-fill-16"
               size={14}
-              color={opacity(getPrimaryColor('0'), 0.33)}
+              color={opacity(foreground, 0.33)}
             />
-            <Text size={12} semibold style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
+            <Text size={12} semibold style={{ color: opacity(foreground, 0.33) }}>
               {reposterName} reposted
             </Text>
           </HStack>
@@ -489,13 +493,13 @@ export const RepostCard = React.memo(function RepostCard({
             style={[
               styles.missingRepost,
               {
-                backgroundColor: getPrimaryColor('900'),
-                borderColor: getPrimaryColor('700'),
+                backgroundColor: surface,
+                borderColor: surfaceTertiary,
               },
             ]}>
             <HStack align="center" gap={6}>
-              <Icon name="mdi:message-text" size={14} color={opacity(getPrimaryColor('0'), 0.33)} />
-              <Text size={13} italic style={{ color: opacity(getPrimaryColor('0'), 0.33) }}>
+              <Icon name="mdi:message-text" size={14} color={opacity(foreground, 0.33)} />
+              <Text size={13} italic style={{ color: opacity(foreground, 0.33) }}>
                 Original post unavailable
               </Text>
             </HStack>
@@ -511,19 +515,19 @@ export const RepostCard = React.memo(function RepostCard({
 // ============================================================================
 
 function EmptyFeed() {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
 
   return (
     <VStack align="center" style={styles.emptyState}>
-      <Icon name="mdi:message-text" size={40} color={getPrimaryColor('600')} />
+      <Icon name="mdi:message-text" size={40} color={defaultColor} />
       <Spacer size={8} />
-      <Text bold size={16} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+      <Text bold size={16} style={{ color: opacity(foreground, 0.5) }}>
         No posts yet
       </Text>
       <Spacer size={4} />
       <Text
         size={13}
-        style={[styles.textAlignCenter, { color: opacity(getPrimaryColor('0'), 0.33) }]}>
+        style={[styles.textAlignCenter, { color: opacity(foreground, 0.33) }]}>
         {"This user hasn't posted any notes."}
       </Text>
     </VStack>
@@ -542,7 +546,7 @@ function UserFeedInner({
   ListHeaderComponent,
   onVideoPostsReady,
 }: UserFeedProps) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const imageOverlay = useImageOverlay();
   const [, startTransition] = useTransition();
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
@@ -1136,7 +1140,7 @@ function UserFeedInner({
           medium
           overpass
           size={13}
-          style={[styles.sectionTitle, { color: opacity(getPrimaryColor('0'), 0.5) }]}>
+          style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
           Notes
         </Text>
         {isLoading ? (

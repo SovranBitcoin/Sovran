@@ -15,15 +15,15 @@
  */
 
 import { Stack } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 import { TransactionsFilterProvider } from 'components/screens/TransactionsFilterContext';
 
 function TransactionsFlowContent() {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
 
   return (
-    <Stack screenOptions={createFlowLayoutScreenOptions(getPrimaryColor)}>
+    <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
       <Stack.Screen
         name="transactions"
         options={{
@@ -31,7 +31,7 @@ function TransactionsFlowContent() {
           headerTransparent: true,
           headerStyle: { backgroundColor: 'transparent' },
           contentStyle: {
-            backgroundColor: getPrimaryColor('950'),
+            backgroundColor: background,
           },
         }}
       />

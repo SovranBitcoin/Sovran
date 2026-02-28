@@ -10,10 +10,10 @@ import { ScrollView, LayoutChangeEvent } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { HistoryEntry } from 'coco-cashu-core';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface MonthItem {
   /** Month key in format "YYYY-MM" */
@@ -51,7 +51,7 @@ const MONTH_NAMES = [
 ];
 
 function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceSecondary] = useThemeColor(['foreground', 'surface-secondary'] as const);
 
   const handlePress = useCallback(() => {
     onPress(item.key);
@@ -62,13 +62,13 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
       <View
         className="shrink-0 flex-row items-center justify-center rounded-2xl px-4 py-2"
         style={{
-          backgroundColor: isSelected ? getPrimaryColor('800') : 'transparent',
+          backgroundColor: isSelected ? surfaceSecondary : 'transparent',
           marginRight: 8,
         }}>
         <Text
           className="text-center"
           style={{
-            color: isSelected ? getPrimaryColor('0') : opacity(getPrimaryColor('0'), 0.4),
+            color: isSelected ? foreground : opacity(foreground, 0.4),
             fontFamily: 'OverpassSemibold',
             fontSize: 15,
           }}>

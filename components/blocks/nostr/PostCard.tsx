@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -29,6 +28,7 @@ import {
   MetricsFooter,
   sharedStyles,
 } from './shared';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 type PostCardVariant = 'feed' | 'repost-original' | 'thread-target' | 'thread-reply';
 
@@ -92,7 +92,7 @@ export const PostCard = React.memo(function PostCard({
   onNestedProfilePressIn,
   onNestedProfilePressOut,
 }: PostCardProps) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
 
   const profile = profiles.get(event.pubkey);
   const displayName = profile?.name || `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
@@ -214,11 +214,11 @@ export const PostCard = React.memo(function PostCard({
                 <Text
                   bold
                   size={15}
-                  style={{ color: opacity(getPrimaryColor('0'), 0.9) }}
+                  style={{ color: opacity(foreground, 0.9) }}
                   numberOfLines={1}>
                   {displayName}
                 </Text>
-                <Text semibold size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
+                <Text semibold size={13} style={{ color: opacity(foreground, 0.4) }}>
                   {truncatedNpub}
                 </Text>
               </VStack>
@@ -238,7 +238,7 @@ export const PostCard = React.memo(function PostCard({
           />
 
           {fullDate ? (
-            <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4), marginTop: 10 }}>
+            <Text size={13} style={{ color: opacity(foreground, 0.4), marginTop: 10 }}>
               {fullDate}
             </Text>
           ) : null}
@@ -247,7 +247,7 @@ export const PostCard = React.memo(function PostCard({
         <View style={{ paddingHorizontal: 16 }}>
           <MetricsFooter
             metrics={metrics}
-            borderColor={getPrimaryColor('0')}
+            borderColor={foreground}
             onCommentPress={onCommentPress ?? navigateToThread}
             onRepostPress={onRepostPress}
             onLikePress={onLikePress}
@@ -267,7 +267,7 @@ export const PostCard = React.memo(function PostCard({
 
   // ── Gutter layout (feed, repost-original, thread-reply) ──
   const hasConnectingBars = showLineAbove || showLineBelow;
-  const lineColor = getPrimaryColor('600');
+  const lineColor = defaultColor;
 
   const gutterContent = (
     <View style={pcStyles.gutterRow}>
@@ -299,7 +299,7 @@ export const PostCard = React.memo(function PostCard({
             <Text
               bold
               size={14}
-              style={{ color: opacity(getPrimaryColor('0'), 0.9) }}
+              style={{ color: opacity(foreground, 0.9) }}
               numberOfLines={isThread ? 1 : undefined}>
               {displayName}
             </Text>
@@ -309,10 +309,10 @@ export const PostCard = React.memo(function PostCard({
               <Text
                 bold
                 size={13}
-                style={{ color: opacity(getPrimaryColor('0'), 0.3), marginRight: 4 }}>
+                style={{ color: opacity(foreground, 0.3), marginRight: 4 }}>
                 {'•'}
               </Text>
-              <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
+              <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
                 {shortTime}
               </Text>
             </>
@@ -354,7 +354,7 @@ export const PostCard = React.memo(function PostCard({
         <View style={pcStyles.inlineMetricsWrap}>
           <MetricsFooter
             metrics={metrics}
-            borderColor={getPrimaryColor('0')}
+            borderColor={foreground}
             compact={isThread}
             showBorder={isThread ? !hasConnectingBars : true}
             onCommentPress={isThread ? (onCommentPress ?? navigateToThread) : undefined}

@@ -13,7 +13,8 @@ import { Text } from 'components/ui/Text';
 import { Tabs } from 'components/ui/Tabs';
 import Icon, { icons } from 'assets/icons';
 import { parseToHsl } from 'polished';
-import { THEMES, useTheme } from 'providers/ThemeProvider';
+import { THEMES } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { Checkbox } from 'expo-checkbox';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { ScrollView } from 'react-native';
@@ -28,7 +29,7 @@ function chunkArray(array: any[], size: number) {
 }
 
 export default function ModalScreen() {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, danger] = useThemeColor(['foreground', 'danger'] as const);
   const experimental = useSettingsStore((state) => state.getExperimental());
   const setExperimental = useSettingsStore((state) => state.setExperimental);
   const [isChecked, setIsChecked] = React.useState(experimental);
@@ -139,7 +140,7 @@ export default function ModalScreen() {
           );
         })}
 
-        <View className="h-8 w-8 bg-primary-950"></View>
+        <View className="h-8 w-8 bg-background"></View>
 
         {/* info message */}
         <Card
@@ -175,7 +176,7 @@ export default function ModalScreen() {
               <Icon
                 name="mingcute:lightning-fill"
                 size={ROW_ICON_SIZE}
-                color={opacity(getPrimaryColor('0'), 0.4)}
+                color={opacity(foreground, 0.4)}
               />
             }
             label="npub1example@npubx.cash"
@@ -184,7 +185,7 @@ export default function ModalScreen() {
               <Icon
                 name="lets-icons:copy"
                 size={ROW_ICON_SIZE}
-                color={opacity(getPrimaryColor('0'), 0.4)}
+                color={opacity(foreground, 0.4)}
               />
             }
           />
@@ -235,9 +236,9 @@ export default function ModalScreen() {
             <HStack key={rowIndex} className="bg-transparent" style={{ marginBottom: 16 }}>
               {row.map((icon) => (
                 <VStack key={icon} className="flex-1 items-center" style={{ margin: 16 }}>
-                  <Icon name={icon} size={48} color={getPrimaryColor('0')} />
+                  <Icon name={icon} size={48} color={foreground} />
                   <Spacer size={8} />
-                  <Text className="w-full truncate text-center text-xs text-primary-0">{icon}</Text>
+                  <Text className="w-full truncate text-center text-xs text-foreground">{icon}</Text>
                 </VStack>
               ))}
               {/* Fill empty columns if row has less than 3 icons */}
@@ -258,7 +259,7 @@ export default function ModalScreen() {
             <Checkbox
               value={isChecked}
               onValueChange={toggleCheckbox}
-              color={isChecked ? getShadeColor('300') : undefined}
+              color={isChecked ? danger : undefined}
             />
             <Spacer size={8} />
             <Text
@@ -268,7 +269,7 @@ export default function ModalScreen() {
               style={{
                 flex: 1,
               }}
-              className="text-primary-0">
+              className="text-foreground">
               Toggle experimental features
             </Text>
           </HStack>

@@ -2,8 +2,8 @@ import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { StyleSheet, ScrollView, View as RNView, useWindowDimensions } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { Stack, router } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
 import { ModalLayoutWrapper } from './debugModal';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
@@ -146,11 +146,15 @@ interface MintTabsProps {
 }
 
 function MintTabs({ mints, selectedMintUrl, onMintChange, pendingByMint, scrollY }: MintTabsProps) {
-  const { getPrimaryColor } = useTheme();
-  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primaryColor300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
-  const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
-  const primaryColor900 = useMemo(() => getPrimaryColor('900'), [getPrimaryColor]);
+  const [foreground, surfaceTertiary, surface] = useThemeColor([
+    'foreground',
+    'surface-tertiary',
+    'surface',
+  ] as const);
+  const primaryColor0 = foreground;
+  const primaryColor300 = opacity(foreground, 0.5);
+  const primaryColor700 = surfaceTertiary;
+  const primaryColor900 = surface;
 
   // Filter to only show mints that have pending transactions
   const mintsWithPending = useMemo(
@@ -214,7 +218,13 @@ function MintTabs({ mints, selectedMintUrl, onMintChange, pendingByMint, scrollY
 // ============================================================================
 
 export default function PendingEcashScreen() {
-  const { getPrimaryColor, getGreenColor } = useTheme();
+  const [green400, foreground, surfaceForeground, muted, background] = useThemeColor([
+    'green-400',
+    'foreground',
+    'surface-foreground',
+    'muted',
+    'background',
+  ] as const);
   const { history } = usePaginatedHistory();
   const { trustedMints: mints } = useMints();
   const manager = useManager();
@@ -225,7 +235,7 @@ export default function PendingEcashScreen() {
   const pagerRef = useRef<PagerView>(null);
   const { height: windowHeight } = useWindowDimensions();
 
-  const accentColor = useMemo(() => getGreenColor('400'), [getGreenColor]);
+  const accentColor = green400;
   const topOffset = insets.top;
 
   // Scroll tracking for animated tabs
@@ -289,7 +299,7 @@ export default function PendingEcashScreen() {
   const totalUnit = displayedTransactions[0]?.unit || 'sat';
 
   // Card colors for transaction list (matching Transactions.tsx pattern)
-  const cardAccentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const cardAccentColor = muted;
   const cardBorderColor = useMemo(() => opacity(cardAccentColor, 0.3), [cardAccentColor]);
 
   // PagerView height: fill remaining screen below hero + tabs
@@ -329,10 +339,10 @@ export default function PendingEcashScreen() {
   const CloseButton = useCallback(
     () => (
       <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
-        <Icon name="material-symbols:close-rounded" size={24} color={getPrimaryColor('0')} />
+        <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
       </TouchableOpacity>
     ),
-    [getPrimaryColor, handleClose]
+    [foreground, handleClose]
   );
 
   // ---------------------------------------------------------------------------
@@ -461,7 +471,7 @@ export default function PendingEcashScreen() {
           headerShadowVisible: false,
           headerTitle: '',
           headerBackVisible: false,
-          headerTintColor: getPrimaryColor('0'),
+          headerTintColor: foreground,
           headerBlurEffect: 'none',
           headerBackground: () => null,
           headerLeft: CloseButton,
@@ -526,19 +536,15 @@ export default function PendingEcashScreen() {
                 },
               ]}>
               <View style={styles.emptyState}>
-                <Icon
-                  name="mdi:check-circle-outline"
-                  size={48}
-                  color={opacity(getPrimaryColor('0'), 0.33)}
-                />
+                <Icon name="mdi:check-circle-outline" size={48} color={opacity(foreground, 0.33)} />
                 <Spacer size={12} />
-                <Text size={18} heavy style={{ color: opacity(getPrimaryColor('0'), 0.8) }}>
+                <Text size={18} heavy style={{ color: opacity(foreground, 0.8) }}>
                   No Pending Ecash
                 </Text>
                 <Text
                   size={14}
                   style={{
-                    color: opacity(getPrimaryColor('0'), 0.4),
+                    color: opacity(foreground, 0.4),
                     textAlign: 'center',
                     marginTop: 4,
                   }}>
@@ -556,11 +562,11 @@ export default function PendingEcashScreen() {
             <RNView
               style={[
                 StyleSheet.absoluteFill,
-                { backgroundColor: getPrimaryColor('950'), bottom: HEADER_OVERLAP },
+                { backgroundColor: background, bottom: HEADER_OVERLAP },
               ]}
             />
             <LinearGradient
-              colors={[getPrimaryColor('950'), 'transparent']}
+              colors={[background, 'transparent']}
               style={styles.headerGradient}
               pointerEvents="none"
             />
@@ -583,8 +589,8 @@ export default function PendingEcashScreen() {
               ]}>
               <PendingEcashCardFrame
                 accentColor={accentColor}
-                backgroundColor={getPrimaryColor('950')}
-                highlightColor={getPrimaryColor('50')}>
+                backgroundColor={background}
+                highlightColor={surfaceForeground}>
                 <VStack style={{ padding: 18, paddingTop: 52 + topOffset, zIndex: 1 }}>
                   <HStack align="center" gap={10}>
                     <View
@@ -592,7 +598,7 @@ export default function PendingEcashScreen() {
                       <Icon name="mdi:clock-alert-outline" size={22} color={accentColor} />
                     </View>
                     <VStack>
-                      <Text size={18} heavy style={{ color: opacity(getPrimaryColor('0'), 0.9) }}>
+                      <Text size={18} heavy style={{ color: opacity(foreground, 0.9) }}>
                         Pending Ecash
                       </Text>
                       <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>

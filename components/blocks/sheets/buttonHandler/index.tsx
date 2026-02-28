@@ -30,8 +30,7 @@
 import React from 'react';
 import ActionSheet, { registerSheet } from 'react-native-actions-sheet';
 import { sheetName, routes } from './routes';
-import { useTheme } from 'providers/ThemeProvider';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 /**
  * ButtonHandlerSheet Component
  *
@@ -39,7 +38,7 @@ import { useTheme } from 'providers/ThemeProvider';
  * @description Main wrapper - do NOT render directly, use SheetManager.show()
  */
 function SheetWithRouter() {
-  const { getPrimaryColor } = useTheme();
+  const surfaceSecondary = useThemeColor('surface-secondary');
 
   return (
     <ActionSheet
@@ -59,7 +58,7 @@ function SheetWithRouter() {
       routes={routes}
       initialRoute="route-a"
       containerStyle={{
-        backgroundColor: getPrimaryColor('800'),
+        backgroundColor: surfaceSecondary,
         flexShrink: 1,
         flexGrow: 0,
         flexBasis: 'auto',

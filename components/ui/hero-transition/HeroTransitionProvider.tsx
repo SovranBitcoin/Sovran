@@ -10,7 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import { router } from 'expo-router';
 import { WalletHealthCardFrame } from 'components/blocks/health/WalletHealthCardFrame';
 import { ClaimUsernameCardFrame } from 'components/blocks/claim/ClaimUsernameCardFrame';
@@ -43,11 +43,9 @@ const HeroTransitionContext = createContext<Ctx | null>(null);
 const DURATION_MS = 520;
 
 export function HeroTransitionProvider({ children }: { children: React.ReactNode }) {
-  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
-  const red = useMemo(() => getRedColor('300'), [getRedColor]);
-  const green = useMemo(() => getGreenColor('400'), [getGreenColor]);
-  const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
-  const primary50 = useMemo(() => getPrimaryColor('50'), [getPrimaryColor]);
+  const [background, surfaceForeground, red, green] = useThemeColor(['background', 'surface-foreground', 'danger', 'green-400'] as const);
+  const primary950 = background;
+  const primary50 = surfaceForeground;
   const gold = '#f59e0b';
 
   const refs = useRef<Record<HeroId, Partial<Record<HeroRole, any>>>>({

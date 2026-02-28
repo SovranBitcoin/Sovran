@@ -19,7 +19,6 @@ import { Section } from 'app/settings-pages';
 import Icon from 'assets/icons';
 import { getDecodedToken, type ReceiveHistoryEntry, type Keypair } from 'coco-cashu-core';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { truncateMiddle } from 'helper/strings';
 import { Proof } from '@cashu/cashu-ts';
@@ -35,6 +34,7 @@ import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useMintStore } from 'stores/mintStore';
 import { useNpcMintStore } from 'stores/npcMintStore';
 import { ListGroup, PressableFeedback } from 'heroui-native';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface ReceiveScreenProps {
   unit: string;
@@ -49,7 +49,10 @@ export function ReceiveScreen({
   onCamera,
   onFixedAmount,
 }: ReceiveScreenProps) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+  ] as const);
   const [hasPermission, requestPermission] = useCameraPermissions();
   const { getMintInfo } = useMintManagement();
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -250,7 +253,7 @@ export function ReceiveScreen({
                       <Icon
                         name="mingcute:lightning-fill"
                         size={20}
-                        color={opacity(getPrimaryColor('0'), 0.4)}
+                        color={opacity(foreground, 0.4)}
                       />
                     </ListGroup.ItemPrefix>
                     <ListGroup.ItemContent>
@@ -262,7 +265,7 @@ export function ReceiveScreen({
                       <Icon
                         name="lets-icons:copy"
                         size={20}
-                        color={opacity(getPrimaryColor('0'), 0.4)}
+                        color={opacity(foreground, 0.4)}
                       />
                     </ListGroup.ItemSuffix>
                   </ListGroup.Item>
@@ -303,7 +306,7 @@ export function ReceiveScreen({
                         <Icon
                           name="solar:key-bold"
                           size={20}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
+                          color={opacity(foreground, 0.4)}
                         />
                       </ListGroup.ItemPrefix>
                       <ListGroup.ItemContent>
@@ -315,7 +318,7 @@ export function ReceiveScreen({
                         <Icon
                           name="lets-icons:copy"
                           size={20}
-                          color={opacity(getPrimaryColor('0'), 0.4)}
+                          color={opacity(foreground, 0.4)}
                         />
                       </ListGroup.ItemSuffix>
                     </ListGroup.Item>
@@ -330,16 +333,16 @@ export function ReceiveScreen({
         <View style={{ marginHorizontal: 16, marginTop: 32 }}>
           <View
             style={{
-              backgroundColor: getPrimaryColor('800'),
+              backgroundColor: surfaceSecondary,
               borderRadius: 12,
               padding: 24,
               alignItems: 'center',
             }}>
-            <Icon name="mdi:key-variant" size={48} color={opacity(getPrimaryColor('0'), 0.25)} />
+            <Icon name="mdi:key-variant" size={48} color={opacity(foreground, 0.25)} />
             <Text
               size={14}
               style={{
-                color: opacity(getPrimaryColor('0'), 0.4),
+                color: opacity(foreground, 0.4),
                 marginTop: 12,
                 textAlign: 'center',
               }}>

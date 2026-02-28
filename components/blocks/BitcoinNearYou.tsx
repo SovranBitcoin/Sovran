@@ -4,7 +4,6 @@ import { AppleMaps, GoogleMaps } from 'expo-maps';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { BlurCardFrame } from 'components/ui/BlurCardFrame';
@@ -14,6 +13,7 @@ import { useBTCMapStore } from 'stores/btcMapStore';
 import { useSettingsStore } from 'stores/settingsStore';
 import { applySafetyOffset } from 'utils/locationPrivacy';
 import { useShallow } from 'zustand/react/shallow';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -78,7 +78,7 @@ function MapPreview({
   longitude: number;
   markers: MapMarker[];
 }) {
-  const { getPrimaryColor } = useTheme();
+  const surfaceSecondary = useThemeColor('surface-secondary');
   const isIOS = Platform.OS === 'ios';
 
   const cameraPosition = useMemo(
@@ -119,7 +119,7 @@ function MapPreview({
         style={[
           StyleSheet.absoluteFillObject,
           {
-            backgroundColor: opacity(getPrimaryColor('800'), 0.35),
+            backgroundColor: opacity(surfaceSecondary, 0.35),
             // @ts-ignore - mixBlendMode works on iOS
             mixBlendMode: 'overlay',
           },
@@ -130,7 +130,7 @@ function MapPreview({
         style={[
           StyleSheet.absoluteFillObject,
           {
-            backgroundColor: opacity(getPrimaryColor('800'), 1),
+            backgroundColor: opacity(surfaceSecondary, 1),
             // @ts-ignore - mixBlendMode works on iOS
             mixBlendMode: 'color',
           },
@@ -141,10 +141,10 @@ function MapPreview({
       {/* Vignette gradients — edges opaque, centre transparent */}
       <LinearGradient
         colors={[
-          getPrimaryColor('800'),
-          opacity(getPrimaryColor('800'), 0.1),
-          opacity(getPrimaryColor('800'), 0.1),
-          getPrimaryColor('800'),
+          surfaceSecondary,
+          opacity(surfaceSecondary, 0.1),
+          opacity(surfaceSecondary, 0.1),
+          surfaceSecondary,
         ]}
         locations={[0, 0.3, 0.7, 1]}
         start={{ x: 0, y: 0.5 }}
@@ -154,10 +154,10 @@ function MapPreview({
       />
       <LinearGradient
         colors={[
-          getPrimaryColor('800'),
-          opacity(getPrimaryColor('800'), 0.1),
-          opacity(getPrimaryColor('800'), 0.1),
-          getPrimaryColor('800'),
+          surfaceSecondary,
+          opacity(surfaceSecondary, 0.1),
+          opacity(surfaceSecondary, 0.1),
+          surfaceSecondary,
         ]}
         locations={[0, 0.25, 0.75, 1]}
         start={{ x: 0.5, y: 0 }}
@@ -174,12 +174,11 @@ function MapPreview({
 // ---------------------------------------------------------------------------
 
 export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
-  const { getPrimaryColor } = useTheme();
+  const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
 
-  // Card frame colors — match Transactions / SpentThisMonth
-  const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const accentColor = muted;
   const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
-  const primary0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const primary0 = foreground;
 
   const mockMode = useSettingsStore((s) => s.mockMode);
 

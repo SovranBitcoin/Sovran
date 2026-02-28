@@ -5,7 +5,7 @@ import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { formatAmount } from 'helper/currency';
 import { BtcIcon, LightningUnit } from 'assets/icons';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { useSettingsStore } from 'stores/settingsStore';
 import { cn } from '@/helper/utils';
@@ -45,7 +45,7 @@ export function AmountFormatter({
   centered = false,
   className,
 }: AmountFormatterProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, danger] = useThemeColor(['foreground', 'danger'] as const);
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
 
   // Animation setup (only if animated is true)
@@ -54,13 +54,11 @@ export function AmountFormatter({
 
   // Dynamic color logic (only if useTypeColors is true)
   const getTypeColor = (): string => {
-    if (!amount) return opacity(getPrimaryColor('0'), 0.4);
-    // Receive = white, Send = shade color
-    return transactionType === 'receive' ? getPrimaryColor('0') : getShadeColor('300');
+    if (!amount) return opacity(foreground, 0.4);
+    return transactionType === 'receive' ? foreground : danger;
   };
 
-  // Final color: prioritize passed color, then type colors, then default
-  const currentColor = color || (useTypeColors ? getTypeColor() : getPrimaryColor('0'));
+  const currentColor = color || (useTypeColors ? getTypeColor() : foreground);
 
   // Animation effect (only if animated is true)
   useEffect(() => {

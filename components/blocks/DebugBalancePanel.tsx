@@ -13,7 +13,7 @@ import { useBalanceContext, useMints, useManager } from 'coco-cashu-react';
 import { Text } from 'components/ui/Text';
 import { CocoManager } from 'helper/coco/manager';
 import type { CoreProof } from 'coco-cashu-core';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 // ─── Types for the unsafe manager cast ───────────────────────────────────────
 
 type UnsafeRepo = {
@@ -312,6 +312,7 @@ function ExpandedPanel({
   debugBalances: DebugBalances;
   debugOps: DebugOperations | null;
 }) {
+  const [danger, success] = useThemeColor(['danger', 'success'] as const);
   const manager = useManager();
   const [busy, setBusy] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
@@ -588,7 +589,7 @@ function ExpandedPanel({
         <Text
           size={9}
           style={{
-            color: lastResult.startsWith('Error') ? '#f87171' : '#4ade80',
+            color: lastResult.startsWith('Error') ? danger : success,
             textAlign: 'center',
           }}>
           {lastResult}

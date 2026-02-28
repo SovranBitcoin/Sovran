@@ -12,7 +12,6 @@ import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
 import * as Clipboard from 'expo-clipboard';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { popup } from '@/helper/popup';
@@ -32,6 +31,7 @@ import { useTransactionSource } from '@/components/blocks/Transaction/Transactio
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface MintQuoteScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
@@ -44,7 +44,7 @@ export function MintQuoteScreen({
   extraButtons = [],
 }: MintQuoteScreenProps) {
   const manager = useManager();
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const [uri, setUri] = useState<string | null>(null);
   const [mintInfo, setMintInfo] = useState<any>(null);
 
@@ -67,7 +67,7 @@ export function MintQuoteScreen({
     return (
       <ModalLayoutWrapper>
         <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-          <Text color={opacity(getPrimaryColor('0'), 0.66)}>
+          <Text color={opacity(foreground, 0.66)}>
             {parseError || 'Loading transaction...'}
           </Text>
         </View>

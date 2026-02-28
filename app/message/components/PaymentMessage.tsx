@@ -5,7 +5,7 @@ import { Text } from 'components/ui/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatAmount } from 'helper/currency';
 import { convertTime } from 'helper/time';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { TransactionData } from 'redux/cashu';
 
 const TransactionComponent = ({
@@ -15,12 +15,13 @@ const TransactionComponent = ({
   transaction: TransactionData;
   isReceived: boolean;
 }) => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [accent, danger] = useThemeColor(['accent', 'danger'] as const);
+  const brandGradient = useThemeColor(['shade-200', 'shade-300', 'shade-400'] as const);
   const gradientColors: readonly [ColorValue, ColorValue, ...ColorValue[]] = isReceived
-    ? [getPrimaryColor('500'), getPrimaryColor('500')]
-    : [getShadeColor('200'), getShadeColor('300')];
+    ? [accent, accent]
+    : [brandGradient[0], brandGradient[1]];
 
-  const arrowBackgroundColor = isReceived ? getPrimaryColor('500') : getShadeColor('300');
+  const arrowBackgroundColor = isReceived ? accent : danger;
 
   const formattedAmount =
     transaction.unit &&
@@ -34,7 +35,7 @@ const TransactionComponent = ({
   return (
     <View
       className={`relative my-2 ${isReceived ? 'self-start' : 'self-end'}`}
-      style={{ minHeight: 80 }} // Ensure minimum height for payment messages
+      style={{ minHeight: 80 }}
     >
       <View
         className="absolute -bottom-1 h-2 w-2"
@@ -51,15 +52,15 @@ const TransactionComponent = ({
           borderRadius: 16,
           padding: 16,
           maxWidth: '75%',
-          minHeight: 70, // Ensure minimum height for content
+          minHeight: 70,
         }}>
         <View className="mb-1 rounded-2xl bg-black/25 p-1">
-          <Text className="text-center text-sm font-bold text-primary-0">
+          <Text className="text-center text-sm font-bold text-foreground">
             {isReceived ? 'You received' : 'You sent'}
           </Text>
         </View>
-        <Text className="mb-2 text-base font-black text-primary-0">{formattedAmount}</Text>
-        <Text className="text-right text-xs font-bold text-primary-0 opacity-75">
+        <Text className="mb-2 text-base font-black text-foreground">{formattedAmount}</Text>
+        <Text className="text-right text-xs font-bold text-foreground opacity-75">
           {transaction?.date ? convertTime(new Date(transaction.date)) : null}
         </Text>
       </LinearGradient>

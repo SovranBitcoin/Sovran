@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View as RNView } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from 'providers/ThemeProvider';
 import { View } from 'components/ui/View/View';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -23,6 +22,7 @@ import type { HealthCta } from './walletHealth';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
 import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { ListGroup, PressableFeedback } from 'heroui-native';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 const HERO_PADDING = 18;
 const HEART_RING_SIZE = 72;
@@ -120,13 +120,17 @@ export function WalletHealthModalContent({
   scrollY?: SharedValue<number>;
   children?: (layout: WalletHealthLayout) => React.ReactNode;
 }) {
-  const { getPrimaryColor, getRedColor } = useTheme();
+  const [foreground, background, shade300] = useThemeColor([
+    'foreground',
+    'background',
+    'shade-300',
+  ] as const);
   const heroTransition = useHeroTransition();
-  const primary50 = useMemo(() => opacity(getPrimaryColor('0'), 0.9), [getPrimaryColor]);
-  const primary300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
-  const primary400 = useMemo(() => opacity(getPrimaryColor('0'), 0.4), [getPrimaryColor]);
-  const primary950 = useMemo(() => getPrimaryColor('950'), [getPrimaryColor]);
-  const red = useMemo(() => getRedColor('300'), [getRedColor]);
+  const primary50 = useMemo(() => opacity(foreground, 0.9), [foreground]);
+  const primary300 = useMemo(() => opacity(foreground, 0.5), [foreground]);
+  const primary400 = useMemo(() => opacity(foreground, 0.4), [foreground]);
+  const primary950 = background;
+  const red = shade300;
 
   // Wallet Health hero: keep the background gradient consistently "red-warm" (like the Needs rebalance state),
   // even when the wallet is Balanced (where hero.accent is intentionally white for text/icon tones).

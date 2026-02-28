@@ -10,7 +10,7 @@
  */
 
 const chroma = require('chroma-js');
-const { THEMES } = require('../themes.js');
+const { THEMES } = require('../themes');
 
 // Shade levels in order from darkest to lightest (for dark themes)
 const SHADE_LEVELS = [950, 900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 0];

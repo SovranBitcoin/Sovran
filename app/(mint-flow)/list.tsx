@@ -10,13 +10,13 @@
 import React from 'react';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { MintListScreen } from 'components/screens/MintListScreen';
 import Icon from 'assets/icons';
 
 function MintListRoute() {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const params = useLocalSearchParams<{
     requireBalance?: string;
     showAddMintsButton?: string;
@@ -53,7 +53,7 @@ function MintListRoute() {
             showAddMintsButton ? (
               <Link href="/add" asChild>
                 <TouchableOpacity style={{ padding: 8 }}>
-                  <Icon name="fluent:add-24-filled" size={24} color={getPrimaryColor('0')} />
+                  <Icon name="fluent:add-24-filled" size={24} color={foreground} />
                 </TouchableOpacity>
               </Link>
             ) : null,

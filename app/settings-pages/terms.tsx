@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from 'components/ui/Button';
 import { ScrollView, Switch } from 'react-native';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import Container from 'components/blocks/Container';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -153,16 +153,16 @@ export default function TermsAndConditions({
   checkboxText = 'I have read and agree to the Terms and Conditions',
   showCheckbox = true,
 }: TermsAndConditionsProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, danger, surfaceSecondary, surfaceTertiary] = useThemeColor(['foreground', 'danger', 'surface-secondary', 'surface-tertiary'] as const);
   const [isChecked, setIsChecked] = useState(false);
 
   const toggleCheckbox = () => setIsChecked(!isChecked);
 
   return (
-    <Container className="bg-primary-900">
+    <Container className="bg-surface">
       <VStack spacing={16} flex={1} className="p-4">
         {/* Header - fixed at top */}
-        <Text overpass bold size={32} className="py-2 text-center text-primary-50">
+        <Text overpass bold size={32} className="py-2 text-center text-foreground">
           {title}
         </Text>
 
@@ -170,11 +170,11 @@ export default function TermsAndConditions({
         <ScrollView
           style={{
             flex: 1,
-            backgroundColor: getPrimaryColor('800'),
+            backgroundColor: surfaceSecondary,
             borderRadius: 12,
           }}
           contentContainerStyle={{ padding: 16 }}>
-          <Text overpass size={14} className="leading-[22px] text-primary-0">
+          <Text overpass size={14} className="leading-[22px] text-foreground">
             {terms}
           </Text>
         </ScrollView>
@@ -188,12 +188,12 @@ export default function TermsAndConditions({
                   value={isChecked}
                   onValueChange={toggleCheckbox}
                   trackColor={{
-                    false: getPrimaryColor('700'),
-                    true: getShadeColor('300'),
+                    false: surfaceTertiary,
+                    true: danger,
                   }}
-                  thumbColor={getPrimaryColor('0')}
+                  thumbColor={foreground}
                 />
-                <Text id="terms-checkbox" overpass size={14} className="flex-1 text-primary-0">
+                <Text id="terms-checkbox" overpass size={14} className="flex-1 text-foreground">
                   {checkboxText}
                 </Text>
               </HStack>

@@ -9,8 +9,8 @@ import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'as
 import { PrimaryBalance } from 'components/blocks/PrimaryBalance';
 
 import { useSettingsStore, isBackgroundImageTheme } from 'stores/settingsStore';
-import { useTheme } from 'providers/ThemeProvider';
 import { NonGestureView } from './NonGestureView';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface AccountData {
   unit: string;
@@ -24,7 +24,7 @@ interface AccountProps {
 }
 
 export function Account({ accounts, account, pagerHeight }: AccountProps): React.ReactElement {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const theme = useSettingsStore((state) => state.getTheme());
   const hasBackgroundImage = isBackgroundImageTheme(theme);
 
@@ -55,7 +55,7 @@ export function Account({ accounts, account, pagerHeight }: AccountProps): React
           weight={isActive ? 'bold' : 'regular'}
           size={16}
           style={{
-            color: isActive ? getPrimaryColor('0') : getPrimaryColor('700'),
+            color: isActive ? foreground : surfaceTertiary,
             marginTop: 3,
           }}>
           •

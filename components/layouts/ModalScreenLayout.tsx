@@ -11,9 +11,9 @@ import { ScrollView, StyleProp, ViewStyle } from 'react-native';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { BottomButtons } from 'components/ui/BottomButtons';
-import { useTheme } from 'providers/ThemeProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface ModalScreenLayoutProps {
   children: ReactNode;
@@ -40,7 +40,7 @@ export function ModalScreenLayout({
   headerHeight = 32,
   debug = false,
 }: ModalScreenLayoutProps) {
-  const { getPrimaryColor } = useTheme();
+  const background = useThemeColor('background');
   const insets = useSafeAreaInsets();
   const navHeaderHeight = useHeaderHeight();
 
@@ -66,7 +66,7 @@ export function ModalScreenLayout({
   );
 
   return (
-    <View style={[{ flex: 1, backgroundColor: getPrimaryColor('950') }, style]}>
+    <View style={[{ flex: 1, backgroundColor: background }, style]}>
       {/* Debug: Container outline */}
       {debug && (
         <View

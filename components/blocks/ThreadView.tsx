@@ -7,7 +7,6 @@
 
 import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import { StyleSheet, ActivityIndicator, InteractionManager } from 'react-native';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
@@ -37,6 +36,7 @@ import { PostCard } from './nostr/PostCard';
 
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/hooks/useNostrEngagement';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // ============================================================================
 // Types
@@ -135,7 +135,12 @@ function buildThreadStructure(
 // ============================================================================
 
 function ThreadViewInner({ eventId }: ThreadViewProps) {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, background, mutedColor, defaultColor] = useThemeColor([
+    'foreground',
+    'background',
+    'muted',
+    'default',
+  ] as const);
   const headerHeight = useHeaderHeight();
   const imageOverlay = useImageOverlay();
   const [isLoading, setIsLoading] = useState(true);
@@ -459,9 +464,9 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         style={[
           styles.container,
           styles.centerContent,
-          { backgroundColor: getPrimaryColor('950'), paddingTop: headerHeight },
+          { backgroundColor: background, paddingTop: headerHeight },
         ]}>
-        <ActivityIndicator size="small" color={getPrimaryColor('400')} />
+        <ActivityIndicator size="small" color={mutedColor} />
       </View>
     );
   }
@@ -472,11 +477,11 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         style={[
           styles.container,
           styles.centerContent,
-          { backgroundColor: getPrimaryColor('950'), paddingTop: headerHeight },
+          { backgroundColor: background, paddingTop: headerHeight },
         ]}>
-        <Icon name="mdi:message-text" size={40} color={getPrimaryColor('600')} />
+        <Icon name="mdi:message-text" size={40} color={defaultColor} />
         <Spacer size={12} />
-        <Text size={15} style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+        <Text size={15} style={{ color: opacity(foreground, 0.5) }}>
           {error}
         </Text>
       </View>
@@ -490,7 +495,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
       onSwipeUpToNextPost={(_openNext) => {
         /* no next video in thread view */
       }}>
-      <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
+      <View style={[styles.container, { backgroundColor: background }]}>
         <LegendList
           data={threadItems}
           keyExtractor={keyExtractor}
@@ -503,7 +508,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           ListFooterComponent={
             hiddenReplyCount > 0 ? (
               <View style={styles.hiddenReplyFooter}>
-                <Text size={13} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
+                <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
                   {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not loaded
                 </Text>
               </View>

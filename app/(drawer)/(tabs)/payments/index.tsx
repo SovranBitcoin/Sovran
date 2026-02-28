@@ -14,7 +14,7 @@ import { searchUsers as apiSearchUsers, getRecommendedUsers, UserProfile } from 
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
@@ -98,7 +98,7 @@ const PaymentsContent = () => {
   // Register this tab's background configuration
   useBackgroundConfig({ blurMode: 'full', backgroundOpacity: 0.25 });
 
-  const { getPrimaryColor } = useTheme();
+  const [foreground, muted, defaultColor, surfaceSecondary] = useThemeColor(['foreground', 'muted', 'default', 'surface-secondary'] as const);
   const [selectedTab, setSelectedTab] = useState('Recent activity');
 
   // Convert default contact npubs to pubkeys (memoized for performance)
@@ -743,16 +743,16 @@ const PaymentsContent = () => {
   // Skeleton configuration
   const skeletonConfig = useMemo(
     () => ({
-      backgroundColor: getPrimaryColor('800'),
-      highlightColor: getPrimaryColor('600'),
+      backgroundColor: surfaceSecondary,
+      highlightColor: defaultColor,
       speed: 800,
       animation: searchLoading ? ('pulse' as const) : ('none' as const),
     }),
-    [getPrimaryColor, searchLoading]
+    [surfaceSecondary, defaultColor, searchLoading]
   );
 
   // Match Recent activity / Mints card frame styling
-  const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const accentColor = muted;
   const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
 
   const navigateToProfile = useCallback(({ pubkey }: { pubkey: string }) => {
@@ -928,7 +928,7 @@ const PaymentsContent = () => {
                           overpass
                           bold
                           size={14}
-                          style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
+                          style={{ color: opacity(foreground, 0.4) }}>
                           Search results
                         </Text>
                       </View>

@@ -11,7 +11,10 @@ import { router } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
 import Icon from 'assets/icons';
 
-type GetPrimaryColor = (shade: string) => string;
+interface FlowColors {
+  foreground: string;
+  background: string;
+}
 
 /**
  * Shared header button component for flow layouts.
@@ -19,10 +22,10 @@ type GetPrimaryColor = (shade: string) => string;
  */
 const FlowHeaderButton = ({
   isFirstScreen,
-  getPrimaryColor,
+  foreground,
 }: {
   isFirstScreen: boolean;
-  getPrimaryColor: GetPrimaryColor;
+  foreground: string;
 }) => (
   <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
     <Icon
@@ -30,7 +33,7 @@ const FlowHeaderButton = ({
         isFirstScreen ? 'material-symbols:close-rounded' : 'material-symbols:arrow-back-rounded'
       }
       size={24}
-      color={getPrimaryColor('0')}
+      color={foreground}
     />
   </TouchableOpacity>
 );
@@ -39,18 +42,16 @@ const FlowHeaderButton = ({
  * Get the base screen options for flow layouts (used inside modal stacks).
  * These options ensure consistent styling across all flow layouts.
  */
-const getBaseFlowScreenOptions = (
-  getPrimaryColor: GetPrimaryColor
-): NativeStackNavigationOptions => ({
+const getBaseFlowScreenOptions = (colors: FlowColors): NativeStackNavigationOptions => ({
   headerShown: true,
   headerTransparent: true,
   headerStyle: {
     backgroundColor: 'transparent',
   },
   headerTitleStyle: {
-    color: getPrimaryColor('0'),
+    color: colors.foreground,
   },
-  headerTintColor: getPrimaryColor('0'),
+  headerTintColor: colors.foreground,
   // Hide any back title that might show parent route names
   headerBackButtonDisplayMode: 'minimal',
   headerBackVisible: false,
@@ -59,7 +60,7 @@ const getBaseFlowScreenOptions = (
   gestureEnabled: true,
   gestureDirection: 'horizontal',
   contentStyle: {
-    backgroundColor: getPrimaryColor('950'),
+    backgroundColor: colors.background,
   },
 });
 
@@ -67,17 +68,17 @@ const getBaseFlowScreenOptions = (
  * Create screen options function for flow layouts.
  * This returns a function that can be passed to Stack's screenOptions prop.
  */
-export const createFlowLayoutScreenOptions = (getPrimaryColor: GetPrimaryColor) => {
+export const createFlowLayoutScreenOptions = (colors: FlowColors) => {
   return ({ navigation }: { navigation: NavigationProp<ParamListBase> }) => {
     // Get the current stack index - 0 means first screen
     const state = navigation.getState();
     const isFirstScreen = state.index === 0;
 
     return {
-      ...getBaseFlowScreenOptions(getPrimaryColor),
+      ...getBaseFlowScreenOptions(colors),
       // Dynamic back/close button based on stack depth
       headerLeft: () => (
-        <FlowHeaderButton isFirstScreen={isFirstScreen} getPrimaryColor={getPrimaryColor} />
+        <FlowHeaderButton isFirstScreen={isFirstScreen} foreground={colors.foreground} />
       ),
     };
   };
@@ -88,13 +89,13 @@ export const createFlowLayoutScreenOptions = (getPrimaryColor: GetPrimaryColor) 
  * Used by _layout.tsx for consistent header styling.
  */
 export const getBaseModalHeaderOptions = (
-  getPrimaryColor: GetPrimaryColor,
+  foreground: string,
   backgroundColor: string
 ): NativeStackNavigationOptions => ({
   headerTitleStyle: {
-    color: getPrimaryColor('0'),
+    color: foreground,
   },
-  headerTintColor: getPrimaryColor('0'),
+  headerTintColor: foreground,
   headerBackTitleStyle: {
     fontSize: 16,
   },

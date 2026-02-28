@@ -4,7 +4,6 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { formatAmount } from 'helper/currency';
@@ -12,6 +11,7 @@ import { Avatar } from 'components/ui/Avatar';
 import TransactionIcon from '../TransactionIcon';
 import Icon from 'assets/icons';
 import { HistoryEntry } from 'coco-cashu-core';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 /** Recipient profile data for payment request mode */
 interface RecipientProfile {
@@ -41,7 +41,13 @@ export function HistoryEntryHeader({
   recipientProfile,
   isLoading,
 }: HistoryEntryHeaderProps) {
-  const { getPrimaryColor, getRedColor, getGreenColor } = useTheme();
+  const [foreground, surface, background, danger, success] = useThemeColor([
+    'foreground',
+    'surface',
+    'background',
+    'danger',
+    'success',
+  ] as const);
 
   // Determine values from either historyEntry or pendingData
   const amount = historyEntry?.amount ?? pendingData?.amount ?? 0;
@@ -75,18 +81,18 @@ export function HistoryEntryHeader({
               position: 'absolute',
               bottom: -4,
               right: -4,
-              backgroundColor: getPrimaryColor('900'),
+              backgroundColor: surface,
               borderRadius: iconOverlaySize / 2,
               width: iconOverlaySize,
               height: iconOverlaySize,
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 2,
-              borderColor: getPrimaryColor('950'),
+              borderColor: background,
             }}>
             <Icon
               name="fluent:arrow-upload-16-filled"
-              color={opacity(getPrimaryColor('0'), 0.9)}
+              color={opacity(foreground, 0.9)}
               size={iconOverlaySize - 8}
             />
           </View>
@@ -108,7 +114,7 @@ export function HistoryEntryHeader({
       <View className="scale-125 transform bg-transparent p-4">
         <Icon
           name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}
-          color={opacity(getPrimaryColor('0'), 0.9)}
+          color={opacity(foreground, 0.9)}
           size={28}
         />
       </View>
@@ -120,10 +126,7 @@ export function HistoryEntryHeader({
       <VStack>
         <HStack align="center">
           <Spacer size={8} />
-          <Text
-            size={isSend ? 32 : 24}
-            color={isSend ? getRedColor('300') : getGreenColor('300')}
-            style={{ opacity: 0.9 }}>
+          <Text size={isSend ? 32 : 24} color={isSend ? danger : success} style={{ opacity: 0.9 }}>
             {isSend ? '-' : '+'}
           </Text>
           <Spacer size={8} />
@@ -132,12 +135,12 @@ export function HistoryEntryHeader({
             unit={unit}
             size={28}
             weight="heavy"
-            color={isReceive ? getGreenColor('300') : getRedColor('300')}
+            color={isReceive ? success : danger}
           />
         </HStack>
-        <Text size={18} color={opacity(getPrimaryColor('0'), 0.66)} bold>
+        <Text size={18} color={opacity(foreground, 0.66)} bold>
           {amount < 0 ? '-' : ''}
-          <Text size={18} color={opacity(getPrimaryColor('0'), 0.9)} style={{ marginLeft: 8 }}>
+          <Text size={18} color={opacity(foreground, 0.9)} style={{ marginLeft: 8 }}>
             {amount < 0 ? '-' : ''}
             {formatAmount(
               { amount: Math.abs(amount), unit },

@@ -9,7 +9,6 @@ import { UntranslatedText } from 'components/ui/Text';
 import { useBtcPrice } from 'stores/pricelistStore';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { FiatCurrencyPill } from 'components/blocks/FiatCurrencyPill';
-import { useTheme } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useAppBalance } from 'hooks/useAppBalance';
@@ -28,6 +27,7 @@ import { CocoManager } from '@/helper/coco/manager';
 import { popup } from '@/helper/popup';
 import { useBalanceContext, useManager, usePaginatedHistory } from 'coco-cashu-react';
 import type { CoreProof, SendHistoryEntry } from 'coco-cashu-core';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface Account {
   unit: CurrencyUnit;
@@ -68,7 +68,7 @@ function PendingEcashPill({
   unit,
   onPress,
 }: PendingEcashPillProps): React.ReactElement | null {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
 
   if (totalAmount <= 0) return null;
 
@@ -91,7 +91,7 @@ function PendingEcashPill({
             glassEffect({
               shape: 'capsule',
               glass: {
-                tint: opacity(getPrimaryColor('500'), 0.15),
+                tint: opacity(accent, 0.15),
                 variant: 'regular',
                 interactive: false,
               },
@@ -104,12 +104,12 @@ function PendingEcashPill({
             <SwiftUIImage
               systemName="clock.arrow.trianglehead.counterclockwise.rotate.90"
               size={12}
-              color={opacity(getPrimaryColor('0'), 0.75)}
+              color={opacity(foreground, 0.75)}
             />
             <SwiftUIText
               modifiers={[
                 font({ size: textSize, design: 'monospaced', weight: 'bold' }),
-                foregroundStyle(opacity(getPrimaryColor('0'), 0.75)),
+                foregroundStyle(opacity(foreground, 0.75)),
               ]}>
               {text}
             </SwiftUIText>
@@ -128,17 +128,17 @@ function PendingEcashPill({
         gap={6}
         className="overflow-hidden rounded-full"
         style={{
-          backgroundColor: opacity(getPrimaryColor('500'), 0.3),
+          backgroundColor: opacity(accent, 0.3),
           borderWidth: 1,
-          borderColor: opacity(getPrimaryColor('400'), 0.3),
+          borderColor: opacity(accent, 0.3),
           paddingHorizontal: 12,
           paddingVertical: 5,
         }}>
-        <Icon name="majesticons:coins" size={14} color={opacity(getPrimaryColor('0'), 0.66)} />
+        <Icon name="majesticons:coins" size={14} color={opacity(foreground, 0.66)} />
         <UntranslatedText
           bold
           size={11}
-          color={opacity(getPrimaryColor('0'), 0.66)}
+          color={opacity(foreground, 0.66)}
           style={{ letterSpacing: 0.5 }}>
           {text}
         </UntranslatedText>
@@ -158,7 +158,7 @@ function ReservedEcashPill({
   unit,
   onPress,
 }: ReservedEcashPillProps): React.ReactElement | null {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
 
   if (totalAmount <= 0) return null;
 
@@ -178,7 +178,7 @@ function ReservedEcashPill({
             glassEffect({
               shape: 'capsule',
               glass: {
-                tint: opacity(getPrimaryColor('500'), 0.15),
+                tint: opacity(accent, 0.15),
                 variant: 'regular',
                 interactive: false,
               },
@@ -191,12 +191,12 @@ function ReservedEcashPill({
             <SwiftUIImage
               systemName="lock.fill"
               size={12}
-              color={opacity(getPrimaryColor('0'), 0.75)}
+              color={opacity(foreground, 0.75)}
             />
             <SwiftUIText
               modifiers={[
                 font({ size: textSize, design: 'monospaced', weight: 'bold' }),
-                foregroundStyle(opacity(getPrimaryColor('0'), 0.75)),
+                foregroundStyle(opacity(foreground, 0.75)),
               ]}>
               {text}
             </SwiftUIText>
@@ -214,17 +214,17 @@ function ReservedEcashPill({
         gap={6}
         className="overflow-hidden rounded-full"
         style={{
-          backgroundColor: opacity(getPrimaryColor('500'), 0.3),
+          backgroundColor: opacity(accent, 0.3),
           borderWidth: 1,
-          borderColor: opacity(getPrimaryColor('400'), 0.3),
+          borderColor: opacity(accent, 0.3),
           paddingHorizontal: 12,
           paddingVertical: 5,
         }}>
-        <Icon name="majesticons:coins" size={14} color={opacity(getPrimaryColor('0'), 0.66)} />
+        <Icon name="majesticons:coins" size={14} color={opacity(foreground, 0.66)} />
         <UntranslatedText
           bold
           size={11}
-          color={opacity(getPrimaryColor('0'), 0.66)}
+          color={opacity(foreground, 0.66)}
           style={{ letterSpacing: 0.5 }}>
           {text}
         </UntranslatedText>

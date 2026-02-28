@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import Icon from 'assets/icons';
 // eslint-disable-next-line import/namespace
 import * as CheckboxPrimitive from '@rn-primitives/checkbox';
@@ -19,34 +19,40 @@ export const Checkbox = ({
   size = 20,
   variant = 'default',
 }: CheckboxProps) => {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, muted, surface, danger, blue300, green400] = useThemeColor([
+    'foreground',
+    'muted',
+    'surface',
+    'danger',
+    'blue-300',
+    'green-400',
+  ] as const);
 
-  // Variant color configuration
   const getVariantColors = () => {
     const variants = {
       default: {
-        border: getPrimaryColor('400'),
-        background: checked ? getPrimaryColor('0') : 'transparent',
-        checkmark: getPrimaryColor('900'),
+        border: muted,
+        background: checked ? foreground : 'transparent',
+        checkmark: surface,
       },
       primary: {
-        border: checked ? '#3b82f6' : getPrimaryColor('400'),
-        background: checked ? '#3b82f6' : 'transparent',
+        border: checked ? blue300 : muted,
+        background: checked ? blue300 : 'transparent',
         checkmark: 'white',
       },
       success: {
-        border: checked ? '#10b981' : getPrimaryColor('400'),
-        background: checked ? '#10b981' : 'transparent',
+        border: checked ? green400 : muted,
+        background: checked ? green400 : 'transparent',
         checkmark: 'white',
       },
       warning: {
-        border: checked ? '#f59e0b' : getPrimaryColor('400'),
+        border: checked ? '#f59e0b' : muted,
         background: checked ? '#f59e0b' : 'transparent',
         checkmark: 'white',
       },
       error: {
-        border: checked ? '#ef4444' : getPrimaryColor('400'),
-        background: checked ? '#ef4444' : 'transparent',
+        border: checked ? danger : muted,
+        background: checked ? danger : 'transparent',
         checkmark: 'white',
       },
     };

@@ -11,7 +11,6 @@
 import React, { FC, useCallback, useMemo, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
@@ -25,6 +24,7 @@ import { DistributionSlider } from './DistributionSlider';
 import { hexToRgb, useExtractedColors } from './colorUtils';
 import { bpToPercent, TOTAL_BASIS_POINTS } from 'stores/mintDistributionStore';
 import { extractDomain } from '@/helper/url';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface MintInfo {
   name?: string;
@@ -69,13 +69,18 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
   onMin,
   disabled = false,
 }) => {
-  const { getPrimaryColor } = useTheme();
-  const primaryColor0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
-  const primaryColor50 = useMemo(() => opacity(getPrimaryColor('0'), 0.9), [getPrimaryColor]);
-  const primaryColor300 = useMemo(() => opacity(getPrimaryColor('0'), 0.5), [getPrimaryColor]);
-  const primaryColor600 = useMemo(() => getPrimaryColor('600'), [getPrimaryColor]);
-  const primaryColor700 = useMemo(() => getPrimaryColor('700'), [getPrimaryColor]);
-  const primaryColor800 = useMemo(() => getPrimaryColor('800'), [getPrimaryColor]);
+  const [foreground, defaultColor, surfaceTertiary, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'default',
+    'surface-tertiary',
+    'surface-secondary',
+  ] as const);
+  const primaryColor0 = foreground;
+  const primaryColor50 = useMemo(() => opacity(foreground, 0.9), [foreground]);
+  const primaryColor300 = useMemo(() => opacity(foreground, 0.5), [foreground]);
+  const primaryColor600 = defaultColor;
+  const primaryColor700 = surfaceTertiary;
+  const primaryColor800 = surfaceSecondary;
 
   // Extract colors from mint icon for slider styling
   const extractedColors = useExtractedColors(mintInfo?.icon_url);

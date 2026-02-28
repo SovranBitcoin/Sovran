@@ -1,15 +1,15 @@
 import React from 'react';
 import Icon from 'assets/icons';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 
 export function Spinner({ size = 8, style }: { size?: number; style?: any }) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   return (
     <Icon
       name="ant-design:loading-outlined"
       size={size}
-      color={opacity(getPrimaryColor('0'), 0.9)}
+      color={opacity(foreground, 0.9)}
       style={style}
       spin={{
         delay: 0,

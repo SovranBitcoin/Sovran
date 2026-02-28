@@ -38,7 +38,7 @@ import {
 } from '@expo/ui/swift-ui/modifiers';
 import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -125,7 +125,7 @@ const StatsCard = memo(function StatsCard({
   category,
   onCategoryChange,
 }: StatsCardProps) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   const visibleText = loading ? '...' : `${visibleCount.toLocaleString()} visible`;
   const totalText = loading
@@ -168,19 +168,19 @@ const StatsCard = memo(function StatsCard({
                     <SwiftUIText
                       modifiers={[
                         font({ size: 18, weight: 'bold' }),
-                        foregroundStyle(getPrimaryColor('0')),
+                        foregroundStyle(foreground),
                       ]}>
                       {visibleText}
                     </SwiftUIText>
                     <SwiftUIHStack alignment="center" spacing={4}>
                       <SwiftUIText
-                        modifiers={[font({ size: 12 }), foregroundStyle(getPrimaryColor('0'))]}>
+                        modifiers={[                        font({ size: 12 }), foregroundStyle(foreground)]}>
                         {totalText}
                       </SwiftUIText>
                       <SwiftUIImage
                         systemName="chevron.down"
                         size={10}
-                        color={getPrimaryColor('0')}
+                        color={foreground}
                       />
                     </SwiftUIHStack>
                   </SwiftUIVStack>
@@ -205,7 +205,7 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
   onZoomIn,
   onZoomOut,
 }: FloatingActionButtonsProps) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   if (Platform.OS === 'ios') {
     return (
@@ -225,7 +225,7 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
             <SwiftUIHStack
               alignment="center"
               modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
-              <SwiftUIImage systemName="location.fill" size={20} color={getPrimaryColor('0')} />
+              <SwiftUIImage systemName="location.fill" size={20} color={foreground} />
             </SwiftUIHStack>
           </SwiftUIButton>
         </Host>
@@ -245,7 +245,7 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
             <SwiftUIHStack
               alignment="center"
               modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
-              <SwiftUIImage systemName="plus" size={20} color={getPrimaryColor('0')} />
+              <SwiftUIImage systemName="plus" size={20} color={foreground} />
             </SwiftUIHStack>
           </SwiftUIButton>
         </Host>
@@ -265,7 +265,7 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
             <SwiftUIHStack
               alignment="center"
               modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
-              <SwiftUIImage systemName="minus" size={20} color={getPrimaryColor('0')} />
+              <SwiftUIImage systemName="minus" size={20} color={foreground} />
             </SwiftUIHStack>
           </SwiftUIButton>
         </Host>
@@ -277,13 +277,13 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
   return (
     <VStack style={styles.floatingButtons} spacing={8}>
       <TouchableOpacity onPress={onMyLocation} style={styles.androidCircleButton}>
-        <Icon name="mdi:crosshairs-gps" size={22} color={getPrimaryColor('0')} />
+        <Icon name="mdi:crosshairs-gps" size={22} color={foreground} />
       </TouchableOpacity>
       <TouchableOpacity onPress={onZoomIn} style={styles.androidCircleButton}>
-        <Icon name="mdi:plus" size={22} color={getPrimaryColor('0')} />
+        <Icon name="mdi:plus" size={22} color={foreground} />
       </TouchableOpacity>
       <TouchableOpacity onPress={onZoomOut} style={styles.androidCircleButton}>
-        <Icon name="mdi:minus" size={22} color={getPrimaryColor('0')} />
+        <Icon name="mdi:minus" size={22} color={foreground} />
       </TouchableOpacity>
     </VStack>
   );
@@ -294,7 +294,7 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
 // ============================================================================
 
 function MapScreen() {
-  const { getPrimaryColor } = useTheme();
+  const [foreground, accent, background] = useThemeColor(['foreground', 'accent', 'background'] as const);
 
   // BTCMap store
   const { placesCache, storeLoading, error, fetchPlaces, setError } = useBTCMapStore(
@@ -633,17 +633,17 @@ function MapScreen() {
 
   if (error || mapUnavailableOnAndroid) {
     return (
-      <View style={[styles.container, { backgroundColor: getPrimaryColor('950') }]}>
+      <View style={[styles.container, { backgroundColor: background }]}>
         <View style={styles.errorContainer}>
-          <Icon name="mdi:alert-circle" size={48} color={opacity(getPrimaryColor('0'), 0.4)} />
-          <Text size={16} style={{ color: opacity(getPrimaryColor('0'), 0.5), marginTop: 16 }}>
+          <Icon name="mdi:alert-circle" size={48} color={opacity(foreground, 0.4)} />
+          <Text size={16} style={{ color: opacity(foreground, 0.5), marginTop: 16 }}>
             {mapUnavailableOnAndroid
               ? 'Google Maps is not configured for Android. Set EXPO_PUBLIC_GOOGLE_MAPS_API_KEY and rebuild.'
               : error}
           </Text>
           <TouchableOpacity
             onPress={mapUnavailableOnAndroid ? () => router.back() : () => setError(null)}
-            style={[styles.retryButton, { backgroundColor: getPrimaryColor('500') }]}>
+            style={[styles.retryButton, { backgroundColor: accent }]}>
             <Text size={14} heavy style={{ color: '#fff' }}>
               {mapUnavailableOnAndroid ? 'Go back' : 'Retry'}
             </Text>

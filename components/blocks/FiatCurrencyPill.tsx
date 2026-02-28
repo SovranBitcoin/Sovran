@@ -7,10 +7,9 @@ import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/mod
 import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { useTheme } from 'providers/ThemeProvider';
 import { DisplayCurrency, useSettingsStore } from 'stores/settingsStore';
 import { supportsLiquidGlass } from '@/helper/version';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 export interface FiatCurrencyPillProps {
   /** Display string, e.g. "≈ $12.34" */
   displayText: string;
@@ -34,7 +33,7 @@ export function FiatCurrencyPill({
   textSize = 14,
   enableCurrencyMenu = true,
 }: FiatCurrencyPillProps): React.ReactElement {
-  const { getGreenColor } = useTheme();
+  const [success, green400, green500] = useThemeColor(['success', 'green-400', 'green-500'] as const);
   const setDisplayCurrency = useSettingsStore((state) => state.setDisplayCurrency);
 
   const handleSelectCurrency = useCallback(
@@ -85,19 +84,14 @@ export function FiatCurrencyPill({
           gap={6}
           className="overflow-hidden rounded-full"
           style={{
-            backgroundColor: opacity(getGreenColor('500'), 0.15),
+            backgroundColor: opacity(green500, 0.15),
             borderWidth: 1,
-            borderColor: opacity(getGreenColor('400'), 0.2),
+            borderColor: opacity(green400, 0.2),
             paddingHorizontal: 14,
             paddingVertical: 6,
             minHeight: iosHeight,
           }}>
-          <Text
-            size={textSize}
-            bold
-            overpass
-            color={getGreenColor('300')}
-            style={{ letterSpacing: 0.3 }}>
+          <Text size={textSize} bold overpass color={success} style={{ letterSpacing: 0.3 }}>
             {text}
           </Text>
         </HStack>
@@ -118,7 +112,7 @@ export function FiatCurrencyPill({
               // Important: keep label sizing aligned with the outer capsule frame.
               modifiers={[
                 font({ size: textSize, design: 'monospaced', weight: 'bold' }),
-                foregroundStyle(getGreenColor('300')),
+                foregroundStyle(success),
                 frame({ height: 22, width: iosWidth, alignment: 'center' }),
               ]}>
               {text}
@@ -126,11 +120,10 @@ export function FiatCurrencyPill({
           }
           modifiers={[
             frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
-            // Use native Liquid Glass tint (matches the QR button pattern).
             glassEffect({
               shape: 'capsule',
               glass: {
-                tint: opacity(getGreenColor('500'), 0.15),
+                tint: opacity(green500, 0.15),
                 variant: 'regular',
                 interactive: true,
               },
@@ -169,18 +162,16 @@ export function FiatCurrencyPill({
             glassEffect({
               shape: 'capsule',
               glass: {
-                tint: opacity(getGreenColor('500'), 0.15),
+                tint: opacity(green500, 0.15),
                 variant: 'regular',
                 interactive: true,
               },
             }),
           ]}>
           <SwiftUIText
-            // Important: the "glass" capsule tends to size to the label, while our
-            // background tint sizes to the outer frame. Keep them identical.
             modifiers={[
               font({ size: textSize, design: 'monospaced', weight: 'bold' }),
-              foregroundStyle(getGreenColor('300')),
+              foregroundStyle(success),
               frame({ height: 22, width: iosWidth, alignment: 'center' }),
             ]}>
             {text}
@@ -199,18 +190,13 @@ export function FiatCurrencyPill({
         gap={6}
         className="overflow-hidden rounded-full"
         style={{
-          backgroundColor: opacity(getGreenColor('500'), 0.15),
+          backgroundColor: opacity(green500, 0.15),
           borderWidth: 1,
-          borderColor: opacity(getGreenColor('400'), 0.2),
+          borderColor: opacity(green400, 0.2),
           paddingHorizontal: 14,
           paddingVertical: 6,
         }}>
-        <Text
-          size={textSize}
-          bold
-          overpass
-          color={getGreenColor('300')}
-          style={{ letterSpacing: 0.3 }}>
+        <Text size={textSize} bold overpass color={success} style={{ letterSpacing: 0.3 }}>
           {text}
         </Text>
       </HStack>

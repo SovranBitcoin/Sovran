@@ -34,14 +34,13 @@ import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { getMintDisplayName, extractDomain } from 'helper/url';
 import { Mint } from 'coco-cashu-core';
-import { useTheme } from '@/providers/ThemeProvider';
 import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Spinner } from '@/components/ui/Spinner';
 import opacity from 'hex-color-opacity';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { AmountFormatter } from '@/components/ui/AmountFormatter';
-
+import { useThemeColor } from 'hooks/useThemeColor';
 interface MintItemProps {
   mint: Mint & { amount?: number; unit?: string };
   balance?: { amount: number; unit: string };
@@ -83,7 +82,7 @@ const MintItem: React.FC<MintItemProps> = ({
   onToggle,
   isAllowed = true,
 }) => {
-  const { getGreenColor } = useTheme();
+  const [foreground, warning, success] = useThemeColor(['foreground', 'yellow-300', 'success'] as const);
   const displayMintUrl = mintUrlProp || mint.mintUrl;
   const displayName = useMemo(
     () => getMintDisplayName(displayMintUrl, mint.mintInfo),
@@ -109,8 +108,6 @@ const MintItem: React.FC<MintItemProps> = ({
     return undefined;
   }, [auditInfo]);
 
-  const { getPrimaryColor } = useTheme();
-
   // Format score (round to 1 decimal or whole number)
   // Note: score of 0 is a valid value, so we check typeof === 'number' not just truthiness
   const displayScore = useMemo(() => {
@@ -127,7 +124,6 @@ const MintItem: React.FC<MintItemProps> = ({
     // Default to success for OK state or when state is undefined/loading
     return 'success';
   }, [auditInfo?.auditorData?.state]);
-  const { getYellowColor } = useTheme();
 
   // Determine opacity based on balance and requirements
   const itemOpacity = useMemo(() => {
@@ -155,7 +151,7 @@ const MintItem: React.FC<MintItemProps> = ({
   return (
     <TouchableOpacity
       key={mint.mintUrl}
-      className="bg-primary-900"
+      className="bg-surface"
       style={{
         padding: 16,
         marginBottom: 4,
@@ -179,7 +175,7 @@ const MintItem: React.FC<MintItemProps> = ({
           </View>
 
           <VStack flex={1}>
-            <Text className="text-primary-0" size={16} bold overpass>
+            <Text className="text-foreground" size={16} bold overpass>
               {displayName}
             </Text>
 
@@ -190,11 +186,11 @@ const MintItem: React.FC<MintItemProps> = ({
                   unit={'sat'}
                   size={14}
                   weight="heavy"
-                  color={getPrimaryColor('0')}
+                  color={foreground}
                   className="ml-[2px]"
                 />
               ) : displayMintUrl ? (
-                <Text heavy size={14} color={opacity(getPrimaryColor('0'), 0.5)}>
+                <Text heavy size={14} color={opacity(foreground, 0.5)}>
                   {extractDomain(displayMintUrl)}
                 </Text>
               ) : null}
@@ -230,7 +226,7 @@ const MintItem: React.FC<MintItemProps> = ({
                   }
                 }}>
                 <Icon
-                  className="bg-primary-600"
+                  className="bg-default"
                   style={{
                     padding: 8,
                     borderRadius: 1000,
@@ -255,7 +251,7 @@ const MintItem: React.FC<MintItemProps> = ({
                 <Skeleton
                   className="h-[24px] w-[56px] rounded-full"
                   style={{
-                    backgroundColor: opacity(getYellowColor('300'), 0.2),
+                    backgroundColor: opacity(warning, 0.2),
                   }}
                 />
               ) : null}
@@ -273,7 +269,7 @@ const MintItem: React.FC<MintItemProps> = ({
                 <Skeleton
                   className="h-[24px] w-[60px] rounded-full"
                   style={{
-                    backgroundColor: opacity(getGreenColor('300'), 0.2),
+                    backgroundColor: opacity(success, 0.2),
                   }}
                 />
               ) : null}

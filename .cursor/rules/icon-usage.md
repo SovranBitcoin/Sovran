@@ -30,11 +30,14 @@ The project uses a custom `<Icon>` component located at `assets/icons/index.tsx`
 
 ```typescript
 import Icon from 'assets/icons';
+import { useThemeColor } from 'hooks/useThemeColor';
+
+const foreground = useThemeColor('foreground');
 
 <Icon
   name="material-symbols:close-rounded"
   size={24}
-  color={getPrimaryColor('0')}
+  color={foreground}
 />
 ```
 
@@ -58,26 +61,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 Icons automatically use theme colors when no color is specified:
 
 ```typescript
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 
-const { getPrimaryColor } = useTheme();
+const foreground = useThemeColor('foreground');
 
-// Uses theme primary color (default)
-<Icon name="material-symbols:close-rounded" size={24} />
+// Uses theme foreground color
+<Icon name="material-symbols:close-rounded" size={24} color={foreground} />
 
-// Uses specific theme color
-<Icon
-  name="material-symbols:close-rounded"
-  size={24}
-  color={getPrimaryColor('0')}
-/>
-
-// Uses semantic colors
-<Icon
-  name="material-symbols:check-rounded"
-  size={24}
-  color={getRedColor('500')}
-/>
+// Uses static semantic color directly
+<Icon name="material-symbols:check-rounded" size={24} color="#9A082E" />
 ```
 
 #### User Interface Icons
@@ -142,7 +134,7 @@ The project uses **Circle Flags** for displaying country flags. This provides cl
 <Icon
   name="circle-flags:de"
   size={24}
-  color={getPrimaryColor('0')}
+  color={foreground}
 />
 ```
 
@@ -474,7 +466,7 @@ import Icon from 'assets/icons';
 <Icon
   name="fluent:add-24-filled"
   size={32}
-  color={getPrimaryColor('0')}
+  color={foreground}
 />
 ```
 
@@ -482,7 +474,7 @@ import Icon from 'assets/icons';
 
 ```typescript
 <TouchableOpacity>
-  <Icon name="lets-icons:copy" size={16} color={getPrimaryColor('400')} />
+  <Icon name="lets-icons:copy" size={16} color={muted} />
 </TouchableOpacity>
 ```
 

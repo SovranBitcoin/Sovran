@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions, View as RNView } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg';
-import { useTheme } from 'providers/ThemeProvider';
 import { Text } from 'components/ui/Text';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { BlurCardFrame } from 'components/ui/BlurCardFrame';
@@ -11,6 +10,7 @@ import opacity from 'hex-color-opacity';
 import { useSettingsStore } from 'stores/settingsStore';
 import { useSwapTransactionsStore } from 'stores/swapTransactionsStore';
 import type { HistoryEntry } from 'coco-cashu-core';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -82,8 +82,6 @@ const PROJECTED_LINE_WIDTH = 1.5;
 const X_TICKS = [1, 6, 11, 16, 21, 28];
 
 // Positive green for received
-const RECEIVED_LINE_COLOR = '#34C759';
-
 // ---------------------------------------------------------------------------
 // Mode config
 // ---------------------------------------------------------------------------
@@ -132,22 +130,24 @@ const MonthlyChart = React.memo(function MonthlyChart({
   unit = 'sat',
   mode,
 }: MonthlyChartProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [muted, foreground, shade100, successColor] = useThemeColor([
+    'muted',
+    'foreground',
+    'shade-100',
+    'success',
+  ] as const);
   const { width: screenWidth } = useWindowDimensions();
   const mockMode = useSettingsStore((s) => s.mockMode);
   const quoteIdToGroup = useSwapTransactionsStore((s) => s.quoteIdToGroup);
 
   const config = MODE_CONFIG[mode];
 
-  // Card frame colors — match Transactions component
-  const accentColor = useMemo(() => getPrimaryColor('300'), [getPrimaryColor]);
+  const accentColor = muted;
   const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
 
-  // Base foreground color
-  const primary0 = useMemo(() => getPrimaryColor('0'), [getPrimaryColor]);
+  const primary0 = foreground;
 
-  // Chart colors — mode-dependent actual line color
-  const actualLineColor = mode === 'spent' ? getShadeColor('100') : RECEIVED_LINE_COLOR;
+  const actualLineColor = mode === 'spent' ? shade100 : successColor;
   const projectedLineColor = useMemo(() => opacity(primary0, 0.3), [primary0]);
   const labelColor = useMemo(() => opacity(primary0, 0.66), [primary0]);
 

@@ -14,7 +14,6 @@ import { router } from 'expo-router';
 import { Avatar } from 'components/ui/Avatar';
 import { Skeleton } from 'components/ui/Skeleton';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
 import opacity from 'hex-color-opacity';
 
 import {
@@ -30,6 +29,7 @@ import {
 } from './shared';
 import type { StoryUser } from './StoriesCarousel';
 import { prefetchImages } from '@/helper/imageCache';
+import { useThemeColor } from 'hooks/useThemeColor';
 
 // ============================================================================
 // Gradient Ring
@@ -83,8 +83,8 @@ export function GradientRing({
 // ============================================================================
 
 function StoriesRowSkeleton() {
-  const { getPrimaryColor } = useTheme();
-  const skeletonBg = getPrimaryColor('700');
+  const surfaceTertiary = useThemeColor('surface-tertiary');
+  const skeletonBg = surfaceTertiary;
   return (
     <View style={styles.container}>
       <ScrollView
@@ -127,7 +127,7 @@ interface StoriesRowProps {
 }
 
 export function StoriesRow({ userPubkey }: StoriesRowProps) {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const [storyUsers, setStoryUsers] = useState<StoryUser[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -280,7 +280,7 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
               <Text
                 size={11}
                 numberOfLines={1}
-                style={[styles.storyName, { color: opacity(getPrimaryColor('0'), 0.7) }]}>
+                style={[styles.storyName, { color: opacity(foreground, 0.7) }]}>
                 {name}
               </Text>
             </TouchableOpacity>

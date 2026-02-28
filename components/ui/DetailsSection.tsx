@@ -4,7 +4,7 @@ import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import { Section } from 'components/ui/Section';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 
@@ -36,7 +36,7 @@ export function DetailsSection({
   camera = false,
 }: DetailsSectionProps) {
   const [expanded, setExpanded] = useState(initialExpanded);
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
 
   // Don't render if there are no items
   if (items.length === 0) return null;
@@ -50,10 +50,10 @@ export function DetailsSection({
         <HStack align="center" gap={6}>
           <Icon
             name={expanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-            color={opacity(getPrimaryColor('0'), 0.5)}
+            color={opacity(foreground, 0.5)}
             size={18}
           />
-          <Text size={14} bold style={{ color: opacity(getPrimaryColor('0'), 0.5) }}>
+          <Text size={14} bold style={{ color: opacity(foreground, 0.5) }}>
             {label}
           </Text>
         </HStack>

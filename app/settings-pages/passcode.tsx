@@ -47,7 +47,7 @@ const PasscodeSettings: React.FC = () => {
           variant="warning"></Card>
         <VStack justify="space-between" align="center" className="flex-1 py-8">
           <VStack align="center" justify="center" className="flex-1">
-            <Text size={20} weight="bold" className="mb-5 text-center text-primary-0">
+            <Text size={20} weight="bold" className="mb-5 text-center text-foreground">
               {step === 'create' ? 'Enter new passcode' : 'Confirm passcode'}
             </Text>
             <HStack className="mb-5">
@@ -55,7 +55,7 @@ const PasscodeSettings: React.FC = () => {
                 <View
                   key={i}
                   className={`mx-1.5 h-3 w-3 rounded-full ${
-                    currentValue.length > i ? 'bg-primary-0' : 'border border-primary-0'
+                    currentValue.length > i ? 'bg-foreground' : 'border border-foreground'
                   }`}
                 />
               ))}

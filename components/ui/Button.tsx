@@ -66,7 +66,7 @@ import {
   GestureResponderEvent,
 } from 'react-native';
 import { Text } from 'components/ui/Text';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from './TouchableOpacity';
 import { HStack } from 'components/ui/View/HStack';
@@ -329,7 +329,14 @@ export const Button = ({
   blur = false,
   haptics = false,
 }: ButtonProps) => {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, surfaceForeground, accent, surfaceTertiary, background, danger] = useThemeColor([
+    'foreground',
+    'surface-foreground',
+    'accent',
+    'surface-tertiary',
+    'background',
+    'danger',
+  ] as const);
 
   // Ripple hook
   const rippleConfig = typeof ripple === 'object' ? ripple : {};
@@ -473,20 +480,20 @@ export const Button = ({
       case 'primary':
         return {
           ...base,
-          backgroundColor: getPrimaryColor('0'), // White/light background for primary
-          borderColor: getPrimaryColor('50'),
+          backgroundColor: foreground,
+          borderColor: surfaceForeground,
         };
       case 'secondary':
         return {
           ...base,
-          backgroundColor: getPrimaryColor('700'),
-          borderColor: getPrimaryColor('500'),
+          backgroundColor: surfaceTertiary,
+          borderColor: accent,
         };
       case 'dangerous':
         return {
           ...base,
-          backgroundColor: getShadeColor('300'),
-          borderColor: getShadeColor('300'),
+          backgroundColor: danger,
+          borderColor: danger,
         };
       default:
         return base;
@@ -513,11 +520,11 @@ export const Button = ({
   const getTextColor = () => {
     switch (variant) {
       case 'primary':
-        return getPrimaryColor('950'); // Use darkest color for contrast against light background
+        return background;
       case 'secondary':
       case 'dangerous':
       default:
-        return getPrimaryColor('0');
+        return foreground;
     }
   };
 

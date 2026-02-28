@@ -6,7 +6,7 @@ import { View } from 'components/ui/View/View';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { useWindowDimensions, ActivityIndicator } from 'react-native';
 import EQRCode from 'react-native-qrcode-svg';
-import { useTheme } from 'providers/ThemeProvider';
+import { useThemeColor } from 'hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -17,7 +17,7 @@ const MAX_QR_DATA_LENGTH = 2000;
  * Circle background for the QR code center logo
  */
 const Circle = memo(() => {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   return (
     <View
       className="absolute z-10"
@@ -28,7 +28,7 @@ const Circle = memo(() => {
         transform: [{ translateX: -50 }, { translateY: -50 }, { scale: 0.63 }],
         left: '50%' as any,
         top: '50%' as any,
-        backgroundColor: getPrimaryColor('0'),
+        backgroundColor: foreground,
       }}
     />
   );
@@ -57,7 +57,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   animate: animateProp = false,
   variant: _variant = 'primary',
 }: AnimatedQRCodeProps) {
-  const { getPrimaryColor, getShadeColor } = useTheme();
+  const [foreground, surfaceTertiary, shade200, shade300] = useThemeColor(['foreground', 'surface-tertiary', 'shade-200', 'shade-300'] as const);
   const { width: screenWidth } = useWindowDimensions();
 
   const [index, setIndex] = useState(0);
@@ -124,8 +124,8 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   const width = Math.min(screenWidth, 600);
   const isLocationUnit = unit.startsWith('circle-flags');
   const gradientColors = needsAnimation
-    ? ([getPrimaryColor('700'), getPrimaryColor('700')] as const)
-    : ([getShadeColor('200'), getShadeColor('300')] as const);
+    ? ([surfaceTertiary, surfaceTertiary] as const)
+    : ([shade200, shade300] as const);
   const qrSize = width - 2 * padding;
 
   return (
@@ -141,7 +141,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
               justifyContent: 'center',
               alignItems: 'center',
             }}>
-            <ActivityIndicator size="large" color={getPrimaryColor('0')} />
+            <ActivityIndicator size="large" color={foreground} />
           </View>
         ) : showError ? (
           // Error state if encoding failed
@@ -156,13 +156,13 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
             <Icon
               name="ri:error-warning-line"
               size={48}
-              color={opacity(getPrimaryColor('0'), 0.5)}
+              color={opacity(foreground, 0.5)}
             />
           </View>
         ) : canRenderQR ? (
           // Normal QR code render
           <EQRCode
-            color={getPrimaryColor('0')}
+            color={foreground}
             backgroundColor="transparent"
             value={qrData}
             size={qrSize}
@@ -177,7 +177,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
               alignItems: 'center',
               padding: 20,
             }}>
-            <ActivityIndicator size="large" color={getPrimaryColor('0')} />
+            <ActivityIndicator size="large" color={foreground} />
           </View>
         )}
       </LinearGradient>

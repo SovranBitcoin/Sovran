@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import { useThemeColor } from '@/hooks/useThemeColor';
 import { Stack, router } from 'expo-router';
 import { useWindowDimensions, View } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
@@ -30,7 +30,7 @@ import { useNfcEcashPayment } from '@/hooks/useNfcEcashPayment';
 export { HEADER_LAYOUT, MOCK_NFC_SUCCESS_SATS } from '@/constants/wallet-header';
 
 export default function HomeLayout() {
-  const iconColor = useThemeColor({}, 'text');
+  const iconColor = useThemeColor('foreground');
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();

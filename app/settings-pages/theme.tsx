@@ -8,7 +8,7 @@ import { Text } from 'components/ui/Text';
 import Image from 'components/ui/Image';
 import { router } from 'expo-router';
 import { useSettingsStore } from 'stores/settingsStore';
-import { useTheme, THEMES } from 'providers/ThemeProvider';
+import { THEMES } from 'providers/ThemeProvider';
 import Icon from 'assets/icons';
 import Container from 'components/blocks/Container';
 import { withSheetProvider } from 'hocs/withSheetProvider';
@@ -24,6 +24,7 @@ import { BlurView } from 'expo-blur';
 import MaskedView from '@react-native-masked-view/masked-view';
 import opacity from 'hex-color-opacity';
 import { PressableFeedback, SearchField } from 'heroui-native';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 const CARD_GAP = 12;
 const HORIZONTAL_PADDING = 20;
@@ -74,7 +75,7 @@ const ThemeCard = React.memo(
     cardWidth,
     cardHeight,
   }: ThemeCardProps) => {
-    const { getPrimaryColor } = useTheme();
+    const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
     const displayName = themeNameMap[themeName] || themeName;
 
     // Get colors for this specific theme
@@ -98,7 +99,7 @@ const ThemeCard = React.memo(
               {
                 width: cardWidth,
                 height: cardHeight,
-                borderColor: isSelected ? getPrimaryColor('400') : 'transparent',
+                borderColor: isSelected ? muted : 'transparent',
                 borderWidth: isSelected ? 2 : 0,
               },
             ]}>
@@ -213,7 +214,7 @@ const ThemeCard = React.memo(
 ThemeCard.displayName = 'ThemeCard';
 
 function ThemeSettings() {
-  const { getPrimaryColor } = useTheme();
+  const foreground = useThemeColor('foreground');
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const [searchText, setSearchText] = useState('');
@@ -308,9 +309,9 @@ function ThemeSettings() {
             <Icon
               name="mingcute:search-3-line"
               size={48}
-              color={opacity(getPrimaryColor('0'), 0.33)}
+              color={opacity(foreground, 0.33)}
             />
-            <Text size={16} style={{ color: opacity(getPrimaryColor('0'), 0.4) }}>
+            <Text size={16} style={{ color: opacity(foreground, 0.4) }}>
               No themes found
             </Text>
           </VStack>
@@ -323,7 +324,7 @@ function ThemeSettings() {
               size={13}
               medium
               overpass
-              style={[styles.sectionTitle, { color: opacity(getPrimaryColor('0'), 0.5) }]}>
+              style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
               WALLPAPERS
             </Text>
             <Spacer size={12} />
@@ -338,7 +339,7 @@ function ThemeSettings() {
               size={13}
               medium
               overpass
-              style={[styles.sectionTitle, { color: opacity(getPrimaryColor('0'), 0.5) }]}>
+              style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
               COLOR THEMES
             </Text>
             <Spacer size={12} />
