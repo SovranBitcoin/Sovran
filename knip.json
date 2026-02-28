@@ -16,7 +16,6 @@
     "buffer",
     "process",
     "cashu-kym",
-    "@babel/core",
     "@monicon/metro",
     "@monicon/core",
     "number-flow-react-native",
@@ -29,7 +28,6 @@
     "constants/wallet-header.ts": ["exports"],
     "helper/nfc/**": ["exports", "types"],
     "helper/nfc.ts": ["exports", "types"],
-    "contexts/NfcSuccessOverlayContext.tsx": ["exports", "types"],
     "stores/nostrSocialStore.ts": ["exports"]
   }
 }
