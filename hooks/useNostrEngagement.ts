@@ -4,7 +4,7 @@ import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventDeletion, Reaction, Repost } from 'nostr-tools/kinds';
 import { useShallow } from 'zustand/shallow';
 
-import { popup } from '@/helper/popup';
+import { engagementUpdateFailedPopup } from '@/helper/popup';
 import { useNostrSocialStore } from '@/stores/nostrSocialStore';
 import type { FeedEvent, NoteMetrics } from 'components/blocks/nostr/shared';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
@@ -218,7 +218,7 @@ async function toggleEngagement(opts: ToggleEngagementOpts): Promise<void> {
     } else {
       clearOptimistic(eventId);
     }
-    popup({ message: `Failed to update ${label}. Please try again.`, type: 'error' });
+    engagementUpdateFailedPopup(label as 'follow' | 'like' | 'repost');
   }
 }
 
@@ -447,7 +447,7 @@ export function useNostrEngagement(
   const toggleLike = useCallback(
     async (target: FeedEvent) => {
       if (!nostrKeys?.pubkey || !ndk) {
-        popup({ message: 'Unable to update like right now', type: 'error' });
+        engagementUpdateFailedPopup('like');
         return;
       }
       const state = getEngagementState(target.id);
@@ -481,7 +481,7 @@ export function useNostrEngagement(
   const toggleRepost = useCallback(
     async (target: FeedEvent) => {
       if (!nostrKeys?.pubkey || !ndk) {
-        popup({ message: 'Unable to update repost right now', type: 'error' });
+        engagementUpdateFailedPopup('repost');
         return;
       }
       const state = getEngagementState(target.id);

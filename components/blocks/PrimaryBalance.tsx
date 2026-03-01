@@ -24,7 +24,7 @@ import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/mod
 import { supportsLiquidGlass } from '@/helper/version';
 import { useRouter } from 'expo-router';
 import { CocoManager } from '@/helper/coco/manager';
-import { popup } from '@/helper/popup';
+import { reservedProofsFreedPopup, reservedProofsFailedPopup } from '@/helper/popup';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import type { SendHistoryEntry } from 'coco-cashu-core';
 import { useThemeColor } from 'hooks/useThemeColor';
@@ -190,9 +190,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         onPress: async () => {
           try {
             const result = await CocoManager.freeAllReservedProofs();
-            popup({
-              message: 'Reserved proofs freed',
-              type: 'success',
+            reservedProofsFreedPopup({
               text:
                 `Reserved proofs found: ${result.totalReservedProofs}\n` +
                 `Rolled back send ops: ${result.rolledBackSendOperations}\n` +
@@ -201,9 +199,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
                 `Errors: ${result.errors.length}`,
             });
           } catch (error) {
-            popup({
-              message: 'Failed to free reserved proofs',
-              type: 'error',
+            reservedProofsFailedPopup({
               text: error instanceof Error ? error.message : 'Unknown error',
             });
           }

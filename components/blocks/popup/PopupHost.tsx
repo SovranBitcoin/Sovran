@@ -4,8 +4,14 @@ import { BottomSheet, Button, useToast } from 'heroui-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Text } from 'components/ui/Text';
+import { AmountFormatter } from '@/components/ui/AmountFormatter';
 import { usePopupStore, type SheetPayload } from '@/stores/popupStore';
-import { registerToast } from '@/helper/popupBridge';
+import {
+  registerToast,
+  resolvePopupIcon,
+  isAmountSegment,
+  type PopupTextSegment,
+} from '@/helper/popup';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -46,6 +52,38 @@ function DurationBar({ duration }: { duration: number }) {
       <Animated.View className="bg-foreground/40 h-full rounded-full" style={animatedStyle} />
     </View>
   );
+}
+
+function SubmessageRenderer({ submessage }: { submessage: SheetPayload['submessage'] }) {
+  if (!submessage) return null;
+
+  if (typeof submessage === 'string') {
+    return <BottomSheet.Description className="text-center">{submessage}</BottomSheet.Description>;
+  }
+
+  if (Array.isArray(submessage)) {
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+        {(submessage as PopupTextSegment[]).map((segment, i) =>
+          isAmountSegment(segment) ? (
+            <AmountFormatter
+              key={i}
+              size={12}
+              weight="heavy"
+              amount={segment.amount}
+              unit={segment.unit}
+            />
+          ) : (
+            <Text key={i} size={12} weight="heavy">
+              {segment}
+            </Text>
+          )
+        )}
+      </View>
+    );
+  }
+
+  return <>{submessage}</>;
 }
 
 function SheetPopup() {
@@ -100,17 +138,9 @@ function SheetPopup() {
           className="mx-4"
           backgroundClassName="rounded-[32px]">
           <View className="items-center gap-2 px-1 pb-1">
-            <View key={`sheet-icon-${openCycle}`}>
-              {payload?.icon ?? <Text size={30}>{payload?.emoji || '💡'}</Text>}
-            </View>
+            <View key={`sheet-icon-${openCycle}`}>{resolvePopupIcon(payload?.icon, 88)}</View>
             <BottomSheet.Title className="text-center">{payload?.message || ''}</BottomSheet.Title>
-            {typeof payload?.submessage === 'string' ? (
-              <BottomSheet.Description className="text-center">
-                {payload.submessage}
-              </BottomSheet.Description>
-            ) : (
-              payload?.submessage
-            )}
+            <SubmessageRenderer submessage={payload?.submessage} />
           </View>
 
           {(payload?.buttons?.length ?? 0) > 0 ? (

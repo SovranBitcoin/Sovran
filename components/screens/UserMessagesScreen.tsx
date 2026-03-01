@@ -66,7 +66,17 @@ import { isValidEcashToken } from '@/helper/coco/utils';
 import { ROUTSTR_PUBKEY } from 'helper/constants';
 import { useRoutstrStore } from 'stores/routstrStore';
 import { checkBalance, sendMessage, getModels, RoutstrModel } from 'helper/routstr/api';
-import { popup } from '@/helper/popup';
+import {
+  popup,
+  invalidTokenPopup,
+  balanceRefreshedPopup,
+  balanceRefreshFailedPopup,
+  noWalletAvailablePopup,
+  noApiKeyPopup,
+  sendMessageFailedPopup,
+  modelSwitchedPopup,
+  photoPickerComingSoonPopup,
+} from '@/helper/popup';
 import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
 import { Proof } from '@cashu/cashu-ts';
 import { formatAmount } from 'helper/currency';
@@ -275,11 +285,7 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
 
   const handlePress = () => {
     if (!isValid) {
-      popup({
-        message: 'Invalid token',
-        emoji: '🚨',
-        type: 'error',
-      });
+      invalidTokenPopup();
       return;
     }
 
@@ -1176,18 +1182,10 @@ export function UserMessagesScreen({
         setApiKey(balanceData.api_key);
       }
       setBalance(balanceData.balance);
-      popup({
-        message: `Balance refreshed: ${formatBalance(balanceData.balance)}`,
-        emoji: '✅',
-        type: 'success',
-      });
+      balanceRefreshedPopup({ balance: formatBalance(balanceData.balance) });
     } catch (error: any) {
       console.error('Failed to refresh balance:', error);
-      popup({
-        message: error.error?.message || 'Failed to refresh balance',
-        emoji: '🚨',
-        type: 'error',
-      });
+      balanceRefreshFailedPopup({ text: error.error?.message });
     } finally {
       setIsRefreshingBalance(false);
     }
@@ -1195,7 +1193,7 @@ export function UserMessagesScreen({
 
   const handleTopUp = async () => {
     if (!nostrKeys?.pubkey) {
-      popup({ message: 'No wallet available', emoji: '🚨', type: 'error' });
+      noWalletAvailablePopup();
       return;
     }
 
@@ -1218,11 +1216,7 @@ export function UserMessagesScreen({
 
   const handleRoutstrSend = async (userMessage: string) => {
     if (!apiKey) {
-      popup({
-        message: 'No API key configured. Please set up your Routstr API key.',
-        emoji: '🚨',
-        type: 'error',
-      });
+      noApiKeyPopup();
       return;
     }
 
@@ -1480,11 +1474,7 @@ export function UserMessagesScreen({
       }
 
       console.error('Error sending message:', error);
-      popup({
-        message: error.error?.message || 'Failed to send message',
-        emoji: '🚨',
-        type: 'error',
-      });
+      sendMessageFailedPopup({ text: error.error?.message });
 
       setStreamingMessageId(null);
 
@@ -1519,11 +1509,7 @@ export function UserMessagesScreen({
   const handleNostrDMSend = async (text: string) => {
     if (!ndk || !nostrKeys?.privateKey || !nostrKeys?.pubkey || !pubkey) {
       console.error('Missing required data for sending DM');
-      popup({
-        message: 'Unable to send message. Please try again.',
-        emoji: '🚨',
-        type: 'error',
-      });
+      sendMessageFailedPopup();
       return;
     }
 
@@ -1600,11 +1586,7 @@ export function UserMessagesScreen({
 
       setMessages((prev) => prev.filter((msg) => msg.id !== tempMessageId));
 
-      popup({
-        message: 'Failed to send message. Please try again.',
-        emoji: '🚨',
-        type: 'error',
-      });
+      sendMessageFailedPopup();
     } finally {
       setIsSending(false);
     }
@@ -1661,11 +1643,7 @@ export function UserMessagesScreen({
       setSelectedModel(modelId);
       setIsModelSwitchBottomSheetOpen(false);
       const selectedModelName = availableModels.find((m) => m.id === modelId)?.name || modelId;
-      popup({
-        message: `Switched to ${selectedModelName}`,
-        emoji: '🤖',
-        type: 'success',
-      });
+      modelSwitchedPopup({ modelName: selectedModelName });
     },
     [availableModels, setSelectedModel]
   );
@@ -2059,7 +2037,7 @@ export function UserMessagesScreen({
                 <Pressable
                   onPress={() => {
                     setIsAttachmentsBottomSheetOpen(false);
-                    popup({ message: 'Photo picker coming soon', emoji: '📸', type: 'info' });
+                    photoPickerComingSoonPopup();
                   }}
                   style={{
                     flexDirection: 'row',

@@ -14,7 +14,15 @@ import { Text } from 'components/ui/Text';
 import { Badge } from 'components/ui/Badge';
 import Icon from 'assets/icons';
 import { useManager } from 'coco-cashu-react';
-import { popup } from '@/helper/popup';
+import {
+  keysLoadFailedPopup,
+  keyGenerateFailedPopup,
+  invalidKeyFormatPopup,
+  keyGeneratedPopup,
+  keyImportedPopup,
+  keyImportFailedPopup,
+  copyPopup,
+} from '@/helper/popup';
 import { truncateMiddle } from 'helper/strings';
 import { Section } from './index';
 import type { Keypair } from 'coco-cashu-core';
@@ -222,7 +230,7 @@ const KeyringSettings: React.FC = () => {
       setKeypairs(allKeys);
     } catch (error) {
       console.error('Failed to load keypairs:', error);
-      popup({ message: 'Failed to load keys', type: 'error' });
+      keysLoadFailedPopup();
     } finally {
       setIsLoading(false);
     }
@@ -241,11 +249,11 @@ const KeyringSettings: React.FC = () => {
     try {
       setIsGenerating(true);
       await manager.keyring.generateKeyPair();
-      popup({ message: 'New key generated', type: 'success', emoji: '🔑' });
+      keyGeneratedPopup();
       await loadKeypairs();
     } catch (error) {
       console.error('Failed to generate keypair:', error);
-      popup({ message: 'Failed to generate key', type: 'error' });
+      keyGenerateFailedPopup();
     } finally {
       setIsGenerating(false);
     }
@@ -313,17 +321,14 @@ const KeyringSettings: React.FC = () => {
               const success = await tryImportKey(trimmedValue);
 
               if (success) {
-                popup({ message: 'Key imported successfully', type: 'success', emoji: '🔑' });
+                keyImportedPopup();
                 await loadKeypairs();
               } else {
-                popup({
-                  message: 'Invalid key format. Enter nsec or 64-character hex key.',
-                  type: 'error',
-                });
+                invalidKeyFormatPopup();
               }
             } catch (error) {
               console.error('Failed to import key:', error);
-              popup({ message: 'Failed to import key', type: 'error' });
+              keyImportFailedPopup();
             }
           },
         },
@@ -337,7 +342,7 @@ const KeyringSettings: React.FC = () => {
    */
   const handleCopyKey = (publicKey: string) => {
     Clipboard.setString(publicKey);
-    popup({ message: 'Public key copied', type: 'success' });
+    copyPopup('publicKey');
   };
 
   return (

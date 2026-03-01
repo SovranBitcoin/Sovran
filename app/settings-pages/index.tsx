@@ -17,7 +17,7 @@ import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { getUsername } from '@/helper/username';
 import { CocoManager } from 'helper/coco/manager';
-import { popup } from '@/helper/popup';
+import { devModePopup, reservedProofsFreedPopup, reservedProofsFailedPopup } from '@/helper/popup';
 import opacity from 'hex-color-opacity';
 import { Avatar } from 'components/ui/Avatar';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
@@ -238,10 +238,7 @@ const ModalScreen = () => {
     if (tapCountRef.current >= 3) {
       tapCountRef.current = 0;
       setDevMode(!devMode);
-      popup({
-        message: devMode ? 'Developer mode disabled' : 'Developer mode enabled',
-        type: 'success',
-      });
+      devModePopup(!devMode);
     }
   }, [devMode, setDevMode]);
 
@@ -266,9 +263,7 @@ const ModalScreen = () => {
             try {
               const result = await CocoManager.freeAllReservedProofs();
 
-              popup({
-                message: 'Reserved proofs freed',
-                type: 'success',
+              reservedProofsFreedPopup({
                 text:
                   `Reserved proofs found: ${result.totalReservedProofs}\n` +
                   `Rolled back send ops: ${result.rolledBackSendOperations}\n` +
@@ -277,9 +272,7 @@ const ModalScreen = () => {
                   `Errors: ${result.errors.length}`,
               });
             } catch (error) {
-              popup({
-                message: 'Failed to free reserved proofs',
-                type: 'error',
+              reservedProofsFailedPopup({
                 text: error instanceof Error ? error.message : 'Unknown error',
               });
             }

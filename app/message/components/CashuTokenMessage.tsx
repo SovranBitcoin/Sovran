@@ -10,7 +10,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { Button } from 'components/ui/Button';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { useReceive } from 'coco-cashu-react';
-import { popup } from '@/helper/popup';
+import { noUnitSetPopup, receiveFailedPopup, receiveSuccessPopup } from '@/helper/popup';
 
 interface Props {
   token: string;
@@ -28,24 +28,15 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
 
   const handleRedeem = async () => {
     if (!unit) {
-      popup({ message: 'No unit set', emoji: '🚨', type: 'error' });
+      noUnitSetPopup();
       return;
     }
 
     try {
       await receive(token);
-      popup({
-        message: 'funds_received',
-        params: { amount, unit },
-        emoji: '🎉',
-        type: 'success',
-      });
+      receiveSuccessPopup({ amount, unit }, { icon: 'emoji:🎉' });
     } catch (error) {
-      popup({
-        message: error instanceof Error ? error.message : 'Failed to receive ecash',
-        emoji: '🚨',
-        type: 'error',
-      });
+      receiveFailedPopup({ text: error instanceof Error ? error.message : undefined });
     }
   };
 

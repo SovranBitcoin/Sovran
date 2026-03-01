@@ -31,7 +31,7 @@ import chunk from 'lodash/chunk';
 import { encode } from 'helper/third-party/emoji';
 import * as Clipboard from 'expo-clipboard';
 import { Card } from 'components/ui/Card';
-import { popup } from 'helper/popup';
+import { copyPopup } from '@/helper/popup';
 
 /**
  * EmojiGrid Component
@@ -79,11 +79,7 @@ const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) =
   const handleEmojiSelect = async (emoji: string) => {
     const encodedEmoji = encode(emoji, payload.token);
     await Clipboard.setStringAsync(encodedEmoji);
-    popup({
-      message: 'ecash_token_copied',
-      type: 'success',
-      onClose: () => router?.goBack(),
-    });
+    copyPopup('ecashToken', { onClose: () => router?.goBack() });
   };
 
   return (

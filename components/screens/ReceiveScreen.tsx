@@ -19,7 +19,13 @@ import { useManager } from 'coco-cashu-react';
 
 import { buildReceiveHistoryEntry, isValidEcashToken } from '@/helper/coco/utils';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
-import { popup } from '@/helper/popup';
+import {
+  noClipboardAddressPopup,
+  invalidAddressPopup,
+  copyPopup,
+  receiveMintUpdatedPopup,
+  receiveMintUpdateFailedPopup,
+} from '@/helper/popup';
 import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
 import { ModalScreenLayout } from 'components/layouts/ModalScreenLayout';
@@ -141,17 +147,12 @@ export function ReceiveScreen({
     }
 
     if (!decodedText) {
-      popup({ message: 'no_clipboard_address', emoji: '🚨', type: 'error' });
+      noClipboardAddressPopup();
       return;
     }
 
     if (!isValidEcashToken(decodedText)) {
-      popup({
-        message: 'invalid_address',
-        params: { address: decodedText },
-        emoji: '🚨',
-        type: 'error',
-      });
+      invalidAddressPopup({ address: decodedText });
       return;
     }
 
@@ -177,7 +178,7 @@ export function ReceiveScreen({
   const handleCopyLightningAddress = useCallback(async () => {
     await EnhancedHaptics.copyHaptic();
     await Clipboard.setStringAsync(`${nostrKeys?.npub}@npubx.cash`);
-    popup({ message: 'lightning_address_copied', type: 'success' });
+    copyPopup('lightningAddress');
   }, [nostrKeys?.npub]);
 
   // Watch for mint selection changes after returning from the mint selector
@@ -192,9 +193,9 @@ export function ReceiveScreen({
 
     updateServerMint(nostrKeys.pubkey, selectedMint, nostrKeys.privateKey).then((ok) => {
       if (ok) {
-        popup({ message: 'Receive mint updated', type: 'success' });
+        receiveMintUpdatedPopup();
       } else {
-        popup({ message: 'Failed to update receive mint', emoji: '🚨', type: 'error' });
+        receiveMintUpdateFailedPopup();
       }
     });
   }, [selectedMint, npcMintUrl, nostrKeys?.pubkey, nostrKeys?.privateKey, updateServerMint]);
@@ -220,7 +221,7 @@ export function ReceiveScreen({
     if (!latestKeypair) return;
     await EnhancedHaptics.copyHaptic();
     await Clipboard.setStringAsync(latestKeypair.publicKeyHex);
-    popup({ message: 'p2pk_copied', type: 'success' });
+    copyPopup('p2pk');
   }, [latestKeypair]);
 
   // Render Lightning content
@@ -229,7 +230,7 @@ export function ReceiveScreen({
       {showLightningAddress && (
         <PaymentInfo
           data={`${nostrKeys?.npub}@npubx.cash`}
-          popupMessage="lightning_address_copied"
+          copyTarget="lightningAddress"
           unit="sat"
         />
       )}
@@ -282,7 +283,7 @@ export function ReceiveScreen({
     <>
       {latestKeypair ? (
         <>
-          <PaymentInfo data={latestKeypair.publicKeyHex} popupMessage="p2pk_copied" unit="p2pk" />
+          <PaymentInfo data={latestKeypair.publicKeyHex} copyTarget="p2pk" unit="p2pk" />
           <View style={{ marginHorizontal: 16 }}>
             <Section title="P2PK PUBLIC KEY">
               <ListGroup variant="secondary">

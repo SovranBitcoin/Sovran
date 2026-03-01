@@ -27,7 +27,12 @@ import {
   normalizeUrlForApi,
 } from 'helper/url';
 import { CocoManager } from 'helper/coco/manager';
-import { popup } from 'helper/popup';
+import {
+  noMintsSelectedPopup,
+  managerNotInitializedPopup,
+  mintsAddFailedPopup,
+  mintsAddedPopup,
+} from '@/helper/popup';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import { withSheetProvider } from 'hocs/withSheetProvider';
@@ -566,7 +571,7 @@ function AddMintsScreen() {
 
   const handleSave = useCallback(async () => {
     if (selectedMints.size === 0) {
-      popup({ message: 'Please select at least one mint to add', type: 'warning' });
+      noMintsSelectedPopup();
       return;
     }
     if (isAdding) return;
@@ -574,7 +579,7 @@ function AddMintsScreen() {
     setIsAdding(true);
     try {
       if (!CocoManager.isInitialized()) {
-        popup({ message: 'Manager not initialized. Please try again.', type: 'error' });
+        managerNotInitializedPopup();
         setIsAdding(false);
         return;
       }
@@ -610,19 +615,16 @@ function AddMintsScreen() {
       }
 
       if (errors.length === 0) {
-        popup({ message: `Successfully added ${results.length} mint(s)`, type: 'success' });
+        mintsAddedPopup({ added: results.length });
         router.back();
       } else if (results.length > 0) {
-        popup({
-          message: `Added ${results.length} mint(s), ${errors.length} failed`,
-          type: 'warning',
-        });
+        mintsAddedPopup({ added: results.length, failed: errors.length });
         router.back();
       } else {
-        popup({ message: `Failed to add any mints`, type: 'error' });
+        mintsAddFailedPopup();
       }
     } catch {
-      popup({ message: `Failed to add mints`, type: 'error' });
+      mintsAddFailedPopup();
     } finally {
       setIsAdding(false);
     }

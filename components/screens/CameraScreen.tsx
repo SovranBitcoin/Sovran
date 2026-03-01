@@ -19,7 +19,7 @@ import {
 import { buttonStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { Text } from 'components/ui/Text';
 import { Button } from 'components/ui/Button';
-import { popup } from '@/helper/popup';
+import { noQrCodeFoundPopup, qrScanFailedPopup } from '@/helper/popup';
 import Icon from 'assets/icons';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
@@ -157,14 +157,14 @@ export function CameraScreen({ onScan, onReset }: CameraScreenProps) {
       const scannedCodes = await scanFromURLAsync(result.assets[0].uri, ['qr']);
 
       if (scannedCodes.length === 0) {
-        popup({ message: 'No QR code found in image', emoji: '🔍', type: 'info' });
+        noQrCodeFoundPopup();
         return;
       }
 
       const scanning: ScanningData = { data: scannedCodes[0].data, type: 'qr' };
       await handleScan(scanning);
     } catch {
-      popup({ message: 'Failed to scan QR code from image', emoji: '❌', type: 'error' });
+      qrScanFailedPopup();
     }
   }, [handleScan]);
 

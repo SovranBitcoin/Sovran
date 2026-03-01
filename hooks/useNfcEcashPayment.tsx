@@ -22,10 +22,7 @@ import { getNfcErrorMessage } from '@/helper/nfc/messages';
 import type { NfcErrorMessage } from '@/helper/nfc/messages';
 import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
-import { popup } from '@/helper/popup';
-import { NfcSuccessConfirmCircleIcon } from '@/components/overlays/NfcSuccessOverlay';
-import { AmountFormatter } from '@/components/ui/AmountFormatter';
-import { Text } from '@/components/ui/Text';
+import { nfcPaymentSentPopup, walletNotReadyPopup, nfcErrorPopup, fmt } from '@/helper/popup';
 import { PAYMENT_TIERS } from '@/constants/wallet-header';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
 
@@ -70,19 +67,10 @@ export function useNfcEcashPayment({
         entry.state === 'finalized'
       ) {
         const sendEntry = entry as SendHistoryEntry;
-        popup({
-          message: 'Payment sent',
-          text: (
-            <Text style={{ alignItems: 'center' }}>
-              <AmountFormatter size={12} weight="heavy" amount={sendEntry.amount} unit="sat" />
-              <Text size={12} weight="heavy">
-                {' sent'}
-              </Text>
-            </Text>
-          ),
-          variant: 'sheet',
+        nfcPaymentSentPopup({
+          text: fmt`${{ amount: sendEntry.amount, unit: 'sat' }} sent`,
+          icon: 'custom:nfc-success',
           duration: 2600,
-          icon: <NfcSuccessConfirmCircleIcon color="#22c55e" size={88} startDelayMs={0} />,
           onClose: () => {
             router.navigate({
               pathname: '/(send-flow)/sendToken' as any,
@@ -103,7 +91,7 @@ export function useNfcEcashPayment({
       if (!send || !manager) {
         setError({ title: 'Error', message: 'Wallet not ready. Please try again.' });
         setStatus('error');
-        popup({ message: 'Error', text: 'Wallet not ready. Please try again.', type: 'error' });
+        walletNotReadyPopup();
         return;
       }
 
@@ -180,7 +168,7 @@ export function useNfcEcashPayment({
         const resolved = getNfcErrorMessage(code, errorMessage, { maxAmountSats });
         setError(resolved);
         setStatus('error');
-        popup({ message: resolved.title, text: resolved.message, type: 'error' });
+        nfcErrorPopup({ title: resolved.title, message: resolved.message });
       }
     },
     [

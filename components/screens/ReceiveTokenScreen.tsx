@@ -15,7 +15,7 @@ import { useReceive, useManager } from 'coco-cashu-react';
 
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
-import { popup } from '@/helper/popup';
+import { unsupportedTokenUnitPopup, receiveFailedPopup, receiveSuccessPopup } from '@/helper/popup';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
@@ -176,10 +176,7 @@ export function ReceiveTokenScreen({
 
       const decoded = getDecodedToken(tokenString);
       if (decoded.unit !== 'sat') {
-        popup({
-          message: `Unsupported token unit "${decoded.unit}". Only sat tokens can be redeemed.`,
-          type: 'error',
-        });
+        unsupportedTokenUnitPopup({ unit: decoded.unit ?? 'unknown' });
         setLoading(false);
         return;
       }
@@ -236,12 +233,10 @@ export function ReceiveTokenScreen({
       }
 
       setIsRedeemed(true);
-      popup({
-        message: 'funds_received',
-        params: { amount: receiveHistoryEntry.amount, unit: receiveHistoryEntry.unit },
-        emoji: '🎉',
-        onClose: onRedeemSuccess,
-      });
+      receiveSuccessPopup(
+        { amount: receiveHistoryEntry.amount, unit: receiveHistoryEntry.unit },
+        { icon: 'emoji:🎉', onClose: onRedeemSuccess }
+      );
     } catch (error) {
       console.error(error);
       const errorMessage = (error instanceof Error ? error.message : String(error)).toLowerCase();
@@ -252,10 +247,7 @@ export function ReceiveTokenScreen({
       if (tokenAlreadySpent) {
         setIsAlreadySpent(true);
       }
-      popup({
-        message: error instanceof Error ? error.message : 'Unknown error',
-        type: 'error',
-      });
+      receiveFailedPopup({ text: error instanceof Error ? error.message : undefined });
     }
     setLoading(false);
   };

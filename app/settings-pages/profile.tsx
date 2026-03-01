@@ -5,7 +5,7 @@ import { useMnemonic, useCashuMnemonic } from 'hooks/useSecureStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import Container from 'components/blocks/Container';
 import Icon from 'assets/icons';
-import { popup } from '@/helper/popup';
+import { copyPopup, type CopyTarget } from '@/helper/popup';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
 import { Avatar } from 'components/ui/Avatar';
@@ -24,10 +24,10 @@ const Profile = () => {
     cashuMnemonic: false,
   });
 
-  const handleCopy = async (text: string, messageKey: string) => {
+  const handleCopy = async (text: string, target: CopyTarget) => {
     if (text) {
       await Clipboard.setStringAsync(text);
-      popup({ message: messageKey, type: 'success', duration: 1000 });
+      copyPopup(target, { duration: 1000 });
     }
   };
 
@@ -43,7 +43,7 @@ const Profile = () => {
   const renderCopyableDetail = (
     label: string,
     value: string,
-    messageKey: string,
+    copyTarget: CopyTarget,
     fieldKey: keyof typeof visibleFields | null = null,
     description: string | null = null,
     isLoading: boolean = false
@@ -89,7 +89,7 @@ const Profile = () => {
                   variant="secondary"
                   size="sm"
                   className={showEyeIcon ? 'flex-1' : 'w-full'}
-                  onPress={() => handleCopy(value, messageKey)}>
+                  onPress={() => handleCopy(value, copyTarget)}>
                   <Icon name="lets-icons:copy" size={15} color={mutedColor} />
                   <Button.Label className="text-muted">Copy</Button.Label>
                 </Button>
@@ -121,7 +121,7 @@ const Profile = () => {
         {renderCopyableDetail(
           'NIP06:',
           mnemonic || '',
-          'mnemonic_copied',
+          'mnemonic',
           'mnemonic',
           'Your recovery phrase that gives access to all your nostr & cashu wallets. Everything is derived from this mnemonic so keep it safe and secure!',
           mnemonicLoading
@@ -130,7 +130,7 @@ const Profile = () => {
         {renderCopyableDetail(
           'NPUB:',
           nostrKeys?.npub || '',
-          'npub_copied',
+          'npub',
           null,
           'Your public identifier on the Nostr network.',
           nostrKeysLoading
@@ -139,7 +139,7 @@ const Profile = () => {
         {renderCopyableDetail(
           'NSEC:',
           nostrKeys?.nsec || '',
-          'nsec_copied',
+          'nsec',
           'nsec',
           'Your private key. Never share this with anyone.',
           nostrKeysLoading
@@ -148,7 +148,7 @@ const Profile = () => {
         {renderCopyableDetail(
           `NUT13:`,
           cashuMnemonic || '',
-          'cashu_mnemonic_copied',
+          'cashuMnemonic',
           'cashuMnemonic',
           'This is a mnemonic you can use in other cashu wallets to recover your funds if you ever want to stop using Sovran.',
           cashuMnemonicLoading

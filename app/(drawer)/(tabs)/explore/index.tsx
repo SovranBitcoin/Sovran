@@ -12,7 +12,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
 import { ROUTSTR_PUBKEY } from 'helper/constants';
-import { popup } from 'helper/popup';
+import { notImplementedPopup } from '@/helper/popup';
 import { truncateMiddle } from 'helper/strings';
 import { getModels, RoutstrModel } from 'helper/routstr/api';
 import opacity from 'hex-color-opacity';
@@ -589,7 +589,7 @@ const ProductCard = ({ product }: { product: (typeof BITREFILL_PRODUCTS)[0] }) =
     <TouchableOpacity
       activeOpacity={0.9}
       style={styles.productCard}
-      onPress={() => popup('not_implemented')}>
+      onPress={() => notImplementedPopup()}>
       <View style={styles.productImageContainer}>
         <Image source={product.image} style={StyleSheet.absoluteFillObject} contentFit="cover" />
         <LinearGradient
@@ -1255,7 +1255,7 @@ const ExploreScreen = () => {
               title="Shop with Bitcoin"
               subtitle="Gift cards & vouchers"
               action="See all"
-              onAction={() => popup('not_implemented')}
+              onAction={() => notImplementedPopup()}
             />
 
             {/* Category Pills */}
@@ -1292,7 +1292,7 @@ const ExploreScreen = () => {
               title="Bitcoin Events"
               subtitle="Upcoming conferences & meetups"
               action="View all"
-              onAction={() => popup('not_implemented')}
+              onAction={() => notImplementedPopup()}
             />
             <ScrollView
               horizontal
