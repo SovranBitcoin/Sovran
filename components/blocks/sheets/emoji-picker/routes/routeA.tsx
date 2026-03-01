@@ -87,9 +87,9 @@ const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) =
   };
 
   return (
-    <View className="mx-4 mb-0 overflow-hidden rounded-2xl bg-background">
+    <View className="bg-background mx-4 mb-0 overflow-hidden rounded-2xl">
       <VStack className="p-6">
-        <Text weight="bold" className="text-lg font-semibold text-foreground">
+        <Text weight="bold" className="text-foreground text-lg font-semibold">
           Encode as Emoji
         </Text>
         <Spacer size={12} />
@@ -102,7 +102,7 @@ const EmojiGrid = ({ router }: RouteScreenProps<'emoji-picker', 'emoji-grid'>) =
                 <TouchableOpacity
                   testID={emoji.id}
                   key={colIndex}
-                  className={`flex-1 rounded-lg bg-surface-secondary p-3 ${colIndex > 0 ? 'ml-2' : ''}`}
+                  className={`bg-surface-secondary flex-1 rounded-lg p-3 ${colIndex > 0 ? 'ml-2' : ''}`}
                   onPress={() => handleEmojiSelect(emoji.emoji)}>
                   <VStack align="center" justify="center" flex={1}>
                     <Text className="text-2xl">{emoji.emoji}</Text>

@@ -1907,7 +1907,7 @@ export function UserMessagesScreen({
                               name="mdi:anonymous"
                               size={14}
                               color={shade400}
-                              className="border-r-[1.5px] border-r-shade-300 pr-1"
+                              className="border-r-shade-300 border-r-[1.5px] pr-1"
                             />
                           )}
                           <Icon

@@ -1,4 +1,3 @@
-import React from 'react';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -7,6 +6,7 @@ import opacity from 'hex-color-opacity';
 import { UserProfile } from 'helper/apiClient';
 import { ProfileImage } from './ProfileImage';
 import { useThemeColor } from 'hooks/useThemeColor';
+
 interface SearchResultProps {
   result: {
     pubkey: string;
@@ -39,9 +39,7 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
               overpass
               regular
               size={12}
-              style={{
-                color: result.profile.nip05Valid ? success : danger,
-              }}>
+              color={result.profile.nip05Valid ? success : danger}>
               {result.profile.nip05Valid ? '✓ ' : '✗ '}
               {result.profile.nip05}
             </Text>

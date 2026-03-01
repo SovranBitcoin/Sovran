@@ -24,6 +24,7 @@ import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurr
 import { ModalLayoutWrapper } from 'app/debugModal';
 import { Mint } from 'coco-cashu-core';
 import { useKYMMints } from 'hooks/coco/useKYMMints';
+import { normalizeMintUrlKey } from 'helper/url';
 import { popup } from 'helper/popup';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
@@ -210,25 +211,6 @@ export function MintListScreen({
   const mintUrls = useMemo(() => processedMints.map((mint) => mint.mintUrl), [processedMints]);
   const { scores: kymScores, loading: kymLoading } = useKYMMints(mintUrls);
 
-  // Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
-  const normalizeUrl = useCallback((url: string): string => {
-    const withoutProtocol = url.replace(/^https?:\/\//, '');
-    const slashIndex = withoutProtocol.indexOf('/');
-    if (slashIndex === -1) {
-      // No path, just domain
-      return withoutProtocol
-        .toLowerCase()
-        .replace(/^www\./, '')
-        .replace(/\/$/, '');
-    }
-    const domain = withoutProtocol
-      .slice(0, slashIndex)
-      .toLowerCase()
-      .replace(/^www\./, '');
-    const path = withoutProtocol.slice(slashIndex).replace(/\/$/, '');
-    return domain + path;
-  }, []);
-
   // Handle currency change
   const handleCurrencyChange = useCallback((currency: string) => {
     setSelectedCurrency(currency);
@@ -322,7 +304,7 @@ export function MintListScreen({
   type MintWithBalance = Mint & { amount: number; unit: string };
   const renderItem = useCallback(
     ({ item }: { item: MintWithBalance }) => {
-      const normalizedUrl = normalizeUrl(item.mintUrl);
+      const normalizedUrl = normalizeMintUrlKey(item.mintUrl);
       const kymData = kymScores[normalizedUrl];
       const kymScore = kymData?.score;
 
@@ -347,7 +329,6 @@ export function MintListScreen({
       );
     },
     [
-      normalizeUrl,
       kymScores,
       kymLoading,
       loadingId,

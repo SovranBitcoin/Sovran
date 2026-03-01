@@ -1,30 +1,21 @@
-import { UntranslatedText } from 'components/ui/Text';
-import { formatAmount } from 'helper/currency';
-import { convertTime } from 'helper/time';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import opacity from 'hex-color-opacity';
-import TransactionIcon from 'components/blocks/TransactionIcon';
-import { nip19 } from 'nostr-tools';
-import { AmountFormatter } from 'components/ui/AmountFormatter';
-import { VStack } from 'components/ui/View/VStack';
-import { HStack } from 'components/ui/View/HStack';
 import React, { useCallback } from 'react';
+
 import { HistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
 import { router } from 'expo-router';
-import { useScanHistoryStore, ScanSource } from 'stores/scanHistoryStore';
-import Icon from 'assets/icons';
-import { useThemeColor } from 'hooks/useThemeColor';
-export function npubToPubkey(npub: string): string {
-  if (!npub) return '';
+import opacity from 'hex-color-opacity';
 
-  if (npub.startsWith('npub')) {
-    const data = nip19.decode(npub);
-    if (data.type === 'npub') {
-      return data.data;
-    }
-  }
-  return npub;
-}
+import Icon from 'assets/icons';
+import TransactionIcon from 'components/blocks/TransactionIcon';
+import { AmountFormatter } from 'components/ui/AmountFormatter';
+import { UntranslatedText } from 'components/ui/Text';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import { HStack } from 'components/ui/View/HStack';
+import { VStack } from 'components/ui/View/VStack';
+import { formatAmount } from 'helper/currency';
+import { convertTime } from 'helper/time';
+import { isOutgoingTransaction } from 'helper/utils';
+import { useThemeColor } from 'hooks/useThemeColor';
+import { useScanHistoryStore, ScanSource } from 'stores/scanHistoryStore';
 
 /**
  * Hook to get the scan source (NFC or QR) for a transaction.
@@ -38,8 +29,8 @@ const useScanSource = (transactionId: string): ScanSource | null => {
 };
 
 const useHistoryEntry = (historyEntry: HistoryEntry) => {
-  const isSend = historyEntry.type === 'send' || historyEntry.type === 'melt';
-  const isReceive = historyEntry.type === 'mint' || historyEntry.type === 'receive';
+  const isSend = isOutgoingTransaction(historyEntry);
+  const isReceive = !isSend;
 
   // Check if this is a rolled back send transaction
   const isRolledBack =
@@ -96,18 +87,13 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
     }
   }, [historyEntry]);
 
-  // Get display label - show "Rolled Back" for rolled back sends
-  const getDisplayLabel = () => {
-    return historyEntry.type[0].toUpperCase() + historyEntry.type.slice(1);
-  };
-
   return {
     isSend,
     isReceive,
     isRolledBack,
     fiatAmount,
     handlePress,
-    displayLabel: getDisplayLabel(),
+    displayLabel: historyEntry.type[0].toUpperCase() + historyEntry.type.slice(1),
   };
 };
 
@@ -139,16 +125,8 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
   return (
     <TouchableOpacity
       key={historyEntry?.id}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: 'transparent',
-        padding: 20,
-        paddingLeft: 16,
-        paddingRight: 16,
-        opacity: isRolledBack ? 0.33 : 1,
-      }}
+      className="flex-row items-center justify-between bg-transparent px-4 py-5"
+      style={isRolledBack ? { opacity: 0.33 } : undefined}
       onPress={handlePress}>
       <HStack spacing={12} flex={1}>
         <TransactionIcon historyEntry={historyEntry} isLoading={isLoading} />
@@ -199,10 +177,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
               bold
               size={10}
               color={opacity(foreground, 0.8)}
-              style={{
-                alignSelf: 'flex-end',
-                textAlign: 'right',
-              }}>
+              className="self-end text-right">
               {fiatAmount}
             </UntranslatedText>
           </HStack>

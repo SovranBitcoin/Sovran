@@ -71,9 +71,9 @@ The function `buildSemanticVars(palette)` converts a 0-950 palette into HeroUI v
 | Palette Shade | Semantic Variable | Typical Use |
 |---------------|------------------|-------------|
 | `950` | `--background` | App background (darkest for dark themes) |
-| `900` | `--surface` | Card / section background |
-| `800` | `--surface-secondary`, `--overlay`, `--default`, `--field-background` | Elevated surfaces, modals, input fields |
-| `700` | `--surface-tertiary`, `--separator` | Tertiary surfaces, dividers |
+| `900` | `--surface`, `--field-background` | Card / section background, input fields (sunken into cards) |
+| `800` | `--surface-secondary`, `--overlay` | Elevated surfaces, modals |
+| `700` | `--surface-tertiary`, `--separator`, `--default` | Tertiary surfaces, dividers, button/control backgrounds |
 | `500` | `--accent`, `--focus` | Interactive accent, focus rings |
 | `400` | `--muted`, `--field-placeholder`, `--link` | Placeholder text, muted text, links |
 | `100` | `--default-foreground`, `--surface-tertiary-foreground` | Text on default/tertiary surfaces |
@@ -299,20 +299,5 @@ ThemeProvider          ← sets CSS vars via Uniwind
 On app launch, `ThemeProvider` reads the persisted theme from the store and applies it immediately in its mount effect.
 
 ---
-
-## Summary of What Does NOT Exist Anymore
-
-The following were removed during the theme refactor. Do not re-introduce them:
-
-- `getPrimaryColor()`, `getShadeColor()`, `getRedColor()`, `getGreenColor()`, `getBlueColor()`, `getPurpleColor()`, `getYellowColor()` — helper functions on the theme context
-- `helper/colorTheme.ts` — the old `--app-*` CSS variable generator
-- `constants/theme.ts` — legacy Expo template `Colors` object
-- `constants/colors.ts` — hardcoded hex constants file
-- `hooks/useColor.ts` — intermediate hook (consolidated into `useThemeColor`)
-- `hooks/use-theme-color.ts` — legacy hook wrapping the old `Colors` object
-- `useThemeColor` imported from `heroui-native` — use `hooks/useThemeColor` instead (it's a superset that supports both semantic tokens and static scales)
-- `--app-primary-*`, `--app-shade-*`, `--app-red-*`, etc. CSS variables
-- `bg-primary-800`, `text-primary-0`, etc. Tailwind classes (replaced by semantic names)
-- Hardcoded hex color strings like `'#ED0C46'`, `'#0CED3E'` in components
 
 If you need a color value in a style prop, use `useThemeColor` from `hooks/useThemeColor`. If you need it in a className, use the Tailwind class (`text-danger`, `bg-shade-300`, etc.). Both resolve from the same CSS variables registered by `themeEngine.ts`.

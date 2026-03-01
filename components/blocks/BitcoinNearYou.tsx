@@ -15,27 +15,18 @@ import { applySafetyOffset } from 'utils/locationPrivacy';
 import { useShallow } from 'zustand/react/shallow';
 import { useThemeColor } from 'hooks/useThemeColor';
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-// Default fallback (London)
 const DEFAULT_LAT = 51.5074;
 const DEFAULT_LON = -0.1278;
 
-// Mock mode location (NYC — matches mockDataStore)
 const MOCK_LAT = 40.758;
 const MOCK_LON = -73.9855;
 
 const MAP_ZOOM = 13;
-
-/** Max nearby markers to show on the preview map. */
 const MAX_MARKERS = 25;
 
 /** Rough bounding-box radius in degrees (~5 km). */
 const NEARBY_RADIUS_DEG = 0.045;
 
-// Shared map UI settings (no gestures, no controls)
 const DISABLED_MAP_UI_SETTINGS = {
   compassEnabled: false,
   myLocationButtonEnabled: false,
@@ -46,7 +37,6 @@ const DISABLED_MAP_UI_SETTINGS = {
   rotationGesturesEnabled: false,
 };
 
-// Google Maps style JSON to hide all labels
 const GOOGLE_MAPS_NO_LABELS_STYLE = JSON.stringify([
   { featureType: 'all', elementType: 'labels', stylers: [{ visibility: 'off' }] },
   { featureType: 'poi', stylers: [{ visibility: 'off' }] },
@@ -54,20 +44,12 @@ const GOOGLE_MAPS_NO_LABELS_STYLE = JSON.stringify([
 ]);
 const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-// ---------------------------------------------------------------------------
-// Marker type
-// ---------------------------------------------------------------------------
-
 interface MapMarker {
   id: string;
   coordinates: { latitude: number; longitude: number };
   tintColor: string;
   title: string;
 }
-
-// ---------------------------------------------------------------------------
-// Map preview sub-component
-// ---------------------------------------------------------------------------
 
 function MapPreview({
   latitude,
@@ -79,7 +61,6 @@ function MapPreview({
   markers: MapMarker[];
 }) {
   const surfaceSecondary = useThemeColor('surface-secondary');
-  const isIOS = Platform.OS === 'ios';
 
   const cameraPosition = useMemo(
     () => ({ coordinates: { latitude, longitude }, zoom: MAP_ZOOM }),
@@ -87,8 +68,8 @@ function MapPreview({
   );
 
   return (
-    <RNView style={styles.mapContainer} pointerEvents="none">
-      {isIOS ? (
+    <RNView className="h-[140px] overflow-hidden" pointerEvents="none">
+      {Platform.OS === 'ios' ? (
         <AppleMaps.View
           style={StyleSheet.absoluteFillObject}
           cameraPosition={cameraPosition}
@@ -112,9 +93,8 @@ function MapPreview({
         <RNView style={StyleSheet.absoluteFillObject} />
       )}
 
-      {/* Grayscale + desaturation overlays */}
-      <RNView style={mapOverlayStyles.grayscaleOverlay} pointerEvents="none" />
-      <RNView style={mapOverlayStyles.grayscaleOverlaySecondary} pointerEvents="none" />
+      <RNView style={overlayStyles.grayscaleOverlay} pointerEvents="none" />
+      <RNView style={overlayStyles.desaturationOverlay} pointerEvents="none" />
       <RNView
         style={[
           StyleSheet.absoluteFillObject,
@@ -138,7 +118,6 @@ function MapPreview({
         pointerEvents="none"
       />
 
-      {/* Vignette gradients — edges opaque, centre transparent */}
       <LinearGradient
         colors={[
           surfaceSecondary,
@@ -169,31 +148,18 @@ function MapPreview({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
   const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
-
-  const accentColor = muted;
-  const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
-  const primary0 = foreground;
-
   const mockMode = useSettingsStore((s) => s.mockMode);
 
-  // BTC Map store — places data
   const { placesCache, fetchPlaces } = useBTCMapStore(
     useShallow((s) => ({ placesCache: s.placesCache, fetchPlaces: s.fetchPlaces }))
   );
 
   useEffect(() => {
-    fetchPlaces().catch(() => {
-      // Silently fail — we'll show fallback count
-    });
+    fetchPlaces().catch(() => {});
   }, [fetchPlaces]);
 
-  // User location (best-effort, non-blocking) — mock mode uses NYC
   const [coords, setCoords] = useState({
     latitude: mockMode ? MOCK_LAT : DEFAULT_LAT,
     longitude: mockMode ? MOCK_LON : DEFAULT_LON,
@@ -216,7 +182,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
           setCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
         }
       } catch {
-        // Silently fail — keep default
+        // keep default
       }
     })();
 
@@ -225,7 +191,6 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
     };
   }, [mockMode]);
 
-  // Nearby places as map markers
   const nearbyMarkers = useMemo((): MapMarker[] => {
     const places = placesCache?.data;
     if (!places?.length) return [];
@@ -235,7 +200,6 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
 
     for (const place of places) {
       if (nearby.length >= MAX_MARKERS) break;
-
       const dLat = Math.abs(place.lat - latitude);
       const dLon = Math.abs(place.lon - longitude);
       if (dLat > NEARBY_RADIUS_DEG || dLon > NEARBY_RADIUS_DEG) continue;
@@ -260,39 +224,40 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
         ? `${totalCount.toLocaleString()} worldwide`
         : '30,000+ locations';
 
-  // Privacy: offset the camera centre so the preview never reveals exact location.
-  // Marker filtering above still uses real coords for accurate "nearby" counts.
   const offsetCoords = useMemo(
     () => applySafetyOffset(coords.latitude, coords.longitude),
     [coords]
   );
 
+  const titleColor = opacity(foreground, 0.66);
+
   return (
     <Link href="/(map-flow)" asChild>
       <TouchableOpacity activeOpacity={0.85}>
-        <RNView style={[styles.card, { borderColor }]}>
-          <BlurCardFrame accentColor={accentColor}>
-            <RNView style={styles.container}>
-              {/* Map with markers — camera uses safety offset */}
+        <RNView
+          className="overflow-hidden rounded-[20px] border"
+          style={{ borderCurve: 'continuous', borderColor: opacity(muted, 0.3) }}>
+          <BlurCardFrame accentColor={muted}>
+            <RNView className="relative z-[1]">
               <MapPreview
                 latitude={offsetCoords.latitude}
                 longitude={offsetCoords.longitude}
                 markers={nearbyMarkers}
               />
 
-              {/* Title overlaid on the map — top */}
-              <RNView style={styles.titleRow}>
-                <Text size={14} semibold color={opacity(primary0, 0.66)}>
+              <RNView className="absolute left-0 right-0 top-0 z-[2] flex-row items-center justify-between px-4 pt-3.5">
+                <Text size={14} semibold color={titleColor}>
                   Bitcoin near you
                 </Text>
-                <Icon name="mdi:chevron-right" size={18} color={opacity(primary0, 0.66)} />
+                <Icon name="mdi:chevron-right" size={18} color={titleColor} />
               </RNView>
 
-              {/* Count pill overlaid on the map — bottom-left */}
-              <RNView style={styles.countPillContainer}>
-                <RNView style={[styles.countPill, { backgroundColor: opacity(primary0, 0.1) }]}>
-                  <Icon name="mdi:map-marker" size={12} color={opacity(primary0, 0.66)} />
-                  <Text size={11} semibold color={opacity(primary0, 0.66)}>
+              <RNView className="absolute bottom-2.5 left-3 z-[2]">
+                <RNView
+                  className="flex-row items-center gap-1 rounded-full px-2 py-1"
+                  style={{ borderCurve: 'continuous', backgroundColor: opacity(foreground, 0.1) }}>
+                  <Icon name="mdi:map-marker" size={12} color={titleColor} />
+                  <Text size={11} semibold color={titleColor}>
                     {countLabel}
                   </Text>
                 </RNView>
@@ -305,57 +270,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
   );
 });
 
-BitcoinNearYou.displayName = 'BitcoinNearYou';
-
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    borderWidth: 1,
-  },
-  container: {
-    zIndex: 1,
-    position: 'relative',
-  },
-  titleRow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    zIndex: 2,
-  },
-  mapContainer: {
-    height: 140,
-    overflow: 'hidden',
-  },
-  countPillContainer: {
-    position: 'absolute',
-    bottom: 10,
-    left: 12,
-    zIndex: 2,
-  },
-  countPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 100,
-    borderCurve: 'continuous',
-  },
-});
-
-const mapOverlayStyles = StyleSheet.create({
+const overlayStyles = StyleSheet.create({
   grayscaleOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'black',
@@ -363,7 +278,7 @@ const mapOverlayStyles = StyleSheet.create({
     // @ts-ignore - mixBlendMode supported on iOS
     mixBlendMode: 'saturation',
   },
-  grayscaleOverlaySecondary: {
+  desaturationOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.15)',
   },

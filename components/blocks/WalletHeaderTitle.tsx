@@ -13,34 +13,26 @@ import { useBalanceContext } from 'coco-cashu-react';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 
 interface WalletHeaderTitleProps {
-  /** Custom width (defaults to header width calculation) */
   width?: number;
-  /** Unit for balance display */
   unit?: string;
-  /** Whether balance is required for mint selection */
   requireBalance?: boolean;
-  /** Callback when a mint is selected */
   onMintSelected?: (mint: { id: string; unit: string }) => void;
-  /** Whether to show the add mints button in the mint list (default: true) */
   showAddMintsButton?: boolean;
-  /** Whether to show the details/inspect button on each mint (default: true) */
   showDetailsButton?: boolean;
-  /** Allowed mint URLs for filtering (payment request mints) */
   allowedMints?: string[];
-  /** Whether being used with Liquid Glass Stack.Toolbar (auto width) */
   liquidGlass?: boolean;
-  /** Inner content width (after subtracting button padding) */
   contentWidth?: number;
-  /** Inner content height (after subtracting button padding) */
   contentHeight?: number;
 }
 
-/**
- * A self-contained mint selector component with glass effect and context menu.
- * Can be used as a header title or standalone in other screens.
- */
+function formatBalance(amount: number): string {
+  if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M sats`;
+  if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)}k sats`;
+  return `${amount} sats`;
+}
+
 export default function WalletHeaderTitle({
-  width: _width,
+  width: explicitWidth,
   unit = 'sat',
   requireBalance = false,
   onMintSelected,
@@ -56,49 +48,33 @@ export default function WalletHeaderTitle({
   const pubkey = keys?.pubkey;
   const setSelectedMint = useMintStore((state) => state.setSelectedMint);
 
-  // Get mints and balances for quick selection
   const { mints } = useMintManagement();
   const { balance: liveBalances } = useBalanceContext();
 
-  // Get top 3 mints sorted by balance (filtered by allowedMints if provided)
   const topMints = useMemo(() => {
     if (!mints || mints.length === 0) return [];
 
-    // Filter by allowed mints if specified
     const filteredMints = allowedMints?.length
       ? mints.filter((mint) => allowedMints.includes(mint.mintUrl))
       : mints;
 
-    const mintsWithBalances = filteredMints.map((mint) => ({
-      ...mint,
-      balance: liveBalances[mint.mintUrl] || 0,
-      displayName: getMintDisplayName(mint.mintUrl, mint.mintInfo),
-    }));
-
-    return mintsWithBalances.sort((a, b) => b.balance - a.balance).slice(0, 3);
+    return filteredMints
+      .map((mint) => ({
+        ...mint,
+        balance: liveBalances[mint.mintUrl] || 0,
+        displayName: getMintDisplayName(mint.mintUrl, mint.mintInfo),
+      }))
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, 3);
   }, [mints, liveBalances, allowedMints]);
-
-  const handleMintSelectedInternal = useCallback(
-    async (mint: { id: string; unit: string }) => {
-      if (!pubkey) {
-        if (__DEV__) {
-          console.warn('WalletHeaderTitle: No pubkey available, cannot set selected mint');
-        }
-        return;
-      }
-      setSelectedMint(pubkey, mint.id);
-      // Call external callback if provided
-      onMintSelected?.(mint);
-    },
-    [pubkey, setSelectedMint, onMintSelected]
-  );
 
   const handleQuickSelectMint = useCallback(
     (mintUrl: string) => {
       if (!pubkey) return;
       setSelectedMint(pubkey, mintUrl);
+      onMintSelected?.({ id: mintUrl, unit });
     },
-    [pubkey, setSelectedMint]
+    [pubkey, setSelectedMint, onMintSelected, unit]
   );
 
   const handleShowAllMints = useCallback(() => {
@@ -118,52 +94,40 @@ export default function WalletHeaderTitle({
     router.navigate('/add');
   }, []);
 
-  // Get window dimensions for width calculations
   const { width: windowWidth } = useWindowDimensions();
 
-  // Extract width/height from style prop for sizing (e.g. when used as headerTitle)
   const styleWidth =
     style && typeof style === 'object' && 'width' in style ? style.width : undefined;
   const styleHeight =
     style && typeof style === 'object' && 'height' in style ? style.height : undefined;
 
-  // Prefer style width, fallback to explicit prop width
   const buttonWidth =
-    typeof styleWidth === 'number' ? styleWidth : typeof _width === 'number' ? _width : undefined;
+    typeof styleWidth === 'number'
+      ? styleWidth
+      : typeof explicitWidth === 'number'
+        ? explicitWidth
+        : undefined;
 
-  // If we have an explicit width but no inner content dimensions, derive reasonable defaults.
-  // Matches the header sizing math used on index: 50 height, 14 vertical padding → 36 inner height.
   const resolvedContentHeight = contentHeight ?? 36;
   const resolvedContentWidth = useMemo(() => {
     if (contentWidth !== undefined) return contentWidth;
-    if (typeof buttonWidth === 'number') {
-      // Default inner padding horizontal ~16px total (8 each side) like the index layout constants.
-      return Math.max(0, buttonWidth - 16);
-    }
+    if (typeof buttonWidth === 'number') return Math.max(0, buttonWidth - 16);
     return undefined;
   }, [contentWidth, buttonWidth]);
 
-  // Format balance for display
-  const formatBalance = (amount: number) => {
-    if (amount >= 1000000) {
-      return `${(amount / 1000000).toFixed(1)}M sats`;
-    }
-    if (amount >= 1000) {
-      return `${(amount / 1000).toFixed(1)}k sats`;
-    }
-    return `${amount} sats`;
+  const mintDisplayProps = {
+    unit,
+    requireBalance,
+    showAddMintsButton,
+    showDetailsButton,
+    allowedMints,
+    contentWidth: resolvedContentWidth,
+    contentHeight: resolvedContentHeight,
   };
 
-  // Blur fallback for older devices (pre-liquid glass)
   if (!supportsLiquidGlass()) {
-    // Calculate width to fit between header buttons
-    const _headerWidth = windowWidth - 124 - 16;
-    const fallbackWidth =
-      typeof buttonWidth === 'number'
-        ? buttonWidth
-        : typeof _width === 'number'
-          ? _width
-          : _headerWidth;
+    const headerWidth = windowWidth - 124 - 16;
+    const fallbackWidth = typeof buttonWidth === 'number' ? buttonWidth : headerWidth;
 
     return (
       <View
@@ -174,36 +138,16 @@ export default function WalletHeaderTitle({
           justifyContent: 'center',
           ...(style || {}),
         }}>
-        <MintBalanceDisplay
-          unit={unit}
-          onMintSelected={handleMintSelectedInternal}
-          requireBalance={requireBalance}
-          updateSelectedMint={true}
-          showAddMintsButton={showAddMintsButton}
-          showDetailsButton={showDetailsButton}
-          allowedMints={allowedMints}
-          contentWidth={resolvedContentWidth}
-          contentHeight={resolvedContentHeight}
-          style={{ width: '100%' }}
-        />
+        <MintBalanceDisplay {...mintDisplayProps} style={{ width: '100%' }} />
       </View>
     );
   }
 
-  // Liquid Glass UI (iOS 26+, iPadOS 26+, macOS 26+)
-  // When liquidGlass=true, use glass button with capsule shape for native Liquid Glass effect
-  // When liquidGlass=false (standard header), use glass button styling with explicit effect
-  const buttonModifiers = liquidGlass
-    ? [
-        buttonStyle('glass'),
-        frame({ height: 50, width: buttonWidth, alignment: 'center' }),
-        // glassEffect({ shape: 'capsule' }),
-      ]
-    : [
-        buttonStyle('glass'),
-        frame({ height: 50, width: buttonWidth, alignment: 'center' }),
-        glassEffect({ shape: 'capsule' }),
-      ];
+  const buttonModifiers = [
+    buttonStyle('glass'),
+    frame({ height: 50, width: buttonWidth, alignment: 'center' }),
+    ...(liquidGlass ? [] : [glassEffect({ shape: 'capsule' })]),
+  ];
 
   return (
     <View
@@ -218,7 +162,6 @@ export default function WalletHeaderTitle({
       <Host style={{ zIndex: 10, height: 50, width: buttonWidth }} matchContents>
         <ContextMenu>
           <ContextMenu.Items>
-            {/* Quick Mint Selection - Top 3 mints */}
             {topMints.map((mint) => (
               <SwiftUIButton
                 key={mint.mintUrl}
@@ -227,41 +170,22 @@ export default function WalletHeaderTitle({
                 onPress={() => handleQuickSelectMint(mint.mintUrl)}
               />
             ))}
-
-            {/* Show All Mints */}
             <SwiftUIButton
               systemImage="list.bullet.rectangle"
               label="Show all mints"
               onPress={handleShowAllMints}
             />
-
-            {/* Actions */}
             {showAddMintsButton && (
               <SwiftUIButton systemImage="plus.circle" label="Add Mint" onPress={handleAddMint} />
             )}
           </ContextMenu.Items>
           <ContextMenu.Trigger>
-            {/* When embedded in a screen with explicit width, avoid extra padding that can squash content */}
             <HStack
               modifiers={
-                liquidGlass
-                  ? []
-                  : typeof buttonWidth === 'number'
-                    ? []
-                    : [padding({ horizontal: 64 })]
+                liquidGlass || typeof buttonWidth === 'number' ? [] : [padding({ horizontal: 64 })]
               }>
               <SwiftUIButton modifiers={buttonModifiers}>
-                <MintBalanceDisplay
-                  unit={unit}
-                  onMintSelected={handleMintSelectedInternal}
-                  requireBalance={requireBalance}
-                  updateSelectedMint={true}
-                  showAddMintsButton={showAddMintsButton}
-                  showDetailsButton={showDetailsButton}
-                  allowedMints={allowedMints}
-                  contentWidth={resolvedContentWidth}
-                  contentHeight={resolvedContentHeight}
-                />
+                <MintBalanceDisplay {...mintDisplayProps} />
               </SwiftUIButton>
             </HStack>
           </ContextMenu.Trigger>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -25,9 +25,10 @@ import { supportsLiquidGlass } from '@/helper/version';
 import { useRouter } from 'expo-router';
 import { CocoManager } from '@/helper/coco/manager';
 import { popup } from '@/helper/popup';
-import { useBalanceContext, useManager, usePaginatedHistory } from 'coco-cashu-react';
-import type { CoreProof, SendHistoryEntry } from 'coco-cashu-core';
+import { usePaginatedHistory } from 'coco-cashu-react';
+import type { SendHistoryEntry } from 'coco-cashu-core';
 import { useThemeColor } from 'hooks/useThemeColor';
+import { useReservedProofs } from 'hooks/useReservedProofs';
 
 interface Account {
   unit: CurrencyUnit;
@@ -40,12 +41,6 @@ interface PrimaryBalanceProps {
   account: Account;
 }
 
-type UnsafeManager = {
-  proofRepository?: {
-    getReservedProofs?: () => Promise<CoreProof[]>;
-  };
-};
-
 // Currency display configuration
 const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }> = {
   usd: { symbol: '$', label: 'USD' },
@@ -54,119 +49,33 @@ const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }
 };
 
 // ---------------------------------------------------------------------------
-// Pending outgoing ecash pill – shows total unclaimed send tokens
+// Shared ecash status pill (pending / reserved / etc.)
 // ---------------------------------------------------------------------------
 
-interface PendingEcashPillProps {
+const PILL_TEXT_SIZE = 11;
+const PILL_IOS_HEIGHT = 30;
+
+interface EcashStatusPillProps {
+  label: string;
   totalAmount: number;
   unit: string;
+  sfSymbol: React.ComponentProps<typeof SwiftUIImage>['systemName'];
   onPress?: () => void;
 }
 
-function PendingEcashPill({
+function EcashStatusPill({
+  label,
   totalAmount,
   unit,
+  sfSymbol,
   onPress,
-}: PendingEcashPillProps): React.ReactElement | null {
+}: EcashStatusPillProps): React.ReactElement | null {
   const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
 
   if (totalAmount <= 0) return null;
 
-  const formatted = totalAmount.toLocaleString();
-  const text = `PENDING: ${formatted} ${unit.toUpperCase()}`;
-  const textSize = 11;
-  const iosHeight = 30;
-  // Match FiatCurrencyPill width calculation: monospace char width ~0.62em + padding + icon (12) + spacing (5).
-  const iosWidth = Math.max(72, Math.round(text.length * (textSize * 0.62) + 28 + 17));
-
-  // iOS 26+ liquid glass – mirrors FiatCurrencyPill's glass capsule with an
-  // SF Symbol icon, laid out like the Send/Receive LiquidCapsuleButton.
-  if (Platform.OS === 'ios' && supportsLiquidGlass()) {
-    return (
-      <Host matchContents>
-        <SwiftUIButton
-          onPress={onPress}
-          modifiers={[
-            frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
-            glassEffect({
-              shape: 'capsule',
-              glass: {
-                tint: opacity(accent, 0.15),
-                variant: 'regular',
-                interactive: false,
-              },
-            }),
-          ]}>
-          <SwiftUIHStack
-            alignment="center"
-            spacing={5}
-            modifiers={[frame({ width: iosWidth, alignment: 'center' })]}>
-            <SwiftUIImage
-              systemName="clock.arrow.trianglehead.counterclockwise.rotate.90"
-              size={12}
-              color={opacity(foreground, 0.75)}
-            />
-            <SwiftUIText
-              modifiers={[
-                font({ size: textSize, design: 'monospaced', weight: 'bold' }),
-                foregroundStyle(opacity(foreground, 0.75)),
-              ]}>
-              {text}
-            </SwiftUIText>
-          </SwiftUIHStack>
-        </SwiftUIButton>
-      </Host>
-    );
-  }
-
-  // Fallback (iOS <26 / Android) – current design with increased opacity.
-  return (
-    <TouchableOpacity onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
-      <HStack
-        align="center"
-        justify="center"
-        gap={6}
-        className="overflow-hidden rounded-full"
-        style={{
-          backgroundColor: opacity(accent, 0.3),
-          borderWidth: 1,
-          borderColor: opacity(accent, 0.3),
-          paddingHorizontal: 12,
-          paddingVertical: 5,
-        }}>
-        <Icon name="majesticons:coins" size={14} color={opacity(foreground, 0.66)} />
-        <UntranslatedText
-          bold
-          size={11}
-          color={opacity(foreground, 0.66)}
-          style={{ letterSpacing: 0.5 }}>
-          {text}
-        </UntranslatedText>
-      </HStack>
-    </TouchableOpacity>
-  );
-}
-
-interface ReservedEcashPillProps {
-  totalAmount: number;
-  unit: string;
-  onPress?: () => void;
-}
-
-function ReservedEcashPill({
-  totalAmount,
-  unit,
-  onPress,
-}: ReservedEcashPillProps): React.ReactElement | null {
-  const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
-
-  if (totalAmount <= 0) return null;
-
-  const formatted = totalAmount.toLocaleString();
-  const text = `RESERVED: ${formatted} ${unit.toUpperCase()}`;
-  const textSize = 11;
-  const iosHeight = 30;
-  const iosWidth = Math.max(72, Math.round(text.length * (textSize * 0.62) + 28 + 17));
+  const text = `${label}: ${totalAmount.toLocaleString()} ${unit.toUpperCase()}`;
+  const iosWidth = Math.max(72, Math.round(text.length * (PILL_TEXT_SIZE * 0.62) + 28 + 17));
 
   if (Platform.OS === 'ios' && supportsLiquidGlass()) {
     return (
@@ -174,28 +83,20 @@ function ReservedEcashPill({
         <SwiftUIButton
           onPress={onPress}
           modifiers={[
-            frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
+            frame({ height: PILL_IOS_HEIGHT, width: iosWidth, alignment: 'center' }),
             glassEffect({
               shape: 'capsule',
-              glass: {
-                tint: opacity(accent, 0.15),
-                variant: 'regular',
-                interactive: false,
-              },
+              glass: { tint: opacity(accent, 0.15), variant: 'regular', interactive: false },
             }),
           ]}>
           <SwiftUIHStack
             alignment="center"
             spacing={5}
             modifiers={[frame({ width: iosWidth, alignment: 'center' })]}>
-            <SwiftUIImage
-              systemName="lock.fill"
-              size={12}
-              color={opacity(foreground, 0.75)}
-            />
+            <SwiftUIImage systemName={sfSymbol} size={12} color={opacity(foreground, 0.75)} />
             <SwiftUIText
               modifiers={[
-                font({ size: textSize, design: 'monospaced', weight: 'bold' }),
+                font({ size: PILL_TEXT_SIZE, design: 'monospaced', weight: 'bold' }),
                 foregroundStyle(opacity(foreground, 0.75)),
               ]}>
               {text}
@@ -223,7 +124,7 @@ function ReservedEcashPill({
         <Icon name="majesticons:coins" size={14} color={opacity(foreground, 0.66)} />
         <UntranslatedText
           bold
-          size={11}
+          size={PILL_TEXT_SIZE}
           color={opacity(foreground, 0.66)}
           style={{ letterSpacing: 0.5 }}>
           {text}
@@ -238,8 +139,6 @@ function ReservedEcashPill({
  */
 export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactElement {
   const router = useRouter();
-  const manager = useManager();
-  const { balance: liveBalances } = useBalanceContext();
   const { history } = usePaginatedHistory();
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
   const setDisplayBtc = useSettingsStore((state) => state.setDisplayBtc);
@@ -256,7 +155,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
   const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
-  const [reservedTotal, setReservedTotal] = useState(0);
+  const { reservedTotal } = useReservedProofs();
   const pendingSends = history.filter(
     (entry): entry is SendHistoryEntry =>
       entry.type === 'send' && (entry.state === 'pending' || entry.state === 'prepared')
@@ -312,42 +211,26 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     ]);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadReserved = async () => {
-      const repo = (manager as unknown as UnsafeManager).proofRepository;
-      if (!repo?.getReservedProofs) {
-        if (!cancelled) setReservedTotal(0);
-        return;
-      }
-
-      try {
-        const proofs = await repo.getReservedProofs();
-        if (!cancelled) setReservedTotal(proofs.reduce((sum, proof) => sum + proof.amount, 0));
-      } catch {
-        if (!cancelled) setReservedTotal(0);
-      }
-    };
-
-    loadReserved();
-    return () => {
-      cancelled = true;
-    };
-  }, [manager, liveBalances]);
-
   return (
     <VStack align="center" gap={8} className="z-9">
       <FiatCurrencyPill displayText={displayText} textSize={12} />
       <TouchableOpacity onPress={toggleUnit} className="flex-col items-center">
         <AmountFormatter weight="heavy" amount={balance} unit={account.unit} />
       </TouchableOpacity>
-      <PendingEcashPill
+      <EcashStatusPill
+        label="PENDING"
         totalAmount={pendingTotal}
         unit={pendingUnit}
+        sfSymbol="clock.arrow.trianglehead.counterclockwise.rotate.90"
         onPress={handlePendingPress}
       />
-      <ReservedEcashPill totalAmount={reservedTotal} unit="sat" onPress={handleReservedPress} />
+      <EcashStatusPill
+        label="RESERVED"
+        totalAmount={reservedTotal}
+        unit="sat"
+        sfSymbol="lock.fill"
+        onPress={handleReservedPress}
+      />
     </VStack>
   );
 }

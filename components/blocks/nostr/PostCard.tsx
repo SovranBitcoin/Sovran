@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { Text } from 'components/ui/Text';
 import { VStack } from 'components/ui/View/VStack';
@@ -102,6 +102,11 @@ export const PostCard = React.memo(function PostCard({
   const isThread = variant === 'thread-reply';
   const isFeed = variant === 'feed';
 
+  // Pre-compute opacity color styles to avoid inline object creation
+  const textPrimary = { color: opacity(foreground, 0.9) };
+  const textMuted = { color: opacity(foreground, 0.4) };
+  const textDimmed = { color: opacity(foreground, 0.3) };
+
   // Entry animation — only for feed variant on initial load
   const shouldAnimate = isFeed && !skipAnimation;
   const progress = useSharedValue(shouldAnimate ? 0 : 1);
@@ -137,35 +142,17 @@ export const PostCard = React.memo(function PostCard({
 
   const suppressThreadTapRef = useRef(false);
 
-  const suppressThreadTapStart = useCallback(() => {
+  const handleNestedPressIn = useCallback(() => {
     suppressThreadTapRef.current = true;
-  }, []);
+    onNestedProfilePressIn?.();
+  }, [onNestedProfilePressIn]);
 
-  const suppressThreadTapEnd = useCallback(() => {
+  const handleNestedPressOut = useCallback(() => {
     setTimeout(() => {
       suppressThreadTapRef.current = false;
     }, 0);
-  }, []);
-
-  const handleProfilePressIn = useCallback(() => {
-    suppressThreadTapStart();
-    onNestedProfilePressIn?.();
-  }, [suppressThreadTapStart, onNestedProfilePressIn]);
-
-  const handleProfilePressOut = useCallback(() => {
-    suppressThreadTapEnd();
     onNestedProfilePressOut?.();
-  }, [suppressThreadTapEnd, onNestedProfilePressOut]);
-
-  const handleActionPressIn = useCallback(() => {
-    suppressThreadTapStart();
-    onNestedProfilePressIn?.();
-  }, [onNestedProfilePressIn, suppressThreadTapStart]);
-
-  const handleActionPressOut = useCallback(() => {
-    suppressThreadTapEnd();
-    onNestedProfilePressOut?.();
-  }, [onNestedProfilePressOut, suppressThreadTapEnd]);
+  }, [onNestedProfilePressOut]);
 
   const handleThreadPress = useCallback(() => {
     if (suppressThreadTapRef.current) return;
@@ -197,10 +184,9 @@ export const PostCard = React.memo(function PostCard({
     return (
       <View>
         <View style={pcStyles.targetRow}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPressIn={handleProfilePressIn}
-            onPressOut={handleProfilePressOut}
+          <Pressable
+            onPressIn={handleNestedPressIn}
+            onPressOut={handleNestedPressOut}
             onPress={navigateToProfile}>
             <HStack align="center" gap={10} style={sharedStyles.mb6}>
               <Avatar
@@ -211,19 +197,15 @@ export const PostCard = React.memo(function PostCard({
                 name={displayName}
               />
               <VStack style={sharedStyles.flex1}>
-                <Text
-                  bold
-                  size={15}
-                  style={{ color: opacity(foreground, 0.9) }}
-                  numberOfLines={1}>
+                <Text bold size={15} style={textPrimary} numberOfLines={1}>
                   {displayName}
                 </Text>
-                <Text semibold size={13} style={{ color: opacity(foreground, 0.4) }}>
+                <Text semibold size={13} style={textMuted}>
                   {truncatedNpub}
                 </Text>
               </VStack>
             </HStack>
-          </TouchableOpacity>
+          </Pressable>
 
           <NoteContent
             content={event.content}
@@ -231,20 +213,20 @@ export const PostCard = React.memo(function PostCard({
             profiles={profiles}
             getMetrics={getMetrics}
             onVideoTap={onVideoTap}
-            onQuotedPressIn={handleProfilePressIn}
-            onQuotedPressOut={handleProfilePressOut}
-            onInlineActionPressIn={handleProfilePressIn}
-            onInlineActionPressOut={handleProfilePressOut}
+            onQuotedPressIn={handleNestedPressIn}
+            onQuotedPressOut={handleNestedPressOut}
+            onInlineActionPressIn={handleNestedPressIn}
+            onInlineActionPressOut={handleNestedPressOut}
           />
 
           {fullDate ? (
-            <Text size={13} style={{ color: opacity(foreground, 0.4), marginTop: 10 }}>
+            <Text size={13} style={[textMuted, pcStyles.targetDate]}>
               {fullDate}
             </Text>
           ) : null}
         </View>
 
-        <View style={{ paddingHorizontal: 16 }}>
+        <View style={pcStyles.targetMetrics}>
           <MetricsFooter
             metrics={metrics}
             borderColor={foreground}
@@ -257,8 +239,8 @@ export const PostCard = React.memo(function PostCard({
             likePending={likePending}
             repostPendingDirection={repostPendingDirection}
             likePendingDirection={likePendingDirection}
-            onActionPressIn={handleActionPressIn}
-            onActionPressOut={handleActionPressOut}
+            onActionPressIn={handleNestedPressIn}
+            onActionPressOut={handleNestedPressOut}
           />
         </View>
       </View>
@@ -272,11 +254,12 @@ export const PostCard = React.memo(function PostCard({
   const gutterContent = (
     <View style={pcStyles.gutterRow}>
       <View style={pcStyles.gutterCol}>
-        {showLineAbove && <View style={[pcStyles.lineAbove, { backgroundColor: lineColor }]} />}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPressIn={handleProfilePressIn}
-          onPressOut={handleProfilePressOut}
+        {showLineAbove ? (
+          <View style={[pcStyles.lineAbove, { backgroundColor: lineColor }]} />
+        ) : null}
+        <Pressable
+          onPressIn={handleNestedPressIn}
+          onPressOut={handleNestedPressOut}
           onPress={navigateToProfile}>
           <Avatar
             picture={profile?.picture}
@@ -285,34 +268,28 @@ export const PostCard = React.memo(function PostCard({
             variant="person"
             name={displayName}
           />
-        </TouchableOpacity>
-        {showLineBelow && <View style={[pcStyles.lineBelow, { backgroundColor: lineColor }]} />}
+        </Pressable>
+        {showLineBelow ? (
+          <View style={[pcStyles.lineBelow, { backgroundColor: lineColor }]} />
+        ) : null}
       </View>
 
       <View style={sharedStyles.flex1}>
         <HStack align="center" gap={6} style={sharedStyles.mb4}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPressIn={handleProfilePressIn}
-            onPressOut={handleProfilePressOut}
+          <Pressable
+            onPressIn={handleNestedPressIn}
+            onPressOut={handleNestedPressOut}
             onPress={navigateToProfile}>
-            <Text
-              bold
-              size={14}
-              style={{ color: opacity(foreground, 0.9) }}
-              numberOfLines={isThread ? 1 : undefined}>
+            <Text bold size={14} style={textPrimary} numberOfLines={isThread ? 1 : undefined}>
               {displayName}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
           {shortTime ? (
             <>
-              <Text
-                bold
-                size={13}
-                style={{ color: opacity(foreground, 0.3), marginRight: 4 }}>
+              <Text bold size={13} style={[textDimmed, pcStyles.dotSeparator]}>
                 {'•'}
               </Text>
-              <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
+              <Text size={13} style={textMuted}>
                 {shortTime}
               </Text>
             </>
@@ -325,12 +302,12 @@ export const PostCard = React.memo(function PostCard({
           profiles={profiles}
           getMetrics={getMetrics}
           onVideoTap={onVideoTap}
-          onQuotedPressIn={handleProfilePressIn}
-          onQuotedPressOut={handleProfilePressOut}
-          onInlineActionPressIn={handleProfilePressIn}
-          onInlineActionPressOut={handleProfilePressOut}
-          onImagePressIn={handleProfilePressIn}
-          onImagePressOut={handleProfilePressOut}
+          onQuotedPressIn={handleNestedPressIn}
+          onQuotedPressOut={handleNestedPressOut}
+          onInlineActionPressIn={handleNestedPressIn}
+          onInlineActionPressOut={handleNestedPressOut}
+          onImagePressIn={handleNestedPressIn}
+          onImagePressOut={handleNestedPressOut}
           event={event}
           metrics={metrics}
           profile={profile}
@@ -345,8 +322,8 @@ export const PostCard = React.memo(function PostCard({
           onCommentPress={onCommentPress ?? navigateToThread}
           onRepostPress={onRepostPress}
           onLikePress={onLikePress}
-          onActionPressIn={handleActionPressIn}
-          onActionPressOut={handleActionPressOut}
+          onActionPressIn={handleNestedPressIn}
+          onActionPressOut={handleNestedPressOut}
         />
 
         <Spacer size={8} />
@@ -366,8 +343,8 @@ export const PostCard = React.memo(function PostCard({
             likePending={likePending}
             repostPendingDirection={repostPendingDirection}
             likePendingDirection={likePendingDirection}
-            onActionPressIn={handleActionPressIn}
-            onActionPressOut={handleActionPressOut}
+            onActionPressIn={handleNestedPressIn}
+            onActionPressOut={handleNestedPressOut}
           />
         </View>
       </View>
@@ -383,11 +360,7 @@ export const PostCard = React.memo(function PostCard({
   }
 
   if (isThread) {
-    return (
-      <TouchableOpacity activeOpacity={0.7} onPress={handleThreadPress}>
-        {gutterContent}
-      </TouchableOpacity>
-    );
+    return <Pressable onPress={handleThreadPress}>{gutterContent}</Pressable>;
   }
 
   return gutterContent;
@@ -402,11 +375,20 @@ const pcStyles = StyleSheet.create({
   },
   gutterCol: {
     width: AVATAR_SIZE,
-    alignItems: 'center' as const,
+    alignItems: 'center',
   },
   targetRow: {
     paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  targetDate: {
+    marginTop: 10,
+  },
+  targetMetrics: {
+    paddingHorizontal: 16,
+  },
+  dotSeparator: {
+    marginRight: 4,
   },
   inlineMetricsWrap: {
     marginLeft: -(AVATAR_SIZE + 12),
@@ -415,7 +397,7 @@ const pcStyles = StyleSheet.create({
     paddingRight: 16,
   },
   lineAbove: {
-    position: 'absolute' as const,
+    position: 'absolute',
     top: 0,
     width: 2,
     height: AVATAR_SIZE / 2,

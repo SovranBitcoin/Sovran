@@ -22,9 +22,8 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
-import { nip19 } from 'nostr-tools';
+import { npubToPubkeySafe } from 'helper/nostrClient';
 import { LegendList, type LegendListRenderItemProps, type LegendListRef } from '@legendapp/list';
-import { router } from 'expo-router';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -33,25 +32,29 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import {
   type FeedEvent,
+  type FeedItem,
+  type FeedParseResult,
   type NoteMetrics,
   type ProfileInfo,
   type RawPrimalEvent,
-  type ContentSegment,
   DEFAULT_METRICS,
   PRIMAL_CACHE_RELAY_URL,
   PRIMAL_KIND_NOTE_STATS,
   PRIMAL_KIND_MENTIONS,
   PRIMAL_KIND_FEED_RANGE,
+  MAX_VIDEO_FEED_PAGES,
   createPrimalRelayClient,
   collectReferencedIds,
   normalizeFeedEvent,
   parseJson,
-  parseContent,
   getFirstTagValue,
   parseProfileFromRaw,
   parseNoteMetrics,
   tryNpubEncode,
-  getVideoUrlsFromContent,
+  getEmbeddedRepostEvent,
+  buildVideoOverlayLayout,
+  computeFeedIndicesWithVideo,
+  enrichFeedPage,
 } from './nostr/shared';
 import { CATEGORY_NPUBS } from './nostr/categoryNpubs';
 
@@ -71,16 +74,6 @@ import { useThemeColor } from 'hooks/useThemeColor';
 // Types
 // ============================================================================
 
-type FeedItem =
-  | { type: 'note'; event: FeedEvent; timestamp: number }
-  | {
-      type: 'repost';
-      repostEvent: FeedEvent;
-      originalEvent: FeedEvent | undefined;
-      originalEventId: string;
-      timestamp: number;
-    };
-
 type HomeFeedListItem = { type: 'stories' } | { type: 'tabs' } | FeedItem;
 
 interface FeedSpec {
@@ -98,17 +91,6 @@ const BG_CONFIG = { blurMode: 'full' as const };
 // Helpers
 // ============================================================================
 
-function getEmbeddedRepostEvent(
-  repostEvent: FeedEvent,
-  expectedEventId?: string
-): FeedEvent | undefined {
-  if (!repostEvent.content) return undefined;
-  const parsed = normalizeFeedEvent(parseJson<unknown>(repostEvent.content));
-  if (!parsed) return undefined;
-  if (expectedEventId && parsed.id !== expectedEventId) return undefined;
-  return parsed;
-}
-
 /**
  * Inject user pubkey into feed specs that require it.
  * Specs with `"id":"feed"` are user-specific (latest from follows, etc.)
@@ -122,15 +104,6 @@ function hydrateSpecWithPubkey(spec: string, pubkey: string): string {
     return JSON.stringify({ ...parsed, pubkey });
   }
   return spec;
-}
-
-function npubToPubkeySafe(npub: string): string | null {
-  try {
-    const decoded = nip19.decode(npub);
-    return decoded.type === 'npub' ? decoded.data : null;
-  } catch {
-    return null;
-  }
 }
 
 function categoryToLabel(category: string): string {
@@ -157,18 +130,7 @@ function getCategoryPubkeysFromSpec(spec: string): string[] {
   return pubkeys;
 }
 
-interface Phase1Result {
-  orderedFeedItems: FeedItem[];
-  metricsMap: Map<string, NoteMetrics>;
-  profilesMap: Map<string, ProfileInfo>;
-  quotedEventsMap: Map<string, FeedEvent>;
-  missingQuotedIds: string[];
-  missingProfilePubkeys: string[];
-  paginationUntil: number;
-  paginationOffset: number;
-}
-
-function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): Phase1Result {
+function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): FeedParseResult {
   const eventMap = new Map<string, FeedEvent>();
   const notes: FeedEvent[] = [];
   const reposts: FeedEvent[] = [];
@@ -494,22 +456,7 @@ function HomeFeedInner() {
                 });
               })();
 
-        console.log('[HomeFeed DEBUG] feedRawEvents count:', feedRawEvents.length);
-        console.log(
-          '[HomeFeed DEBUG] feedRawEvents kinds:',
-          feedRawEvents.map((e) => e.kind)
-        );
-        if (feedRawEvents.length > 0) {
-          console.log(
-            '[HomeFeed DEBUG] sample event:',
-            JSON.stringify(feedRawEvents[0]).slice(0, 300)
-          );
-        }
-
         const phase1 = parseMegaFeedResponse(feedRawEvents);
-
-        console.log('[HomeFeed DEBUG] phase1 notes:', phase1.orderedFeedItems.length);
-        console.log('[HomeFeed DEBUG] paginationUntil:', phase1.paginationUntil);
 
         paginationUntilRef.current = phase1.paginationUntil;
         hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
@@ -531,84 +478,40 @@ function HomeFeedInner() {
           isFirstRender.current = false;
         });
 
-        // Phase 2 + 3 run in parallel on the same WS connection
-        const phase2Promise = (async () => {
-          if (phase1.missingQuotedIds.length === 0) return;
-
-          const referencedRawEvents = await client.request(`${requestPrefix}_quoted`, {
-            cache: ['events', { event_ids: phase1.missingQuotedIds }],
-          });
-
-          const nextQuoted = new Map(phase1.quotedEventsMap);
-          const extraProfiles = new Map<string, ProfileInfo>();
-          const extraMetrics = new Map<string, NoteMetrics>();
-
-          for (const raw of referencedRawEvents) {
-            if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-              const parsed = parseJson<Record<string, unknown>>(raw.content);
-              const eventId = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-              if (!eventId || !parsed) continue;
-              extraMetrics.set(eventId, parseNoteMetrics(parsed));
-              continue;
-            }
-
-            if (raw.kind === Metadata) {
-              const result = parseProfileFromRaw(raw);
-              if (result) extraProfiles.set(result[0], result[1]);
-              continue;
-            }
-
-            const ev = normalizeFeedEvent(raw);
-            if (!ev) continue;
-            nextQuoted.set(ev.id, ev);
-          }
-
-          startTransition(() => {
-            setQuotedEventsMap(nextQuoted);
-            if (extraMetrics.size > 0) {
-              setMetricsMap((prev) => {
-                const next = new Map(prev);
-                for (const [k, v] of extraMetrics) next.set(k, v);
-                return next;
-              });
-            }
-            if (extraProfiles.size > 0) {
-              setProfilesMap((prev) => {
-                const next = new Map(prev);
-                for (const [k, v] of extraProfiles) next.set(k, v);
-                return next;
-              });
-            }
-            setDataVersion((v) => v + 1);
-          });
-        })();
-
-        const phase3Promise = (async () => {
-          if (phase1.missingProfilePubkeys.length === 0) return;
-
-          const profileRawEvents = await client.request(`${requestPrefix}_profiles`, {
-            cache: ['user_infos', { pubkeys: phase1.missingProfilePubkeys }],
-          });
-
-          const extraProfiles = new Map<string, ProfileInfo>();
-          for (const raw of profileRawEvents) {
-            if (raw.kind !== Metadata) continue;
-            const result = parseProfileFromRaw(raw);
-            if (result) extraProfiles.set(result[0], result[1]);
-          }
-
-          if (extraProfiles.size === 0) return;
-          startTransition(() => {
-            setProfilesMap((prev) => {
-              const next = new Map(prev);
-              for (const [k, v] of extraProfiles) next.set(k, v);
-              return next;
+        await enrichFeedPage(
+          client,
+          requestPrefix,
+          phase1.missingQuotedIds,
+          phase1.missingProfilePubkeys,
+          phase1.quotedEventsMap,
+          phase1.profilesMap,
+          (updates) => {
+            startTransition(() => {
+              if (updates.quotedEvents) {
+                setQuotedEventsMap((prev) => {
+                  const n = new Map(prev);
+                  for (const [k, v] of updates.quotedEvents!) n.set(k, v);
+                  return n;
+                });
+              }
+              if (updates.metrics) {
+                setMetricsMap((prev) => {
+                  const n = new Map(prev);
+                  for (const [k, v] of updates.metrics!) n.set(k, v);
+                  return n;
+                });
+              }
+              if (updates.profiles) {
+                setProfilesMap((prev) => {
+                  const n = new Map(prev);
+                  for (const [k, v] of updates.profiles!) n.set(k, v);
+                  return n;
+                });
+              }
+              setDataVersion((v) => v + 1);
             });
-            setDataVersion((v) => v + 1);
-          });
-        })();
-
-        await Promise.all([phase2Promise, phase3Promise]);
+          }
+        );
       } catch (error) {
         console.error('HomeFeed: Failed to load feed', error);
         setFeedItems([]);
@@ -817,86 +720,42 @@ function HomeFeedInner() {
         setDataVersion((v) => v + 1);
       });
 
-      // Enrichment for new page
       const missingQ = page.missingQuotedIds.filter((id) => !quotedRef.current.has(id));
       const missingP = page.missingProfilePubkeys.filter((pk) => !profilesRef.current.has(pk));
-      const enrichTasks: Promise<void>[] = [];
-
-      if (missingQ.length > 0) {
-        enrichTasks.push(
-          client
-            .request(`${rp}_eq`, { cache: ['events', { event_ids: missingQ }] })
-            .then((evts) => {
-              const xQ = new Map<string, FeedEvent>();
-              const xM = new Map<string, NoteMetrics>();
-              const xP = new Map<string, ProfileInfo>();
-              for (const raw of evts) {
-                if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-                  const p = parseJson<Record<string, unknown>>(raw.content);
-                  const eid = typeof p?.event_id === 'string' ? p.event_id : undefined;
-                  if (!eid || !p) continue;
-                  xM.set(eid, parseNoteMetrics(p));
-                  continue;
-                }
-                if (raw.kind === Metadata) {
-                  const r = parseProfileFromRaw(raw);
-                  if (r) xP.set(r[0], r[1]);
-                  continue;
-                }
-                const ev = normalizeFeedEvent(raw);
-                if (ev) xQ.set(ev.id, ev);
-              }
-              startTransition(() => {
-                if (xQ.size > 0)
-                  setQuotedEventsMap((prev) => {
-                    const n = new Map(prev);
-                    for (const [k, v] of xQ) n.set(k, v);
-                    return n;
-                  });
-                if (xM.size > 0)
-                  setMetricsMap((prev) => {
-                    const n = new Map(prev);
-                    for (const [k, v] of xM) n.set(k, v);
-                    return n;
-                  });
-                if (xP.size > 0)
-                  setProfilesMap((prev) => {
-                    const n = new Map(prev);
-                    for (const [k, v] of xP) n.set(k, v);
-                    return n;
-                  });
-                setDataVersion((v) => v + 1);
+      await enrichFeedPage(
+        client,
+        rp,
+        missingQ,
+        missingP,
+        quotedRef.current,
+        profilesRef.current,
+        (updates) => {
+          startTransition(() => {
+            if (updates.quotedEvents) {
+              setQuotedEventsMap((prev) => {
+                const n = new Map(prev);
+                for (const [k, v] of updates.quotedEvents!) n.set(k, v);
+                return n;
               });
-            })
-        );
-      }
-
-      if (missingP.length > 0) {
-        enrichTasks.push(
-          client
-            .request(`${rp}_ep`, { cache: ['user_infos', { pubkeys: missingP }] })
-            .then((evts) => {
-              const xP = new Map<string, ProfileInfo>();
-              for (const raw of evts) {
-                if (raw.kind !== Metadata) continue;
-                const r = parseProfileFromRaw(raw);
-                if (r) xP.set(r[0], r[1]);
-              }
-              if (xP.size > 0) {
-                startTransition(() => {
-                  setProfilesMap((prev) => {
-                    const n = new Map(prev);
-                    for (const [k, v] of xP) n.set(k, v);
-                    return n;
-                  });
-                  setDataVersion((v) => v + 1);
-                });
-              }
-            })
-        );
-      }
-
-      await Promise.all(enrichTasks);
+            }
+            if (updates.metrics) {
+              setMetricsMap((prev) => {
+                const n = new Map(prev);
+                for (const [k, v] of updates.metrics!) n.set(k, v);
+                return n;
+              });
+            }
+            if (updates.profiles) {
+              setProfilesMap((prev) => {
+                const n = new Map(prev);
+                for (const [k, v] of updates.profiles!) n.set(k, v);
+                return n;
+              });
+            }
+            setDataVersion((v) => v + 1);
+          });
+        }
+      );
       return newItems;
     } catch (error) {
       console.error('HomeFeed: loadMore failed', error);
@@ -937,77 +796,23 @@ function HomeFeedInner() {
   // listData = [tabs, ...feedItems] when stories are hidden, otherwise [stories, tabs, ...feedItems].
   const FEED_ITEM_OFFSET = SHOW_STORIES_ROW ? 2 : 1;
   const overlaySourceIndexRef = useRef(-1);
-  const feedIndicesWithVideo = useMemo(() => {
-    const out: number[] = [];
-    feedItems.forEach((item, i) => {
-      const ev = item.type === 'note' ? item.event : item.originalEvent;
-      if (ev && getVideoUrlsFromContent(ev.content).length > 0) out.push(i);
-    });
-    return out;
-  }, [feedItems]);
+  const feedIndicesWithVideo = useMemo(() => computeFeedIndicesWithVideo(feedItems), [feedItems]);
 
   const onOverlayOpenedFromIndex = useCallback((index: number) => {
     overlaySourceIndexRef.current = index;
   }, []);
 
-  const MAX_VIDEO_FEED_PAGES = 20;
-
   const buildLayoutForVideoIndex = useCallback(
-    (feedIndex: number): ImageOverlayReplaceLayout | null => {
-      const item = feedItems[feedIndex];
-      const event = item?.type === 'note' ? item.event : item?.originalEvent;
-      if (!event) return null;
-      const segments = parseContent(event.content);
-      const blockSegments = segments.filter(
-        (s): s is ContentSegment & { kind: 'image' | 'video'; url: string } =>
-          s.kind === 'image' || s.kind === 'video'
-      );
-      if (blockSegments.length === 0) return null;
-      const urls = blockSegments.map((s) => s.url);
-      const mediaTypes = blockSegments.map((s) =>
-        s.kind === 'video' ? ('video' as const) : ('image' as const)
-      );
-      const firstVideoIndex = mediaTypes.indexOf('video');
-      if (firstVideoIndex === -1) return null;
-      const metrics = getDisplayMetrics(event.id) || DEFAULT_METRICS;
-      const engagement = getEngagementState(event.id);
-      const profile = profilesRef.current.get(event.pubkey) ?? null;
-      return {
-        url: urls[firstVideoIndex],
-        urls,
-        mediaTypes,
-        initialIndex: firstVideoIndex,
-        aspectRatio: 16 / 9,
-        post: {
-          event: {
-            id: event.id,
-            pubkey: event.pubkey,
-            content: event.content,
-            created_at: event.created_at,
-          },
-          metrics: {
-            replyCount: metrics.replyCount,
-            repostCount: metrics.repostCount,
-            likeCount: metrics.likeCount,
-            satsZapped: metrics.satsZapped,
-          },
-          profile: profile ?? undefined,
-          reposted: engagement.reposted,
-          liked: engagement.liked,
-          repostPending: engagement.repostPending,
-          likePending: engagement.likePending,
-          repostPendingDirection: engagement.repostPendingDirection,
-          likePendingDirection: engagement.likePendingDirection,
-          onCommentPress: () =>
-            router.navigate({
-              pathname: '/(user-flow)/thread' as any,
-              params: { eventId: event.id },
-            }),
-          onRepostPress: () => toggleRepost(event),
-          onLikePress: () => toggleLike(event),
-        },
-      };
-    },
+    (feedIndex: number): ImageOverlayReplaceLayout | null =>
+      buildVideoOverlayLayout(
+        feedIndex,
+        feedItems,
+        getDisplayMetrics,
+        getEngagementState,
+        profilesRef,
+        toggleLike,
+        toggleRepost
+      ),
     [feedItems, getDisplayMetrics, getEngagementState, toggleLike, toggleRepost]
   );
 
@@ -1028,71 +833,12 @@ function HomeFeedInner() {
       const current = overlaySourceIndexRef.current;
       const nextVideoIndex = feedIndicesWithVideo.find((i) => i > current);
       if (typeof nextVideoIndex !== 'number') return;
-      const item = feedItems[nextVideoIndex];
-      const event = item.type === 'note' ? item.event : item.originalEvent;
-      if (!event) return;
-      const segments = parseContent(event.content);
-      const blockSegments = segments.filter(
-        (s): s is ContentSegment & { kind: 'image' | 'video'; url: string } =>
-          s.kind === 'image' || s.kind === 'video'
-      );
-      const media = blockSegments;
-      if (media.length === 0) return;
-      const urls = media.map((s) => s.url);
-      const mediaTypes = media.map((s) =>
-        s.kind === 'video' ? ('video' as const) : ('image' as const)
-      );
-      const firstVideoIndex = mediaTypes.indexOf('video');
-      if (firstVideoIndex === -1) return;
-      const metrics = getDisplayMetrics(event.id) || DEFAULT_METRICS;
-      const engagement = getEngagementState(event.id);
-      const profile = profilesRef.current.get(event.pubkey) ?? null;
-      const layout: ImageOverlayReplaceLayout = {
-        url: urls[firstVideoIndex],
-        urls,
-        mediaTypes,
-        initialIndex: firstVideoIndex,
-        aspectRatio: 16 / 9,
-        post: {
-          event: {
-            id: event.id,
-            pubkey: event.pubkey,
-            content: event.content,
-            created_at: event.created_at,
-          },
-          metrics: {
-            replyCount: metrics.replyCount,
-            repostCount: metrics.repostCount,
-            likeCount: metrics.likeCount,
-            satsZapped: metrics.satsZapped,
-          },
-          profile: profile ?? undefined,
-          reposted: engagement.reposted,
-          liked: engagement.liked,
-          repostPending: engagement.repostPending,
-          likePending: engagement.likePending,
-          repostPendingDirection: engagement.repostPendingDirection,
-          likePendingDirection: engagement.likePendingDirection,
-          onCommentPress: () =>
-            router.navigate({
-              pathname: '/(user-flow)/thread' as any,
-              params: { eventId: event.id },
-            }),
-          onRepostPress: () => toggleRepost(event),
-          onLikePress: () => toggleLike(event),
-        },
-      };
+      const layout = buildLayoutForVideoIndex(nextVideoIndex);
+      if (!layout) return;
       overlaySourceIndexRef.current = nextVideoIndex;
       openNext(layout);
     },
-    [
-      feedIndicesWithVideo,
-      feedItems,
-      getDisplayMetrics,
-      getEngagementState,
-      toggleLike,
-      toggleRepost,
-    ]
+    [feedIndicesWithVideo, buildLayoutForVideoIndex]
   );
 
   // ── Render ──
@@ -1103,10 +849,7 @@ function HomeFeedInner() {
   }));
 
   const tabLabelActiveColor = useMemo(() => opacity(foreground, 0.95), [foreground]);
-  const tabLabelInactiveColor = useMemo(
-    () => opacity(foreground, 0.45),
-    [foreground]
-  );
+  const tabLabelInactiveColor = useMemo(() => opacity(foreground, 0.45), [foreground]);
 
   const tabsBar = useMemo(
     () =>
@@ -1140,11 +883,7 @@ function HomeFeedInner() {
             })}
             <Reanimated.View
               pointerEvents="none"
-              style={[
-                styles.feedTabIndicator,
-                { backgroundColor: foreground },
-                indicatorStyle,
-              ]}
+              style={[styles.feedTabIndicator, { backgroundColor: foreground }, indicatorStyle]}
             />
           </ScrollView>
         </View>

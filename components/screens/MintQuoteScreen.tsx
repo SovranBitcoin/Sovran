@@ -5,33 +5,32 @@
  * It is used by both standalone and flow-based route wrappers.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Share } from 'react-native';
-import { VStack } from 'components/ui/View/VStack';
-import { HStack } from 'components/ui/View/HStack';
-import { View } from 'components/ui/View/View';
-import { Text } from 'components/ui/Text';
-import opacity from 'hex-color-opacity';
+
 import * as Clipboard from 'expo-clipboard';
-import { PaymentInfo } from 'components/blocks/PaymentInfo';
+
+import type { MintHistoryEntry } from 'coco-cashu-core';
+
 import { popup } from '@/helper/popup';
-import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { useManager } from 'coco-cashu-react';
-import { DetailsSection } from 'components/ui/DetailsSection';
 import { truncateMiddle } from 'helper/strings';
-import { Card } from 'components/ui/Card';
-import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
+import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
-import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
 import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
 import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
-import type { MintHistoryEntry } from 'coco-cashu-core';
-import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
-import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
+import { PaymentInfo } from 'components/blocks/PaymentInfo';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
+import type { ButtonHandlerButton } from 'components/ui/ButtonHandler';
 import { BottomButtons } from 'components/ui/BottomButtons';
+import { Card } from 'components/ui/Card';
+import { DetailsSection } from 'components/ui/DetailsSection';
 import { ModalLayoutWrapper } from 'app/debugModal';
+import { VStack } from 'components/ui/View/VStack';
+import { HStack } from 'components/ui/View/HStack';
+import { ScreenErrorState, ScreenLoadingState } from 'components/ui/ScreenStates';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
-import { useThemeColor } from 'hooks/useThemeColor';
+import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
+import { useMintInfo } from 'hooks/useMintInfo';
 
 interface MintQuoteScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
@@ -43,36 +42,19 @@ export function MintQuoteScreen({
   mintHistoryEntry: mintHistoryEntryProp,
   extraButtons = [],
 }: MintQuoteScreenProps) {
-  const manager = useManager();
-  const foreground = useThemeColor('foreground');
-  const [uri, setUri] = useState<string | null>(null);
-  const [mintInfo, setMintInfo] = useState<any>(null);
+  const [, setUri] = useState<string | null>(null);
 
-  // Use the generic history entry hook for parsing, state, and event subscription
   const { entry: currentTransaction, error: parseError } =
     useHistoryEntry<MintHistoryEntry>(mintHistoryEntryProp);
   const sourceLabel = useTransactionSource(currentTransaction?.id);
+  const mintInfo = useMintInfo(currentTransaction?.mintUrl);
 
-  useEffect(() => {
-    if (currentTransaction?.mintUrl) {
-      manager.mint
-        .getMintInfo(currentTransaction.mintUrl)
-        .then(setMintInfo)
-        .catch(() => setMintInfo(null));
-    }
-  }, [currentTransaction?.mintUrl, manager]);
+  if (parseError) {
+    return <ScreenErrorState message={parseError} onGoBack={() => {}} />;
+  }
 
-  // Show loading/error state if entry not available
-  if (parseError || !currentTransaction) {
-    return (
-      <ModalLayoutWrapper>
-        <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-          <Text color={opacity(foreground, 0.66)}>
-            {parseError || 'Loading transaction...'}
-          </Text>
-        </View>
-      </ModalLayoutWrapper>
-    );
+  if (!currentTransaction) {
+    return <ScreenLoadingState message="Loading transaction..." />;
   }
 
   const handleCopy = async (close: (event: any) => void) => {
@@ -81,9 +63,7 @@ export function MintQuoteScreen({
   };
 
   const handleShare = async (close: (event: any) => void) => {
-    if (uri) {
-      await Share.share({ url: uri, message: currentTransaction.paymentRequest });
-    }
+    await Share.share({ message: currentTransaction.paymentRequest });
     close({});
   };
 
@@ -136,15 +116,10 @@ export function MintQuoteScreen({
           <Card message={currentTransaction.metadata.memo} variant="info" />
         )}
 
-        <HistoryEntryRefresh
-          mintInfo={mintInfo}
-          historyEntry={currentTransaction}
-          handleCheckStatus={async () => {}}
-        />
+        {mintInfo && <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={currentTransaction} />}
 
         <HistoryEntryTimeline historyEntry={currentTransaction} />
 
-        {/* Technical details - collapsed by default */}
         <DetailsSection
           items={[
             ...(sourceLabel ? [{ title: 'Source', value: sourceLabel }] : []),
@@ -154,8 +129,6 @@ export function MintQuoteScreen({
             },
           ]}
         />
-
-        <TransactionDebugCode historyEntry={currentTransaction} />
       </VStack>
     </ModalLayoutWrapper>
   );

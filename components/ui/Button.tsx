@@ -329,14 +329,15 @@ export const Button = ({
   blur = false,
   haptics = false,
 }: ButtonProps) => {
-  const [foreground, surfaceForeground, accent, surfaceTertiary, background, danger] = useThemeColor([
-    'foreground',
-    'surface-foreground',
-    'accent',
-    'surface-tertiary',
-    'background',
-    'danger',
-  ] as const);
+  const [foreground, surfaceForeground, accent, surfaceTertiary, background, danger] =
+    useThemeColor([
+      'foreground',
+      'surface-foreground',
+      'accent',
+      'surface-tertiary',
+      'background',
+      'danger',
+    ] as const);
 
   // Ripple hook
   const rippleConfig = typeof ripple === 'object' ? ripple : {};

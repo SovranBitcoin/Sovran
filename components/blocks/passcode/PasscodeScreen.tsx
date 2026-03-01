@@ -20,6 +20,26 @@ interface Props {
 const AVATAR_SIZE = 80;
 const SPACING = 16;
 
+const TEXT_SHADOW = {
+  textShadowColor: 'black',
+  textShadowOffset: { width: 0, height: 0 },
+  textShadowRadius: 3,
+} as const;
+
+const DOT_SHADOW = {
+  shadowColor: 'black',
+  shadowOffset: { width: 0, height: 0 },
+  shadowOpacity: 1,
+  shadowRadius: 3,
+} as const;
+
+const AVATAR_SHADOW = {
+  shadowColor: 'red',
+  shadowOffset: { width: 0, height: 0 },
+  shadowOpacity: 1,
+  shadowRadius: 3,
+} as const;
+
 const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   const { keys: nostrKeys } = useNostrKeysContext();
   const [value, setValue] = useState('');
@@ -28,32 +48,10 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   const shake = useRef(new Animated.Value(0)).current;
   const background = useThemeColor('background');
 
-  // Shadow styles - cannot be fully replicated with Tailwind in React Native
-  const textShadow = {
-    textShadowColor: 'black',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 3,
-  };
-
-  const dotShadow = {
-    shadowColor: 'black',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 3,
-  };
-
-  const avatarShadow = {
-    shadowColor: 'red',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 3,
-  };
-
-  // Helper function for dot styling
   const getDotStyle = (isActive: boolean) => ({
     backgroundColor: isActive ? 'rgb(255 255 255)' : 'transparent',
     borderColor: isActive ? 'transparent' : 'rgb(255 255 255)',
-    ...dotShadow,
+    ...DOT_SHADOW,
   });
 
   const handlePress = (val: string) => {
@@ -98,9 +96,9 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   };
 
   return (
-    <BlurView className="flex-1 bg-background">
+    <BlurView className="bg-background flex-1">
       <Animated.View
-        className="flex-1 bg-background"
+        className="bg-background flex-1"
         style={{
           opacity,
           transform: [{ translateX: shake }],
@@ -108,7 +106,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
         <VStack align="center" justify="center" flex={1} spacing={SPACING}>
           <AnimatedSpriteBackground backgroundColor={background} />
 
-          <View style={avatarShadow}>
+          <View style={AVATAR_SHADOW}>
             <Avatar
               seed={nostrKeys?.pubkey}
               name={getUsername(nostrKeys?.pubkey || '')}
@@ -117,13 +115,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
             />
           </View>
 
-          <Text
-            size={18}
-            weight="bold"
-            className="text-foreground"
-            style={{
-              ...textShadow,
-            }}>
+          <Text size={18} weight="bold" className="text-foreground" style={TEXT_SHADOW}>
             {`Welcome back, ${getUsername(nostrKeys?.pubkey || '')}`}
           </Text>
 

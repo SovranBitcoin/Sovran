@@ -1,4 +1,3 @@
-import React from 'react';
 import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
 import Icon from 'assets/icons';
@@ -12,15 +11,11 @@ interface SearchTipProps {
 
 export function SearchTip({ icon, text }: SearchTipProps) {
   const foreground = useThemeColor('foreground');
+  const mutedForeground = opacity(foreground, 0.5);
   return (
     <HStack spacing={0} align="center">
-      <Icon name={icon} size={20} color={opacity(foreground, 0.5)} />
-      <Text
-        className="flex-1 pl-2"
-        size={14}
-        overpass
-        regular
-        style={{ color: opacity(foreground, 0.5) }}>
+      <Icon name={icon} size={20} color={mutedForeground} />
+      <Text className="flex-1 pl-2" size={14} overpass regular color={mutedForeground}>
         {text}
       </Text>
     </HStack>

@@ -1,13 +1,12 @@
-import React, { FC, useCallback, useMemo } from 'react';
+import React, { FC, useMemo } from 'react';
 import { View as RNView, ScrollView, StyleSheet } from 'react-native';
 import { ContactItem } from './ContactItem';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
-import { ProfilesCardFrame } from './ProfilesCardFrame';
+import { BlurCardFrame } from 'components/ui/BlurCardFrame';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from 'hooks/useThemeColor';
 
-// Memoized wrapper component that receives pre-resolved profile
 const RenderItem = React.memo(
   ({
     item,
@@ -18,9 +17,7 @@ const RenderItem = React.memo(
     profile: any;
     isLoadingProfiles?: boolean;
   }) => {
-    // Only show loading if we're still fetching profiles AND this specific contact doesn't have profile data yet
     const shouldShowLoading = isLoadingProfiles && !profile;
-
     return <ContactItem item={item} profile={profile} isLoadingProfile={shouldShowLoading} />;
   }
 );
@@ -35,6 +32,8 @@ interface DraggableContactsListProps {
   emptyMessage: string;
 }
 
+let fallbackKeyCounter = 0;
+
 export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   profilesMap,
   data,
@@ -42,19 +41,12 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   isLoadingProfiles = false,
   emptyMessage,
 }) => {
-  const [foreground, surfaceForeground, muted] = useThemeColor(['foreground', 'surface-foreground', 'muted'] as const);
-
-  const primary50 = surfaceForeground;
-  const accentColor = muted;
-  const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
-
-  const keyExtractor = useCallback((item: any) => {
-    return item.pubkey || item.mint?.mintUrl || item.id || Math.random().toString();
-  }, []);
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+  const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
 
   if (isDecrypting) {
     return (
-      <RNView style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
+      <RNView style={emptyStateStyles.container}>
         <Text style={{ color: opacity(foreground, 0.4), textAlign: 'center' }}>
           Decrypting messages...
         </Text>
@@ -64,10 +56,8 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
 
   if (data.length === 0) {
     return (
-      <RNView style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 80 }}>
-        <Text style={{ color: opacity(foreground, 0.4), textAlign: 'center' }}>
-          {emptyMessage}
-        </Text>
+      <RNView style={emptyStateStyles.container}>
+        <Text style={{ color: opacity(foreground, 0.4), textAlign: 'center' }}>{emptyMessage}</Text>
       </RNView>
     );
   }
@@ -78,14 +68,15 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ flexGrow: 0, paddingBottom: 120 }}>
       <RNView style={[styles.card, { borderColor }]}>
-        <ProfilesCardFrame accentColor={accentColor} highlightColor={primary50}>
+        <BlurCardFrame accentColor={muted}>
           <View style={styles.content} className="gap-4">
             {data.map((item) => {
-              // Look up profile here so re-renders happen when profiles change
               const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
+              const key =
+                item.pubkey || item.mint?.mintUrl || item.id || `fallback-${fallbackKeyCounter++}`;
               return (
                 <RenderItem
-                  key={keyExtractor(item)}
+                  key={key}
                   item={item}
                   profile={profile}
                   isLoadingProfiles={isLoadingProfiles}
@@ -93,11 +84,20 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
               );
             })}
           </View>
-        </ProfilesCardFrame>
+        </BlurCardFrame>
       </RNView>
     </ScrollView>
   );
 };
+
+const emptyStateStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 80,
+  },
+});
 
 const styles = StyleSheet.create({
   card: {

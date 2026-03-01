@@ -1,12 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { VStack } from 'components/ui/View/VStack';
-import { HStack } from 'components/ui/View/HStack';
-import { View } from 'components/ui/View/View';
-import { Text } from 'components/ui/Text';
-import { convertTime } from 'helper/time';
 import { StyleSheet } from 'react-native';
+
+import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
+import opacity from 'hex-color-opacity';
 import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
-import Icon from 'assets/icons';
+
 import type {
   HistoryEntry,
   MintHistoryEntry,
@@ -14,10 +12,21 @@ import type {
   SendHistoryEntry,
   ReceiveHistoryEntry,
 } from 'coco-cashu-core';
-import { mintHistoryEntryExpired, getMintHistoryEntryTimeUntilExpiry } from 'helper/utils';
-import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
-import opacity from 'hex-color-opacity';
+
+import Icon from 'assets/icons';
+import { Text } from 'components/ui/Text';
+import { HStack } from 'components/ui/View/HStack';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
+import { convertTime } from 'helper/time';
+import {
+  meltQuoteExpired,
+  getMeltQuoteTimeUntilExpiry,
+  mintHistoryEntryExpired,
+  getMintHistoryEntryTimeUntilExpiry,
+} from 'helper/utils';
 import { useThemeColor } from 'hooks/useThemeColor';
+
 interface HistoryEntryTimelineProps {
   historyEntry: HistoryEntry;
   meltQuote?: MeltQuoteBolt11Response;
@@ -157,7 +166,7 @@ function buildTimeline({
       const isExpired =
         meltQuote &&
         meltTx.state === MeltQuoteState.UNPAID &&
-        isMeltQuoteExpired(meltQuote, currentTime);
+        meltQuoteExpired(meltQuote, currentTime);
 
       if (isExpired) {
         return [
@@ -377,7 +386,6 @@ interface TimelineDotProps {
 
 function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }: TimelineDotProps) {
   const dotSize = 14;
-  const _smallDotSize = 6;
   const iconSize = 14;
 
   // Future small dot
@@ -401,45 +409,30 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
     const border = opacity(greyColor, 0.32);
     return (
       <View
-        style={[
-          {
-            width: 20,
-            height: 20,
-            borderRadius: dotSize / 2,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: bg,
-            borderWidth: 1,
-            borderColor: border,
-          },
-          // boxShadow && {
-          //   shadowColor: greenColor,
-          //   shadowOffset: { width: 0, height: 0 },
-          //   shadowOpacity: 0.5,
-          //   shadowRadius: 4,
-          //   elevation: 4,
-          // },
-        ]}>
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: dotSize / 2,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: bg,
+          borderWidth: 1,
+          borderColor: border,
+        }}>
         <Icon name="mdi:clock-outline" color={opacity('#FFFFFF', 0.7)} size={iconSize} />
       </View>
     );
   }
 
-  // Get background color and icon based on step type
   let backgroundColor = greenColor;
   let iconName = 'fluent:checkmark-16-filled';
-  let _boxShadow = false;
 
   switch (stepType) {
     case 'complete':
     case 'success':
-      backgroundColor = greenColor;
-      iconName = 'fluent:checkmark-16-filled';
-      break;
     case 'current':
       backgroundColor = greenColor;
       iconName = 'fluent:checkmark-16-filled';
-      _boxShadow = true;
       break;
     case 'expired':
       backgroundColor = redColor;
@@ -455,32 +448,21 @@ function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }:
       break;
   }
 
-  // Match the more "polished" icon container treatment used elsewhere (tinted bg + subtle border),
-  // instead of flat solid circles.
   const bg = opacity(backgroundColor, 0.18);
   const border = opacity(backgroundColor, 0.32);
 
   return (
     <View
-      style={[
-        {
-          width: 20,
-          height: 20,
-          borderRadius: dotSize / 2,
-          backgroundColor: bg,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderWidth: 1,
-          borderColor: border,
-        },
-        // boxShadow && {
-        //   shadowColor: greenColor,
-        //   shadowOffset: { width: 0, height: 0 },
-        //   shadowOpacity: 0.5,
-        //   shadowRadius: 4,
-        //   elevation: 4,
-        // },
-      ]}>
+      style={{
+        width: 20,
+        height: 20,
+        borderRadius: dotSize / 2,
+        backgroundColor: bg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: border,
+      }}>
       <Icon name={iconName} color={backgroundColor} size={iconSize} />
     </View>
   );
@@ -542,39 +524,6 @@ function TimelineLine({
     />
   );
 }
-
-// ============ Helper Functions ============
-
-// Helper function to check if melt quote is expired
-const isMeltQuoteExpired = (meltQuote: MeltQuoteBolt11Response, currentTime: number): boolean => {
-  if (!meltQuote.expiry) return false;
-  const now = Math.floor(currentTime / 1000);
-  return now > meltQuote.expiry;
-};
-
-// Helper function to get time until expiry for melt quotes
-const getMeltQuoteTimeUntilExpiry = (
-  meltQuote: MeltQuoteBolt11Response,
-  currentTime: number
-): string => {
-  if (!meltQuote.expiry) return '';
-  const now = Math.floor(currentTime / 1000);
-  const timeLeft = meltQuote.expiry - now;
-
-  if (timeLeft <= 0) return '';
-
-  const hours = Math.floor(timeLeft / 3600);
-  const minutes = Math.floor((timeLeft % 3600) / 60);
-  const seconds = timeLeft % 60;
-
-  if (hours > 0) {
-    return `expires in ${hours}h ${minutes}m ${seconds}s`;
-  } else if (minutes > 0) {
-    return `expires in ${minutes}m ${seconds}s`;
-  } else {
-    return `expires in ${seconds}s`;
-  }
-};
 
 // Get card label (e.g., "MINT • AWAITING PAYMENT")
 const getCardLabel = (
@@ -705,9 +654,8 @@ export function HistoryEntryTimeline({
 
   const orangeColor = '#fb923c';
   const greyColor = muted;
-  const primaryWhite = foreground;
-  const primaryGrey200 = opacity(foreground, 0.66);
-  const primaryGrey300 = opacity(foreground, 0.5);
+  const foreground66 = opacity(foreground, 0.66);
+  const foreground50 = opacity(foreground, 0.5);
 
   // Update time every second for real-time countdown
   useEffect(() => {
@@ -735,7 +683,7 @@ export function HistoryEntryTimeline({
 
   // Get expiry info
   const getExpiryBadge = (): string | null => {
-    if (historyEntry.type === 'melt' && meltQuote && !isMeltQuoteExpired(meltQuote, currentTime)) {
+    if (historyEntry.type === 'melt' && meltQuote && !meltQuoteExpired(meltQuote, currentTime)) {
       const expiryInfo = getMeltQuoteTimeUntilExpiry(meltQuote, currentTime);
       if (expiryInfo) return expiryInfo;
     }
@@ -787,26 +735,23 @@ export function HistoryEntryTimeline({
       case 'warning':
         return orangeColor;
       default:
-        return primaryGrey200;
+        return foreground66;
     }
   };
 
   // Get text color for state label
   const getStateTextColor = (stepType: TimelineStepType, isFuture: boolean) => {
-    if (isFuture) return primaryGrey300;
+    if (isFuture) return foreground50;
     if (stepType === 'expired') return redColor;
     if (stepType === 'already-spent') return orangeColor;
     if (stepType === 'rolled-back') return orangeColor;
-    return primaryWhite;
+    return foreground;
   };
 
   return (
-    <View
-      // blur
-      className="bg-surface-secondary"
-      style={styles.card}>
+    <View className="bg-surface-secondary mx-4 rounded-2xl p-5">
       {/* Card Label */}
-      <Text size={11} bold style={[styles.cardLabel, { color: primaryGrey300 }]}>
+      <Text size={11} bold style={[styles.cardLabel, { color: foreground50 }]}>
         {cardLabel}
       </Text>
 
@@ -887,21 +832,12 @@ export function HistoryEntryTimeline({
                     {item.displayLabel}
                   </Text>
                   {item.timestamp && (
-                    <Text
-                      size={13}
-                      style={{
-                        color: primaryGrey200,
-                      }}>
+                    <Text size={13} style={{ color: foreground66 }}>
                       {convertTime(new Date(item.timestamp))}
                     </Text>
                   )}
                   {item.info && (
-                    <Text
-                      size={12}
-                      style={{
-                        color: primaryGrey200,
-                        marginTop: 2,
-                      }}>
+                    <Text size={12} style={{ color: foreground66, marginTop: 2 }}>
                       {item.info}
                     </Text>
                   )}
@@ -916,11 +852,6 @@ export function HistoryEntryTimeline({
 }
 
 const styles = StyleSheet.create({
-  card: {
-    padding: 20,
-    marginHorizontal: 16,
-    borderRadius: 16,
-  },
   cardLabel: {
     marginBottom: 8,
     textTransform: 'uppercase',

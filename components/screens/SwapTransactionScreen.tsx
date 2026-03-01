@@ -43,6 +43,7 @@ import {
 } from 'components/ui/TransferLegCard';
 import { convertTime } from 'helper/time';
 import { formatAmount } from 'helper/currency';
+import { getMintDisplayName } from 'helper/url';
 import { useMintManagement } from 'hooks/coco/useMintManagement';
 import Icon from 'assets/icons';
 import { router } from 'expo-router';
@@ -57,14 +58,6 @@ interface Props {
 // -----------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------
-
-function extractDomain(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
-}
 
 /** Groups consecutive legs that share a chainId into a single visual group. */
 interface LegGroup {
@@ -168,8 +161,8 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
   const dstUrl = lastLeg?.toMintUrl ?? '';
   const srcInfo = mintInfoMap[srcUrl];
   const dstInfo = mintInfoMap[dstUrl];
-  const srcName = srcInfo?.name || extractDomain(srcUrl);
-  const dstName = dstInfo?.name || extractDomain(dstUrl);
+  const srcName = getMintDisplayName(srcUrl, srcInfo);
+  const dstName = getMintDisplayName(dstUrl, dstInfo);
 
   return (
     <View style={styles.collapsedRow}>
@@ -451,8 +444,8 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
                       const fromInfo = mintInfoMap[leg.fromMintUrl];
                       const toInfo = mintInfoMap[leg.toMintUrl];
-                      const fromName = fromInfo?.name || extractDomain(leg.fromMintUrl);
-                      const toName = toInfo?.name || extractDomain(leg.toMintUrl);
+                      const fromName = getMintDisplayName(leg.fromMintUrl, fromInfo);
+                      const toName = getMintDisplayName(leg.toMintUrl, toInfo);
                       const hasError = leg.localStatus === 'failed';
 
                       // Skip the separator between chained legs when the previous

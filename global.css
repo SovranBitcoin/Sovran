@@ -54,6 +54,9 @@
   --color-gradient-200: var(--gradient-200);
   --color-gradient-300: var(--gradient-300);
 
+  /* Skeleton loading placeholder — decoupled from accent */
+  --color-skeleton: var(--skeleton);
+
   /* Backward-compat aliases for shadcn class names -> HeroUI tokens */
   --color-card: var(--surface);
   --color-card-foreground: var(--surface-foreground);

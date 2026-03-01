@@ -6,35 +6,38 @@
  */
 
 import React, { useCallback, useState, useEffect, useRef } from 'react';
+
 import { router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
-import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { useCameraPermissions } from 'expo-camera';
+
+import opacity from 'hex-color-opacity';
+import { ListGroup, PressableFeedback } from 'heroui-native';
+
+import type { ReceiveHistoryEntry, Keypair } from 'coco-cashu-core';
+import { useManager } from 'coco-cashu-react';
+
+import { buildReceiveHistoryEntry, isValidEcashToken } from '@/helper/coco/utils';
+import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { popup } from '@/helper/popup';
-import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { decode, isEncoded } from 'helper/third-party/emoji';
+import { PaymentInfo } from 'components/blocks/PaymentInfo';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
+import { ModalScreenLayout } from 'components/layouts/ModalScreenLayout';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
+import { EnhancedHaptics } from 'components/ui/Haptics';
+import { Tabs } from 'components/ui/Tabs';
+import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
+import { decode, isEncoded } from 'helper/third-party/emoji';
+import { truncateMiddle } from 'helper/strings';
+import { useThemeColor } from 'hooks/useThemeColor';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { Section } from 'app/settings-pages';
 import Icon from 'assets/icons';
-import { getDecodedToken, type ReceiveHistoryEntry, type Keypair } from 'coco-cashu-core';
-import { Text } from 'components/ui/Text';
-import opacity from 'hex-color-opacity';
-import { truncateMiddle } from 'helper/strings';
-import { Proof } from '@cashu/cashu-ts';
-import { isValidEcashToken } from '@/helper/coco/utils';
-import { EnhancedHaptics } from 'components/ui/Haptics';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { Tabs } from 'components/ui/Tabs';
 import { useSettingsStore } from 'stores/settingsStore';
-import { useManager } from 'coco-cashu-react';
-import { ModalScreenLayout } from 'components/layouts/ModalScreenLayout';
-import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useMintStore } from 'stores/mintStore';
 import { useNpcMintStore } from 'stores/npcMintStore';
-import { ListGroup, PressableFeedback } from 'heroui-native';
-import { useThemeColor } from 'hooks/useThemeColor';
 
 interface ReceiveScreenProps {
   unit: string;
@@ -124,19 +127,7 @@ export function ReceiveScreen({
   }, []);
 
   const handleEcashToken = ({ token }: { token: string }): void => {
-    const decodedToken = getDecodedToken(token);
-    const receiveHistoryEntry: ReceiveHistoryEntry = {
-      id: `receive-${Date.now()}`,
-      type: 'receive',
-      amount: decodedToken.proofs.reduce((sum: number, proof: Proof) => sum + proof.amount, 0),
-      unit: unit,
-      mintUrl: decodedToken.mint,
-      createdAt: Date.now(),
-      metadata: { rawToken: token },
-      token: decodedToken,
-    };
-
-    onReceiveToken(receiveHistoryEntry);
+    onReceiveToken(buildReceiveHistoryEntry(token, unit));
   };
 
   const handleEcashPaste = async (): Promise<void> => {
@@ -262,11 +253,7 @@ export function ReceiveScreen({
                       </ListGroup.ItemTitle>
                     </ListGroup.ItemContent>
                     <ListGroup.ItemSuffix>
-                      <Icon
-                        name="lets-icons:copy"
-                        size={20}
-                        color={opacity(foreground, 0.4)}
-                      />
+                      <Icon name="lets-icons:copy" size={20} color={opacity(foreground, 0.4)} />
                     </ListGroup.ItemSuffix>
                   </ListGroup.Item>
                 </PressableFeedback.Scale>
@@ -303,11 +290,7 @@ export function ReceiveScreen({
                   <PressableFeedback.Scale>
                     <ListGroup.Item disabled>
                       <ListGroup.ItemPrefix>
-                        <Icon
-                          name="solar:key-bold"
-                          size={20}
-                          color={opacity(foreground, 0.4)}
-                        />
+                        <Icon name="solar:key-bold" size={20} color={opacity(foreground, 0.4)} />
                       </ListGroup.ItemPrefix>
                       <ListGroup.ItemContent>
                         <ListGroup.ItemTitle>
@@ -315,11 +298,7 @@ export function ReceiveScreen({
                         </ListGroup.ItemTitle>
                       </ListGroup.ItemContent>
                       <ListGroup.ItemSuffix>
-                        <Icon
-                          name="lets-icons:copy"
-                          size={20}
-                          color={opacity(foreground, 0.4)}
-                        />
+                        <Icon name="lets-icons:copy" size={20} color={opacity(foreground, 0.4)} />
                       </ListGroup.ItemSuffix>
                     </ListGroup.Item>
                   </PressableFeedback.Scale>

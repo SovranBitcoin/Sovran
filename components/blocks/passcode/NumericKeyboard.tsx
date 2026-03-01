@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { Button } from 'components/ui/Button';
 import { VStack } from 'components/ui/View/VStack';
@@ -18,10 +18,15 @@ interface KeyButtonProps {
   onPress: (value: KeyVal) => void;
 }
 
+const TEXT_SHADOW = {
+  textShadowColor: 'rgba(0,0,0,0.5)',
+  textShadowOffset: { width: 0, height: 0 },
+  textShadowRadius: 8,
+} as const;
+
 const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
-  // Handle empty values (don't render button)
   if (!value) {
-    return <View style={{ flex: 1, marginHorizontal: 0.5 }} />;
+    return <View className="flex-1" style={{ marginHorizontal: 0.5 }} />;
   }
 
   return (
@@ -42,31 +47,11 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
       text={
         <VStack align="center" justify="center" flex={1}>
           {value === '<' ? (
-            <Text
-              size={32}
-              bold
-              overpass
-              className="text-white-0"
-              style={{
-                textShadowColor: 'rgba(0,0,0,0.5)',
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 8,
-              }}>
+            <Text size={32} bold overpass className="text-white-0" style={TEXT_SHADOW}>
               ⌫
             </Text>
           ) : (
-            <Text
-              size={32}
-              bold
-              overpass
-              className="text-white-0"
-              style={{
-                padding: 16,
-                paddingHorizontal: 24,
-                textShadowColor: 'rgba(0,0,0,0.5)',
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 8,
-              }}>
+            <Text size={32} bold overpass className="text-white-0 p-4 px-6" style={TEXT_SHADOW}>
               {value}
             </Text>
           )}
@@ -77,22 +62,20 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
 };
 
 const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
-  const [, setInputValue] = useState('');
+  const inputRef = useRef('');
 
   const handlePress = useCallback(
     (value: KeyVal) => {
-      setInputValue((prev) => {
-        let newValue = prev;
-        if (String(value) === '<') {
-          EnhancedHaptics.actionHaptic();
-          newValue = prev.slice(0, -1);
-        } else {
-          EnhancedHaptics.buttonHaptic();
-          newValue = prev + String(value);
-        }
-        onKeyPress(newValue);
-        return newValue;
-      });
+      let newValue: string;
+      if (String(value) === '<') {
+        EnhancedHaptics.actionHaptic();
+        newValue = inputRef.current.slice(0, -1);
+      } else {
+        EnhancedHaptics.buttonHaptic();
+        newValue = inputRef.current + String(value);
+      }
+      inputRef.current = newValue;
+      onKeyPress(newValue);
     },
     [onKeyPress]
   );
@@ -112,11 +95,7 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
   return (
     <VStack align="center" className="bg-transparent">
       {buttons.map((row, rowIndex) => (
-        <HStack
-          key={rowIndex}
-          justify="space-between"
-          className="bg-transparent"
-          style={{ width: '100%' }}>
+        <HStack key={rowIndex} justify="space-between" className="w-full bg-transparent">
           {row.map(renderButton)}
           {rowIndex < buttons.length - 1 && <Spacer size={1} />}
         </HStack>

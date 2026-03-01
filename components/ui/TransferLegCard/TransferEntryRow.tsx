@@ -64,7 +64,12 @@ export const TransferEntryRow = React.memo(
     onPress,
     statusIcon,
   }: TransferEntryRowProps) => {
-    const [foreground, accent, danger, success] = useThemeColor(['foreground', 'accent', 'danger', 'success'] as const);
+    const [foreground, accent, danger, success] = useThemeColor([
+      'foreground',
+      'accent',
+      'danger',
+      'success',
+    ] as const);
 
     const isSend = type === 'send';
     const amountColor = isSend ? danger : success;

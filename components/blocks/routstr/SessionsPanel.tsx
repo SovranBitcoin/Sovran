@@ -34,6 +34,7 @@ import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { useRoutstrStore, RoutstrSession } from 'stores/routstrStore';
 import { getUsername } from 'helper/username';
 import { useThemeColor } from 'hooks/useThemeColor';
+
 interface SessionsPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -49,7 +50,6 @@ const ANIMATION_CONFIG = {
   duration: 300,
 };
 
-// Utility functions
 function formatBalance(msats: number | null): string {
   if (msats === null) return 'Unknown';
   if (msats >= 1000) {
@@ -62,14 +62,11 @@ function extractModelName(modelId: string, availableModels: any[]): string {
   const model = availableModels.find((m) => m.id === modelId);
   if (!model) return modelId;
 
-  // Try to extract from canonical_slug first
   const slugParts = model.canonical_slug?.split('/') || [];
   let modelName = slugParts[1] || model.name;
 
-  // Remove date suffix if present
   modelName = modelName.replace(/-\d{8}$/, '');
 
-  // If name includes provider prefix, extract just the model part
   if (model.name?.includes(':')) {
     const nameParts = model.name.split(':');
     if (nameParts.length > 1) {
@@ -80,19 +77,52 @@ function extractModelName(modelId: string, availableModels: any[]): string {
   return modelName || modelId;
 }
 
+/**
+ * Single row in the actions list (settings-style). Renders icon + label + chevron.
+ */
+const ActionRow: React.FC<{
+  icon: string;
+  label: string;
+  onPress?: () => void;
+  isFirst?: boolean;
+}> = ({ icon, label, onPress, isFirst }) => {
+  const [foreground, surfaceSecondary, surfaceTertiary] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'surface-tertiary',
+  ] as const);
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={{
+        backgroundColor: surfaceSecondary,
+        padding: 12,
+        ...(!isFirst && { borderTopWidth: 1, borderTopColor: surfaceTertiary }),
+      }}>
+      <HStack align="center" spacing={8}>
+        <Icon name={icon} size={18} color={foreground} />
+        <Text size={16} className="text-foreground">
+          {label}
+        </Text>
+        <View className="flex-1" />
+        <Icon name="fa6-solid:chevron-right" size={14} color={opacity(foreground, 0.4)} />
+      </HStack>
+    </TouchableOpacity>
+  );
+};
+
 const SessionItem: React.FC<{
   session: RoutstrSession;
   isCurrent: boolean;
   onPress: () => void;
 }> = ({ session, isCurrent, onPress }) => {
-  const [foreground, accent, surfaceSecondary, shade400] = useThemeColor([
+  const [foreground, accent, surfaceSecondary] = useThemeColor([
     'foreground',
     'accent',
     'surface-secondary',
-    'shade-400',
   ] as const);
 
-  // Format date/time
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -123,7 +153,7 @@ const SessionItem: React.FC<{
       <HStack align="center" justify="space-between">
         <VStack flex={1} spacing={4}>
           <HStack align="center" spacing={8}>
-            <Text weight="heavy" size={16} style={{ color: foreground }} numberOfLines={1}>
+            <Text weight="heavy" size={16} className="text-foreground" numberOfLines={1}>
               {session.title}
             </Text>
             {isCurrent && (
@@ -135,7 +165,7 @@ const SessionItem: React.FC<{
               ? `${session.messages.length} message${session.messages.length !== 1 ? 's' : ''}`
               : 'No messages yet'}
           </Text>
-          <Text size={10} style={{ color: shade400 }}>
+          <Text size={10} className="text-shade-400">
             {formatDate(session.createdAt)}
           </Text>
         </VStack>
@@ -156,10 +186,9 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
 }) => {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const [foreground, surface, surfaceSecondary, surfaceTertiary, shade400] = useThemeColor([
+  const [foreground, surface, surfaceTertiary, shade400] = useThemeColor([
     'foreground',
     'surface',
-    'surface-secondary',
     'surface-tertiary',
     'shade-400',
   ] as const);
@@ -175,7 +204,6 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
   } = useRoutstrStore();
 
   const [internalSearchQuery, setInternalSearchQuery] = useState('');
-  // Use external search query from parent header when provided, otherwise use internal
   const searchQuery = externalSearchQuery ?? internalSearchQuery;
   const translateX = useSharedValue(-width);
   const backdropOpacity = useSharedValue(0);
@@ -187,7 +215,6 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
   const selectedModelId = getSelectedModel();
   const availableModels = useMemo(() => getCachedModels() || [], [getCachedModels]);
 
-  // Fetch user metadata for profile display (current user, not Routstr)
   const userPubkey = nostrKeys?.pubkey;
   const metadataFilters = useMemo(
     () =>
@@ -215,7 +242,6 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
     return extractModelName(selectedModelId, availableModels);
   }, [selectedModelId, availableModels]);
 
-  // Filter sessions by search query
   const filteredSessions = sessions.filter((session) =>
     session.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -227,7 +253,6 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
     } else {
       translateX.value = withTiming(-width, ANIMATION_CONFIG);
       backdropOpacity.value = withTiming(0, ANIMATION_CONFIG);
-      // Clear internal search when closing
       setInternalSearchQuery('');
     }
   }, [isOpen, width, translateX, backdropOpacity]);
@@ -251,38 +276,32 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
     onClose();
   }, [onClose]);
 
-  // Pan gesture handler for swipe-to-close
   const panGesture = Gesture.Pan()
     .onStart(() => {
       panStartX.value = translateX.value;
     })
     .onUpdate((event) => {
-      // Only allow leftward swipes (negative translationX)
       if (event.translationX < 0) {
         const newX = Math.max(panStartX.value + event.translationX, -width);
         translateX.value = newX;
-        // Update backdrop opacity based on panel position
         const progress = Math.abs(newX) / width;
         backdropOpacity.value = Math.max(0, 0.5 * (1 - progress));
       }
     })
     .onEnd((event) => {
-      const threshold = width * 0.3; // Close if swiped more than 30% of width
+      const threshold = width * 0.3;
       const velocity = event.velocityX;
 
       if (event.translationX < -threshold || velocity < -500) {
-        // Close panel
         translateX.value = withTiming(-width, ANIMATION_CONFIG);
         backdropOpacity.value = withTiming(0, ANIMATION_CONFIG);
         runOnJS(onClose)();
       } else {
-        // Snap back
         translateX.value = withTiming(0, ANIMATION_CONFIG);
         backdropOpacity.value = withTiming(0.5, ANIMATION_CONFIG);
       }
     });
 
-  // Animated styles
   const panelStyle = useAnimatedStyle(() => {
     const isFullyClosed = translateX.value === -width;
     return {
@@ -366,7 +385,6 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                   bottom: 0,
                   width: width,
                   backgroundColor: surface,
-                  paddingTop: 0,
                   paddingBottom: insets.bottom,
                   shadowColor: '#000',
                   shadowOffset: { width: 2, height: 0 },
@@ -376,8 +394,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                 },
                 panelStyle,
               ]}>
-              <VStack flex={1} style={{ paddingHorizontal: 16, paddingBottom: 0 }}>
-                {/* Sessions List with Action Buttons */}
+              <VStack flex={1} className="px-4">
                 <FlatList
                   data={filteredSessions}
                   renderItem={renderItem}
@@ -389,101 +406,21 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                   }}
                   ListHeaderComponent={
                     <>
-                      {/* Action Buttons (settings-style rows) */}
-                      <View
-                        style={{
-                          borderRadius: 12,
-                          overflow: 'hidden',
-                          marginBottom: 16,
-                        }}>
-                        <TouchableOpacity
+                      <View className="mb-4 overflow-hidden rounded-xl">
+                        <ActionRow
+                          icon="lucide:square-pen"
+                          label="New Session"
                           onPress={handleNewSession}
-                          style={{
-                            backgroundColor: surfaceSecondary,
-                            padding: 12,
-                            borderTopLeftRadius: 12,
-                            borderTopRightRadius: 12,
-                          }}>
-                          <HStack align="center" spacing={8}>
-                            <Icon name="lucide:square-pen" size={18} color={foreground} />
-                            <Text size={16} style={{ color: foreground }}>
-                              New Session
-                            </Text>
-                            <View style={{ flex: 1 }} />
-                            <Icon
-                              name="fa6-solid:chevron-right"
-                              size={14}
-                              color={opacity(foreground, 0.4)}
-                            />
-                          </HStack>
-                        </TouchableOpacity>
-                        <TouchableOpacity
+                          isFirst
+                        />
+                        <ActionRow
+                          icon="ic:round-refresh"
+                          label="Refresh Balance"
                           onPress={onRefreshBalance}
-                          style={{
-                            backgroundColor: surfaceSecondary,
-                            padding: 12,
-                            borderTopWidth: 1,
-                            borderTopColor: surfaceTertiary,
-                          }}>
-                          <HStack align="center" spacing={8}>
-                            <Icon name="ic:round-refresh" size={18} color={foreground} />
-                            <Text size={16} style={{ color: foreground }}>
-                              Refresh Balance
-                            </Text>
-                            <View style={{ flex: 1 }} />
-                            <Icon
-                              name="fa6-solid:chevron-right"
-                              size={14}
-                              color={opacity(foreground, 0.4)}
-                            />
-                          </HStack>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={onTopUp}
-                          style={{
-                            backgroundColor: surfaceSecondary,
-                            padding: 12,
-                            borderTopWidth: 1,
-                            borderTopColor: surfaceTertiary,
-                          }}>
-                          <HStack align="center" spacing={8}>
-                            <Icon name="ph:coins" size={18} color={foreground} />
-                            <Text size={16} style={{ color: foreground }}>
-                              Top Up Balance
-                            </Text>
-                            <View style={{ flex: 1 }} />
-                            <Icon
-                              name="fa6-solid:chevron-right"
-                              size={14}
-                              color={opacity(foreground, 0.4)}
-                            />
-                          </HStack>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={onSwitchModel}
-                          style={{
-                            backgroundColor: surfaceSecondary,
-                            padding: 12,
-                            borderTopWidth: 1,
-                            borderTopColor: surfaceTertiary,
-                            borderBottomLeftRadius: 12,
-                            borderBottomRightRadius: 12,
-                          }}>
-                          <HStack align="center" spacing={8}>
-                            <Icon name="mdi:robot" size={18} color={foreground} />
-                            <Text size={16} style={{ color: foreground }}>
-                              Switch Model
-                            </Text>
-                            <View style={{ flex: 1 }} />
-                            <Icon
-                              name="fa6-solid:chevron-right"
-                              size={14}
-                              color={opacity(foreground, 0.4)}
-                            />
-                          </HStack>
-                        </TouchableOpacity>
+                        />
+                        <ActionRow icon="ph:coins" label="Top Up Balance" onPress={onTopUp} />
+                        <ActionRow icon="mdi:robot" label="Switch Model" onPress={onSwitchModel} />
                       </View>
-                      {/* Sessions section header */}
                       {filteredSessions.length > 0 && (
                         <Text
                           size={13}
@@ -491,11 +428,9 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                           overpass
                           style={{
                             color: opacity(foreground, 0.5),
-                            marginBottom: 8,
-                            marginLeft: 4,
-                            textTransform: 'uppercase',
                             letterSpacing: 0.5,
-                          }}>
+                          }}
+                          className="mb-2 ml-1 uppercase">
                           Sessions
                         </Text>
                       )}
@@ -503,12 +438,8 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                   }
                   ListEmptyComponent={
                     searchQuery ? (
-                      <VStack align="center" justify="center" style={{ paddingTop: 32 }}>
-                        <Text
-                          style={{
-                            color: opacity(foreground, 0.4),
-                            textAlign: 'center',
-                          }}>
+                      <VStack align="center" justify="center" className="pt-8">
+                        <Text className="text-center" style={{ color: opacity(foreground, 0.4) }}>
                           No sessions found
                         </Text>
                       </VStack>
@@ -516,7 +447,6 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                   }
                 />
 
-                {/* Profile Information at Bottom - Absolutely Positioned with Blur */}
                 {userPubkey && (
                   <View
                     blur
@@ -543,14 +473,8 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                         variant="person"
                         loading={isMetadataLoading}
                       />
-                      <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
-                        <Text
-                          size={16}
-                          bold
-                          style={{
-                            color: foreground,
-                          }}
-                          numberOfLines={1}>
+                      <VStack spacing={2} className="min-w-0 flex-1">
+                        <Text size={16} bold className="text-foreground" numberOfLines={1}>
                           {username}
                         </Text>
                         <HStack align="center" justify="flex-start" spacing={4}>
@@ -559,12 +483,12 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                             size={14}
                             color={shade400}
                           />
-                          <Text size={12} style={{ color: shade400 }}>
+                          <Text size={12} className="text-shade-400">
                             {formatBalance(balance)}
                           </Text>
                           <Spacer size={4} />
                           <Icon name="mdi:robot" size={14} color={shade400} />
-                          <Text size={12} style={{ color: shade400 }} numberOfLines={1}>
+                          <Text size={12} className="text-shade-400" numberOfLines={1}>
                             {selectedModelName}
                           </Text>
                         </HStack>

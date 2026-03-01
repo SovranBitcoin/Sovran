@@ -43,7 +43,12 @@ const HeroTransitionContext = createContext<Ctx | null>(null);
 const DURATION_MS = 520;
 
 export function HeroTransitionProvider({ children }: { children: React.ReactNode }) {
-  const [background, surfaceForeground, red, green] = useThemeColor(['background', 'surface-foreground', 'danger', 'green-400'] as const);
+  const [background, surfaceForeground, red, green] = useThemeColor([
+    'background',
+    'surface-foreground',
+    'danger',
+    'green-400',
+  ] as const);
   const primary950 = background;
   const primary50 = surfaceForeground;
   const gold = '#f59e0b';

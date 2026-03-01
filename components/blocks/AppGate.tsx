@@ -1,22 +1,25 @@
 import React from 'react';
+
 import { useSettingsStore } from 'stores/settingsStore';
 import TermsConditionsScreen from 'app/settings-pages/terms';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import OnboardingScreen from 'components/blocks/onboarding/OnboardingScreen';
 
 interface AppGateProps {
   children: React.ReactNode;
 }
 
 /**
- * AppGate component handles app-level checks like terms acceptance and onboarding
- * This prevents unnecessary hook execution in child components when these checks fail
+ * AppGate gates the app behind terms acceptance, onboarding, and key readiness.
+ * Order: Terms → Onboarding carousel → Keys loading → App
  */
 const AppGate: React.FC<AppGateProps> = ({ children }) => {
   const { isReady, isLoading } = useNostrKeysContext();
   const isTermsAccepted = useSettingsStore((state) => state.isTermsAccepted());
   const acceptTerms = useSettingsStore((state) => state.acceptTerms);
+  const hasSeenOnboarding = useSettingsStore((state) => state.hasSeenOnboarding);
+  const completeOnboarding = useSettingsStore((state) => state.completeOnboarding);
 
-  // Check if terms have been accepted
   if (!isTermsAccepted) {
     return (
       <TermsConditionsScreen
@@ -27,12 +30,14 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
     );
   }
 
-  // Don't show onboarding while keys are still loading
-  if (isLoading || !isReady) {
-    return null; // The NostrKeysProvider will show its own loading screen
+  if (!hasSeenOnboarding) {
+    return <OnboardingScreen onComplete={completeOnboarding} />;
   }
 
-  // If all checks pass, render the children
+  if (isLoading || !isReady) {
+    return null;
+  }
+
   return <>{children}</>;
 };
 

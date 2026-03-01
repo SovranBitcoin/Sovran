@@ -142,14 +142,11 @@ const MonthlyChart = React.memo(function MonthlyChart({
 
   const config = MODE_CONFIG[mode];
 
-  const accentColor = muted;
-  const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
-
-  const primary0 = foreground;
+  const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
 
   const actualLineColor = mode === 'spent' ? shade100 : successColor;
-  const projectedLineColor = useMemo(() => opacity(primary0, 0.3), [primary0]);
-  const labelColor = useMemo(() => opacity(primary0, 0.66), [primary0]);
+  const projectedLineColor = useMemo(() => opacity(foreground, 0.3), [foreground]);
+  const labelColor = useMemo(() => opacity(foreground, 0.66), [foreground]);
 
   // Use a unique gradient ID per mode to avoid SVG collisions when both charts render
   const gradientId = `monthlyGradient-${mode}`;
@@ -286,12 +283,12 @@ const MonthlyChart = React.memo(function MonthlyChart({
 
   return (
     <RNView style={[styles.card, { borderColor }]}>
-      <BlurCardFrame accentColor={accentColor}>
+      <BlurCardFrame accentColor={muted}>
         <RNView style={styles.container}>
           {/* Header */}
           <RNView style={styles.header}>
             <RNView style={styles.headerLeft}>
-              <Text size={14} semibold color={opacity(primary0, 0.66)}>
+              <Text size={14} semibold color={opacity(foreground, 0.66)}>
                 {config.title}
               </Text>
               <RNView style={styles.amountRow}>
@@ -322,7 +319,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
                   unit={unit}
                   size={14}
                   weight="medium"
-                  color={opacity(primary0, 0.66)}
+                  color={opacity(foreground, 0.66)}
                 />
               </RNView>
             ) : null}
@@ -335,8 +332,8 @@ const MonthlyChart = React.memo(function MonthlyChart({
             viewBox={`0 0 ${chartWidth} ${totalSvgHeight}`}>
             <Defs>
               <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor={primary0} stopOpacity="0.08" />
-                <Stop offset="1" stopColor={primary0} stopOpacity="0" />
+                <Stop offset="0" stopColor={foreground} stopOpacity="0.08" />
+                <Stop offset="1" stopColor={foreground} stopOpacity="0" />
               </LinearGradient>
             </Defs>
 

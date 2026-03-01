@@ -4,7 +4,6 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
-import { formatCustomDate } from 'helper/time';
 import { Link } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import { PUBLIC_KEYS } from '@/helper/constants';
@@ -40,11 +39,6 @@ const styles = {
     flex: 1,
   },
   profileName: {
-    fontFamily: 'OverpassBold',
-    fontSize: 16,
-  },
-  date: {
-    marginLeft: 8,
     fontFamily: 'OverpassBold',
     fontSize: 16,
   },
@@ -89,12 +83,6 @@ export const ContactItem = React.memo(function ContactItem({
     prefetchImage(displayInfo.picture);
   }, [displayInfo.picture]);
 
-  // Format date (kept for future use when date display is re-enabled)
-  const _formattedDate = useMemo(() => {
-    if (!item.dmEvent?.created_at) return null;
-    return formatCustomDate(new Date(item.dmEvent.created_at * 1000));
-  }, [item.dmEvent?.created_at]);
-
   const linkHref = useMemo(
     () =>
       item.pubkey
@@ -135,11 +123,6 @@ export const ContactItem = React.memo(function ContactItem({
           </Text>
         </VStack>
       </HStack>
-      {/* {formattedDate && (
-        <Text style={styles.date} className="text-default-foreground">
-          {formattedDate}
-        </Text>
-      )} */}
     </HStack>
   );
 

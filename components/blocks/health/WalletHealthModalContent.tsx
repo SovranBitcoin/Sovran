@@ -1,15 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View as RNView } from 'react-native';
-import opacity from 'hex-color-opacity';
+
 import { LinearGradient } from 'expo-linear-gradient';
-import { View } from 'components/ui/View/View';
-import { VStack } from 'components/ui/View/VStack';
-import { HStack } from 'components/ui/View/HStack';
-import { Text } from 'components/ui/Text';
-import Icon from 'assets/icons';
-import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
-import { TOTAL_BASIS_POINTS, useMintDistributionStore } from 'stores/mintDistributionStore';
-import { ROW_ICON_SIZE, Section } from 'app/settings-pages';
+import { ListGroup, PressableFeedback } from 'heroui-native';
+import opacity from 'hex-color-opacity';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -17,77 +11,25 @@ import Animated, {
   withDelay,
   type SharedValue,
 } from 'react-native-reanimated';
+
+import Icon from 'assets/icons';
+import { ROW_ICON_SIZE, Section } from 'app/settings-pages';
 import { MintCurrencyTabs } from 'components/blocks/sheets/mint-balance/MintCurrencyTabs';
-import type { HealthCta } from './walletHealth';
-import { WalletHealthCardFrame } from './WalletHealthCardFrame';
+import { Text } from 'components/ui/Text';
+import { HStack } from 'components/ui/View/HStack';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
 import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
-import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from 'hooks/useThemeColor';
+
+import { useWalletHealthData } from './useWalletHealthData';
+import type { HealthCta } from './walletHealth';
+import { formatPctFromBp, normalizeBpLargestRemainder } from './walletHealth';
+import { WalletHealthCardFrame } from './WalletHealthCardFrame';
 
 const HERO_PADDING = 18;
 const HEART_RING_SIZE = 72;
 const HEART_RING_RADIUS = HEART_RING_SIZE / 2;
-
-function getMintsForUnit(trustedMints: any[], unit: string) {
-  const u = unit.toLowerCase();
-  return trustedMints.filter((mint) => {
-    if (u === 'sat') {
-      if (!mint.mintInfo?.nuts?.['4']?.methods) return true;
-      return mint.mintInfo.nuts['4'].methods.some(
-        (method: any) => method.unit?.toLowerCase() === 'sat'
-      );
-    }
-    if (!mint.mintInfo?.nuts?.['4']?.methods) return false;
-    return mint.mintInfo.nuts['4'].methods.some((method: any) => method.unit?.toLowerCase() === u);
-  });
-}
-
-function normalizeBpLargestRemainder(
-  mintUrls: string[],
-  balances: Record<string, number>,
-  total: number
-): Record<string, number> {
-  if (total <= 0) {
-    return mintUrls.reduce(
-      (acc, url) => {
-        acc[url] = 0;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-  }
-
-  const rows = mintUrls.map((mintUrl) => {
-    const bal = balances[mintUrl] || 0;
-    const exact = (bal / total) * TOTAL_BASIS_POINTS;
-    const floor = Math.floor(exact);
-    return { mintUrl, floor, remainder: exact - floor };
-  });
-
-  const floorSum = rows.reduce((s, r) => s + r.floor, 0);
-  let remaining = TOTAL_BASIS_POINTS - floorSum;
-
-  // Deterministic rounding: stable tie-break by mintUrl.
-  rows.sort((a, b) => {
-    if (b.remainder !== a.remainder) return b.remainder - a.remainder;
-    return a.mintUrl.localeCompare(b.mintUrl);
-  });
-
-  const out: Record<string, number> = {};
-  for (const r of rows) {
-    if (remaining > 0) {
-      out[r.mintUrl] = r.floor + 1;
-      remaining--;
-    } else {
-      out[r.mintUrl] = r.floor;
-    }
-  }
-  return out;
-}
-
-function formatPctFromBp(bp: number): string {
-  return `${Math.round(bp / 100)}%`;
-}
 
 function statLabelText(key: 'drift' | 'pending' | 'split'): string {
   if (key === 'drift') return 'Drift';
@@ -132,64 +74,44 @@ export function WalletHealthModalContent({
   const primary950 = background;
   const red = shade300;
 
-  // Wallet Health hero: keep the background gradient consistently "red-warm" (like the Needs rebalance state),
+  // Keep the background gradient consistently "red-warm" (like the Needs rebalance state),
   // even when the wallet is Balanced (where hero.accent is intentionally white for text/icon tones).
   const gradientAccent = red;
 
   const statPillBg = useMemo(() => opacity(gradientAccent, 0.1), [gradientAccent]);
 
-  const { trustedMints } = useMints();
-  const { balance } = useBalanceContext();
-  const { history } = usePaginatedHistory();
-  const distributions = useMintDistributionStore((s) => s.distributions);
+  const { normalizedUnit, balance, mintUrlsForUnit, desiredDistributionBp, pendingOutgoingCount } =
+    useWalletHealthData(unit);
 
-  const normalizedUnit = unit.toLowerCase() === 'sat' ? 'sat' : unit.toLowerCase();
-  const heroRef = useRef<any>(null);
+  const heroRef = useRef<RNView>(null);
 
   const handleHeroLayout = useCallback(() => {
-    // Register destination ref for hero transition measurement.
     heroTransition.registerRef('walletHealth', 'destination', heroRef.current);
   }, [heroTransition]);
 
-  const mintsForUnit = useMemo(
-    () => getMintsForUnit(trustedMints, normalizedUnit),
-    [trustedMints, normalizedUnit]
+  const hasDesired = useMemo(
+    () => Object.values(desiredDistributionBp).some((v) => (v || 0) > 0),
+    [desiredDistributionBp]
   );
-  const mintUrlsForUnit = useMemo(() => mintsForUnit.map((m: any) => m.mintUrl), [mintsForUnit]);
-
-  const desired = useMemo(
-    () => distributions[normalizedUnit] || {},
-    [distributions, normalizedUnit]
-  );
-  const hasDesired = useMemo(() => Object.values(desired).some((v) => (v || 0) > 0), [desired]);
 
   const totalBalance = useMemo(() => {
-    return mintUrlsForUnit.reduce((sum, url) => sum + ((balance as any)?.[url] || 0), 0);
+    return mintUrlsForUnit.reduce((sum, url) => sum + (balance[url] || 0), 0);
   }, [mintUrlsForUnit, balance]);
 
-  const pendingOutgoingCount = useMemo(() => {
-    return history.filter(
-      (entry: any) =>
-        entry.type === 'send' &&
-        (entry.state === 'pending' || entry.state === 'prepared') &&
-        (entry.unit?.toLowerCase?.() || 'sat') === normalizedUnit
-    ).length;
-  }, [history, normalizedUnit]);
+  const maxDriftBp = useMemo(() => {
+    if (!hasDesired || totalBalance <= 0) return 0;
 
-  const { maxDriftBp } = useMemo(() => {
-    if (!hasDesired || totalBalance <= 0) return { maxDriftBp: 0, largestShareBp: 0 };
-
-    const actualBp = normalizeBpLargestRemainder(mintUrlsForUnit, balance as any, totalBalance);
+    const actualBp = normalizeBpLargestRemainder(mintUrlsForUnit, balance, totalBalance);
 
     let maxDrift = 0;
     for (const url of mintUrlsForUnit) {
-      const d = desired[url] || 0;
+      const d = desiredDistributionBp[url] || 0;
       const a = actualBp[url] || 0;
       maxDrift = Math.max(maxDrift, Math.abs(a - d));
     }
 
-    return { maxDriftBp: maxDrift, largestShareBp: 0 };
-  }, [hasDesired, totalBalance, mintUrlsForUnit, balance, desired]);
+    return maxDrift;
+  }, [hasDesired, totalBalance, mintUrlsForUnit, balance, desiredDistributionBp]);
 
   const needsRebalance = hasDesired && totalBalance > 0 && maxDriftBp >= 200;
 
@@ -249,8 +171,6 @@ export function WalletHealthModalContent({
     return hasDesired ? 'Set' : 'Not set';
   }, [totalBalance, hasDesired]);
 
-  // In the hero (which can be accent-washed), use "on-accent" text (white w/ opacity) instead of grey.
-  const heroTitleColor = primary50;
   const heroSubtitleColor = useMemo(() => opacity(primary50, 0.72), [primary50]);
   const statLabelColor = useMemo(() => opacity(primary50, 0.6), [primary50]);
 
@@ -266,12 +186,12 @@ export function WalletHealthModalContent({
     return opacity(primary50, 0.16);
   }, [totalBalance, hasDesired, needsRebalance, red, primary50]);
 
-  const handleRebalancePress = useMemo(() => {
-    return () => onAction({ type: 'openRebalancePlan', unit: normalizedUnit });
+  const handleRebalancePress = useCallback(() => {
+    onAction({ type: 'openRebalancePlan', unit: normalizedUnit });
   }, [onAction, normalizedUnit]);
 
-  const handleSplitPress = useMemo(() => {
-    return () => onAction({ type: 'openBalanceSplit', unit: normalizedUnit });
+  const handleSplitPress = useCallback(() => {
+    onAction({ type: 'openBalanceSplit', unit: normalizedUnit });
   }, [onAction, normalizedUnit]);
 
   const heroStats = useMemo(() => {
@@ -340,7 +260,6 @@ export function WalletHealthModalContent({
     totalBalance,
     needsRebalance,
     maxDriftBp,
-    primary50,
     primary400,
     handleRebalancePress,
     handleSplitPress,
@@ -414,8 +333,8 @@ export function WalletHealthModalContent({
           <Icon name="garden:heart-fill-16" size={30} color={hero.accent} />
         </View>
 
-        <VStack align="center" gap={4} style={{ paddingHorizontal: 8 }}>
-          <Text size={18} heavy style={{ color: heroTitleColor }} numberOfLines={1}>
+        <VStack align="center" gap={4} className="px-2">
+          <Text size={18} heavy style={{ color: primary50 }} numberOfLines={1}>
             {hero.title}
           </Text>
           <Text
@@ -426,7 +345,7 @@ export function WalletHealthModalContent({
           </Text>
         </VStack>
 
-        <HStack gap={10} style={{ width: '100%' }}>
+        <HStack gap={10} className="w-full">
           {heroStats.map((s) => (
             <View
               key={s.key}
@@ -463,7 +382,7 @@ export function WalletHealthModalContent({
 
   const bodyContent = (
     <Animated.View style={bodyAnimStyle}>
-      <View style={{ paddingHorizontal: 16 }}>
+      <View className="px-4">
         <Section title="Actions">
           <ListGroup variant="secondary">
             {actionRows.map((r) => (

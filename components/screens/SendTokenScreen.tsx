@@ -11,51 +11,51 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Share, ActivityIndicator } from 'react-native';
+import { Share } from 'react-native';
+
 import * as Clipboard from 'expo-clipboard';
 import * as SQLite from 'expo-sqlite';
-import { SheetManager } from 'react-native-actions-sheet';
-import { HStack } from 'components/ui/View/HStack';
-import { VStack } from 'components/ui/View/VStack';
-import { View } from 'components/ui/View/View';
-import { Spacer } from 'components/ui/View/Spacer';
-import { Text } from 'components/ui/Text';
-import { PaymentInfo } from 'components/blocks/PaymentInfo';
+
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import {
   getEncodedTokenV4,
-  GetInfoResponse,
   decodePaymentRequest,
   PaymentRequestTransportType,
   PaymentRequestPayload,
   Token,
 } from '@cashu/cashu-ts';
-import { nip19 } from 'nostr-tools';
-import type { ProfilePointer } from 'nostr-tools/nip19';
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { Metadata } from 'nostr-tools/kinds';
-import { useReceive, useManager } from 'coco-cashu-react';
 import type { SendHistoryEntry } from 'coco-cashu-core';
-import { popup } from '@/helper/popup';
-import { writeTokenToNFC } from 'helper/nfc';
-import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { DetailsSection } from 'components/ui/DetailsSection';
-import { Card } from 'components/ui/Card';
-import { convertTime } from 'helper/time';
-import { truncateMiddle } from 'helper/strings';
-import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
-import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
+import { useReceive, useManager } from 'coco-cashu-react';
+import { nip19 } from 'nostr-tools';
+import { Metadata } from 'nostr-tools/kinds';
+import type { ProfilePointer } from 'nostr-tools/nip19';
+import { SheetManager } from 'react-native-actions-sheet';
+
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
-import { BottomButtons } from 'components/ui/BottomButtons';
-import { ModalLayoutWrapper } from 'app/debugModal';
+import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
+import { popup } from '@/helper/popup';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 import { useNostrDirectMessage } from '@/hooks/useNostrDirectMessage';
-import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
-import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
-import opacity from 'hex-color-opacity';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
-import { useThemeColor } from 'hooks/useThemeColor';
+import { ModalLayoutWrapper } from 'app/debugModal';
+import { PaymentInfo } from 'components/blocks/PaymentInfo';
+import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
+import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
+import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
+import { BottomButtons } from 'components/ui/BottomButtons';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
+import { Card } from 'components/ui/Card';
+import { DetailsSection } from 'components/ui/DetailsSection';
+import { ScreenErrorState, ScreenLoadingState } from 'components/ui/ScreenStates';
+import { HStack } from 'components/ui/View/HStack';
+import { View } from 'components/ui/View/View';
+import { VStack } from 'components/ui/View/VStack';
+import { writeTokenToNFC } from 'helper/nfc';
+import { truncateMiddle } from 'helper/strings';
+import { convertTime } from 'helper/time';
+import { useMintInfo } from 'hooks/useMintInfo';
 
 // Default relay for payment requests
 const DEFAULT_PAYMENT_RELAY = 'wss://relay.vertexlab.io';
@@ -113,64 +113,22 @@ interface SendTokenScreenProps {
   /** Initial nostrSent state (true when coming from CurrencyScreen payment request flow) */
   initialNostrSent?: boolean;
   onNavigateBack: () => void;
-  onNavigateToMessages?: (pubkey: string) => void;
 }
 
-/** Error screen shown when transaction data is missing or invalid */
-function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBack: () => void }) {
-  const foreground = useThemeColor('foreground');
-  return (
-    <ModalLayoutWrapper>
-      <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-        <Text color={opacity(foreground, 0.66)}>{message}</Text>
-        <ButtonHandler
-          buttons={[
-            {
-              text: 'Go Back',
-              icon: 'ri:arrow-left-line',
-              variant: 'primary',
-              onPress: async () => onNavigateBack(),
-            },
-          ]}
-        />
-      </View>
-    </ModalLayoutWrapper>
-  );
-}
-
-/** Loading state while fetching profile */
-function LoadingState() {
-  const foreground = useThemeColor('foreground');
-  return (
-    <ModalLayoutWrapper>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={opacity(foreground, 0.4)} />
-        <Spacer size={16} />
-        <Text color={opacity(foreground, 0.5)}>Loading payment request...</Text>
-      </View>
-    </ModalLayoutWrapper>
-  );
-}
-
-/**
- * SendTokenScreen - Unified component for both modes
- */
 export function SendTokenScreen({
   sendHistoryEntry: sendHistoryEntryProp,
   paymentRequest,
   initialNostrSent = false,
   onNavigateBack,
-  onNavigateToMessages,
 }: SendTokenScreenProps) {
   const { receive: _receive } = useReceive();
-  const { getMintInfo, isKnownMint } = useMintManagement();
+  const { isKnownMint } = useMintManagement();
   const manager = useManager();
   const { send, isSending } = useSendWithHistory();
   const { sendDirectMessage, isSending: isSendingDM } = useNostrDirectMessage();
 
   // State
   const [, setUri] = useState('');
-  const [mintInfo, setMintInfo] = useState<GetInfoResponse | null>(null);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [isSendingPayment, setIsSendingPayment] = useState(false);
   const [isMintTrusted, setIsMintTrusted] = useState<boolean | null>(null);
@@ -189,6 +147,8 @@ export function SendTokenScreen({
   const { entry: currentTransaction, error: parseError } =
     useHistoryEntry<SendHistoryEntry>(entryToUse);
   const sourceLabel = useTransactionSource(currentTransaction?.id);
+  const resolvedMintUrl = currentTransaction?.mintUrl || paymentRequest?.mintUrl;
+  const mintInfo = useMintInfo(resolvedMintUrl);
 
   // Determine mode: payment request mode if we have paymentRequest and no transaction yet
   const isPaymentRequestMode = !!paymentRequest && !currentTransaction;
@@ -277,24 +237,19 @@ export function SendTokenScreen({
     profile?.name ||
     (recipientInfo?.pubkey ? truncateMiddle(recipientInfo.pubkey, 8) : 'Unknown');
 
-  // Load mint info when entry changes or for payment request
+  // Check mint trust status (separate from mint info loading)
   useEffect(() => {
-    const loadMintInfo = async () => {
-      const mintUrl = currentTransaction?.mintUrl || paymentRequest?.mintUrl;
-      if (mintUrl) {
-        try {
-          const info = await getMintInfo(mintUrl);
-          setMintInfo(info);
-          const trusted = await isKnownMint(mintUrl);
-          setIsMintTrusted(trusted);
-        } catch (error) {
-          console.error('Failed to load mint info:', error);
-          setMintInfo(null);
-        }
-      }
+    if (!resolvedMintUrl) return;
+    let mounted = true;
+    isKnownMint(resolvedMintUrl)
+      .then((trusted) => {
+        if (mounted) setIsMintTrusted(trusted);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
     };
-    loadMintInfo();
-  }, [currentTransaction?.mintUrl, paymentRequest?.mintUrl, getMintInfo, isKnownMint]);
+  }, [resolvedMintUrl, isKnownMint]);
 
   // Get the token - prefer createdToken, then currentTransaction.token
   const token = createdToken || currentTransaction?.token;
@@ -650,41 +605,41 @@ export function SendTokenScreen({
   // Error states for payment request mode
   if (isPaymentRequestMode) {
     if (decodeError) {
-      return <ErrorState message={decodeError} onNavigateBack={onNavigateBack} />;
+      return <ScreenErrorState message={decodeError} onGoBack={onNavigateBack} />;
     }
     if (!decodedRequest) {
       return (
-        <ErrorState message="Failed to decode payment request" onNavigateBack={onNavigateBack} />
+        <ScreenErrorState message="Failed to decode payment request" onGoBack={onNavigateBack} />
       );
     }
     if (!nostrTransport) {
       return (
-        <ErrorState
+        <ScreenErrorState
           message="This payment request requires Nostr transport which is not available"
-          onNavigateBack={onNavigateBack}
+          onGoBack={onNavigateBack}
         />
       );
     }
     if (!recipientInfo) {
       return (
-        <ErrorState
+        <ScreenErrorState
           message="Invalid recipient in payment request"
-          onNavigateBack={onNavigateBack}
+          onGoBack={onNavigateBack}
         />
       );
     }
     // Loading state while fetching profile
     if (!profileEose) {
-      return <LoadingState />;
+      return <ScreenLoadingState message="Loading payment request..." />;
     }
   }
 
   // Error state for normal mode without transaction
   if (!isPaymentRequestMode && (parseError || !currentTransaction)) {
     return (
-      <ErrorState
+      <ScreenErrorState
         message={parseError || 'Missing transaction data. Please try again.'}
-        onNavigateBack={onNavigateBack}
+        onGoBack={onNavigateBack}
       />
     );
   }
@@ -724,18 +679,6 @@ export function SendTokenScreen({
               variant: 'secondary',
               onPress: async () => onNavigateBack(),
               condition: !isPaymentRequestMode && isPaid,
-            },
-            {
-              text: 'View Messages',
-              icon: 'mdi:message-reply',
-              variant: 'primary',
-              onPress: async () => {
-                if (onNavigateToMessages && currentTransaction?.metadata?.nostr) {
-                  onNavigateToMessages(currentTransaction.metadata.nostr as string);
-                }
-                onNavigateBack();
-              },
-              condition: false,
             },
             {
               text: 'Copy',

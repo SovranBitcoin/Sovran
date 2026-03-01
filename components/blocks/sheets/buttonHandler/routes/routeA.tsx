@@ -33,52 +33,25 @@ import opacity from 'hex-color-opacity';
 import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useThemeColor } from 'hooks/useThemeColor';
-/**
- * RouteA Component
- *
- * @component
- * @param {RouteScreenProps<'button-handler', 'route-a'>} props
- * @returns {JSX.Element}
- */
-const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
-  const [foreground, muted, surfaceSecondary, surfaceTertiary, danger] = useThemeColor([
-    'foreground',
-    'muted',
-    'surface-secondary',
-    'surface-tertiary',
-    'danger',
-  ] as const);
-  const payload = useSheetPayload('button-handler');
 
+const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
+  const [foreground, muted, danger] = useThemeColor(['foreground', 'muted', 'danger'] as const);
+  const payload = useSheetPayload('button-handler');
   const [processingButtonIndex, setProcessingButtonIndex] = useState<number>();
 
-  /**
-   * Handles button press execution
-   *
-   * @description Executes button action with processing state management and close handling
-   *
-   * **Process:** set processing → execute action → handle promise/sync → reset state
-   * **Effects:** Button state changes, sheet close, async operation handling
-   *
-   * @param {Function} onPress - Button action function
-   * @param {number} index - Button index for processing state
-   */
   const handleButtonPress = (
     onPress: (close: (event: GestureResponderEvent) => void) => Promise<void>,
     index: number
   ) => {
     setProcessingButtonIndex(index);
 
-    // Call the original onPress function
     const result = onPress(() => {
       router?.goBack();
     });
 
-    // If it's a promise, reset the processing state when it resolves or rejects
     if (result && typeof result.then === 'function') {
       result.finally(() => {
         setProcessingButtonIndex(undefined);
-        // router?.close();
       });
     } else {
       setProcessingButtonIndex(undefined);
@@ -92,20 +65,8 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
   ];
 
   return (
-    <View
-      style={{
-        marginHorizontal: 16,
-        marginBottom: 0,
-        borderRadius: 16,
-        overflow: 'hidden',
-        backgroundColor: surfaceSecondary,
-      }}>
-      <VStack
-        style={{
-          backgroundColor: surfaceTertiary,
-          padding: 16,
-          borderRadius: 16,
-        }}>
+    <View className="bg-surface-secondary mx-4 mb-0 overflow-hidden rounded-2xl">
+      <VStack className="bg-surface-tertiary rounded-2xl p-4">
         {reorderedButtons.map((button, i) => {
           const isProcessing = processingButtonIndex !== undefined;
           const isDisabled = button.disabled || (isProcessing && processingButtonIndex !== i);
@@ -115,27 +76,19 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
             <TouchableOpacity
               testID={button.testID}
               key={i}
-              style={{
-                opacity: isDisabled ? 0.5 : 1,
-                marginBottom: i === payload.buttons.length - 1 ? 0 : 32,
-              }}
+              className={`${isDisabled ? 'opacity-50' : ''} ${i < payload.buttons.length - 1 ? 'mb-8' : ''}`}
               onPress={() => handleButtonPress(button.onPress, i)}
               disabled={isDisabled}>
               <HStack align="center" spacing={16}>
                 <View
-                  style={{
-                    backgroundColor: opacity(muted, 0.25),
-                    borderRadius: 1000,
-                    padding: 4,
-                  }}>
+                  className="rounded-full p-1"
+                  style={{ backgroundColor: opacity(muted, 0.25) }}>
                   {button.icon && (
                     <Icon color={isDangerous ? danger : foreground} name={button.icon} size={32} />
                   )}
                 </View>
                 <Text
-                  style={{
-                    color: isDangerous ? danger : foreground,
-                  }}
+                  className={isDangerous ? 'text-danger' : 'text-foreground'}
                   size={18}
                   weight="bold">
                   {button.text}
