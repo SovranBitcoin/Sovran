@@ -31,7 +31,6 @@ export interface MiddlemanRoutingSettings {
 }
 
 interface SettingsState {
-  // Core settings
   theme: string;
   language: string;
   displayBtc: number;
@@ -41,17 +40,40 @@ interface SettingsState {
   mockMode: boolean;
   mockOffline: boolean;
   termsAccepted: TermsAccepted | null;
+  hasSeenOnboarding: boolean;
   quickAccessP2PK: boolean;
   regenerateP2PKOnReceive: boolean;
   sendLocationEnabled: boolean;
-
-  // Rebalancing settings
   /** Minimum transfer amount in sats to include in a rebalance plan. */
   minTransferThreshold: number;
-
-  // Middleman routing settings
   middlemanRouting: MiddlemanRoutingSettings;
 }
+
+const DEFAULT_MIDDLEMAN_ROUTING: MiddlemanRoutingSettings = {
+  maxHops: 2,
+  maxFee: 5,
+  minSuccessRate: 0.9,
+  requireLastOk: true,
+  trustMode: 'trusted_only',
+};
+
+/** Default settings used for initialization and reset. Passcode excluded (never persisted). */
+const DEFAULT_SETTINGS: Omit<SettingsState, 'passcode'> = {
+  theme: 'dark',
+  language: 'en',
+  displayBtc: 3,
+  displayCurrency: 'usd',
+  experimental: false,
+  mockMode: false,
+  mockOffline: false,
+  termsAccepted: null,
+  hasSeenOnboarding: false,
+  quickAccessP2PK: false,
+  regenerateP2PKOnReceive: true,
+  sendLocationEnabled: false,
+  minTransferThreshold: 5,
+  middlemanRouting: DEFAULT_MIDDLEMAN_ROUTING,
+};
 
 interface SettingsActions {
   // Theme management (unified theme and background image)
@@ -88,6 +110,9 @@ interface SettingsActions {
   getTermsAccepted: () => TermsAccepted | null;
   isTermsAccepted: () => boolean;
 
+  // Onboarding
+  completeOnboarding: () => void;
+
   // P2PK quick access
   setQuickAccessP2PK: (enabled: boolean) => void;
   getQuickAccessP2PK: () => boolean;
@@ -119,97 +144,34 @@ type SettingsStore = SettingsState & SettingsActions;
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set, get) => ({
-      // Initial state
-      theme: 'dark',
-      language: 'en',
-      displayBtc: 3,
-      displayCurrency: 'usd',
+      ...DEFAULT_SETTINGS,
       passcode: '',
-      experimental: false,
-      mockMode: false,
-      mockOffline: false,
-      termsAccepted: null,
-      quickAccessP2PK: false,
-      regenerateP2PKOnReceive: true,
-      sendLocationEnabled: false,
-      minTransferThreshold: 5,
-      middlemanRouting: {
-        maxHops: 2,
-        maxFee: 5,
-        minSuccessRate: 0.9,
-        requireLastOk: true,
-        trustMode: 'trusted_only',
-      },
 
-      // Theme management
-      setTheme: (theme: string) => {
-        console.log('SettingsStore: setTheme called with:', theme);
-        set({ theme });
-      },
+      // Theme
+      setTheme: (theme: string) => set({ theme }),
+      getTheme: () => get().theme,
 
-      getTheme: () => {
-        const theme = get().theme;
-        console.log('SettingsStore: getTheme called, returning:', theme);
-        return theme;
-      },
+      // Language
+      setLanguage: (language: string) => set({ language }),
+      getLanguage: () => get().language,
 
-      // Language management
-      setLanguage: (language: string) => {
-        console.log('SettingsStore: setLanguage called with:', language);
-        set({ language });
-      },
+      // Display
+      setDisplayBtc: (display: number) => set({ displayBtc: display }),
+      getDisplayBtc: () => get().displayBtc,
+      setDisplayCurrency: (currency: DisplayCurrency) => set({ displayCurrency: currency }),
+      getDisplayCurrency: () => get().displayCurrency,
 
-      getLanguage: () => {
-        const language = get().language;
-        console.log('SettingsStore: getLanguage called, returning:', language);
-        return language;
-      },
+      // Passcode (never persisted)
+      setPasscode: (passcode: string) => set({ passcode }),
+      getPasscode: () => get().passcode,
+      clearPasscode: () => set({ passcode: '' }),
 
-      // Display settings
-      setDisplayBtc: (display: number) => {
-        set({ displayBtc: display });
-      },
+      // Experimental
+      setExperimental: (experimental: boolean) => set({ experimental }),
+      getExperimental: () => get().experimental,
 
-      getDisplayBtc: () => {
-        const displayBtc = get().displayBtc;
-        return displayBtc;
-      },
-
-      setDisplayCurrency: (currency: DisplayCurrency) => {
-        set({ displayCurrency: currency });
-      },
-
-      getDisplayCurrency: () => {
-        return get().displayCurrency;
-      },
-
-      // Passcode management
-      setPasscode: (passcode: string) => {
-        set({ passcode });
-      },
-
-      getPasscode: () => {
-        const passcode = get().passcode;
-        return passcode;
-      },
-
-      clearPasscode: () => {
-        set({ passcode: '' });
-      },
-
-      // Experimental features
-      setExperimental: (experimental: boolean) => {
-        set({ experimental });
-      },
-
-      getExperimental: () => {
-        const experimental = get().experimental;
-        return experimental;
-      },
-
-      // Mock mode
+      // Mock mode — lazy-import to avoid circular dependency at module load time
       setMockMode: (enabled: boolean) => {
-        // Lazy-import to avoid circular dependency at module load time
         const { useMockDataStore } = require('stores/mockDataStore') as {
           useMockDataStore: { getState: () => { activate: () => void; deactivate: () => void } };
         };
@@ -220,76 +182,31 @@ export const useSettingsStore = create<SettingsStore>()(
         }
         set({ mockMode: enabled });
       },
+      getMockMode: () => get().mockMode,
+      setMockOffline: (enabled: boolean) => set({ mockOffline: enabled }),
+      getMockOffline: () => get().mockOffline,
 
-      getMockMode: () => {
-        return get().mockMode;
-      },
+      // Terms
+      acceptTerms: (date: string) => set({ termsAccepted: { termsAccepted: true, date } }),
+      getTermsAccepted: () => get().termsAccepted,
+      isTermsAccepted: () => get().termsAccepted?.termsAccepted === true,
 
-      setMockOffline: (enabled: boolean) => {
-        set({ mockOffline: enabled });
-      },
+      // Onboarding
+      completeOnboarding: () => set({ hasSeenOnboarding: true }),
 
-      getMockOffline: () => {
-        return get().mockOffline;
-      },
+      // P2PK
+      setQuickAccessP2PK: (enabled: boolean) => set({ quickAccessP2PK: enabled }),
+      getQuickAccessP2PK: () => get().quickAccessP2PK,
+      setRegenerateP2PKOnReceive: (enabled: boolean) => set({ regenerateP2PKOnReceive: enabled }),
+      getRegenerateP2PKOnReceive: () => get().regenerateP2PKOnReceive,
 
-      // Terms acceptance
-      acceptTerms: (date: string) => {
-        set({
-          termsAccepted: {
-            termsAccepted: true,
-            date,
-          },
-        });
-      },
-
-      getTermsAccepted: () => {
-        const termsAccepted = get().termsAccepted;
-        return termsAccepted;
-      },
-
-      isTermsAccepted: () => {
-        const termsAccepted = get().termsAccepted;
-        const isAccepted = termsAccepted?.termsAccepted === true;
-        console.log('SettingsStore: isTermsAccepted called, returning:', isAccepted);
-        return isAccepted;
-      },
-
-      // P2PK quick access
-      setQuickAccessP2PK: (enabled: boolean) => {
-        set({ quickAccessP2PK: enabled });
-      },
-
-      getQuickAccessP2PK: () => {
-        return get().quickAccessP2PK;
-      },
-
-      // P2PK key regeneration on receive
-      setRegenerateP2PKOnReceive: (enabled: boolean) => {
-        set({ regenerateP2PKOnReceive: enabled });
-      },
-
-      getRegenerateP2PKOnReceive: () => {
-        return get().regenerateP2PKOnReceive;
-      },
-
-      // Send location stamping
-      setSendLocationEnabled: (enabled: boolean) => {
-        set({ sendLocationEnabled: enabled });
-      },
-
-      getSendLocationEnabled: () => {
-        return get().sendLocationEnabled;
-      },
+      // Location stamping
+      setSendLocationEnabled: (enabled: boolean) => set({ sendLocationEnabled: enabled }),
+      getSendLocationEnabled: () => get().sendLocationEnabled,
 
       // Rebalancing
-      setMinTransferThreshold: (sats: number) => {
-        set({ minTransferThreshold: sats });
-      },
-
-      getMinTransferThreshold: () => {
-        return get().minTransferThreshold;
-      },
+      setMinTransferThreshold: (sats: number) => set({ minTransferThreshold: sats }),
+      getMinTransferThreshold: () => get().minTransferThreshold,
 
       // Middleman routing
       setMiddlemanRouting: (settings) => {
@@ -297,74 +214,17 @@ export const useSettingsStore = create<SettingsStore>()(
           middlemanRouting: { ...state.middlemanRouting, ...settings },
         }));
       },
+      getMiddlemanRouting: () => get().middlemanRouting,
 
-      getMiddlemanRouting: () => {
-        return get().middlemanRouting;
-      },
+      // Utility
+      getAllSettings: () => get(),
 
-      // Utility methods
-      getAllSettings: () => {
-        const state = get();
-        console.log('SettingsStore: getAllSettings called, returning:', state);
-        return state;
-      },
+      resetSettings: () => set({ ...DEFAULT_SETTINGS, passcode: '' }),
 
-      resetSettings: () => {
-        console.log('SettingsStore: resetSettings called');
-        set({
-          theme: 'dark',
-          language: 'en',
-          displayBtc: 3,
-          displayCurrency: 'usd',
-          passcode: '',
-          experimental: false,
-          mockMode: false,
-          mockOffline: false,
-          termsAccepted: null,
-          quickAccessP2PK: false,
-          regenerateP2PKOnReceive: true,
-          sendLocationEnabled: false,
-          minTransferThreshold: 5,
-          middlemanRouting: {
-            maxHops: 2,
-            maxFee: 5,
-            minSuccessRate: 0.9,
-            requireLastOk: true,
-            trustMode: 'trusted_only',
-          },
-        });
-      },
-
-      // Clear all data from both state and storage
       clearAllData: async () => {
         try {
-          console.log('SettingsStore: clearAllData called');
-          // Clear from AsyncStorage
           await AsyncStorage.removeItem('settings-store');
-          // Reset state to initial values
-          set({
-            theme: 'dark',
-            language: 'en',
-            displayBtc: 3,
-            displayCurrency: 'usd',
-            passcode: '',
-            experimental: false,
-            mockMode: false,
-            mockOffline: false,
-            termsAccepted: null,
-            quickAccessP2PK: false,
-            regenerateP2PKOnReceive: true,
-            sendLocationEnabled: false,
-            minTransferThreshold: 5,
-            middlemanRouting: {
-              maxHops: 2,
-              maxFee: 5,
-              minSuccessRate: 0.9,
-              requireLastOk: true,
-              trustMode: 'trusted_only',
-            },
-          });
-          console.log('SettingsStore: All data cleared successfully');
+          set({ ...DEFAULT_SETTINGS, passcode: '' });
         } catch (error) {
           console.error('SettingsStore: Error clearing data:', error);
           throw error;
@@ -374,7 +234,6 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: 'settings-store',
       storage: createJSONStorage(() => AsyncStorage),
-      // Only persist the core settings, not sensitive data like passcode
       partialize: (state) => ({
         theme: state.theme,
         language: state.language,
@@ -389,23 +248,17 @@ export const useSettingsStore = create<SettingsStore>()(
         sendLocationEnabled: state.sendLocationEnabled,
         minTransferThreshold: state.minTransferThreshold,
         middlemanRouting: state.middlemanRouting,
-        // Note: passcode is not persisted for security reasons
       }),
       onRehydrateStorage: () => (state, error) => {
-        console.log('SettingsStore: onRehydrateStorage called with state:', state, 'error:', error);
         if (error) {
-          console.warn('SettingsStore: Failed to rehydrate from storage:', error);
-        } else {
-          console.log('SettingsStore: Successfully rehydrated from storage:', state);
-          // Re-activate mock mode if it was persisted as enabled
-          if (state?.mockMode) {
-            const { useMockDataStore } = require('stores/mockDataStore') as {
-              useMockDataStore: {
-                getState: () => { activate: () => void };
-              };
-            };
-            useMockDataStore.getState().activate();
-          }
+          console.warn('SettingsStore: Failed to rehydrate:', error);
+          return;
+        }
+        if (state?.mockMode) {
+          const { useMockDataStore } = require('stores/mockDataStore') as {
+            useMockDataStore: { getState: () => { activate: () => void } };
+          };
+          useMockDataStore.getState().activate();
         }
       },
     }

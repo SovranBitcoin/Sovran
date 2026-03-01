@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
-import { auditMint, fetchMintInfo, type AuditMintResponse } from 'helper/apiClient';
+
+// TODO: re-export GetInfoResponse (or MintInfo alias) from coco-cashu-core
 import type { GetInfoResponse } from '@cashu/cashu-ts';
+
+import { auditMint, fetchMintInfo, type AuditMintResponse } from 'helper/apiClient';
 import { useAuditMintStore } from 'stores/auditMintStore';
 
 // Transform API response to match expected interface structure

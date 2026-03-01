@@ -15,14 +15,6 @@ export function convertTime(date: Date): string {
   }).format(date);
 }
 
-/** Short date: "Jan 15", "Dec 25". */
-export function formatCustomDate(date: Date): string {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-  }).format(date);
-}
-
 /** Localized long date using the user's language preference from settingsStore. */
 export function formatDate(date: string | number): string {
   const language = useSettingsStore.getState().language || 'en';

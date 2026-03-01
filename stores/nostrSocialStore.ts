@@ -1,8 +1,13 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+
 import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
 
 const profileStorage = createProfileScopedStorage();
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 type NostrReactionState = {
   reactionEventId?: string;
@@ -91,6 +96,10 @@ interface NostrSocialActions {
 
 type NostrSocialStore = NostrSocialState & NostrSocialActions;
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function extractFollowingFromTags(tags: string[][]): Record<string, true> {
   const map: Record<string, true> = {};
   for (const tag of tags) {
@@ -101,27 +110,50 @@ function extractFollowingFromTags(tags: string[][]): Record<string, true> {
   return map;
 }
 
+/** Delete a key from a record immutably. */
+function omitKey<V>(record: Record<string, V>, key: string): Record<string, V> {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
+
+/** Set a timestamped optimistic entry for a given map key. */
+function withOptimisticEntry<V extends { updatedAt: number }>(
+  map: Record<string, V>,
+  key: string,
+  params: Omit<V, 'updatedAt'>
+): Record<string, V> {
+  return { ...map, [key]: { ...params, updatedAt: Date.now() } as unknown as V };
+}
+
+// ---------------------------------------------------------------------------
+// Store
+// ---------------------------------------------------------------------------
+
+const INITIAL_STATE: NostrSocialState = {
+  contactsTags: [],
+  contactsContent: '',
+  contactsUpdatedAt: 0,
+  followingPubkeys: {},
+  likesByEventId: {},
+  repostsByEventId: {},
+  deletedRepostOriginalIds: {},
+  optimisticFollowsByPubkey: {},
+  optimisticLikesByEventId: {},
+  optimisticRepostsByEventId: {},
+};
+
 export const useNostrSocialStore = create<NostrSocialStore>()(
   persist(
     (set, get) => ({
-      contactsTags: [],
-      contactsContent: '',
-      contactsUpdatedAt: 0,
-      followingPubkeys: {},
+      ...INITIAL_STATE,
 
-      likesByEventId: {},
-      repostsByEventId: {},
-      deletedRepostOriginalIds: {},
-
-      optimisticFollowsByPubkey: {},
-      optimisticLikesByEventId: {},
-      optimisticRepostsByEventId: {},
+      // ---- contacts ----
 
       setContactsFromRelay: ({ tags, content, createdAt }) => {
         set((state) => {
           if (createdAt < state.contactsUpdatedAt) return state;
           return {
-            ...state,
             contactsTags: tags,
             contactsContent: content,
             contactsUpdatedAt: createdAt,
@@ -130,40 +162,39 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         });
       },
 
+      // ---- follow optimistic ----
+
       setFollowOptimistic: (pubkey, value, pending) => {
         set((state) => ({
-          ...state,
-          optimisticFollowsByPubkey: {
-            ...state.optimisticFollowsByPubkey,
-            [pubkey]: { value, pending, updatedAt: Date.now() },
-          },
+          optimisticFollowsByPubkey: withOptimisticEntry(state.optimisticFollowsByPubkey, pubkey, {
+            value,
+            pending,
+          }),
         }));
       },
 
       clearFollowOptimistic: (pubkey) => {
-        set((state) => {
-          const next = { ...state.optimisticFollowsByPubkey };
-          delete next[pubkey];
-          return { ...state, optimisticFollowsByPubkey: next };
-        });
+        set((state) => ({
+          optimisticFollowsByPubkey: omitKey(state.optimisticFollowsByPubkey, pubkey),
+        }));
       },
 
       clearSettledFollowOptimistic: () => {
         set((state) => {
           const next: Record<string, FollowOptimisticState> = {};
           for (const [pubkey, opt] of Object.entries(state.optimisticFollowsByPubkey)) {
-            const base = !!state.followingPubkeys[pubkey];
-            if (opt.pending || opt.value !== base) {
+            if (opt.pending || opt.value !== !!state.followingPubkeys[pubkey]) {
               next[pubkey] = opt;
             }
           }
-          return { ...state, optimisticFollowsByPubkey: next };
+          return { optimisticFollowsByPubkey: next };
         });
       },
 
+      // ---- repost deletion tracking ----
+
       markRepostDeleted: (originalEventId) => {
         set((state) => ({
-          ...state,
           deletedRepostOriginalIds: {
             ...state.deletedRepostOriginalIds,
             [originalEventId]: Date.now(),
@@ -172,19 +203,19 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
       },
 
       unmarkRepostDeleted: (originalEventId) => {
-        set((state) => {
-          const next = { ...state.deletedRepostOriginalIds };
-          delete next[originalEventId];
-          return { ...state, deletedRepostOriginalIds: next };
-        });
+        set((state) => ({
+          deletedRepostOriginalIds: omitKey(state.deletedRepostOriginalIds, originalEventId),
+        }));
       },
 
+      // ---- sync from relay ----
+
       syncLikesFromRelay: (targetEventIds, likes) => {
-        const likeByTarget: Record<string, NostrReactionState> = {};
+        const byTarget: Record<string, NostrReactionState> = {};
         for (const like of likes) {
-          const existing = likeByTarget[like.targetEventId];
+          const existing = byTarget[like.targetEventId];
           if (!existing || like.createdAt >= existing.updatedAt) {
-            likeByTarget[like.targetEventId] = {
+            byTarget[like.targetEventId] = {
               reactionEventId: like.reactionEventId,
               updatedAt: like.createdAt,
             };
@@ -194,23 +225,20 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         set((state) => {
           const nextLikes = { ...state.likesByEventId };
           for (const id of targetEventIds) {
-            const relayValue = likeByTarget[id];
-            if (relayValue) {
-              nextLikes[id] = relayValue;
-            } else {
-              delete nextLikes[id];
-            }
+            const relay = byTarget[id];
+            if (relay) nextLikes[id] = relay;
+            else delete nextLikes[id];
           }
-          return { ...state, likesByEventId: nextLikes };
+          return { likesByEventId: nextLikes };
         });
       },
 
       syncRepostsFromRelay: (targetEventIds, reposts) => {
-        const repostByTarget: Record<string, NostrRepostState> = {};
+        const byTarget: Record<string, NostrRepostState> = {};
         for (const repost of reposts) {
-          const existing = repostByTarget[repost.targetEventId];
+          const existing = byTarget[repost.targetEventId];
           if (!existing || repost.createdAt >= existing.updatedAt) {
-            repostByTarget[repost.targetEventId] = {
+            byTarget[repost.targetEventId] = {
               repostEventId: repost.repostEventId,
               updatedAt: repost.createdAt,
             };
@@ -221,99 +249,83 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
           const nextReposts = { ...state.repostsByEventId };
           const nextDeleted = { ...state.deletedRepostOriginalIds };
           for (const id of targetEventIds) {
-            const relayValue = repostByTarget[id];
-            if (relayValue) {
-              nextReposts[id] = relayValue;
+            const relay = byTarget[id];
+            if (relay) {
+              nextReposts[id] = relay;
             } else {
               delete nextReposts[id];
-              // Relay confirms no active repost — deletion has propagated
               delete nextDeleted[id];
             }
           }
-          return {
-            ...state,
-            repostsByEventId: nextReposts,
-            deletedRepostOriginalIds: nextDeleted,
-          };
+          return { repostsByEventId: nextReposts, deletedRepostOriginalIds: nextDeleted };
         });
       },
 
+      // ---- engagement optimistic ----
+
       setLikeOptimistic: (eventId, params) => {
         set((state) => ({
-          ...state,
-          optimisticLikesByEventId: {
-            ...state.optimisticLikesByEventId,
-            [eventId]: { ...params, updatedAt: Date.now() },
-          },
+          optimisticLikesByEventId: withOptimisticEntry(
+            state.optimisticLikesByEventId,
+            eventId,
+            params
+          ),
         }));
       },
 
       setRepostOptimistic: (eventId, params) => {
         set((state) => ({
-          ...state,
-          optimisticRepostsByEventId: {
-            ...state.optimisticRepostsByEventId,
-            [eventId]: { ...params, updatedAt: Date.now() },
-          },
+          optimisticRepostsByEventId: withOptimisticEntry(
+            state.optimisticRepostsByEventId,
+            eventId,
+            params
+          ),
         }));
       },
 
       clearLikeOptimistic: (eventId) => {
-        set((state) => {
-          const next = { ...state.optimisticLikesByEventId };
-          delete next[eventId];
-          return { ...state, optimisticLikesByEventId: next };
-        });
+        set((state) => ({
+          optimisticLikesByEventId: omitKey(state.optimisticLikesByEventId, eventId),
+        }));
       },
 
       clearRepostOptimistic: (eventId) => {
-        set((state) => {
-          const next = { ...state.optimisticRepostsByEventId };
-          delete next[eventId];
-          return { ...state, optimisticRepostsByEventId: next };
-        });
+        set((state) => ({
+          optimisticRepostsByEventId: omitKey(state.optimisticRepostsByEventId, eventId),
+        }));
       },
 
       clearSettledEngagementOptimistic: () => {
         set((state) => {
-          const nextLikes: Record<string, EngagementOptimisticState> = {};
-          for (const [eventId, opt] of Object.entries(state.optimisticLikesByEventId)) {
-            const base = !!state.likesByEventId[eventId];
-            if (opt.pending || opt.value !== base) {
-              nextLikes[eventId] = opt;
+          const filterSettled = <Base>(
+            optimistic: Record<string, EngagementOptimisticState>,
+            base: Record<string, Base>
+          ) => {
+            const next: Record<string, EngagementOptimisticState> = {};
+            for (const [id, opt] of Object.entries(optimistic)) {
+              if (opt.pending || opt.value !== !!base[id]) next[id] = opt;
             }
-          }
-
-          const nextReposts: Record<string, EngagementOptimisticState> = {};
-          for (const [eventId, opt] of Object.entries(state.optimisticRepostsByEventId)) {
-            const base = !!state.repostsByEventId[eventId];
-            if (opt.pending || opt.value !== base) {
-              nextReposts[eventId] = opt;
-            }
-          }
+            return next;
+          };
 
           return {
-            ...state,
-            optimisticLikesByEventId: nextLikes,
-            optimisticRepostsByEventId: nextReposts,
+            optimisticLikesByEventId: filterSettled(
+              state.optimisticLikesByEventId,
+              state.likesByEventId
+            ),
+            optimisticRepostsByEventId: filterSettled(
+              state.optimisticRepostsByEventId,
+              state.repostsByEventId
+            ),
           };
         });
       },
 
+      // ---- reset ----
+
       clearAllData: async () => {
         await profileStorage.removeItem('nostr-social-store');
-        set({
-          contactsTags: [],
-          contactsContent: '',
-          contactsUpdatedAt: 0,
-          followingPubkeys: {},
-          likesByEventId: {},
-          repostsByEventId: {},
-          deletedRepostOriginalIds: {},
-          optimisticFollowsByPubkey: {},
-          optimisticLikesByEventId: {},
-          optimisticRepostsByEventId: {},
-        });
+        set(INITIAL_STATE);
       },
     }),
     {
@@ -334,6 +346,10 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
     }
   )
 );
+
+// ---------------------------------------------------------------------------
+// Selectors
+// ---------------------------------------------------------------------------
 
 export const selectIsFollowingPubkey = (pubkey: string) => (state: NostrSocialStore) => {
   const optimistic = state.optimisticFollowsByPubkey[pubkey];

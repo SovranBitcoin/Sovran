@@ -1,39 +1,34 @@
 import { useEffect } from 'react';
+
+import * as Application from 'expo-application';
+import semver from 'semver';
+
 import { getLatestVersion } from 'helper/apiClient';
 import { popup } from 'helper/popup';
-import semver from 'semver';
-import { version } from 'app/settings-pages';
 
 /**
- * Custom hook to check for app version updates
- * Automatically checks for updates on mount and shows a popup if a newer version is available
+ * Checks for app updates on mount and shows a popup when a newer version exists.
  */
 export const useVersionCheck = () => {
   useEffect(() => {
     const checkForUpdates = async () => {
-      if (!version) return;
+      const currentVersion = Application.nativeApplicationVersion;
+      if (!currentVersion) return;
 
-      const latestVersionResult = await getLatestVersion({
-        storage: {
-          version: version,
-        },
+      const result = await getLatestVersion({
+        storage: { version: currentVersion },
       });
 
-      if (latestVersionResult.isOk()) {
-        if (
-          latestVersionResult.value &&
-          typeof latestVersionResult.value === 'object' &&
-          'version' in latestVersionResult.value
-        ) {
-          if (semver.gt(latestVersionResult.value.version, version)) {
-            popup({
-              message: 'latest_version',
-              params: {
-                version: latestVersionResult.value.version,
-              },
-            });
-          }
-        }
+      if (!result.isOk()) return;
+
+      const payload = result.value;
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        'version' in payload &&
+        semver.gt(payload.version, currentVersion)
+      ) {
+        popup({ message: 'latest_version', params: { version: payload.version } });
       }
     };
 

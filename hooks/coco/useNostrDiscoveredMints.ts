@@ -1,33 +1,24 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { fetchMintInfo } from 'helper/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
+
+import { fetchMintInfo } from 'helper/apiClient';
 import {
   isCashuRecommendationEvent,
   extractMintUrlFromEvent,
   parseRecommendation,
   type NostrEvent,
 } from 'helper/nostrClient';
+import { normalizeMintUrlKey } from 'helper/url';
+
+import type { MintRecommendation } from './useKYMMints';
 import { useMintManagement } from './useMintManagement';
 
-/**
- * Individual recommendation for a mint
- */
-interface MintRecommendation {
-  score: number;
-  comment: string;
-  pubkey: string;
-  eventId: string;
-  created_at: number;
-}
-
-/**
- * Data structure for Nostr-discovered mints (aggregated)
- */
 interface NostrDiscoveredMintData {
   url: string;
-  score: number; // Average score from all recommendations
-  recommendations: MintRecommendation[]; // All individual recommendations
+  score: number;
+  recommendations: MintRecommendation[];
   mintInfo: GetInfoResponse | null;
 }
 
@@ -39,15 +30,29 @@ interface UseNostrDiscoveredMintsResult {
 }
 
 /**
- * Helper function to normalize URLs for comparison (remove trailing slash)
+ * Appends a mint to state if not already present (by normalized URL).
+ * Shared by the parallel per-URL fetch callbacks to avoid race-condition duplicates.
  */
-const normalizeUrl = (url: string): string => {
-  return url.replace(/\/$/, '');
-};
+function appendMintIfNew(
+  setter: React.Dispatch<React.SetStateAction<NostrDiscoveredMintData[]>>,
+  result: NostrDiscoveredMintData
+) {
+  setter((prev) => {
+    const existingUrls = new Set(prev.map((m) => m.url));
+    if (existingUrls.has(result.url)) return prev;
+    return [...prev, result];
+  });
+}
+
+/** Calculates average score from a list of recommendations */
+function averageScore(recommendations: MintRecommendation[]): number {
+  const sum = recommendations.reduce((acc, r) => acc + r.score, 0);
+  return Number((sum / recommendations.length).toFixed(2));
+}
 
 /**
- * Hook for discovering mints via Nostr kind 38000 recommendation events
- * Uses parallel async processing pattern for efficient incremental updates
+ * Discovers mints via Nostr kind 38000 recommendation events.
+ * Uses nostrClient helpers for event parsing and normalizeMintUrlKey for URL dedup.
  */
 export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
   const [mints, setMints] = useState<NostrDiscoveredMintData[]>([]);
@@ -56,134 +61,73 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
   const [retryCount, setRetryCount] = useState(0);
   const processedUrls = useRef(new Set<string>());
 
-  // Get known mints for blacklist
   const { mints: knownMints } = useMintManagement();
 
-  // Subscribe to kind 38000 recommendation events
-  const filters = useMemo(
-    () => [
-      {
-        kinds: [38000], // Mint recommendation events
-        limit: 100,
-      },
-    ],
-    []
-  );
-
+  const filters = useMemo(() => [{ kinds: [38000], limit: 100 }], []);
   const { events, eose } = useSubscribe({ filters });
 
-  // Loading state: true until we receive EOSE (end of stored events)
   useEffect(() => {
-    if (eose) {
-      setLoading(false);
-    }
+    if (eose) setLoading(false);
   }, [eose]);
 
-  // Process events using parallel async pattern
   useEffect(() => {
     if (!events || events.length === 0) {
-      if (eose) {
-        setLoading(false);
-      }
+      if (eose) setLoading(false);
       return;
     }
 
     try {
       setError(null);
 
-      // Get known mint URLs for blacklist (normalized)
-      const knownMintUrls = new Set(knownMints.map((mint) => normalizeUrl(mint.mintUrl)));
+      const knownMintUrls = new Set(knownMints.map((mint) => normalizeMintUrlKey(mint.mintUrl)));
 
-      // Aggregate recommendations by URL
       const recommendationsByUrl = new Map<string, MintRecommendation[]>();
 
       events.forEach((event: any) => {
-        // Validate it's a Cashu recommendation
         if (!isCashuRecommendationEvent(event as NostrEvent)) return;
-
-        // Extract mint URL
         const mintUrl = extractMintUrlFromEvent(event as NostrEvent);
         if (!mintUrl) return;
 
-        const normalized = normalizeUrl(mintUrl);
-
-        // Skip blacklisted (known mints)
+        const normalized = normalizeMintUrlKey(mintUrl);
         if (knownMintUrls.has(normalized)) return;
 
-        // Parse recommendation
         const recommendation = parseRecommendation(event.content);
         if (!recommendation) return;
 
-        // Aggregate recommendations by URL
-        const existingRecommendations = recommendationsByUrl.get(normalized) || [];
-        existingRecommendations.push({
+        const existing = recommendationsByUrl.get(normalized) || [];
+        existing.push({
           score: recommendation.score,
           comment: recommendation.comment,
           pubkey: event.pubkey,
           eventId: event.id,
           created_at: event.created_at,
         });
-        recommendationsByUrl.set(normalized, existingRecommendations);
+        recommendationsByUrl.set(normalized, existing);
       });
 
-      // Single pass: find new URLs to process
       const urlsToProcess: string[] = [];
-
-      recommendationsByUrl.forEach((recommendations, url) => {
-        // Skip if already processed
+      recommendationsByUrl.forEach((_recs, url) => {
         if (processedUrls.current.has(url)) return;
-
-        // Mark as processed immediately
         processedUrls.current.add(url);
-
-        // Collect for processing
         urlsToProcess.push(url);
       });
 
       if (urlsToProcess.length === 0) return;
 
-      // Process all URLs in parallel, updating state incrementally as each completes
       urlsToProcess.forEach(async (url) => {
+        const recommendations = recommendationsByUrl.get(url)!;
+        const score = averageScore(recommendations);
+
         try {
-          const recommendations = recommendationsByUrl.get(url)!;
-
-          // Calculate average score
-          const sumScore = recommendations.reduce((sum, r) => sum + r.score, 0);
-          const avgScore = Number((sumScore / recommendations.length).toFixed(2));
-
           const mintInfoResult = await fetchMintInfo(url);
-          const result: NostrDiscoveredMintData = {
+          appendMintIfNew(setMints, {
             url,
-            score: avgScore,
+            score,
             recommendations,
             mintInfo: mintInfoResult.isOk() ? mintInfoResult.value : null,
-          };
-
-          // Update state immediately as this mint completes
-          setMints((prev) => {
-            // Avoid duplicates (in case of race conditions)
-            const existingUrls = new Set(prev.map((m) => m.url));
-            if (existingUrls.has(result.url)) return prev;
-            return [...prev, result];
           });
         } catch {
-          const recommendations = recommendationsByUrl.get(url)!;
-          const sumScore = recommendations.reduce((sum, r) => sum + r.score, 0);
-          const avgScore = Number((sumScore / recommendations.length).toFixed(2));
-
-          const result: NostrDiscoveredMintData = {
-            url,
-            score: avgScore,
-            recommendations,
-            mintInfo: null,
-          };
-
-          // Update state even for failed fetches (with null mintInfo)
-          setMints((prev) => {
-            const existingUrls = new Set(prev.map((m) => m.url));
-            if (existingUrls.has(result.url)) return prev;
-            return [...prev, result];
-          });
+          appendMintIfNew(setMints, { url, score, recommendations, mintInfo: null });
         }
       });
     } catch {
@@ -191,7 +135,6 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
     }
   }, [events, knownMints, eose]);
 
-  // Reset on retry
   useEffect(() => {
     if (retryCount > 0) {
       setMints([]);
@@ -201,9 +144,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
     }
   }, [retryCount]);
 
-  const retry = () => {
-    setRetryCount((prev) => prev + 1);
-  };
+  const retry = () => setRetryCount((prev) => prev + 1);
 
   return { mints, loading, error, retry };
 };

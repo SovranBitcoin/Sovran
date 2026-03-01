@@ -101,16 +101,19 @@ function buildSemanticVars(palette: ThemePalette): SemanticVars {
 
     '--muted': palette[400],
 
-    '--default': palette[800],
+    '--default': palette[700],
     '--default-foreground': palette[100],
 
-    '--accent': palette[500],
+    '--accent': STATIC_COLOR_VALUES['shade-300'],
     '--accent-foreground': accentIsDark ? palette[0] : palette[950],
+
+    '--skeleton': palette[500],
+    '--color-skeleton': palette[500],
 
     '--segment': palette[900],
     '--segment-foreground': palette[50],
 
-    '--field-background': palette[800],
+    '--field-background': palette[900],
     '--field-foreground': palette[0],
     '--field-placeholder': palette[400],
     '--field-border': 'transparent',

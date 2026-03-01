@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { fetchMintInfo } from 'helper/apiClient';
+
 import type { GetInfoResponse } from '@cashu/cashu-ts';
+
+import { fetchMintInfo } from 'helper/apiClient';
+import { normalizeMintUrlKey } from 'helper/url';
+
 import { useMintManagement } from './useMintManagement';
 
-/**
- * Data structure for Sovran API-discovered mints
- */
 interface SovranDiscoveredMintData {
   url: string;
-  score: number; // Default score of 0 (no recommendations from Sovran API)
-  recommendations: []; // Empty array (no recommendations from Sovran API)
+  score: number;
+  recommendations: [];
   mintInfo: GetInfoResponse | null;
 }
 
@@ -20,18 +21,25 @@ interface UseSovranDiscoveredMintsResult {
   retry: () => void;
 }
 
-/**
- * Helper function to normalize URLs for comparison (remove trailing slash)
- */
-const normalizeUrl = (url: string): string => {
-  return url.replace(/\/$/, '');
-};
-
 const SOVRAN_MINTS_API_URL = 'https://api.sovran.money/api/cashu/mints';
 
 /**
- * Hook for discovering mints via Sovran API endpoint
- * Fetches a list of mint URLs and processes them in parallel
+ * Appends a mint to state if not already present (by normalized URL).
+ */
+function appendMintIfNew(
+  setter: React.Dispatch<React.SetStateAction<SovranDiscoveredMintData[]>>,
+  result: SovranDiscoveredMintData
+) {
+  setter((prev) => {
+    const existingUrls = new Set(prev.map((m) => normalizeMintUrlKey(m.url)));
+    if (existingUrls.has(normalizeMintUrlKey(result.url))) return prev;
+    return [...prev, result];
+  });
+}
+
+/**
+ * Discovers mints via the Sovran API endpoint.
+ * Uses normalizeMintUrlKey for URL dedup and filters out already-known mints.
  */
 export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
   const [mints, setMints] = useState<SovranDiscoveredMintData[]>([]);
@@ -40,10 +48,8 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
   const [retryCount, setRetryCount] = useState(0);
   const processedUrls = useRef(new Set<string>());
 
-  // Get known mints for blacklist
   const { mints: knownMints } = useMintManagement();
 
-  // Fetch mints from Sovran API
   useEffect(() => {
     const fetchMints = async () => {
       try {
@@ -64,20 +70,14 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
           return;
         }
 
-        // Get known mint URLs for exclusion (normalized)
-        const knownMintUrls = new Set(knownMints.map((mint) => normalizeUrl(mint.mintUrl)));
+        const knownMintUrls = new Set(knownMints.map((mint) => normalizeMintUrlKey(mint.mintUrl)));
 
-        // Filter out known mints and normalize URLs
         const urlsToProcess = mintUrls
-          .map((url) => normalizeUrl(url))
+          .map((url) => normalizeMintUrlKey(url))
           .filter((url) => {
-            const isKnown = knownMintUrls.has(url);
-            const alreadyProcessed = processedUrls.current.has(url);
-            if (!isKnown && !alreadyProcessed) {
-              processedUrls.current.add(url);
-              return true;
-            }
-            return false;
+            if (knownMintUrls.has(url) || processedUrls.current.has(url)) return false;
+            processedUrls.current.add(url);
+            return true;
           });
 
         if (urlsToProcess.length === 0) {
@@ -86,42 +86,24 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
           return;
         }
 
-        // Process all URLs in parallel, updating state incrementally as each completes
         urlsToProcess.forEach(async (url) => {
+          const base: Omit<SovranDiscoveredMintData, 'mintInfo'> = {
+            url,
+            score: 0,
+            recommendations: [],
+          };
+
           try {
             const mintInfoResult = await fetchMintInfo(url);
-            const result: SovranDiscoveredMintData = {
-              url,
-              score: 0, // No score from Sovran API
-              recommendations: [], // No recommendations from Sovran API
+            appendMintIfNew(setMints, {
+              ...base,
               mintInfo: mintInfoResult.isOk() ? mintInfoResult.value : null,
-            };
-
-            // Update state immediately as this mint completes
-            setMints((prev) => {
-              // Avoid duplicates (in case of race conditions)
-              const existingUrls = new Set(prev.map((m) => normalizeUrl(m.url)));
-              if (existingUrls.has(normalizeUrl(result.url))) return prev;
-              return [...prev, result];
             });
           } catch {
-            // Still add the mint even if info fetch fails (with null mintInfo)
-            const result: SovranDiscoveredMintData = {
-              url,
-              score: 0,
-              recommendations: [],
-              mintInfo: null,
-            };
-            setMints((prev) => {
-              const existingUrls = new Set(prev.map((m) => normalizeUrl(m.url)));
-              if (existingUrls.has(normalizeUrl(result.url))) return prev;
-              return [...prev, result];
-            });
+            appendMintIfNew(setMints, { ...base, mintInfo: null });
           }
         });
 
-        // Set loading to false after starting all requests
-        // (individual mints will update incrementally)
         setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch mints from Sovran API');
@@ -132,9 +114,7 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
     fetchMints();
   }, [knownMints, retryCount]);
 
-  const retry = () => {
-    setRetryCount((prev) => prev + 1);
-  };
+  const retry = () => setRetryCount((prev) => prev + 1);
 
   return { mints, loading, error, retry };
 };

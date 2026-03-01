@@ -18,6 +18,9 @@ export interface TransactionLocation {
   createdAt: number;
 }
 
+/** Coordinates without the store-managed timestamp — used at capture time. */
+export type TransactionCoordinates = Omit<TransactionLocation, 'createdAt'>;
+
 interface TransactionLocationState {
   /** Map of historyEntry.id -> location data */
   locations: Record<string, TransactionLocation>;

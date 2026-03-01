@@ -2,20 +2,22 @@ import OpenAI from 'openai';
 
 const ROUTSTR_BASE_URL = 'https://api.routstr.com/v1';
 
+// ── Types ────────────────────────────────────────────────────────────────
+
 interface BalanceResponse {
-  balance: number; // msats
-  total_spent?: number; // msats (optional, may not be in response)
-  api_key?: string; // API key (returned when using Cashu token directly)
-  reserved?: number; // Reserved balance
+  balance: number;
+  total_spent?: number;
+  api_key?: string;
+  reserved?: number;
 }
 
 interface TopUpResponse {
-  added_amount: number; // msats
+  added_amount: number;
 }
 
 interface CreateWalletResponse {
   api_key: string;
-  balance: number; // msats
+  balance: number;
   created_at: string;
   key_id: string;
 }
@@ -33,43 +35,18 @@ interface RoutstrError {
   };
 }
 
-/**
- * Helper function to detect if a response is HTML
- */
-function isHTMLResponse(response: Response): boolean {
+interface ParsedErrorData {
+  message: string;
+  type: string;
+  details?: Record<string, unknown>;
+  error?: { message?: string };
+}
+
+// ── Error Handling ───────────────────────────────────────────────────────
+
+async function parseErrorResponse(response: Response): Promise<ParsedErrorData> {
   const contentType = response.headers.get('content-type') || '';
-  return contentType.includes('text/html');
-}
-
-/**
- * Helper function to extract error message from HTML response
- */
-async function extractErrorMessageFromHTML(response: Response): Promise<string> {
-  try {
-    const html = await response.text();
-    // Try to extract meaningful error message from Cloudflare error pages
-    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-    if (titleMatch) {
-      const title = titleMatch[1];
-      // Extract error code and message (e.g., "routstr.com | 502: Bad gateway")
-      const errorMatch = title.match(/(\d+):\s*(.+)/);
-      if (errorMatch) {
-        return `${errorMatch[1]} ${errorMatch[2]}`;
-      }
-      return title.replace(/^[^|]+\s*\|\s*/, ''); // Remove domain prefix
-    }
-    // Fallback to status text
-    return response.statusText || `HTTP ${response.status}`;
-  } catch {
-    return `HTTP ${response.status}`;
-  }
-}
-
-/**
- * Helper function to parse error response (handles both JSON and HTML)
- */
-async function parseErrorResponse(response: Response): Promise<any> {
-  if (isHTMLResponse(response)) {
+  if (contentType.includes('text/html')) {
     const message = await extractErrorMessageFromHTML(response);
     return {
       message,
@@ -87,26 +64,64 @@ async function parseErrorResponse(response: Response): Promise<any> {
   }
 }
 
+/** Extract a human-readable message from Cloudflare / gateway HTML error pages. */
+async function extractErrorMessageFromHTML(response: Response): Promise<string> {
+  try {
+    const html = await response.text();
+    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+    if (titleMatch) {
+      const title = titleMatch[1];
+      const errorMatch = title.match(/(\d+):\s*(.+)/);
+      if (errorMatch) return `${errorMatch[1]} ${errorMatch[2]}`;
+      return title.replace(/^[^|]+\s*\|\s*/, '');
+    }
+    return response.statusText || `HTTP ${response.status}`;
+  } catch {
+    return `HTTP ${response.status}`;
+  }
+}
+
+const FRIENDLY_MESSAGES: Record<number, string> = {
+  401: 'Authentication failed. Please check your API key.',
+  402: 'Insufficient balance. Please top up your account.',
+  429: 'Rate limit exceeded. Please wait a moment before trying again.',
+  502: 'Service temporarily unavailable. Please try again in a few minutes.',
+  503: 'Service temporarily unavailable. Please try again in a few minutes.',
+  504: 'Request timeout. The service is taking too long to respond.',
+};
+
+function getUserFriendlyErrorMessage(status: number, errorData: ParsedErrorData): string {
+  if (status === 402 && errorData.error?.message) return errorData.error.message;
+  return (
+    FRIENDLY_MESSAGES[status] ||
+    errorData.error?.message ||
+    errorData.message ||
+    `HTTP ${status} error`
+  );
+}
+
 /**
- * Helper function to create user-friendly error messages
+ * Throw a typed RoutstrError from a failed fetch Response.
+ * Shared by all API functions to avoid duplicating the parse → format → throw chain.
  */
-function getUserFriendlyErrorMessage(status: number, errorData: any): string {
-  if (status === 502 || status === 503) {
-    return 'Service temporarily unavailable. Please try again in a few minutes.';
-  }
-  if (status === 504) {
-    return 'Request timeout. The service is taking too long to respond.';
-  }
-  if (status === 401) {
-    return 'Authentication failed. Please check your API key.';
-  }
-  if (status === 402) {
-    return errorData.error?.message || 'Insufficient balance. Please top up your account.';
-  }
-  if (status === 429) {
-    return 'Rate limit exceeded. Please wait a moment before trying again.';
-  }
-  return errorData.error?.message || errorData.message || `HTTP ${status} error`;
+async function throwResponseError(response: Response): Promise<never> {
+  const errorData = await parseErrorResponse(response);
+  throw {
+    status: response.status,
+    error: {
+      message: getUserFriendlyErrorMessage(response.status, errorData),
+      type: errorData.type || 'unknown_error',
+      details: errorData.details,
+    },
+  } as RoutstrError;
+}
+
+/** Wrap a caught unknown into a RoutstrError (re-throws if already one). */
+function toRoutstrError(error: unknown): never {
+  if (error && typeof error === 'object' && 'status' in error) throw error;
+  const message =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : 'Network error';
+  throw { status: 0, error: { message, type: 'network_error' } } as RoutstrError;
 }
 
 export interface RoutstrModel {
@@ -160,65 +175,34 @@ interface ModelsResponse {
   data: RoutstrModel[];
 }
 
-/**
- * Create OpenAI client configured for Routstr API
- */
+// ── Client ───────────────────────────────────────────────────────────────
+
 function createRoutstrClient(apiKey: string): OpenAI {
   return new OpenAI({
     apiKey,
     baseURL: ROUTSTR_BASE_URL,
-    timeout: 60000, // 60 seconds
+    timeout: 60_000,
     maxRetries: 2,
   });
 }
 
-/**
- * Get available models from Routstr API
- */
+// ── Public API ───────────────────────────────────────────────────────────
+
 export async function getModels(): Promise<RoutstrModel[]> {
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/models`, {
       method: 'GET',
-      headers: {
-        // Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
     });
-
-    if (!response.ok) {
-      const errorData = await parseErrorResponse(response);
-      const error: RoutstrError = {
-        status: response.status,
-        error: {
-          message: getUserFriendlyErrorMessage(response.status, errorData),
-          type: errorData.type || 'unknown_error',
-          details: errorData.details,
-        },
-      };
-      throw error;
-    }
+    if (!response.ok) await throwResponseError(response);
 
     const data: ModelsResponse = await response.json();
-    // Filter to only enabled models
     return data.data.filter((model) => model.enabled);
-  } catch (error: any) {
-    if (error.status) {
-      throw error; // Re-throw RoutstrError
-    }
-    // Network or other errors
-    throw {
-      status: 0,
-      error: {
-        message: error.message || 'Network error',
-        type: 'network_error',
-      },
-    } as RoutstrError;
+  } catch (error) {
+    toRoutstrError(error);
   }
 }
 
-/**
- * Check balance for a Routstr wallet
- */
 export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/`, {
@@ -228,49 +212,23 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
         'Content-Type': 'application/json',
       },
     });
-
-    if (!response.ok) {
-      const errorData = await parseErrorResponse(response);
-      const error: RoutstrError = {
-        status: response.status,
-        error: {
-          message: getUserFriendlyErrorMessage(response.status, errorData),
-          type: errorData.type || 'unknown_error',
-          details: errorData.details,
-        },
-      };
-      throw error;
-    }
+    if (!response.ok) await throwResponseError(response);
 
     const data = await response.json();
-    console.log(
-      'checkBalance response:',
-      JSON.stringify({ apiKey: apiKey?.substring(0, 20) + '...', response: data })
-    );
     return {
       balance: data.balance || 0,
       total_spent: data.total_spent || 0,
       api_key: data.api_key,
       reserved: data.reserved || 0,
     };
-  } catch (error: any) {
-    if (error.status) {
-      throw error; // Re-throw RoutstrError
-    }
-    // Network or other errors
-    throw {
-      status: 0,
-      error: {
-        message: error.message || 'Network error',
-        type: 'network_error',
-      },
-    } as RoutstrError;
+  } catch (error) {
+    toRoutstrError(error);
   }
 }
 
 /**
- * Create a Routstr wallet from a Cashu token
- * Note: This endpoint may not be available yet. Falls back to using token directly as API key.
+ * Returns null when the endpoint is unavailable (404),
+ * signaling the caller to use the token directly as an API key.
  */
 export async function createWalletFromToken(
   cashuToken: string
@@ -278,28 +236,12 @@ export async function createWalletFromToken(
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/create`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cashu_token: cashuToken }),
     });
 
-    if (!response.ok) {
-      // If endpoint doesn't exist yet (404), return null to use token directly
-      if (response.status === 404) {
-        return null;
-      }
-      const errorData = await parseErrorResponse(response);
-      const error: RoutstrError = {
-        status: response.status,
-        error: {
-          message: getUserFriendlyErrorMessage(response.status, errorData),
-          type: errorData.type || 'unknown_error',
-          details: errorData.details,
-        },
-      };
-      throw error;
-    }
+    if (response.status === 404) return null;
+    if (!response.ok) await throwResponseError(response);
 
     const data = await response.json();
     return {
@@ -308,18 +250,13 @@ export async function createWalletFromToken(
       created_at: data.created_at,
       key_id: data.key_id,
     };
-  } catch (error: any) {
-    // If endpoint doesn't exist, return null to use token directly
-    if (error.status === 404 || error.message?.includes('404')) {
-      return null;
-    }
+  } catch (error: unknown) {
+    const asAny = error as Record<string, unknown>;
+    if (asAny?.status === 404) return null;
     throw error;
   }
 }
 
-/**
- * Top up balance using a Cashu token
- */
 export async function topUpBalance(apiKey: string, cashuToken: string): Promise<TopUpResponse> {
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/topup`, {
@@ -330,190 +267,94 @@ export async function topUpBalance(apiKey: string, cashuToken: string): Promise<
       },
       body: JSON.stringify({ cashu_token: cashuToken }),
     });
-
-    if (!response.ok) {
-      const errorData = await parseErrorResponse(response);
-      const error: RoutstrError = {
-        status: response.status,
-        error: {
-          message: getUserFriendlyErrorMessage(response.status, errorData),
-          type: errorData.type || 'unknown_error',
-          details: errorData.details,
-        },
-      };
-      throw error;
-    }
+    if (!response.ok) await throwResponseError(response);
 
     const data = await response.json();
-    console.log('topUpBalance response:', JSON.stringify(data));
-    return {
-      added_amount: data.msats || 0,
-    };
-  } catch (error: any) {
-    if (error.status) {
-      throw error; // Re-throw RoutstrError
-    }
-    // Network or other errors
-    throw {
-      status: 0,
-      error: {
-        message: error.message || 'Network error',
-        type: 'network_error',
-      },
-    } as RoutstrError;
+    return { added_amount: data.msats || 0 };
+  } catch (error) {
+    toRoutstrError(error);
   }
 }
 
 /**
- * Parse SSE (Server-Sent Events) stream manually for React Native compatibility
- * Processes chunks incrementally as they arrive for true streaming behavior
+ * Parse SSE stream manually for React Native compatibility.
+ * Uses ReadableStream when available, falls back to full-text parsing.
  */
 async function* parseSSEStream(
   response: Response
 ): AsyncGenerator<OpenAI.Chat.Completions.ChatCompletionChunk> {
-  // Try to use ReadableStream if available (works in some React Native versions)
   if (response.body && typeof response.body.getReader === 'function') {
-    try {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          // Process any remaining data in buffer
-          if (buffer.trim()) {
-            const lines = buffer.split('\n');
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6).trim();
-                if (data === '[DONE]') {
-                  reader.releaseLock();
-                  return;
-                }
-                if (data) {
-                  try {
-                    const chunk = JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;
-                    yield chunk;
-                  } catch (e) {
-                    console.warn('Failed to parse SSE chunk:', data, e);
-                  }
-                }
-              }
-            }
-          }
-          reader.releaseLock();
-          return;
-        }
-
-        // Decode the chunk and add to buffer
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
-
-        // Process complete lines (ending with \n)
-        const lines = buffer.split('\n');
-        // Keep the last incomplete line in buffer
-        buffer = lines.pop() || '';
-
-        // Process each complete line immediately
-        for (const line of lines) {
-          const trimmedLine = line.trim();
-
-          // Skip empty lines and non-data lines
-          if (!trimmedLine || !trimmedLine.startsWith('data: ')) {
-            continue;
-          }
-
-          const data = trimmedLine.slice(6).trim();
-
-          // Check for end marker
-          if (data === '[DONE]') {
-            reader.releaseLock();
-            return;
-          }
-
-          // Parse and yield chunk immediately
-          if (data) {
-            try {
-              const parsedChunk = JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;
-              // Log first few chunks for debugging
-              const hasContent = !!parsedChunk.choices?.[0]?.delta?.content;
-              if (hasContent) {
-                console.log('SSE: Yielding chunk with content:', {
-                  contentLength: parsedChunk.choices[0].delta.content?.length,
-                  contentPreview: parsedChunk.choices[0].delta.content?.substring(0, 50),
-                });
-              }
-              yield parsedChunk;
-            } catch (e) {
-              // Skip invalid JSON - might be partial data or malformed chunk
-              console.warn('Failed to parse SSE chunk:', data.substring(0, 100), e);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      // If streaming fails, log error but don't fall back to full response
-      // This ensures we fail fast rather than silently degrading to non-streaming
-      console.error('Streaming error:', error);
-      throw new Error(
-        'Failed to stream response: ' + (error instanceof Error ? error.message : String(error))
-      );
-    }
+    yield* parseSSEFromReadableStream(response.body);
+    return;
   }
 
-  // Fallback: If ReadableStream is not available, we need to read in chunks
-  // This is a last resort and will still try to process incrementally
-  console.warn(
-    'ReadableStream not available, using fallback method - this may cause delayed updates'
-  );
+  if (__DEV__) console.warn('ReadableStream not available, falling back to full-text SSE parsing');
+  yield* parseSSEFromText(await response.text());
+}
 
+function tryParseSSELine(
+  line: string
+): OpenAI.Chat.Completions.ChatCompletionChunk | 'done' | null {
+  const trimmed = line.trim();
+  if (!trimmed || !trimmed.startsWith('data: ')) return null;
+  const data = trimmed.slice(6).trim();
+  if (data === '[DONE]') return 'done';
+  if (!data) return null;
   try {
-    // Try to read response as text stream if possible
-    const text = await response.text();
-    console.log('Fallback: Read full response, length:', text.length);
-    const lines = text.split('\n');
-    console.log('Fallback: Total lines:', lines.length);
-
-    let chunkCount = 0;
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (!trimmedLine || !trimmedLine.startsWith('data: ')) {
-        continue;
-      }
-
-      const data = trimmedLine.slice(6).trim();
-      if (data === '[DONE]') {
-        console.log('Fallback: Received [DONE] marker after', chunkCount, 'chunks');
-        return;
-      }
-
-      if (data) {
-        try {
-          const chunk = JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;
-          chunkCount++;
-          const hasContent = !!chunk.choices?.[0]?.delta?.content;
-          if (hasContent && chunkCount <= 3) {
-            console.log('Fallback: Yielding chunk', chunkCount, 'with content');
-          }
-          yield chunk;
-        } catch (e) {
-          console.warn('Failed to parse SSE chunk in fallback:', data.substring(0, 100), e);
-        }
-      }
-    }
-    console.log('Fallback: Processed', chunkCount, 'chunks total');
-  } catch (error) {
-    console.error('Fallback parsing failed:', error);
-    throw error;
+    return JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;
+  } catch {
+    if (__DEV__) console.warn('Failed to parse SSE chunk:', data.substring(0, 100));
+    return null;
   }
 }
 
-/**
- * Send a chat message with streaming support
- * Uses manual SSE parsing for React Native compatibility
- */
+async function* parseSSEFromReadableStream(
+  body: ReadableStream<Uint8Array>
+): AsyncGenerator<OpenAI.Chat.Completions.ChatCompletionChunk> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        for (const line of buffer.split('\n')) {
+          const result = tryParseSSELine(line);
+          if (result === 'done') return;
+          if (result) yield result;
+        }
+        return;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const result = tryParseSSELine(line);
+        if (result === 'done') return;
+        if (result) yield result;
+      }
+    }
+  } catch (error) {
+    throw new Error(
+      'Failed to stream response: ' + (error instanceof Error ? error.message : String(error))
+    );
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function* parseSSEFromText(text: string): Generator<OpenAI.Chat.Completions.ChatCompletionChunk> {
+  for (const line of text.split('\n')) {
+    const result = tryParseSSELine(line);
+    if (result === 'done') return;
+    if (result) yield result;
+  }
+}
+
 export async function sendMessage(
   apiKey: string,
   messages: { role: 'user' | 'assistant' | 'system'; content: string }[],
@@ -531,82 +372,50 @@ export async function sendMessage(
 
   try {
     if (stream) {
-      // Use manual fetch with SSE parsing for React Native streaming support
       const response = await fetch(`${ROUTSTR_BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature,
-          max_tokens,
-          stream: true,
-        }),
+        body: JSON.stringify({ model, messages, temperature, max_tokens, stream: true }),
       });
+      if (!response.ok) await throwResponseError(response);
 
-      if (!response.ok) {
-        const errorData = await parseErrorResponse(response);
-        const error: RoutstrError = {
-          status: response.status,
-          error: {
-            message: getUserFriendlyErrorMessage(response.status, errorData),
-            type: errorData.type || 'unknown_error',
-            details: errorData.details,
-          },
-        };
-        throw error;
-      }
-
-      // Return async generator for streaming
       return { stream: parseSSEStream(response) };
-    } else {
-      // Non-streaming: use OpenAI client
-      const client = createRoutstrClient(apiKey);
-      const response = await client.chat.completions.create({
-        model,
-        messages,
-        temperature,
-        max_tokens,
-        stream: false,
-      });
-
-      return { response };
     }
-  } catch (error: any) {
-    // Handle errors and convert to RoutstrError format
-    if (error.status) {
-      // Check if error message contains HTML (502/503 errors from Cloudflare)
-      const errorMessage = error.message || '';
-      const isHTML = errorMessage.includes('<!DOCTYPE') || errorMessage.includes('<html');
 
-      let friendlyMessage = error.message || `HTTP ${error.status}`;
-      if (isHTML || error.status === 502 || error.status === 503) {
-        friendlyMessage = getUserFriendlyErrorMessage(error.status, {});
-      } else if (error.error?.message) {
-        friendlyMessage = getUserFriendlyErrorMessage(error.status, error.error);
-      }
+    const client = createRoutstrClient(apiKey);
+    const response = await client.chat.completions.create({
+      model,
+      messages,
+      temperature,
+      max_tokens,
+      stream: false,
+    });
+    return { response };
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'status' in error) {
+      const e = error as Record<string, unknown>;
+      const status = e.status as number;
+      const errorObj = (e.error || {}) as ParsedErrorData;
+      const msg = e.message as string | undefined;
 
-      const routstrError: RoutstrError = {
-        status: error.status,
+      const isHTML = msg?.includes('<!DOCTYPE') || msg?.includes('<html');
+      const friendlyMessage =
+        isHTML || status === 502 || status === 503
+          ? FRIENDLY_MESSAGES[status] || `HTTP ${status} error`
+          : getUserFriendlyErrorMessage(status, errorObj);
+
+      throw {
+        status,
         error: {
           message: friendlyMessage,
-          type: error.type || (error.status >= 500 ? 'server_error' : 'api_error'),
-          details: error.error?.details || {},
+          type: (e.type as string) || (status >= 500 ? 'server_error' : 'api_error'),
+          details: errorObj.details || {},
         },
-      };
-      throw routstrError;
+      } as RoutstrError;
     }
-
-    // Network or other errors
-    throw {
-      status: 0,
-      error: {
-        message: error.message || 'Network error. Please check your connection.',
-        type: 'network_error',
-      },
-    } as RoutstrError;
+    toRoutstrError(error);
   }
 }

@@ -31,6 +31,27 @@ const SYMBOLS: Record<string, string> = {
 
 const FIAT_UNITS = ['usd', 'eur', 'gbp'];
 
+const satsFormatter = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+const fiatFormatter = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const btcFormatter = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 8,
+  maximumFractionDigits: 8,
+});
+
+function getFormatter(unit: string): Intl.NumberFormat {
+  if (unit === 'btc') return btcFormatter;
+  if (unit === 'sats') return satsFormatter;
+  return fiatFormatter;
+}
+
 /** Exchange rate relative to BTC. Falls back to hardcoded estimates if pricelist is empty. */
 function getRate(unit: string): number {
   const pricelist = usePricelistStore.getState().pricelist;
@@ -43,38 +64,25 @@ function getRate(unit: string): number {
   };
   return rates[unit] ?? 1;
 }
+
 export function formatAmount(input: AmountWithUnit, options: FormatAmountOptions = {}): string {
-  // Normalize input unit (handle 'sat' -> 'sats' conversion)
   const inputUnit = input.unit.toLowerCase() === 'sat' ? 'sats' : input.unit.toLowerCase();
   const outputUnit = options.displayAs?.toLowerCase() || inputUnit;
 
-  // Handle user preference for sats display (BTC vs sats)
   if (options.useUserPreference && inputUnit === 'sats') {
     const displayBtc = useSettingsStore.getState().getDisplayBtc();
-    const precision = displayBtc === 0 ? 8 : 0;
-    const value = displayBtc === 0 ? input.amount / 100_000_000 : input.amount;
-    const formatted = value.toLocaleString('en-US', {
-      minimumFractionDigits: precision,
-      maximumFractionDigits: precision,
-    });
+    const asBtc = displayBtc === 0;
+    const value = asBtc ? input.amount / 100_000_000 : input.amount;
+    const formatted = (asBtc ? btcFormatter : satsFormatter).format(value);
     return displayBtc === 2 ? `${formatted} sats` : formatted;
   }
 
-  // Convert value through BTC as base currency
   const adjustedInput = FIAT_UNITS.includes(inputUnit) ? input.amount / 100 : input.amount;
   const inBtc = adjustedInput / getRate(inputUnit);
   const outputValue = inBtc * getRate(outputUnit);
 
-  // Determine precision based on output unit
-  const precision = outputUnit === 'btc' ? 8 : outputUnit === 'sats' ? 0 : 2;
+  const formatted = getFormatter(outputUnit).format(outputValue);
 
-  // Format number with appropriate precision
-  const formatted = outputValue.toLocaleString('en-US', {
-    minimumFractionDigits: precision,
-    maximumFractionDigits: precision,
-  });
-
-  // Apply currency display formatting
   const display = options.currencyDisplay ?? (FIAT_UNITS.includes(outputUnit) ? 'symbol' : 'none');
 
   if (display === 'symbol' && SYMBOLS[outputUnit]) {

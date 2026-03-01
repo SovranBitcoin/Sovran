@@ -1,15 +1,17 @@
 /**
  * Wallet tab header state: mint info and balance label.
  *
- * headerAmountLabel uses formatAmount with useUserPreference, which already
- * appends the correct unit suffix when displayBtc === 2. The label is returned
- * as-is to avoid a double "sats sats" suffix.
+ * headerAmountLabel uses formatAmount with useUserPreference, which reads the
+ * display setting imperatively. We subscribe to displayBtc reactively here so
+ * switching between BTC/sats display updates the label without waiting for a
+ * balance change.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 
 import { formatAmount } from 'helper/currency';
 import { getMintDisplayName } from '@/helper/url';
+import { useSettingsStore } from 'stores/settingsStore';
 
 interface UseWalletHeaderStateArgs {
   selectedMint: string | undefined;
@@ -26,6 +28,8 @@ export function useWalletHeaderState({
     name?: string;
     icon_url?: string;
   } | null>(null);
+
+  const displayBtc = useSettingsStore((s) => s.displayBtc);
 
   useEffect(() => {
     let isMounted = true;
@@ -53,7 +57,7 @@ export function useWalletHeaderState({
 
   const headerAmountLabel = useMemo(
     () => formatAmount({ amount: balanceForMint, unit: 'sat' }, { useUserPreference: true }),
-    [balanceForMint]
+    [balanceForMint, displayBtc]
   );
 
   return {

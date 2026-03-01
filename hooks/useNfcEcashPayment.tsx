@@ -8,21 +8,26 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
+
 import { router } from 'expo-router';
+
+// TODO: re-export getEncodedTokenV4 from coco-cashu-core
 import { getEncodedTokenV4 } from '@cashu/cashu-ts';
+
+import type { SendHistoryEntry } from 'coco-cashu-core';
+import { useManager } from 'coco-cashu-react';
+
 import { NfcPayment, NfcError } from '@/helper/nfc';
 import { getNfcErrorMessage } from '@/helper/nfc/messages';
 import type { NfcErrorMessage } from '@/helper/nfc/messages';
 import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
-import { useManager } from 'coco-cashu-react';
-import type { SendHistoryEntry } from 'coco-cashu-core';
-import { PAYMENT_TIERS } from '@/constants/wallet-header';
-import { useScanHistoryStore } from 'stores/scanHistoryStore';
 import { popup } from '@/helper/popup';
 import { NfcSuccessConfirmCircleIcon } from '@/components/overlays/NfcSuccessOverlay';
 import { AmountFormatter } from '@/components/ui/AmountFormatter';
 import { Text } from '@/components/ui/Text';
+import { PAYMENT_TIERS } from '@/constants/wallet-header';
+import { useScanHistoryStore } from 'stores/scanHistoryStore';
 
 export type NfcPaymentStatus = 'idle' | 'paying' | 'error';
 

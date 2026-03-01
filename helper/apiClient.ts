@@ -86,34 +86,6 @@ export const searchUsers = ({ query, limit = 10 }: { query: string; limit?: numb
   return safeFetch<SearchUsersResponse>(`${BASE_URL}/nostr/search?${params}`);
 };
 
-interface RecommendedUsersResponse {
-  source: string;
-  limit: number;
-  sort: string;
-  results: UserProfile[];
-  fromCache: boolean;
-}
-
-export const getRecommendedUsers = ({
-  source,
-  limit = 5,
-  sort = 'globalPagerank',
-}: {
-  source?: string;
-  limit?: number;
-  sort?: string;
-}) => {
-  console.log('source', source);
-  console.log('limit', limit);
-  console.log('sort', sort);
-  const params = new URLSearchParams();
-  if (source) params.append('source', source);
-  params.append('limit', String(limit));
-  params.append('sort', sort);
-
-  return safeFetch<RecommendedUsersResponse>(`${BASE_URL}/nostr/recommended?${params}`);
-};
-
 export interface AuditMintResponse {
   id: number;
   url: string;
@@ -197,3 +169,39 @@ export const fetchMintInfo = async (mintUrl: string): Promise<Result<GetInfoResp
     );
   }
 };
+
+// ---------------------------------------------------------------------------
+// Nostr profile
+// ---------------------------------------------------------------------------
+
+export interface NostrProfileResponse {
+  pubkey: string;
+  npub: string;
+  rank: number;
+  followers: number;
+  follows: number;
+  score: number;
+  topFollowers: TopFollower[];
+  created_at: number;
+  fromCache: boolean;
+  mintUrl?: string;
+}
+
+export interface TopFollower {
+  pubkey: string;
+  npub: string;
+  rank: number;
+  name?: string;
+  displayName?: string;
+  picture?: string;
+  image?: string;
+  banner?: string;
+  about?: string;
+  nip05?: string;
+  nip05Valid?: boolean;
+  website?: string;
+  lud16?: string;
+}
+
+export const fetchNostrProfile = (pubkey: string) =>
+  safeFetch<NostrProfileResponse>(`${BASE_URL}/nostr/profile?pubkey=${pubkey}`);

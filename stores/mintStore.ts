@@ -13,7 +13,6 @@ interface MintActions {
   getSelectedMint: (pubkey: string) => string | undefined;
   clearSelectedMint: (pubkey: string) => void;
   getAllSelectedMints: () => Record<string, string | undefined>;
-  debugStorage: () => Promise<any>;
   clearAllData: () => Promise<void>;
 }
 
@@ -25,71 +24,26 @@ export const useMintStore = create<MintStore>()(
       selectedMints: {},
 
       setSelectedMint: (pubkey: string, mintUrl: string) => {
-        console.log('MintStore: setSelectedMint called with:', { pubkey, mintUrl });
-        set((state) => {
-          const newState = {
-            selectedMints: {
-              ...state.selectedMints,
-              [pubkey]: mintUrl,
-            },
-          };
-          console.log('MintStore: Updated selectedMints:', newState.selectedMints);
-          return newState;
-        });
+        set((state) => ({
+          selectedMints: { ...state.selectedMints, [pubkey]: mintUrl },
+        }));
       },
 
-      getSelectedMint: (pubkey: string) => {
-        const currentState = get();
-        const result = currentState.selectedMints[pubkey];
-        console.log('MintStore: getSelectedMint called with pubkey:', pubkey, 'result:', result);
-        console.log('MintStore: Current selectedMints state:', currentState.selectedMints);
-        console.log(
-          'MintStore: All keys in selectedMints:',
-          Object.keys(currentState.selectedMints)
-        );
-        return result;
-      },
+      getSelectedMint: (pubkey: string) => get().selectedMints[pubkey],
 
       clearSelectedMint: (pubkey: string) => {
         set((state) => {
-          const newSelectedMints = { ...state.selectedMints };
-          delete newSelectedMints[pubkey];
-          return { selectedMints: newSelectedMints };
+          const { [pubkey]: _, ...rest } = state.selectedMints;
+          return { selectedMints: rest };
         });
       },
 
-      getAllSelectedMints: () => {
-        const currentState = get();
-        console.log(
-          'MintStore: getAllSelectedMints called, returning:',
-          currentState.selectedMints
-        );
-        return currentState.selectedMints;
-      },
+      getAllSelectedMints: () => get().selectedMints,
 
-      debugStorage: async () => {
-        try {
-          const stored = await profileStorage.getItem('mint-store');
-          console.log('MintStore: Raw storage data:', stored);
-          const parsed = stored ? JSON.parse(stored) : null;
-          console.log('MintStore: Parsed storage data:', parsed);
-          return parsed;
-        } catch (error) {
-          console.error('MintStore: Error reading from storage:', error);
-          return null;
-        }
-      },
-
-      // Clear all data from both state and storage
       clearAllData: async () => {
         try {
-          console.log('MintStore: clearAllData called');
-          // Clear from profile-scoped AsyncStorage
           await profileStorage.removeItem('mint-store');
-          set({
-            selectedMints: {},
-          });
-          console.log('MintStore: All data cleared successfully');
+          set({ selectedMints: {} });
         } catch (error) {
           console.error('MintStore: Error clearing data:', error);
           throw error;
@@ -98,17 +52,13 @@ export const useMintStore = create<MintStore>()(
     }),
     {
       name: 'mint-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
+      storage: createJSONStorage(() => profileStorage),
       partialize: (state) => ({
         selectedMints: state.selectedMints,
       }),
-      // Add error handling for storage issues
-      onRehydrateStorage: () => (state, error) => {
-        console.log('MintStore: onRehydrateStorage called with state:', state, 'error:', error);
+      onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('MintStore: Failed to rehydrate from storage:', error);
-        } else {
-          console.log('MintStore: Successfully rehydrated from storage:', state?.selectedMints);
+          console.warn('MintStore: Failed to rehydrate:', error);
         }
       },
     }
