@@ -307,7 +307,7 @@ export const Transactions = React.memo(
                   size={16}
                   style={{
                     color: opacity(foreground, 0.66),
-                    fontFamily: 'OverpassSemibold',
+                    fontFamily: 'OxygenBold',
                     textAlign: 'center',
                   }}>
                   No transactions found
@@ -370,7 +370,7 @@ export const Transactions = React.memo(
                     size={16}
                     style={{
                       color: opacity(foreground, 0.66),
-                      fontFamily: 'OverpassSemibold',
+                      fontFamily: 'OxygenBold',
                       textAlign: 'center',
                     }}>
                     No History

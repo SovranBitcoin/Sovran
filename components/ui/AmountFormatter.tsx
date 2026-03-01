@@ -75,7 +75,7 @@ export function AmountFormatter({
     return (
       <View className={containerClass} style={style}>
         <ScaleWrapper animated={animated} scaleAnim={scaleAnim}>
-          <Text size={size} weight={weight} style={textStyle}>
+          <Text overpass size={size} weight={weight} style={textStyle}>
             {formattedAmount}
           </Text>
         </ScaleWrapper>
@@ -100,6 +100,7 @@ export function AmountFormatter({
             </View>
           )}
           <TextComponent
+            overpass
             size={size}
             weight={weight}
             style={{

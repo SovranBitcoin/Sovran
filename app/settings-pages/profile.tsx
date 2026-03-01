@@ -105,7 +105,7 @@ const Profile = () => {
   return (
     <Container>
       <ScrollView className="px-4">
-        <Text bold overpass size={13} className="mb-2 ml-2 uppercase tracking-wide">
+        <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
           Profile Details
         </Text>
         <Card variant="secondary" className="mb-4">

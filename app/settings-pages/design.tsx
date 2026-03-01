@@ -43,92 +43,31 @@ export default function ModalScreen() {
   return (
     <Container>
       <ScrollView>
-        <Text thin overpass size={16}>
-          OverpassThin
+        <Text light size={16}>
+          Oxygen Light
         </Text>
-        <Text extralight overpass size={16}>
-          OverpassExtralight
-        </Text>
-        <Text light overpass size={16}>
-          OverpassLight
-        </Text>
-        {/* Overpass Regular is the default if nothing is passed */}
-        <Text regular overpass size={16}>
-          OverpassRegular
-        </Text>
-        <Text semibold overpass size={16}>
-          OverpassSemibold
-        </Text>
-        <Text bold overpass size={16}>
-          OverpassBold
-        </Text>
-        <Text extrabold overpass size={16}>
-          OverpassExtrabold
-        </Text>
-        <Text heavy overpass size={16}>
-          OverpassHeavy
+        <Text size={16}>Oxygen Regular</Text>
+        <Text bold size={16}>
+          Oxygen Bold
         </Text>
         <Spacer size={8} />
-
-        <Text thin overpass italic size={16}>
-          OverpassThinItalic
+        <Text overpass light size={16}>
+          Overpass Light
         </Text>
-        <Text extralight overpass italic size={16}>
-          OverpassExtralightItalic
+        <Text overpass size={16}>
+          Overpass Regular
         </Text>
-        <Text light overpass italic size={16}>
-          OverpassLightItalic
+        <Text overpass semibold size={16}>
+          Overpass Semibold
         </Text>
-        <Text regular overpass italic size={16}>
-          OverpassItalic
+        <Text overpass bold size={16}>
+          Overpass Bold
         </Text>
-        <Text semibold overpass italic size={16}>
-          OverpassSemiboldItalic
+        <Text overpass extrabold size={16}>
+          Overpass Extrabold
         </Text>
-        <Text bold overpass italic size={16}>
-          OverpassBoldItalic
-        </Text>
-        <Text extrabold overpass italic size={16}>
-          OverpassExtraboldItalic
-        </Text>
-        <Text heavy overpass italic size={16}>
-          OverpassHeavyItalic
-        </Text>
-
-        <Spacer size={8} />
-        <Text mono overpass size={16}>
-          OverpassMono
-        </Text>
-
-        <Spacer size={8} />
-
-        {/* Lexend isn't really used in this project, only in onboarding flows */}
-        <Text thin lexend size={16}>
-          LexendThin
-        </Text>
-        <Text extralight lexend size={16}>
-          LexendExtraLight
-        </Text>
-        <Text light lexend size={16}>
-          LexendLight
-        </Text>
-        <Text regular lexend size={16}>
-          LexendRegular
-        </Text>
-        <Text medium lexend size={16}>
-          LexendMedium
-        </Text>
-        <Text semibold lexend size={16}>
-          LexendSemiBold
-        </Text>
-        <Text bold lexend size={16}>
-          LexendBold
-        </Text>
-        <Text extrabold lexend size={16}>
-          LexendExtraBold
-        </Text>
-        <Text black lexend size={16}>
-          LexendBlack
+        <Text overpass heavy size={16}>
+          Overpass Heavy
         </Text>
 
         {Object.keys(THEMES).map((theme) => {
@@ -255,7 +194,7 @@ export default function ModalScreen() {
               color={isChecked ? danger : undefined}
             />
             <Spacer size={8} />
-            <Text id="terms-checkbox" size={14} regular className="text-foreground flex-1">
+            <Text id="terms-checkbox" size={14} className="text-foreground flex-1">
               Toggle experimental features
             </Text>
           </HStack>

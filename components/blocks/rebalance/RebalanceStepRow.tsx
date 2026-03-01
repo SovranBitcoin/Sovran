@@ -136,7 +136,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
       <TransferCard>
         {chainInfo ? (
           <VStack gap={6} className="px-4 pt-4">
-            <Text size={11} bold overpass style={{ color: primaryColor400 }}>
+            <Text size={11} bold style={{ color: primaryColor400 }}>
               Middleman route
             </Text>
             <HStack align="center" gap={4} className="flex-wrap gap-y-1">
@@ -243,7 +243,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                   <VStack gap={2}>
                     <HStack align="center" gap={4}>
                       <Icon name="mdi:swap-horizontal" size={14} color={primaryColor0} />
-                      <Text bold overpass size={12} className="text-foreground">
+                      <Text bold size={12} className="text-foreground">
                         Retry through middleman
                       </Text>
                     </HStack>
@@ -266,7 +266,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                   }}>
                   <HStack align="center" gap={4}>
                     <Icon name="mdi:refresh" size={14} color={primaryColor0} />
-                    <Text bold overpass size={12} className="text-foreground">
+                    <Text bold size={12} className="text-foreground">
                       Retry
                     </Text>
                   </HStack>
@@ -284,7 +284,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                   }}>
                   <HStack align="center" gap={4}>
                     <Icon name="mdi:skip-next" size={14} color={primaryColor0} />
-                    <Text bold overpass size={12} className="text-foreground">
+                    <Text bold size={12} className="text-foreground">
                       Skip
                     </Text>
                   </HStack>

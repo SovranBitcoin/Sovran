@@ -329,11 +329,11 @@ export const Button = ({
   blur = false,
   haptics = false,
 }: ButtonProps) => {
-  const [foreground, surfaceForeground, accent, surfaceTertiary, background, danger] =
+  const [foreground, surfaceForeground, foregroundSecondary, surfaceTertiary, background, danger] =
     useThemeColor([
       'foreground',
       'surface-foreground',
-      'accent',
+      'foreground-secondary',
       'surface-tertiary',
       'background',
       'danger',
@@ -488,7 +488,7 @@ export const Button = ({
         return {
           ...base,
           backgroundColor: surfaceTertiary,
-          borderColor: accent,
+          borderColor: foregroundSecondary,
         };
       case 'dangerous':
         return {
@@ -558,7 +558,6 @@ export const Button = ({
           <Text
             size={16}
             bold
-            overpass
             style={{
               color: getTextColor(),
             }}>
@@ -645,7 +644,7 @@ export const Button = ({
                 <Text
                   style={{
                     color: getTextColor(),
-                    fontFamily: 'OverpassBold',
+                    fontFamily: 'OxygenBold',
                     paddingVertical: 12, // py-3
                     textAlign: 'center',
                   }}

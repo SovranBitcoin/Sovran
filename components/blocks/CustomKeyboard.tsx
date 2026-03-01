@@ -73,7 +73,6 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
           <Text
             size={compact ? 22 : 24}
             bold
-            overpass
             color="white"
             style={{ padding: compact ? 14 : 16, paddingHorizontal: compact ? 22 : 24 }}>
             {value}

@@ -112,7 +112,7 @@ const CurrentKeyItem: React.FC<{
       </HStack>
 
       <View className="bg-surface rounded-xl px-3.5 py-3">
-        <Text mono size={12} className="text-foreground">
+        <Text size={12} className="text-foreground">
           {displayKey}
         </Text>
       </View>
@@ -173,7 +173,7 @@ const KeyItem: React.FC<{
           />
         </View>
         <ListGroup.ItemContent>
-          <Text mono size={11} style={{ color: foreground }}>
+          <Text size={11} style={{ color: foreground }}>
             {truncateMiddle(displayKey, 7)}
           </Text>
           <Text size={10} className="mt-0.5" style={{ color: opacity(foreground, 0.4) }}>

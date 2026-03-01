@@ -58,7 +58,9 @@ const TransactionComponent = ({
             {isReceived ? 'You received' : 'You sent'}
           </Text>
         </View>
-        <Text className="text-foreground mb-2 text-base font-black">{formattedAmount}</Text>
+        <Text overpass className="text-foreground mb-2 text-base font-black">
+          {formattedAmount}
+        </Text>
         <Text className="text-foreground text-right text-xs font-bold opacity-75">
           {transaction?.date ? convertTime(new Date(transaction.date)) : null}
         </Text>

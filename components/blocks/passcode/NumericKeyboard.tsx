@@ -47,11 +47,11 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
       text={
         <VStack align="center" justify="center" flex={1}>
           {value === '<' ? (
-            <Text size={32} bold overpass className="text-white-0" style={TEXT_SHADOW}>
+            <Text size={32} bold className="text-white-0" style={TEXT_SHADOW}>
               ⌫
             </Text>
           ) : (
-            <Text size={32} bold overpass className="text-white-0 p-4 px-6" style={TEXT_SHADOW}>
+            <Text size={32} bold className="text-white-0 p-4 px-6" style={TEXT_SHADOW}>
               {value}
             </Text>
           )}

@@ -74,7 +74,7 @@ function AndroidLiquidCapsuleButton({
         className="absolute inset-0 flex-row items-center justify-center gap-2"
         style={{ elevation: 1 }}>
         <Icon name={icon} size={16} color={color} />
-        <Text size={14} style={{ color, fontFamily: 'OverpassSemibold' }}>
+        <Text size={14} style={{ color, fontFamily: 'OxygenBold' }}>
           {label}
         </Text>
       </View>

@@ -92,7 +92,7 @@ function FallbackSearchHeader({ clearKey }: { clearKey: number }) {
           flex: 1,
           color: foreground,
           fontSize: 16,
-          fontFamily: 'OverpassRegular',
+          fontFamily: 'OxygenRegular',
         }}
         keyboardType="web-search"
         autoCorrect={false}

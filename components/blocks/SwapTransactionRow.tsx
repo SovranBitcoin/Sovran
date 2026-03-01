@@ -52,7 +52,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
           </HStack>
 
           <HStack justify="space-between" align="center">
-            <UntranslatedText regular size={10} color={opacity(foreground, 0.8)}>
+            <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
               {convertTime(new Date(group.createdAt))}
             </UntranslatedText>
             <UntranslatedText bold size={10} color={opacity(foreground, 0.8)}>

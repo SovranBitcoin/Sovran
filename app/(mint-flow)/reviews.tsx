@@ -235,20 +235,14 @@ const HeaderStats = React.memo(function HeaderStats({
   return (
     <View className="items-center pb-6 pt-4">
       <VStack align="center" spacing={4}>
-        {loading && !hasScore ? (
-          <Skeleton
-            style={{
-              width: 80,
-              height: 48,
-              borderRadius: 8,
-              backgroundColor: surfaceSecondary,
-            }}
-          />
-        ) : (
-          <Text heavy size={48} style={{ color: warning, lineHeight: 52 }}>
-            {displayScore}
-          </Text>
-        )}
+        <Text
+          loading={loading && !hasScore}
+          placeholder="0.0"
+          heavy
+          size={48}
+          style={{ color: warning, lineHeight: 52 }}>
+          {displayScore}
+        </Text>
 
         {loading && !hasScore ? (
           <HStack gap={4}>
@@ -268,21 +262,13 @@ const HeaderStats = React.memo(function HeaderStats({
           <StarRating score={score} size={24} />
         ) : null}
 
-        {loading && totalReviews === 0 ? (
-          <Skeleton
-            style={{
-              width: 80,
-              height: 14,
-              borderRadius: 4,
-              marginTop: 4,
-              backgroundColor: surfaceSecondary,
-            }}
-          />
-        ) : (
-          <Text size={14} style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
-            {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
-          </Text>
-        )}
+        <Text
+          loading={loading && totalReviews === 0}
+          placeholder="0 reviews"
+          size={14}
+          style={{ color: opacity(foreground, 0.4), marginTop: 4 }}>
+          {totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}
+        </Text>
       </VStack>
     </View>
   );

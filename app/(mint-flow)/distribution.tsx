@@ -249,7 +249,6 @@ function DistributionScreen() {
             </Text>
             <Text
               bold
-              overpass
               size={14}
               style={{
                 color: totalBp === TOTAL_BASIS_POINTS ? foreground : danger,

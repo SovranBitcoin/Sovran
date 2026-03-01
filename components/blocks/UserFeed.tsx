@@ -927,11 +927,7 @@ function UserFeedInner({
     <View>
       {ListHeaderComponent}
       <View style={styles.feedContainer}>
-        <Text
-          medium
-          overpass
-          size={13}
-          style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
+        <Text medium size={13} style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
           Notes
         </Text>
         {isLoading ? (

@@ -28,7 +28,7 @@ const TextInput: FC<TextInputProps> = ({ style, placeholderTextColor, ...props }
           shadowOffset: { width: 1, height: 4 },
           shadowOpacity: 0.25,
           shadowRadius: 6,
-          fontFamily: 'OverpassBold',
+          fontFamily: 'OxygenBold',
           borderStyle: 'solid',
         },
         style,

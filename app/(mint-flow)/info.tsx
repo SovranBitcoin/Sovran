@@ -196,37 +196,11 @@ function StatsGridComponent({
     [successRate, avgTimeMs, totalMints, totalMelts]
   );
 
-  const fadeAnims = useRef([
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-  ]).current;
-
   const hasValidData =
     successRate !== undefined ||
     avgTimeMs !== undefined ||
     totalMints !== undefined ||
     totalMelts !== undefined;
-
-  const hasAnimatedRef = useRef(false);
-  useEffect(() => {
-    if (hasValidData && !hasAnimatedRef.current) {
-      hasAnimatedRef.current = true;
-
-      const animations = fadeAnims.map((anim, index) =>
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: 400,
-          delay: index * 80,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        })
-      );
-
-      Animated.stagger(80, animations).start();
-    }
-  }, [hasValidData, fadeAnims]);
 
   const stats = useMemo(
     () => [
@@ -267,8 +241,7 @@ function StatsGridComponent({
     <View style={styles.statsGrid}>
       {[0, 2].map((rowStart) => (
         <View key={rowStart} style={styles.statsRow}>
-          {stats.slice(rowStart, rowStart + 2).map((stat, i) => {
-            const index = rowStart + i;
+          {stats.slice(rowStart, rowStart + 2).map((stat) => {
             return (
               <View key={stat.label} style={styles.statItem}>
                 <View
@@ -280,49 +253,30 @@ function StatsGridComponent({
                       borderColor: surfaceTertiary,
                     },
                   ]}>
-                  {showSkeleton ? (
-                    <>
-                      <Skeleton
-                        style={[styles.skeletonLabel, { backgroundColor: surfaceTertiary }]}
-                      />
-                      <Skeleton
-                        style={[
-                          styles.skeletonValue,
-                          {
-                            backgroundColor: surfaceTertiary,
-                            width: stat.accent ? 100 : 60,
-                          },
-                        ]}
-                      />
-                      <Skeleton
-                        style={[styles.skeletonDesc, { backgroundColor: surfaceTertiary }]}
-                      />
-                    </>
-                  ) : (
-                    <Animated.View style={{ opacity: fadeAnims[index] }}>
-                      <Text
-                        bold
-                        overpass
-                        size={12}
-                        style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
-                        {stat.label.toUpperCase()}
-                      </Text>
-                      <Text
-                        bold
-                        overpass
-                        size={stat.accent ? 24 : 20}
-                        style={{ color: foreground, marginBottom: 2 }}>
-                        {stat.value}
-                      </Text>
-                      <Text
-                        bold
-                        overpass
-                        size={12}
-                        style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
-                        {stat.description}
-                      </Text>
-                    </Animated.View>
-                  )}
+                  <Text
+                    loading={showSkeleton}
+                    placeholder="SUCCESS RATE"
+                    bold
+                    size={12}
+                    style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
+                    {stat.label.toUpperCase()}
+                  </Text>
+                  <Text
+                    loading={showSkeleton}
+                    placeholder="100%"
+                    bold
+                    size={stat.accent ? 24 : 20}
+                    style={{ color: foreground, marginBottom: 2 }}>
+                    {stat.value}
+                  </Text>
+                  <Text
+                    loading={showSkeleton}
+                    placeholder="Completion rate"
+                    bold
+                    size={12}
+                    style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
+                    {stat.description}
+                  </Text>
                 </View>
               </View>
             );

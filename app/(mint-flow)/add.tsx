@@ -197,7 +197,7 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
           flex: 1,
           color: foreground,
           fontSize: 16,
-          fontFamily: 'OverpassRegular',
+          fontFamily: 'OxygenRegular',
         }}
         keyboardType="url"
         autoCorrect={false}
@@ -329,7 +329,7 @@ const MintItem = memo(function MintItem({
           />
 
           <VStack flex={1}>
-            <Text className="text-foreground" size={16} bold overpass>
+            <Text className="text-foreground" size={16} bold>
               {displayName}
             </Text>
 

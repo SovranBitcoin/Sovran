@@ -124,7 +124,11 @@ export function HistoryEntryHeader({
       <VStack>
         <HStack align="center">
           <Spacer size={8} />
-          <Text size={isSend ? 32 : 24} color={isSend ? danger : success} style={{ opacity: 0.9 }}>
+          <Text
+            overpass
+            size={isSend ? 32 : 24}
+            color={isSend ? danger : success}
+            style={{ opacity: 0.9 }}>
             {isSend ? '-' : '+'}
           </Text>
           <Spacer size={8} />
@@ -136,7 +140,7 @@ export function HistoryEntryHeader({
             color={isReceive ? success : danger}
           />
         </HStack>
-        <Text size={18} color={opacity(foreground, 0.9)} bold>
+        <Text overpass size={18} color={opacity(foreground, 0.9)} bold>
           {formatAmount(
             { amount: Math.abs(amount), unit },
             {

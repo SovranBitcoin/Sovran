@@ -782,7 +782,6 @@ const LightningAddressCard = () => {
                       />
                       <Text
                         size={13}
-                        mono
                         style={{ color: opacity(accentColor, 0.7) }}
                         numberOfLines={1}>
                         {currentAddress}
@@ -835,10 +834,10 @@ const LightningAddressCard = () => {
                         color="#22c55e"
                         style={{ marginRight: 8 }}
                       />
-                      <Text size={14} mono style={{ color: opacity(foreground, 0.9) }}>
+                      <Text size={14} style={{ color: opacity(foreground, 0.9) }}>
                         satoshi
                       </Text>
-                      <Text size={14} mono style={{ color: opacity(accentColor, 0.7) }}>
+                      <Text size={14} style={{ color: opacity(accentColor, 0.7) }}>
                         @npubx.cash
                       </Text>
                     </View>

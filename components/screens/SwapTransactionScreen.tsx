@@ -376,8 +376,8 @@ export function SwapTransactionScreen({ groupId }: Props) {
                 color={headerColor}
               />
             </HStack>
-            <Text size={18} color={opacity(foreground, 0.9)} bold>
-              <Text size={18} color={opacity(foreground, 0.9)} style={{ marginLeft: 8 }}>
+            <Text overpass size={18} color={opacity(foreground, 0.9)} bold>
+              <Text overpass size={18} color={opacity(foreground, 0.9)} style={{ marginLeft: 8 }}>
                 {fiatAmount}
               </Text>
             </Text>

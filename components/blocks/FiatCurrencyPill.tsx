@@ -146,7 +146,7 @@ export function FiatCurrencyPill({
           paddingVertical: 6,
           minHeight: iosHeight,
         }}>
-        <Text size={textSize} bold overpass color={success} style={{ letterSpacing: 0.3 }}>
+        <Text overpass size={textSize} bold color={success} style={{ letterSpacing: 0.3 }}>
           {text}
         </Text>
       </HStack>

@@ -860,7 +860,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
         {metrics.satsZapped > 0 ? (
           <HStack align="center" gap={4}>
             <Icon name="mingcute:lightning-fill" size={iconSize} color={iconColor} />
-            <Text size={textSize} style={{ color: textColor }}>
+            <Text overpass size={textSize} style={{ color: textColor }}>
               {formatSats(metrics.satsZapped)}
             </Text>
           </HStack>

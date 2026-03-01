@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabText: {
-    fontFamily: 'OverpassBold',
+    fontFamily: 'OxygenBold',
     maxWidth: 100,
   },
   // Gradient covering the bottom of the sticky header — content fades as it scrolls behind

@@ -25,7 +25,6 @@ import {
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SkeletonContainer } from 'react-native-skeleton-component';
 import { usePaymentsSearch } from './_layout';
 import { LayoutDebugWrapper } from '../example';
 import { NoResultsFound } from '@/components/blocks/contacts/NoResultsFound';
@@ -121,12 +120,7 @@ async function decryptNip04Events<
 const PaymentsContent = () => {
   useBackgroundConfig({ blurMode: 'full', backgroundOpacity: 0.25 });
 
-  const [foreground, muted, defaultColor, surfaceSecondary] = useThemeColor([
-    'foreground',
-    'muted',
-    'default',
-    'surface-secondary',
-  ] as const);
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const [selectedTab, setSelectedTab] = useState('Recent activity');
 
   const defaultContactPubkeys = useMemo(
@@ -552,11 +546,7 @@ const PaymentsContent = () => {
       <ScrollableGradientOverlay contentHeight={windowHeight * 1.5} />
 
       <SafeAreaView style={layoutStyles.flex1} edges={['bottom']}>
-        <SkeletonContainer
-          backgroundColor={surfaceSecondary}
-          highlightColor={defaultColor}
-          speed={800}
-          animation={searchLoading ? 'pulse' : 'none'}>
+        <View style={{ flex: 1 }}>
           <View style={{ position: 'relative', flex: 1, paddingTop: HEADER_HEIGHT }}>
             {/* Tabs - hidden when searching to avoid layout shift */}
             <View
@@ -585,7 +575,7 @@ const PaymentsContent = () => {
                   <RNView style={[styles.card, { borderColor }]}>
                     <BlurCardFrame accentColor={muted}>
                       <View style={styles.searchSectionHeader}>
-                        <Text overpass bold size={14} style={{ color: opacity(foreground, 0.4) }}>
+                        <Text bold size={14} style={{ color: opacity(foreground, 0.4) }}>
                           Search results
                         </Text>
                       </View>
@@ -640,7 +630,7 @@ const PaymentsContent = () => {
               </View>
             )}
           </View>
-        </SkeletonContainer>
+        </View>
       </SafeAreaView>
     </LayoutDebugWrapper>
   );

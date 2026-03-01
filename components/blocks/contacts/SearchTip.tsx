@@ -15,7 +15,7 @@ export function SearchTip({ icon, text }: SearchTipProps) {
   return (
     <HStack spacing={0} align="center">
       <Icon name={icon} size={20} color={mutedForeground} />
-      <Text className="flex-1 pl-2" size={14} overpass regular color={mutedForeground}>
+      <Text className="flex-1 pl-2" size={14} color={mutedForeground}>
         {text}
       </Text>
     </HStack>

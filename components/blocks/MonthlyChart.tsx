@@ -305,7 +305,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
                       { backgroundColor: opacity(actualLineColor, 0.12) },
                     ]}>
                     <Icon name={changeIcon} size={14} color={actualLineColor} />
-                    <Text size={13} semibold color={actualLineColor}>
+                    <Text overpass size={13} semibold color={actualLineColor}>
                       {fmt(dailyChange, unit)}
                     </Text>
                   </RNView>
@@ -366,7 +366,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
                 x={x}
                 y={totalSvgHeight - 4}
                 fontSize={11}
-                fontFamily="OverpassSemibold"
+                fontFamily="OxygenBold"
                 fill={labelColor}
                 textAnchor="middle">
                 {day}

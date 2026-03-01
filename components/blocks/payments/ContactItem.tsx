@@ -39,11 +39,11 @@ const styles = {
     flex: 1,
   },
   profileName: {
-    fontFamily: 'OverpassBold',
+    fontFamily: 'OxygenBold',
     fontSize: 16,
   },
   previewText: {
-    fontFamily: 'OverpassRegular',
+    fontFamily: 'OxygenRegular',
     fontSize: 16,
     marginTop: 2,
   },
@@ -113,10 +113,17 @@ export const ContactItem = React.memo(function ContactItem({
           />
         </VStack>
         <VStack style={styles.textContainer}>
-          <Text style={styles.profileName} className="text-foreground">
+          <Text
+            loading={isLoadingProfile}
+            placeholder="Contact Name"
+            style={styles.profileName}
+            className="text-foreground">
             {displayInfo.name}
           </Text>
-          <Text style={[styles.previewText, { color: opacity(foreground, 0.8) }]}>
+          <Text
+            loading={isLoadingProfile}
+            placeholder="Last message preview text"
+            style={[styles.previewText, { color: opacity(foreground, 0.8) }]}>
             {displayInfo.subtitle.length > 50
               ? `${displayInfo.subtitle.slice(0, 50)}...`
               : displayInfo.subtitle}

@@ -214,7 +214,7 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
             alt={`${displayName} icon`}
           />
           <VStack gap={2} className="flex-1">
-            <Text bold overpass size={14} style={{ color: primaryColor0 }} numberOfLines={1}>
+            <Text bold size={14} style={{ color: primaryColor0 }} numberOfLines={1}>
               {displayName}
             </Text>
             <AmountFormatter
@@ -228,8 +228,8 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
         </HStack>
 
         <Text
-          heavy
           overpass
+          heavy
           size={24}
           style={{ color: primaryColor0, minWidth: 60, textAlign: 'right' }}>
           {percentDisplay}%

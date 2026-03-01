@@ -123,6 +123,7 @@ function EcashStatusPill({
         }}>
         <Icon name="majesticons:coins" size={14} color={opacity(foreground, 0.66)} />
         <UntranslatedText
+          overpass
           bold
           size={PILL_TEXT_SIZE}
           color={opacity(foreground, 0.66)}
@@ -172,8 +173,8 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
       params: {
         account: JSON.stringify(account),
         filterCurrency: account.unit,
-        filterPaymentType: 'all',
-        filterDirection: 'all',
+        filterPaymentType: 'ecash',
+        filterDirection: 'outgoing',
         filterStatus: 'Pending',
         filterMintUrl: 'all',
       },

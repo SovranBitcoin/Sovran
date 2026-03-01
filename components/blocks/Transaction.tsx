@@ -137,7 +137,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
               {displayLabel}
             </UntranslatedText>
             <HStack align="center" spacing={0}>
-              <UntranslatedText color={isSend ? danger : success} bold size={16}>
+              <UntranslatedText overpass color={isSend ? danger : success} bold size={16}>
                 {isSend ? '- ' : isReceive ? '+ ' : ''}
               </UntranslatedText>
               <AmountFormatter
@@ -152,7 +152,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
 
           <HStack justify="space-between" align="center">
             <HStack align="center" spacing={4}>
-              <UntranslatedText regular size={10} color={opacity(foreground, 0.8)}>
+              <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
                 {historyEntry?.createdAt
                   ? convertTime(new Date(historyEntry.createdAt))
                   : 'Unconfirmed'}
@@ -174,6 +174,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
               )}
             </HStack>
             <UntranslatedText
+              overpass
               bold
               size={10}
               color={opacity(foreground, 0.8)}

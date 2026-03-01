@@ -39,7 +39,7 @@ function FilterButton() {
             size={10}
             style={{
               color: foreground,
-              fontFamily: 'OverpassBold',
+              fontFamily: 'OxygenBold',
             }}>
             {activeFilterCount}
           </Text>

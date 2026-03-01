@@ -93,7 +93,6 @@ export function Section({ items, style, camera = false, special }: SectionProps)
       return (
         <VStack align="center" className="flex-1" justify="center">
           <Text
-            mono
             size={18}
             color={opacity(foreground, 0.9)}
             style={{
@@ -106,7 +105,6 @@ export function Section({ items, style, camera = false, special }: SectionProps)
               primary
               size={24}
               heavy
-              overpass
               className="text-shade-200"
               style={{
                 textAlign: 'center',
@@ -163,7 +161,6 @@ export function Section({ items, style, camera = false, special }: SectionProps)
             color={opacity(foreground, 0.9)}
             style={{
               textAlign: 'left',
-              fontFamily: 'OverpassMono',
               wordBreak: 'break-all',
             }}>
             {item.value}
@@ -177,7 +174,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
     return (
       <View>
         <Text
-          weight={titleText === '' ? 'mono' : 'bold'}
+          weight={titleText === '' ? 'regular' : 'bold'}
           size={titleText === '' ? 12 : 16}
           color={foreground}
           style={{
@@ -209,7 +206,6 @@ export function Section({ items, style, camera = false, special }: SectionProps)
           color={opacity(foreground, 0.9)}
           style={{
             textAlign: 'center',
-            fontFamily: 'OverpassMono',
           }}>
           {value}
         </Text>

@@ -425,7 +425,6 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                         <Text
                           size={13}
                           medium
-                          overpass
                           style={{
                             color: opacity(foreground, 0.5),
                             letterSpacing: 0.5,
@@ -474,7 +473,13 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                         loading={isMetadataLoading}
                       />
                       <VStack spacing={2} className="min-w-0 flex-1">
-                        <Text size={16} bold className="text-foreground" numberOfLines={1}>
+                        <Text
+                          loading={isMetadataLoading}
+                          placeholder="Username"
+                          size={16}
+                          bold
+                          className="text-foreground"
+                          numberOfLines={1}>
                           {username}
                         </Text>
                         <HStack align="center" justify="flex-start" spacing={4}>
@@ -483,7 +488,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                             size={14}
                             color={shade400}
                           />
-                          <Text size={12} className="text-shade-400">
+                          <Text overpass size={12} className="text-shade-400">
                             {formatBalance(balance)}
                           </Text>
                           <Spacer size={4} />

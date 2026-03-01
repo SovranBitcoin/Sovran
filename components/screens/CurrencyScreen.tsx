@@ -139,28 +139,26 @@ function FiatAmountDisplay({
 
   return (
     <HStack align="baseline" justify="center">
-      <Text size={size} weight="heavy" style={{ color: activeColor }}>
+      <Text overpass size={size} weight="heavy" style={{ color: activeColor }}>
         {symbol}
         {formattedWhole}
       </Text>
       {showDecimalSection && (
         <>
-          {/* Show the decimal point - in active color if user typed it, placeholder if auto-shown for "0" */}
           <Text
+            overpass
             size={size}
             weight="heavy"
             style={{ color: hasDecimal ? activeColor : placeholderColor }}>
             .
           </Text>
-          {/* Show any typed decimal digits */}
           {decimalPart && (
-            <Text size={size} weight="heavy" style={{ color: activeColor }}>
+            <Text overpass size={size} weight="heavy" style={{ color: activeColor }}>
               {decimalPart}
             </Text>
           )}
-          {/* Show placeholder for remaining decimal places */}
           {placeholderDecimals && (
-            <Text size={size} weight="heavy" style={{ color: placeholderColor }}>
+            <Text overpass size={size} weight="heavy" style={{ color: placeholderColor }}>
               {placeholderDecimals}
             </Text>
           )}

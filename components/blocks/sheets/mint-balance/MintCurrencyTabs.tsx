@@ -195,7 +195,7 @@ function AnimatedCurrencyTab({
             {renderIcon()}
           </Animated.View>
           <Animated.Text
-            style={[{ fontFamily: 'OverpassBold', color: primaryColor0 }, animatedTextStyle]}>
+            style={[{ fontFamily: 'OxygenBold', color: primaryColor0 }, animatedTextStyle]}>
             {label}
           </Animated.Text>
         </Animated.View>

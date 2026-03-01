@@ -40,7 +40,6 @@ export const Section: React.FC<{
         className="text-foreground/50 my-2 ml-3 uppercase tracking-wide"
         size={13}
         medium
-        overpass
         style={isDanger ? { color: danger } : undefined}>
         {title}
       </Text>
@@ -123,7 +122,6 @@ export const RowButton: React.FC<{
         {value && (
           <Text
             className="tracking-tight"
-            overpass
             bold
             size={ROW_ICON_SIZE}
             style={{
@@ -413,10 +411,10 @@ const ModalScreen = () => {
 
         <TouchableOpacity onPress={handleVersionPress}>
           <VStack spacing={4}>
-            <Text className="text-foreground/50 text-center" overpass bold size={13}>
+            <Text className="text-foreground/50 text-center" bold size={13}>
               {name}
             </Text>
-            <Text className="text-foreground/50 text-center" size={13} overpass medium>
+            <Text className="text-foreground/50 text-center" size={13} medium>
               App Version {version} ({buildNumber})
             </Text>
           </VStack>

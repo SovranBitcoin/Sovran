@@ -55,7 +55,6 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
           {title && (
             <Text
               heavy
-              overpass
               className="text-base"
               style={{
                 color: opacity(foreground, 0.5),

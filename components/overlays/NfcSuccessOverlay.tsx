@@ -8,7 +8,9 @@
  */
 
 import React, { useMemo, useEffect } from 'react';
-import { Platform, StyleSheet, Text } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
+
+import { UntranslatedText } from 'components/ui/Text';
 import { FullWindowOverlay } from 'react-native-screens';
 import Animated, {
   createAnimatedComponent,
@@ -152,7 +154,11 @@ function NfcSuccessOverlay({ onComplete, amountSats }: NfcSuccessOverlayProps) {
           size={CONFIRM_ICON_SIZE}
           startDelayMs={0}
         />
-        {amountLabel != null ? <Text style={styles.amountText}>You sent {amountLabel}</Text> : null}
+        {amountLabel != null ? (
+          <UntranslatedText overpass semibold size={18} style={styles.amountText}>
+            You sent {amountLabel}
+          </UntranslatedText>
+        ) : null}
       </Animated.View>
     </Animated.View>
   );
@@ -176,7 +182,5 @@ const styles = StyleSheet.create({
   },
   amountText: {
     color: CHECK_WHITE,
-    fontSize: 18,
-    fontWeight: '600',
   },
 });

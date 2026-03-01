@@ -1665,7 +1665,7 @@ function RebalancePlanScreen() {
               <Text size={14} style={{ color: fgMuted }}>
                 Steps
               </Text>
-              <Text bold overpass size={18} style={{ color: foreground }}>
+              <Text bold size={18} style={{ color: foreground }}>
                 {stepCounts.completed}/{plan.steps.length}
               </Text>
             </HStack>
@@ -1674,7 +1674,7 @@ function RebalancePlanScreen() {
                 <Text size={14} style={{ color: fgMuted }}>
                   Skipped
                 </Text>
-                <Text bold overpass size={18} style={{ color: fgDim }}>
+                <Text bold size={18} style={{ color: fgDim }}>
                   {stepCounts.skipped}
                 </Text>
               </HStack>
@@ -1684,11 +1684,7 @@ function RebalancePlanScreen() {
                 <Text size={14} style={{ color: fgMuted }}>
                   Errors
                 </Text>
-                <Text
-                  bold
-                  overpass
-                  size={18}
-                  style={{ color: stepCounts.failed > 0 ? danger : foreground }}>
+                <Text bold size={18} style={{ color: stepCounts.failed > 0 ? danger : foreground }}>
                   {stepCounts.failed}
                 </Text>
               </HStack>

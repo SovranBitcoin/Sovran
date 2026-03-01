@@ -359,7 +359,7 @@ export function WalletHealthModalContent({
               <Text size={10} style={{ color: statLabelColor }}>
                 {statLabelText(s.key)}
               </Text>
-              <Text bold overpass size={14} style={{ color: s.tone }}>
+              <Text bold size={14} style={{ color: s.tone }}>
                 {s.value}
               </Text>
             </View>

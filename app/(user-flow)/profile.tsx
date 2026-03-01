@@ -57,7 +57,7 @@ import { getUsername } from '@/helper/username';
 import { generateSeededGradient } from '@/helper/avatarGradient';
 import type { VideoPostRecord } from 'components/blocks/nostr/shared';
 import type { StoryUser } from 'components/blocks/nostr/StoriesCarousel';
-import { ListGroup, PressableFeedback } from 'heroui-native';
+import { ListGroup, PressableFeedback, Skeleton as HeroSkeleton } from 'heroui-native';
 import { useThemeColor } from '@/hooks/useThemeColor';
 
 const BANNER_HEIGHT = 150;
@@ -173,40 +173,37 @@ function ProfileStatsGridComponent({
 
   const showSkeleton = isLoading && !hasValidData;
 
-  const renderStatCard = (stat: (typeof stats)[0], index: number) => (
+  const renderStatCard = (stat: (typeof stats)[0], _index: number) => (
     <View key={stat.label} style={styles.statItem}>
       <View
         style={[
           styles.statCard,
           { backgroundColor: surfaceSecondary, borderColor: surfaceTertiary },
         ]}>
-        {showSkeleton ? (
-          <>
-            <Skeleton style={[styles.skeletonLabel, { backgroundColor: surfaceTertiary }]} />
-            <Skeleton style={[styles.skeletonValue, { backgroundColor: surfaceTertiary }]} />
-            <Skeleton style={[styles.skeletonDesc, { backgroundColor: surfaceTertiary }]} />
-          </>
-        ) : (
-          <Animated.View style={{ opacity: fadeAnims[index] }}>
-            <Text
-              bold
-              overpass
-              size={12}
-              style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
-              {stat.label.toUpperCase()}
-            </Text>
-            <Text
-              bold
-              overpass
-              size={stat.smallValue ? 16 : 20}
-              style={{ color: foreground, marginBottom: 2 }}>
-              {stat.value}
-            </Text>
-            <Text bold overpass size={12} style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
-              {stat.description}
-            </Text>
-          </Animated.View>
-        )}
+        <Text
+          loading={showSkeleton}
+          placeholder="FOLLOWING"
+          bold
+          size={12}
+          style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
+          {stat.label.toUpperCase()}
+        </Text>
+        <Text
+          loading={showSkeleton}
+          placeholder="1,234"
+          bold
+          size={stat.smallValue ? 16 : 20}
+          style={{ color: foreground, marginBottom: 2 }}>
+          {stat.value}
+        </Text>
+        <Text
+          loading={showSkeleton}
+          placeholder="Network score"
+          bold
+          size={12}
+          style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
+          {stat.description}
+        </Text>
       </View>
     </View>
   );
@@ -322,7 +319,6 @@ function TopFollowersComponent({
     <View style={{ paddingHorizontal: 16 }}>
       <Text
         bold
-        overpass
         size={12}
         style={{ color: opacity(foreground, 0.4), marginBottom: 12, marginLeft: 4 }}>
         TOP FOLLOWERS
@@ -371,9 +367,8 @@ function BannerWithAvatarComponent({
   hasStories?: boolean;
   onAvatarPress?: () => void;
 }) {
-  const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor([
+  const [foreground, surfaceSecondary, background] = useThemeColor([
     'foreground',
-    'surface-tertiary',
     'surface-secondary',
     'background',
   ] as const);
@@ -459,65 +454,61 @@ function BannerWithAvatarComponent({
 
       {/* Name and NIP-05 */}
       <VStack align="center" style={{ marginTop: 8 }}>
-        {isLoading ? (
-          <>
-            <Skeleton
-              style={{
-                width: 150,
-                height: 24,
-                borderRadius: 4,
-                backgroundColor: surfaceTertiary,
-              }}
-            />
-            <Spacer size={8} />
-            <Skeleton
-              style={{
-                width: 100,
-                height: 16,
-                borderRadius: 4,
-                backgroundColor: surfaceTertiary,
-              }}
-            />
-          </>
-        ) : (
-          <>
-            <Text bold size={22} style={{ color: foreground }}>
-              {displayName}
+        <Text
+          loading={isLoading}
+          placeholder="Display Name"
+          bold
+          size={22}
+          style={{
+            color: foreground,
+            includeFontPadding: false,
+            lineHeight: Math.round(22 * 1.25),
+          }}>
+          {displayName}
+        </Text>
+        {(isLoading || nip05) && (
+          <HStack align="center" gap={4}>
+            {!isLoading && (
+              <Icon name="mdi:check-decagram" size={16} color={opacity(foreground, 0.4)} />
+            )}
+            <Text
+              loading={isLoading}
+              placeholder="username@relay.example"
+              size={14}
+              style={{ color: opacity(foreground, 0.4) }}>
+              {nip05 || '\u00A0'}
             </Text>
-            {nip05 && (
-              <HStack align="center" gap={4}>
-                <Icon name="mdi:check-decagram" size={16} color={opacity(foreground, 0.4)} />
-                <Text size={14} style={{ color: opacity(foreground, 0.4) }}>
-                  {nip05}
-                </Text>
-              </HStack>
-            )}
-            {showFollowButton && (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={onToggleFollow}
-                disabled={isFollowLoading}
-                style={[
-                  styles.followButton,
-                  {
-                    backgroundColor: isFollowing ? opacity(foreground, 0.12) : foreground,
-                    borderColor: isFollowing ? opacity(foreground, 0.25) : foreground,
-                  },
-                  isFollowLoading && styles.followButtonDisabled,
-                ]}>
-                <Text
-                  bold
-                  overpass
-                  size={13}
-                  style={{
-                    color: isFollowing ? foreground : background,
-                  }}>
-                  {isFollowing ? 'Following' : 'Follow'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </>
+          </HStack>
         )}
+        {showFollowButton &&
+          (isLoading ? (
+            <HeroSkeleton
+              className="h-[34px] min-w-[108px] rounded-full"
+              style={{ marginTop: 10 }}
+            />
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={onToggleFollow}
+              disabled={isFollowLoading}
+              style={[
+                styles.followButton,
+                {
+                  backgroundColor: isFollowing ? opacity(foreground, 0.12) : foreground,
+                  borderColor: isFollowing ? opacity(foreground, 0.25) : foreground,
+                },
+                isFollowLoading && styles.followButtonDisabled,
+              ]}>
+              <Text
+                bold
+                size={13}
+                style={{
+                  color: isFollowing ? foreground : background,
+                }}>
+                {isFollowing ? 'Following' : 'Follow'}
+              </Text>
+            </TouchableOpacity>
+          ))}
       </VStack>
     </View>
   );

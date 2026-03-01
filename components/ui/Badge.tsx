@@ -259,7 +259,7 @@ function Badge({ className, variant, icon, size = 12, color, children }: BadgePr
       {icon && <Icon name={icon} size={size} color={textColor} />}
       {/* Render text content if provided */}
       {children && (
-        <Text size={size} bold overpass color={textColor}>
+        <Text size={size} bold color={textColor}>
           {children}
         </Text>
       )}

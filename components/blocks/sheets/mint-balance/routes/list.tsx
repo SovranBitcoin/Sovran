@@ -174,7 +174,7 @@ const MintItem: React.FC<MintItemProps> = ({
           </View>
 
           <VStack flex={1}>
-            <Text className="text-foreground" size={16} bold overpass>
+            <Text className="text-foreground" size={16} bold>
               {displayName}
             </Text>
 

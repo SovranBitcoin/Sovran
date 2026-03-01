@@ -187,7 +187,7 @@ const ThemeCard = React.memo(
 
             {/* Theme name */}
             <View style={styles.labelContainer}>
-              <Text size={14} bold overpass style={styles.themeName} numberOfLines={1}>
+              <Text size={14} bold style={styles.themeName} numberOfLines={1}>
                 {displayName}
               </Text>
               {isSelected && (
@@ -311,7 +311,6 @@ function ThemeSettings() {
             <Text
               size={13}
               medium
-              overpass
               style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
               WALLPAPERS
             </Text>
@@ -326,7 +325,6 @@ function ThemeSettings() {
             <Text
               size={13}
               medium
-              overpass
               style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
               COLOR THEMES
             </Text>

@@ -157,13 +157,13 @@ export default function TermsAndConditions({
   return (
     <Container className="bg-surface">
       <VStack spacing={16} flex={1} className="p-4">
-        <Text overpass bold size={32} className="text-foreground py-2 text-center">
+        <Text bold size={32} className="text-foreground py-2 text-center">
           {title}
         </Text>
 
         <Card variant="secondary" className="flex-1">
           <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
-            <Text overpass size={14} className="text-foreground leading-[22px]">
+            <Text size={14} className="text-foreground leading-[22px]">
               {terms}
             </Text>
           </ScrollView>

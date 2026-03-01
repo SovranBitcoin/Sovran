@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   },
   bannerText: {
     fontSize: 11,
-    fontFamily: 'OverpassBold',
+    fontFamily: 'OxygenBold',
     letterSpacing: 0.8,
   },
 });

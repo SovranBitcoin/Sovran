@@ -17,17 +17,17 @@ export function NoResultsFound() {
       </VStack>
 
       <VStack spacing={12}>
-        <Text className="text-center" color={opacity(foreground, 0.5)} overpass bold size={20}>
+        <Text className="text-center" color={opacity(foreground, 0.5)} bold size={20}>
           No Results Found
         </Text>
 
-        <Text className="text-center" color={opacity(foreground, 0.4)} overpass regular size={16}>
+        <Text className="text-center" color={opacity(foreground, 0.4)} size={16}>
           {"We couldn't find any users matching your search"}
         </Text>
       </VStack>
 
       <VStack className="bg-surface-secondary w-full rounded-xl p-4">
-        <Text color={opacity(foreground, 0.66)} overpass bold size={16}>
+        <Text color={opacity(foreground, 0.66)} bold size={16}>
           Try adjusting your search:
         </Text>
         <VStack spacing={12} className="mt-2">

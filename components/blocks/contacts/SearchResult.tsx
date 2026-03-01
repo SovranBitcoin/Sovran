@@ -30,14 +30,18 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
       <HStack spacing={8} align="center">
         <ProfileImage loading={loading} profile={result.profile} />
         <VStack spacing={4} className="flex-1">
-          <Text loading={loading} overpass bold size={16} color={opacity(foreground, 0.9)}>
+          <Text
+            loading={loading}
+            placeholder="Display Name"
+            bold
+            size={16}
+            color={opacity(foreground, 0.9)}>
             {title}
           </Text>
           {result.profile?.nip05 && (
             <Text
               loading={loading}
-              overpass
-              regular
+              placeholder="user@relay.example"
               size={12}
               color={result.profile.nip05Valid ? success : danger}>
               {result.profile.nip05Valid ? '✓ ' : '✗ '}
