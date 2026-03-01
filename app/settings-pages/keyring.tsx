@@ -11,7 +11,6 @@ import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { Badge } from 'components/ui/Badge';
 import Icon from 'assets/icons';
 import { useManager } from 'coco-cashu-react';
@@ -25,7 +24,13 @@ import { nip19 } from 'nostr-tools';
 import QRCode from 'react-native-qrcode-svg';
 import { Tabs } from 'components/ui/Tabs';
 import opacity from 'hex-color-opacity';
-import { Button, Card, ListGroup, Separator, Switch as HeroSwitch } from 'heroui-native';
+import {
+  Button,
+  ListGroup,
+  PressableFeedback,
+  Separator,
+  Switch as HeroSwitch,
+} from 'heroui-native';
 import { useThemeColor } from '@/hooks/useThemeColor';
 
 /**
@@ -35,21 +40,17 @@ const CurrentKeyItem: React.FC<{
   keypair: Keypair;
   onCopy: (publicKey: string) => void;
 }> = ({ keypair, onCopy }) => {
-  const [foreground, surfaceTertiary, surfaceSecondary, surface] = useThemeColor(['foreground', 'surface-tertiary', 'surface-secondary', 'surface'] as const);
+  const [foreground, surface, muted] = useThemeColor(['foreground', 'surface', 'muted'] as const);
   const [selectedTab, setSelectedTab] = useState('P2PK');
 
   const isDerived = keypair.derivationIndex !== undefined;
 
-  // Get the npub value for non-derived keys
   const npubValue = !isDerived
     ? nip19.npubEncode(keypair.publicKeyHex.replace(/^02/, ''))
     : undefined;
 
-  // Determine which data to show based on selected tab
   const isNpubTab = selectedTab === 'NPUB' && !isDerived;
   const activeData = isNpubTab ? npubValue! : keypair.publicKeyHex;
-
-  // Display key based on tab selection (for derived keys, always show hex)
   const displayKey = isDerived ? keypair.publicKeyHex : activeData;
 
   const handleTabPress = useCallback((tab: string) => {
@@ -72,128 +73,80 @@ const CurrentKeyItem: React.FC<{
   }, [activeData, onCopy]);
 
   return (
-    <View
-      style={{
-        backgroundColor: surface,
-        borderRadius: 16,
-        marginBottom: 16,
-        overflow: 'hidden',
-      }}>
-      {/* Elevated key card */}
-      <View
-        style={{
-          backgroundColor: surfaceTertiary,
-          borderRadius: 14,
-          padding: 16,
-        }}>
-        {/* Tabs for npub keys */}
+    <View className="p-4">
+      {!isDerived && (
+        <View className="mb-4">
+          <Tabs tabs={['P2PK', 'NPUB']} selectedTab={selectedTab} handleTabPress={handleTabPress} />
+        </View>
+      )}
+
+      <PressableFeedback
+        onPress={handleShowQR}
+        className="mb-4 self-center overflow-hidden rounded-xl">
+        <PressableFeedback.Highlight />
+        <View
+          style={{
+            alignItems: 'center',
+            padding: 12,
+            backgroundColor: foreground,
+            borderRadius: 12,
+          }}>
+          <QRCode value={activeData} size={120} color={surface} backgroundColor={foreground} />
+        </View>
+      </PressableFeedback>
+
+      <HStack align="center" spacing={8} className="mb-3.5 flex-wrap gap-y-2">
+        <Badge variant="success" icon="solar:key-bold" size={11}>
+          ACTIVE
+        </Badge>
         {!isDerived && (
-          <View style={{ marginBottom: 16 }}>
-            <Tabs
-              tabs={['P2PK', 'NPUB']}
-              selectedTab={selectedTab}
-              handleTabPress={handleTabPress}
-            />
-          </View>
-        )}
-
-        {/* QR Code Preview */}
-        <TouchableOpacity onPress={handleShowQR}>
-          <View
-            style={{
-              alignItems: 'center',
-              marginBottom: 16,
-              padding: 12,
-              backgroundColor: foreground,
-              borderRadius: 12,
-              alignSelf: 'center',
-            }}>
-            <QRCode
-              value={activeData}
-              size={120}
-              color={surface}
-              backgroundColor={foreground}
-            />
-          </View>
-        </TouchableOpacity>
-
-        {/* Badge row */}
-        <HStack
-          align="center"
-          spacing={8}
-          style={{ marginBottom: 14, flexWrap: 'wrap', rowGap: 8 }}>
-          <Badge variant="success" icon="solar:key-bold" size={11}>
-            ACTIVE
+          <Badge variant="primary" icon={isNpubTab ? 'ph:user-bold' : 'solar:key-bold'} size={11}>
+            {isNpubTab ? 'NPUB' : 'P2PK'}
           </Badge>
-          {!isDerived && (
-            <Badge variant="primary" icon={isNpubTab ? 'ph:user-bold' : 'solar:key-bold'} size={11}>
-              {isNpubTab ? 'NPUB' : 'P2PK'}
-            </Badge>
-          )}
-          {isDerived && (
-            <Badge variant="primary" icon="mdi:key-arrow-right" size={11}>
-              DERIVED {keypair.derivationIndex}
-            </Badge>
-          )}
-        </HStack>
+        )}
+        {isDerived && (
+          <Badge variant="primary" icon="mdi:key-arrow-right" size={11}>
+            DERIVED {keypair.derivationIndex}
+          </Badge>
+        )}
+      </HStack>
 
-        {/* Key content */}
-        <HStack align="center">
-          {/* Public key display */}
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: surfaceSecondary,
-              borderRadius: 10,
-              paddingVertical: 12,
-              paddingHorizontal: 14,
-            }}>
-            <Text
-              mono
-              size={12}
-              style={{
-              color: foreground,
-              flexShrink: 0,
-              }}>
-              {displayKey}
-            </Text>
-          </View>
-        </HStack>
-
-        {/* Action buttons */}
-        <HStack spacing={10} style={{ marginTop: 14 }}>
-          <Button variant="secondary" className="flex-1" onPress={handleCopy}>
-            <Icon name="lets-icons:copy" size={16} />
-            <Button.Label>Copy</Button.Label>
-          </Button>
-          <Button variant="secondary" className="flex-1" onPress={handleShowQR}>
-            <Icon name="stash:qr-code" size={16} />
-            <Button.Label>Show QR</Button.Label>
-          </Button>
-        </HStack>
+      <View className="bg-surface rounded-xl px-3.5 py-3">
+        <Text size={12} className="text-foreground">
+          {displayKey}
+        </Text>
       </View>
+
+      <HStack spacing={10} className="mt-3.5">
+        <Button variant="secondary" className="flex-1" onPress={handleCopy}>
+          <Icon name="lets-icons:copy" size={16} color={muted} />
+          <Button.Label style={{ color: muted }}>Copy</Button.Label>
+        </Button>
+        <Button variant="secondary" className="flex-1" onPress={handleShowQR}>
+          <Icon name="stash:qr-code" size={16} color={muted} />
+          <Button.Label style={{ color: muted }}>Show QR</Button.Label>
+        </Button>
+      </HStack>
     </View>
   );
 };
 
 /**
- * KeyItem - Individual key display component
+ * KeyItem - Individual key display component using PressableFeedback
  */
 const KeyItem: React.FC<{
   keypair: Keypair;
   onCopy: (publicKey: string) => void;
 }> = ({ keypair, onCopy }) => {
-  const [foreground, defaultColor, surfaceTertiary] = useThemeColor(['foreground', 'default', 'surface-tertiary'] as const);
+  const foreground = useThemeColor('foreground');
 
   const isDerived = keypair.derivationIndex !== undefined;
 
-  // Convert to npub if derived key, otherwise show raw hex
   const displayKey = !isDerived
     ? nip19.npubEncode(keypair.publicKeyHex.replace(/^02/, ''))
     : keypair.publicKeyHex;
 
   const handleShowQR = () => {
-    // For non-derived (imported) keys, pass npub to enable tab switching
     const npubValue = !isDerived
       ? nip19.npubEncode(keypair.publicKeyHex.replace(/^02/, ''))
       : undefined;
@@ -209,56 +162,34 @@ const KeyItem: React.FC<{
   };
 
   return (
-    <HStack
-      align="center"
-      style={{
-        backgroundColor: surfaceTertiary,
-        borderRadius: 12,
-        marginBottom: 8,
-        padding: 8,
-      }}>
-      {/* Type indicator */}
-      <View
-        style={{
-          backgroundColor: defaultColor,
-          padding: 8,
-          borderRadius: 8,
-          marginRight: 10,
-        }}>
-        <Icon
-          name={isDerived ? 'mdi:key-arrow-right' : 'ph:user-bold'}
-          size={16}
-          color={opacity(foreground, 0.5)}
-        />
+    <PressableFeedback onPress={() => onCopy(keypair.publicKeyHex)}>
+      <PressableFeedback.Highlight />
+      <View className="flex-row items-center gap-3 p-4">
+        <View className="bg-default items-center justify-center rounded-lg p-2">
+          <Icon
+            name={isDerived ? 'mdi:key-arrow-right' : 'ph:user-bold'}
+            size={16}
+            color={opacity(foreground, 0.5)}
+          />
+        </View>
+        <ListGroup.ItemContent>
+          <Text size={11} style={{ color: foreground }}>
+            {truncateMiddle(displayKey, 7)}
+          </Text>
+          <Text size={10} className="mt-0.5" style={{ color: opacity(foreground, 0.4) }}>
+            {isDerived ? `Derived Key ${keypair.derivationIndex}` : 'Imported'}
+          </Text>
+        </ListGroup.ItemContent>
+        <HStack spacing={4}>
+          <Button variant="ghost" size="sm" isIconOnly onPress={() => onCopy(keypair.publicKeyHex)}>
+            <Icon name="lets-icons:copy" size={16} />
+          </Button>
+          <Button variant="ghost" size="sm" isIconOnly onPress={handleShowQR}>
+            <Icon name="stash:qr-code" size={16} />
+          </Button>
+        </HStack>
       </View>
-
-      {/* Public key */}
-      <VStack flex={1}>
-        <Text
-          mono
-          size={11}
-          style={{
-            color: opacity(foreground, 0.8),
-          }}>
-          {truncateMiddle(displayKey, 7)}
-        </Text>
-        <Text size={10} style={{ color: opacity(foreground, 0.4), marginTop: 2 }}>
-          {isDerived ? `Derived Key ${keypair.derivationIndex}` : `Imported`}
-        </Text>
-      </VStack>
-
-      <Button
-        variant="ghost"
-        size="sm"
-        isIconOnly
-        onPress={() => onCopy(keypair.publicKeyHex)}
-        className="ml-1">
-        <Icon name="lets-icons:copy" size={16} />
-      </Button>
-      <Button variant="ghost" size="sm" isIconOnly onPress={handleShowQR} className="ml-1">
-        <Icon name="stash:qr-code" size={16} />
-      </Button>
-    </HStack>
+    </PressableFeedback>
   );
 };
 
@@ -475,56 +406,37 @@ const KeyringSettings: React.FC = () => {
 
         {/* Keys List */}
         <Section title={`Your Keys (${keypairs.length})`}>
-          <Card variant="secondary">
-            <Card.Body>
-              <View style={{ padding: 4 }}>
-                {isLoading ? (
-                  <VStack align="center" style={{ padding: 24 }}>
-                    <ActivityIndicator size="small" color={opacity(foreground, 0.4)} />
-                    <Text
-                      size={14}
-                      style={{ color: opacity(foreground, 0.4), marginTop: 8 }}>
-                      Loading keys...
-                    </Text>
-                  </VStack>
-                ) : keypairs.length === 0 ? (
-                  <VStack align="center" style={{ padding: 24 }}>
-                    <Icon name="mdi:key-variant" size={40} color={defaultColor} />
-                    <Text
-                      size={14}
-                      style={{
-                        color: opacity(foreground, 0.4),
-                        marginTop: 12,
-                        textAlign: 'center',
-                      }}>
-                      Generate or import a key to get started with P2PK-locked ecash
-                    </Text>
-                  </VStack>
-                ) : (
-                  <>
-                    {/* Display keys in reverse order (most recent first) */}
-                    {[...keypairs]
-                      .reverse()
-                      .map((keypair, index) =>
-                        index === 0 ? (
-                          <CurrentKeyItem
-                            key={keypair.publicKeyHex}
-                            keypair={keypair}
-                            onCopy={handleCopyKey}
-                          />
-                        ) : (
-                          <KeyItem
-                            key={keypair.publicKeyHex}
-                            keypair={keypair}
-                            onCopy={handleCopyKey}
-                          />
-                        )
-                      )}
-                  </>
-                )}
-              </View>
-            </Card.Body>
-          </Card>
+          <ListGroup variant="secondary">
+            {isLoading ? (
+              <VStack align="center" className="p-6">
+                <ActivityIndicator size="small" color={opacity(foreground, 0.4)} />
+                <Text size={14} className="mt-2" style={{ color: opacity(foreground, 0.4) }}>
+                  Loading keys...
+                </Text>
+              </VStack>
+            ) : keypairs.length === 0 ? (
+              <VStack align="center" className="p-6">
+                <Icon name="mdi:key-variant" size={40} color={defaultColor} />
+                <Text
+                  size={14}
+                  className="mt-3 text-center"
+                  style={{ color: opacity(foreground, 0.4) }}>
+                  Generate or import a key to get started with P2PK-locked ecash
+                </Text>
+              </VStack>
+            ) : (
+              [...keypairs].reverse().map((keypair, index) => (
+                <React.Fragment key={keypair.publicKeyHex}>
+                  {index > 0 && <Separator className="mx-4" />}
+                  {index === 0 ? (
+                    <CurrentKeyItem keypair={keypair} onCopy={handleCopyKey} />
+                  ) : (
+                    <KeyItem keypair={keypair} onCopy={handleCopyKey} />
+                  )}
+                </React.Fragment>
+              ))
+            )}
+          </ListGroup>
         </Section>
 
         <Spacer size={32} />

@@ -13,7 +13,6 @@
  */
 
 import React, { useMemo } from 'react';
-import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
@@ -29,6 +28,7 @@ import {
   TransferErrorBanner,
 } from 'components/ui/TransferLegCard';
 import Icon from 'assets/icons';
+import { extractDomain, getMintDisplayName } from 'helper/url';
 import { useThemeColor } from 'hooks/useThemeColor';
 
 export type StepStatus =
@@ -88,27 +88,10 @@ interface RebalanceStepRowProps {
   onRetry?: () => void;
   /** Called when skip is pressed */
   onSkip?: () => void;
-  /** Step number for display */
-  stepNumber: number;
-  /** Whether this is the current step (highlighted) */
-  isCurrent?: boolean;
   /** Chain info when this step is part of a middleman route */
   chainInfo?: ChainInfo;
   /** Sub-status detail during auto-routing (e.g. "Hop 1/2: Sending…") */
   routingDetail?: string;
-}
-
-function extractDomain(url: string): string {
-  try {
-    const hostname = new URL(url).hostname;
-    return hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
-}
-
-function mintDisplayName(info: MintInfo | null | undefined, url: string): string {
-  return info?.name || extractDomain(url);
 }
 
 export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
@@ -124,7 +107,6 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   onRouteThrough,
   onRetry,
   onSkip,
-  // stepNumber, isCurrent — kept in interface for API compat but no longer used
   chainInfo,
   routingDetail,
 }) => {
@@ -134,13 +116,12 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   const primaryColor400 = useMemo(() => opacity(foreground, 0.4), [foreground]);
   const primaryColor700 = surfaceTertiary;
 
-  const fromName = fromMintInfo?.name || extractDomain(fromMintUrl);
-  const toName = toMintInfo?.name || extractDomain(toMintUrl);
+  const fromName = getMintDisplayName(fromMintUrl, fromMintInfo);
+  const toName = getMintDisplayName(toMintUrl, toMintInfo);
 
   const isDone = status === 'done';
   const isFailed = status === 'failed';
 
-  // Build the "via X" subtitle for the retry button
   const routeViaLabel = useMemo(() => {
     if (!routeSuggestion?.path || routeSuggestion.path.length < 3) return null;
     const intermediaries = routeSuggestion.path.slice(1, -1);
@@ -151,18 +132,17 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   const totalHops = chainInfo ? chainInfo.chainPath.length - 1 : 0;
 
   return (
-    <View style={[styles.outerContainer, isDone && { opacity: 0.85 }]}>
+    <View className="mx-4 my-1.5" style={isDone ? { opacity: 0.85 } : undefined}>
       <TransferCard>
-        {/* Middleman chain route: A → B → C → … */}
         {chainInfo ? (
-          <VStack gap={6} style={styles.chainSection}>
-            <Text size={11} bold overpass style={{ color: primaryColor400 }}>
+          <VStack gap={6} className="px-4 pt-4">
+            <Text size={11} bold style={{ color: primaryColor400 }}>
               Middleman route
             </Text>
-            <HStack align="center" gap={4} style={{ flexWrap: 'wrap', rowGap: 4 }}>
+            <HStack align="center" gap={4} className="flex-wrap gap-y-1">
               {chainInfo.chainPath.map((url, idx) => {
                 const info = chainInfo.pathMintInfos[idx];
-                const name = mintDisplayName(info, url);
+                const name = getMintDisplayName(url, info);
                 const isActiveNode =
                   idx === chainInfo.chainHopIndex || idx === chainInfo.chainHopIndex + 1;
                 const isIntermediary = idx > 0 && idx < chainInfo.chainPath.length - 1;
@@ -181,11 +161,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                     <HStack
                       align="center"
                       gap={3}
-                      style={[
-                        styles.chainMintSection,
-                        !isActiveNode && styles.chainDimmed,
-                        { flexShrink: 1 },
-                      ]}>
+                      className={`min-w-0 shrink ${!isActiveNode ? 'opacity-40' : ''}`}>
                       <Avatar
                         picture={info?.icon_url}
                         size={20}
@@ -197,7 +173,8 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                         size={10}
                         numberOfLines={1}
                         bold={isIntermediary}
-                        style={[styles.mintName, { color: primaryColor0 }]}>
+                        className="flex-1"
+                        style={{ color: primaryColor0 }}>
                         {name}
                       </Text>
                     </HStack>
@@ -211,7 +188,6 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
           </VStack>
         ) : null}
 
-        {/* Send row (from source mint) */}
         <TransferEntryRow
           type="send"
           mintIconUrl={fromMintInfo?.icon_url}
@@ -220,7 +196,6 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
           unit={unit}
         />
 
-        {/* Step chain: ● Invoice ── ● Send/Swap ── ● Done */}
         <TransferStepChain
           status={status}
           routingDetail={routingDetail}
@@ -228,7 +203,6 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
           progressVariant={chainInfo ? 'swap' : 'default'}
         />
 
-        {/* Receive row (to destination mint) */}
         <TransferEntryRow
           type="receive"
           mintIconUrl={toMintInfo?.icon_url}
@@ -237,14 +211,13 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
           unit={unit}
         />
 
-        {/* Error banner and actions */}
         {isFailed && errorMessage && (
-          <VStack gap={8} style={styles.errorSection}>
+          <VStack gap={8} className="pb-3">
             <TransferErrorBanner message={errorMessage} />
 
             {String(errorMessage).includes('no_route') &&
               routeSuggestion?.status === 'searching' && (
-                <HStack align="center" gap={8} style={styles.errorActionRow}>
+                <HStack align="center" gap={8} className="px-4">
                   <Spinner size={14} />
                   <Text size={12} style={{ color: primaryColor300 }}>
                     Finding a middleman…
@@ -252,20 +225,25 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                 </HStack>
               )}
             {String(errorMessage).includes('no_route') && routeSuggestion?.status === 'none' && (
-              <Text size={12} style={{ color: primaryColor300, paddingHorizontal: 16 }}>
+              <Text size={12} className="px-4" style={{ color: primaryColor300 }}>
                 No middleman routes available right now.
               </Text>
             )}
-            <HStack gap={8} style={styles.errorActionRow}>
+            <HStack gap={8} className="px-4">
               {routeSuggestion?.status === 'found' && routeSuggestion?.path && onRouteThrough ? (
                 <TouchableOpacity
                   onPress={onRouteThrough}
                   haptics
-                  style={[styles.actionButton, { backgroundColor: primaryColor700 }]}>
+                  style={{
+                    backgroundColor: primaryColor700,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                  }}>
                   <VStack gap={2}>
                     <HStack align="center" gap={4}>
                       <Icon name="mdi:swap-horizontal" size={14} color={primaryColor0} />
-                      <Text bold overpass size={12} style={{ color: primaryColor0 }}>
+                      <Text bold size={12} className="text-foreground">
                         Retry through middleman
                       </Text>
                     </HStack>
@@ -280,10 +258,15 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                 <TouchableOpacity
                   onPress={onRetry}
                   haptics
-                  style={[styles.actionButton, { backgroundColor: primaryColor700 }]}>
+                  style={{
+                    backgroundColor: primaryColor700,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                  }}>
                   <HStack align="center" gap={4}>
                     <Icon name="mdi:refresh" size={14} color={primaryColor0} />
-                    <Text bold overpass size={12} style={{ color: primaryColor0 }}>
+                    <Text bold size={12} className="text-foreground">
                       Retry
                     </Text>
                   </HStack>
@@ -293,10 +276,15 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                 <TouchableOpacity
                   onPress={onSkip}
                   haptics
-                  style={[styles.actionButton, { backgroundColor: primaryColor700 }]}>
+                  style={{
+                    backgroundColor: primaryColor700,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 6,
+                  }}>
                   <HStack align="center" gap={4}>
                     <Icon name="mdi:skip-next" size={14} color={primaryColor0} />
-                    <Text bold overpass size={12} style={{ color: primaryColor0 }}>
+                    <Text bold size={12} className="text-foreground">
                       Skip
                     </Text>
                   </HStack>
@@ -309,34 +297,3 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  outerContainer: {
-    marginHorizontal: 16,
-    marginVertical: 6,
-  },
-  chainSection: {
-    paddingTop: 16,
-    paddingHorizontal: 16,
-  },
-  chainMintSection: {
-    minWidth: 0,
-  },
-  chainDimmed: {
-    opacity: 0.4,
-  },
-  mintName: {
-    flex: 1,
-  },
-  errorSection: {
-    paddingBottom: 12,
-  },
-  errorActionRow: {
-    paddingHorizontal: 16,
-  },
-  actionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-});

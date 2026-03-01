@@ -90,9 +90,7 @@ export function useThemeColor<T extends readonly [ColorToken, ...ColorToken[]]>(
 export function useThemeColor(tokens: ColorToken[]): string[];
 export function useThemeColor(token: ColorToken | ColorToken[]): string | string[] {
   const isArray = Array.isArray(token);
-  const vars = isArray
-    ? token.map((t) => `--color-${t}`)
-    : [`--color-${token as ColorToken}`];
+  const vars = isArray ? token.map((t) => `--color-${t}`) : [`--color-${token as ColorToken}`];
 
   const resolved = useCSSVariable(vars);
   const colors: string[] = resolved.map((c) => {

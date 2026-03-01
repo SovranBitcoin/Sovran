@@ -82,7 +82,11 @@ const MintItem: React.FC<MintItemProps> = ({
   onToggle,
   isAllowed = true,
 }) => {
-  const [foreground, warning, success] = useThemeColor(['foreground', 'yellow-300', 'success'] as const);
+  const [foreground, warning, success] = useThemeColor([
+    'foreground',
+    'yellow-300',
+    'success',
+  ] as const);
   const displayMintUrl = mintUrlProp || mint.mintUrl;
   const displayName = useMemo(
     () => getMintDisplayName(displayMintUrl, mint.mintInfo),
@@ -151,19 +155,14 @@ const MintItem: React.FC<MintItemProps> = ({
   return (
     <TouchableOpacity
       key={mint.mintUrl}
-      className="bg-surface"
-      style={{
-        padding: 16,
-        marginBottom: 4,
-        borderRadius: 16,
-        opacity: itemOpacity,
-      }}
+      className="bg-surface mb-1 rounded-2xl p-4"
+      style={{ opacity: itemOpacity }}
       onPress={onPress}
       disabled={isDisabled}>
       <VStack gap={0}>
         {/* Top section: Logo, name, balance/URL, checkbox/dots */}
         <HStack align="center" gap={12}>
-          <View style={{ position: 'relative' }}>
+          <View className="relative">
             <Avatar
               key={mint.mintUrl}
               picture={mint.mintInfo?.icon_url || undefined}
@@ -175,11 +174,11 @@ const MintItem: React.FC<MintItemProps> = ({
           </View>
 
           <VStack flex={1}>
-            <Text className="text-foreground" size={16} bold overpass>
+            <Text className="text-foreground" size={16} bold>
               {displayName}
             </Text>
 
-            <View style={{ alignSelf: 'flex-start' }}>
+            <View className="self-start">
               {balance ? (
                 <AmountFormatter
                   amount={balance.amount}
@@ -198,12 +197,7 @@ const MintItem: React.FC<MintItemProps> = ({
           </VStack>
 
           {isLoading ? (
-            <View
-              style={{
-                padding: 8,
-                borderRadius: 1000,
-                backgroundColor: 'transparent',
-              }}>
+            <View className="rounded-full bg-transparent p-2">
               <Spinner size={20} />
             </View>
           ) : showCheckbox ? (
@@ -225,14 +219,7 @@ const MintItem: React.FC<MintItemProps> = ({
                     onInspectPress();
                   }
                 }}>
-                <Icon
-                  className="bg-default"
-                  style={{
-                    padding: 8,
-                    borderRadius: 1000,
-                  }}
-                  name="bx:dots-vertical-rounded"
-                />
+                <Icon className="bg-default rounded-full p-2" name="bx:dots-vertical-rounded" />
               </TouchableOpacity>
             )
           )}

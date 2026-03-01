@@ -16,7 +16,11 @@ interface CardProps {
 }
 
 export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
-  const [foreground, surfaceSecondary, danger] = useThemeColor(['foreground', 'surface-secondary', 'danger'] as const);
+  const [foreground, surfaceSecondary, danger] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'danger',
+  ] as const);
 
   const getBorderColor = () => {
     switch (variant) {
@@ -51,7 +55,6 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
           {title && (
             <Text
               heavy
-              overpass
               className="text-base"
               style={{
                 color: opacity(foreground, 0.5),

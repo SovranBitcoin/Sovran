@@ -29,7 +29,8 @@
  * @see {@link https://github.com/gandlaf21/bolt11-decode} BOLT11 Decode
  */
 
-import { getDecodedToken } from '@cashu/cashu-ts';
+import { getDecodedToken, type ReceiveHistoryEntry } from 'coco-cashu-core';
+
 import { decode } from '@gandlaf21/bolt11-decode';
 import _ from 'lodash';
 
@@ -306,3 +307,43 @@ export const requestInvoiceFromLnurl = async (
 
   return data.pr;
 };
+
+// ============================================================================
+// Ecash Token Helpers
+// ============================================================================
+
+/**
+ * Sums the amounts of all proofs in an array.
+ * Eliminates repeated `.reduce((sum, p) => sum + p.amount, 0)` across the codebase.
+ */
+function sumProofAmounts(proofs: ReadonlyArray<{ amount: number }>): number {
+  let total = 0;
+  for (const p of proofs) total += p.amount;
+  return total;
+}
+
+/**
+ * Builds a `ReceiveHistoryEntry` from a decoded token.
+ *
+ * Centralises the pattern that was duplicated in ReceiveScreen, useProcessPaymentString,
+ * and UserMessagesScreen — each constructing the same shape manually.
+ *
+ * @param rawToken  The original encoded token string (stored in metadata for re-encoding)
+ * @param unitOverride  Explicit unit; falls back to `decodedToken.unit ?? 'sat'`
+ */
+export function buildReceiveHistoryEntry(
+  rawToken: string,
+  unitOverride?: string
+): ReceiveHistoryEntry {
+  const decodedToken = getDecodedToken(rawToken);
+  return {
+    id: `receive-${Date.now()}`,
+    type: 'receive',
+    amount: sumProofAmounts(decodedToken.proofs),
+    unit: unitOverride ?? decodedToken.unit ?? 'sat',
+    mintUrl: decodedToken.mint,
+    createdAt: Date.now(),
+    metadata: { rawToken },
+    token: decodedToken,
+  };
+}

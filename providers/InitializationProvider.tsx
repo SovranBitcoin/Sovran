@@ -174,9 +174,9 @@ export function InitializationProvider({
   // registerStage so updateStage can check it before the next React render.
   const blockingFlagsRef = useRef<Map<string, boolean>>(new Map());
   // Track pending log updates per stage to debounce rapid calls
-  const pendingLogUpdates = useRef<Map<string, { message: string; timeout: NodeJS.Timeout }>>(
-    new Map()
-  );
+  const pendingLogUpdates = useRef<
+    Map<string, { message: string; timeout: ReturnType<typeof setTimeout> }>
+  >(new Map());
 
   const registerStage = useCallback((id: string, config: StageConfig) => {
     const isBlocking = config.blocking !== false;
@@ -796,7 +796,7 @@ function InitializationScreenInternal() {
   const [seenTimestamps, setSeenTimestamps] = useState<Set<number>>(new Set());
   const [shouldRender, setShouldRender] = useState(true);
   const [visualActiveIndex, setVisualActiveIndex] = useState(0);
-  const activeTransitionTimeout = useRef<NodeJS.Timeout | null>(null);
+  const activeTransitionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rafId = useRef<number | null>(null);
   const lastTransitionTime = useRef<number>(Date.now());
   const MINIMUM_ACTIVE_TIME = 200;
@@ -808,7 +808,7 @@ function InitializationScreenInternal() {
 
   const hasShownAllSteps = logHistory.length === 0 || visualActiveIndex >= logHistory.length - 1;
   const [readyToFade, setReadyToFade] = useState(false);
-  const fadeDelayTimeout = useRef<NodeJS.Timeout | null>(null);
+  const fadeDelayTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fadeRafId = useRef<number | null>(null);
   useEffect(() => {

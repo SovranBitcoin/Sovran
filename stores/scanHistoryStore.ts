@@ -76,7 +76,7 @@ interface ScanHistoryActions {
 
 type ScanHistoryStore = ScanHistoryState & ScanHistoryActions;
 
-const generateId = () => `scan-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+const generateId = () => `scan-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
 export const useScanHistoryStore = create<ScanHistoryStore>()(
   persist(
@@ -207,7 +207,12 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
     }),
     {
       name: 'scan-history-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
+      storage: createJSONStorage(() => profileStorage),
+      onRehydrateStorage: () => (_state, error) => {
+        if (error) {
+          console.warn('ScanHistoryStore: Failed to rehydrate:', error);
+        }
+      },
     }
   )
 );

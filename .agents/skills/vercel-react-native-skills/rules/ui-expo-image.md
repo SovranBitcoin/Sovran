@@ -47,7 +47,7 @@ function Avatar({ url }: { url: string }) {
 <Image
   source={{ uri: url }}
   priority="high"
-  cachePolicy="disk"
+  cachePolicy="memory-disk"
   style={styles.hero}
 />
 ```

@@ -7,14 +7,20 @@
  * and React provider composition.
  */
 
-import { MintHistoryEntry } from 'coco-cashu-core';
+import React from 'react';
+
+import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
+import { type ClassValue, clsx } from 'clsx';
 import { decode } from '@gandlaf21/bolt11-decode';
 import _ from 'lodash';
-import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
-
-import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import React from 'react';
+
+import type { HistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
+
+/** Outgoing = ecash send or Lightning melt */
+export function isOutgoingTransaction(entry: Pick<HistoryEntry, 'type'>): boolean {
+  return entry.type === 'send' || entry.type === 'melt';
+}
 
 /**
  * Checks if a mint history entry has expired based on its payment request
@@ -91,27 +97,40 @@ export function getMintHistoryEntryTimeUntilExpiry(historyEntry: MintHistoryEntr
 }
 
 /**
- * Checks if a melt quote has expired based on its expiry timestamp
- *
- * This function checks if the current time exceeds the melt quote's expiry time.
- * If no expiry timestamp exists, it returns false (not expired).
- *
- * @param meltQuote - The melt quote response containing the expiry timestamp
- * @returns True if the melt quote has expired, false if not expired or if no expiry exists
- *
- * @example
- * const quote = { expiry: 1234567890, ... };
- * const isExpired = meltQuoteExpired(quote);
- * if (isExpired) {
- *   // Handle expired melt quote - show refresh component
- * }
+ * Accepts an optional `currentTimeMs` for ticker-driven UIs (e.g. countdown timers).
+ * Falls back to Date.now() when omitted.
  */
-export function meltQuoteExpired(meltQuote: MeltQuoteBolt11Response): boolean {
-  if (!meltQuote.expiry) {
-    return false;
-  }
-  const now = Math.floor(Date.now() / 1000);
-  return now > meltQuote.expiry;
+export function meltQuoteExpired(
+  meltQuote: MeltQuoteBolt11Response,
+  currentTimeMs?: number
+): boolean {
+  if (!meltQuote.expiry) return false;
+  const nowSec = Math.floor((currentTimeMs ?? Date.now()) / 1000);
+  return nowSec > meltQuote.expiry;
+}
+
+/**
+ * Returns a human-readable countdown string like "expires in 14m 32s",
+ * or null if no expiry or already expired.
+ * Accepts an optional `currentTimeMs` for ticker-driven UIs.
+ */
+export function getMeltQuoteTimeUntilExpiry(
+  meltQuote: MeltQuoteBolt11Response,
+  currentTimeMs?: number
+): string | null {
+  if (!meltQuote.expiry) return null;
+  const nowSec = Math.floor((currentTimeMs ?? Date.now()) / 1000);
+  const timeLeft = meltQuote.expiry - nowSec;
+
+  if (timeLeft <= 0) return null;
+
+  const hours = Math.floor(timeLeft / 3600);
+  const minutes = Math.floor((timeLeft % 3600) / 60);
+  const seconds = timeLeft % 60;
+
+  if (hours > 0) return `expires in ${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `expires in ${minutes}m ${seconds}s`;
+  return `expires in ${seconds}s`;
 }
 
 /**

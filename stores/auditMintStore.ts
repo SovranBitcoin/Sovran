@@ -1,28 +1,10 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import type { AuditMintResponse } from 'helper/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
-
-// Consistent URL normalization across the app
-// Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
-const normalizeUrl = (url: string): string => {
-  const withoutProtocol = url.replace(/^https?:\/\//, '');
-  const slashIndex = withoutProtocol.indexOf('/');
-  if (slashIndex === -1) {
-    // No path, just domain
-    return withoutProtocol
-      .toLowerCase()
-      .replace(/^www\./, '')
-      .replace(/\/$/, '');
-  }
-  const domain = withoutProtocol
-    .slice(0, slashIndex)
-    .toLowerCase()
-    .replace(/^www\./, '');
-  const path = withoutProtocol.slice(slashIndex).replace(/\/$/, '');
-  return domain + path;
-};
+import { normalizeMintUrlKey } from 'helper/url';
 
 interface CachedMintData {
   auditData: AuditMintResponse;
@@ -53,13 +35,13 @@ export const useAuditMintStore = create<AuditMintStore>()(
 
       // Actions
       getCached: (mintUrl: string) => {
-        const normalized = normalizeUrl(mintUrl);
+        const normalized = normalizeMintUrlKey(mintUrl);
         const currentState = get();
         return currentState.cache[normalized];
       },
 
       setCached: (mintUrl: string, auditData: AuditMintResponse, mintInfo: GetInfoResponse) => {
-        const normalized = normalizeUrl(mintUrl);
+        const normalized = normalizeMintUrlKey(mintUrl);
         set((state) => ({
           cache: {
             ...state.cache,
@@ -77,7 +59,7 @@ export const useAuditMintStore = create<AuditMintStore>()(
       },
 
       clearMintCache: (mintUrl: string) => {
-        const normalized = normalizeUrl(mintUrl);
+        const normalized = normalizeMintUrlKey(mintUrl);
         set((state) => {
           const newCache = { ...state.cache };
           delete newCache[normalized];
@@ -86,7 +68,7 @@ export const useAuditMintStore = create<AuditMintStore>()(
       },
 
       isStale: (mintUrl: string, maxAgeMinutes: number = 5) => {
-        const normalized = normalizeUrl(mintUrl);
+        const normalized = normalizeMintUrlKey(mintUrl);
         const currentState = get();
         const cached = currentState.cache[normalized];
         if (!cached) return true;
@@ -111,11 +93,9 @@ export const useAuditMintStore = create<AuditMintStore>()(
       storage: createJSONStorage(() => AsyncStorage),
       // Only persist the cache data
       partialize: (state) => ({ cache: state.cache }),
-      onRehydrateStorage: () => (state, error) => {
+      onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('AuditMintStore: Failed to rehydrate from storage:', error);
-        } else {
-          console.log('AuditMintStore: Successfully rehydrated from storage');
+          console.warn('AuditMintStore: Failed to rehydrate:', error);
         }
       },
     }

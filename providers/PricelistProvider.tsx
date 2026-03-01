@@ -25,7 +25,7 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
 
   useEffect(() => {
     let ws: WebSocket | null = null;
-    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 5;
     const reconnectDelay = 1000; // Start with 1 second

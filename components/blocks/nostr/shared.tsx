@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { StyleSheet, TouchableOpacity, Linking, Dimensions, Platform } from 'react-native';
+import { StyleSheet, Pressable, Linking, Dimensions, Platform } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -19,6 +19,7 @@ import { Avatar } from 'components/ui/Avatar';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { nip19 } from 'nostr-tools';
+import { Metadata } from 'nostr-tools/kinds';
 import { ImageBlock, useImageOverlay } from './image-overlay';
 import type { ImageOverlayLayout, ImageOverlayPost } from './image-overlay';
 import { useThemeColor } from 'hooks/useThemeColor';
@@ -445,18 +446,7 @@ export function createPrimalRelayClient(url: string) {
   ws.onmessage = (msg) => {
     if (typeof msg.data !== 'string') return;
     const parsed = parseJson<RelayMessage>(msg.data);
-    if (!parsed || !Array.isArray(parsed)) {
-      console.log('[PrimalWS] non-array message:', String(msg.data).slice(0, 200));
-      return;
-    }
-    console.log(
-      '[PrimalWS] msg type:',
-      parsed[0],
-      'subId:',
-      parsed[1],
-      'inflight?',
-      inflight.has(parsed[1] as string)
-    );
+    if (!parsed || !Array.isArray(parsed)) return;
 
     if (parsed[0] === 'EVENT') {
       const subId = parsed[1];
@@ -629,7 +619,7 @@ export const InlineLink = React.memo(function InlineLink({
 // ImageBlock is now in ./image-overlay/ImageBlock.tsx — re-exported via the import above.
 export { ImageBlock };
 
-const IOSVideoBlock = React.memo(function IOSVideoBlock({
+const VideoBlockInner = React.memo(function VideoBlockInner({
   url,
   onTap,
   onBeforeOpen,
@@ -642,91 +632,9 @@ const IOSVideoBlock = React.memo(function IOSVideoBlock({
   openOverlay?: (layout: ImageOverlayLayout) => void;
   overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
 }) {
-  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
+  const surface = useThemeColor('surface');
   const containerRef = useRef<React.ComponentRef<typeof View>>(null);
-  const player = useVideoPlayer(url, (p) => {
-    p.loop = false;
-    p.muted = true;
-  });
-
-  const handleTap = useCallback(() => {
-    if (openOverlay && overlayLayout && containerRef.current) {
-      onBeforeOpen?.();
-      containerRef.current.measureInWindow(
-        (pageX: number, pageY: number, width: number, height: number) => {
-          openOverlay({
-            ...overlayLayout,
-            pageX,
-            pageY,
-            width,
-            height,
-          });
-        }
-      );
-    } else if (onTap) {
-      onTap();
-    }
-  }, [openOverlay, overlayLayout, onBeforeOpen, onTap]);
-
-  const tapGesture = useMemo(
-    () =>
-      handleTap
-        ? Gesture.Tap().onEnd(() => {
-            'worklet';
-            runOnJS(handleTap)();
-          })
-        : undefined,
-    [handleTap]
-  );
-
-  const hasTap = !!(openOverlay && overlayLayout) || !!onTap;
-  const aspectRatio = overlayLayout?.aspectRatio ?? 16 / 9;
-
-  const content = (
-    <View style={[sharedStyles.videoBlockOuter, { backgroundColor: surface }]}>
-      <View
-        ref={containerRef}
-        collapsable={false}
-        style={{ aspectRatio }}
-        pointerEvents={hasTap ? 'none' : 'auto'}>
-        <VideoView
-          player={player}
-          style={StyleSheet.absoluteFill}
-          contentFit="contain"
-          nativeControls={!hasTap}
-        />
-      </View>
-      {hasTap && (
-        <View
-          pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
-          <Icon name="mingcute:play-fill" size={48} color="rgba(255,255,255,0.75)" />
-        </View>
-      )}
-    </View>
-  );
-
-  if (tapGesture) {
-    return <GestureDetector gesture={tapGesture}>{content}</GestureDetector>;
-  }
-  return content;
-});
-
-const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
-  url,
-  onTap,
-  onBeforeOpen,
-  openOverlay,
-  overlayLayout,
-}: {
-  url: string;
-  onTap?: () => void;
-  onBeforeOpen?: () => void;
-  openOverlay?: (layout: ImageOverlayLayout) => void;
-  overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
-}) {
-  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
-  const containerRef = useRef<React.ComponentRef<typeof View>>(null);
+  const isAndroid = Platform.OS === 'android';
   const openInBrowser = useCallback(() => Linking.openURL(url).catch(() => {}), [url]);
   const player = useVideoPlayer(url, (p) => {
     p.loop = false;
@@ -738,28 +646,23 @@ const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
       onBeforeOpen?.();
       containerRef.current.measureInWindow(
         (pageX: number, pageY: number, width: number, height: number) => {
-          openOverlay({
-            ...overlayLayout,
-            pageX,
-            pageY,
-            width,
-            height,
-          });
+          openOverlay({ ...overlayLayout, pageX, pageY, width, height });
         }
       );
-    } else {
+    } else if (isAndroid) {
       (onTap ?? openInBrowser)();
+    } else if (onTap) {
+      onTap();
     }
-  }, [openOverlay, overlayLayout, onBeforeOpen, onTap, openInBrowser]);
+  }, [openOverlay, overlayLayout, onBeforeOpen, onTap, isAndroid, openInBrowser]);
 
-  const tapGesture = useMemo(
-    () =>
-      Gesture.Tap().onEnd(() => {
-        'worklet';
-        runOnJS(handleTap)();
-      }),
-    [handleTap]
-  );
+  const tapGesture = useMemo(() => {
+    if (!isAndroid && !handleTap) return undefined;
+    return Gesture.Tap().onEnd(() => {
+      'worklet';
+      runOnJS(handleTap)();
+    });
+  }, [isAndroid, handleTap]);
 
   const hasTap = !!(openOverlay && overlayLayout) || !!onTap;
   const aspectRatio = overlayLayout?.aspectRatio ?? 16 / 9;
@@ -778,53 +681,23 @@ const AndroidVideoBlock = React.memo(function AndroidVideoBlock({
           nativeControls={!hasTap}
         />
       </View>
-      {hasTap && (
+      {hasTap ? (
         <View
           pointerEvents="none"
           style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
           <Icon name="mingcute:play-fill" size={48} color="rgba(255,255,255,0.75)" />
         </View>
-      )}
+      ) : null}
     </View>
   );
 
-  return <GestureDetector gesture={tapGesture}>{content}</GestureDetector>;
+  if (tapGesture) {
+    return <GestureDetector gesture={tapGesture}>{content}</GestureDetector>;
+  }
+  return content;
 });
 
-export const VideoBlock = React.memo(function VideoBlock({
-  url,
-  onTap,
-  onBeforeOpen,
-  openOverlay,
-  overlayLayout,
-}: {
-  url: string;
-  onTap?: () => void;
-  onBeforeOpen?: () => void;
-  openOverlay?: (layout: ImageOverlayLayout) => void;
-  overlayLayout?: Omit<ImageOverlayLayout, 'pageX' | 'pageY' | 'width' | 'height'>;
-}) {
-  if (Platform.OS === 'android') {
-    return (
-      <AndroidVideoBlock
-        url={url}
-        onTap={onTap}
-        onBeforeOpen={onBeforeOpen}
-        openOverlay={openOverlay}
-        overlayLayout={overlayLayout}
-      />
-    );
-  }
-  return (
-    <IOSVideoBlock
-      url={url}
-      onTap={onTap}
-      onBeforeOpen={onBeforeOpen}
-      openOverlay={openOverlay}
-      overlayLayout={overlayLayout}
-    />
-  );
-});
+export const VideoBlock = VideoBlockInner;
 
 export const LightningBlock = React.memo(function LightningBlock({ invoice }: { invoice: string }) {
   const [foreground, surface, surfaceTertiary] = useThemeColor([
@@ -834,8 +707,7 @@ export const LightningBlock = React.memo(function LightningBlock({ invoice }: { 
   ] as const);
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <Pressable
       onPress={() => {
         router.navigate({ pathname: '/(send-flow)/meltQuote' as any, params: { invoice } });
       }}
@@ -852,7 +724,7 @@ export const LightningBlock = React.memo(function LightningBlock({ invoice }: { 
         </VStack>
         <Icon name="mdi:chevron-right" size={18} color={opacity(foreground, 0.33)} />
       </HStack>
-    </TouchableOpacity>
+    </Pressable>
   );
 });
 
@@ -938,8 +810,7 @@ export const MetricsFooter = React.memo(function MetricsFooter({
         showBorder && { borderBottomColor: opacity(borderColor, 0.1) },
       ]}>
       <HStack align="center" justify="space-between">
-        <TouchableOpacity
-          activeOpacity={onCommentPress ? 0.7 : 1}
+        <Pressable
           onPress={onCommentPress}
           disabled={!onCommentPress}
           onPressIn={onActionPressIn}
@@ -951,9 +822,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
               {formatCount(metrics.replyCount)}
             </Text>
           </HStack>
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={onRepostPress ? 0.7 : 1}
+        </Pressable>
+        <Pressable
           onPress={onRepostPress}
           disabled={!onRepostPress || repostPending}
           onPressIn={onActionPressIn}
@@ -969,9 +839,8 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             isActive={reposted}
             pending={repostPending}
           />
-        </TouchableOpacity>
-        <TouchableOpacity
-          activeOpacity={onLikePress ? 0.7 : 1}
+        </Pressable>
+        <Pressable
           onPress={onLikePress}
           disabled={!onLikePress || likePending}
           onPressIn={onActionPressIn}
@@ -987,11 +856,11 @@ export const MetricsFooter = React.memo(function MetricsFooter({
             isActive={liked}
             pending={likePending}
           />
-        </TouchableOpacity>
+        </Pressable>
         {metrics.satsZapped > 0 ? (
           <HStack align="center" gap={4}>
             <Icon name="mingcute:lightning-fill" size={iconSize} color={iconColor} />
-            <Text size={textSize} style={{ color: textColor }}>
+            <Text overpass size={textSize} style={{ color: textColor }}>
               {formatSats(metrics.satsZapped)}
             </Text>
           </HStack>
@@ -1064,8 +933,7 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
   const displayName = profile?.name || `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <Pressable
       onPressIn={suppressQuotedTapStart}
       onPressOut={suppressQuotedTapEnd}
       onPress={handleOpenQuotedThread}>
@@ -1109,7 +977,7 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
           onQuotedPressOut={suppressQuotedTapEnd}
         />
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 });
 
@@ -1487,6 +1355,231 @@ export const NoteContent = React.memo(function NoteContent({
     </VStack>
   );
 });
+
+// ============================================================================
+// Shared feed types — used by HomeFeed, UserFeed, and ThreadView
+// ============================================================================
+
+/** Unified feed item — either an original note or a repost (Kind 6/16) */
+export type FeedItem =
+  | { type: 'note'; event: FeedEvent; timestamp: number }
+  | {
+      type: 'repost';
+      repostEvent: FeedEvent;
+      originalEvent: FeedEvent | undefined;
+      originalEventId: string;
+      timestamp: number;
+    };
+
+export interface FeedParseResult {
+  orderedFeedItems: FeedItem[];
+  metricsMap: Map<string, NoteMetrics>;
+  profilesMap: Map<string, ProfileInfo>;
+  quotedEventsMap: Map<string, FeedEvent>;
+  missingQuotedIds: string[];
+  missingProfilePubkeys: string[];
+  paginationUntil: number;
+  paginationOffset: number;
+}
+
+// ============================================================================
+// Shared feed helpers
+// ============================================================================
+
+export function getEmbeddedRepostEvent(
+  repostEvent: FeedEvent,
+  expectedEventId?: string
+): FeedEvent | undefined {
+  if (!repostEvent.content) return undefined;
+  const parsed = normalizeFeedEvent(parseJson<unknown>(repostEvent.content));
+  if (!parsed) return undefined;
+  if (expectedEventId && parsed.id !== expectedEventId) return undefined;
+  return parsed;
+}
+
+/**
+ * Given an array of feed items and a profiles ref, build the
+ * ImageOverlayReplaceLayout for a specific item by feed index.
+ * Shared between HomeFeed and UserFeed.
+ */
+export function buildVideoOverlayLayout(
+  feedIndex: number,
+  feedItems: FeedItem[],
+  getDisplayMetrics: (id: string) => NoteMetrics,
+  getEngagementState: (id: string) => {
+    liked: boolean;
+    reposted: boolean;
+    likePending: boolean;
+    repostPending: boolean;
+    likePendingDirection?: 'activating' | 'deactivating';
+    repostPendingDirection?: 'activating' | 'deactivating';
+  },
+  profilesRef: React.RefObject<Map<string, ProfileInfo>>,
+  toggleLike: (event: FeedEvent) => void,
+  toggleRepost: (event: FeedEvent) => void
+): {
+  url: string;
+  urls: string[];
+  mediaTypes: ('image' | 'video')[];
+  initialIndex: number;
+  aspectRatio: number;
+  post: {
+    event: { id: string; pubkey: string; content: string; created_at: number };
+    metrics: { replyCount: number; repostCount: number; likeCount: number; satsZapped: number };
+    profile?: ProfileInfo;
+    reposted: boolean;
+    liked: boolean;
+    repostPending: boolean;
+    likePending: boolean;
+    repostPendingDirection?: 'activating' | 'deactivating';
+    likePendingDirection?: 'activating' | 'deactivating';
+    onCommentPress: () => void;
+    onRepostPress: () => void;
+    onLikePress: () => void;
+  };
+} | null {
+  const item = feedItems[feedIndex];
+  const event = item?.type === 'note' ? item.event : item?.originalEvent;
+  if (!event) return null;
+  const segments = parseContent(event.content);
+  const blockSegments = segments.filter(
+    (s): s is ContentSegment & { kind: 'image' | 'video'; url: string } =>
+      s.kind === 'image' || s.kind === 'video'
+  );
+  if (blockSegments.length === 0) return null;
+  const urls = blockSegments.map((s) => s.url);
+  const mediaTypes = blockSegments.map((s) =>
+    s.kind === 'video' ? ('video' as const) : ('image' as const)
+  );
+  const firstVideoIndex = mediaTypes.indexOf('video');
+  if (firstVideoIndex === -1) return null;
+  const metrics = getDisplayMetrics(event.id) || DEFAULT_METRICS;
+  const engagement = getEngagementState(event.id);
+  const profile = profilesRef.current?.get(event.pubkey) ?? null;
+  return {
+    url: urls[firstVideoIndex],
+    urls,
+    mediaTypes,
+    initialIndex: firstVideoIndex,
+    aspectRatio: 16 / 9,
+    post: {
+      event: {
+        id: event.id,
+        pubkey: event.pubkey,
+        content: event.content,
+        created_at: event.created_at,
+      },
+      metrics: {
+        replyCount: metrics.replyCount,
+        repostCount: metrics.repostCount,
+        likeCount: metrics.likeCount,
+        satsZapped: metrics.satsZapped,
+      },
+      profile: profile ?? undefined,
+      reposted: engagement.reposted,
+      liked: engagement.liked,
+      repostPending: engagement.repostPending,
+      likePending: engagement.likePending,
+      repostPendingDirection: engagement.repostPendingDirection,
+      likePendingDirection: engagement.likePendingDirection,
+      onCommentPress: () =>
+        router.navigate({
+          pathname: '/(user-flow)/thread' as any,
+          params: { eventId: event.id },
+        }),
+      onRepostPress: () => toggleRepost(event),
+      onLikePress: () => toggleLike(event),
+    },
+  };
+}
+
+export const MAX_VIDEO_FEED_PAGES = 20;
+
+/**
+ * Build video feed indices — returns the list indices that contain video content.
+ * Shared between HomeFeed and UserFeed.
+ */
+export function computeFeedIndicesWithVideo(feedItems: FeedItem[]): number[] {
+  const out: number[] = [];
+  feedItems.forEach((item, i) => {
+    const ev = item.type === 'note' ? item.event : item.originalEvent;
+    if (ev && getVideoUrlsFromContent(ev.content).length > 0) out.push(i);
+  });
+  return out;
+}
+
+/**
+ * Shared enrichment: fetch missing quoted events and profiles for a page of feed items.
+ * Used by both HomeFeed and UserFeed during initial load and pagination.
+ */
+export async function enrichFeedPage(
+  client: ReturnType<typeof createPrimalRelayClient>,
+  requestPrefix: string,
+  missingQuotedIds: string[],
+  missingProfilePubkeys: string[],
+  existingQuoted: Map<string, FeedEvent>,
+  existingProfiles: Map<string, ProfileInfo>,
+  onUpdate: (updates: {
+    quotedEvents?: Map<string, FeedEvent>;
+    metrics?: Map<string, NoteMetrics>;
+    profiles?: Map<string, ProfileInfo>;
+  }) => void
+): Promise<void> {
+  const tasks: Promise<void>[] = [];
+
+  if (missingQuotedIds.length > 0) {
+    tasks.push(
+      client
+        .request(`${requestPrefix}_eq`, { cache: ['events', { event_ids: missingQuotedIds }] })
+        .then((evts) => {
+          const xQ = new Map<string, FeedEvent>();
+          const xM = new Map<string, NoteMetrics>();
+          const xP = new Map<string, ProfileInfo>();
+          for (const raw of evts) {
+            if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
+              const p = parseJson<Record<string, unknown>>(raw.content);
+              const eid = typeof p?.event_id === 'string' ? p.event_id : undefined;
+              if (!eid || !p) continue;
+              xM.set(eid, parseNoteMetrics(p));
+              continue;
+            }
+            if (raw.kind === Metadata) {
+              const r = parseProfileFromRaw(raw);
+              if (r) xP.set(r[0], r[1]);
+              continue;
+            }
+            const ev = normalizeFeedEvent(raw);
+            if (ev) xQ.set(ev.id, ev);
+          }
+          const updates: Parameters<typeof onUpdate>[0] = {};
+          if (xQ.size > 0) updates.quotedEvents = xQ;
+          if (xM.size > 0) updates.metrics = xM;
+          if (xP.size > 0) updates.profiles = xP;
+          if (Object.keys(updates).length > 0) onUpdate(updates);
+        })
+    );
+  }
+
+  if (missingProfilePubkeys.length > 0) {
+    tasks.push(
+      client
+        .request(`${requestPrefix}_ep`, {
+          cache: ['user_infos', { pubkeys: missingProfilePubkeys }],
+        })
+        .then((evts) => {
+          const xP = new Map<string, ProfileInfo>();
+          for (const raw of evts) {
+            if (raw.kind !== Metadata) continue;
+            const r = parseProfileFromRaw(raw);
+            if (r) xP.set(r[0], r[1]);
+          }
+          if (xP.size > 0) onUpdate({ profiles: xP });
+        })
+    );
+  }
+
+  await Promise.all(tasks);
+}
 
 // ============================================================================
 // Shared Styles

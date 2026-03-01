@@ -9,16 +9,12 @@ import { View } from 'components/ui/View/View';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Global stores
 import { useAuditMintStore } from 'stores/auditMintStore';
 import { useBTCMapStore } from 'stores/btcMapStore';
 import { useKYMMintStore } from 'stores/kymMintStore';
 import { usePricelistStore } from 'stores/pricelistStore';
 import { useSettingsStore } from 'stores/settingsStore';
 import { useProfileStore } from 'stores/profileStore';
-
-// Profile-scoped stores
 import { useMintStore } from 'stores/mintStore';
 import { useMintDistributionStore } from 'stores/mintDistributionStore';
 import { useRoutstrStore } from 'stores/routstrStore';
@@ -27,7 +23,6 @@ import { useSearchHistoryStore } from 'stores/searchHistoryStore';
 import { useSwapTransactionsStore } from 'stores/swapTransactionsStore';
 import { useTransactionLocationStore } from 'stores/transactionLocationStore';
 import opacity from 'hex-color-opacity';
-
 
 interface StoreSection {
   name: string;
@@ -38,7 +33,6 @@ interface StoreSection {
   scope: 'global' | 'profile';
 }
 
-// Simple JSON display
 const JSONDisplay: React.FC<{ data: any }> = ({ data }) => {
   const foreground = useThemeColor('foreground');
   const jsonString = JSON.stringify(data, null, 2);
@@ -62,13 +56,10 @@ function countEntries(data: any): number | null {
   const keys = Object.keys(data);
   if (keys.length === 0) return 0;
 
-  // Try common patterns: look for the first key whose value is an object/array
   for (const key of keys) {
     const val = data[key];
     if (Array.isArray(val)) return val.length;
-    if (val && typeof val === 'object' && !Array.isArray(val)) {
-      return Object.keys(val).length;
-    }
+    if (val && typeof val === 'object') return Object.keys(val).length;
   }
   return null;
 }
@@ -78,8 +69,7 @@ const StoreCard: React.FC<{
   isExpanded: boolean;
   onToggle: () => void;
 }> = ({ section, isExpanded, onToggle }) => {
-  const [foreground, surface, surfaceSecondary, defaultColor, background] = useThemeColor(['foreground', 'surface', 'surface-secondary', 'default', 'background'] as const);
-  const [danger, red400] = useThemeColor(['danger', 'red-400'] as const);
+  const [foreground, red400] = useThemeColor(['foreground', 'red-400'] as const);
 
   const handleClear = () => {
     Alert.alert('Clear Store', `Are you sure you want to clear all data from ${section.name}?`, [
@@ -119,28 +109,14 @@ const StoreCard: React.FC<{
 
   return (
     <View
-      className="mb-3 overflow-hidden rounded-2xl"
-      style={{
-        backgroundColor: surface,
-        borderWidth: 1,
-        borderColor: isExpanded ? defaultColor : surfaceSecondary,
-      }}>
-      {/* Header */}
+      className={`bg-surface mb-3 overflow-hidden rounded-2xl border ${isExpanded ? 'border-default' : 'border-surface-secondary'}`}>
       <TouchableOpacity onPress={onToggle} activeOpacity={0.7}>
         <HStack className="items-center p-4">
-          {/* Icon */}
-          <View
-            className="mr-3 items-center justify-center rounded-xl"
-            style={{
-              width: 40,
-              height: 40,
-              backgroundColor: surfaceSecondary,
-            }}>
+          <View className="bg-surface-secondary mr-3 h-10 w-10 items-center justify-center rounded-xl">
             <Icon name={section.icon} color={opacity(foreground, 0.5)} size={20} />
           </View>
 
-          {/* Title & Meta */}
-          <VStack spacing={2} style={{ flex: 1 }}>
+          <VStack spacing={2} className="flex-1">
             <Text size={15} bold style={{ color: opacity(foreground, 0.9) }}>
               {section.name}
             </Text>
@@ -148,27 +124,13 @@ const StoreCard: React.FC<{
               <Text size={11} style={{ color: opacity(foreground, 0.33) }}>
                 {section.storageKey}
               </Text>
-              <View
-                style={{
-                  width: 3,
-                  height: 3,
-                  borderRadius: 1.5,
-                  backgroundColor: defaultColor,
-                }}
-              />
+              <View className="bg-default h-[3px] w-[3px] rounded-full" />
               <Text size={11} style={{ color: opacity(foreground, 0.33) }}>
                 {formattedSize}
               </Text>
               {entryCount !== null ? (
                 <>
-                  <View
-                    style={{
-                      width: 3,
-                      height: 3,
-                      borderRadius: 1.5,
-                      backgroundColor: defaultColor,
-                    }}
-                  />
+                  <View className="bg-default h-[3px] w-[3px] rounded-full" />
                   <Text size={11} style={{ color: opacity(foreground, 0.33) }}>
                     {entryCount} {entryCount === 1 ? 'entry' : 'entries'}
                   </Text>
@@ -177,7 +139,6 @@ const StoreCard: React.FC<{
             </HStack>
           </VStack>
 
-          {/* Chevron */}
           <Icon
             name={isExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
             color={opacity(foreground, 0.33)}
@@ -186,19 +147,10 @@ const StoreCard: React.FC<{
         </HStack>
       </TouchableOpacity>
 
-      {/* Expanded Content */}
       {isExpanded ? (
         <>
-          {/* Divider */}
-          <View
-            style={{
-              height: 1,
-              backgroundColor: surfaceSecondary,
-              marginHorizontal: 16,
-            }}
-          />
+          <View className="bg-surface-secondary mx-4 h-px" />
 
-          {/* JSON Display */}
           <View className="p-4">
             <ScrollView
               horizontal
@@ -208,28 +160,17 @@ const StoreCard: React.FC<{
                 style={{ maxHeight: 300 }}
                 showsVerticalScrollIndicator={true}
                 nestedScrollEnabled>
-                <View
-                  className="rounded-xl p-4"
-                  style={{ backgroundColor: background, minWidth: 280 }}>
+                <View className="bg-background rounded-xl p-4" style={{ minWidth: 280 }}>
                   <JSONDisplay data={section.data} />
                 </View>
               </ScrollView>
             </ScrollView>
 
-            {/* Action Buttons */}
             <HStack className="mt-3 justify-end" spacing={10}>
               <TouchableOpacity
                 onPress={handleShare}
                 activeOpacity={0.7}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: surfaceSecondary,
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  gap: 6,
-                }}>
+                className="bg-surface-secondary flex-row items-center gap-1.5 rounded-lg px-3.5 py-2">
                 <Icon name="ri:share-fill" color={opacity(foreground, 0.5)} size={14} />
                 <Text size={13} medium style={{ color: opacity(foreground, 0.66) }}>
                   Share
@@ -240,17 +181,7 @@ const StoreCard: React.FC<{
                 <TouchableOpacity
                   onPress={handleClear}
                   activeOpacity={0.7}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: 'transparent',
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: danger,
-                    gap: 6,
-                  }}>
+                  className="border-danger flex-row items-center gap-1.5 rounded-lg border px-3.5 py-2">
                   <Icon name="mdi:trash-can-outline" color={red400} size={14} />
                   <Text size={13} medium style={{ color: red400 }}>
                     Clear
@@ -267,23 +198,18 @@ const StoreCard: React.FC<{
 
 /** Section header for "Global" / "Profile-Scoped" groupings. */
 const ScopeHeader: React.FC<{ label: string; description: string }> = ({ label, description }) => {
-  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
+  const foreground = useThemeColor('foreground');
   return (
-    <VStack spacing={2} style={{ marginTop: 12, marginBottom: 8 }}>
-      <Text
-        size={13}
-        bold
-        style={{ color: opacity(foreground, 0.5), textTransform: 'uppercase' }}>
+    <VStack spacing={2} className="mb-2 mt-3">
+      <Text size={13} bold style={{ color: opacity(foreground, 0.5), textTransform: 'uppercase' }}>
         {label}
       </Text>
-      <Text size={11} style={{ color: defaultColor }}>
+      <Text size={11} className="text-default">
         {description}
       </Text>
     </VStack>
   );
 };
-
-// ---- Raw AsyncStorage diagnostic ----
 
 /** All known persisted store keys (both global and profile-scoped). */
 const ALL_STORE_KEYS = [
@@ -320,8 +246,7 @@ async function readRawStorage(maxProfileIndex: number): Promise<Record<string, s
 }
 
 const RawStorageCard: React.FC = () => {
-  const [foreground, surface, surfaceSecondary, defaultColor, background] = useThemeColor(['foreground', 'surface', 'surface-secondary', 'default', 'background'] as const);
-  const [success, green400] = useThemeColor(['success', 'green-400'] as const);
+  const [foreground, green400] = useThemeColor(['foreground', 'green-400'] as const);
   const activeProfile = useProfileStore.getState().activeAccountIndex;
   const profileCount = Object.keys(useProfileStore.getState().profiles ?? {}).length;
   const maxIdx = Math.max(activeProfile, profileCount, 1);
@@ -348,7 +273,7 @@ const RawStorageCard: React.FC = () => {
     // Parse stored JSON for readability, fall back to raw string
     const parsed: Record<string, any> = {};
     for (const [key, value] of Object.entries(rawData)) {
-      if (value == null) continue; // skip empty keys
+      if (value == null) continue;
       try {
         parsed[key] = JSON.parse(value);
       } catch {
@@ -359,7 +284,6 @@ const RawStorageCard: React.FC = () => {
     await Share.share({ message: jsonString, title: 'Raw AsyncStorage Dump' });
   };
 
-  // Summarise: how many keys have data vs empty
   const summary = useMemo(() => {
     if (!rawData) return null;
     const withData = Object.entries(rawData).filter(([, v]) => v != null);
@@ -369,22 +293,15 @@ const RawStorageCard: React.FC = () => {
 
   return (
     <View
-      className="mb-3 overflow-hidden rounded-2xl"
-      style={{
-        backgroundColor: surface,
-        borderWidth: 1,
-        borderColor: expanded ? success : surfaceSecondary,
-      }}>
+      className={`bg-surface mb-3 overflow-hidden rounded-2xl border ${expanded ? 'border-success' : 'border-surface-secondary'}`}>
       <TouchableOpacity
         onPress={rawData ? () => setExpanded((p) => !p) : handleLoad}
         activeOpacity={0.7}>
         <HStack className="items-center p-4">
-          <View
-            className="mr-3 items-center justify-center rounded-xl"
-            style={{ width: 40, height: 40, backgroundColor: surfaceSecondary }}>
+          <View className="bg-surface-secondary mr-3 h-10 w-10 items-center justify-center rounded-xl">
             <Icon name="mdi:database-search" color={green400} size={20} />
           </View>
-          <VStack spacing={2} style={{ flex: 1 }}>
+          <VStack spacing={2} className="flex-1">
             <Text size={15} bold style={{ color: opacity(foreground, 0.9) }}>
               Raw AsyncStorage
             </Text>
@@ -408,9 +325,7 @@ const RawStorageCard: React.FC = () => {
 
       {expanded && rawData ? (
         <>
-          <View
-            style={{ height: 1, backgroundColor: surfaceSecondary, marginHorizontal: 16 }}
-          />
+          <View className="bg-surface-secondary mx-4 h-px" />
           <View className="p-4">
             <ScrollView
               horizontal
@@ -420,9 +335,7 @@ const RawStorageCard: React.FC = () => {
                 style={{ maxHeight: 400 }}
                 showsVerticalScrollIndicator
                 nestedScrollEnabled>
-                <View
-                  className="rounded-xl p-4"
-                  style={{ backgroundColor: background, minWidth: 280 }}>
+                <View className="bg-background rounded-xl p-4" style={{ minWidth: 280 }}>
                   {summary?.withData.map(([key, value]) => {
                     let parsed: any;
                     try {
@@ -430,7 +343,6 @@ const RawStorageCard: React.FC = () => {
                     } catch {
                       parsed = value;
                     }
-                    // Show a compact summary: key name + size + top-level keys of .state
                     const stateKeys =
                       parsed?.state && typeof parsed.state === 'object'
                         ? Object.keys(parsed.state)
@@ -440,12 +352,13 @@ const RawStorageCard: React.FC = () => {
                       size < 1024 ? `${size} B` : `${(size / 1024).toFixed(1)} KB`;
 
                     return (
-                      <VStack key={key} spacing={2} style={{ marginBottom: 12 }}>
+                      <VStack key={key} spacing={2} className="mb-3">
                         <HStack spacing={8} className="items-center">
                           <Text
                             size={12}
                             bold
-                            style={{ color: success, fontFamily: 'monospace' }}>
+                            className="text-success"
+                            style={{ fontFamily: 'monospace' }}>
                             {key}
                           </Text>
                           <Text
@@ -467,11 +380,10 @@ const RawStorageCard: React.FC = () => {
                             state keys: [{stateKeys.join(', ')}]
                           </Text>
                         ) : null}
-                        {/* Show first 200 chars of raw value for quick peek */}
                         <Text
                           size={10}
+                          className="text-default"
                           style={{
-                            color: defaultColor,
                             fontFamily: 'monospace',
                             lineHeight: 14,
                           }}>
@@ -494,15 +406,7 @@ const RawStorageCard: React.FC = () => {
               <TouchableOpacity
                 onPress={handleLoad}
                 activeOpacity={0.7}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: surfaceSecondary,
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  gap: 6,
-                }}>
+                className="bg-surface-secondary flex-row items-center gap-1.5 rounded-lg px-3.5 py-2">
                 <Icon name="mdi:refresh" color={opacity(foreground, 0.5)} size={14} />
                 <Text size={13} medium style={{ color: opacity(foreground, 0.66) }}>
                   Reload
@@ -511,15 +415,7 @@ const RawStorageCard: React.FC = () => {
               <TouchableOpacity
                 onPress={handleShare}
                 activeOpacity={0.7}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: surfaceSecondary,
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  gap: 6,
-                }}>
+                className="bg-surface-secondary flex-row items-center gap-1.5 rounded-lg px-3.5 py-2">
                 <Icon name="ri:share-fill" color={opacity(foreground, 0.5)} size={14} />
                 <Text size={13} medium style={{ color: opacity(foreground, 0.66) }}>
                   Share Full Dump
@@ -534,11 +430,10 @@ const RawStorageCard: React.FC = () => {
 };
 
 export default function StorageScreen() {
-  const [foreground, surface, surfaceSecondary, defaultColor] = useThemeColor(['foreground', 'surface', 'surface-secondary', 'default'] as const);
+  const foreground = useThemeColor('foreground');
   const [expandedStores, setExpandedStores] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
 
-  // ---- Global stores ----
   const auditMintStore = useAuditMintStore();
   const btcMapStore = useBTCMapStore();
   const kymMintStore = useKYMMintStore();
@@ -546,7 +441,6 @@ export default function StorageScreen() {
   const settingsStore = useSettingsStore();
   const profileStore = useProfileStore();
 
-  // ---- Profile-scoped stores ----
   const mintStore = useMintStore();
   const mintDistributionStore = useMintDistributionStore();
   const routstrStore = useRoutstrStore();
@@ -561,7 +455,7 @@ export default function StorageScreen() {
         name: 'Profile',
         icon: 'mdi:account-circle',
         storageKey: 'profile-store',
-        scope: 'global' as const,
+        scope: 'global',
         data: {
           activeAccountIndex: profileStore.activeAccountIndex,
           profiles: profileStore.profiles,
@@ -571,7 +465,7 @@ export default function StorageScreen() {
         name: 'Settings',
         icon: 'material-symbols:settings-rounded',
         storageKey: 'settings-store',
-        scope: 'global' as const,
+        scope: 'global',
         data: {
           theme: settingsStore.theme,
           language: settingsStore.language,
@@ -587,7 +481,7 @@ export default function StorageScreen() {
         name: 'Audit Mint',
         icon: 'material-symbols:verified',
         storageKey: 'audit-mint-store',
-        scope: 'global' as const,
+        scope: 'global',
         data: { cache: auditMintStore.cache },
         onClear: auditMintStore.clearAllData,
       },
@@ -595,7 +489,7 @@ export default function StorageScreen() {
         name: 'BTC Map',
         icon: 'mdi:map-marker',
         storageKey: 'btcmap-store',
-        scope: 'global' as const,
+        scope: 'global',
         data: {
           placesCache: btcMapStore.placesCache,
           placeDetailsCache: btcMapStore.placeDetailsCache,
@@ -608,7 +502,7 @@ export default function StorageScreen() {
         name: 'KYM Mint',
         icon: 'mdi:check-circle-outline',
         storageKey: 'kym-mint-store',
-        scope: 'global' as const,
+        scope: 'global',
         data: { cache: kymMintStore.cache },
         onClear: kymMintStore.clearAllData,
       },
@@ -616,7 +510,7 @@ export default function StorageScreen() {
         name: 'Pricelist',
         icon: 'solar:tag-price-bold',
         storageKey: 'pricelist-store',
-        scope: 'global' as const,
+        scope: 'global',
         data: {
           pricelist: pricelistStore.pricelist,
           lastUpdated: pricelistStore.lastUpdated,
@@ -660,7 +554,7 @@ export default function StorageScreen() {
         name: 'Swap Transactions',
         icon: 'mdi:swap-horizontal',
         storageKey: 'swap-transactions-store',
-        scope: 'profile' as const,
+        scope: 'profile',
         data: {
           groups: swapTransactionsStore.groups,
           quoteIdToGroup: swapTransactionsStore.quoteIdToGroup,
@@ -671,7 +565,7 @@ export default function StorageScreen() {
         name: 'Mint Selection',
         icon: 'ph:coins',
         storageKey: 'mint-store',
-        scope: 'profile' as const,
+        scope: 'profile',
         data: { selectedMints: mintStore.selectedMints },
         onClear: mintStore.clearAllData,
       },
@@ -679,7 +573,7 @@ export default function StorageScreen() {
         name: 'Mint Distribution',
         icon: 'mdi:chart-pie',
         storageKey: 'mint-distribution-store',
-        scope: 'profile' as const,
+        scope: 'profile',
         data: { distributions: mintDistributionStore.distributions },
         onClear: mintDistributionStore.clearAllData,
       },
@@ -687,7 +581,7 @@ export default function StorageScreen() {
         name: 'Routstr AI',
         icon: 'mdi:robot',
         storageKey: 'routstr-store',
-        scope: 'profile' as const,
+        scope: 'profile',
         data: {
           apiKey: routstrStore.apiKey ? '***REDACTED***' : null,
           balance: routstrStore.balance,
@@ -703,7 +597,7 @@ export default function StorageScreen() {
         name: 'Scan History',
         icon: 'mdi:qrcode-scan',
         storageKey: 'scan-history-store',
-        scope: 'profile' as const,
+        scope: 'profile',
         data: { entries: scanHistoryStore.entries },
         onClear: scanHistoryStore.clearAllData,
       },
@@ -711,7 +605,7 @@ export default function StorageScreen() {
         name: 'Search History',
         icon: 'mdi:magnify',
         storageKey: 'search-history-store',
-        scope: 'profile' as const,
+        scope: 'profile',
         data: { recentSearches: searchHistoryStore.recentSearches },
         onClear: searchHistoryStore.clearAllData,
       },
@@ -719,7 +613,7 @@ export default function StorageScreen() {
         name: 'Transaction Locations',
         icon: 'mdi:map-marker-radius',
         storageKey: 'transaction-location-store',
-        scope: 'profile' as const,
+        scope: 'profile',
         data: { locations: transactionLocationStore.locations },
         onClear: transactionLocationStore.clearAllData,
       },
@@ -803,13 +697,7 @@ export default function StorageScreen() {
           />
         }>
         {/* Header Stats */}
-        <View
-          className="mb-4 rounded-2xl p-4"
-          style={{
-            backgroundColor: surface,
-            borderWidth: 1,
-            borderColor: surfaceSecondary,
-          }}>
+        <View className="border-surface-secondary bg-surface mb-4 rounded-2xl border p-4">
           <HStack className="items-center justify-between">
             <VStack spacing={2}>
               <Text size={13} style={{ color: opacity(foreground, 0.33) }}>
@@ -818,7 +706,7 @@ export default function StorageScreen() {
               <Text size={22} bold style={{ color: opacity(foreground, 0.9) }}>
                 {totalSize}
               </Text>
-              <Text size={11} style={{ color: defaultColor }}>
+              <Text size={11} className="text-default">
                 Active profile: {activeProfile}
               </Text>
             </VStack>
@@ -826,30 +714,20 @@ export default function StorageScreen() {
               <TouchableOpacity
                 onPress={collapseAll}
                 activeOpacity={0.7}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  backgroundColor: surfaceSecondary,
-                }}>
+                className="bg-surface-secondary rounded-lg px-3 py-2">
                 <Icon name="mdi:minus" color={opacity(foreground, 0.5)} size={18} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={expandAll}
                 activeOpacity={0.7}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  backgroundColor: surfaceSecondary,
-                }}>
+                className="bg-surface-secondary rounded-lg px-3 py-2">
                 <Icon name="mdi:plus" color={opacity(foreground, 0.5)} size={18} />
               </TouchableOpacity>
             </HStack>
           </HStack>
         </View>
 
-        {/* Raw AsyncStorage Diagnostic */}
+        {/* Diagnostics */}
         <ScopeHeader label="Diagnostics" description="Read raw disk data to debug store issues" />
         <RawStorageCard />
 
@@ -878,8 +756,7 @@ export default function StorageScreen() {
           />
         ))}
 
-        {/* Bottom Padding */}
-        <View style={{ height: 40 }} />
+        <View className="h-10" />
       </ScrollView>
     </Container>
   );

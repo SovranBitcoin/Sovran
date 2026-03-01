@@ -1,17 +1,4 @@
-/**
- * @fileoverview Rebalance Plan Screen
- *
- * Shows the computed rebalance plan and allows executing transfers
- * to move from current balances to desired distribution.
- *
- * Execution flow per step:
- * 1. Create mint invoice on receiver mint
- * 2. Melt from sender mint by paying that invoice
- * 3. Verify and refresh balances
- */
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -48,14 +35,7 @@ import { useSettingsStore } from 'stores/settingsStore';
 import { CocoManager } from 'helper/coco/manager';
 import Icon from 'assets/icons';
 import { auditMint, type AuditMintResponse } from 'helper/apiClient';
-
-function extractDomain(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
-}
+import { extractDomain } from 'helper/url';
 
 interface StepState {
   status: StepStatus;
@@ -74,41 +54,31 @@ interface StepState {
 }
 
 function RebalancePlanScreen() {
-  const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor(['foreground', 'surface-tertiary', 'surface-secondary', 'background'] as const);
+  const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor([
+    'foreground',
+    'surface-tertiary',
+    'surface-secondary',
+    'background',
+  ] as const);
   const [danger, green400] = useThemeColor(['danger', 'green-400'] as const);
-  const primaryColor0 = foreground;
-  const primaryColor300 = opacity(foreground, 0.5);
-  const primaryColor400 = opacity(foreground, 0.4);
-  const primaryColor700 = surfaceTertiary;
-  const primaryColor800 = surfaceSecondary;
-  const primaryColor950 = background;
-  const greenColor = green400;
+  const fgMuted = opacity(foreground, 0.5);
+  const fgDim = opacity(foreground, 0.4);
 
-  // Get params
   const params = useLocalSearchParams<{ unit: string }>();
   const unit = params.unit?.toLowerCase() || 'sat';
 
-  // Mint data
   const { trustedMints } = useMints();
   const { balance: liveBalances } = useBalanceContext();
   const { getMintInfo } = useMintManagement();
   const manager = useManager();
-
-  // Lightning operations for creating invoices
   const { requestLightningInvoice } = useLightningOperations();
-
-  // Settings
   const middlemanRouting = useSettingsStore((state) => state.middlemanRouting);
   const minTransferThreshold = useSettingsStore((state) => state.minTransferThreshold);
-
-  // Mint info state
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, any>>({});
 
-  // Distribution store
   const distributions = useMintDistributionStore((state) => state.distributions);
   const distribution = useMemo(() => distributions[unit] || {}, [distributions, unit]);
 
-  // Get mints for this unit
   const mintsForUnit = useMemo(() => {
     return trustedMints.filter((mint) => {
       if (unit === 'sat') {
@@ -126,7 +96,6 @@ function RebalancePlanScreen() {
 
   const mintUrls = useMemo(() => mintsForUnit.map((m) => m.mintUrl), [mintsForUnit]);
 
-  // Load mint info
   useEffect(() => {
     const loadMintInfo = async () => {
       const infoMap: Record<string, any> = {};
@@ -143,7 +112,6 @@ function RebalancePlanScreen() {
     loadMintInfo();
   }, [trustedMints, getMintInfo]);
 
-  // Compute the rebalance plan (live preview; do not use this for execution directly)
   const computedPlan = useMemo(() => {
     const mintBalances = mintUrls.map((mintUrl) => ({
       mintUrl,
@@ -152,49 +120,30 @@ function RebalancePlanScreen() {
     return computeRebalancePlan(mintBalances, distribution, minTransferThreshold);
   }, [mintUrls, liveBalances, distribution, minTransferThreshold]);
 
-  /**
-   * Freeze the plan snapshot on Start so that:
-   * - completed steps never disappear
-   * - step order and amounts remain stable during the run
-   */
   const [runPlan, setRunPlan] = useState<RebalancePlan | null>(null);
-
-  // Step execution state (only meaningful once a run has started)
   const [stepStates, setStepStates] = useState<Record<string, StepState>>({});
   const stepStatesRef = useRef<Record<string, StepState>>({});
-
-  // Runner state
   const [runStatus, setRunStatus] = useState<'idle' | 'running' | 'finished' | 'cancelled'>('idle');
-  const [currentStepId, setCurrentStepId] = useState<string | null>(null);
+  const [, setCurrentStepId] = useState<string | null>(null);
 
-  // Prevent concurrent execution / double-starts and allow safe cancellation
   const runIdRef = useRef(0);
   const abortRef = useRef(false);
   const executionLockRef = useRef(false);
   const auditCacheRef = useRef<Map<string, AuditMintResponse>>(new Map());
-  // Ref-based guard to prevent concurrent starts (state-based check has race conditions)
   const isRunningRef = useRef(false);
-
-  // Swap grouping (store only; Coco remains source of HistoryEntry truth)
   const swapGroupIdRef = useRef<string | null>(null);
   const swapLegIdByStepIdRef = useRef<Record<string, string>>({});
 
-  // Debug error log – appended to on every step start / error / completion
-  const [debugLog, setDebugLog] = useState<Record<string, unknown>[]>([]);
   const appendDebug = useCallback((entry: Record<string, unknown>) => {
-    const stamped = { ...entry, _ts: new Date().toISOString() };
-    console.log('[REBALANCE]', JSON.stringify(stamped));
-    setDebugLog((prev) => [...prev, stamped]);
+    console.log('[REBALANCE]', JSON.stringify({ ...entry, _ts: new Date().toISOString() }));
   }, []);
 
-  // Display either the frozen run plan (once started) or the live preview
   const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
 
   useEffect(() => {
     stepStatesRef.current = stepStates;
   }, [stepStates]);
 
-  // Cleanup: abort runner on unmount
   useEffect(() => {
     return () => {
       abortRef.current = true;
@@ -203,61 +152,44 @@ function RebalancePlanScreen() {
     };
   }, []);
 
-  // Check if already balanced
   const alreadyBalanced = useMemo(() => {
     return isAlreadyBalanced(plan.currentBalances, plan.targetBalances, minTransferThreshold);
   }, [plan, minTransferThreshold]);
 
-  // Check if all steps are done or skipped
-  const allComplete = useMemo(() => {
-    return plan.steps.every((step) => {
-      const state = stepStates[step.id];
-      // If we haven't started, treat everything as pending
-      if (!runPlan) return false;
-      return state?.status === 'done' || state?.status === 'skipped' || state?.status === 'failed';
-    });
+  const stepCounts = useMemo(() => {
+    let completed = 0;
+    let failed = 0;
+    let skipped = 0;
+    let executing = false;
+    for (const step of plan.steps) {
+      const s = stepStates[step.id]?.status;
+      if (s === 'done') completed++;
+      else if (s === 'failed') failed++;
+      else if (s === 'skipped') skipped++;
+      else if (
+        s === 'creatingInvoice' ||
+        s === 'invoiceReady' ||
+        s === 'melting' ||
+        s === 'verifying' ||
+        s === 'routing'
+      )
+        executing = true;
+    }
+    const terminal = completed + failed + skipped;
+    return {
+      completed,
+      failed,
+      skipped,
+      executing,
+      allComplete: runPlan ? terminal === plan.steps.length : false,
+      progressPct:
+        !runPlan || plan.steps.length === 0
+          ? 0
+          : Math.max(0, Math.min(1, terminal / plan.steps.length)),
+      hasFailedStep: failed > 0,
+    };
   }, [plan.steps, stepStates, runPlan]);
 
-  // Count completed steps
-  const completedCount = useMemo(() => {
-    return plan.steps.filter((step) => stepStates[step.id]?.status === 'done').length;
-  }, [plan.steps, stepStates]);
-
-  // Check if any step is currently running (must be defined before useEffect that uses it)
-  const isExecuting = useMemo(() => {
-    return plan.steps.some((step) => {
-      const state = stepStates[step.id];
-      return (
-        state?.status === 'creatingInvoice' ||
-        state?.status === 'invoiceReady' ||
-        state?.status === 'melting' ||
-        state?.status === 'verifying' ||
-        state?.status === 'routing'
-      );
-    });
-  }, [plan.steps, stepStates]);
-
-  const failedCount = useMemo(() => {
-    return plan.steps.filter((step) => stepStates[step.id]?.status === 'failed').length;
-  }, [plan.steps, stepStates]);
-
-  const skippedCount = useMemo(() => {
-    return plan.steps.filter((step) => stepStates[step.id]?.status === 'skipped').length;
-  }, [plan.steps, stepStates]);
-
-  const terminalCount = useMemo(() => {
-    return plan.steps.filter((step) => {
-      const s = stepStates[step.id]?.status;
-      return s === 'done' || s === 'failed' || s === 'skipped';
-    }).length;
-  }, [plan.steps, stepStates]);
-
-  const progressPct = useMemo(() => {
-    if (!runPlan || plan.steps.length === 0) return 0;
-    return Math.max(0, Math.min(1, terminalCount / plan.steps.length));
-  }, [runPlan, terminalCount, plan.steps.length]);
-
-  // Update step state helper
   const updateStepState = useCallback((stepId: string, update: Partial<StepState>) => {
     setStepStates((prev) => ({
       ...prev,
@@ -331,7 +263,6 @@ function RebalancePlanScreen() {
     [runPlan, fetchAudit, mintInfoMap, trustedMints, middlemanRouting]
   );
 
-  // Poll for balance increase with timeout
   const waitForBalanceIncrease = useCallback(
     async (mintUrl: string, _expectedIncrease: number, maxWaitMs: number = 15000) => {
       // Get fresh balances directly from manager to avoid stale closure
@@ -365,7 +296,6 @@ function RebalancePlanScreen() {
     [manager]
   );
 
-  // Wait for execution lock with timeout
   const waitForLock = useCallback(async (maxWaitMs: number = 30000): Promise<boolean> => {
     const startTime = Date.now();
     const pollInterval = 100;
@@ -380,7 +310,6 @@ function RebalancePlanScreen() {
     return true;
   }, []);
 
-  // Execute a single step with fee-aware logic (returns true if done, false if failed)
   const executeStep = useCallback(
     async (step: TransferStep, runId: number): Promise<boolean> => {
       if (abortRef.current || runIdRef.current !== runId) return false;
@@ -1372,7 +1301,6 @@ function RebalancePlanScreen() {
     [executeStep]
   );
 
-  // Handle starting execution (Start once)
   const handleStart = useCallback(() => {
     // Use ref-based guard to prevent race conditions (state check is async)
     if (isRunningRef.current) return;
@@ -1407,7 +1335,6 @@ function RebalancePlanScreen() {
     runStepsSequentially(snapshot.steps, runId);
   }, [computedPlan, runStatus, runStepsSequentially, unit]);
 
-  // Handle retry for a failed step
   const handleRetry = useCallback(
     async (step: TransferStep) => {
       // Use ref-based guard to prevent race conditions
@@ -1435,7 +1362,6 @@ function RebalancePlanScreen() {
     [executeStep, updateStepState, runStatus]
   );
 
-  // Handle skip for a failed step
   const handleSkip = useCallback(
     (step: TransferStep) => {
       if (runStatus === 'running') return;
@@ -1444,15 +1370,9 @@ function RebalancePlanScreen() {
     [updateStepState, runStatus]
   );
 
-  // Handle done - dismiss everything back to home
   const handleDone = useCallback(() => {
     router.dismissTo('/');
   }, []);
-
-  // Check if there's a failed step
-  const hasFailedStep = useMemo(() => {
-    return plan.steps.some((step) => stepStates[step.id]?.status === 'failed');
-  }, [plan.steps, stepStates]);
 
   const handleRetryFailed = useCallback(async () => {
     if (!runPlan) return;
@@ -1612,7 +1532,6 @@ function RebalancePlanScreen() {
     }
   }, []);
 
-  // Bottom buttons
   const bottomButtons = useMemo(() => {
     if (alreadyBalanced || plan.steps.length === 0) {
       return (
@@ -1630,7 +1549,7 @@ function RebalancePlanScreen() {
       );
     }
 
-    if (runStatus === 'finished' || allComplete) {
+    if (runStatus === 'finished' || stepCounts.allComplete) {
       return (
         <BottomButtons>
           <ButtonHandler
@@ -1640,7 +1559,7 @@ function RebalancePlanScreen() {
                 variant: 'primary' as const,
                 onPress: async () => handleDone(),
               },
-              ...(hasFailedStep
+              ...(stepCounts.hasFailedStep
                 ? [
                     {
                       text: 'Retry failed',
@@ -1655,7 +1574,6 @@ function RebalancePlanScreen() {
       );
     }
 
-    // If not started yet, show Start button (Start once)
     if (runStatus === 'idle') {
       return (
         <BottomButtons>
@@ -1677,7 +1595,6 @@ function RebalancePlanScreen() {
       );
     }
 
-    // Execution in progress (or cancelled but still on screen)
     return (
       <BottomButtons>
         <ButtonHandler
@@ -1690,7 +1607,7 @@ function RebalancePlanScreen() {
                 if (runStatus === 'running') return handleCancelRun();
                 return handleDone();
               },
-              disabled: isExecuting && runStatus === 'running',
+              disabled: stepCounts.executing && runStatus === 'running',
             },
           ]}
         />
@@ -1699,9 +1616,7 @@ function RebalancePlanScreen() {
   }, [
     alreadyBalanced,
     plan.steps,
-    allComplete,
-    hasFailedStep,
-    isExecuting,
+    stepCounts,
     runStatus,
     handleDone,
     handleStart,
@@ -1710,34 +1625,32 @@ function RebalancePlanScreen() {
   ]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: primaryColor950 }}>
+    <View style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: 'Rebalance Plan',
-          // Explicitly clear any previously-set headerRight (React Navigation sometimes keeps prior options while hot-reloading).
           headerRight: () => null,
         }}
       />
 
       <ModalLayoutWrapper bottomContent={bottomButtons} contentPadding={0}>
-        {/* Summary header */}
-        <View style={[styles.summaryContainer, { backgroundColor: primaryColor800 }]}>
+        <View className="mx-4 my-2 rounded-2xl p-4" style={{ backgroundColor: surfaceSecondary }}>
           <VStack gap={8}>
             {runPlan && (
-              <View style={[styles.progressTrack, { backgroundColor: primaryColor700 }]}>
+              <View
+                className="h-1.5 overflow-hidden rounded-full"
+                style={{ backgroundColor: surfaceTertiary }}>
                 <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${progressPct * 100}%`,
-                      backgroundColor: failedCount > 0 ? danger : greenColor,
-                    },
-                  ]}
+                  className="h-1.5 rounded-full"
+                  style={{
+                    width: `${stepCounts.progressPct * 100}%`,
+                    backgroundColor: stepCounts.failed > 0 ? danger : green400,
+                  }}
                 />
               </View>
             )}
             <HStack justify="space-between" align="center">
-              <Text size={14} style={{ color: primaryColor300 }}>
+              <Text size={14} style={{ color: fgMuted }}>
                 Total to move
               </Text>
               <AmountFormatter
@@ -1745,81 +1658,74 @@ function RebalancePlanScreen() {
                 unit={unit}
                 size={18}
                 weight="heavy"
-                color={primaryColor0}
+                color={foreground}
               />
             </HStack>
             <HStack justify="space-between" align="center">
-              <Text size={14} style={{ color: primaryColor300 }}>
+              <Text size={14} style={{ color: fgMuted }}>
                 Steps
               </Text>
-              <Text bold overpass size={18} style={{ color: primaryColor0 }}>
-                {completedCount}/{plan.steps.length}
+              <Text bold size={18} style={{ color: foreground }}>
+                {stepCounts.completed}/{plan.steps.length}
               </Text>
             </HStack>
-            {runPlan && skippedCount > 0 && (
+            {runPlan && stepCounts.skipped > 0 && (
               <HStack justify="space-between" align="center">
-                <Text size={14} style={{ color: primaryColor300 }}>
+                <Text size={14} style={{ color: fgMuted }}>
                   Skipped
                 </Text>
-                <Text bold overpass size={18} style={{ color: primaryColor400 }}>
-                  {skippedCount}
+                <Text bold size={18} style={{ color: fgDim }}>
+                  {stepCounts.skipped}
                 </Text>
               </HStack>
             )}
             {runPlan && (
               <HStack justify="space-between" align="center">
-                <Text size={14} style={{ color: primaryColor300 }}>
+                <Text size={14} style={{ color: fgMuted }}>
                   Errors
                 </Text>
-                <Text
-                  bold
-                  overpass
-                  size={18}
-                  style={{ color: failedCount > 0 ? danger : primaryColor0 }}>
-                  {failedCount}
+                <Text bold size={18} style={{ color: stepCounts.failed > 0 ? danger : foreground }}>
+                  {stepCounts.failed}
                 </Text>
               </HStack>
             )}
-            <Text size={11} style={{ color: primaryColor400 }}>
+            <Text size={11} style={{ color: fgDim }}>
               Transfers under {minTransferThreshold} sats are ignored
             </Text>
           </VStack>
         </View>
 
-        {/* Already balanced message */}
         {alreadyBalanced && (
-          <View style={styles.emptyContainer}>
+          <View className="items-center p-10">
             <VStack gap={12} align="center">
-              <Icon name="mdi:check-circle" size={48} color={greenColor} />
-              <Text size={16} style={{ color: primaryColor0, textAlign: 'center' }}>
+              <Icon name="mdi:check-circle" size={48} color={green400} />
+              <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
                 Already balanced!
               </Text>
-              <Text size={14} style={{ color: primaryColor300, textAlign: 'center' }}>
+              <Text size={14} style={{ color: fgMuted, textAlign: 'center' }}>
                 Your current balances match the desired distribution.
               </Text>
             </VStack>
           </View>
         )}
 
-        {/* No steps needed */}
         {!alreadyBalanced && plan.steps.length === 0 && (
-          <View style={styles.emptyContainer}>
+          <View className="items-center p-10">
             <VStack gap={12} align="center">
-              <Icon name="mdi:check-circle" size={48} color={greenColor} />
-              <Text size={16} style={{ color: primaryColor0, textAlign: 'center' }}>
+              <Icon name="mdi:check-circle" size={48} color={green400} />
+              <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
                 No transfers needed
               </Text>
-              <Text size={14} style={{ color: primaryColor300, textAlign: 'center' }}>
+              <Text size={14} style={{ color: fgMuted, textAlign: 'center' }}>
                 All differences are below the {minTransferThreshold} sat threshold.
               </Text>
             </VStack>
           </View>
         )}
 
-        {/* Steps list */}
         {plan.steps.length > 0 && (
-          <VStack gap={0} style={{ paddingTop: 8 }}>
-            {plan.steps.map((step, index) => {
+          <VStack gap={0} className="pt-2">
+            {plan.steps.map((step) => {
               const state = runPlan
                 ? stepStates[step.id] || { status: 'pending' }
                 : { status: 'pending' as StepStatus };
@@ -1848,8 +1754,6 @@ function RebalancePlanScreen() {
                       : undefined
                   }
                   onSkip={runStatus !== 'running' ? () => handleSkip(step) : undefined}
-                  stepNumber={index + 1}
-                  isCurrent={runPlan ? currentStepId === step.id : false}
                   chainInfo={
                     step.chainId && step.chainPath
                       ? {
@@ -1866,9 +1770,8 @@ function RebalancePlanScreen() {
           </VStack>
         )}
 
-        {/* View Swap button — shown when run finishes */}
         {runStatus === 'finished' && plan.steps.length > 0 && swapGroupIdRef.current && (
-          <View style={styles.viewSwapContainer}>
+          <View className="px-4 pb-2 pt-3">
             <TouchableOpacity
               haptics
               onPress={() => {
@@ -1877,10 +1780,12 @@ function RebalancePlanScreen() {
                   params: { groupId: swapGroupIdRef.current! },
                 });
               }}>
-              <View style={[styles.viewSwapButton, { borderColor: primaryColor700 }]}>
-                <BlurCardFrame accentColor={primaryColor300}>
-                  <View style={styles.viewSwapContent}>
-                    <Text size={14} bold style={{ color: primaryColor0 }}>
+              <View
+                className="overflow-hidden rounded-[20px] border"
+                style={{ borderColor: surfaceTertiary, borderCurve: 'continuous' as any }}>
+                <BlurCardFrame accentColor={fgMuted}>
+                  <View className="z-[1] items-center p-3">
+                    <Text size={14} bold style={{ color: foreground }}>
                       View Swap
                     </Text>
                   </View>
@@ -1889,96 +1794,9 @@ function RebalancePlanScreen() {
             </TouchableOpacity>
           </View>
         )}
-
-        {/* Debug log – raw JSON of every event / error */}
-        {debugLog.length > 0 && (
-          <View style={styles.debugContainer}>
-            <HStack justify="space-between" align="center" style={{ marginBottom: 4 }}>
-              <Text size={11} weight="bold" style={{ color: '#facc15' }}>
-                REBALANCE DEBUG LOG ({debugLog.length} entries)
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  console.log('[REBALANCE] === FULL DEBUG LOG DUMP ===');
-                  debugLog.forEach((entry, i) =>
-                    console.log(`[REBALANCE] [${i}]`, JSON.stringify(entry))
-                  );
-                  console.log('[REBALANCE] === END DUMP ===');
-                }}
-                style={styles.debugDumpBtn}>
-                <Text size={9} weight="bold" style={{ color: '#facc15' }}>
-                  Log All
-                </Text>
-              </TouchableOpacity>
-            </HStack>
-            <ScrollView style={{ maxHeight: 300 }} nestedScrollEnabled showsVerticalScrollIndicator>
-              <Text
-                size={9}
-                style={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}
-                selectable>
-                {JSON.stringify(debugLog, null, 2)}
-              </Text>
-            </ScrollView>
-          </View>
-        )}
       </ModalLayoutWrapper>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  summaryContainer: {
-    padding: 16,
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
-    borderRadius: 16,
-  },
-  progressTrack: {
-    height: 6,
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: 6,
-    borderRadius: 999,
-  },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  viewSwapContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  viewSwapButton: {
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    borderWidth: 1,
-  },
-  viewSwapContent: {
-    padding: 12,
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  debugContainer: {
-    margin: 16,
-    padding: 12,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(250,204,21,0.3)',
-  },
-  debugDumpBtn: {
-    backgroundColor: 'rgba(250,204,21,0.15)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(250,204,21,0.3)',
-  },
-});
 
 export default withSheetProvider(RebalancePlanScreen);

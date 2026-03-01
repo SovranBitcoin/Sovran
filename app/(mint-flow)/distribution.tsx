@@ -1,19 +1,5 @@
-/**
- * @fileoverview Balance Split Distribution Editor
- *
- * Modal screen for editing mint distribution percentages.
- * Uses basis points (10,000 = 100%) for precise integer math.
- *
- * Features:
- * - Unit selector tabs (BTC, USD, EUR, GBP)
- * - Per-mint sliders with percentage display
- * - Max/Min quick actions per mint
- * - Equalize button for even distribution among active mints
- * - Persists to Zustand store
- */
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { StyleSheet, Alert } from 'react-native';
+import { Alert } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useSharedValue } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -35,31 +21,23 @@ import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useMintDistributionStore, TOTAL_BASIS_POINTS } from 'stores/mintDistributionStore';
 import opacity from 'hex-color-opacity';
 
-// Height constants
-const DISTRIBUTION_BAR_HEIGHT = 48; // 32px bar + 16px margin
+const DISTRIBUTION_BAR_HEIGHT = 48;
 const CURRENCY_TABS_HEIGHT = 48;
 const STICKY_CONTENT_HEIGHT = DISTRIBUTION_BAR_HEIGHT + CURRENCY_TABS_HEIGHT;
 
 function DistributionScreen() {
-  const [foreground, background, danger] = useThemeColor(['foreground', 'background', 'danger'] as const);
-  const primaryColor0 = foreground;
-  const primaryColor950 = background;
-
-  // Get params
+  const [foreground, background, danger] = useThemeColor([
+    'foreground',
+    'background',
+    'danger',
+  ] as const);
   const params = useLocalSearchParams<{ unit?: string }>();
-
-  // Scroll tracking for animated currency tabs
   const scrollY = useSharedValue(0);
-
-  // Mint data
   const { trustedMints } = useMints();
   const { balance: liveBalances } = useBalanceContext();
   const { getMintInfo } = useMintManagement();
-
-  // Mint info state
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, any>>({});
 
-  // Read initial unit from route params (e.g. { unit: 'usd' } from Wallet Health modal)
   const routeCurrency = useMemo(() => {
     const raw = params.unit;
     if (!raw) return null;
@@ -69,10 +47,8 @@ function DistributionScreen() {
     return norm.toUpperCase();
   }, [params.unit]);
 
-  // Currency selection state
   const [selectedCurrency, setSelectedCurrency] = useState<string>('SAT');
 
-  // Distribution store - subscribe to distributions for reactive updates
   const distributions = useMintDistributionStore((state) => state.distributions);
   const setMintDistribution = useMintDistributionStore((state) => state.setMintDistribution);
   const initializeDistribution = useMintDistributionStore((state) => state.initializeDistribution);
@@ -80,13 +56,11 @@ function DistributionScreen() {
   const maxMint = useMintDistributionStore((state) => state.maxMint);
   const minMint = useMintDistributionStore((state) => state.minMint);
 
-  // Get distribution for current currency (reactive to store changes)
   const distribution = useMemo(
     () => distributions[selectedCurrency.toLowerCase()] || {},
     [distributions, selectedCurrency]
   );
 
-  // Extract available currencies from mints
   const availableCurrencies = useMemo(() => {
     const units: string[] = [];
     trustedMints.forEach((mint) => {
@@ -106,7 +80,6 @@ function DistributionScreen() {
     return filtered.length > 0 ? filtered : ['SAT'];
   }, [trustedMints]);
 
-  // Initialize selected currency from route param exactly once (if valid), otherwise keep default.
   useEffect(() => {
     if (!routeCurrency) return;
     if (!availableCurrencies.includes(routeCurrency)) return;
@@ -114,7 +87,6 @@ function DistributionScreen() {
     setSelectedCurrency((prev) => (prev === 'SAT' ? routeCurrency : prev));
   }, [routeCurrency, availableCurrencies]);
 
-  // Mints for the selected currency
   const mintsForCurrency = useMemo(() => {
     return trustedMints.filter((mint) => {
       if (selectedCurrency === 'SAT') {
@@ -131,17 +103,14 @@ function DistributionScreen() {
     });
   }, [trustedMints, selectedCurrency]);
 
-  // Mint URLs for the selected currency
   const mintUrls = useMemo(() => mintsForCurrency.map((m) => m.mintUrl), [mintsForCurrency]);
 
-  // Initialize distribution when mints or currency change
   useEffect(() => {
     if (mintUrls.length > 0) {
       initializeDistribution(selectedCurrency, mintUrls);
     }
   }, [selectedCurrency, mintUrls, initializeDistribution]);
 
-  // Load mint info for all mints
   useEffect(() => {
     const loadMintInfo = async () => {
       const infoMap: Record<string, any> = {};
@@ -159,12 +128,6 @@ function DistributionScreen() {
     loadMintInfo();
   }, [trustedMints, getMintInfo]);
 
-  // Handle currency change
-  const handleCurrencyChange = useCallback((currency: string) => {
-    setSelectedCurrency(currency);
-  }, []);
-
-  // Handle distribution change from slider
   const handleDistributionChange = useCallback(
     (mintUrl: string, bp: number) => {
       setMintDistribution(selectedCurrency, mintUrl, bp, mintUrls);
@@ -172,7 +135,6 @@ function DistributionScreen() {
     [selectedCurrency, mintUrls, setMintDistribution]
   );
 
-  // Handle Max button
   const handleMax = useCallback(
     (mintUrl: string) => {
       maxMint(selectedCurrency, mintUrl, mintUrls);
@@ -180,7 +142,6 @@ function DistributionScreen() {
     [selectedCurrency, mintUrls, maxMint]
   );
 
-  // Handle Min button
   const handleMin = useCallback(
     (mintUrl: string) => {
       minMint(selectedCurrency, mintUrl, mintUrls);
@@ -188,52 +149,37 @@ function DistributionScreen() {
     [selectedCurrency, mintUrls, minMint]
   );
 
-  // Handle Equalize button
   const handleEqualize = useCallback(() => {
     equalizeMints(selectedCurrency, mintUrls);
   }, [selectedCurrency, mintUrls, equalizeMints]);
 
-  // Check if there are active mints (bp > 0)
   const hasActiveMints = useMemo(() => {
     return mintUrls.some((url) => (distribution[url] || 0) > 0);
   }, [mintUrls, distribution]);
 
-  // Verify total is 10,000
   const totalBp = useMemo(() => {
     return mintUrls.reduce((sum, url) => sum + (distribution[url] || 0), 0);
   }, [mintUrls, distribution]);
 
-  // Sticky header content (distribution bar + currency tabs)
   const stickyHeader = useMemo(
     () => (
       <View>
-        {/* Distribution overview bar */}
         <DistributionBar
           distribution={distribution}
           mintInfoMap={mintInfoMap}
           mintUrls={mintUrls}
         />
-        {/* Currency tabs */}
         <MintCurrencyTabs
           currencies={availableCurrencies}
           selectedCurrency={selectedCurrency}
-          onCurrencyChange={handleCurrencyChange}
+          onCurrencyChange={setSelectedCurrency}
           scrollY={scrollY}
         />
       </View>
     ),
-    [
-      distribution,
-      mintInfoMap,
-      mintUrls,
-      availableCurrencies,
-      selectedCurrency,
-      handleCurrencyChange,
-      scrollY,
-    ]
+    [distribution, mintInfoMap, mintUrls, availableCurrencies, selectedCurrency, scrollY]
   );
 
-  // Handle navigating to rebalance plan
   const handleRebalance = useCallback(() => {
     router.navigate({
       pathname: '/rebalancePlan',
@@ -241,7 +187,6 @@ function DistributionScreen() {
     });
   }, [selectedCurrency]);
 
-  // Bottom buttons
   const bottomButtons = useMemo(
     () => (
       <BottomButtons>
@@ -265,7 +210,7 @@ function DistributionScreen() {
   );
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: primaryColor950 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: 'Balance split',
@@ -282,8 +227,8 @@ function DistributionScreen() {
                   [{ text: 'Got it' }]
                 );
               }}
-              style={{ padding: 8 }}>
-              <Icon name="mdi:help-circle" size={24} color={primaryColor0} />
+              className="p-2">
+              <Icon name="mdi:help-circle" size={24} color={foreground} />
             </TouchableOpacity>
           ),
         }}
@@ -297,15 +242,13 @@ function DistributionScreen() {
         scrollY={scrollY}
         bottomContent={bottomButtons}
         contentPadding={0}>
-        {/* Distribution summary */}
-        <View style={styles.summaryContainer}>
-          <HStack justify="space-between" align="center" style={{ paddingHorizontal: 16 }}>
+        <View className="mb-1 py-1.5">
+          <HStack justify="space-between" align="center" className="px-4">
             <Text size={14} style={{ color: opacity(foreground, 0.5) }}>
               Total distribution
             </Text>
             <Text
               bold
-              overpass
               size={14}
               style={{
                 color: totalBp === TOTAL_BASIS_POINTS ? foreground : danger,
@@ -315,10 +258,9 @@ function DistributionScreen() {
           </HStack>
         </View>
 
-        {/* Mints list */}
         {mintsForCurrency.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={{ color: primaryColor0, textAlign: 'center' }}>
+          <View className="items-center p-10">
+            <Text style={{ color: foreground, textAlign: 'center' }}>
               No mints available for {selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}
             </Text>
           </View>
@@ -340,8 +282,7 @@ function DistributionScreen() {
           </VStack>
         )}
 
-        {/* Info text */}
-        <View style={styles.infoContainer}>
+        <View className="mt-2 p-4">
           <Text size={12} style={{ color: opacity(foreground, 0.4), textAlign: 'center' }}>
             {hasActiveMints
               ? 'Adjusting one mint redistributes among active mints only'
@@ -352,20 +293,5 @@ function DistributionScreen() {
     </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  summaryContainer: {
-    paddingVertical: 6,
-    marginBottom: 4,
-  },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  infoContainer: {
-    padding: 16,
-    marginTop: 8,
-  },
-});
 
 export default withSheetProvider(DistributionScreen);

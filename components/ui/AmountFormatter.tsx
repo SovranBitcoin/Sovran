@@ -1,14 +1,17 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleProp, ViewStyle, Animated } from 'react-native';
+
+import { BtcIcon, LightningUnit } from 'assets/icons';
+import opacity from 'hex-color-opacity';
+
+import { formatAmount } from 'helper/currency';
+import { cn } from '@/helper/utils';
+import { useThemeColor } from 'hooks/useThemeColor';
+import { useSettingsStore } from 'stores/settingsStore';
+
 import { StyledText, Text } from 'components/ui/Text';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
-import { formatAmount } from 'helper/currency';
-import { BtcIcon, LightningUnit } from 'assets/icons';
-import { useThemeColor } from 'hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
-import { useSettingsStore } from 'stores/settingsStore';
-import { cn } from '@/helper/utils';
 
 type CurrencyUnit = 'sat' | 'usd' | 'eur' | string;
 type FontWeight = 'heavy' | 'medium' | 'regular' | 'light';
@@ -21,7 +24,6 @@ interface AmountFormatterProps {
   weight?: FontWeight;
   color?: string;
   style?: StyleProp<ViewStyle>;
-  // Optional enhancements (defaults preserve existing behavior)
   animated?: boolean;
   useTypeColors?: boolean;
   transactionType?: TransactionType;
@@ -30,7 +32,10 @@ interface AmountFormatterProps {
 }
 
 /**
- * Formats and displays monetary amounts with appropriate currency symbols
+ * Displays a formatted monetary amount with the appropriate icon/symbol for
+ * the user's display preference (BTC, lightning sats, plain sats, or BTC alt).
+ *
+ * displayBtc modes: 0/3 = ₿ icon prefix, 1 = lightning icon suffix, 2 = text-only "X sats".
  */
 export function AmountFormatter({
   amount,
@@ -48,159 +53,96 @@ export function AmountFormatter({
   const [foreground, danger] = useThemeColor(['foreground', 'danger'] as const);
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
 
-  // Animation setup (only if animated is true)
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const formattedAmount = formatAmount({ amount, unit }, { useUserPreference: true });
 
-  // Dynamic color logic (only if useTypeColors is true)
-  const getTypeColor = (): string => {
-    if (!amount) return opacity(foreground, 0.4);
-    return transactionType === 'receive' ? foreground : danger;
-  };
+  const currentColor =
+    color ||
+    (useTypeColors ? getTypeColor(amount, transactionType, foreground, danger) : foreground);
+  const textAlign = centered ? ('center' as const) : ('left' as const);
+  const containerClass = centered ? 'items-center justify-center' : 'flex-row items-center';
 
-  const currentColor = color || (useTypeColors ? getTypeColor() : foreground);
-
-  // Animation effect (only if animated is true)
   useEffect(() => {
     if (!animated) return;
-
-    const length = formattedAmount.toString().length;
+    const length = formattedAmount.length;
     const newScale = length > 6 ? 1 - (length - 6) * 0.05 : 1;
-
-    Animated.timing(scaleAnim, {
-      toValue: newScale,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    Animated.timing(scaleAnim, { toValue: newScale, duration: 300, useNativeDriver: true }).start();
   }, [animated, formattedAmount, scaleAnim]);
 
-  // Wrapper component for animation (only when animated is true)
-  const AnimatedWrapper = ({ children }: { children: React.ReactNode }) => {
-    if (!animated) {
-      return <>{children}</>;
-    }
-    return <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>{children}</Animated.View>;
-  };
-
-  // Container styling based on centered prop
-  const containerClass = centered ? 'items-center justify-center' : 'flex-row items-center';
+  const textStyle = { color: currentColor, margin: 0, zIndex: 2, textAlign };
 
   if (unit !== 'sat') {
     return (
       <View className={containerClass} style={style}>
-        <AnimatedWrapper>
-          <Text
-            size={size}
-            weight={weight}
-            style={{
-              color: currentColor,
-              margin: 0,
-              zIndex: 2,
-              textAlign: centered ? 'center' : 'left',
-            }}>
+        <ScaleWrapper animated={animated} scaleAnim={scaleAnim}>
+          <Text overpass size={size} weight={weight} style={textStyle}>
             {formattedAmount}
           </Text>
-        </AnimatedWrapper>
+        </ScaleWrapper>
       </View>
     );
   }
 
+  const showBtcIcon = displayBtc === 0 || displayBtc === 3;
+  const showLightningIcon = displayBtc === 1;
+  const TextComponent = displayBtc === 1 ? StyledText : Text;
+
+  const iconMarginLeft = centered ? 0 : Math.round(size * (weight === 'heavy' ? -0.14 : -0.1));
+  const textMarginLeft = centered ? 0 : Math.round(size * (weight === 'heavy' ? -0.05 : -0.1));
+
   return (
     <View className={cn(containerClass, className)} style={style}>
-      {displayBtc === 0 && (
-        <AnimatedWrapper>
-          <HStack align="center" style={style}>
-            <View
-              style={{
-                marginLeft: centered ? 0 : Math.round(size * (weight === 'heavy' ? -0.14 : -0.1)),
-                marginRight: centered ? 4 : 0,
-              }}>
+      <ScaleWrapper animated={animated} scaleAnim={scaleAnim}>
+        <HStack align="center" style={style}>
+          {showBtcIcon && (
+            <View style={{ marginLeft: iconMarginLeft, marginRight: centered ? 4 : 0 }}>
               <BtcIcon weight={weight} size={size} color={currentColor} />
             </View>
-            <Text
-              size={size}
-              weight={weight}
-              style={{
-                color: currentColor,
-                marginLeft: centered ? 0 : Math.round(size * (weight === 'heavy' ? -0.05 : -0.1)),
-                margin: 0,
-                zIndex: 2,
-                textAlign: centered ? 'center' : 'left',
-              }}>
-              {formattedAmount}
-            </Text>
-          </HStack>
-        </AnimatedWrapper>
-      )}
-
-      {displayBtc === 1 && (
-        <AnimatedWrapper>
-          <HStack align="center" style={style}>
-            <StyledText
-              size={size}
-              weight={weight}
-              style={{
-                color: currentColor,
-                margin: 0,
-                zIndex: 2,
-                textAlign: centered ? 'center' : 'left',
-              }}>
-              {formattedAmount}
-            </StyledText>
-            <View
-              style={{
-                marginBottom: 4,
-                marginLeft: centered ? 4 : 0,
-              }}>
+          )}
+          <TextComponent
+            overpass
+            size={size}
+            weight={weight}
+            style={{
+              ...textStyle,
+              ...(showBtcIcon && { marginLeft: textMarginLeft }),
+            }}>
+            {formattedAmount}
+          </TextComponent>
+          {showLightningIcon && (
+            <View style={{ marginBottom: 4, marginLeft: centered ? 4 : 0 }}>
               <LightningUnit height={size} width={size} color={currentColor} />
             </View>
-          </HStack>
-        </AnimatedWrapper>
-      )}
-
-      {displayBtc === 2 && (
-        <AnimatedWrapper>
-          <HStack align="center" style={style}>
-            <Text
-              size={size}
-              weight={weight}
-              style={{
-                color: currentColor,
-                margin: 0,
-                zIndex: 2,
-                textAlign: centered ? 'center' : 'left',
-              }}>
-              {formattedAmount}
-            </Text>
-          </HStack>
-        </AnimatedWrapper>
-      )}
-
-      {displayBtc === 3 && (
-        <AnimatedWrapper>
-          <HStack align="center" style={style}>
-            <View
-              style={{
-                marginLeft: centered ? 0 : Math.round(size * (weight === 'heavy' ? -0.14 : -0.1)),
-                marginRight: centered ? 4 : 0,
-              }}>
-              <BtcIcon weight={weight} size={size} color={currentColor} />
-            </View>
-            <Text
-              size={size}
-              weight={weight}
-              style={{
-                color: currentColor,
-                marginLeft: centered ? 0 : Math.round(size * (weight === 'heavy' ? -0.05 : -0.1)),
-                margin: 0,
-                zIndex: 2,
-                textAlign: centered ? 'center' : 'left',
-              }}>
-              {formattedAmount}
-            </Text>
-          </HStack>
-        </AnimatedWrapper>
-      )}
+          )}
+        </HStack>
+      </ScaleWrapper>
     </View>
   );
+}
+
+function getTypeColor(
+  amount: number,
+  transactionType: TransactionType,
+  foreground: string,
+  danger: string
+): string {
+  if (!amount) return opacity(foreground, 0.4);
+  return transactionType === 'receive' ? foreground : danger;
+}
+
+/**
+ * Wraps children in Animated.View when animated, otherwise renders children directly.
+ * Defined as a named component so React preserves identity across renders.
+ */
+function ScaleWrapper({
+  animated,
+  scaleAnim,
+  children,
+}: {
+  animated: boolean;
+  scaleAnim: Animated.Value;
+  children: React.ReactNode;
+}) {
+  if (!animated) return <>{children}</>;
+  return <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>{children}</Animated.View>;
 }

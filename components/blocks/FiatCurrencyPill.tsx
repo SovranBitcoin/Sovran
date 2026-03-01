@@ -33,7 +33,11 @@ export function FiatCurrencyPill({
   textSize = 14,
   enableCurrencyMenu = true,
 }: FiatCurrencyPillProps): React.ReactElement {
-  const [success, green400, green500] = useThemeColor(['success', 'green-400', 'green-500'] as const);
+  const [success, green400, green500] = useThemeColor([
+    'success',
+    'green-400',
+    'green-500',
+  ] as const);
   const setDisplayCurrency = useSettingsStore((state) => state.setDisplayCurrency);
 
   const handleSelectCurrency = useCallback(
@@ -49,8 +53,6 @@ export function FiatCurrencyPill({
 
   const text = showToggleGlyph ? `${displayText}  ⇄` : displayText;
   const iosHeight = 34;
-  // Expo SwiftUI wrappers often need an explicit frame to avoid collapsed width.
-  // Approximate monospace character width: ~0.62em + fixed padding.
   const iosWidth = Math.max(72, Math.round(text.length * (textSize * 0.62) + 28));
 
   const openCurrencySheet = useCallback(() => {
@@ -68,67 +70,28 @@ export function FiatCurrencyPill({
     );
   }, [handleSelectCurrency]);
 
-  // Non-Liquid Glass fallback on iOS: use RN capsule, and ActionSheet for currency selection.
-  if (Platform.OS === 'ios' && !supportsLiquidGlass()) {
-    const primaryHandler = enableCurrencyMenu && !onPress ? openCurrencySheet : onPress;
-    const longPressHandler = enableCurrencyMenu && onPress ? openCurrencySheet : undefined;
+  const glassModifiers = [
+    frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
+    glassEffect({
+      shape: 'capsule' as const,
+      glass: { tint: opacity(green500, 0.15), variant: 'regular' as const, interactive: true },
+    }),
+  ];
 
-    return (
-      <TouchableOpacity
-        disabled={!primaryHandler && !longPressHandler}
-        onPress={primaryHandler}
-        onLongPress={longPressHandler}>
-        <HStack
-          align="center"
-          justify="center"
-          gap={6}
-          className="overflow-hidden rounded-full"
-          style={{
-            backgroundColor: opacity(green500, 0.15),
-            borderWidth: 1,
-            borderColor: opacity(green400, 0.2),
-            paddingHorizontal: 14,
-            paddingVertical: 6,
-            minHeight: iosHeight,
-          }}>
-          <Text size={textSize} bold overpass color={success} style={{ letterSpacing: 0.3 }}>
-            {text}
-          </Text>
-        </HStack>
-      </TouchableOpacity>
-    );
-  }
+  const glassTextModifiers = [
+    font({ size: textSize, design: 'monospaced' as const, weight: 'bold' as const }),
+    foregroundStyle(success),
+    frame({ height: 22, width: iosWidth, alignment: 'center' }),
+  ];
 
-  // Use SwiftUI ContextMenu with liquid glass button on iOS
-  if (Platform.OS === 'ios' && enableCurrencyMenu) {
+  // iOS liquid glass with currency menu
+  if (Platform.OS === 'ios' && supportsLiquidGlass() && enableCurrencyMenu) {
     return (
       <Host style={{ zIndex: 10 }} matchContents>
         <Menu
-          // If `onPress` is provided, a tap triggers that action and a long-press shows the menu.
-          // If `onPress` is not provided (e.g. PrimaryBalance), a tap opens the menu directly.
           onPrimaryAction={onPress}
-          label={
-            <SwiftUIText
-              // Important: keep label sizing aligned with the outer capsule frame.
-              modifiers={[
-                font({ size: textSize, design: 'monospaced', weight: 'bold' }),
-                foregroundStyle(success),
-                frame({ height: 22, width: iosWidth, alignment: 'center' }),
-              ]}>
-              {text}
-            </SwiftUIText>
-          }
-          modifiers={[
-            frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
-            glassEffect({
-              shape: 'capsule',
-              glass: {
-                tint: opacity(green500, 0.15),
-                variant: 'regular',
-                interactive: true,
-              },
-            }),
-          ]}>
+          label={<SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>}
+          modifiers={glassModifiers}>
           <SwiftUIButton
             systemImage="dollarsign"
             label="USD"
@@ -149,41 +112,27 @@ export function FiatCurrencyPill({
     );
   }
 
-  // iOS, but menu disabled: still use liquid-glass button for consistent look.
-  if (Platform.OS === 'ios') {
+  // iOS liquid glass without menu
+  if (Platform.OS === 'ios' && supportsLiquidGlass()) {
     return (
       <Host style={{ zIndex: 10 }} matchContents>
-        <SwiftUIButton
-          onPress={onPress}
-          modifiers={[
-            // buttonStyle('glass'),
-            frame({ height: iosHeight, width: iosWidth, alignment: 'center' }),
-            // Keep tint consistent with the menu-enabled variant.
-            glassEffect({
-              shape: 'capsule',
-              glass: {
-                tint: opacity(green500, 0.15),
-                variant: 'regular',
-                interactive: true,
-              },
-            }),
-          ]}>
-          <SwiftUIText
-            modifiers={[
-              font({ size: textSize, design: 'monospaced', weight: 'bold' }),
-              foregroundStyle(success),
-              frame({ height: 22, width: iosWidth, alignment: 'center' }),
-            ]}>
-            {text}
-          </SwiftUIText>
+        <SwiftUIButton onPress={onPress} modifiers={glassModifiers}>
+          <SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>
         </SwiftUIButton>
       </Host>
     );
   }
 
-  // Fallback for non-iOS platforms
+  // Non-liquid-glass fallback (iOS <26, Android, etc.)
+  const useCurrencySheet = Platform.OS === 'ios' && enableCurrencyMenu;
+  const primaryHandler = useCurrencySheet && !onPress ? openCurrencySheet : onPress;
+  const longPressHandler = useCurrencySheet && onPress ? openCurrencySheet : undefined;
+
   return (
-    <TouchableOpacity disabled={!onPress} onPress={onPress}>
+    <TouchableOpacity
+      disabled={!primaryHandler && !longPressHandler}
+      onPress={primaryHandler}
+      onLongPress={longPressHandler}>
       <HStack
         align="center"
         justify="center"
@@ -195,8 +144,9 @@ export function FiatCurrencyPill({
           borderColor: opacity(green400, 0.2),
           paddingHorizontal: 14,
           paddingVertical: 6,
+          minHeight: iosHeight,
         }}>
-        <Text size={textSize} bold overpass color={success} style={{ letterSpacing: 0.3 }}>
+        <Text overpass size={textSize} bold color={success} style={{ letterSpacing: 0.3 }}>
           {text}
         </Text>
       </HStack>

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
 import { NPCClient, JWTAuthProvider } from 'npubcash-sdk';
-import { finalizeEvent } from 'nostr-tools';
+import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
 
 const NPC_BASE_URL = 'https://npubx.cash';
 const NPC_DEFAULT_MINT_URL = 'https://mint.minibits.cash/Bitcoin';
@@ -12,25 +12,30 @@ interface NpcMintState {
   mintUrls: Record<string, string | undefined>;
   /** Timestamp of last successful server sync per pubkey */
   lastSyncedAt: Record<string, number | undefined>;
-  /** Whether a sync from server is in progress */
   isSyncing: boolean;
-  /** Whether an update to the server is in progress */
   isUpdating: boolean;
 }
 
+interface NpcInfo {
+  mintUrl?: string;
+  mint_url?: string;
+}
+
 interface NpcMintActions {
-  /** Read the locally cached NPC mint URL (works offline) */
   getMintUrl: (pubkey: string) => string | undefined;
 
   /**
-   * Fetch the current mint URL from the NPC server and cache it locally.
-   * Returns the mint URL on success, or the cached value on failure.
+   * Fetch the current mint URL from the NPC server and cache locally.
+   * Returns the mint URL on success, or the cached/default value on failure.
    */
-  syncFromServer: (pubkey: string, manager: any) => Promise<string | undefined>;
+  syncFromServer: (
+    pubkey: string,
+    manager: { ext?: { npc?: { getInfo: () => Promise<NpcInfo> } } }
+  ) => Promise<string | undefined>;
 
   /**
-   * Update the NPC server with a new mint URL, then cache it locally.
-   * Returns true on success, false on failure.
+   * Update the NPC server with a new mint URL, then cache locally.
+   * Returns true on success.
    */
   updateServerMint: (
     pubkey: string,
@@ -41,39 +46,37 @@ interface NpcMintActions {
 
 type NpcMintStore = NpcMintState & NpcMintActions;
 
-/** Build an authenticated NPCClient from a Nostr private key */
 function createNpcClient(privateKey: Uint8Array): NPCClient {
-  const signer = async (eventTemplate: any) => finalizeEvent(eventTemplate, privateKey);
+  const signer = async (eventTemplate: EventTemplate): Promise<VerifiedEvent> =>
+    finalizeEvent(eventTemplate, privateKey);
   const authProvider = new JWTAuthProvider(NPC_BASE_URL, signer);
   return new NPCClient(NPC_BASE_URL, authProvider);
+}
+
+function getOrDefault(mintUrls: Record<string, string | undefined>, pubkey: string): string {
+  return mintUrls[pubkey] ?? NPC_DEFAULT_MINT_URL;
 }
 
 export const useNpcMintStore = create<NpcMintStore>()(
   persist(
     (set, get) => ({
-      // --- persisted state ---
       mintUrls: {},
       lastSyncedAt: {},
-
-      // --- transient state ---
       isSyncing: false,
       isUpdating: false,
 
-      // --- actions ---
-      getMintUrl: (pubkey: string) => get().mintUrls[pubkey] ?? NPC_DEFAULT_MINT_URL,
+      getMintUrl: (pubkey) => getOrDefault(get().mintUrls, pubkey),
 
-      syncFromServer: async (pubkey: string, manager: any) => {
-        const { isSyncing } = get();
-        if (isSyncing) return get().mintUrls[pubkey] ?? NPC_DEFAULT_MINT_URL;
+      syncFromServer: async (pubkey, manager) => {
+        if (get().isSyncing) return getOrDefault(get().mintUrls, pubkey);
 
         set({ isSyncing: true });
         try {
           const npcApi = manager?.ext?.npc;
-          if (!npcApi) return get().mintUrls[pubkey] ?? NPC_DEFAULT_MINT_URL;
+          if (!npcApi) return getOrDefault(get().mintUrls, pubkey);
 
           const npcInfo = await npcApi.getInfo();
-          const mintUrl: string | undefined =
-            (npcInfo as any)?.mintUrl ?? (npcInfo as any)?.mint_url;
+          const mintUrl = npcInfo?.mintUrl ?? npcInfo?.mint_url;
 
           if (mintUrl) {
             set((state) => ({
@@ -83,22 +86,17 @@ export const useNpcMintStore = create<NpcMintStore>()(
             return mintUrl;
           }
 
-          return get().mintUrls[pubkey] ?? NPC_DEFAULT_MINT_URL;
+          return getOrDefault(get().mintUrls, pubkey);
         } catch (error) {
           console.warn('npcMintStore: syncFromServer failed, returning cached value:', error);
-          return get().mintUrls[pubkey] ?? NPC_DEFAULT_MINT_URL;
+          return getOrDefault(get().mintUrls, pubkey);
         } finally {
           set({ isSyncing: false });
         }
       },
 
-      updateServerMint: async (
-        pubkey: string,
-        newMintUrl: string,
-        privateKey: Uint8Array
-      ): Promise<boolean> => {
-        const { isUpdating } = get();
-        if (isUpdating) return false;
+      updateServerMint: async (pubkey, newMintUrl, privateKey) => {
+        if (get().isUpdating) return false;
 
         set({ isUpdating: true });
         try {

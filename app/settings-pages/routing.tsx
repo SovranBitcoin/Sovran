@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSettingsStore, type MiddlemanRoutingSettings } from 'stores/settingsStore';
 import Container from 'components/blocks/Container';
 import { withSheetProvider } from 'hocs/withSheetProvider';
@@ -39,9 +39,9 @@ function RoutingSettingsScreen() {
   return (
     <Container>
       <ScrollView
-        style={styles.scrollView}
+        className="px-4"
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.scrollContent}>
+        contentContainerStyle={{ paddingBottom: 32 }}>
         <Section title="Rebalancing">
           <VStack gap={12}>
             <Card variant="secondary">
@@ -190,9 +190,9 @@ function RoutingSettingsScreen() {
                       name="mdi:alert-circle-outline"
                       size={16}
                       color="#f59e0b"
-                      style={styles.warningIcon}
+                      style={{ marginTop: 2 }}
                     />
-                    <Text size={12} style={styles.warningText}>
+                    <Text size={12} className="flex-1" style={{ color: '#f59e0b' }}>
                       Untrusted mints will be temporarily trusted for the swap and untrusted
                       afterward. Your ecash passes through mints you have not verified. Only use
                       this with small amounts.
@@ -207,26 +207,5 @@ function RoutingSettingsScreen() {
     </Container>
   );
 }
-
-const styles = StyleSheet.create({
-  scrollView: {
-    paddingHorizontal: 16,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
-  card: {
-    borderRadius: 12,
-    borderCurve: 'continuous',
-    padding: 16,
-  },
-  warningIcon: {
-    marginTop: 2,
-  },
-  warningText: {
-    color: '#f59e0b',
-    flex: 1,
-  },
-});
 
 export default withSheetProvider(RoutingSettingsScreen);

@@ -6,9 +6,9 @@ const Container: React.FC<{
   children: React.ReactNode;
   style?: any;
   className?: string;
-}> = ({ children, style = {}, className }) => {
+}> = ({ children, style, className }) => {
   return (
-    <SafeAreaView style={{ flex: 1, ...style }} className={cn('bg-primary-950', className)}>
+    <SafeAreaView style={style} className={cn('bg-primary-950 flex-1', className)}>
       {children}
     </SafeAreaView>
   );

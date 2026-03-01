@@ -31,11 +31,7 @@ export const TransferSeparator = React.memo(({ failed, status }: TransferSeparat
   const effectiveStatus = status ?? (failed ? 'failed' : 'idle');
 
   const bgColor =
-    effectiveStatus === 'done'
-      ? green500
-      : effectiveStatus === 'failed'
-        ? red500
-        : accent;
+    effectiveStatus === 'done' ? green500 : effectiveStatus === 'failed' ? red500 : accent;
 
   const renderIcon = () => {
     switch (effectiveStatus) {

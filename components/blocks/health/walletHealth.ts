@@ -1,3 +1,5 @@
+import type { Mint } from 'coco-cashu-core';
+
 import { TOTAL_BASIS_POINTS } from 'stores/mintDistributionStore';
 
 type HealthSeverity = 'ok' | 'warn' | 'error' | 'info';
@@ -31,11 +33,11 @@ export interface WalletHealthResult {
  * we want a list of concrete, actionable checks that can grow over time.
  */
 
-function formatPctFromBp(bp: number): string {
+export function formatPctFromBp(bp: number): string {
   return `${(bp / 100).toFixed(0)}%`;
 }
 
-function normalizeBpLargestRemainder(
+export function normalizeBpLargestRemainder(
   mintUrls: string[],
   balances: Record<string, number>,
   total: number
@@ -78,6 +80,23 @@ function normalizeBpLargestRemainder(
     }
   }
   return out;
+}
+
+/**
+ * Filters trusted mints to those that support a given unit via NUT-4 methods.
+ * For 'sat', mints with no NUT-4 metadata are included (backwards-compat default).
+ */
+export function getMintsForUnit(trustedMints: Mint[], unit: string): Mint[] {
+  const u = unit.toLowerCase();
+  return trustedMints.filter((mint) => {
+    const methods = mint.mintInfo?.nuts?.['4']?.methods;
+    if (u === 'sat') {
+      if (!methods) return true;
+      return methods.some((m) => m.unit?.toLowerCase() === 'sat');
+    }
+    if (!methods) return false;
+    return methods.some((m) => m.unit?.toLowerCase() === u);
+  });
 }
 
 export function computeWalletHealth({

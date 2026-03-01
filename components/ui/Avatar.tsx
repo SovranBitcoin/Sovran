@@ -1,7 +1,9 @@
 import { Avatar as HeroAvatar } from 'heroui-native/avatar';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+
+import { UntranslatedText } from 'components/ui/Text';
 
 import Icon from 'assets/icons';
 import { VStack } from 'components/ui/View/VStack';
@@ -158,16 +160,16 @@ export const Avatar = ({
             />
           </View>
           {fallbackText ? (
-            <Text
+            <UntranslatedText
+              bold
               style={{
                 color: gradientTextColor,
-                fontWeight: '800',
               }}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.65}>
               {fallbackText}
-            </Text>
+            </UntranslatedText>
           ) : (
             <Icon
               name={fallbackIcon}

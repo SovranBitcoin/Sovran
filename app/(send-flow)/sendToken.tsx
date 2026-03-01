@@ -42,12 +42,6 @@ function ModalScreen() {
         paymentRequest={paymentRequestProp}
         initialNostrSent={params.nostrSent === 'true'}
         onNavigateBack={() => router.back()}
-        onNavigateToMessages={(pubkey) =>
-          router.navigate({
-            pathname: '/userMessages',
-            params: { pubkey },
-          })
-        }
       />
     </>
   );

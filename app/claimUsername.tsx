@@ -146,7 +146,14 @@ function DomainOption({
   onSelect: () => void;
   availabilityResult?: AvailabilityResult;
 }) {
-  const [foreground, muted, accent, defaultColor, surfaceSecondary, surface] = useThemeColor(['foreground', 'muted', 'accent', 'default', 'surface-secondary', 'surface'] as const);
+  const [foreground, muted, accent, defaultColor, surfaceSecondary, surface] = useThemeColor([
+    'foreground',
+    'muted',
+    'accent',
+    'default',
+    'surface-secondary',
+    'surface',
+  ] as const);
   const [danger, success] = useThemeColor(['danger', 'success'] as const);
 
   const getStatusInfo = () => {
@@ -171,9 +178,7 @@ function DomainOption({
       style={[
         styles.domainOption,
         {
-          backgroundColor: isSelected
-            ? opacity(accent, 0.15)
-            : surface,
+          backgroundColor: isSelected ? opacity(accent, 0.15) : surface,
           borderColor: isSelected ? accent : surfaceSecondary,
         },
       ]}>
@@ -182,26 +187,20 @@ function DomainOption({
           style={[
             styles.domainIcon,
             {
-              backgroundColor: isSelected
-                ? opacity(muted, 0.2)
-                : surfaceSecondary,
+              backgroundColor: isSelected ? opacity(muted, 0.2) : surfaceSecondary,
             },
           ]}>
           <Icon
             name="mingcute:lightning-fill"
             size={16}
-            color={
-              isSelected ? opacity(foreground, 0.4) : opacity(foreground, 0.33)
-            }
+            color={isSelected ? opacity(foreground, 0.4) : opacity(foreground, 0.33)}
           />
         </View>
         <Text
           size={15}
           heavy={isSelected}
           style={{
-            color: isSelected
-              ? opacity(foreground, 0.9)
-              : opacity(foreground, 0.5),
+            color: isSelected ? opacity(foreground, 0.9) : opacity(foreground, 0.5),
           }}>
           @{domain.label}
         </Text>
@@ -223,14 +222,8 @@ function DomainOption({
 
       {/* Selection indicator */}
       {!status && (
-        <View
-          style={[
-            styles.radioOuter,
-            { borderColor: isSelected ? accent : defaultColor },
-          ]}>
-          {isSelected && (
-            <View style={[styles.radioInner, { backgroundColor: accent }]} />
-          )}
+        <View style={[styles.radioOuter, { borderColor: isSelected ? accent : defaultColor }]}>
+          {isSelected && <View style={[styles.radioInner, { backgroundColor: accent }]} />}
         </View>
       )}
     </TouchableOpacity>
@@ -265,7 +258,13 @@ function generateNip98Auth(url: string, method: string, privateKey: Uint8Array):
 }
 
 function ClaimUsernameScreen() {
-  const [foreground, surfaceForeground, accent, surface, background] = useThemeColor(['foreground', 'surface-foreground', 'accent', 'surface', 'background'] as const);
+  const [foreground, surfaceForeground, accent, surface, background] = useThemeColor([
+    'foreground',
+    'surface-foreground',
+    'accent',
+    'surface',
+    'background',
+  ] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
   const hero = useHeroTransition();
   const insets = useSafeAreaInsets();
@@ -478,8 +477,8 @@ function ClaimUsernameScreen() {
             ]}>
             <ClaimUsernameCardFrame
               accentColor={accentColor}
-                backgroundColor={background}
-                highlightColor={surfaceForeground}>
+              backgroundColor={background}
+              highlightColor={surfaceForeground}>
               <VStack style={{ paddingHorizontal: 20, paddingBottom: 20, zIndex: 1 }}>
                 <HStack align="center" style={{ marginBottom: 14 }}>
                   <View
@@ -496,9 +495,7 @@ function ClaimUsernameScreen() {
                   </VStack>
                 </HStack>
 
-                <Text
-                  size={14}
-                  style={{ color: opacity(foreground, 0.5), marginBottom: 14 }}>
+                <Text size={14} style={{ color: opacity(foreground, 0.5), marginBottom: 14 }}>
                   Choose a memorable username for receiving Bitcoin.
                 </Text>
 
@@ -554,14 +551,8 @@ function ClaimUsernameScreen() {
                       { text: 'No spaces or special characters', icon: 'mdi:check' },
                     ].map((item, index) => (
                       <HStack key={index} align="center">
-                        <Icon
-                          name={item.icon}
-                          size={16}
-                          color={opacity(foreground, 0.33)}
-                        />
-                        <Text
-                          size={13}
-                          style={{ color: opacity(foreground, 0.4), marginLeft: 10 }}>
+                        <Icon name={item.icon} size={16} color={opacity(foreground, 0.33)} />
+                        <Text size={13} style={{ color: opacity(foreground, 0.4), marginLeft: 10 }}>
                           {item.text}
                         </Text>
                       </HStack>

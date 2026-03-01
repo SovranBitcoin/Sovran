@@ -25,12 +25,12 @@ import { useTransactionLocationSection } from '@/hooks/useTransactionLocationSec
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from 'hooks/useThemeColor';
+
 interface TransactionLocationSectionProps {
   /** The transaction's history entry ID */
   transactionId: string | undefined;
 }
 
-// Shared map UI settings (no gestures, no controls)
 const DISABLED_MAP_UI_SETTINGS = {
   compassEnabled: false,
   myLocationButtonEnabled: false,
@@ -41,13 +41,14 @@ const DISABLED_MAP_UI_SETTINGS = {
   rotationGesturesEnabled: false,
 };
 
-// Google Maps style JSON to hide all labels
 const GOOGLE_MAPS_NO_LABELS_STYLE = JSON.stringify([
   { featureType: 'all', elementType: 'labels', stylers: [{ visibility: 'off' }] },
   { featureType: 'poi', stylers: [{ visibility: 'off' }] },
   { featureType: 'transit', stylers: [{ visibility: 'off' }] },
 ]);
 const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+const MAP_CONTAINER_CN = 'mx-4 rounded-xl overflow-hidden h-[150px]';
 
 /**
  * Reusable grayscale + vignette overlay for maps
@@ -57,34 +58,39 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
 
   return (
     <>
-      {/* Base grayscale layers */}
-      <View style={mapStyles.grayscaleOverlay} pointerEvents="none" />
-      <View style={mapStyles.grayscaleOverlaySecondary} pointerEvents="none" />
-
-      {/* Optional blur for privacy placeholder */}
-      {withBlur && <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFillObject} />}
-
-      {/* Color blend overlays */}
       <View
-        style={[
-          StyleSheet.absoluteFillObject,
-          {
-            backgroundColor: opacity(surfaceSecondary, 0.35),
-            // @ts-ignore - mixBlendMode works on iOS
-            mixBlendMode: 'overlay',
-          },
-        ]}
+        className="absolute inset-0"
+        style={{
+          backgroundColor: 'black',
+          // @ts-ignore - mixBlendMode supported on iOS
+          mixBlendMode: 'saturation',
+        }}
         pointerEvents="none"
       />
       <View
-        style={[
-          StyleSheet.absoluteFillObject,
-          {
-            backgroundColor: opacity(surfaceSecondary, 1),
-            // @ts-ignore - mixBlendMode works on iOS
-            mixBlendMode: 'color',
-          },
-        ]}
+        className="absolute inset-0"
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.15)' }}
+        pointerEvents="none"
+      />
+
+      {withBlur && <BlurView intensity={10} tint="dark" style={StyleSheet.absoluteFillObject} />}
+
+      <View
+        className="absolute inset-0"
+        style={{
+          backgroundColor: opacity(surfaceSecondary, 0.35),
+          // @ts-ignore - mixBlendMode works on iOS
+          mixBlendMode: 'overlay',
+        }}
+        pointerEvents="none"
+      />
+      <View
+        className="absolute inset-0"
+        style={{
+          backgroundColor: opacity(surfaceSecondary, 1),
+          // @ts-ignore - mixBlendMode works on iOS
+          mixBlendMode: 'color',
+        }}
         pointerEvents="none"
       />
 
@@ -120,24 +126,22 @@ function MapGrayscaleOverlay({ withBlur = false }: { withBlur?: boolean }) {
 }
 
 /**
- * Privacy placeholder that hides the map until user taps to reveal
- * Shows a blurred, grayscale preview of a fake location to hint it's a map
+ * Privacy placeholder that hides the map until user taps to reveal.
+ * Shows a blurred, grayscale preview of a fake location to hint it's a map.
  */
 function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
   const foreground = useThemeColor('foreground');
   const isIOS = Platform.OS === 'ios';
 
-  // Fake location (somewhere generic) for the blurred preview
   const previewCameraPosition = {
-    coordinates: { latitude: 51.5074, longitude: -0.1278 }, // London
+    coordinates: { latitude: 51.5074, longitude: -0.1278 },
     zoom: 14,
   };
 
   return (
     <TouchableOpacity onPress={onReveal} activeOpacity={0.7}>
-      <View style={mapStyles.container}>
-        {/* Grayscale map preview - labels hidden for cleaner blur effect */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View className={MAP_CONTAINER_CN}>
+        <View className="absolute inset-0" pointerEvents="none">
           {isIOS ? (
             <AppleMaps.View
               style={StyleSheet.absoluteFillObject}
@@ -157,14 +161,13 @@ function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
               uiSettings={DISABLED_MAP_UI_SETTINGS}
             />
           ) : (
-            <View style={StyleSheet.absoluteFillObject} />
+            <View className="absolute inset-0" />
           )}
           <MapGrayscaleOverlay withBlur />
         </View>
 
-        {/* Content - centered overlay */}
-        <View style={StyleSheet.absoluteFill}>
-          <VStack align="center" justify="center" gap={6} style={{ flex: 1 }}>
+        <View className="absolute inset-0 items-center justify-center">
+          <VStack align="center" gap={6}>
             <Icon name="mdi:map-marker" size={24} color={opacity(foreground, 0.75)} />
             <Text heavy size={13} style={{ color: opacity(foreground, 0.75) }}>
               Tap to reveal location
@@ -177,8 +180,8 @@ function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
 }
 
 /**
- * Small map showing where the transaction was created
- * Uses a grayscale overlay for a muted appearance
+ * Small map showing where the transaction was created.
+ * Uses a grayscale overlay for a muted appearance.
  */
 function TransactionLocationMap({
   latitude,
@@ -207,7 +210,7 @@ function TransactionLocationMap({
   };
 
   return (
-    <View style={mapStyles.container} pointerEvents="none">
+    <View className={MAP_CONTAINER_CN} pointerEvents="none">
       {isIOS ? (
         <AppleMaps.View
           style={StyleSheet.absoluteFillObject}
@@ -226,7 +229,7 @@ function TransactionLocationMap({
           markers={markerConfig}
         />
       ) : (
-        <View style={StyleSheet.absoluteFillObject} />
+        <View className="absolute inset-0" />
       )}
       {grayscale && <MapGrayscaleOverlay />}
     </View>
@@ -234,44 +237,21 @@ function TransactionLocationMap({
 }
 
 /**
- * Main component that decides what to render based on location data availability
- * Returns null if no location data exists (setting disabled or not captured)
+ * Main component that decides what to render based on location data availability.
+ * Returns null if no location data exists (setting disabled or not captured).
  */
 export function TransactionLocationSection({ transactionId }: TransactionLocationSectionProps) {
   const { location, isRevealed, reveal } = useTransactionLocationSection(transactionId);
 
-  // No location data - render nothing
   if (!transactionId || !location) {
     return null;
   }
 
-  // Show privacy placeholder until user taps to reveal
   if (!isRevealed) {
     return <LocationPrivacyPlaceholder onReveal={reveal} />;
   }
 
-  // Show the map after reveal with grayscale effect
   return (
     <TransactionLocationMap latitude={location.latitude} longitude={location.longitude} grayscale />
   );
 }
-
-const mapStyles = StyleSheet.create({
-  container: {
-    marginHorizontal: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
-    height: 150,
-  },
-  grayscaleOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'black',
-    opacity: 1,
-    // @ts-ignore - mixBlendMode supported on iOS
-    mixBlendMode: 'saturation',
-  },
-  grayscaleOverlaySecondary: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-  },
-});

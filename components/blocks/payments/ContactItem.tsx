@@ -4,7 +4,6 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
-import { formatCustomDate } from 'helper/time';
 import { Link } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import { PUBLIC_KEYS } from '@/helper/constants';
@@ -40,16 +39,11 @@ const styles = {
     flex: 1,
   },
   profileName: {
-    fontFamily: 'OverpassBold',
-    fontSize: 16,
-  },
-  date: {
-    marginLeft: 8,
-    fontFamily: 'OverpassBold',
+    fontFamily: 'OxygenBold',
     fontSize: 16,
   },
   previewText: {
-    fontFamily: 'OverpassRegular',
+    fontFamily: 'OxygenRegular',
     fontSize: 16,
     marginTop: 2,
   },
@@ -89,12 +83,6 @@ export const ContactItem = React.memo(function ContactItem({
     prefetchImage(displayInfo.picture);
   }, [displayInfo.picture]);
 
-  // Format date (kept for future use when date display is re-enabled)
-  const _formattedDate = useMemo(() => {
-    if (!item.dmEvent?.created_at) return null;
-    return formatCustomDate(new Date(item.dmEvent.created_at * 1000));
-  }, [item.dmEvent?.created_at]);
-
   const linkHref = useMemo(
     () =>
       item.pubkey
@@ -125,21 +113,23 @@ export const ContactItem = React.memo(function ContactItem({
           />
         </VStack>
         <VStack style={styles.textContainer}>
-          <Text style={styles.profileName} className="text-foreground">
+          <Text
+            loading={isLoadingProfile}
+            placeholder="Contact Name"
+            style={styles.profileName}
+            className="text-foreground">
             {displayInfo.name}
           </Text>
-          <Text style={[styles.previewText, { color: opacity(foreground, 0.8) }]}>
+          <Text
+            loading={isLoadingProfile}
+            placeholder="Last message preview text"
+            style={[styles.previewText, { color: opacity(foreground, 0.8) }]}>
             {displayInfo.subtitle.length > 50
               ? `${displayInfo.subtitle.slice(0, 50)}...`
               : displayInfo.subtitle}
           </Text>
         </VStack>
       </HStack>
-      {/* {formattedDate && (
-        <Text style={styles.date} className="text-default-foreground">
-          {formattedDate}
-        </Text>
-      )} */}
     </HStack>
   );
 

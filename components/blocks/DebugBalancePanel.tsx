@@ -14,7 +14,7 @@ import { Text } from 'components/ui/Text';
 import { CocoManager } from 'helper/coco/manager';
 import type { CoreProof } from 'coco-cashu-core';
 import { useThemeColor } from 'hooks/useThemeColor';
-// ─── Types for the unsafe manager cast ───────────────────────────────────────
+import { useReservedProofs } from 'hooks/useReservedProofs';
 
 type UnsafeRepo = {
   getReadyProofs: (url: string) => Promise<CoreProof[]>;
@@ -52,8 +52,6 @@ type UnsafeManager = {
   sendOperationService?: { recoverPendingOperations: () => Promise<void> };
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 const sumProofs = (proofs: CoreProof[]): number => proofs.reduce((acc, p) => acc + p.amount, 0);
 
 function truncateUrl(url: string): string {
@@ -89,8 +87,6 @@ function groupByMint(
   return Array.from(map.entries());
 }
 
-// ─── Debug Balances Hook ─────────────────────────────────────────────────────
-
 interface DebugBalances {
   ready: number;
   available: number;
@@ -108,6 +104,7 @@ interface DebugBalances {
 function useDebugBalances(mints: { mintUrl: string }[]): DebugBalances | null {
   const manager = useManager();
   const { balance: liveBalances } = useBalanceContext();
+  const { reservedTotal, reservedProofs: liveReservedProofs } = useReservedProofs();
   const [debug, setDebug] = useState<DebugBalances | null>(null);
 
   useEffect(() => {
@@ -120,10 +117,9 @@ function useDebugBalances(mints: { mintUrl: string }[]): DebugBalances | null {
 
         const mintUrls = mints.map((m) => m.mintUrl);
 
-        const [readyPerMint, availablePerMint, allReserved, allInflight] = await Promise.all([
+        const [readyPerMint, availablePerMint, allInflight] = await Promise.all([
           Promise.all(mintUrls.map((url) => repo.getReadyProofs(url))),
           Promise.all(mintUrls.map((url) => repo.getAvailableProofs(url))),
-          repo.getReservedProofs(),
           repo.getInflightProofs(mintUrls),
         ]);
 
@@ -132,16 +128,14 @@ function useDebugBalances(mints: { mintUrl: string }[]): DebugBalances | null {
         setDebug({
           ready: readyPerMint.reduce((t, p) => t + sumProofs(p), 0),
           available: availablePerMint.reduce((t, p) => t + sumProofs(p), 0),
-          reserved: sumProofs(allReserved as CoreProof[]),
+          reserved: reservedTotal,
           inflight: sumProofs(allInflight),
-          reservedProofs: (allReserved as (CoreProof & { usedByOperationId?: string })[]).map(
-            (p) => ({
-              mintUrl: p.mintUrl,
-              secret: p.secret,
-              amount: p.amount,
-              usedByOperationId: p.usedByOperationId,
-            })
-          ),
+          reservedProofs: liveReservedProofs.map((p) => ({
+            mintUrl: p.mintUrl,
+            secret: p.secret,
+            amount: p.amount,
+            usedByOperationId: p.usedByOperationId,
+          })),
           inflightProofs: allInflight.map((p) => ({
             mintUrl: p.mintUrl,
             secret: p.secret,
@@ -157,12 +151,10 @@ function useDebugBalances(mints: { mintUrl: string }[]): DebugBalances | null {
     return () => {
       cancelled = true;
     };
-  }, [manager, mints, liveBalances]);
+  }, [manager, mints, liveBalances, reservedTotal, liveReservedProofs]);
 
   return debug;
 }
-
-// ─── Debug Operations Hook ───────────────────────────────────────────────────
 
 interface DebugOperations {
   meltOps: MeltOp[];
@@ -224,15 +216,6 @@ function useDebugOperations(expanded: boolean): DebugOperations | null {
   return ops;
 }
 
-// ─── Colours ─────────────────────────────────────────────────────────────────
-
-const PANEL_BG = 'rgba(0,0,0,0.55)';
-const ROW_BG = 'rgba(255,255,255,0.06)';
-const BTN_BG = 'rgba(255,255,255,0.10)';
-const WHITE60 = 'rgba(255,255,255,0.6)';
-const WHITE40 = 'rgba(255,255,255,0.4)';
-const WHITE = '#fff';
-
 const STATE_COLORS: Record<string, string> = {
   init: '#94a3b8',
   prepared: '#60a5fa',
@@ -243,8 +226,6 @@ const STATE_COLORS: Record<string, string> = {
   rolled_back: '#ef4444',
 };
 
-// ─── Public Component ────────────────────────────────────────────────────────
-
 export function DebugBalancePanel(): React.ReactElement | null {
   const { mints } = useMints();
   const [expanded, setExpanded] = useState(false);
@@ -254,31 +235,21 @@ export function DebugBalancePanel(): React.ReactElement | null {
   if (!debugBalances) return null;
 
   return (
-    <VStack gap={8} style={{ paddingHorizontal: 16, paddingTop: 4 }}>
-      {/* Summary badges — tap to expand */}
+    <VStack gap={8} className="px-4 pt-1">
       <TouchableOpacity onPress={() => setExpanded((v) => !v)} activeOpacity={0.7}>
-        <HStack
-          gap={12}
-          justify="center"
-          style={{
-            backgroundColor: PANEL_BG,
-            borderRadius: 8,
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-          }}>
+        <HStack gap={12} justify="center" className="bg-overlay/55 rounded-lg px-3 py-1.5">
           <DebugBadge label="Ready" value={debugBalances.ready} color="#4ade80" />
           <DebugBadge label="Avail" value={debugBalances.available} color="#60a5fa" />
           <DebugBadge label="Rsrvd" value={debugBalances.reserved} color="#facc15" />
           <DebugBadge label="Flight" value={debugBalances.inflight} color="#fb923c" />
           <VStack align="center" justify="center">
-            <Text size={10} style={{ color: WHITE40 }}>
+            <Text size={10} className="text-muted">
               {expanded ? '▲' : '▼'}
             </Text>
           </VStack>
         </HStack>
       </TouchableOpacity>
 
-      {/* Expanded panel */}
       {expanded && (
         <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator nestedScrollEnabled>
           <ExpandedPanel debugBalances={debugBalances} debugOps={debugOps} />
@@ -288,12 +259,10 @@ export function DebugBalancePanel(): React.ReactElement | null {
   );
 }
 
-// ─── Badge ───────────────────────────────────────────────────────────────────
-
 function DebugBadge({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <VStack align="center" gap={2}>
-      <Text size={9} weight="medium" style={{ color: WHITE60 }}>
+      <Text size={9} weight="medium" className="text-muted">
         {label}
       </Text>
       <Text size={11} weight="bold" style={{ color }}>
@@ -303,8 +272,6 @@ function DebugBadge({ label, value, color }: { label: string; value: number; col
   );
 }
 
-// ─── Expanded Panel ──────────────────────────────────────────────────────────
-
 function ExpandedPanel({
   debugBalances,
   debugOps,
@@ -312,7 +279,7 @@ function ExpandedPanel({
   debugBalances: DebugBalances;
   debugOps: DebugOperations | null;
 }) {
-  const [danger, success] = useThemeColor(['danger', 'success'] as const);
+  const [danger, success, muted] = useThemeColor(['danger', 'success', 'muted'] as const);
   const manager = useManager();
   const [busy, setBusy] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
@@ -333,8 +300,6 @@ function ExpandedPanel({
     },
     [busy]
   );
-
-  // ── Actions ──
 
   const handleFreeReserved = () =>
     runAction('free-reserved', async () => {
@@ -408,36 +373,20 @@ function ExpandedPanel({
       return `${opId.slice(0, 8)}… rolled back`;
     });
 
-  // ── Active (non-terminal) operations ──
   const activeStates = ['init', 'prepared', 'executing', 'pending', 'rolling_back'];
   const activeOps = debugOps ? activeStates.flatMap((s) => debugOps.meltOpsByState[s] ?? []) : [];
 
   return (
-    <VStack
-      gap={8}
-      style={{
-        backgroundColor: PANEL_BG,
-        borderRadius: 12,
-        padding: 12,
-      }}>
-      {/* ── Reserved proofs ── */}
+    <VStack gap={8} className="bg-overlay/55 rounded-xl p-3">
       {debugBalances.reservedProofs.length > 0 && (
         <VStack gap={4}>
           <Text size={10} weight="bold" style={{ color: '#facc15' }}>
             RESERVED PROOFS ({debugBalances.reservedProofs.length})
           </Text>
           {groupByOperation(debugBalances.reservedProofs).map(([opId, proofs]) => (
-            <HStack
-              key={opId}
-              gap={6}
-              align="center"
-              style={{
-                backgroundColor: ROW_BG,
-                borderRadius: 6,
-                padding: 6,
-              }}>
-              <VStack gap={1} style={{ flex: 1 }}>
-                <Text size={9} style={{ color: WHITE60 }}>
+            <HStack key={opId} gap={6} align="center" className="bg-foreground/6 rounded-md p-1.5">
+              <VStack gap={1} className="flex-1">
+                <Text size={9} className="text-muted">
                   op: {opId === 'none' ? '(orphan)' : opId.slice(0, 12) + '…'}
                 </Text>
                 <Text size={10} weight="bold" style={{ color: '#facc15' }}>
@@ -449,7 +398,6 @@ function ExpandedPanel({
         </VStack>
       )}
 
-      {/* ── Inflight proofs ── */}
       {debugBalances.inflightProofs.length > 0 && (
         <VStack gap={4}>
           <Text size={10} weight="bold" style={{ color: '#fb923c' }}>
@@ -460,13 +408,9 @@ function ExpandedPanel({
               key={mintUrl}
               gap={6}
               align="center"
-              style={{
-                backgroundColor: ROW_BG,
-                borderRadius: 6,
-                padding: 6,
-              }}>
-              <VStack gap={1} style={{ flex: 1 }}>
-                <Text size={9} style={{ color: WHITE60 }}>
+              className="bg-foreground/6 rounded-md p-1.5">
+              <VStack gap={1} className="flex-1">
+                <Text size={9} className="text-muted">
                   {truncateUrl(mintUrl)}
                 </Text>
                 <Text size={10} weight="bold" style={{ color: '#fb923c' }}>
@@ -478,42 +422,28 @@ function ExpandedPanel({
         </VStack>
       )}
 
-      {/* ── Active melt operations ── */}
       {activeOps.length > 0 && (
         <VStack gap={4}>
-          <Text size={10} weight="bold" style={{ color: WHITE }}>
+          <Text size={10} weight="bold" className="text-foreground">
             MELT OPERATIONS ({activeOps.length} active)
           </Text>
           {activeOps.map((op) => (
-            <VStack
-              key={op.id}
-              gap={4}
-              style={{
-                backgroundColor: ROW_BG,
-                borderRadius: 6,
-                padding: 6,
-              }}>
+            <VStack key={op.id} gap={4} className="bg-foreground/6 rounded-md p-1.5">
               <HStack gap={6} align="center">
-                <VStack gap={1} style={{ flex: 1 }}>
+                <VStack gap={1} className="flex-1">
                   <HStack gap={4} align="center">
-                    <Text
-                      size={9}
-                      weight="bold"
-                      style={{
-                        color: STATE_COLORS[op.state] ?? WHITE60,
-                      }}>
+                    <Text size={9} weight="bold" style={{ color: STATE_COLORS[op.state] ?? muted }}>
                       {op.state.toUpperCase()}
                     </Text>
-                    <Text size={9} style={{ color: WHITE40 }}>
+                    <Text size={9} className="text-foreground/40">
                       {op.id.slice(0, 12)}…
                     </Text>
                   </HStack>
-                  <Text size={9} style={{ color: WHITE40 }}>
+                  <Text size={9} className="text-foreground/40">
                     {truncateUrl(op.mintUrl)}
                   </Text>
                 </VStack>
               </HStack>
-              {/* Per-op actions */}
               <HStack gap={4}>
                 {op.state === 'pending' && (
                   <>
@@ -545,12 +475,11 @@ function ExpandedPanel({
         </VStack>
       )}
 
-      {/* ── Quick actions ── */}
       <VStack gap={4}>
-        <Text size={10} weight="bold" style={{ color: WHITE }}>
+        <Text size={10} weight="bold" className="text-foreground">
           RECOVERY ACTIONS
         </Text>
-        <HStack gap={4} style={{ flexWrap: 'wrap' }}>
+        <HStack gap={4} className="flex-wrap">
           <ActionChip
             label="Free Reserved"
             color="#facc15"
@@ -584,22 +513,17 @@ function ExpandedPanel({
         </HStack>
       </VStack>
 
-      {/* ── Last result ── */}
       {lastResult && (
         <Text
           size={9}
-          style={{
-            color: lastResult.startsWith('Error') ? danger : success,
-            textAlign: 'center',
-          }}>
+          className="text-center"
+          style={{ color: lastResult.startsWith('Error') ? danger : success }}>
           {lastResult}
         </Text>
       )}
     </VStack>
   );
 }
-
-// ─── Action Chip ─────────────────────────────────────────────────────────────
 
 function ActionChip({
   label,
@@ -616,12 +540,8 @@ function ActionChip({
     <TouchableOpacity
       onPress={onPress}
       disabled={busy}
+      className="bg-foreground/10 rounded-md border px-2 py-1"
       style={{
-        backgroundColor: BTN_BG,
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderWidth: 1,
         borderColor: color + '40',
         opacity: busy ? 0.5 : 1,
       }}>

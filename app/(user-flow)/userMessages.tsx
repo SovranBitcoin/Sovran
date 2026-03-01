@@ -14,12 +14,7 @@ import { UserMessagesScreen } from 'components/screens/UserMessagesScreen';
 function ModalScreen() {
   const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
 
-  // Handle back navigation within the flow
-  const handleBack = () => {
-    router.back();
-  };
-
-  return <UserMessagesScreen pubkey={pubkey} onBack={handleBack} isFlowContext />;
+  return <UserMessagesScreen pubkey={pubkey} onBack={() => router.back()} isFlowContext />;
 }
 
 export default withSheetProvider(ModalScreen);

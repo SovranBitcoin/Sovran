@@ -5,7 +5,7 @@
  * user's exact position. The offset is created once per app session (cold
  * start) and reused on every call, so the map doesn't jump between renders.
  *
- * Offset distance: 200 – 800 m in a random direction.
+ * Offset distance: 750 – 1 800 m in a random direction.
  */
 
 const MIN_DISTANCE_M = 750;

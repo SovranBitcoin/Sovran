@@ -27,6 +27,8 @@ export interface BitcoinPrices {
   EUR: number;
 }
 
+type SupportedCurrency = keyof PricelistData;
+
 interface PricelistActions {
   setPricelist: (data: PricelistData) => void;
   setBtcPrice: (price: number) => void;
@@ -35,7 +37,7 @@ interface PricelistActions {
   setError: (error: string | null) => void;
   clearPricelist: () => void;
   clearAllData: () => Promise<void>;
-  getBtcPrice: (currency?: string) => number | null;
+  getBtcPrice: (currency?: SupportedCurrency) => number | null;
   isStale: (maxAgeMinutes?: number) => boolean;
 }
 
@@ -44,13 +46,11 @@ type PricelistStore = PricelistState & PricelistActions;
 export const usePricelistStore = create<PricelistStore>()(
   persist(
     (set, get) => ({
-      // Initial state
       pricelist: null,
       isLoading: false,
       lastUpdated: null,
       error: null,
 
-      // Actions
       setPricelist: (data: PricelistData) => {
         set({
           pricelist: data,
@@ -59,29 +59,28 @@ export const usePricelistStore = create<PricelistStore>()(
         });
       },
 
+      /**
+       * Sets only the USD/BTC price, preserving existing EUR/GBP rates.
+       * Spread order: existing first, then usd override.
+       */
       setBtcPrice: (price: number) => {
-        const currentState = get();
-        const newPricelist: PricelistData = {
-          usd: { btc: price },
-          ...currentState.pricelist,
-        };
-
-        set({
-          pricelist: newPricelist,
+        set((state) => ({
+          pricelist: {
+            ...state.pricelist,
+            usd: { btc: price },
+          },
           lastUpdated: Date.now(),
           error: null,
-        });
+        }));
       },
 
       setBtcPrices: (prices: BitcoinPrices) => {
-        const newPricelist: PricelistData = {
-          usd: { btc: prices.USD },
-          eur: { btc: prices.EUR },
-          gbp: { btc: prices.GBP },
-        };
-
         set({
-          pricelist: newPricelist,
+          pricelist: {
+            usd: { btc: prices.USD },
+            eur: { btc: prices.EUR },
+            gbp: { btc: prices.GBP },
+          },
           lastUpdated: Date.now(),
           error: null,
         });
@@ -103,66 +102,43 @@ export const usePricelistStore = create<PricelistStore>()(
         });
       },
 
-      // Clear all data from both state and storage
       clearAllData: async () => {
-        try {
-          // Clear from AsyncStorage
-          await AsyncStorage.removeItem('pricelist-store');
-          // Reset state to initial values
-          set({
-            pricelist: null,
-            isLoading: false,
-            lastUpdated: null,
-            error: null,
-          });
-        } catch (error) {
-          throw error;
-        }
+        await AsyncStorage.removeItem('pricelist-store');
+        set({
+          pricelist: null,
+          isLoading: false,
+          lastUpdated: null,
+          error: null,
+        });
       },
 
-      getBtcPrice: (currency: string = 'usd') => {
-        const currentState = get();
-        if (!currentState.pricelist) return null;
-
-        const price = (currentState.pricelist as any)[currency]?.btc;
-        return price || null;
+      getBtcPrice: (currency: SupportedCurrency = 'usd') => {
+        const { pricelist } = get();
+        return pricelist?.[currency]?.btc ?? null;
       },
 
       isStale: (maxAgeMinutes: number = 5) => {
-        const currentState = get();
-        if (!currentState.lastUpdated) return true;
-
-        const ageMinutes = (Date.now() - currentState.lastUpdated) / (1000 * 60);
-        const isStale = ageMinutes > maxAgeMinutes;
-        return isStale;
+        const { lastUpdated } = get();
+        if (!lastUpdated) return true;
+        return (Date.now() - lastUpdated) / (1000 * 60) > maxAgeMinutes;
       },
     }),
     {
       name: 'pricelist-store',
       storage: createJSONStorage(() => AsyncStorage),
-      // Only persist the pricelist data and lastUpdated timestamp
       partialize: (state) => ({
         pricelist: state.pricelist,
         lastUpdated: state.lastUpdated,
       }),
-      onRehydrateStorage: () => (state, error) => {
-        console.log(
-          'PricelistStore: onRehydrateStorage called with state:',
-          state,
-          'error:',
-          error
-        );
+      onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('PricelistStore: Failed to rehydrate from storage:', error);
-        } else {
-          console.log('PricelistStore: Successfully rehydrated from storage:', state?.pricelist);
+          console.warn('PricelistStore: Failed to rehydrate:', error);
         }
       },
     }
   )
 );
 
-// Helper hook for easy access to BTC price
-export const useBtcPrice = (currency: string = 'usd') => {
+export const useBtcPrice = (currency: SupportedCurrency = 'usd') => {
   return usePricelistStore((state) => state.getBtcPrice(currency));
 };

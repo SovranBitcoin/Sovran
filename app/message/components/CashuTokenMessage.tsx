@@ -56,8 +56,7 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
   return (
     <View
       className={`relative my-2 w-full ${isReceived ? 'self-start' : 'self-end'}`}
-      style={{ minHeight: 120 }}
-    >
+      style={{ minHeight: 120 }}>
       <View
         className="absolute -bottom-1 h-2 w-2"
         style={{
@@ -76,7 +75,7 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
             maxWidth: '75%',
             minHeight: 100,
           }}>
-          <Text className="text-xs font-bold text-foreground opacity-75">{decoded.mint}</Text>
+          <Text className="text-foreground text-xs font-bold opacity-75">{decoded.mint}</Text>
 
           <HStack justify="space-between" className="mt-2">
             <VStack>
@@ -90,7 +89,7 @@ const CashuTokenComponent = ({ token, isReceived }: Props) => {
                 />
               )}
               {decoded.memo && (
-                <Text className="mt-2 rounded-lg bg-foreground/10 p-4 text-xs text-foreground">
+                <Text className="bg-foreground/10 text-foreground mt-2 rounded-lg p-4 text-xs">
                   {decoded.memo}
                 </Text>
               )}

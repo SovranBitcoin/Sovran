@@ -1,41 +1,9 @@
-/**
- * @fileoverview Custom numeric keyboard for amount entry
- *
- * ## Unit-Based Behavior
- *
- * ### Sats Mode (`unit === 'sat'`)
- * - No decimal point button shown
- * - Leading zeros not allowed (typing "0" is blocked)
- * - Integer-only input
- *
- * ### Fiat Mode (`unit !== 'sat'`)
- * - Decimal point button shown
- * - Maximum 2 decimal places enforced
- * - Special zero handling (see below)
- *
- * ## Fiat Zero Replacement
- *
- * When current value is exactly "0" and user types a digit (not decimal):
- * - The zero is REPLACED, not appended
- * - Prevents invalid inputs like "05", "07", etc.
- * - Keeps input stack clean (backspace won't reveal stale zero)
- *
- * | Current | User Types | Result | Why                              |
- * |---------|------------|--------|----------------------------------|
- * | `0`     | `.`        | `0.`   | Valid: starting decimal entry    |
- * | `0`     | `5`        | `5`    | Zero replaced (not "05")         |
- * | `0.`    | `5`        | `0.5`  | Normal append after decimal      |
- * | `12`    | `0`        | `120`  | Normal append (not leading zero) |
- *
- * @see CurrencyScreen - for full fiat input display behavior documentation
- */
-
 import React, { useState, useCallback, memo } from 'react';
-import { View, TouchableOpacity } from 'react-native';
+import { View } from 'components/ui/View/View';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import Icon from 'assets/icons';
 import { EnhancedHaptics } from 'components/ui/Haptics';
 import { Text } from 'components/ui/Text';
-import { useThemeColor } from 'hooks/useThemeColor';
 
 interface CustomKeyboardProps {
   onKeyPress: (value: string) => void;
@@ -52,60 +20,40 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   loading = false,
   compact = false,
 }) => {
-  const [, setInputValue] = useState<string>('');
-  const background = useThemeColor('background');
+  const [, setInputValue] = useState('');
 
   const handlePress = useCallback(
     (value: KeyboardValue) => {
-      setInputValue((prevInputValue) => {
-        const stringValue = String(value);
-        let newValue: string;
+      setInputValue((prev) => {
+        const str = String(value);
+        let next: string;
 
-        if (stringValue === '<') {
+        if (str === '<') {
           EnhancedHaptics.actionHaptic();
-          newValue = prevInputValue.slice(0, -1);
+          next = prev.slice(0, -1);
+        } else if (unit !== 'sat' && prev === '0' && str !== '.') {
+          EnhancedHaptics.buttonHaptic();
+          next = str;
         } else {
           EnhancedHaptics.buttonHaptic();
-
-          // In fiat mode: if current value is exactly "0" and user types a digit (not decimal),
-          // replace the 0 instead of appending (so typing "5" gives "5", not "05")
-          if (unit !== 'sat' && prevInputValue === '0' && stringValue !== '.') {
-            newValue = stringValue;
-          } else {
-            newValue = prevInputValue + stringValue;
-          }
+          next = prev + str;
         }
 
-        // Validation rules
-        if (newValue.startsWith('.')) {
-          return prevInputValue;
+        if (next.startsWith('.')) return prev;
+        if ((next.match(/\./g) || []).length > 1) return prev;
+
+        if (next.startsWith('0')) {
+          if (unit === 'sat') return prev;
+          if (next.startsWith('00')) return prev;
         }
 
-        const dotCount = (newValue.match(/\./g) || []).length;
-        if (dotCount > 1) {
-          return prevInputValue;
-        }
-
-        // Handle zeros based on unit type
-        if (newValue.startsWith('0')) {
-          // In integer mode (sats), don't allow any leading zeros
-          if (unit === 'sat') {
-            return prevInputValue;
-          }
-          // In decimal mode, only prevent multiple leading zeros
-          else if (newValue.startsWith('00')) {
-            return prevInputValue;
-          }
-        }
-
-        // Handle decimal precision
-        const parts = newValue.split('.');
+        const parts = next.split('.');
         if (parts[1] && parts[1].length > 2) {
-          newValue = `${parts[0]}.${parts[1].slice(0, 2)}`;
+          next = `${parts[0]}.${parts[1].slice(0, 2)}`;
         }
 
-        onKeyPress(newValue);
-        return newValue;
+        onKeyPress(next);
+        return next;
       });
     },
     [onKeyPress, unit]
@@ -115,11 +63,8 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
     (value: KeyboardValue) => (
       <TouchableOpacity
         key={String(value)}
-        className="mx-0.5 w-1/3 items-center justify-center overflow-hidden"
-        style={{
-          backgroundColor: background,
-          opacity: loading ? 0.5 : 1,
-        }}
+        className="bg-background mx-0.5 w-1/3 items-center justify-center overflow-hidden"
+        style={{ opacity: loading ? 0.5 : 1 }}
         disabled={loading}
         onPress={() => handlePress(value)}>
         {value === '<' ? (
@@ -128,18 +73,14 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
           <Text
             size={compact ? 22 : 24}
             bold
-            overpass
-            style={{
-              padding: compact ? 14 : 16,
-              paddingHorizontal: compact ? 22 : 24,
-              color: 'white',
-            }}>
+            color="white"
+            style={{ padding: compact ? 14 : 16, paddingHorizontal: compact ? 22 : 24 }}>
             {value}
           </Text>
         )}
       </TouchableOpacity>
     ),
-    [compact, handlePress, loading, background]
+    [compact, handlePress, loading]
   );
 
   const buttons: KeyboardValue[][] = [

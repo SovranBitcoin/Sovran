@@ -1,15 +1,15 @@
 import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 
 /**
- * Provides scroll position tracking for list/scroll components.
- * Use with LegendList/ScrollView onScroll for scroll-aware close animations.
+ * Scroll position tracking via Reanimated shared value.
+ * Stays on the UI thread — no JS re-renders during scroll.
  */
 export function useScrollViewOffset() {
   const scrollOffsetY = useSharedValue(0);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
-      scrollOffsetY.value = event.contentOffset.y;
+      scrollOffsetY.set(event.contentOffset.y);
     },
   });
 

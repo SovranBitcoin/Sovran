@@ -292,6 +292,8 @@ export const icons: string[] = [
   'mdi:qrcode-scan',
   'mdi:refresh',
   'mdi:send',
+  'mdi:broadcast',
+  'mdi:shield-check',
   'mdi:shield-refresh',
   'mdi:skip-next',
   'mdi:swap-horizontal',
@@ -309,7 +311,11 @@ export const icons: string[] = [
 ];
 
 export function BitcoinMaskIcon() {
-  const [surfaceSecondary, surfaceTertiary, surface] = useThemeColor(['surface-secondary', 'surface-tertiary', 'surface'] as const);
+  const [surfaceSecondary, surfaceTertiary, surface] = useThemeColor([
+    'surface-secondary',
+    'surface-tertiary',
+    'surface',
+  ] as const);
 
   return (
     <Svg width="150" height="150" viewBox="0 0 158 158" fill="none">
@@ -332,7 +338,11 @@ export function BitcoinMaskIcon() {
 }
 
 export function DollarMaskIcon() {
-  const [surfaceSecondary, surfaceTertiary, surface] = useThemeColor(['surface-secondary', 'surface-tertiary', 'surface'] as const);
+  const [surfaceSecondary, surfaceTertiary, surface] = useThemeColor([
+    'surface-secondary',
+    'surface-tertiary',
+    'surface',
+  ] as const);
 
   return (
     <Svg width="150" height="150" viewBox="0 0 158 158" fill="none">
@@ -355,7 +365,11 @@ export function DollarMaskIcon() {
 }
 
 export function EuroMaskIcon() {
-  const [surfaceSecondary, surfaceTertiary, surface] = useThemeColor(['surface-secondary', 'surface-tertiary', 'surface'] as const);
+  const [surfaceSecondary, surfaceTertiary, surface] = useThemeColor([
+    'surface-secondary',
+    'surface-tertiary',
+    'surface',
+  ] as const);
 
   return (
     <Svg width="158" height="158" viewBox="0 0 158 158" fill="none">
@@ -378,7 +392,11 @@ export function EuroMaskIcon() {
 }
 
 export function PoundMaskIcon() {
-  const [surfaceSecondary, surfaceTertiary, surface] = useThemeColor(['surface-secondary', 'surface-tertiary', 'surface'] as const);
+  const [surfaceSecondary, surfaceTertiary, surface] = useThemeColor([
+    'surface-secondary',
+    'surface-tertiary',
+    'surface',
+  ] as const);
 
   return (
     <Svg width="158" height="158" viewBox="0 0 158 158" fill="none">
@@ -452,8 +470,16 @@ export function CurrencyIcon({
   currency?: string;
   colors?: string[];
 }) {
-  const [foreground, surfaceForeground, defaultForeground] = useThemeColor(['foreground', 'surface-foreground', 'default-foreground'] as const);
-  const [shade200, shade300, shade400] = useThemeColor(['shade-200', 'shade-300', 'shade-400'] as const);
+  const [foreground, surfaceForeground, defaultForeground] = useThemeColor([
+    'foreground',
+    'surface-foreground',
+    'default-foreground',
+  ] as const);
+  const [shade200, shade300, shade400] = useThemeColor([
+    'shade-200',
+    'shade-300',
+    'shade-400',
+  ] as const);
   const gradientColors = colors ?? [shade200, shade300, shade300];
 
   if (currency === 'eur') {

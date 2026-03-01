@@ -1,16 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
+
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+
 import {
   isCashuRecommendationEvent,
   extractMintUrlFromEvent,
   parseRecommendation,
   type NostrEvent,
 } from 'helper/nostrClient';
+import { normalizeMintUrlKey } from 'helper/url';
 import { useKYMMintStore } from 'stores/kymMintStore';
 
-/**
- * Individual recommendation for a mint from Nostr
- */
 export interface MintRecommendation {
   score: number;
   comment: string;
@@ -19,9 +19,6 @@ export interface MintRecommendation {
   created_at: number;
 }
 
-/**
- * KYM score data for a single mint
- */
 interface KYMMintData {
   score: number;
   recommendations: MintRecommendation[];
@@ -32,29 +29,6 @@ interface UseKYMMintsResult {
   loading: boolean;
   error: string | null;
 }
-
-/**
- * Helper function to normalize URLs for comparison
- * Removes protocol (http/https), www prefix, trailing slash
- * Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
- */
-const normalizeUrl = (url: string): string => {
-  const withoutProtocol = url.replace(/^https?:\/\//, '');
-  const slashIndex = withoutProtocol.indexOf('/');
-  if (slashIndex === -1) {
-    // No path, just domain
-    return withoutProtocol
-      .toLowerCase()
-      .replace(/^www\./, '')
-      .replace(/\/$/, '');
-  }
-  const domain = withoutProtocol
-    .slice(0, slashIndex)
-    .toLowerCase()
-    .replace(/^www\./, '');
-  const path = withoutProtocol.slice(slashIndex).replace(/\/$/, '');
-  return domain + path;
-};
 
 /**
  * Hook to fetch Nostr-based rating data for multiple mint URLs in a single subscription
@@ -84,7 +58,7 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
 
   // Normalize mint URLs for comparison
   const normalizedMintUrls = useMemo(() => {
-    return new Set(mintUrls.map((url) => normalizeUrl(url)));
+    return new Set(mintUrls.map((url) => normalizeMintUrlKey(url)));
   }, [mintUrls]);
 
   // Subscribe to ALL kind 38000 recommendation events (filter client-side)
@@ -162,7 +136,7 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
         const mintUrl = extractMintUrlFromEvent(event as NostrEvent);
         if (!mintUrl) return;
 
-        const normalized = normalizeUrl(mintUrl);
+        const normalized = normalizeMintUrlKey(mintUrl);
 
         // Filter by our target mint URLs
         if (!normalizedMintUrls.has(normalized)) return;

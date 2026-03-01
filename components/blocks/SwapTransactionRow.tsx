@@ -34,15 +34,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
 
   return (
     <TouchableOpacity
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: 'transparent',
-        padding: 20,
-        paddingLeft: 16,
-        paddingRight: 16,
-      }}
+      className="flex-row items-center justify-between bg-transparent px-4 py-5"
       onPress={handlePress}>
       <HStack spacing={12} flex={1}>
         <View className="relative h-7 w-7 items-center justify-center bg-transparent">
@@ -60,7 +52,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
           </HStack>
 
           <HStack justify="space-between" align="center">
-            <UntranslatedText regular size={10} color={opacity(foreground, 0.8)}>
+            <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
               {convertTime(new Date(group.createdAt))}
             </UntranslatedText>
             <UntranslatedText bold size={10} color={opacity(foreground, 0.8)}>

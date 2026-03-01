@@ -26,12 +26,7 @@ import { useWindowDimensions } from 'react-native';
 import { useThemeColor } from 'hooks/useThemeColor';
 
 const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-list'>) => {
-  const [foreground, muted, surfaceSecondary, surfaceTertiary] = useThemeColor([
-    'foreground',
-    'muted',
-    'surface-secondary',
-    'surface-tertiary',
-  ] as const);
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const payload = useSheetPayload('profile-switcher');
   const profiles = useProfileStore((s) => s.profiles);
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
@@ -39,7 +34,6 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
 
   const handleSwitch = (accountIndex: number) => {
     router?.close();
-    // Small delay to let the sheet close animation start before triggering the switch
     setTimeout(() => {
       payload.onSwitchProfile(accountIndex);
     }, 100);
@@ -54,59 +48,34 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
 
   return (
     <View
-      style={{
-        marginHorizontal: 16,
-        marginBottom: 12,
-        borderRadius: 20,
-        overflow: 'hidden',
-        backgroundColor: surfaceSecondary,
-        borderWidth: 1,
-        borderColor: opacity(muted, 0.2),
-      }}>
+      className="bg-surface-secondary mx-4 mb-3 overflow-hidden rounded-[20px] border"
+      style={{ borderColor: opacity(muted, 0.2) }}>
       <ScrollView
-        style={{
-          maxHeight: screenHeight * 0.6,
-          backgroundColor: surfaceTertiary,
-        }}
-        contentContainerStyle={{
-          padding: 16,
-        }}
+        style={{ maxHeight: screenHeight * 0.6 }}
+        contentContainerStyle={{ padding: 16 }}
         showsVerticalScrollIndicator>
         <VStack>
-          {/* Profile list */}
           {profiles.map((profile) => {
             const isActive = profile.accountIndex === activeAccountIndex;
             const username = getUsername(profile.pubkey);
             return (
               <TouchableOpacity
                 key={profile.accountIndex}
+                className="mb-2 rounded-[14px] p-2"
                 style={{
                   opacity: isActive ? 1 : 0.92,
-                  marginBottom: 8,
-                  borderRadius: 14,
-                  paddingHorizontal: 8,
-                  paddingVertical: 8,
                   backgroundColor: isActive ? opacity(muted, 0.16) : 'transparent',
                 }}
                 onPress={() => handleSwitch(profile.accountIndex)}
                 disabled={isActive}>
                 <HStack align="center" spacing={12}>
                   <View
-                    style={{
-                      borderRadius: 24,
-                      borderWidth: 2,
-                      borderColor: isActive ? muted : 'transparent',
-                      padding: 2,
-                    }}>
+                    className="rounded-3xl border-2 p-0.5"
+                    style={{ borderColor: isActive ? muted : 'transparent' }}>
                     <Avatar seed={profile.pubkey} name={username} size={40} variant="person" />
                   </View>
-                  <VStack spacing={2} style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        color: foreground,
-                      }}
-                      size={16}
-                      weight="bold">
+                  <VStack spacing={2} className="flex-1">
+                    <Text className="text-foreground" size={16} weight="bold">
                       {username}
                     </Text>
                     {profile.cachedBalanceSats != null ? (
@@ -124,11 +93,7 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
                     )}
                   </VStack>
                   {isActive && (
-                    <Icon
-                      name="mdi:check-circle"
-                      size={22}
-                      color={opacity(foreground, 0.4)}
-                    />
+                    <Icon name="mdi:check-circle" size={22} color={opacity(foreground, 0.4)} />
                   )}
                 </HStack>
               </TouchableOpacity>
@@ -136,39 +101,16 @@ const ProfileList = ({ router }: RouteScreenProps<'profile-switcher', 'profile-l
           })}
         </VStack>
       </ScrollView>
-      <View
-        style={{
-          backgroundColor: surfaceTertiary,
-          paddingHorizontal: 16,
-          paddingTop: 8,
-          paddingBottom: 16,
-        }}>
-        <View
-          style={{
-            height: 1,
-            backgroundColor: opacity(muted, 0.15),
-            marginBottom: 12,
-          }}
-        />
+      <View className="bg-surface-tertiary px-4 pb-4 pt-2">
+        <View className="mb-3 h-px" style={{ backgroundColor: opacity(muted, 0.15) }} />
         <TouchableOpacity onPress={handleAddProfile}>
           <HStack align="center" spacing={12}>
             <View
-              style={{
-                backgroundColor: opacity(muted, 0.2),
-                borderRadius: 24,
-                width: 44,
-                height: 44,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
+              className="h-11 w-11 items-center justify-center rounded-3xl"
+              style={{ backgroundColor: opacity(muted, 0.2) }}>
               <Icon name="fluent:add-24-filled" size={24} color={foreground} />
             </View>
-            <Text
-              style={{
-                color: foreground,
-              }}
-              size={16}
-              weight="bold">
+            <Text className="text-foreground" size={16} weight="bold">
               New Profile
             </Text>
           </HStack>

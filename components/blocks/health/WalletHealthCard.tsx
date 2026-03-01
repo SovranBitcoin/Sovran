@@ -1,16 +1,7 @@
 import React, { useMemo, useCallback, useRef } from 'react';
 import { StyleSheet, View as RNView } from 'react-native';
+
 import opacity from 'hex-color-opacity';
-import { View } from 'components/ui/View/View';
-import { HStack } from 'components/ui/View/HStack';
-import { VStack } from 'components/ui/View/VStack';
-import { Text } from 'components/ui/Text';
-import Icon from 'assets/icons';
-import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
-import { useMintDistributionStore } from 'stores/mintDistributionStore';
-import { WalletHealthCardFrame } from './WalletHealthCardFrame';
-import { computeWalletHealth } from './walletHealth';
-import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -19,21 +10,18 @@ import Animated, {
   interpolate,
   runOnJS,
 } from 'react-native-reanimated';
+
+import Icon from 'assets/icons';
+import { Text } from 'components/ui/Text';
+import { HStack } from 'components/ui/View/HStack';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
+import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { useThemeColor } from 'hooks/useThemeColor';
 
-function getMintsForUnit(trustedMints: any[], unit: string) {
-  const u = unit.toLowerCase();
-  return trustedMints.filter((mint) => {
-    if (u === 'sat') {
-      if (!mint.mintInfo?.nuts?.['4']?.methods) return true;
-      return mint.mintInfo.nuts['4'].methods.some(
-        (method: any) => method.unit?.toLowerCase() === 'sat'
-      );
-    }
-    if (!mint.mintInfo?.nuts?.['4']?.methods) return false;
-    return mint.mintInfo.nuts['4'].methods.some((method: any) => method.unit?.toLowerCase() === u);
-  });
-}
+import { useWalletHealthData } from './useWalletHealthData';
+import { computeWalletHealth } from './walletHealth';
+import { WalletHealthCardFrame } from './WalletHealthCardFrame';
 
 function chipIconName(label: string): string {
   const key = label.toLowerCase();
@@ -58,41 +46,26 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
   const accentColor = shade300;
   const hero = useHeroTransition();
 
-  const { trustedMints } = useMints();
-  const { balance } = useBalanceContext();
-  const { history } = usePaginatedHistory();
-  const distributions = useMintDistributionStore((s) => s.distributions);
+  const { normalizedUnit, balance, mintUrlsForUnit, desiredDistributionBp, pendingOutgoingCount } =
+    useWalletHealthData(defaultUnit);
 
-  const unit = defaultUnit.toLowerCase();
-  const cardRef = useRef<any>(null);
-  const mintsForUnit = useMemo(() => getMintsForUnit(trustedMints, unit), [trustedMints, unit]);
-  const mintUrlsForUnit = useMemo(() => mintsForUnit.map((m: any) => m.mintUrl), [mintsForUnit]);
-
-  const pendingOutgoingCount = useMemo(() => {
-    return history.filter(
-      (entry: any) =>
-        entry.type === 'send' &&
-        (entry.state === 'pending' || entry.state === 'prepared') &&
-        (entry.unit?.toLowerCase?.() || 'sat') === unit
-    ).length;
-  }, [history, unit]);
+  const cardRef = useRef<RNView>(null);
 
   const health = useMemo(() => {
     return computeWalletHealth({
-      unit,
+      unit: normalizedUnit,
       mintUrlsForUnit,
-      balancesByMintUrl: balance as any,
-      desiredDistributionBp: distributions[unit] || {},
+      balancesByMintUrl: balance,
+      desiredDistributionBp,
       pendingOutgoingCount,
     });
-  }, [unit, mintUrlsForUnit, balance, distributions, pendingOutgoingCount]);
+  }, [normalizedUnit, mintUrlsForUnit, balance, desiredDistributionBp, pendingOutgoingCount]);
 
   const handlePress = useCallback(() => {
     hero.registerRef('walletHealth', 'source', cardRef.current);
-    hero.startWalletHealth(unit);
-  }, [hero, unit]);
+    hero.startWalletHealth(normalizedUnit);
+  }, [hero, normalizedUnit]);
 
-  // Animated press state: GPU-accelerated scale + opacity (skill 3.3 / 7.1)
   const pressed = useSharedValue(0);
 
   const tap = Gesture.Tap()
@@ -117,7 +90,6 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
         <RNView
           ref={cardRef}
           onLayout={() => hero.registerRef('walletHealth', 'source', cardRef.current)}
-          // Keep a real native view node for shared transitions (avoid RN view-flattening).
           collapsable={false}
           shouldRasterizeIOS
           renderToHardwareTextureAndroid
@@ -132,7 +104,7 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
             accentColor={accentColor}
             backgroundColor={primary950}
             highlightColor={primary50}>
-            <VStack style={{ padding: 18 }}>
+            <VStack className="p-4.5">
               <HStack align="center" justify="space-between">
                 <HStack align="center" gap={10}>
                   <View style={[styles.iconBox, { backgroundColor: opacity(accentColor, 0.16) }]}>
@@ -142,7 +114,7 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
                     <Text size={16} heavy style={{ color: primary50 }}>
                       Wallet health
                     </Text>
-                    <HStack align="center" gap={8} style={{ marginTop: 6 }}>
+                    <HStack align="center" gap={8} className="mt-1.5">
                       <View
                         style={[
                           styles.unitPill,
@@ -152,7 +124,7 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
                           },
                         ]}>
                         <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
-                          {unit.toUpperCase()}
+                          {normalizedUnit.toUpperCase()}
                         </Text>
                       </View>
                       <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
@@ -164,11 +136,9 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
                 <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
               </HStack>
 
-              {/* Status row - styled like “Easy to share / Scannable QR” */}
-              <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
+              <HStack align="center" className="mt-3.5 flex-wrap gap-4">
                 {health.chips.map((chip) => {
                   const iconName = chipIconName(chip.label);
-                  // On this red/heart card: use white for “Balanced”, and red accent for everything else.
                   const isBalanced = chip.label.toLowerCase().includes('balanced');
                   const displayColor = isBalanced
                     ? opacity(primary50, 0.85)
@@ -184,7 +154,6 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
                 })}
               </HStack>
 
-              {/* Subtle CTA row */}
               <View
                 style={[
                   styles.cta,
@@ -195,7 +164,6 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
                 ]}>
                 <HStack align="center" justify="space-between">
                   <HStack align="center" gap={8}>
-                    {/* Use an icon already included in metro.config.js */}
                     <Icon
                       name="material-symbols:info-rounded"
                       size={16}

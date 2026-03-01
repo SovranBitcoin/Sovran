@@ -57,7 +57,12 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   animate: animateProp = false,
   variant: _variant = 'primary',
 }: AnimatedQRCodeProps) {
-  const [foreground, surfaceTertiary, shade200, shade300] = useThemeColor(['foreground', 'surface-tertiary', 'shade-200', 'shade-300'] as const);
+  const [foreground, surfaceTertiary, shade200, shade300] = useThemeColor([
+    'foreground',
+    'surface-tertiary',
+    'shade-200',
+    'shade-300',
+  ] as const);
   const { width: screenWidth } = useWindowDimensions();
 
   const [index, setIndex] = useState(0);
@@ -153,20 +158,11 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
               alignItems: 'center',
               padding: 20,
             }}>
-            <Icon
-              name="ri:error-warning-line"
-              size={48}
-              color={opacity(foreground, 0.5)}
-            />
+            <Icon name="ri:error-warning-line" size={48} color={opacity(foreground, 0.5)} />
           </View>
         ) : canRenderQR ? (
           // Normal QR code render
-          <EQRCode
-            color={foreground}
-            backgroundColor="transparent"
-            value={qrData}
-            size={qrSize}
-          />
+          <EQRCode color={foreground} backgroundColor="transparent" value={qrData} size={qrSize} />
         ) : (
           // Fallback: data too large and couldn't be encoded
           <View

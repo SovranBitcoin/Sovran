@@ -445,7 +445,10 @@ const AIModelCard = ({ model }: { model: RoutstrModel }) => {
 
 // Map Teaser Card
 const MapTeaserCard = () => {
-  const [foreground, surfaceSecondary] = useThemeColor(['foreground', 'surface-secondary'] as const);
+  const [foreground, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+  ] as const);
   const { placesCache, fetchPlaces } = useBTCMapStore(
     useShallow((s) => ({ placesCache: s.placesCache, fetchPlaces: s.fetchPlaces }))
   );
@@ -779,7 +782,6 @@ const LightningAddressCard = () => {
                       />
                       <Text
                         size={13}
-                        mono
                         style={{ color: opacity(accentColor, 0.7) }}
                         numberOfLines={1}>
                         {currentAddress}
@@ -832,10 +834,10 @@ const LightningAddressCard = () => {
                         color="#22c55e"
                         style={{ marginRight: 8 }}
                       />
-                      <Text size={14} mono style={{ color: opacity(foreground, 0.9) }}>
+                      <Text size={14} style={{ color: opacity(foreground, 0.9) }}>
                         satoshi
                       </Text>
-                      <Text size={14} mono style={{ color: opacity(accentColor, 0.7) }}>
+                      <Text size={14} style={{ color: opacity(accentColor, 0.7) }}>
                         @npubx.cash
                       </Text>
                     </View>
@@ -899,7 +901,11 @@ const LightningAddressCard = () => {
 // Pending Ecash Card - Shows pending send operations that can be reclaimed
 // Styled to match WalletHealthCard with a green color scheme + hero transition
 const PendingEcashCard = () => {
-  const [foreground, background, green400] = useThemeColor(['foreground', 'background', 'green-400'] as const);
+  const [foreground, background, green400] = useThemeColor([
+    'foreground',
+    'background',
+    'green-400',
+  ] as const);
   const { history } = usePaginatedHistory();
   const hero = useHeroTransition();
   const cardRef = useRef<any>(null);

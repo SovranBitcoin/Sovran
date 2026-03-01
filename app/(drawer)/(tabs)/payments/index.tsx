@@ -2,15 +2,14 @@ import { NDKEvent, NDKPrivateKeySigner, NDKUser, useSubscribe } from '@nostr-dev
 import { unwrapGiftWrap } from 'utils/nip17';
 import { Mint } from 'coco-cashu-core';
 import { SearchResult } from 'components/blocks/contacts';
-import { ContactItem } from 'components/blocks/payments';
 import { DraggableContactsList } from 'components/blocks/payments/DraggableContactsList';
-import { npubToPubkey } from 'components/blocks/Transaction';
+import { npubToPubkey } from 'helper/nostrClient';
 import { ScrollableGradientOverlay } from 'components/ui/BackgroundView';
 import { Tabs } from 'components/ui/Tabs';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
 import { router } from 'expo-router';
-import { searchUsers as apiSearchUsers, getRecommendedUsers, UserProfile } from 'helper/apiClient';
+import { searchUsers as apiSearchUsers, UserProfile } from 'helper/apiClient';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { useBackgroundConfig } from 'providers/BackgroundProvider';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
@@ -26,7 +25,6 @@ import {
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SkeletonContainer } from 'react-native-skeleton-component';
 import { usePaymentsSearch } from './_layout';
 import { LayoutDebugWrapper } from '../example';
 import { NoResultsFound } from '@/components/blocks/contacts/NoResultsFound';
@@ -36,7 +34,6 @@ import { BlurCardFrame } from 'components/ui/BlurCardFrame';
 import opacity from 'hex-color-opacity';
 import { prefetchImages } from '@/helper/imageCache';
 
-// Define proper types
 interface SearchResultData {
   pubkey: string;
   profile: UserProfile;
@@ -49,19 +46,6 @@ interface PlaceholderResult {
 
 type DisplayResult = SearchResultData | PlaceholderResult;
 
-const LOG_PREFIX = '[Page.Payments]';
-const logPayments = (...args: any[]) => {
-  console.log(LOG_PREFIX, ...args);
-};
-
-// Memoized ContactItem to prevent unnecessary re-renders
-const RenderItem = React.memo(({ item }: { item: any }) => {
-  return <ContactItem item={item} />;
-});
-
-RenderItem.displayName = 'RenderItem';
-
-// Memoized SearchResultItem to prevent unnecessary re-renders
 const SearchResultItem = React.memo(
   ({
     result,
@@ -82,7 +66,6 @@ const SearchResultItem = React.memo(
 
 SearchResultItem.displayName = 'SearchResultItem';
 
-// Default contacts that should always appear in Recent activity
 const DEFAULT_CONTACTS = [
   {
     npub: 'npub1ref7jqxrh0z74554y900ufajer2lh52lk0wczrdrqcm8fjmjzweqll64x3',
@@ -94,109 +77,95 @@ const DEFAULT_CONTACTS = [
   },
 ];
 
+const PLACEHOLDER_RESULTS: PlaceholderResult[] = Array.from({ length: 6 }, (_, i) => ({
+  pubkey: `placeholder-${i}`,
+}));
+
+const TABS = ['Recent activity', 'Mints'];
+
+/**
+ * Decrypt NIP-04 DM events for a list of items sharing { pubkey, dmEvent, nip17Content? }.
+ * NIP-17 messages are already decrypted during unwrapping and passed through via nip17Content.
+ */
+async function decryptNip04Events<
+  T extends { pubkey: string | null; dmEvent?: any; nip17Content?: string },
+>(items: T[], privateKey: Uint8Array): Promise<T[]> {
+  const signer = new NDKPrivateKeySigner(privateKey);
+  const results: T[] = [];
+
+  for (const item of items) {
+    try {
+      if (item.nip17Content !== undefined) {
+        results.push({ ...item, dmEvent: { content: item.nip17Content } });
+        continue;
+      }
+      if (!item.dmEvent || !item.pubkey) {
+        results.push(item);
+        continue;
+      }
+      if (item.dmEvent instanceof NDKEvent) {
+        const counterparty = new NDKUser({ pubkey: item.pubkey });
+        await item.dmEvent.decrypt(counterparty, signer);
+        results.push({ ...item, dmEvent: { ...item.dmEvent, content: item.dmEvent.content } });
+      } else {
+        results.push(item);
+      }
+    } catch {
+      results.push({ ...item, dmEvent: { ...item.dmEvent, content: '[Encrypted message]' } });
+    }
+  }
+  return results;
+}
+
 const PaymentsContent = () => {
-  // Register this tab's background configuration
   useBackgroundConfig({ blurMode: 'full', backgroundOpacity: 0.25 });
 
-  const [foreground, muted, defaultColor, surfaceSecondary] = useThemeColor(['foreground', 'muted', 'default', 'surface-secondary'] as const);
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const [selectedTab, setSelectedTab] = useState('Recent activity');
 
-  // Convert default contact npubs to pubkeys (memoized for performance)
-  const defaultContactPubkeys = useMemo(() => {
-    return DEFAULT_CONTACTS.map((contact) => ({
-      pubkey: npubToPubkey(contact.npub),
-      label: contact.label,
-    }));
-  }, []);
+  const defaultContactPubkeys = useMemo(
+    () =>
+      DEFAULT_CONTACTS.map((contact) => ({
+        pubkey: npubToPubkey(contact.npub),
+        label: contact.label,
+      })),
+    []
+  );
 
-  // Get search state from layout context
   const { searchQuery, isSearching } = usePaymentsSearch();
-
-  // Search history store
   const addSearchToHistory = useSearchHistoryStore((state) => state.addSearch);
-
-  const { mints, loadMints, getMintInfo } = useMintManagement();
+  const { mints, getMintInfo } = useMintManagement();
   const { keys: nostrKeys } = useNostrKeysContext();
 
-  // State for mint info data
   const [mintsWithInfo, setMintsWithInfo] = useState<{ mint: Mint; mintInfo: any }[]>([]);
-  const [mintsLoadingInfo, setMintsLoadingInfo] = useState(false);
+  const [mintInfoLoading, setMintInfoLoading] = useState(false);
 
-  // Search-related state
   const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Recommended users state (currently unused, kept for future RecommendedUsers component)
-  const [_recommendedUsers, setRecommendedUsers] = useState<UserProfile[]>([]);
-  const [_recommendedLoading, setRecommendedLoading] = useState(false);
-
-  // Get all NIP-04 DM events for the current user
+  // NIP-04 DM subscription
   const dmFilters = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;
-
     return [
-      {
-        kinds: [EncryptedDirectMessage],
-        authors: [nostrKeys.pubkey],
-      },
-      {
-        kinds: [EncryptedDirectMessage],
-        '#p': [nostrKeys.pubkey],
-      },
+      { kinds: [EncryptedDirectMessage], authors: [nostrKeys.pubkey] },
+      { kinds: [EncryptedDirectMessage], '#p': [nostrKeys.pubkey] },
     ];
   }, [nostrKeys?.pubkey]);
 
   const { events: dmEvents } = useSubscribe({ filters: dmFilters });
 
-  // Get all NIP-17 gift-wrapped events addressed to us (kind 1059)
+  // NIP-17 gift-wrap subscription
   const giftWrapFilters = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;
-
-    return [
-      {
-        kinds: [1059 as number],
-        '#p': [nostrKeys.pubkey],
-      },
-    ];
+    return [{ kinds: [1059 as number], '#p': [nostrKeys.pubkey] }];
   }, [nostrKeys?.pubkey]);
 
   const { events: giftWrapEvents } = useSubscribe({ filters: giftWrapFilters });
 
-  useEffect(() => {
-    logPayments('mounted');
-    return () => {
-      logPayments('unmounted');
-    };
-  }, []);
-
-  useEffect(() => {
-    logPayments('search state changed', {
-      searchQuery,
-      isSearching,
-      selectedTab,
-    });
-  }, [isSearching, searchQuery, selectedTab]);
-
-  useEffect(() => {
-    logPayments('nostr key state changed', {
-      hasPubkey: !!nostrKeys?.pubkey,
-      hasPrivateKey: !!nostrKeys?.privateKey,
-    });
-  }, [nostrKeys?.privateKey, nostrKeys?.pubkey]);
-
-  useEffect(() => {
-    logPayments('subscription events updated', {
-      dmEvents: dmEvents?.length ?? 0,
-      giftWrapEvents: giftWrapEvents?.length ?? 0,
-    });
-  }, [dmEvents, giftWrapEvents]);
-
-  // Unwrap NIP-17 gift-wrapped events to extract sender and content
   const unwrappedDMs = useMemo(() => {
     if (!giftWrapEvents?.length || !nostrKeys?.privateKey) return [];
-
     return giftWrapEvents
       .map((event) => {
         const unwrapped = unwrapGiftWrap(
@@ -209,27 +178,23 @@ const PaymentsContent = () => {
       .filter((dm): dm is NonNullable<typeof dm> => dm !== null);
   }, [giftWrapEvents, nostrKeys?.privateKey]);
 
-  // State for decrypted contacts
   const [decryptedContacts, setDecryptedContacts] = useState<any[]>([]);
   const [isDecrypting, setIsDecrypting] = useState(false);
 
-  // Extract unique pubkeys from both NIP-04 and NIP-17 events and create contact list
+  // Build recent activity contacts from NIP-04 and NIP-17 events
   const recentActivityContacts = useMemo(() => {
     if (!nostrKeys?.pubkey) return [];
 
-    // contactMap stores the most recent event per contact pubkey
     const contactMap = new Map<
       string,
       { type: string; event?: NDKEvent; dm?: (typeof unwrappedDMs)[number]; timestamp: number }
     >();
 
-    // Process NIP-04 (kind 4) events
     dmEvents?.forEach((event) => {
       const otherPubkey =
         event.pubkey === nostrKeys.pubkey
           ? event.tags.find((tag) => tag[0] === 'p')?.[1]
           : event.pubkey;
-
       if (!otherPubkey) return;
 
       const existing = contactMap.get(otherPubkey);
@@ -239,11 +204,9 @@ const PaymentsContent = () => {
       }
     });
 
-    // Process NIP-17 (kind 1059 → 14) unwrapped events
     unwrappedDMs.forEach((dm) => {
       const otherPubkey =
         dm.senderPubkey === nostrKeys.pubkey ? dm.recipientPubkeys[0] : dm.senderPubkey;
-
       if (!otherPubkey) return;
 
       const existing = contactMap.get(otherPubkey);
@@ -252,12 +215,10 @@ const PaymentsContent = () => {
       }
     });
 
-    // Convert map to array and sort by most recent
     return Array.from(contactMap.entries())
       .map(([pubkey, entry]) => ({
         type: 'contact',
         pubkey,
-        // For NIP-04 events, decryption happens later; for NIP-17, content is already available
         dmEvent: entry.type === 'nip04' ? entry.event : null,
         nip17Content: entry.type === 'nip17' ? entry.dm?.content : undefined,
         timestamp: entry.timestamp,
@@ -265,18 +226,10 @@ const PaymentsContent = () => {
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [dmEvents, unwrappedDMs, nostrKeys?.pubkey]);
 
-  useEffect(() => {
-    logPayments('recent activity contacts computed', {
-      count: recentActivityContacts.length,
-    });
-  }, [recentActivityContacts]);
-
   // Merge default contacts with recent activity contacts
   const contactsWithDefaults = useMemo(() => {
-    // Create a set of existing pubkeys from recent activity
     const existingPubkeys = new Set(recentActivityContacts.map((c) => c.pubkey));
 
-    // Filter out default contacts that already exist in recent activity
     const defaultsToAdd = defaultContactPubkeys
       .filter((dc) => !existingPubkeys.has(dc.pubkey))
       .map((dc) => ({
@@ -284,215 +237,102 @@ const PaymentsContent = () => {
         pubkey: dc.pubkey,
         dmEvent: null,
         nip17Content: undefined as string | undefined,
-        timestamp: 0, // No timestamp for default contacts without messages
+        timestamp: 0,
         isDefault: true,
       }));
 
-    // Combine: recent activity first (sorted by time), then defaults at the end
     return [...recentActivityContacts, ...defaultsToAdd];
   }, [recentActivityContacts, defaultContactPubkeys]);
 
+  // Decrypt contact DM events
   useEffect(() => {
-    const defaultsInList = contactsWithDefaults.filter((c: any) => c.isDefault).length;
-    logPayments('contacts merged with defaults', {
-      total: contactsWithDefaults.length,
-      defaultsInList,
-      recentContacts: recentActivityContacts.length,
-    });
-  }, [contactsWithDefaults, recentActivityContacts.length]);
+    let cancelled = false;
 
-  // Decrypt DM events for contacts
-  useEffect(() => {
-    const decryptContacts = async () => {
-      logPayments('decryptContacts:start', {
-        contactsWithDefaults: contactsWithDefaults.length,
-        hasPubkey: !!nostrKeys?.pubkey,
-        hasPrivateKey: !!nostrKeys?.privateKey,
-      });
-
+    const run = async () => {
       if (!contactsWithDefaults.length) {
-        logPayments('decryptContacts:empty contacts, clearing list');
         setDecryptedContacts([]);
         return;
       }
 
-      // Keep default contacts visible even before keys are available.
-      // In this state we cannot decrypt DMs, so pass through available content.
+      // Without keys, pass through NIP-17 content unencrypted (defaults stay visible)
       if (!nostrKeys?.pubkey || !nostrKeys?.privateKey) {
-        const fallbackContacts = contactsWithDefaults.map((contact) => {
-          if (contact.nip17Content !== undefined) {
-            return {
-              ...contact,
-              dmEvent: { content: contact.nip17Content },
-            };
-          }
-          return contact;
-        });
-        logPayments('decryptContacts:fallback (no keys)', {
-          fallbackCount: fallbackContacts.length,
-        });
-        setDecryptedContacts(fallbackContacts);
+        setDecryptedContacts(
+          contactsWithDefaults.map((c) =>
+            c.nip17Content !== undefined ? { ...c, dmEvent: { content: c.nip17Content } } : c
+          )
+        );
         setIsDecrypting(false);
         return;
       }
 
       try {
         setIsDecrypting(true);
-
-        // Create a single signer instance to reuse
-        const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
-
-        // Decrypt sequentially to avoid race conditions with NDK's decrypt method
-        const decryptedResults = [];
-        for (const contact of contactsWithDefaults) {
-          try {
-            // NIP-17 messages are already decrypted during unwrapping
-            if (contact.nip17Content !== undefined) {
-              decryptedResults.push({
-                ...contact,
-                dmEvent: { content: contact.nip17Content },
-              });
-              continue;
-            }
-
-            // Skip decryption for contacts without DM events (default contacts)
-            if (!contact.dmEvent) {
-              decryptedResults.push(contact);
-              continue;
-            }
-
-            if (contact.dmEvent instanceof NDKEvent) {
-              // Decrypt the NIP-04 message content
-              // Use contact.pubkey (the other party) not dmEvent.pubkey
-              // because dmEvent.pubkey could be our own pubkey if we sent it
-              const counterparty = new NDKUser({ pubkey: contact.pubkey });
-              await contact.dmEvent.decrypt(counterparty, signer);
-              decryptedResults.push({
-                ...contact,
-                dmEvent: {
-                  ...contact.dmEvent,
-                  content: contact.dmEvent.content, // Now decrypted
-                },
-              });
-            } else {
-              decryptedResults.push(contact);
-            }
-          } catch {
-            decryptedResults.push({
-              ...contact,
-              dmEvent: {
-                ...contact.dmEvent,
-                content: '[Encrypted message]', // Fallback for failed decryption
-              },
-            });
-          }
-        }
-
-        setDecryptedContacts(decryptedResults);
-        logPayments('decryptContacts:success', {
-          decryptedCount: decryptedResults.length,
-        });
-      } catch (err) {
-        console.error('Error decrypting contacts:', err);
-        logPayments('decryptContacts:error, using fallback contacts');
-        setDecryptedContacts(contactsWithDefaults);
+        const results = await decryptNip04Events(contactsWithDefaults, nostrKeys.privateKey);
+        if (!cancelled) setDecryptedContacts(results);
+      } catch {
+        if (!cancelled) setDecryptedContacts(contactsWithDefaults);
       } finally {
-        setIsDecrypting(false);
+        if (!cancelled) setIsDecrypting(false);
       }
     };
 
-    decryptContacts();
+    run();
+    return () => {
+      cancelled = true;
+    };
   }, [contactsWithDefaults, nostrKeys?.pubkey, nostrKeys?.privateKey]);
 
+  // Load mint info and filter for those with nostr contacts
   useEffect(() => {
-    logPayments('decrypted contacts updated', {
-      count: decryptedContacts.length,
-      isDecrypting,
-    });
-  }, [decryptedContacts, isDecrypting]);
+    if (mints.length === 0) return;
+    let cancelled = false;
 
-  // Load mints and their info on component mount
-  useEffect(() => {
-    const loadMintsData = async () => {
-      try {
-        setMintsLoadingInfo(true);
-        logPayments('loadMints:start');
-        await loadMints();
-        logPayments('loadMints:success');
-      } catch (error) {
-        console.error('Failed to load mints:', error);
-        logPayments('loadMints:error');
-      } finally {
-        setMintsLoadingInfo(false);
-      }
-    };
-
-    loadMintsData();
-  }, [loadMints]);
-
-  // Load mint info for each mint and filter for nostr contacts
-  useEffect(() => {
     const loadMintInfo = async () => {
-      if (mints.length === 0) return;
-
       try {
-        setMintsLoadingInfo(true);
-        logPayments('loadMintInfo:start', { mints: mints.length });
-        const mintsWithInfo = await Promise.all(
+        setMintInfoLoading(true);
+        const results = await Promise.all(
           mints.map(async (mint) => {
             try {
-              const mintInfo = await getMintInfo(mint.mintUrl);
-              return { mint, mintInfo };
-            } catch (error) {
-              console.error(`Failed to get mint info for ${mint.mintUrl}:`, error);
+              return { mint, mintInfo: await getMintInfo(mint.mintUrl) };
+            } catch {
               return { mint, mintInfo: null };
             }
           })
         );
+        if (cancelled) return;
 
-        // Filter mints that have nostr contact info
-        const mintsWithNostr = mintsWithInfo.filter(({ mintInfo }) => {
+        const withNostr = results.filter(({ mintInfo }) => {
           if (!mintInfo?.contact) return false;
-
-          const nostrContact = mintInfo.contact.find((contact: any) => contact.method === 'nostr');
-          return nostrContact?.info && nostrContact.info.startsWith('npub1');
+          const nostrContact = mintInfo.contact.find((c: any) => c.method === 'nostr');
+          return nostrContact?.info?.startsWith('npub1');
         });
-
-        setMintsWithInfo(mintsWithNostr);
-        logPayments('loadMintInfo:success', {
-          withNostrContacts: mintsWithNostr.length,
-        });
-      } catch (error) {
-        console.error('Failed to load mint info:', error);
-        logPayments('loadMintInfo:error');
+        setMintsWithInfo(withNostr);
+      } catch {
+        // Mint info loading failed silently
       } finally {
-        setMintsLoadingInfo(false);
+        if (!cancelled) setMintInfoLoading(false);
       }
     };
 
-    if (mints.length > 0) {
-      loadMintInfo();
-    }
+    loadMintInfo();
+    return () => {
+      cancelled = true;
+    };
   }, [mints, getMintInfo]);
 
-  // State for decrypted mints
   const [decryptedMints, setDecryptedMints] = useState<any[]>([]);
   const [isDecryptingMints, setIsDecryptingMints] = useState(false);
 
-  // Build mints with most recent DM
+  // Build mints with most recent DM metadata
   const mintsWithMetadata = useMemo(() => {
-    if (!dmEvents) {
-      return [];
-    }
+    if (!dmEvents) return [];
 
-    // Create a map of most recent DMs by pubkey
     const dmMap = new Map();
     dmEvents?.forEach((event) => {
       const otherPubkey =
         event.pubkey === nostrKeys?.pubkey
           ? event.tags.find((tag) => tag[0] === 'p')?.[1]
           : event.pubkey;
-
       if (!otherPubkey) return;
 
       const existing = dmMap.get(otherPubkey);
@@ -502,14 +342,13 @@ const PaymentsContent = () => {
     });
 
     return mintsWithInfo.map(({ mint, mintInfo }) => {
-      // Get pubkey from mint's nostr contact
       let mintPubkey = null;
-      const nostrContact = mintInfo.contact?.find((contact: any) => contact.method === 'nostr');
+      const nostrContact = mintInfo.contact?.find((c: any) => c.method === 'nostr');
       if (nostrContact?.info) {
         try {
           mintPubkey = npubToPubkey(nostrContact.info);
         } catch {
-          // Failed to decode nostr contact from mint
+          // ignore decode failure
         }
       }
 
@@ -524,154 +363,70 @@ const PaymentsContent = () => {
     });
   }, [mintsWithInfo, dmEvents, nostrKeys?.pubkey]);
 
-  // Decrypt DM events for mints
+  // Decrypt mint DM events
   useEffect(() => {
-    const decryptMints = async () => {
-      if (!mintsWithMetadata.length || !nostrKeys?.pubkey) {
-        logPayments('decryptMints:empty or missing pubkey', {
-          mintsWithMetadata: mintsWithMetadata.length,
-          hasPubkey: !!nostrKeys?.pubkey,
-        });
+    let cancelled = false;
+
+    const run = async () => {
+      if (!mintsWithMetadata.length || !nostrKeys?.pubkey || !nostrKeys?.privateKey) {
         setDecryptedMints([]);
         return;
       }
-
       try {
         setIsDecryptingMints(true);
-
-        // Create a single signer instance to reuse
-        const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
-
-        // Decrypt sequentially to avoid race conditions with NDK's decrypt method
-        const decryptedResults = [];
-        for (const mint of mintsWithMetadata) {
-          try {
-            if (mint.dmEvent && mint.pubkey) {
-              // Decrypt the message content
-              // Use mint.pubkey (the mint's nostr pubkey) not dmEvent.pubkey
-              // because dmEvent.pubkey could be our own pubkey if we sent it
-              const counterparty = new NDKUser({ pubkey: mint.pubkey });
-              await mint.dmEvent.decrypt(counterparty, signer);
-              decryptedResults.push({
-                ...mint,
-                dmEvent: {
-                  ...mint.dmEvent,
-                  content: mint.dmEvent.content, // Now decrypted
-                },
-              });
-            } else {
-              decryptedResults.push(mint);
-            }
-          } catch {
-            decryptedResults.push({
-              ...mint,
-              dmEvent: {
-                ...mint.dmEvent,
-                content: '[Encrypted message]', // Fallback for failed decryption
-              },
-            });
-          }
-        }
-
-        setDecryptedMints(decryptedResults);
-        logPayments('decryptMints:success', { decryptedMints: decryptedResults.length });
-      } catch (error) {
-        console.error('Error decrypting mints:', error);
-        logPayments('decryptMints:error, using fallback metadata');
-        setDecryptedMints(mintsWithMetadata);
+        const results = await decryptNip04Events(mintsWithMetadata, nostrKeys.privateKey);
+        if (!cancelled) setDecryptedMints(results);
+      } catch {
+        if (!cancelled) setDecryptedMints(mintsWithMetadata);
       } finally {
-        setIsDecryptingMints(false);
+        if (!cancelled) setIsDecryptingMints(false);
       }
     };
 
-    decryptMints();
+    run();
+    return () => {
+      cancelled = true;
+    };
   }, [mintsWithMetadata, nostrKeys?.pubkey, nostrKeys?.privateKey]);
-
-  useEffect(() => {
-    logPayments('decrypted mints updated', {
-      count: decryptedMints.length,
-      isDecryptingMints,
-      mintsLoadingInfo,
-    });
-  }, [decryptedMints, isDecryptingMints, mintsLoadingInfo]);
 
   const pagerRef = useRef<PagerView>(null);
 
-  // Fetch recommended users
-  const fetchRecommendedUsers = useCallback(async () => {
-    try {
-      setRecommendedLoading(true);
-      const result = await getRecommendedUsers({
-        limit: 10,
-        sort: 'globalPagerank',
-      });
-
-      if (result.isOk()) {
-        setRecommendedUsers(result.value.results);
-      } else {
-        console.error('Error fetching recommended users:', result.error);
-        setRecommendedUsers([]);
-      }
-    } catch (error) {
-      console.error('Unexpected error fetching recommended users:', error);
-      setRecommendedUsers([]);
-    } finally {
-      setRecommendedLoading(false);
-    }
-  }, []);
-
-  // Search functionality
+  // Search
   const searchUsers = useCallback(
     async (query: string) => {
       if (!query.trim()) return;
-
       setSearchLoading(true);
       setHasSearched(true);
 
       try {
         const result = await apiSearchUsers({ query, limit: 10 });
-
         if (result.isOk()) {
           const data = result.value;
-
           if (data.results && Array.isArray(data.results)) {
-            const formattedResults: SearchResultData[] = data.results.map((res) => {
-              // Some search rows may not include a `profileEvent`. Treat those as partial profiles.
-              // Also guard against invalid JSON so one bad row doesn't wipe the entire list.
+            const formatted: SearchResultData[] = data.results.map((res) => {
               let profileEventPubkey = res.pubkey;
               if (res.profileEvent) {
                 try {
                   const parsed = JSON.parse(res.profileEvent);
                   if (parsed?.pubkey) profileEventPubkey = parsed.pubkey;
-                } catch (e) {
-                  console.warn('Invalid profileEvent JSON for pubkey', res.pubkey, e);
+                } catch {
+                  // Invalid profileEvent JSON
                 }
               }
-
               return {
                 pubkey: res.pubkey,
-                profile: {
-                  ...res,
-                  pubkey: profileEventPubkey,
-                },
+                profile: { ...res, pubkey: profileEventPubkey },
               };
             });
-
-            setSearchResults(formattedResults);
-
-            // Save successful searches to history
-            if (formattedResults.length > 0) {
-              addSearchToHistory(query, 'payments');
-            }
+            setSearchResults(formatted);
+            if (formatted.length > 0) addSearchToHistory(query, 'payments');
           } else {
             setSearchResults([]);
           }
         } else {
-          console.error('Error searching users:', result.error);
           setSearchResults([]);
         }
-      } catch (error) {
-        console.error('Unexpected error during search:', error);
+      } catch {
         setSearchResults([]);
       } finally {
         setSearchLoading(false);
@@ -680,14 +435,10 @@ const PaymentsContent = () => {
     [addSearchToHistory]
   );
 
-  // Debounced search handler
+  // Debounced search
   useEffect(() => {
-    // Clear existing timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
+    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
 
-    // Reset state if search is cleared
     if (!searchQuery.trim()) {
       setHasSearched(false);
       setSearchResults([]);
@@ -695,209 +446,109 @@ const PaymentsContent = () => {
       return;
     }
 
-    // Immediately enter "searching" state so the UI doesn't flash recent searches
-    // or stale results while we wait for the debounce window.
+    // Immediately enter loading state to avoid flashing stale results
     setHasSearched(false);
     setSearchResults([]);
     setSearchLoading(true);
 
-    // Debounce the search
     debounceTimeoutRef.current = setTimeout(() => {
       searchUsers(searchQuery);
     }, 500);
 
-    // Cleanup function
     return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
+      if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
     };
   }, [searchQuery, searchUsers]);
 
-  // Fetch recommended users on mount
-  useEffect(() => {
-    fetchRecommendedUsers();
-  }, [fetchRecommendedUsers]);
-
-  // Generate placeholder results for the loading state (reduced from 20 to 6 for performance)
-  const placeholderResults = useMemo<PlaceholderResult[]>(
-    () =>
-      Array(6)
-        .fill(null)
-        .map((_, index) => ({
-          pubkey: `placeholder-${index}`,
-        })),
-    []
-  );
-
-  // Memoized computed values
   const displayResults: DisplayResult[] = useMemo(() => {
-    // Keep the card height stable while the debounce/request is in-flight.
-    if (searchLoading || !hasSearched) return placeholderResults;
+    if (searchLoading || !hasSearched) return PLACEHOLDER_RESULTS;
     return searchResults;
-  }, [hasSearched, placeholderResults, searchLoading, searchResults]);
+  }, [hasSearched, searchLoading, searchResults]);
 
   const showNoResults =
     searchQuery.trim().length > 0 && hasSearched && !searchLoading && searchResults.length === 0;
 
-  // Skeleton configuration
-  const skeletonConfig = useMemo(
-    () => ({
-      backgroundColor: surfaceSecondary,
-      highlightColor: defaultColor,
-      speed: 800,
-      animation: searchLoading ? ('pulse' as const) : ('none' as const),
-    }),
-    [surfaceSecondary, defaultColor, searchLoading]
-  );
-
-  // Match Recent activity / Mints card frame styling
-  const accentColor = muted;
-  const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
+  const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
 
   const navigateToProfile = useCallback(({ pubkey }: { pubkey: string }) => {
     router.navigate({
       pathname: '/(user-flow)/profile' as any,
-      params: {
-        pubkey: pubkey,
-      },
+      params: { pubkey },
     });
   }, []);
 
-  // Handler for recommended user press (currently unused, kept for future RecommendedUsers component)
-  const _handleRecommendedUserPress = useCallback(
-    (user: UserProfile) => {
-      navigateToProfile({
-        pubkey: user.pubkey,
-      });
-    },
-    [navigateToProfile]
-  );
-
-  // Memoized handler for search result press
   const handleSearchResultPress = useCallback(
     (result: DisplayResult) => {
       if (searchLoading || !result.profile) return;
-
-      // Ensure the search header input is blurred before navigating,
-      // otherwise iOS can keep/reopen the keyboard on the next screen.
       Keyboard.dismiss();
-
-      // Let the dismiss propagate before route transition.
       requestAnimationFrame(() => {
-        navigateToProfile({
-          pubkey: result.pubkey,
-        });
+        navigateToProfile({ pubkey: result.pubkey });
       });
     },
     [searchLoading, navigateToProfile]
   );
 
-  // Dismiss keyboard when tapping outside
   const dismissKeyboard = useCallback(() => {
     Keyboard.dismiss();
   }, []);
 
   const onPageSelected = useCallback((event: any) => {
-    const pageIndex = event.nativeEvent.position;
-    const tabNames = ['Recent activity', 'Mints'];
-    setSelectedTab(tabNames[pageIndex]);
-    logPayments('pager page selected', {
-      pageIndex,
-      tab: tabNames[pageIndex],
-    });
+    setSelectedTab(TABS[event.nativeEvent.position]);
   }, []);
 
-  const handleTabPress = (tab: string, index: number) => {
+  const handleTabPress = useCallback((tab: string, index: number) => {
     setSelectedTab(tab);
     pagerRef.current?.setPage(index);
-  };
+  }, []);
 
-  const tabs = ['Recent activity', 'Mints'];
-
-  // Fetch kind 0 (profile) events for all contacts including defaults
+  // Profile subscription for all visible contacts
   const profileFilters = useMemo(() => {
-    // Include default contact pubkeys to always fetch their profiles
-    const defaultPubkeys = defaultContactPubkeys.map((dc) => dc.pubkey);
-
     const allPubkeys = [
-      ...defaultPubkeys,
+      ...defaultContactPubkeys.map((dc) => dc.pubkey),
       ...decryptedContacts.map((item: any) => item.pubkey),
       ...decryptedMints.map((item: any) => item.pubkey),
     ].filter((pubkey): pubkey is string => !!pubkey);
 
-    // Deduplicate pubkeys
     const uniquePubkeys = [...new Set(allPubkeys)];
-
     if (uniquePubkeys.length === 0) return null;
-
-    return [
-      {
-        kinds: [0],
-        authors: uniquePubkeys,
-      },
-    ];
+    return [{ kinds: [0], authors: uniquePubkeys }];
   }, [decryptedContacts, decryptedMints, defaultContactPubkeys]);
 
-  const { events: profileEvents, eose: profilesEose } = useSubscribe({
-    filters: profileFilters,
-  });
-
-  useEffect(() => {
-    logPayments('profile subscription updated', {
-      filtersAuthorsCount: profileFilters?.[0]?.authors?.length ?? 0,
-      profileEvents: profileEvents?.length ?? 0,
-      profilesEose,
-    });
-  }, [profileEvents, profileFilters, profilesEose]);
-
-  // Loading state for profiles: true until we receive EOSE
+  const { events: profileEvents, eose: profilesEose } = useSubscribe({ filters: profileFilters });
   const isLoadingProfiles = !profilesEose;
 
-  // Parse and map profile events to a more usable format
   const profilesMap = useMemo(() => {
     const map = new Map();
     profileEvents?.forEach((event) => {
       try {
-        const profile = JSON.parse(event.content);
-        map.set(event.pubkey, profile);
+        map.set(event.pubkey, JSON.parse(event.content));
       } catch {
-        // Failed to parse profile
+        // Skip invalid profile JSON
       }
     });
     return map;
   }, [profileEvents]);
 
   useEffect(() => {
-    prefetchImages(Array.from(profilesMap.values()).map((profile: any) => profile?.picture));
+    prefetchImages(Array.from(profilesMap.values()).map((p: any) => p?.picture));
   }, [profilesMap]);
 
   useEffect(() => {
     prefetchImages(mintsWithInfo.map(({ mintInfo }) => mintInfo?.icon_url));
   }, [mintsWithInfo]);
 
-  // Use dynamic window dimensions for responsive layout
   const { height: windowHeight } = useWindowDimensions();
-
-  // Get safe area insets for proper header spacing on all devices
   const insets = useSafeAreaInsets();
-
-  // Header height accounts for the transparent header with search bar + safe area
-  // Standard iOS nav bar (44px) + small buffer (12px) + top safe area inset
   const HEADER_HEIGHT = 56 + insets.top;
+
   return (
     <LayoutDebugWrapper scrollable={false}>
-      {/* Gradient overlay for the entire page */}
       <ScrollableGradientOverlay contentHeight={windowHeight * 1.5} />
 
-      <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
-        <SkeletonContainer
-          backgroundColor={skeletonConfig.backgroundColor}
-          highlightColor={skeletonConfig.highlightColor}
-          speed={skeletonConfig.speed}
-          animation={skeletonConfig.animation}>
+      <SafeAreaView style={layoutStyles.flex1} edges={['bottom']}>
+        <View style={{ flex: 1 }}>
           <View style={{ position: 'relative', flex: 1, paddingTop: HEADER_HEIGHT }}>
-            {/* Tabs - Always render but hide with height when searching */}
+            {/* Tabs - hidden when searching to avoid layout shift */}
             <View
               style={{
                 paddingHorizontal: 12,
@@ -906,29 +557,25 @@ const PaymentsContent = () => {
                 opacity: isSearching ? 0 : 1,
               }}>
               <Tabs
-                tabs={tabs}
+                tabs={TABS}
                 selectedTab={selectedTab}
                 handleTabPress={handleTabPress}
                 amounts={[String(decryptedContacts.length), String(decryptedMints.length)]}
               />
             </View>
 
-            {/* Search results overlay - positioned absolutely to avoid layout shifts */}
+            {/* Search results overlay */}
             {isSearching && (
-              <Pressable style={{ flex: 1 }} onPress={dismissKeyboard}>
+              <Pressable style={layoutStyles.flex1} onPress={dismissKeyboard}>
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
                   keyboardDismissMode="on-drag"
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.searchContainer}>
                   <RNView style={[styles.card, { borderColor }]}>
-                    <BlurCardFrame accentColor={accentColor}>
+                    <BlurCardFrame accentColor={muted}>
                       <View style={styles.searchSectionHeader}>
-                        <Text
-                          overpass
-                          bold
-                          size={14}
-                          style={{ color: opacity(foreground, 0.4) }}>
+                        <Text bold size={14} style={{ color: opacity(foreground, 0.4) }}>
                           Search results
                         </Text>
                       </View>
@@ -952,19 +599,16 @@ const PaymentsContent = () => {
               </Pressable>
             )}
 
-            {/* Main content - PagerView for tabs - always rendered but hidden when searching */}
+            {/* Tab content */}
             {!isSearching && (
-              <View
-                style={{
-                  flex: 1,
-                }}>
+              <View style={layoutStyles.flex1}>
                 <PagerView
                   ref={pagerRef}
                   onPageSelected={onPageSelected}
                   style={{ flex: 1, minHeight: 1 }}
                   initialPage={0}
-                  scrollEnabled={true}>
-                  <View key="1" collapsable={false} style={{ flex: 1 }}>
+                  scrollEnabled>
+                  <View key="1" collapsable={false} style={layoutStyles.flex1}>
                     <DraggableContactsList
                       data={decryptedContacts}
                       profilesMap={profilesMap}
@@ -973,11 +617,11 @@ const PaymentsContent = () => {
                       emptyMessage="No recent conversations found"
                     />
                   </View>
-                  <View key="2" collapsable={false} style={{ flex: 1 }}>
+                  <View key="2" collapsable={false} style={layoutStyles.flex1}>
                     <DraggableContactsList
                       data={decryptedMints}
                       profilesMap={profilesMap}
-                      isDecrypting={mintsLoadingInfo || isDecryptingMints}
+                      isDecrypting={mintInfoLoading || isDecryptingMints}
                       isLoadingProfiles={isLoadingProfiles}
                       emptyMessage="No mints with nostr contacts found"
                     />
@@ -986,13 +630,17 @@ const PaymentsContent = () => {
               </View>
             )}
           </View>
-        </SkeletonContainer>
+        </View>
       </SafeAreaView>
     </LayoutDebugWrapper>
   );
 };
 
 export default PaymentsContent;
+
+const layoutStyles = StyleSheet.create({
+  flex1: { flex: 1 },
+});
 
 const styles = StyleSheet.create({
   searchContainer: {

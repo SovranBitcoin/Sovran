@@ -1,10 +1,13 @@
-import { Mint } from 'coco-cashu-core';
+import { useCallback, useEffect, useState } from 'react';
+
+import type { Mint } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
-import { useCallback, useState, useEffect } from 'react';
 
 /**
- * Custom hook for mint management operations
- * This replaces the mint-related functions in cashuClient.ts
+ * Manages the trusted-mints list and common mint operations via the coco Manager.
+ *
+ * Loads mints on mount, re-exposes `trustMint`, `isTrustedMint`, `getMintInfo`,
+ * `getBalances`, and `restore` behind loading/error state.
  */
 export function useMintManagement() {
   const manager = useManager();
@@ -12,23 +15,13 @@ export function useMintManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  /**
-   * Load all mints from the manager
-   */
   const loadMints = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const mints = await manager.mint.getAllTrustedMints();
-      if (__DEV__) {
-        console.log('🏦 useMintManagement: Loaded mints from manager:', mints.length);
-        console.log(
-          '🏦 useMintManagement: Mint URLs:',
-          mints.map((m) => m.mintUrl)
-        );
-      }
-      setMints(mints);
+      const allMints = await manager.mint.getAllTrustedMints();
+      setMints(allMints);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to load mints');
       setError(error);
@@ -37,10 +30,6 @@ export function useMintManagement() {
     }
   }, [manager]);
 
-  /**
-   * Add a new mint
-   * This replaces the old addMints function
-   */
   const addMint = useCallback(
     async (mintUrl: string) => {
       setIsLoading(true);
@@ -48,10 +37,7 @@ export function useMintManagement() {
 
       try {
         const result = await manager.mint.trustMint(mintUrl);
-
-        // Reload mints to get the updated list
         await loadMints();
-
         return result;
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to add mint');
@@ -64,10 +50,6 @@ export function useMintManagement() {
     [manager, loadMints]
   );
 
-  /**
-   * Check if a mint is known
-   * This replaces the old isKnownMint function
-   */
   const isKnownMint = useCallback(
     async (mintUrl: string): Promise<boolean> => {
       try {
@@ -79,10 +61,6 @@ export function useMintManagement() {
     [manager]
   );
 
-  /**
-   * Get mint info
-   * This replaces the old getMintInfo function
-   */
   const getMintInfo = useCallback(
     async (mintUrl: string) => {
       try {
@@ -96,33 +74,6 @@ export function useMintManagement() {
     [manager]
   );
 
-  /**
-   * Remove a mint (if supported by the manager)
-   * Note: This might not be directly supported by Coco,
-   * but we can implement it by clearing proofs and counters
-   */
-  const removeMint = useCallback(
-    async (_mintUrl: string) => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        await loadMints();
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error('Failed to remove mint');
-        setError(error);
-        throw error;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [loadMints]
-  );
-
-  /**
-   * Get balances for all mints
-   * This replaces the old getBalances function
-   */
   const getBalances = useCallback(async () => {
     try {
       return await manager.wallet.getBalances();
@@ -133,10 +84,6 @@ export function useMintManagement() {
     }
   }, [manager]);
 
-  /**
-   * Restore a mint from seed
-   * This replaces the old restoreMint function
-   */
   const restoreMint = useCallback(
     async (mintUrl: string) => {
       setIsLoading(true);
@@ -144,8 +91,6 @@ export function useMintManagement() {
 
       try {
         await manager.wallet.restore(mintUrl);
-
-        // Reload mints after restoration
         await loadMints();
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to restore mint');
@@ -158,39 +103,29 @@ export function useMintManagement() {
     [manager, loadMints]
   );
 
-  // Load mints on mount
   useEffect(() => {
     if (manager) {
       loadMints();
-    } else {
     }
   }, [loadMints, manager]);
 
-  /**
-   * Reset error state
-   */
   const reset = useCallback(() => {
     setError(null);
   }, []);
 
   return {
-    // Data
     mints,
 
-    // Operations
     addMint,
-    removeMint,
     isKnownMint,
     getMintInfo,
     getBalances,
     restoreMint,
     loadMints,
 
-    // State
     isLoading,
     error,
 
-    // Utilities
     reset,
   };
 }

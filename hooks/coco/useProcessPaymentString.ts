@@ -1,4 +1,17 @@
+import { useCallback, useRef, useState } from 'react';
+import { AppState } from 'react-native';
+
+import { router } from 'expo-router';
+
+// TODO: re-export decodePaymentRequest & PaymentRequestTransportType from coco-cashu-core
+import { decodePaymentRequest, PaymentRequestTransportType } from '@cashu/cashu-ts';
+import { URDecoder } from '@gandlaf21/bc-ur';
+import { nip19 } from 'nostr-tools';
+
+import { useMints, useBalanceContext } from 'coco-cashu-react';
+
 import {
+  buildReceiveHistoryEntry,
   getLightningAmount,
   isLightningInvoice,
   isValidEcashToken,
@@ -6,15 +19,7 @@ import {
   isLightningAddress,
   isLnurlp,
 } from '@/helper/coco/utils';
-import { Proof, decodePaymentRequest, PaymentRequestTransportType } from '@cashu/cashu-ts';
-import { URDecoder } from '@gandlaf21/bc-ur';
-import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
-import { useMints, useBalanceContext } from 'coco-cashu-react';
 import Haptics from 'components/ui/Haptics';
-import { router } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
-import { AppState } from 'react-native';
-import { nip19 } from 'nostr-tools';
 import { useScanHistoryStore, ScanSource } from 'stores/scanHistoryStore';
 
 /**
@@ -173,32 +178,15 @@ export const useProcessPaymentString = ({
           if (urDecoder.isComplete() && urDecoder.isSuccess()) {
             const ur = urDecoder.resultUR();
             const decoded = ur.decodeCBOR();
-            const _tokenString = new TextDecoder().decode(decoded);
-            const decodedToken = getDecodedToken(_tokenString);
+            const tokenString = new TextDecoder().decode(decoded);
             onProgress?.(0);
 
-            // Only save to scan history once when UR is fully decoded (not for each frame)
-            addScan(scanning.data, _tokenString, 'ecash', source);
-
-            // Create a receive history entry for ecash receive
-            const receiveHistoryEntry: ReceiveHistoryEntry = {
-              id: `receive-${Date.now()}`,
-              type: 'receive',
-              amount: decodedToken.proofs.reduce(
-                (sum: number, proof: Proof) => sum + proof.amount,
-                0
-              ),
-              unit: decodedToken.unit ?? 'sat',
-              mintUrl: decodedToken.mint,
-              createdAt: Date.now(),
-              metadata: { rawToken: _tokenString },
-              token: decodedToken,
-            };
+            addScan(scanning.data, tokenString, 'ecash', source);
 
             router.navigate({
               pathname: '/(receive-flow)/receiveToken' as any,
               params: {
-                receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
+                receiveHistoryEntry: JSON.stringify(buildReceiveHistoryEntry(tokenString)),
               },
             });
 
@@ -213,29 +201,12 @@ export const useProcessPaymentString = ({
 
         // Handle regular ecash tokens
         if (isValidEcashToken(scanning.data)) {
-          // Save to scan history
           addScan(scanning.data, scanning.data, 'ecash', source);
-
-          const decodedToken = getDecodedToken(scanning.data);
-          // Create a receive history entry for ecash receive
-          const receiveHistoryEntry: ReceiveHistoryEntry = {
-            id: `receive-${Date.now()}`,
-            type: 'receive',
-            amount: decodedToken.proofs.reduce(
-              (sum: number, proof: Proof) => sum + proof.amount,
-              0
-            ),
-            unit: decodedToken.unit ?? 'sat',
-            mintUrl: decodedToken.mint,
-            createdAt: Date.now(),
-            metadata: { rawToken: scanning.data },
-            token: decodedToken,
-          };
 
           router.navigate({
             pathname: '/(receive-flow)/receiveToken' as any,
             params: {
-              receiveHistoryEntry: JSON.stringify(receiveHistoryEntry),
+              receiveHistoryEntry: JSON.stringify(buildReceiveHistoryEntry(scanning.data)),
             },
           });
           return { urInProgress: false };

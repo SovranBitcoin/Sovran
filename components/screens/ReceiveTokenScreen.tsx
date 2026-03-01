@@ -6,60 +6,38 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { popup } from '@/helper/popup';
+
 import { router } from 'expo-router';
-import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { DetailsSection } from 'components/ui/DetailsSection';
-import { truncateMiddle } from 'helper/strings';
-import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
-import { TransactionDebugCode } from 'components/blocks/Transaction/TransactionDebugCode';
-import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
-import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
-import { VStack } from 'components/ui/View/VStack';
-import { View } from 'components/ui/View/View';
-import { Text } from 'components/ui/Text';
-import opacity from 'hex-color-opacity';
+
+import { getDecodedToken } from '@cashu/cashu-ts';
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
+import { useReceive, useManager } from 'coco-cashu-react';
+
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
-import { BottomButtons } from 'components/ui/BottomButtons';
-import { ModalLayoutWrapper } from 'app/debugModal';
+import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
+import { popup } from '@/helper/popup';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
-import { useReceive, useManager } from 'coco-cashu-react';
-import { getDecodedToken } from '@cashu/cashu-ts';
 import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
+import { ModalLayoutWrapper } from 'app/debugModal';
+import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
+import { HistoryEntryTimeline } from 'components/blocks/Transaction/HistoryEntryTimeline';
+import { TransactionLocationSection } from 'components/blocks/TransactionLocationSection';
+import { BottomButtons } from 'components/ui/BottomButtons';
+import { ButtonHandler } from 'components/ui/ButtonHandler';
+import { DetailsSection } from 'components/ui/DetailsSection';
+import { ScreenErrorState } from 'components/ui/ScreenStates';
+import { VStack } from 'components/ui/View/VStack';
+import { truncateMiddle } from 'helper/strings';
+import { useMintInfo } from 'hooks/useMintInfo';
 import { useScanHistoryStore } from 'stores/scanHistoryStore';
 import { useSettingsStore } from 'stores/settingsStore';
-import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
-import { useThemeColor } from 'hooks/useThemeColor';
 
 interface ReceiveTokenScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
   receiveHistoryEntry: ReceiveHistoryEntry | string | undefined;
   onNavigateBack: () => void;
   onRedeemSuccess: () => void;
-}
-
-/** Error screen shown when transaction data is missing or invalid */
-function ErrorState({ message, onNavigateBack }: { message: string; onNavigateBack: () => void }) {
-  const foreground = useThemeColor('foreground');
-  return (
-    <ModalLayoutWrapper>
-      <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
-        <Text color={opacity(foreground, 0.66)}>{message}</Text>
-        <ButtonHandler
-          buttons={[
-            {
-              text: 'Go Back',
-              icon: 'ri:arrow-left-line',
-              variant: 'primary',
-              onPress: async () => onNavigateBack(),
-            },
-          ]}
-        />
-      </View>
-    </ModalLayoutWrapper>
-  );
 }
 
 export function ReceiveTokenScreen({
@@ -69,9 +47,8 @@ export function ReceiveTokenScreen({
 }: ReceiveTokenScreenProps) {
   const { receive } = useReceive();
   const manager = useManager();
-  const { isKnownMint, getMintInfo } = useMintManagement();
+  const { isKnownMint } = useMintManagement();
   const [loading, setLoading] = useState(false);
-  const [mintInfo, setMintInfo] = useState<any>({});
   const [isRedeemed, setIsRedeemed] = useState(false);
   const [isAlreadySpent, setIsAlreadySpent] = useState(false);
   // Holds the real history entry id after redeem (for location lookup)
@@ -81,6 +58,7 @@ export function ReceiveTokenScreen({
   const { entry: receiveHistoryEntry, error: parseError } =
     useHistoryEntry<ReceiveHistoryEntry>(receiveHistoryEntryProp);
   const sourceLabel = useTransactionSource(finalizedTransactionId ?? receiveHistoryEntry?.id);
+  const mintInfo = useMintInfo(receiveHistoryEntry?.mintUrl);
 
   const tokenString = receiveHistoryEntry?.token
     ? manager.wallet.encodeToken(receiveHistoryEntry.token)
@@ -118,23 +96,6 @@ export function ReceiveTokenScreen({
     : effectiveIsAlreadySpent
       ? 'alreadySpent'
       : 'pending';
-
-  useEffect(() => {
-    const loadMintInfo = async () => {
-      if (receiveHistoryEntry?.mintUrl) {
-        try {
-          const info = await getMintInfo(receiveHistoryEntry.mintUrl);
-          setMintInfo(info);
-        } catch (error) {
-          console.error('Failed to load mint info:', error);
-          setMintInfo({});
-        }
-      } else {
-        setMintInfo({});
-      }
-    };
-    loadMintInfo();
-  }, [receiveHistoryEntry?.mintUrl, getMintInfo]);
 
   // Reconcile "already redeemed" state:
   // - If this screen was opened from Transactions, the receive entry is persisted (non-placeholder id)
@@ -194,9 +155,9 @@ export function ReceiveTokenScreen({
   // Show error state if parsing failed
   if (parseError || !receiveHistoryEntry) {
     return (
-      <ErrorState
+      <ScreenErrorState
         message={parseError || 'Missing transaction data. Please try again.'}
-        onNavigateBack={onNavigateBack}
+        onGoBack={onNavigateBack}
       />
     );
   }
@@ -355,7 +316,7 @@ export function ReceiveTokenScreen({
           />
         )}
 
-        <HistoryEntryRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />
+        {mintInfo && <HistoryEntryRefresh historyEntry={receiveHistoryEntry} mintInfo={mintInfo} />}
 
         <HistoryEntryTimeline
           historyEntry={{ ...receiveHistoryEntry, state: receiveState } as ReceiveHistoryEntry}
@@ -369,8 +330,6 @@ export function ReceiveTokenScreen({
             ...(tokenString ? [{ title: 'Token', value: truncateMiddle(tokenString, 6) }] : []),
           ]}
         />
-
-        <TransactionDebugCode historyEntry={receiveHistoryEntry} />
       </VStack>
     </ModalLayoutWrapper>
   );

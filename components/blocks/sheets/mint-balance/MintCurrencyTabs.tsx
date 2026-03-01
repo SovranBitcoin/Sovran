@@ -5,8 +5,8 @@
  * large (expanded) and small (compact) sizes based on scroll position.
  */
 
-import React, { useMemo, useCallback } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import React, { useCallback } from 'react';
+import { ScrollView } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   interpolate,
@@ -185,16 +185,17 @@ function AnimatedCurrencyTab({
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
       <Animated.View
+        className="rounded-2xl"
         style={[
-          styles.tabContainer,
           { backgroundColor: isSelected ? primaryColor700 : primaryColor900 },
           animatedContainerStyle,
         ]}>
-        <Animated.View style={[styles.tabContent, animatedGapStyle]}>
-          <Animated.View style={[styles.iconContainer, animatedIconStyle]}>
+        <Animated.View className="flex-row items-center" style={animatedGapStyle}>
+          <Animated.View className="items-center justify-center" style={animatedIconStyle}>
             {renderIcon()}
           </Animated.View>
-          <Animated.Text style={[styles.tabText, { color: primaryColor0 }, animatedTextStyle]}>
+          <Animated.Text
+            style={[{ fontFamily: 'OxygenBold', color: primaryColor0 }, animatedTextStyle]}>
             {label}
           </Animated.Text>
         </Animated.View>
@@ -209,7 +210,11 @@ export function MintCurrencyTabs({
   onCurrencyChange,
   scrollY,
 }: MintCurrencyTabsProps) {
-  const [primaryColor0, primaryColor700, primaryColor900] = useThemeColor(['foreground', 'surface-tertiary', 'surface'] as const);
+  const [primaryColor0, primaryColor700, primaryColor900] = useThemeColor([
+    'foreground',
+    'surface-tertiary',
+    'surface',
+  ] as const);
 
   const handleCurrencyChange = useCallback(
     (currency: string) => {
@@ -237,9 +242,9 @@ export function MintCurrencyTabs({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}>
-      <Animated.View style={[styles.tabList, animatedListGapStyle]}>
+      className="px-4 pb-2"
+      contentContainerStyle={{ alignItems: 'center' }}>
+      <Animated.View className="flex-row items-center" style={animatedListGapStyle}>
         {currencies.map((currency) => (
           <AnimatedCurrencyTab
             key={currency}
@@ -256,31 +261,3 @@ export function MintCurrencyTabs({
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  scrollView: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  scrollContent: {
-    alignItems: 'center',
-  },
-  tabList: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  tabContainer: {
-    borderRadius: 16,
-  },
-  tabContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabText: {
-    fontFamily: 'OverpassBold',
-  },
-});

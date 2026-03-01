@@ -51,30 +51,30 @@ import Reanimated, {
 
 import {
   type FeedEvent,
+  type FeedItem,
+  type FeedParseResult,
   type NoteMetrics,
   type ProfileInfo,
   type RawPrimalEvent,
-  type ContentSegment,
-  type RelayMessage,
   DEFAULT_METRICS,
-  EMPTY_QUOTED_EVENTS,
   PRIMAL_CACHE_RELAY_URL,
   PRIMAL_KIND_NOTE_STATS,
   PRIMAL_KIND_MENTIONS,
   PRIMAL_KIND_FEED_RANGE,
+  MAX_VIDEO_FEED_PAGES,
   createPrimalRelayClient,
-  parseContent,
   collectReferencedIds,
-  formatTimestamp,
-  formatCount,
   normalizeFeedEvent,
   parseJson,
   getFirstTagValue,
   parseProfileFromRaw,
   parseNoteMetrics,
   tryNpubEncode,
+  getEmbeddedRepostEvent,
+  buildVideoOverlayLayout,
+  computeFeedIndicesWithVideo,
+  enrichFeedPage,
   buildDedupedVideoPosts,
-  getVideoUrlsFromContent,
   type VideoPostRecord,
 } from './nostr/shared';
 
@@ -90,54 +90,17 @@ import { useNostrSocialStore } from '@/stores/nostrSocialStore';
 import { useThemeColor } from 'hooks/useThemeColor';
 
 // ============================================================================
-// Re-exports for backward compatibility (ThreadView imports from './UserFeed')
-// ============================================================================
-
-export type { FeedEvent, NoteMetrics, ProfileInfo, RawPrimalEvent, ContentSegment, RelayMessage };
-export {
-  DEFAULT_METRICS,
-  EMPTY_QUOTED_EVENTS,
-  PRIMAL_CACHE_RELAY_URL,
-  PRIMAL_KIND_NOTE_STATS,
-  PRIMAL_KIND_MENTIONS,
-  createPrimalRelayClient,
-  parseContent,
-  collectReferencedIds,
-  formatTimestamp,
-  formatCount,
-  normalizeFeedEvent,
-  parseJson,
-  parseProfileFromRaw,
-  tryNpubEncode,
-};
-
-// ============================================================================
 // Types (UserFeed-specific)
 // ============================================================================
 
 interface UserFeedProps {
   pubkey: string;
-  /** Author info passed from the profile screen so we don't re-fetch */
   authorName?: string;
   authorPicture?: string;
-  /** When true, repost items that were locally unreposted are filtered out on load */
   isOwnProfile?: boolean;
-  /** Optional header rendered above the feed inside the LegendList */
   ListHeaderComponent?: React.ReactElement | null;
-  /** Called when video posts are computed from the feed (e.g. for profile story ring). */
   onVideoPostsReady?: (videoPosts: VideoPostRecord[]) => void;
 }
-
-/** Unified feed item — either an original note or a repost (Kind 6/16) */
-type FeedItem =
-  | { type: 'note'; event: FeedEvent; timestamp: number }
-  | {
-      type: 'repost';
-      repostEvent: FeedEvent;
-      originalEvent: FeedEvent | undefined;
-      originalEventId: string;
-      timestamp: number;
-    };
 
 // ============================================================================
 // UserFeed-only helpers
@@ -149,34 +112,12 @@ function isRootNote(event: FeedEvent): boolean {
   return eTags.every((t) => t[3] === 'mention');
 }
 
-function getEmbeddedRepostEvent(
-  repostEvent: FeedEvent,
-  expectedEventId?: string
-): FeedEvent | undefined {
-  if (!repostEvent.content) return undefined;
-  const parsed = normalizeFeedEvent(parseJson<unknown>(repostEvent.content));
-  if (!parsed) return undefined;
-  if (expectedEventId && parsed.id !== expectedEventId) return undefined;
-  return parsed;
-}
-
-interface Phase1Result {
-  orderedFeedItems: FeedItem[];
-  metricsMap: Map<string, NoteMetrics>;
-  profilesMap: Map<string, ProfileInfo>;
-  quotedEventsMap: Map<string, FeedEvent>;
-  missingQuotedIds: string[];
-  missingProfilePubkeys: string[];
-  paginationUntil: number;
-  paginationOffset: number;
-}
-
 function parsePhase1(
   feedRawEvents: RawPrimalEvent[],
   pubkey: string,
   authorName?: string,
   authorPicture?: string
-): Phase1Result {
+): FeedParseResult {
   const eventMap = new Map<string, FeedEvent>();
   const userAuthoredPosts: FeedEvent[] = [];
   const embeddedMentionEvents = new Map<string, FeedEvent>();
@@ -455,11 +396,7 @@ export const RepostCard = React.memo(function RepostCard({
             align="center"
             gap={6}
             style={{ paddingHorizontal: 16, paddingTop: 10, marginLeft: 36 + 12 }}>
-            <Icon
-              name="garden:arrow-retweet-fill-16"
-              size={14}
-              color={opacity(foreground, 0.33)}
-            />
+            <Icon name="garden:arrow-retweet-fill-16" size={14} color={opacity(foreground, 0.33)} />
             <Text size={12} semibold style={{ color: opacity(foreground, 0.33) }}>
               {reposterName} reposted
             </Text>
@@ -525,9 +462,7 @@ function EmptyFeed() {
         No posts yet
       </Text>
       <Spacer size={4} />
-      <Text
-        size={13}
-        style={[styles.textAlignCenter, { color: opacity(foreground, 0.33) }]}>
+      <Text size={13} style={[styles.textAlignCenter, { color: opacity(foreground, 0.33) }]}>
         {"This user hasn't posted any notes."}
       </Text>
     </VStack>
@@ -645,89 +580,43 @@ function UserFeedInner({
           isFirstRender.current = false;
         });
 
-        const phase2Promise = (async () => {
-          if (phase1.missingQuotedIds.length === 0) return;
-
-          const referencedRawEvents = await client.request(`${requestPrefix}_quoted`, {
-            cache: ['events', { event_ids: phase1.missingQuotedIds }],
-          });
-          if (cancelled) return;
-
-          const nextQuoted = new Map(phase1.quotedEventsMap);
-          const extraProfiles = new Map<string, ProfileInfo>();
-          const extraMetrics = new Map<string, NoteMetrics>();
-
-          for (const raw of referencedRawEvents) {
-            if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-              const parsed = parseJson<Record<string, unknown>>(raw.content);
-              const eventId = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-              if (!eventId || !parsed) continue;
-              extraMetrics.set(eventId, parseNoteMetrics(parsed));
-              continue;
-            }
-
-            if (raw.kind === Metadata) {
-              const result = parseProfileFromRaw(raw);
-              if (result) extraProfiles.set(result[0], result[1]);
-              continue;
-            }
-
-            const ev = normalizeFeedEvent(raw);
-            if (!ev) continue;
-            nextQuoted.set(ev.id, ev);
-          }
-
-          if (cancelled) return;
-          startTransition(() => {
-            setQuotedEventsMap(nextQuoted);
-
-            if (extraMetrics.size > 0) {
-              setMetricsMap((prev) => {
-                const next = new Map(prev);
-                for (const [k, v] of extraMetrics) next.set(k, v);
-                return next;
+        if (!cancelled) {
+          await enrichFeedPage(
+            client,
+            requestPrefix,
+            phase1.missingQuotedIds,
+            phase1.missingProfilePubkeys,
+            phase1.quotedEventsMap,
+            phase1.profilesMap,
+            (updates) => {
+              if (cancelled) return;
+              startTransition(() => {
+                if (updates.quotedEvents) {
+                  setQuotedEventsMap((prev) => {
+                    const n = new Map(prev);
+                    for (const [k, v] of updates.quotedEvents!) n.set(k, v);
+                    return n;
+                  });
+                }
+                if (updates.metrics) {
+                  setMetricsMap((prev) => {
+                    const n = new Map(prev);
+                    for (const [k, v] of updates.metrics!) n.set(k, v);
+                    return n;
+                  });
+                }
+                if (updates.profiles) {
+                  setProfilesMap((prev) => {
+                    const n = new Map(prev);
+                    for (const [k, v] of updates.profiles!) n.set(k, v);
+                    return n;
+                  });
+                }
+                setDataVersion((v) => v + 1);
               });
             }
-
-            if (extraProfiles.size > 0) {
-              setProfilesMap((prev) => {
-                const next = new Map(prev);
-                for (const [k, v] of extraProfiles) next.set(k, v);
-                return next;
-              });
-            }
-
-            setDataVersion((v) => v + 1);
-          });
-        })();
-
-        const phase3Promise = (async () => {
-          if (phase1.missingProfilePubkeys.length === 0) return;
-
-          const profileRawEvents = await client.request(`${requestPrefix}_profiles`, {
-            cache: ['user_infos', { pubkeys: phase1.missingProfilePubkeys }],
-          });
-          if (cancelled) return;
-
-          const extraProfiles = new Map<string, ProfileInfo>();
-          for (const raw of profileRawEvents) {
-            if (raw.kind !== Metadata) continue;
-            const result = parseProfileFromRaw(raw);
-            if (result) extraProfiles.set(result[0], result[1]);
-          }
-
-          if (cancelled || extraProfiles.size === 0) return;
-          startTransition(() => {
-            setProfilesMap((prev) => {
-              const next = new Map(prev);
-              for (const [k, v] of extraProfiles) next.set(k, v);
-              return next;
-            });
-            setDataVersion((v) => v + 1);
-          });
-        })();
-
-        await Promise.all([phase2Promise, phase3Promise]);
+          );
+        }
       } catch (error) {
         console.error('UserFeed: Failed to load Primal cached feed', error);
         if (!cancelled) {
@@ -847,86 +736,42 @@ function UserFeedInner({
         setDataVersion((v) => v + 1);
       });
 
-      // Enrichment for new page (quoted events + profiles)
       const missingQ = page.missingQuotedIds.filter((id) => !quotedRef.current.has(id));
       const missingP = page.missingProfilePubkeys.filter((pk) => !profilesRef.current.has(pk));
-      const enrichTasks: Promise<void>[] = [];
-
-      if (missingQ.length > 0) {
-        enrichTasks.push(
-          client
-            .request(`${rp}_eq`, { cache: ['events', { event_ids: missingQ }] })
-            .then((evts) => {
-              const xQ = new Map<string, FeedEvent>();
-              const xM = new Map<string, NoteMetrics>();
-              const xP = new Map<string, ProfileInfo>();
-              for (const raw of evts) {
-                if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-                  const p = parseJson<Record<string, unknown>>(raw.content);
-                  const eid = typeof p?.event_id === 'string' ? p.event_id : undefined;
-                  if (!eid || !p) continue;
-                  xM.set(eid, parseNoteMetrics(p));
-                  continue;
-                }
-                if (raw.kind === Metadata) {
-                  const r = parseProfileFromRaw(raw);
-                  if (r) xP.set(r[0], r[1]);
-                  continue;
-                }
-                const ev = normalizeFeedEvent(raw);
-                if (ev) xQ.set(ev.id, ev);
-              }
-              startTransition(() => {
-                if (xQ.size > 0)
-                  setQuotedEventsMap((prev) => {
-                    const n = new Map(prev);
-                    for (const [k, v] of xQ) n.set(k, v);
-                    return n;
-                  });
-                if (xM.size > 0)
-                  setMetricsMap((prev) => {
-                    const n = new Map(prev);
-                    for (const [k, v] of xM) n.set(k, v);
-                    return n;
-                  });
-                if (xP.size > 0)
-                  setProfilesMap((prev) => {
-                    const n = new Map(prev);
-                    for (const [k, v] of xP) n.set(k, v);
-                    return n;
-                  });
-                setDataVersion((v) => v + 1);
+      await enrichFeedPage(
+        client,
+        rp,
+        missingQ,
+        missingP,
+        quotedRef.current,
+        profilesRef.current,
+        (updates) => {
+          startTransition(() => {
+            if (updates.quotedEvents) {
+              setQuotedEventsMap((prev) => {
+                const n = new Map(prev);
+                for (const [k, v] of updates.quotedEvents!) n.set(k, v);
+                return n;
               });
-            })
-        );
-      }
-
-      if (missingP.length > 0) {
-        enrichTasks.push(
-          client
-            .request(`${rp}_ep`, { cache: ['user_infos', { pubkeys: missingP }] })
-            .then((evts) => {
-              const xP = new Map<string, ProfileInfo>();
-              for (const raw of evts) {
-                if (raw.kind !== Metadata) continue;
-                const r = parseProfileFromRaw(raw);
-                if (r) xP.set(r[0], r[1]);
-              }
-              if (xP.size > 0) {
-                startTransition(() => {
-                  setProfilesMap((prev) => {
-                    const n = new Map(prev);
-                    for (const [k, v] of xP) n.set(k, v);
-                    return n;
-                  });
-                  setDataVersion((v) => v + 1);
-                });
-              }
-            })
-        );
-      }
-
-      await Promise.all(enrichTasks);
+            }
+            if (updates.metrics) {
+              setMetricsMap((prev) => {
+                const n = new Map(prev);
+                for (const [k, v] of updates.metrics!) n.set(k, v);
+                return n;
+              });
+            }
+            if (updates.profiles) {
+              setProfilesMap((prev) => {
+                const n = new Map(prev);
+                for (const [k, v] of updates.profiles!) n.set(k, v);
+                return n;
+              });
+            }
+            setDataVersion((v) => v + 1);
+          });
+        }
+      );
       return dedupedItems;
     } catch (error) {
       console.error('UserFeed: loadMore failed', error);
@@ -975,77 +820,23 @@ function UserFeedInner({
     onVideoPostsReady?.(videoPosts);
   }, [videoPosts, onVideoPostsReady]);
 
-  const feedIndicesWithVideo = useMemo(() => {
-    const out: number[] = [];
-    feedItems.forEach((item, i) => {
-      const ev = item.type === 'note' ? item.event : item.originalEvent;
-      if (ev && getVideoUrlsFromContent(ev.content).length > 0) out.push(i);
-    });
-    return out;
-  }, [feedItems]);
+  const feedIndicesWithVideo = useMemo(() => computeFeedIndicesWithVideo(feedItems), [feedItems]);
 
   const onOverlayOpenedFromIndex = useCallback((index: number) => {
     overlaySourceIndexRef.current = index;
   }, []);
 
-  const MAX_VIDEO_FEED_PAGES = 20;
-
   const buildLayoutForVideoIndex = useCallback(
-    (feedIndex: number): ImageOverlayReplaceLayout | null => {
-      const item = feedItems[feedIndex];
-      const event = item?.type === 'note' ? item.event : item?.originalEvent;
-      if (!event) return null;
-      const segments = parseContent(event.content);
-      const blockSegments = segments.filter(
-        (s): s is ContentSegment & { kind: 'image' | 'video'; url: string } =>
-          s.kind === 'image' || s.kind === 'video'
-      );
-      if (blockSegments.length === 0) return null;
-      const urls = blockSegments.map((s) => s.url);
-      const mediaTypes = blockSegments.map((s) =>
-        s.kind === 'video' ? ('video' as const) : ('image' as const)
-      );
-      const firstVideoIndex = mediaTypes.indexOf('video');
-      if (firstVideoIndex === -1) return null;
-      const metrics = getDisplayMetrics(event.id) || DEFAULT_METRICS;
-      const engagement = getEngagementState(event.id);
-      const profile = profilesRef.current.get(event.pubkey) ?? null;
-      return {
-        url: urls[firstVideoIndex],
-        urls,
-        mediaTypes,
-        initialIndex: firstVideoIndex,
-        aspectRatio: 16 / 9,
-        post: {
-          event: {
-            id: event.id,
-            pubkey: event.pubkey,
-            content: event.content,
-            created_at: event.created_at,
-          },
-          metrics: {
-            replyCount: metrics.replyCount,
-            repostCount: metrics.repostCount,
-            likeCount: metrics.likeCount,
-            satsZapped: metrics.satsZapped,
-          },
-          profile: profile ?? undefined,
-          reposted: engagement.reposted,
-          liked: engagement.liked,
-          repostPending: engagement.repostPending,
-          likePending: engagement.likePending,
-          repostPendingDirection: engagement.repostPendingDirection,
-          likePendingDirection: engagement.likePendingDirection,
-          onCommentPress: () =>
-            router.navigate({
-              pathname: '/(user-flow)/thread' as any,
-              params: { eventId: event.id },
-            }),
-          onRepostPress: () => toggleRepost(event),
-          onLikePress: () => toggleLike(event),
-        },
-      };
-    },
+    (feedIndex: number): ImageOverlayReplaceLayout | null =>
+      buildVideoOverlayLayout(
+        feedIndex,
+        feedItems,
+        getDisplayMetrics,
+        getEngagementState,
+        profilesRef,
+        toggleLike,
+        toggleRepost
+      ),
     [feedItems, getDisplayMetrics, getEngagementState, toggleLike, toggleRepost]
   );
 
@@ -1136,11 +927,7 @@ function UserFeedInner({
     <View>
       {ListHeaderComponent}
       <View style={styles.feedContainer}>
-        <Text
-          medium
-          overpass
-          size={13}
-          style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
+        <Text medium size={13} style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
           Notes
         </Text>
         {isLoading ? (
@@ -1209,71 +996,12 @@ function UserFeedInner({
       const current = overlaySourceIndexRef.current;
       const nextVideoIndex = feedIndicesWithVideo.find((i) => i > current);
       if (typeof nextVideoIndex !== 'number') return;
-      const item = feedItems[nextVideoIndex];
-      const event = item.type === 'note' ? item.event : item.originalEvent;
-      if (!event) return;
-      const segments = parseContent(event.content);
-      const blockSegments = segments.filter(
-        (s): s is ContentSegment & { kind: 'image' | 'video'; url: string } =>
-          s.kind === 'image' || s.kind === 'video'
-      );
-      const media = blockSegments;
-      if (media.length === 0) return;
-      const urls = media.map((s) => s.url);
-      const mediaTypes = media.map((s) =>
-        s.kind === 'video' ? ('video' as const) : ('image' as const)
-      );
-      const firstVideoIndex = mediaTypes.indexOf('video');
-      if (firstVideoIndex === -1) return;
-      const metrics = getDisplayMetrics(event.id) || DEFAULT_METRICS;
-      const engagement = getEngagementState(event.id);
-      const profile = profilesRef.current.get(event.pubkey) ?? null;
-      const layout: ImageOverlayReplaceLayout = {
-        url: urls[firstVideoIndex],
-        urls,
-        mediaTypes,
-        initialIndex: firstVideoIndex,
-        aspectRatio: 16 / 9,
-        post: {
-          event: {
-            id: event.id,
-            pubkey: event.pubkey,
-            content: event.content,
-            created_at: event.created_at,
-          },
-          metrics: {
-            replyCount: metrics.replyCount,
-            repostCount: metrics.repostCount,
-            likeCount: metrics.likeCount,
-            satsZapped: metrics.satsZapped,
-          },
-          profile: profile ?? undefined,
-          reposted: engagement.reposted,
-          liked: engagement.liked,
-          repostPending: engagement.repostPending,
-          likePending: engagement.likePending,
-          repostPendingDirection: engagement.repostPendingDirection,
-          likePendingDirection: engagement.likePendingDirection,
-          onCommentPress: () =>
-            router.navigate({
-              pathname: '/(user-flow)/thread' as any,
-              params: { eventId: event.id },
-            }),
-          onRepostPress: () => toggleRepost(event),
-          onLikePress: () => toggleLike(event),
-        },
-      };
+      const layout = buildLayoutForVideoIndex(nextVideoIndex);
+      if (!layout) return;
       overlaySourceIndexRef.current = nextVideoIndex;
       openNext(layout);
     },
-    [
-      feedIndicesWithVideo,
-      feedItems,
-      getDisplayMetrics,
-      getEngagementState,
-      toggleLike,
-      toggleRepost,
-    ]
+    [feedIndicesWithVideo, buildLayoutForVideoIndex]
   );
 
   return (

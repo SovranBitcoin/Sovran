@@ -329,14 +329,15 @@ export const Button = ({
   blur = false,
   haptics = false,
 }: ButtonProps) => {
-  const [foreground, surfaceForeground, accent, surfaceTertiary, background, danger] = useThemeColor([
-    'foreground',
-    'surface-foreground',
-    'accent',
-    'surface-tertiary',
-    'background',
-    'danger',
-  ] as const);
+  const [foreground, surfaceForeground, foregroundSecondary, surfaceTertiary, background, danger] =
+    useThemeColor([
+      'foreground',
+      'surface-foreground',
+      'foreground-secondary',
+      'surface-tertiary',
+      'background',
+      'danger',
+    ] as const);
 
   // Ripple hook
   const rippleConfig = typeof ripple === 'object' ? ripple : {};
@@ -487,7 +488,7 @@ export const Button = ({
         return {
           ...base,
           backgroundColor: surfaceTertiary,
-          borderColor: accent,
+          borderColor: foregroundSecondary,
         };
       case 'dangerous':
         return {
@@ -557,7 +558,6 @@ export const Button = ({
           <Text
             size={16}
             bold
-            overpass
             style={{
               color: getTextColor(),
             }}>
@@ -644,7 +644,7 @@ export const Button = ({
                 <Text
                   style={{
                     color: getTextColor(),
-                    fontFamily: 'OverpassBold',
+                    fontFamily: 'OxygenBold',
                     paddingVertical: 12, // py-3
                     textAlign: 'center',
                   }}

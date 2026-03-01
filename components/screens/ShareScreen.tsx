@@ -161,22 +161,14 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
                       currency={config.iconCurrency}
                     />
                   ) : config.iconName ? (
-                    <Icon
-                      name={config.iconName}
-                      size={20}
-                      color={opacity(foreground, 0.4)}
-                    />
+                    <Icon name={config.iconName} size={20} color={opacity(foreground, 0.4)} />
                   ) : undefined}
                 </ListGroup.ItemPrefix>
                 <ListGroup.ItemContent>
                   <ListGroup.ItemTitle>{truncateMiddle(activeData, 10)}</ListGroup.ItemTitle>
                 </ListGroup.ItemContent>
                 <ListGroup.ItemSuffix>
-                  <Icon
-                    name="lets-icons:copy"
-                    size={20}
-                    color={opacity(foreground, 0.4)}
-                  />
+                  <Icon name="lets-icons:copy" size={20} color={opacity(foreground, 0.4)} />
                 </ListGroup.ItemSuffix>
               </ListGroup.Item>
             </PressableFeedback.Scale>

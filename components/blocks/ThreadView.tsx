@@ -52,6 +52,25 @@ type ThreadItem =
   | { type: 'reply'; event: FeedEvent };
 
 // ============================================================================
+// Stable list helpers (module-level — no closures needed)
+// ============================================================================
+
+function threadKeyExtractor(item: ThreadItem): string {
+  switch (item.type) {
+    case 'parent':
+      return `p_${item.event.id}`;
+    case 'target':
+      return `t_${item.event.id}`;
+    case 'reply':
+      return `r_${item.event.id}`;
+  }
+}
+
+function threadItemType(item: ThreadItem): string {
+  return item.type;
+}
+
+// ============================================================================
 // Thread data fetching helpers
 // ============================================================================
 
@@ -75,7 +94,6 @@ function buildThreadStructure(
 
   while (true) {
     const eTags = (current.tags || []).filter((t) => t[0] === 'e');
-    // Look for 'reply' marker first, then 'root', then fall back to last e-tag
     const replyTag = eTags.find((t) => t[3] === 'reply');
     const rootTag = eTags.find((t) => t[3] === 'root');
     const parentTag = replyTag || rootTag || (eTags.length > 0 ? eTags[eTags.length - 1] : null);
@@ -100,14 +118,12 @@ function buildThreadStructure(
     if (parents.some((p) => p.id === ev.id)) continue;
 
     const eTags = (ev.tags || []).filter((t) => t[0] === 'e');
-    // Check if any e-tag with 'reply' marker points to our event
     const replyTag = eTags.find((t) => t[3] === 'reply');
     if (replyTag && replyTag[1] === eventId) {
       replies.push(ev);
       continue;
     }
-    // Check if root tag points to our event and there's no reply marker
-    // (NIP-10: if only root is present, it's a direct reply)
+    // NIP-10: if only root is present, it's a direct reply
     if (!replyTag) {
       const rootTag = eTags.find((t) => t[3] === 'root');
       if (rootTag && rootTag[1] === eventId) {
@@ -115,7 +131,7 @@ function buildThreadStructure(
         continue;
       }
     }
-    // If no markers, check if the last e-tag points to our event (NIP-10 positional)
+    // NIP-10 positional: last e-tag points to our event
     if (!replyTag && eTags.length > 0) {
       const lastETag = eTags[eTags.length - 1];
       if (lastETag[1] === eventId && lastETag[3] !== 'root' && lastETag[3] !== 'mention') {
@@ -146,7 +162,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Data state
   const [threadItems, setThreadItems] = useState<ThreadItem[]>([]);
   const [profilesMap, setProfilesMap] = useState<Map<string, ProfileInfo>>(new Map());
   const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(new Map());
@@ -163,16 +178,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 
   const [hiddenReplyCount, setHiddenReplyCount] = useState(0);
 
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  // Index of the target item to scroll to
   const targetIndex = useMemo(() => {
     return threadItems.findIndex((item) => item.type === 'target');
   }, [threadItems]);
@@ -255,10 +260,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         let { parents, target, replies } = buildThreadStructure(eventId, allEvents);
 
         if (!target) {
-          if (mountedRef.current) {
-            setError('Post not found');
-            setIsLoading(false);
-          }
+          setError('Post not found');
+          setIsLoading(false);
           return;
         }
 
@@ -310,6 +313,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
             // event_replies not available on this Primal cache version
           }
         }
+
+        if (cancelled) return;
 
         // Phase 2: Fetch missing quoted events
         const contentSources = [target, ...parents, ...replies];
@@ -376,22 +381,19 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           items.push({ type: 'reply', event: reply });
         }
 
-        if (mountedRef.current) {
-          // Compute hidden reply count from metrics vs loaded replies
-          const targetMetrics = metrics.get(eventId);
-          const expectedReplies = targetMetrics?.replyCount ?? 0;
-          const hidden = Math.max(0, expectedReplies - replies.length);
-          setHiddenReplyCount(hidden);
+        // Compute hidden reply count from metrics vs loaded replies
+        const targetMetrics = metrics.get(eventId);
+        const expectedReplies = targetMetrics?.replyCount ?? 0;
+        setHiddenReplyCount(Math.max(0, expectedReplies - replies.length));
 
-          setThreadItems(items);
-          setProfilesMap(profiles);
-          setMetricsMap(metrics);
-          setQuotedEventsMap(quotedEvents);
-          setDataVersion((v) => v + 1);
-          setIsLoading(false);
-        }
+        setThreadItems(items);
+        setProfilesMap(profiles);
+        setMetricsMap(metrics);
+        setQuotedEventsMap(quotedEvents);
+        setDataVersion((v) => v + 1);
+        setIsLoading(false);
       } catch {
-        if (mountedRef.current && !cancelled) {
+        if (!cancelled) {
           setError('Failed to load thread');
           setIsLoading(false);
         }
@@ -410,26 +412,12 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     };
   }, [eventId]);
 
-  const keyExtractor = useCallback((item: ThreadItem) => {
-    switch (item.type) {
-      case 'parent':
-        return `p_${item.event.id}`;
-      case 'target':
-        return `t_${item.event.id}`;
-      case 'reply':
-        return `r_${item.event.id}`;
-    }
-  }, []);
-
   const hasParents = useMemo(() => threadItems.some((i) => i.type === 'parent'), [threadItems]);
 
   const renderItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<ThreadItem, string | undefined>) => {
       const isParent = item.type === 'parent';
       const isTarget = item.type === 'target';
-
-      const showLineAbove = isParent ? index > 0 : isTarget ? hasParents : false;
-      const showLineBelow = isParent ? true : false;
 
       const metrics = getDisplayMetrics(item.event.id);
       const engagement = getEngagementState(item.event.id);
@@ -442,8 +430,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           quotedEvents={quotedRef.current}
           profiles={profilesRef.current}
           getMetrics={getMetrics}
-          showLineAbove={showLineAbove}
-          showLineBelow={showLineBelow}
+          showLineAbove={isParent ? index > 0 : isTarget ? hasParents : false}
+          showLineBelow={isParent}
           liked={engagement.liked}
           reposted={engagement.reposted}
           likePending={engagement.likePending}
@@ -491,15 +479,12 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   return (
     <ImageOverlayProvider
       getDisplayMetrics={getDisplayMetrics}
-      getEngagementState={getEngagementState}
-      onSwipeUpToNextPost={(_openNext) => {
-        /* no next video in thread view */
-      }}>
+      getEngagementState={getEngagementState}>
       <View style={[styles.container, { backgroundColor: background }]}>
         <LegendList
           data={threadItems}
-          keyExtractor={keyExtractor}
-          getItemType={(item) => item.type}
+          keyExtractor={threadKeyExtractor}
+          getItemType={threadItemType}
           estimatedItemSize={200}
           drawDistance={500}
           renderItem={renderItem}
@@ -533,14 +518,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   );
 }
 
-function ThreadViewComponent(props: ThreadViewProps) {
-  return <ThreadViewInner {...props} />;
-}
-
-export const ThreadView = React.memo(ThreadViewComponent);
+export const ThreadView = React.memo(ThreadViewInner);
 
 // ============================================================================
-// Styles (ThreadView-specific only — shared styles live in nostr/shared.tsx)
+// Styles
 // ============================================================================
 
 const styles = StyleSheet.create({

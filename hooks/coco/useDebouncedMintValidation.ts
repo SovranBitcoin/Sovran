@@ -1,15 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+
+import type { GetInfoResponse } from '@cashu/cashu-ts';
+
 import { fetchMintInfo } from '@/helper/apiClient';
+import { normalizeUrlForApi } from '@/helper/url';
 
 interface ValidationState {
-  isValid: boolean | null; // null = not checked, true = valid, false = invalid
+  isValid: boolean | null;
   isLoading: boolean;
   error: string | null;
 }
 
 /**
- * Custom hook for debounced mint URL validation
- * Validates mint URLs with a debounce delay to avoid excessive API calls
+ * Debounced mint URL validation via fetchMintInfo.
+ * Marks a mint as valid only when its /v1/info endpoint responds successfully.
  */
 export function useDebouncedMintValidation(debounceMs: number = 800) {
   const [validationState, setValidationState] = useState<ValidationState>({
@@ -18,63 +22,31 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
     error: null,
   });
   const [url, setUrl] = useState('');
-  const [mintInfo, setMintInfo] = useState<any>(null);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Normalize URL for API calls by ensuring https:// prefix
-  // Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
-  const normalizeUrlForApi = useCallback((rawUrl: string): string => {
-    const trimmed = rawUrl.trim();
-    const withoutProtocol = trimmed.replace(/^https?:\/\//, '');
-    const slashIndex = withoutProtocol.indexOf('/');
-    if (slashIndex === -1) {
-      // No path, just domain
-      const domain = withoutProtocol.toLowerCase().replace(/^www\./, '');
-      return `https://${domain}`;
-    }
-    const domain = withoutProtocol
-      .slice(0, slashIndex)
-      .toLowerCase()
-      .replace(/^www\./, '');
-    const path = withoutProtocol.slice(slashIndex);
-    return `https://${domain}${path}`;
-  }, []);
+  const [mintInfo, setMintInfo] = useState<GetInfoResponse | null>(null);
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const validateUrl = useCallback(async (mintUrl: string) => {
     if (!mintUrl.trim()) {
-      setValidationState({
-        isValid: null,
-        isLoading: false,
-        error: null,
-      });
+      setValidationState({ isValid: null, isLoading: false, error: null });
       setMintInfo(null);
       return;
     }
 
-    // Normalize URL for API call (ensures https:// prefix)
     const normalizedUrl = normalizeUrlForApi(mintUrl);
 
-    // Basic URL validation
     try {
       new URL(normalizedUrl);
     } catch {
-      setValidationState({
-        isValid: false,
-        isLoading: false,
-        error: 'Invalid URL format',
-      });
+      setValidationState({ isValid: false, isLoading: false, error: 'Invalid URL format' });
       setMintInfo(null);
       return;
     }
 
     setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    // For validation, we need to successfully fetch mint info
-    // Only mark as valid if we actually get valid mint info back
     const mintInfoResult = await fetchMintInfo(normalizedUrl);
 
     if (mintInfoResult.isErr()) {
-      // If we can't get mint info, it's invalid
       setValidationState({
         isValid: false,
         isLoading: false,
@@ -82,7 +54,6 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
       });
       setMintInfo(null);
     } else {
-      // Only valid if we got actual mint info back
       const hasValidInfo = mintInfoResult.value !== null;
       setValidationState({
         isValid: hasValidInfo,
@@ -97,26 +68,18 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
     (mintUrl: string) => {
       setUrl(mintUrl);
 
-      // Clear existing timeout
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
 
-      // Reset state if URL is empty
       if (!mintUrl.trim()) {
-        setValidationState({
-          isValid: null,
-          isLoading: false,
-          error: null,
-        });
+        setValidationState({ isValid: null, isLoading: false, error: null });
         setMintInfo(null);
         return;
       }
 
-      // Set loading state immediately for better UX
       setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-      // Debounce the validation
       debounceTimeoutRef.current = setTimeout(() => {
         validateUrl(mintUrl);
       }, debounceMs);
@@ -124,7 +87,6 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
     [validateUrl, debounceMs]
   );
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (debounceTimeoutRef.current) {
@@ -135,11 +97,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
 
   const reset = useCallback(() => {
     setUrl('');
-    setValidationState({
-      isValid: null,
-      isLoading: false,
-      error: null,
-    });
+    setValidationState({ isValid: null, isLoading: false, error: null });
     setMintInfo(null);
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);

@@ -331,7 +331,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
         </Pressable>
         <View style={styles.metricBtn}>
           <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
-          <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+          <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
             {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
           </Text>
         </View>
@@ -471,7 +471,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
         </Pressable>
         <View style={styles.metricBtn}>
           <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
-          <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+          <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
             {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
           </Text>
         </View>

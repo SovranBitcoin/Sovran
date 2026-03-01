@@ -1,23 +1,26 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
+
 import { LegendList } from '@legendapp/list';
-import { Text } from 'components/ui/Text';
-import Icon from 'assets/icons';
-import { VStack } from 'components/ui/View/VStack';
-import { Spacer } from 'components/ui/View/Spacer';
-import { View } from 'components/ui/View/View';
 import { Link } from 'expo-router';
-import { HistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
-import { formatDate } from 'helper/time';
-import { Transaction } from 'components/blocks/Transaction';
-import { SwapTransactionRow } from 'components/blocks/SwapTransactionRow';
-import _ from 'lodash';
-import { mintHistoryEntryExpired } from 'helper/utils';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import opacity from 'hex-color-opacity';
+import _ from 'lodash';
+
+import { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
+
+import Icon from 'assets/icons';
+import { SwapTransactionRow } from 'components/blocks/SwapTransactionRow';
+import { Transaction } from 'components/blocks/Transaction';
 import { BlurCardFrame } from 'components/ui/BlurCardFrame';
-import { useSwapTransactionsStore, type SwapGroup } from 'stores/swapTransactionsStore';
+import { Text } from 'components/ui/Text';
+import { TouchableOpacity } from 'components/ui/TouchableOpacity';
+import { Spacer } from 'components/ui/View/Spacer';
+import { VStack } from 'components/ui/View/VStack';
+import { View } from 'components/ui/View/View';
+import { formatDate } from 'helper/time';
+import { mintHistoryEntryExpired } from 'helper/utils';
 import { useThemeColor } from 'hooks/useThemeColor';
+import { useSwapTransactionsStore, type SwapGroup } from 'stores/swapTransactionsStore';
 
 // ---------------------------------------------------------------------------
 // Timeline item: a discriminated union so transactions and swap groups can
@@ -101,8 +104,7 @@ export const Transactions = React.memo(
   }: Props) => {
     const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
 
-    const accentColor = muted;
-    const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
+    const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
     const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
 
@@ -120,9 +122,8 @@ export const Transactions = React.memo(
           if (account.unit !== 'all' && historyEntry.unit !== account.unit) return false;
           if (mintUrlFilter !== 'all' && historyEntry.mintUrl !== mintUrlFilter) return false;
 
-          // Hide underlying child transactions that are part of a swap group
           if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
-            const quoteId = (historyEntry as any).quoteId as string | undefined;
+            const quoteId = (historyEntry as MintHistoryEntry | MeltHistoryEntry).quoteId;
             if (quoteId && quoteIdToGroup[quoteId]) return false;
           }
 
@@ -284,31 +285,29 @@ export const Transactions = React.memo(
       return sections.all;
     }, [sections, tab]);
 
-    /** Render a single timeline item (transaction or swap). */
-    const renderTimelineItem = (item: TimelineItem) => {
-      const key = getTimelineKey(item);
-      if (item.kind === 'swap') {
-        return <SwapTransactionRow key={key} group={item.data} />;
-      }
-      return <Transaction key={key} historyEntry={item.data} onPress={onTransactionPress} />;
-    };
+    const renderTimelineItem = useCallback(
+      (item: TimelineItem) => {
+        const key = getTimelineKey(item);
+        if (item.kind === 'swap') {
+          return <SwapTransactionRow key={key} group={item.data} />;
+        }
+        return <Transaction key={key} historyEntry={item.data} onPress={onTransactionPress} />;
+      },
+      [onTransactionPress]
+    );
 
     const emptyComponent = useMemo(
       () => (
-        <View style={{ paddingTop: 32 }}>
+        <View className="pt-8">
           <View style={[styles.card, { borderColor }]}>
-            <BlurCardFrame accentColor={accentColor}>
+            <BlurCardFrame accentColor={muted}>
               <View style={styles.emptyState}>
-                <Icon
-                  name="fluent:clock-12-filled"
-                  size={36}
-                  color={opacity(foreground, 0.33)}
-                />
+                <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
                 <Text
                   size={16}
                   style={{
                     color: opacity(foreground, 0.66),
-                    fontFamily: 'OverpassSemibold',
+                    fontFamily: 'OxygenBold',
                     textAlign: 'center',
                   }}>
                   No transactions found
@@ -326,7 +325,7 @@ export const Transactions = React.memo(
           </View>
         </View>
       ),
-      [accentColor, borderColor, foreground]
+      [muted, borderColor, foreground]
     );
 
     if (showMore) {
@@ -364,18 +363,14 @@ export const Transactions = React.memo(
           <View>
             <Spacer size={24} />
             <View style={[styles.card, { borderColor }]}>
-              <BlurCardFrame accentColor={accentColor}>
+              <BlurCardFrame accentColor={muted}>
                 <View style={styles.emptyState}>
-                  <Icon
-                    name="fluent:clock-12-filled"
-                    size={36}
-                    color={opacity(foreground, 0.33)}
-                  />
+                  <Icon name="fluent:clock-12-filled" size={36} color={opacity(foreground, 0.33)} />
                   <Text
                     size={16}
                     style={{
                       color: opacity(foreground, 0.66),
-                      fontFamily: 'OverpassSemibold',
+                      fontFamily: 'OxygenBold',
                       textAlign: 'center',
                     }}>
                     No History
@@ -404,7 +399,7 @@ export const Transactions = React.memo(
                 <View key={section.title}>
                   <VStack spacing={8}>
                     <View style={[styles.card, { borderColor }]}>
-                      <BlurCardFrame accentColor={accentColor}>
+                      <BlurCardFrame accentColor={muted}>
                         <View style={styles.content}>
                           <View style={styles.sectionHeader}>
                             <Text heavy size={16} color={foreground}>
@@ -430,7 +425,7 @@ export const Transactions = React.memo(
                         asChild>
                         <TouchableOpacity>
                           <View style={[styles.viewAllButton, { borderColor }]}>
-                            <BlurCardFrame accentColor={accentColor}>
+                            <BlurCardFrame accentColor={muted}>
                               <View style={styles.viewAllContent}>
                                 <Text size={14} bold>
                                   View all ({filteredHistory.length})
@@ -477,7 +472,7 @@ export const Transactions = React.memo(
         onScroll={onScroll}
         scrollEventThrottle={16}
         renderItem={({ item: section }) => (
-          <VStack spacing={4} style={{ marginBottom: 16 }}>
+          <VStack spacing={4} className="mb-4">
             <Text
               size={14}
               heavy
@@ -486,7 +481,7 @@ export const Transactions = React.memo(
               {section.title}
             </Text>
             <View style={[styles.card, { borderColor }]}>
-              <BlurCardFrame accentColor={accentColor}>
+              <BlurCardFrame accentColor={muted}>
                 <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
               </BlurCardFrame>
             </View>

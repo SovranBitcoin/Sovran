@@ -64,7 +64,12 @@ export const TransferEntryRow = React.memo(
     onPress,
     statusIcon,
   }: TransferEntryRowProps) => {
-    const [foreground, accent, danger, success] = useThemeColor(['foreground', 'accent', 'danger', 'success'] as const);
+    const [foreground, accent, danger, success] = useThemeColor([
+      'foreground',
+      'accent',
+      'danger',
+      'success',
+    ] as const);
 
     const isSend = type === 'send';
     const amountColor = isSend ? danger : success;
@@ -90,7 +95,7 @@ export const TransferEntryRow = React.memo(
               {mintName}
             </UntranslatedText>
             <HStack align="center" spacing={0}>
-              <UntranslatedText color={amountColor} bold size={16}>
+              <UntranslatedText overpass color={amountColor} bold size={16}>
                 {isSend ? '- ' : '+ '}
               </UntranslatedText>
               <AmountFormatter
@@ -107,7 +112,7 @@ export const TransferEntryRow = React.memo(
           {(subtitle || secondarySubtitle) && (
             <HStack justify="space-between" align="center">
               {subtitle ? (
-                <UntranslatedText regular size={10} color={subtitleColor ?? defaultSubtitleColor}>
+                <UntranslatedText size={10} color={subtitleColor ?? defaultSubtitleColor}>
                   {subtitle}
                 </UntranslatedText>
               ) : (
@@ -115,6 +120,7 @@ export const TransferEntryRow = React.memo(
               )}
               {secondarySubtitle ? (
                 <UntranslatedText
+                  overpass
                   bold
                   size={10}
                   color={secondarySubtitleColor ?? defaultSubtitleColor}>

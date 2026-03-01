@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useHandleCameraPermission } from 'hooks/useHandleCameraPermission';
 import 'react-native-get-random-values';
 import Swiper from 'react-native-web-infinite-swiper';
@@ -38,12 +38,15 @@ import { LiquidButtonView } from 'expo-liquid-glass-native';
 import { hasAndroidLiquidButtonView } from '@/components/navigation/expoRouter55';
 import { useThemeColor } from 'hooks/useThemeColor';
 
-// Invisible figure-space titles to give LiquidButtonView intrinsic width
 const INVISIBLE_TITLE_WIDE = '\u2007'.repeat(12);
 const INVISIBLE_TITLE_SHORT = '\u2007'.repeat(1);
 
 const BUTTON_H = 48;
 const QR_SIZE = 72;
+
+// ---------------------------------------------------------------------------
+// Platform-specific button components (module-scoped, no closures needed)
+// ---------------------------------------------------------------------------
 
 function AndroidLiquidCapsuleButton({
   label,
@@ -57,7 +60,7 @@ function AndroidLiquidCapsuleButton({
   onPress: () => void;
 }) {
   return (
-    <View style={{ width: '100%', height: BUTTON_H }}>
+    <View className="w-full" style={{ height: BUTTON_H }}>
       <LiquidButtonView
         title={INVISIBLE_TITLE_WIDE}
         enabled
@@ -68,20 +71,10 @@ function AndroidLiquidCapsuleButton({
       />
       <View
         pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: 0,
-          bottom: 0,
-          flexDirection: 'row',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: 8,
-          elevation: 1,
-        }}>
+        className="absolute inset-0 flex-row items-center justify-center gap-2"
+        style={{ elevation: 1 }}>
         <Icon name={icon} size={16} color={color} />
-        <Text size={14} style={{ color, fontFamily: 'OverpassSemibold' }}>
+        <Text size={14} style={{ color, fontFamily: 'OxygenBold' }}>
           {label}
         </Text>
       </View>
@@ -100,11 +93,11 @@ function AndroidLiquidQRButton({
 }) {
   return (
     <View
+      className="overflow-hidden"
       style={{
         width: QR_SIZE,
         height: QR_SIZE,
         borderRadius: QR_SIZE / 2,
-        overflow: 'hidden',
         transform: [{ scale: 1.3 }],
       }}>
       <LiquidButtonView
@@ -119,21 +112,86 @@ function AndroidLiquidQRButton({
       />
       <View
         pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: 0,
-          bottom: 0,
-          justifyContent: 'center',
-          alignItems: 'center',
-          elevation: 1,
-        }}>
+        className="absolute inset-0 items-center justify-center"
+        style={{ elevation: 1 }}>
         <Icon name="stash:qr-code" size={24} color={color} />
       </View>
     </View>
   );
 }
+
+function LiquidCapsuleButton({
+  label,
+  systemIcon,
+  color,
+  onPress,
+}: {
+  label: string;
+  systemIcon: React.ComponentProps<typeof SwiftUIImage>['systemName'];
+  color: string;
+  onPress: () => void;
+}) {
+  return (
+    <Host style={{ height: BUTTON_H, width: '100%' }} matchContents={false}>
+      <SwiftUIButton
+        modifiers={[
+          buttonStyle('glass'),
+          frame({ height: BUTTON_H, maxWidth: Infinity, alignment: 'center' }),
+        ]}
+        onPress={onPress}>
+        <SwiftUIHStack
+          alignment="center"
+          spacing={8}
+          modifiers={[frame({ maxWidth: Infinity, alignment: 'center' })]}>
+          <SwiftUIImage systemName={systemIcon} size={18} color={color} />
+          <SwiftUIText
+            modifiers={[
+              font({ size: 14, weight: 'bold' }),
+              foregroundStyle(color),
+              padding({ vertical: 8 }),
+            ]}>
+            {label}
+          </SwiftUIText>
+        </SwiftUIHStack>
+      </SwiftUIButton>
+    </Host>
+  );
+}
+
+function LiquidQRButton({
+  tint,
+  color,
+  onPress,
+}: {
+  tint: string;
+  color: string;
+  onPress: () => void;
+}) {
+  return (
+    <Host style={{ height: QR_SIZE, width: QR_SIZE }} matchContents={false}>
+      <SwiftUIButton
+        modifiers={[
+          buttonStyle('glass'),
+          frame({ height: QR_SIZE, width: QR_SIZE }),
+          glassEffect({
+            shape: 'circle',
+            glass: { tint, variant: 'regular', interactive: true },
+          }),
+        ]}
+        onPress={onPress}>
+        <SwiftUIHStack
+          alignment="center"
+          modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
+          <SwiftUIImage systemName="qrcode.viewfinder" size={22} color={color} />
+        </SwiftUIHStack>
+      </SwiftUIButton>
+    </Host>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 interface AccountType {
   unit: string;
@@ -157,7 +215,6 @@ export function AccountPagerView({
     'shade-300',
   ] as const);
 
-  // Calculate 50% of screen height for the pager view
   const pagerHeight = Math.max(windowHeight * 0.3, 250);
 
   const { handlePermission } = useHandleCameraPermission();
@@ -167,7 +224,6 @@ export function AccountPagerView({
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMintUrl = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 
-  const loopedAccounts = accounts;
   const swiperRef = useRef<any>(null);
 
   const onPageSelected = useCallback(
@@ -178,15 +234,11 @@ export function AccountPagerView({
     [accounts, setAccount]
   );
 
-  const goToIndex = (index: number): void => {
-    swiperRef.current?.goTo(index);
-  };
-
   useEffect(() => {
-    goToIndex(accounts.findIndex((a) => a.unit === account.unit));
+    const idx = accounts.findIndex((a) => a.unit === account.unit);
+    swiperRef.current?.goTo(idx);
   }, [accounts, account]);
 
-  // Handlers
   const handleReceive = useCallback(() => {
     router.navigate({
       pathname: '/(receive-flow)/receive',
@@ -226,77 +278,50 @@ export function AccountPagerView({
     });
   }, [getBalances, selectedMintUrl, account.unit]);
 
-  // Button components
-  const liquidGlassForeground = foreground;
-  const qrGlassTint = shadeColor300;
   const useAndroidLiquidButtons = Platform.OS === 'android' && hasAndroidLiquidButtonView();
 
-  function LiquidCapsuleButton({
-    label,
-    systemIcon,
-    onPress,
-  }: {
-    label: string;
-    systemIcon: React.ComponentProps<typeof SwiftUIImage>['systemName'];
-    onPress: () => void;
-  }) {
+  const renderCapsuleButton = (
+    label: string,
+    systemIcon: string,
+    rnIcon: string,
+    onPress: () => void
+  ) => {
+    if (supportsLiquidGlass()) {
+      return (
+        <LiquidCapsuleButton
+          label={label}
+          systemIcon={systemIcon as any}
+          color={foreground}
+          onPress={onPress}
+        />
+      );
+    }
+    if (useAndroidLiquidButtons) {
+      return (
+        <AndroidLiquidCapsuleButton
+          label={label}
+          icon={rnIcon}
+          color={foreground}
+          onPress={onPress}
+        />
+      );
+    }
     return (
-      <Host style={{ height: BUTTON_H, width: '100%' }} matchContents={false}>
-        <SwiftUIButton
-          modifiers={[
-            buttonStyle('glass'),
-            frame({ height: BUTTON_H, maxWidth: Infinity, alignment: 'center' }),
-          ]}
-          onPress={onPress}>
-          <SwiftUIHStack
-            alignment="center"
-            spacing={8}
-            modifiers={[frame({ maxWidth: Infinity, alignment: 'center' })]}>
-            <SwiftUIImage systemName={systemIcon} size={18} color={liquidGlassForeground} />
-            <SwiftUIText
-              modifiers={[
-                font({ size: 14, weight: 'bold' }),
-                foregroundStyle(liquidGlassForeground),
-                padding({ vertical: 8 }),
-              ]}>
-              {label}
-            </SwiftUIText>
-          </SwiftUIHStack>
-        </SwiftUIButton>
-      </Host>
+      <Button
+        text={label}
+        icon={<Icon name={rnIcon} size={16} color={foreground} />}
+        onPress={onPress}
+        variant="secondary"
+        blur={{ intensity: 70, tint: 'dark' }}
+        haptics
+        style={{ margin: 0, marginBottom: 0, width: '100%', minHeight: BUTTON_H }}
+      />
     );
-  }
-
-  function LiquidQRButton({ onPress }: { onPress: () => void }) {
-    return (
-      <Host style={{ height: QR_SIZE, width: QR_SIZE }} matchContents={false}>
-        <SwiftUIButton
-          modifiers={[
-            buttonStyle('glass'),
-            frame({ height: QR_SIZE, width: QR_SIZE }),
-            glassEffect({
-              shape: 'circle',
-              glass: {
-                tint: qrGlassTint, // 👈 background tint (only for QR)
-                variant: 'regular', // subtle / material-like
-                interactive: true, // reacts to presses
-              },
-            }),
-          ]}
-          onPress={onPress}>
-          <SwiftUIHStack
-            alignment="center"
-            modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
-            <SwiftUIImage systemName="qrcode.viewfinder" size={22} color={liquidGlassForeground} />
-          </SwiftUIHStack>
-        </SwiftUIButton>
-      </Host>
-    );
-  }
+  };
 
   return (
     <>
-      <View style={{ height: pagerHeight, width: '100%' }}>
+      <View className="w-full" style={{ height: pagerHeight }}>
         <Swiper
           containerStyle={{ height: pagerHeight }}
           controlsEnabled={false}
@@ -307,239 +332,36 @@ export function AccountPagerView({
           minDistanceForAction={0.1}
           onIndexChanged={onPageSelected}
           controlsProps={{ dotsTouchable: true, dotsPos: 'top' }}>
-          {loopedAccounts.map((acc, index) => (
+          {accounts.map((acc, index) => (
             <VStack key={`${acc.unit}-${index}`} align="center" justify="center" className="flex-1">
-              <Account
-                accounts={loopedAccounts}
-                account={acc}
-                goToIndex={goToIndex}
-                pagerHeight={pagerHeight}
-              />
+              <Account accounts={accounts} account={acc} pagerHeight={pagerHeight} />
             </VStack>
           ))}
         </Swiper>
       </View>
 
-      {/* Quick action buttons — Sweep / Swap / More */}
-      {/* <View style={actionStyles.row}>
-        {supportsLiquidGlass() ? (
-          <>
-            <View style={actionStyles.button}>
-              <Host style={{ height: ACTION_SIZE, width: ACTION_SIZE }} matchContents={false}>
-                <SwiftUIButton
-                  modifiers={[
-                    buttonStyle('glass'),
-                    frame({ height: ACTION_SIZE, width: ACTION_SIZE }),
-                    glassEffect({
-                      shape: 'circle',
-                      glass: { variant: 'regular', interactive: true },
-                    }),
-                  ]}
-                  onPress={handleSweep}>
-                  <SwiftUIHStack
-                    alignment="center"
-                    modifiers={[
-                      frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
-                    ]}>
-                    <SwiftUIImage
-                      systemName="tray.and.arrow.down"
-                      size={18}
-                      color={liquidGlassForeground}
-                    />
-                  </SwiftUIHStack>
-                </SwiftUIButton>
-              </Host>
-              <Text size={12} semibold color={actionFg}>
-                Sweep
-              </Text>
-            </View>
-            <View style={actionStyles.button}>
-              <Host style={{ height: ACTION_SIZE, width: ACTION_SIZE }} matchContents={false}>
-                <SwiftUIButton
-                  modifiers={[
-                    buttonStyle('glass'),
-                    frame({ height: ACTION_SIZE, width: ACTION_SIZE }),
-                    glassEffect({
-                      shape: 'circle',
-                      glass: { variant: 'regular', interactive: true },
-                    }),
-                  ]}
-                  onPress={handleSwap}>
-                  <SwiftUIHStack
-                    alignment="center"
-                    modifiers={[
-                      frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
-                    ]}>
-                    <SwiftUIImage
-                      systemName="arrow.triangle.2.circlepath"
-                      size={18}
-                      color={liquidGlassForeground}
-                    />
-                  </SwiftUIHStack>
-                </SwiftUIButton>
-              </Host>
-              <Text size={12} semibold color={actionFg}>
-                Swap
-              </Text>
-            </View>
-            <View style={actionStyles.button}>
-              <Host style={{ height: ACTION_SIZE, width: ACTION_SIZE }} matchContents={false}>
-                <SwiftUIButton
-                  modifiers={[
-                    buttonStyle('glass'),
-                    frame({ height: ACTION_SIZE, width: ACTION_SIZE }),
-                    glassEffect({
-                      shape: 'circle',
-                      glass: { variant: 'regular', interactive: true },
-                    }),
-                  ]}
-                  onPress={handleMore}>
-                  <SwiftUIHStack
-                    alignment="center"
-                    modifiers={[
-                      frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' }),
-                    ]}>
-                    <SwiftUIImage systemName="ellipsis" size={18} color={liquidGlassForeground} />
-                  </SwiftUIHStack>
-                </SwiftUIButton>
-              </Host>
-              <Text size={12} semibold color={actionFg}>
-                More
-              </Text>
-            </View>
-          </>
-        ) : (
-          <>
-            <TouchableOpacity
-              style={actionStyles.button}
-              onPress={handleSweep}
-              haptics={{ type: 'impact', impactStyle: 'light' }}
-              activeOpacity={0.7}>
-              <View style={[actionStyles.circle, { backgroundColor: actionBg }]}>
-                <Icon name="fluent:arrow-download-16-filled" size={20} color={actionFg} />
-              </View>
-              <Text size={12} semibold color={actionFg}>
-                Sweep
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={actionStyles.button}
-              onPress={handleSwap}
-              haptics={{ type: 'impact', impactStyle: 'light' }}
-              activeOpacity={0.7}>
-              <View style={[actionStyles.circle, { backgroundColor: actionBg }]}>
-                <Icon name="fluent:arrow-swap-16-filled" size={20} color={actionFg} />
-              </View>
-              <Text size={12} semibold color={actionFg}>
-                Swap
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={actionStyles.button}
-              onPress={handleMore}
-              haptics={{ type: 'impact', impactStyle: 'light' }}
-              activeOpacity={0.7}>
-              <View style={[actionStyles.circle, { backgroundColor: actionBg }]}>
-                <Icon name="tabler:dots" size={20} color={actionFg} />
-              </View>
-              <Text size={12} semibold color={actionFg}>
-                More
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View> */}
-
       <View
-        style={{
-          width: '100%',
-          paddingHorizontal: 12,
-          marginTop: 8,
-          position: 'relative',
-          height: Math.max(QR_SIZE, BUTTON_H),
-          justifyContent: 'center',
-        }}>
-        {/* Two equal columns (capsules) */}
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          <View style={{ flex: 1 }}>
-            {supportsLiquidGlass() ? (
-              <LiquidCapsuleButton
-                label="Receive"
-                systemIcon="arrow.down.left"
-                onPress={handleReceive}
-              />
-            ) : useAndroidLiquidButtons ? (
-              <AndroidLiquidCapsuleButton
-                label="Receive"
-                icon="lucide:arrow-down-left"
-                color={liquidGlassForeground}
-                onPress={handleReceive}
-              />
-            ) : (
-              <Button
-                text="Receive"
-                icon={<Icon name="lucide:arrow-down-left" size={16} color={foreground} />}
-                onPress={handleReceive}
-                variant="secondary"
-                blur={{ intensity: 70, tint: 'dark' }}
-                haptics
-                style={{
-                  margin: 0,
-                  marginBottom: 0,
-                  width: '100%',
-                  minHeight: BUTTON_H,
-                }}
-              />
+        className="relative w-full justify-center px-3"
+        style={{ marginTop: 8, height: Math.max(QR_SIZE, BUTTON_H) }}>
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            {renderCapsuleButton(
+              'Receive',
+              'arrow.down.left',
+              'lucide:arrow-down-left',
+              handleReceive
             )}
           </View>
-
-          <View style={{ flex: 1 }}>
-            {supportsLiquidGlass() ? (
-              <LiquidCapsuleButton label="Send" systemIcon="arrow.up.right" onPress={handleSend} />
-            ) : useAndroidLiquidButtons ? (
-              <AndroidLiquidCapsuleButton
-                label="Send"
-                icon="lucide:arrow-up-right"
-                color={liquidGlassForeground}
-                onPress={handleSend}
-              />
-            ) : (
-              <Button
-                text="Send"
-                icon={<Icon name="lucide:arrow-up-right" size={16} color={foreground} />}
-                onPress={handleSend}
-                variant="secondary"
-                blur={{ intensity: 70, tint: 'dark' }}
-                haptics
-                style={{
-                  margin: 0,
-                  marginBottom: 0,
-                  width: '100%',
-                  minHeight: BUTTON_H,
-                }}
-              />
-            )}
+          <View className="flex-1">
+            {renderCapsuleButton('Send', 'arrow.up.right', 'lucide:arrow-up-right', handleSend)}
           </View>
         </View>
 
-        {/* Overlay QR in the center */}
-        <View
-          pointerEvents="box-none"
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            alignItems: 'center',
-            zIndex: 1000,
-          }}>
+        <View pointerEvents="box-none" className="absolute inset-x-0 z-[1000] items-center">
           {supportsLiquidGlass() ? (
-            <LiquidQRButton onPress={handleScanQR} />
+            <LiquidQRButton tint={shadeColor300} color={foreground} onPress={handleScanQR} />
           ) : useAndroidLiquidButtons ? (
-            <AndroidLiquidQRButton
-              tint={qrGlassTint}
-              color={liquidGlassForeground}
-              onPress={handleScanQR}
-            />
+            <AndroidLiquidQRButton tint={shadeColor300} color={foreground} onPress={handleScanQR} />
           ) : (
             <TouchableOpacity
               style={{
@@ -553,22 +375,14 @@ export function AccountPagerView({
                 borderRadius: 10000,
                 borderColor: shadeColor100,
                 borderWidth: 0.5,
-                alignItems: 'center',
-                justifyContent: 'center',
               }}
+              className="items-center justify-center"
               haptics={{ type: 'impact', impactStyle: 'light' }}
               activeOpacity={0.75}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               onPress={handleScanQR}>
               <LinearGradient
-                style={{
-                  padding: 8,
-                  borderRadius: 1000,
-                  width: '100%',
-                  height: '100%',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+                className="h-full w-full items-center justify-center rounded-full p-2"
                 colors={[shadeColor100, shadeColor300]}>
                 <Icon name="stash:qr-code" size={24} color={foreground} />
               </LinearGradient>

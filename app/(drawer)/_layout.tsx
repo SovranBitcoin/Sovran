@@ -73,7 +73,11 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
-  const [foreground, defaultColor, shade400] = useThemeColor(['foreground', 'default', 'shade-400'] as const);
+  const [foreground, defaultColor, shade400] = useThemeColor([
+    'foreground',
+    'default',
+    'shade-400',
+  ] as const);
   const { getKeysForAccount } = useNostrKeysContext();
   const { resetStages, cancelResetStages } = useInitializationReset();
   const devMode = useSettingsStore((s) => s.experimental);
@@ -200,9 +204,9 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
         style={[
           styles.profileAvatarButton,
           {
-              borderColor: defaultColor,
-              borderWidth: 2,
-              backgroundColor: defaultColor,
+            borderColor: defaultColor,
+            borderWidth: 2,
+            backgroundColor: defaultColor,
           },
         ]}>
         <Icon name="tabler:dots" size={24} color={foreground} />
@@ -230,15 +234,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
 
   return (
     <LinearGradient
-      colors={[
-        surface,
-        surface,
-        surface,
-        surface,
-        surface,
-        surface,
-        opacity(surface, 0),
-      ]}
+      colors={[surface, surface, surface, surface, surface, surface, opacity(surface, 0)]}
       style={[styles.gradientContainer, { paddingTop: insets.top + 16 }]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}>
@@ -279,7 +275,7 @@ function MenuButton({
   onPress: () => void;
   isActive: boolean;
 }) {
-  const [foreground, accent, surfaceTertiary] = useThemeColor(['foreground', 'accent', 'surface-tertiary'] as const);
+  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
 
   return (
     <GesturePressable
@@ -289,20 +285,12 @@ function MenuButton({
         styles.menuButton,
         isActive && {
           backgroundColor: opacity(surfaceTertiary, 0.72),
-          borderColor: opacity(accent, 0.5),
         },
         pressed && { opacity: 0.6 },
       ]}>
       <HStack align="center" spacing={12}>
-        <Icon
-          name={icon}
-          color={isActive ? foreground : opacity(foreground, 0.5)}
-          size={24}
-        />
-        <Text
-          size={18}
-          bold
-          style={{ color: isActive ? foreground : opacity(foreground, 0.5) }}>
+        <Icon name={icon} color={isActive ? foreground : opacity(foreground, 0.5)} size={24} />
+        <Text size={18} bold style={{ color: isActive ? foreground : opacity(foreground, 0.5) }}>
           {label}
         </Text>
       </HStack>

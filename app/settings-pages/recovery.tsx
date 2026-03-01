@@ -23,8 +23,11 @@ interface RecoveryResult {
 }
 
 const RecoveryScreen: React.FC = () => {
-  const [foreground, surfaceSecondary, accent, defaultColor] = useThemeColor(['foreground', 'surface-secondary', 'accent', 'default'] as const);
-  const [danger, success, green400, red400] = useThemeColor(['danger', 'success', 'green-400', 'red-400'] as const);
+  const [foreground, green400, red400] = useThemeColor([
+    'foreground',
+    'green-400',
+    'red-400',
+  ] as const);
   const navigation = useNavigation();
   const { mints, restoreMint, loadMints } = useMintManagement();
 
@@ -114,9 +117,7 @@ const RecoveryScreen: React.FC = () => {
 
   const renderIdleState = () => (
     <VStack spacing={24} className="flex-1 items-center justify-center px-6">
-      <View
-        className="h-24 w-24 items-center justify-center rounded-full"
-        style={{ backgroundColor: surfaceSecondary }}>
+      <View className="bg-surface-secondary h-24 w-24 items-center justify-center rounded-full">
         <Icon name="mdi:shield-refresh" size={48} color={foreground} />
       </View>
 
@@ -195,19 +196,13 @@ const RecoveryScreen: React.FC = () => {
                 ) : currentMintIndex > mints.length ? (
                   <Icon name="mdi:check-circle" size={24} color={green400} />
                 ) : (
-                  <View
-                    className="h-4 w-4 rounded-full"
-                    style={{ backgroundColor: defaultColor }}
-                  />
+                  <View className="bg-default h-4 w-4 rounded-full" />
                 )}
               </View>
               <Text
                 size={14}
                 style={{
-                  color:
-                    currentMintIndex >= mints.length
-                      ? foreground
-                      : opacity(foreground, 0.33),
+                  color: currentMintIndex >= mints.length ? foreground : opacity(foreground, 0.33),
                 }}>
                 Recovering pending transactions
               </Text>
@@ -221,10 +216,7 @@ const RecoveryScreen: React.FC = () => {
   const renderCompleteState = () => (
     <VStack spacing={24} className="flex-1 items-center justify-center px-6">
       <View
-        className="h-24 w-24 items-center justify-center rounded-full"
-        style={{
-          backgroundColor: failureCount === 0 ? success : surfaceSecondary,
-        }}>
+        className={`h-24 w-24 items-center justify-center rounded-full ${failureCount === 0 ? 'bg-success' : 'bg-surface-secondary'}`}>
         <Icon
           name={failureCount === 0 ? 'mdi:check-circle' : 'mdi:alert-circle'}
           size={48}
@@ -286,9 +278,7 @@ const RecoveryScreen: React.FC = () => {
 
   const renderErrorState = () => (
     <VStack spacing={24} className="flex-1 items-center justify-center px-6">
-      <View
-        className="h-24 w-24 items-center justify-center rounded-full"
-        style={{ backgroundColor: danger }}>
+      <View className="bg-danger h-24 w-24 items-center justify-center rounded-full">
         <Icon name="mdi:alert-circle" size={48} color={red400} />
       </View>
 
@@ -340,8 +330,11 @@ const MintRecoveryRow: React.FC<{
   currentIndex: number;
   result?: RecoveryResult;
 }> = ({ mint, index, currentIndex, result }) => {
-  const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
-  const [green400, red400] = useThemeColor(['green-400', 'red-400'] as const);
+  const [foreground, green400, red400] = useThemeColor([
+    'foreground',
+    'green-400',
+    'red-400',
+  ] as const);
 
   const isActive = index === currentIndex;
   const isComplete = index < currentIndex;
@@ -364,12 +357,7 @@ const MintRecoveryRow: React.FC<{
         {isComplete && !result?.success && (
           <Icon name="mdi:close-circle" size={24} color={red400} />
         )}
-        {isPending && (
-          <View
-            className="h-4 w-4 rounded-full"
-            style={{ backgroundColor: defaultColor }}
-          />
-        )}
+        {isPending && <View className="bg-default h-4 w-4 rounded-full" />}
       </View>
       <VStack spacing={2} className="flex-1">
         <Text

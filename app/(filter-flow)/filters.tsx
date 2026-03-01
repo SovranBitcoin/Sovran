@@ -46,26 +46,18 @@ const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress }) => {
       style={[
         styles.chip,
         {
-          backgroundColor: isSelected
-            ? opacity(foreground, 0.15)
-            : opacity(foreground, 0.05),
-          borderColor: isSelected
-            ? opacity(foreground, 0.25)
-            : opacity(foreground, 0.08),
+          backgroundColor: isSelected ? opacity(foreground, 0.15) : opacity(foreground, 0.05),
+          borderColor: isSelected ? opacity(foreground, 0.25) : opacity(foreground, 0.08),
         },
       ]}>
       {icon ? (
-        <Icon
-          name={icon}
-          size={16}
-          color={isSelected ? foreground : opacity(foreground, 0.4)}
-        />
+        <Icon name={icon} size={16} color={isSelected ? foreground : opacity(foreground, 0.4)} />
       ) : null}
       <Text
         size={14}
         style={{
           color: isSelected ? foreground : opacity(foreground, 0.4),
-          fontFamily: 'OverpassSemibold',
+          fontFamily: 'OxygenBold',
         }}>
         {label}
       </Text>
@@ -87,7 +79,7 @@ const Section: React.FC<SectionProps> = ({ title, children }) => {
         size={13}
         style={{
           color: opacity(foreground, 0.33),
-          fontFamily: 'OverpassSemibold',
+          fontFamily: 'OxygenBold',
           textTransform: 'uppercase',
           letterSpacing: 1,
           marginBottom: 12,
@@ -122,12 +114,8 @@ const MintSelectorChip: React.FC<MintSelectorChipProps> = ({
       style={[
         styles.mintChip,
         {
-          backgroundColor: isSelected
-            ? opacity(foreground, 0.15)
-            : opacity(foreground, 0.05),
-          borderColor: isSelected
-            ? opacity(foreground, 0.25)
-            : opacity(foreground, 0.08),
+          backgroundColor: isSelected ? opacity(foreground, 0.15) : opacity(foreground, 0.05),
+          borderColor: isSelected ? opacity(foreground, 0.25) : opacity(foreground, 0.08),
         },
       ]}>
       {showIcon ? (
@@ -138,7 +126,7 @@ const MintSelectorChip: React.FC<MintSelectorChipProps> = ({
         numberOfLines={1}
         style={{
           color: isSelected ? foreground : opacity(foreground, 0.7),
-          fontFamily: 'OverpassSemibold',
+          fontFamily: 'OxygenBold',
           maxWidth: 140,
         }}>
         {name}
@@ -302,9 +290,7 @@ export default function FiltersScreen() {
             onPress={handleReset}
             disabled={!hasActiveFilters}
             style={[styles.resetButton, { opacity: hasActiveFilters ? 1 : 0 }]}>
-            <Text
-              size={14}
-              style={{ color: opacity(foreground, 0.4), fontFamily: 'OverpassMedium' }}>
+            <Text size={14} style={{ color: opacity(foreground, 0.4), fontFamily: 'OxygenBold' }}>
               Reset
             </Text>
           </Pressable>

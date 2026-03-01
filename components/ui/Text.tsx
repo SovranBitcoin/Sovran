@@ -1,11 +1,12 @@
 import React from 'react';
-import { Text as DefaultText, TextStyle, ColorValue } from 'react-native';
-import { useThemeColor } from 'hooks/useThemeColor';
+import { Text as DefaultText, TextStyle, ColorValue, View } from 'react-native';
+
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
-import { Skeleton } from 'react-native-skeleton-component';
-import capsize from 'react-native-capsize';
-import { getFontMetrics } from 'helper/fontMetrics';
+
+import { Skeleton } from 'heroui-native/skeleton';
+
+import { useThemeColor } from 'hooks/useThemeColor';
 
 interface GradientTextProps extends TextProps {
   children: React.ReactNode;
@@ -96,29 +97,22 @@ export const StyledText = ({
 type TextProps = DefaultText['props'] & { id?: string };
 
 export interface CustomTextProps extends TextProps {
-  // Weight props
   thin?: boolean;
   extralight?: boolean;
   light?: boolean;
-  regular?: boolean;
   medium?: boolean;
   semibold?: boolean;
   bold?: boolean;
   extrabold?: boolean;
   heavy?: boolean;
   black?: boolean;
-  mono?: boolean;
   weight?: string;
 
-  // Font family props
+  /** Use the Overpass font family instead of the default Oxygen. */
   overpass?: boolean;
-  lexend?: boolean;
 
-  // Style props
   italic?: boolean;
   size?: number;
-  capHeight?: number;
-  lineGap?: number;
   style?: object;
   lightColor?: string;
   darkColor?: string;
@@ -127,156 +121,67 @@ export interface CustomTextProps extends TextProps {
   className?: string;
   testID?: string;
   loading?: boolean;
+  /** Invisible text rendered to size the skeleton when children is nullish. */
+  placeholder?: string;
   color?: string;
 }
 
-function getWeightFromProps(props: CustomTextProps): string {
-  if (props.weight) return props.weight;
-  if (props.thin) return 'thin';
-  if (props.extralight) return 'extralight';
-  if (props.light) return 'light';
-  if (props.medium) return 'medium';
-  if (props.semibold) return 'semibold';
-  if (props.bold) return 'bold';
-  if (props.extrabold) return 'extrabold';
-  if (props.heavy) return 'heavy';
-  if (props.black) return 'black';
-  if (props.mono) return 'mono';
-  return 'regular'; // default
+/**
+ * Resolve weight props to one of the three Oxygen font families.
+ * Oxygen only ships Light, Regular, and Bold.
+ */
+function getOxygenFamily(props: CustomTextProps): string {
+  if (props.weight) {
+    const w = props.weight;
+    if (w === 'thin' || w === 'extralight' || w === 'light') return 'OxygenLight';
+    if (w === 'regular') return 'OxygenRegular';
+    return 'OxygenBold';
+  }
+  if (props.thin || props.extralight || props.light) return 'OxygenLight';
+  if (props.bold || props.semibold || props.medium || props.extrabold || props.heavy || props.black)
+    return 'OxygenBold';
+  return 'OxygenRegular';
 }
 
-function getFamilyFromProps(props: CustomTextProps): string {
-  if (props.lexend) return 'lexend';
-  return 'overpass'; // default
+/**
+ * Resolve weight props to Overpass font families.
+ * Used for balance / amount / monetary value displays.
+ */
+function getOverpassFamily(props: CustomTextProps): string {
+  const WEIGHT_MAP: Record<string, string> = {
+    thin: 'OverpassThin',
+    extralight: 'OverpassExtralight',
+    light: 'OverpassLight',
+    regular: 'OverpassRegular',
+    medium: 'OverpassSemibold',
+    semibold: 'OverpassSemibold',
+    bold: 'OverpassBold',
+    extrabold: 'OverpassExtrabold',
+    heavy: 'OverpassHeavy',
+    black: 'OverpassHeavy',
+    mono: 'OverpassMono',
+  };
+
+  if (props.weight && WEIGHT_MAP[props.weight]) return WEIGHT_MAP[props.weight];
+
+  for (const key of Object.keys(WEIGHT_MAP)) {
+    if ((props as Record<string, unknown>)[key]) return WEIGHT_MAP[key];
+  }
+  return 'OverpassRegular';
 }
 
-export function UntranslatedText({
-  size = 14,
-  italic = false,
-  capHeight,
-  lineGap = 0,
-  ...props
-}: CustomTextProps) {
+export function UntranslatedText({ size = 14, italic = false, ...props }: CustomTextProps) {
   const foreground = useThemeColor('foreground');
   const { style, children, ...otherProps } = props;
 
-  const weight = getWeightFromProps(props);
-  const family = getFamilyFromProps(props);
+  const fontFamily = props.overpass ? getOverpassFamily(props) : getOxygenFamily(props);
 
-  let fontFamily;
-
-  if (weight === 'mono') {
-    fontFamily = `${family.charAt(0).toUpperCase() + family.slice(1)}Mono`;
-  } else {
-    // Handle different weight mappings for each font family
-    let weightSuffix;
-
-    if (family === 'overpass') {
-      switch (weight) {
-        case 'thin':
-          weightSuffix = 'Thin';
-          break;
-        case 'extralight':
-          weightSuffix = 'Extralight';
-          break;
-        case 'light':
-          weightSuffix = 'Light';
-          break;
-        case 'regular':
-          weightSuffix = 'Regular';
-          break;
-        case 'medium':
-          weightSuffix = 'Semibold'; // Overpass doesn't have Medium, map to Semibold
-          break;
-        case 'semibold':
-          weightSuffix = 'Semibold';
-          break;
-        case 'bold':
-          weightSuffix = 'Bold';
-          break;
-        case 'extrabold':
-          weightSuffix = 'Extrabold';
-          break;
-        case 'heavy':
-          weightSuffix = 'Heavy';
-          break;
-        case 'black':
-          weightSuffix = 'Heavy'; // Overpass doesn't have Black, map to Heavy
-          break;
-        default:
-          weightSuffix = 'Regular';
-      }
-    } else {
-      // lexend
-      switch (weight) {
-        case 'thin':
-          weightSuffix = 'Thin';
-          break;
-        case 'extralight':
-          weightSuffix = 'ExtraLight';
-          break;
-        case 'light':
-          weightSuffix = 'Light';
-          break;
-        case 'regular':
-          weightSuffix = 'Regular';
-          break;
-        case 'medium':
-          weightSuffix = 'Medium';
-          break;
-        case 'semibold':
-          weightSuffix = 'SemiBold';
-          break;
-        case 'bold':
-          weightSuffix = 'Bold';
-          break;
-        case 'extrabold':
-          weightSuffix = 'ExtraBold';
-          break;
-        case 'heavy':
-          weightSuffix = 'Black'; // Lexend doesn't have Heavy, map to Black
-          break;
-        case 'black':
-          weightSuffix = 'Black';
-          break;
-        default:
-          weightSuffix = 'Regular';
-      }
-    }
-
-    // Add italic suffix for Overpass (Lexend doesn't seem to have italic variants in your list)
-    const italicSuffix = italic && family === 'overpass' ? 'Italic' : '';
-
-    // Handle special case for Overpass regular italic
-    if (family === 'overpass' && weight === 'regular' && italic) {
-      fontFamily = 'OverpassItalic';
-    } else {
-      fontFamily = `${family.charAt(0).toUpperCase() + family.slice(1)}${weightSuffix}${italicSuffix}`;
-    }
-  }
-
-  // Apply capsize if capHeight is provided and font metrics are available
-  const fontMetrics = getFontMetrics(family as 'overpass' | 'lexend', weight, italic);
-  const shouldUseCapsize = capHeight !== undefined && fontMetrics !== null;
-
-  // Build base style
   const baseStyle: TextStyle = {
     color: foreground,
-    fontFamily: fontFamily,
+    fontFamily,
+    fontSize: size,
+    ...(italic ? { fontStyle: 'italic' } : undefined),
   };
-
-  // Apply capsize styles if capHeight is provided
-  if (shouldUseCapsize) {
-    const capsizedStyles = capsize({
-      fontMetrics: fontMetrics!,
-      capHeight: capHeight!,
-      lineGap: lineGap,
-    });
-    Object.assign(baseStyle, capsizedStyles);
-  } else {
-    // Fall back to standard fontSize when capHeight is not provided
-    baseStyle.fontSize = size;
-  }
 
   return (
     <DefaultText
@@ -288,40 +193,55 @@ export function UntranslatedText({
   );
 }
 
-export function Text({
-  loading = false,
-  size = 14,
-  italic = false,
-  capHeight,
-  lineGap,
-  ...props
-}: CustomTextProps) {
-  const { children, ...otherProps } = props;
+/**
+ * Primary text component. Defaults to Oxygen (Light / Regular / Bold).
+ * Pass `overpass` for balance / amount / monetary displays.
+ *
+ * Skeleton behaviour:
+ * - `loading={true}`  → always show skeleton (use when data exists but is stale)
+ * - `loading={false}` → never show skeleton (explicit opt-out)
+ * - `loading` omitted  → auto-skeleton when `children` is null / undefined
+ *
+ * Pass `placeholder` to control the skeleton width when children is nullish.
+ * The placeholder string is rendered invisibly so its text metrics size the
+ * skeleton naturally (e.g. `placeholder="Username"` ≈ name-length skeleton).
+ */
+export function Text({ loading, size = 14, italic = false, ...props }: CustomTextProps) {
+  const { children, placeholder, ...otherProps } = props;
 
-  // Use capHeight for skeleton height if provided, otherwise use size
-  const skeletonHeight = capHeight !== undefined ? capHeight + 2 : size + 2;
+  const showSkeleton = loading ?? children == null;
 
-  if (loading) {
+  if (showSkeleton) {
     return (
-      <Skeleton
-        style={{
-          width: 120,
-          height: skeletonHeight,
-          marginBottom: 2,
-          borderRadius: 2,
-        }}></Skeleton>
+      <View style={skeletonWrapperStyle}>
+        <Skeleton isLoading className="rounded-sm" style={skeletonInsetStyle} />
+        <UntranslatedText
+          size={size}
+          italic={italic}
+          {...otherProps}
+          style={[otherProps.style, hiddenTextStyle]}>
+          {placeholder ?? children ?? '\u00A0'}
+        </UntranslatedText>
+      </View>
     );
   }
 
   return (
-    <UntranslatedText
-      testID={props.testID}
-      size={size}
-      italic={italic}
-      capHeight={capHeight}
-      lineGap={lineGap}
-      {...otherProps}>
+    <UntranslatedText size={size} italic={italic} {...otherProps}>
       {children}
     </UntranslatedText>
   );
 }
+
+const skeletonWrapperStyle = { position: 'relative' as const, overflow: 'hidden' as const };
+const hiddenTextStyle = { opacity: 0 };
+
+/** Inset the skeleton to ~90% height, vertically centered, to account for glyph padding. */
+const SKELETON_INSET = '5%' as unknown as number;
+const skeletonInsetStyle = {
+  position: 'absolute' as const,
+  top: SKELETON_INSET,
+  bottom: SKELETON_INSET,
+  left: 0,
+  right: 0,
+};

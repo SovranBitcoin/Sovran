@@ -14,7 +14,6 @@ import {
   StyleSheet,
   useWindowDimensions,
   View,
-  TouchableOpacity,
 } from 'react-native';
 import Animated, {
   SharedValue,
@@ -46,6 +45,28 @@ export interface StoryUser {
   pubkey: string;
   profile?: ProfileInfo;
   videoPosts: VideoPostRecord[];
+}
+
+// ============================================================================
+// Module-scope constants
+// ============================================================================
+
+const VIEWABILITY_CONFIG = {
+  itemVisiblePercentThreshold: 100,
+  minimumViewTime: 0,
+};
+
+const TOP_GRADIENT = easeGradient({
+  colorStops: {
+    0: { color: 'rgba(0,0,0,0.4)' },
+    1: { color: 'rgba(0,0,0,0.0)' },
+  },
+});
+
+function safePlayerCall(player: ReturnType<typeof useVideoPlayer>, fn: (p: typeof player) => void) {
+  try {
+    fn(player);
+  } catch {}
 }
 
 // ============================================================================
@@ -103,11 +124,6 @@ export const StoriesCarousel: FC<CarouselProps> = ({
     []
   );
 
-  const viewabilityConfig = {
-    itemVisiblePercentThreshold: 100,
-    minimumViewTime: 0,
-  };
-
   return (
     <Animated.FlatList
       ref={scrollRef as any}
@@ -131,7 +147,7 @@ export const StoriesCarousel: FC<CarouselProps> = ({
       onScroll={scrollHandler}
       scrollEventThrottle={16}
       pagingEnabled
-      viewabilityConfig={viewabilityConfig}
+      viewabilityConfig={VIEWABILITY_CONFIG}
       onViewableItemsChanged={onViewableItemsChanged}
       decelerationRate="fast"
       style={rContainerStyle}
@@ -188,61 +204,46 @@ const UserStoriesItem: FC<UserItemProps> = ({
   useEffect(() => {
     return () => {
       mountedRef.current = false;
-      try {
-        player.pause();
-      } catch {
-        // player may already be released
-      }
+      safePlayerCall(player, (p) => p.pause());
     };
   }, [player]);
 
   useEffect(() => {
-    if (isClosing) {
-      try {
-        player.pause();
-      } catch {}
-    }
+    if (isClosing) safePlayerCall(player, (p) => p.pause());
   }, [isClosing, player]);
 
-  // Track progress via expo-video time updates
   useEffect(() => {
-    try {
-      player.timeUpdateEventInterval = isActive ? 0.05 : 0;
-    } catch {
-      // player may have been released
-    }
+    safePlayerCall(player, (p) => {
+      p.timeUpdateEventInterval = isActive ? 0.05 : 0;
+    });
     return () => {
-      try {
-        player.timeUpdateEventInterval = 0;
-      } catch {}
+      safePlayerCall(player, (p) => {
+        p.timeUpdateEventInterval = 0;
+      });
     };
   }, [isActive, player]);
 
   useEventListener(player, 'timeUpdate', () => {
     if (!isActive) return;
-    try {
-      const ct = player.currentTime ?? 0;
-      const dur = player.duration ?? 0;
+    safePlayerCall(player, (p) => {
+      const ct = p.currentTime ?? 0;
+      const dur = p.duration ?? 0;
       if (dur > 0) storyProgress.set(ct / dur);
-    } catch {}
+    });
   });
 
-  // Reset and play when story or active state changes
   useEffect(() => {
     if (isActive) {
       storyProgress.set(0);
-      try {
-        player.currentTime = 0;
-        player.play();
-      } catch {}
+      safePlayerCall(player, (p) => {
+        p.currentTime = 0;
+        p.play();
+      });
     } else {
-      try {
-        player.pause();
-      } catch {}
+      safePlayerCall(player, (p) => p.pause());
     }
   }, [currentStoryIndex, isActive, player, storyProgress]);
 
-  // Handle video end → advance to next story or next user
   useEventListener(player, 'playToEnd', () => {
     if (!isActive || !mountedRef.current) return;
     if (currentStoryIndex < user.videoPosts.length - 1) {
@@ -250,27 +251,19 @@ const UserStoriesItem: FC<UserItemProps> = ({
     } else if (userIndex < totalUsers - 1) {
       scrollRef.current?.scrollToIndex({ index: userIndex + 1, animated: true });
     } else {
-      // Pause player and delay close to avoid navigating during a render cycle
-      try {
-        player.pause();
-      } catch {}
+      safePlayerCall(player, (p) => p.pause());
       setTimeout(() => {
         if (mountedRef.current) onClose?.();
       }, 150);
     }
   });
 
-  // Pause/resume on drag
   const pausePlayer = useCallback(() => {
-    try {
-      player.pause();
-    } catch {}
+    safePlayerCall(player, (p) => p.pause());
   }, [player]);
 
   const resumePlayer = useCallback(() => {
-    try {
-      player.play();
-    } catch {}
+    safePlayerCall(player, (p) => p.play());
   }, [player]);
 
   useAnimatedReaction(
@@ -278,18 +271,15 @@ const UserStoriesItem: FC<UserItemProps> = ({
     (current) => {
       if (current) {
         runOnJS(pausePlayer)();
-      } else {
-        if (userIndex === listCurrentIndex) {
-          runOnJS(resumePlayer)();
-        }
+      } else if (userIndex === listCurrentIndex) {
+        runOnJS(resumePlayer)();
       }
     }
   );
 
   const onStoryPress = useCallback(
     (e: GestureResponderEvent) => {
-      const screenX = e.nativeEvent.pageX;
-      const isLeft = screenX < screenWidth / 2;
+      const isLeft = e.nativeEvent.pageX < screenWidth / 2;
       const isLastStory = currentStoryIndex === user.videoPosts.length - 1;
       const isFirstStory = currentStoryIndex === 0;
 
@@ -324,24 +314,18 @@ const UserStoriesItem: FC<UserItemProps> = ({
   );
 
   const onStoryLongPress = useCallback(() => {
-    try {
-      player.pause();
-    } catch {}
+    safePlayerCall(player, (p) => p.pause());
   }, [player]);
 
   const onStoryPressOut = useCallback(() => {
     if (isDragging.get()) return;
-    try {
-      player.play();
-    } catch {}
+    safePlayerCall(player, (p) => p.play());
   }, [isDragging, player]);
 
-  const { colors: gradientColors, locations: gradientLocations } = easeGradient({
-    colorStops: {
-      0: { color: 'rgba(0,0,0,0.4)' },
-      1: { color: 'rgba(0,0,0,0.0)' },
-    },
-  });
+  const handleClose = useCallback(() => {
+    safePlayerCall(player, (p) => p.pause());
+    onClose?.();
+  }, [player, onClose]);
 
   const profileName = user.profile?.name || user.pubkey.slice(0, 12) + '…';
   const profilePicture = user.profile?.picture;
@@ -354,7 +338,6 @@ const UserStoriesItem: FC<UserItemProps> = ({
         onLongPress={onStoryLongPress}
         delayLongPress={250}
         onPressOut={onStoryPressOut}>
-        {/* Video player — hide when closing so all VideoViews unmount before navigation */}
         <Animated.View
           key={currentVideo?.videoUrl}
           entering={FadeIn.duration(200)}
@@ -374,15 +357,13 @@ const UserStoriesItem: FC<UserItemProps> = ({
           )}
         </Animated.View>
 
-        {/* Top gradient overlay */}
         <LinearGradient
-          colors={gradientColors}
-          locations={gradientLocations}
+          colors={TOP_GRADIENT.colors}
+          locations={TOP_GRADIENT.locations}
           style={styles.topGradient}
         />
       </Pressable>
 
-      {/* Header: progress bars + profile info */}
       <View style={styles.header} pointerEvents="box-none">
         <View style={styles.progressRow} pointerEvents="none">
           {user.videoPosts.map((_, idx) => (
@@ -405,17 +386,9 @@ const UserStoriesItem: FC<UserItemProps> = ({
           <Text size={14} bold style={[styles.profileName, styles.flex1]} numberOfLines={1}>
             {profileName}
           </Text>
-          <TouchableOpacity
-            onPress={() => {
-              try {
-                player.pause();
-              } catch {}
-              onClose?.();
-            }}
-            hitSlop={12}
-            style={styles.closeButton}>
+          <Pressable onPress={handleClose} hitSlop={12} style={styles.closeButton}>
             <Icon name="mdi:close" size={22} color="#fff" />
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
     </StoriesContainer>

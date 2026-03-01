@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { SafeAreaView, Clipboard, ScrollView, View } from 'react-native';
+import { ScrollView } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useMnemonic, useCashuMnemonic } from 'hooks/useSecureStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import Container from 'components/blocks/Container';
 import Icon from 'assets/icons';
 import { popup } from '@/helper/popup';
 import { Text } from 'components/ui/Text';
+import { View } from 'components/ui/View/View';
 import { Avatar } from 'components/ui/Avatar';
 import { Button, Card, Description, Input, Label, TextField } from 'heroui-native';
 import { useThemeColor } from '@/hooks/useThemeColor';
@@ -22,9 +24,9 @@ const Profile = () => {
     cashuMnemonic: false,
   });
 
-  const handleCopy = (text: string, messageKey: string) => {
+  const handleCopy = async (text: string, messageKey: string) => {
     if (text) {
-      Clipboard.setString(text);
+      await Clipboard.setStringAsync(text);
       popup({ message: messageKey, type: 'success', duration: 1000 });
     }
   };
@@ -78,7 +80,7 @@ const Profile = () => {
                       size={15}
                       color={mutedColor}
                     />
-                    <Button.Label style={{ color: mutedColor }}>
+                    <Button.Label className="text-muted">
                       {isVisible ? 'Hide' : 'Show'}
                     </Button.Label>
                   </Button>
@@ -89,7 +91,7 @@ const Profile = () => {
                   className={showEyeIcon ? 'flex-1' : 'w-full'}
                   onPress={() => handleCopy(value, messageKey)}>
                   <Icon name="lets-icons:copy" size={15} color={mutedColor} />
-                  <Button.Label style={{ color: mutedColor }}>Copy</Button.Label>
+                  <Button.Label className="text-muted">Copy</Button.Label>
                 </Button>
               </View>
             ) : null}
@@ -103,56 +105,54 @@ const Profile = () => {
   return (
     <Container>
       <ScrollView className="px-4">
-        <SafeAreaView>
-          <Text bold overpass size={13} className="mb-2 ml-2 uppercase tracking-wide">
-            Profile Details
-          </Text>
-          <Card variant="secondary" className="mb-4">
-            <Card.Body className="items-center py-5">
-              <Avatar seed={nostrKeys?.pubkey || ''} name={username} size={72} variant="person" />
-              <Card.Title className="mt-3">{username}</Card.Title>
-              <Card.Description className="mt-1">
-                {nostrKeysLoading ? 'Loading public key...' : nostrKeys?.npub || 'N/A'}
-              </Card.Description>
-            </Card.Body>
-          </Card>
+        <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
+          Profile Details
+        </Text>
+        <Card variant="secondary" className="mb-4">
+          <Card.Body className="items-center py-5">
+            <Avatar seed={nostrKeys?.pubkey || ''} name={username} size={72} variant="person" />
+            <Card.Title className="mt-3">{username}</Card.Title>
+            <Card.Description className="mt-1">
+              {nostrKeysLoading ? 'Loading public key...' : nostrKeys?.npub || 'N/A'}
+            </Card.Description>
+          </Card.Body>
+        </Card>
 
-          {renderCopyableDetail(
-            'NIP06:',
-            mnemonic || '',
-            'mnemonic_copied',
-            'mnemonic',
-            'Your recovery phrase that gives access to all your nostr & cashu wallets. Everything is derived from this mnemonic so keep it safe and secure!',
-            mnemonicLoading
-          )}
+        {renderCopyableDetail(
+          'NIP06:',
+          mnemonic || '',
+          'mnemonic_copied',
+          'mnemonic',
+          'Your recovery phrase that gives access to all your nostr & cashu wallets. Everything is derived from this mnemonic so keep it safe and secure!',
+          mnemonicLoading
+        )}
 
-          {renderCopyableDetail(
-            'NPUB:',
-            nostrKeys?.npub || '',
-            'npub_copied',
-            null,
-            'Your public identifier on the Nostr network.',
-            nostrKeysLoading
-          )}
+        {renderCopyableDetail(
+          'NPUB:',
+          nostrKeys?.npub || '',
+          'npub_copied',
+          null,
+          'Your public identifier on the Nostr network.',
+          nostrKeysLoading
+        )}
 
-          {renderCopyableDetail(
-            'NSEC:',
-            nostrKeys?.nsec || '',
-            'nsec_copied',
-            'nsec',
-            'Your private key. Never share this with anyone.',
-            nostrKeysLoading
-          )}
+        {renderCopyableDetail(
+          'NSEC:',
+          nostrKeys?.nsec || '',
+          'nsec_copied',
+          'nsec',
+          'Your private key. Never share this with anyone.',
+          nostrKeysLoading
+        )}
 
-          {renderCopyableDetail(
-            `NUT13:`,
-            cashuMnemonic || '',
-            'cashu_mnemonic_copied',
-            'cashuMnemonic',
-            'This is a mnemonic you can use in other cashu wallets to recover your funds if you ever want to stop using Sovran.',
-            cashuMnemonicLoading
-          )}
-        </SafeAreaView>
+        {renderCopyableDetail(
+          `NUT13:`,
+          cashuMnemonic || '',
+          'cashu_mnemonic_copied',
+          'cashuMnemonic',
+          'This is a mnemonic you can use in other cashu wallets to recover your funds if you ever want to stop using Sovran.',
+          cashuMnemonicLoading
+        )}
       </ScrollView>
     </Container>
   );

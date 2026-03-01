@@ -1,3 +1,31 @@
+import { nip19 } from 'nostr-tools';
+
+/**
+ * Converts an npub-encoded Nostr public key to its hex representation.
+ * Returns the input unchanged if it doesn't start with 'npub'.
+ */
+export function npubToPubkey(npub: string): string {
+  if (!npub) return '';
+
+  if (npub.startsWith('npub')) {
+    const data = nip19.decode(npub);
+    if (data.type === 'npub') {
+      return data.data;
+    }
+  }
+  return npub;
+}
+
+/** Like npubToPubkey but returns null on invalid input instead of echoing it back. */
+export function npubToPubkeySafe(npub: string): string | null {
+  try {
+    const decoded = nip19.decode(npub);
+    return decoded.type === 'npub' ? decoded.data : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Nostr event type for recommendation events
  */

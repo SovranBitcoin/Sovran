@@ -166,22 +166,14 @@ const StatsCard = memo(function StatsCard({
                   <SwiftUIImage systemName="bitcoinsign.circle.fill" size={24} color="#F7931A" />
                   <SwiftUIVStack alignment="leading" spacing={2}>
                     <SwiftUIText
-                      modifiers={[
-                        font({ size: 18, weight: 'bold' }),
-                        foregroundStyle(foreground),
-                      ]}>
+                      modifiers={[font({ size: 18, weight: 'bold' }), foregroundStyle(foreground)]}>
                       {visibleText}
                     </SwiftUIText>
                     <SwiftUIHStack alignment="center" spacing={4}>
-                      <SwiftUIText
-                        modifiers={[                        font({ size: 12 }), foregroundStyle(foreground)]}>
+                      <SwiftUIText modifiers={[font({ size: 12 }), foregroundStyle(foreground)]}>
                         {totalText}
                       </SwiftUIText>
-                      <SwiftUIImage
-                        systemName="chevron.down"
-                        size={10}
-                        color={foreground}
-                      />
+                      <SwiftUIImage systemName="chevron.down" size={10} color={foreground} />
                     </SwiftUIHStack>
                   </SwiftUIVStack>
                 </SwiftUIHStack>
@@ -294,7 +286,11 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
 // ============================================================================
 
 function MapScreen() {
-  const [foreground, accent, background] = useThemeColor(['foreground', 'accent', 'background'] as const);
+  const [foreground, accent, background] = useThemeColor([
+    'foreground',
+    'accent',
+    'background',
+  ] as const);
 
   // BTCMap store
   const { placesCache, storeLoading, error, fetchPlaces, setError } = useBTCMapStore(

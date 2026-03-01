@@ -45,7 +45,6 @@ import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { Text } from 'components/ui/Text';
-import { Skeleton } from 'components/ui/Skeleton';
 import { Avatar } from 'components/ui/Avatar';
 import TextInput from 'components/ui/TextInput';
 import Icon from 'assets/icons';
@@ -1816,7 +1815,7 @@ export function UserMessagesScreen({
                       flex: 1,
                       color: foreground,
                       fontSize: 16,
-                      fontFamily: 'OverpassRegular',
+                      fontFamily: 'OxygenRegular',
                     }}
                     keyboardType="web-search"
                     autoCorrect={false}
@@ -1877,26 +1876,17 @@ export function UserMessagesScreen({
                           justifyContent: 'flex-start',
                           alignItems: 'flex-start',
                         }}>
-                        {shouldShowAvatarLoading ? (
-                          <Skeleton
-                            style={{
-                              width: 132,
-                              height: 18,
-                              borderRadius: 4,
-                              backgroundColor: surfaceTertiary,
-                            }}
-                          />
-                        ) : (
-                          <Text
-                            size={16}
-                            bold
-                            style={{
-                              color: foreground,
-                              textAlign: 'left',
-                            }}>
-                            {displayName}
-                          </Text>
-                        )}
+                        <Text
+                          loading={shouldShowAvatarLoading}
+                          placeholder="Display Name"
+                          size={16}
+                          bold
+                          style={{
+                            color: foreground,
+                            textAlign: 'left',
+                          }}>
+                          {displayName}
+                        </Text>
                         <HStack
                           align="center"
                           justify="flex-start"
@@ -1907,7 +1897,7 @@ export function UserMessagesScreen({
                               name="mdi:anonymous"
                               size={14}
                               color={shade400}
-                              className="border-r-[1.5px] border-r-shade-300 pr-1"
+                              className="border-r-shade-300 border-r-[1.5px] pr-1"
                             />
                           )}
                           <Icon
@@ -1915,7 +1905,7 @@ export function UserMessagesScreen({
                             size={14}
                             color={shade400}
                           />
-                          <Text size={12} style={{ color: shade400 }}>
+                          <Text overpass size={12} style={{ color: shade400 }}>
                             {formatBalance(balance)}
                           </Text>
                           <Spacer size={4} />
@@ -1954,27 +1944,18 @@ export function UserMessagesScreen({
                     justifyContent: 'flex-start',
                     alignItems: 'flex-start',
                   }}>
-                  {shouldShowAvatarLoading ? (
-                    <Skeleton
-                      style={{
-                        width: 132,
-                        height: 18,
-                        borderRadius: 4,
-                        backgroundColor: surfaceTertiary,
-                      }}
-                    />
-                  ) : (
-                    <Text
-                      size={16}
-                      bold
-                      style={{
-                        color: foreground,
-                        textAlign: 'left',
-                      }}
-                      numberOfLines={1}>
-                      {displayName}
-                    </Text>
-                  )}
+                  <Text
+                    loading={shouldShowAvatarLoading}
+                    placeholder="Display Name"
+                    size={16}
+                    bold
+                    style={{
+                      color: foreground,
+                      textAlign: 'left',
+                    }}
+                    numberOfLines={1}>
+                    {displayName}
+                  </Text>
                   {isRoutstrMode ? (
                     <HStack align="center" justify="flex-start">
                       <Icon
@@ -1982,7 +1963,7 @@ export function UserMessagesScreen({
                         size={14}
                         color={shade400}
                       />
-                      <Text size={12} style={{ color: shade400 }}>
+                      <Text overpass size={12} style={{ color: shade400 }}>
                         {formatBalance(balance)}
                       </Text>
                       <Icon name="mdi:robot" size={14} color={shade400} />

@@ -35,8 +35,7 @@ const TransactionComponent = ({
   return (
     <View
       className={`relative my-2 ${isReceived ? 'self-start' : 'self-end'}`}
-      style={{ minHeight: 80 }}
-    >
+      style={{ minHeight: 80 }}>
       <View
         className="absolute -bottom-1 h-2 w-2"
         style={{
@@ -55,12 +54,14 @@ const TransactionComponent = ({
           minHeight: 70,
         }}>
         <View className="mb-1 rounded-2xl bg-black/25 p-1">
-          <Text className="text-center text-sm font-bold text-foreground">
+          <Text className="text-foreground text-center text-sm font-bold">
             {isReceived ? 'You received' : 'You sent'}
           </Text>
         </View>
-        <Text className="mb-2 text-base font-black text-foreground">{formattedAmount}</Text>
-        <Text className="text-right text-xs font-bold text-foreground opacity-75">
+        <Text overpass className="text-foreground mb-2 text-base font-black">
+          {formattedAmount}
+        </Text>
+        <Text className="text-foreground text-right text-xs font-bold opacity-75">
           {transaction?.date ? convertTime(new Date(transaction.date)) : null}
         </Text>
       </LinearGradient>

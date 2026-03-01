@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+
 import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventDeletion, Reaction, Repost } from 'nostr-tools/kinds';
+import { useShallow } from 'zustand/shallow';
+
 import { popup } from '@/helper/popup';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import type { FeedEvent, NoteMetrics } from 'components/blocks/nostr/shared';
 import { useNostrSocialStore } from '@/stores/nostrSocialStore';
+import type { FeedEvent, NoteMetrics } from 'components/blocks/nostr/shared';
+import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 
 type EngagementState = {
   liked: boolean;
@@ -20,6 +23,10 @@ export type EngagementViewState = EngagementState;
 const OPTIMISTIC_SETTLE_GRACE_MS = 15_000;
 const OPTIMISTIC_STALE_WARN_MS = 30_000;
 
+// ---------------------------------------------------------------------------
+// Shared Nostr-event tag helpers
+// ---------------------------------------------------------------------------
+
 function normalizeTags(input: unknown): string[][] {
   if (!Array.isArray(input)) return [];
   return input.filter(Array.isArray) as string[][];
@@ -30,9 +37,194 @@ function getFirstTagValue(tags: string[][], name: string): string | undefined {
   return tag?.[1];
 }
 
-function createdAtOrZero(event: { created_at?: number }) {
-  return event.created_at || 0;
+// ---------------------------------------------------------------------------
+// Generic relay-engagement builder (deduplicates relayLikes / relayReposts)
+// ---------------------------------------------------------------------------
+
+interface RelayEngagement {
+  targetEventId: string;
+  engagementEventId: string;
+  createdAt: number;
 }
+
+/**
+ * Builds a de-duplicated, most-recent-per-target list of relay engagements
+ * (likes or reposts) from raw NDK subscription events, after filtering out
+ * deletions of the specified `kind`.
+ */
+function buildRelayEngagements(opts: {
+  rawEvents: any[] | undefined;
+  deletionEvents: any[] | undefined;
+  knownTargets: Map<string, FeedEvent>;
+  kind: number;
+  contentFilter?: (content: string) => boolean;
+}): RelayEngagement[] {
+  const { rawEvents, deletionEvents, knownTargets, kind, contentFilter } = opts;
+
+  const targetByEngagementId = new Map<string, string>();
+  for (const event of rawEvents || []) {
+    if (typeof event.id !== 'string') continue;
+    if (contentFilter && typeof event.content === 'string' && !contentFilter(event.content))
+      continue;
+    const tags = normalizeTags(event.tags);
+    const targetId = getFirstTagValue(tags, 'e');
+    if (!targetId || !knownTargets.has(targetId)) continue;
+    targetByEngagementId.set(event.id, targetId);
+  }
+
+  const deletedIds = new Set<string>();
+  for (const event of deletionEvents || []) {
+    const tags = normalizeTags(event.tags);
+    if (getFirstTagValue(tags, 'k') !== String(kind)) continue;
+    const eid = getFirstTagValue(tags, 'e');
+    if (eid) deletedIds.add(eid);
+  }
+
+  const latest = new Map<string, RelayEngagement>();
+  for (const event of rawEvents || []) {
+    if (typeof event.id !== 'string' || deletedIds.has(event.id)) continue;
+    const targetId = targetByEngagementId.get(event.id);
+    if (!targetId) continue;
+    const candidate: RelayEngagement = {
+      targetEventId: targetId,
+      engagementEventId: event.id,
+      createdAt: event.created_at || 0,
+    };
+    const prev = latest.get(targetId);
+    if (!prev || candidate.createdAt >= prev.createdAt) latest.set(targetId, candidate);
+  }
+
+  return Array.from(latest.values());
+}
+
+// ---------------------------------------------------------------------------
+// Generic toggle-engagement helper (deduplicates toggleLike / toggleRepost)
+// ---------------------------------------------------------------------------
+
+interface ToggleEngagementOpts {
+  target: FeedEvent;
+  ndk: any;
+  kind: typeof Reaction | typeof Repost;
+  currentState: boolean;
+  isPending: boolean;
+  previousOptimistic:
+    | {
+        value: boolean;
+        pending: boolean;
+        delta: number;
+        expectedCount?: number;
+        relatedEventId?: string;
+      }
+    | undefined;
+  relatedEventIdFromStore: string | undefined;
+  displayedCount: number;
+  baseCount: number;
+  setOptimistic: (
+    eventId: string,
+    params: {
+      value: boolean;
+      pending: boolean;
+      delta: number;
+      expectedCount?: number;
+      relatedEventId?: string;
+    }
+  ) => void;
+  clearOptimistic: (eventId: string) => void;
+  buildContent: (target: FeedEvent) => string;
+  onActivated?: (eventId: string) => void;
+  onDeactivated?: (eventId: string) => void;
+  label: string;
+}
+
+async function toggleEngagement(opts: ToggleEngagementOpts): Promise<void> {
+  const {
+    target,
+    ndk,
+    kind,
+    currentState,
+    isPending,
+    previousOptimistic,
+    relatedEventIdFromStore,
+    displayedCount,
+    baseCount,
+    setOptimistic,
+    clearOptimistic,
+    buildContent,
+    onActivated,
+    onDeactivated,
+    label,
+  } = opts;
+
+  const eventId = target.id;
+  if (isPending) return;
+
+  const nextActive = !currentState;
+  const expectedCount = Math.max(0, displayedCount + (nextActive ? 1 : -1));
+  const delta = expectedCount - baseCount;
+  const prevRelated = previousOptimistic?.relatedEventId || relatedEventIdFromStore;
+
+  setOptimistic(eventId, {
+    value: nextActive,
+    pending: true,
+    delta,
+    expectedCount,
+    relatedEventId: prevRelated,
+  });
+
+  try {
+    if (nextActive) {
+      const ndkEvent = new NDKEvent(ndk);
+      ndkEvent.kind = kind;
+      ndkEvent.content = buildContent(target);
+      ndkEvent.tags = [
+        ['e', target.id],
+        ['p', target.pubkey],
+      ];
+      ndkEvent.created_at = Math.floor(Date.now() / 1000);
+      await ndkEvent.publish();
+      onActivated?.(eventId);
+      setOptimistic(eventId, {
+        value: nextActive,
+        pending: false,
+        delta,
+        expectedCount,
+        relatedEventId: ndkEvent.id,
+      });
+      return;
+    }
+
+    if (!prevRelated) throw new Error(`${label} event not found`);
+
+    const deleteEvent = new NDKEvent(ndk);
+    deleteEvent.kind = EventDeletion;
+    deleteEvent.content = 'Deleted by the author';
+    deleteEvent.tags = [
+      ['e', prevRelated],
+      ['k', String(kind)],
+    ];
+    deleteEvent.created_at = Math.floor(Date.now() / 1000);
+    await deleteEvent.publish();
+    onDeactivated?.(eventId);
+    setOptimistic(eventId, { value: nextActive, pending: false, delta, expectedCount });
+  } catch {
+    if (previousOptimistic) {
+      setOptimistic(eventId, {
+        value: previousOptimistic.value,
+        pending: previousOptimistic.pending,
+        delta: previousOptimistic.delta,
+        expectedCount: previousOptimistic.expectedCount,
+        relatedEventId: previousOptimistic.relatedEventId,
+      });
+    } else {
+      clearOptimistic(eventId);
+    }
+    popup({ message: `Failed to update ${label}. Please try again.`, type: 'error' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
 
 export function useNostrEngagement(
   events: FeedEvent[],
@@ -41,28 +233,36 @@ export function useNostrEngagement(
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
 
-  const likesByEventId = useNostrSocialStore((state) => state.likesByEventId);
-  const repostsByEventId = useNostrSocialStore((state) => state.repostsByEventId);
-  const optimisticLikesByEventId = useNostrSocialStore((state) => state.optimisticLikesByEventId);
-  const optimisticRepostsByEventId = useNostrSocialStore(
-    (state) => state.optimisticRepostsByEventId
-  );
-  const syncLikesFromRelay = useNostrSocialStore((state) => state.syncLikesFromRelay);
-  const syncRepostsFromRelay = useNostrSocialStore((state) => state.syncRepostsFromRelay);
-  const setLikeOptimistic = useNostrSocialStore((state) => state.setLikeOptimistic);
-  const setRepostOptimistic = useNostrSocialStore((state) => state.setRepostOptimistic);
-  const clearLikeOptimistic = useNostrSocialStore((state) => state.clearLikeOptimistic);
-  const clearRepostOptimistic = useNostrSocialStore((state) => state.clearRepostOptimistic);
-  const markRepostDeleted = useNostrSocialStore((state) => state.markRepostDeleted);
-  const unmarkRepostDeleted = useNostrSocialStore((state) => state.unmarkRepostDeleted);
+  // State slices — grouped with useShallow to minimise re-subscriptions
+  const { likesByEventId, repostsByEventId, optimisticLikesByEventId, optimisticRepostsByEventId } =
+    useNostrSocialStore(
+      useShallow((s) => ({
+        likesByEventId: s.likesByEventId,
+        repostsByEventId: s.repostsByEventId,
+        optimisticLikesByEventId: s.optimisticLikesByEventId,
+        optimisticRepostsByEventId: s.optimisticRepostsByEventId,
+      }))
+    );
+
+  // Actions are stable references — read once from the store, no selector needed
+  const actions = useRef(useNostrSocialStore.getState());
+  useEffect(() => {
+    actions.current = useNostrSocialStore.getState();
+  });
+
   const lastStaleWarningRef = useRef(0);
+
+  // ---- derived event lookup ----
 
   const eventsById = useMemo(() => {
     const map = new Map<string, FeedEvent>();
     for (const event of events) map.set(event.id, event);
     return map;
   }, [events]);
+
   const eventIds = useMemo(() => Array.from(eventsById.keys()), [eventsById]);
+
+  // ---- relay subscription filters ----
 
   const reactionFilters = useMemo(() => {
     if (!nostrKeys?.pubkey || eventIds.length === 0) return null;
@@ -83,122 +283,72 @@ export function useNostrEngagement(
   const { events: myRepostEvents } = useSubscribe({ filters: repostFilters });
   const { events: myDeletionEvents } = useSubscribe({ filters: deletionFilters });
 
-  const relayLikes = useMemo(() => {
-    const reactionTargetById = new Map<string, string>();
-    for (const event of myReactionEvents || []) {
-      if (typeof event.id !== 'string') continue;
-      if (typeof event.content === 'string' && event.content !== '+') continue;
-      const tags = normalizeTags(event.tags);
-      const targetId = getFirstTagValue(tags, 'e');
-      if (!targetId || !eventsById.has(targetId)) continue;
-      reactionTargetById.set(event.id, targetId);
-    }
+  // ---- build relay engagements (unified) ----
 
-    const deletedReactionEventIds = new Set<string>();
-    for (const event of myDeletionEvents || []) {
-      const tags = normalizeTags(event.tags);
-      const kindTag = getFirstTagValue(tags, 'k');
-      if (kindTag !== String(Reaction)) continue;
-      const targetEventId = getFirstTagValue(tags, 'e');
-      if (targetEventId) deletedReactionEventIds.add(targetEventId);
-    }
+  const relayLikes = useMemo(
+    () =>
+      buildRelayEngagements({
+        rawEvents: myReactionEvents,
+        deletionEvents: myDeletionEvents,
+        knownTargets: eventsById,
+        kind: Reaction,
+        contentFilter: (c) => c === '+' || c === '',
+      }),
+    [eventsById, myDeletionEvents, myReactionEvents]
+  );
 
-    const perTarget = new Map<
-      string,
-      { targetEventId: string; reactionEventId: string; createdAt: number }
-    >();
-    for (const event of myReactionEvents || []) {
-      if (typeof event.id !== 'string') continue;
-      if (deletedReactionEventIds.has(event.id)) continue;
-      const targetId = reactionTargetById.get(event.id);
-      if (!targetId) continue;
-      const prev = perTarget.get(targetId);
-      const next = {
-        targetEventId: targetId,
-        reactionEventId: event.id,
-        createdAt: createdAtOrZero(event),
-      };
-      if (!prev || next.createdAt >= prev.createdAt) perTarget.set(targetId, next);
-    }
-    return Array.from(perTarget.values());
-  }, [eventsById, myDeletionEvents, myReactionEvents]);
+  const relayReposts = useMemo(
+    () =>
+      buildRelayEngagements({
+        rawEvents: myRepostEvents,
+        deletionEvents: myDeletionEvents,
+        knownTargets: eventsById,
+        kind: Repost,
+      }),
+    [eventsById, myDeletionEvents, myRepostEvents]
+  );
 
-  const relayReposts = useMemo(() => {
-    const repostTargetById = new Map<string, string>();
-    for (const event of myRepostEvents || []) {
-      if (typeof event.id !== 'string') continue;
-      const tags = normalizeTags(event.tags);
-      const targetId = getFirstTagValue(tags, 'e');
-      if (!targetId || !eventsById.has(targetId)) continue;
-      repostTargetById.set(event.id, targetId);
-    }
-
-    const deletedRepostEventIds = new Set<string>();
-    for (const event of myDeletionEvents || []) {
-      const tags = normalizeTags(event.tags);
-      const kindTag = getFirstTagValue(tags, 'k');
-      if (kindTag !== String(Repost)) continue;
-      const targetEventId = getFirstTagValue(tags, 'e');
-      if (targetEventId) deletedRepostEventIds.add(targetEventId);
-    }
-
-    const perTarget = new Map<
-      string,
-      { targetEventId: string; repostEventId: string; createdAt: number }
-    >();
-    for (const event of myRepostEvents || []) {
-      if (typeof event.id !== 'string') continue;
-      if (deletedRepostEventIds.has(event.id)) continue;
-      const targetId = repostTargetById.get(event.id);
-      if (!targetId) continue;
-      const prev = perTarget.get(targetId);
-      const next = {
-        targetEventId: targetId,
-        repostEventId: event.id,
-        createdAt: createdAtOrZero(event),
-      };
-      if (!prev || next.createdAt >= prev.createdAt) perTarget.set(targetId, next);
-    }
-    return Array.from(perTarget.values());
-  }, [eventsById, myDeletionEvents, myRepostEvents]);
+  // ---- sync relay data into store ----
 
   useEffect(() => {
     if (eventIds.length === 0) return;
-    syncLikesFromRelay(eventIds, relayLikes);
-    syncRepostsFromRelay(eventIds, relayReposts);
-  }, [eventIds, relayLikes, relayReposts, syncLikesFromRelay, syncRepostsFromRelay]);
+    const { syncLikesFromRelay, syncRepostsFromRelay } = actions.current;
+
+    const likesPayload = relayLikes.map((l) => ({
+      targetEventId: l.targetEventId,
+      reactionEventId: l.engagementEventId,
+      createdAt: l.createdAt,
+    }));
+    const repostsPayload = relayReposts.map((r) => ({
+      targetEventId: r.targetEventId,
+      repostEventId: r.engagementEventId,
+      createdAt: r.createdAt,
+    }));
+
+    syncLikesFromRelay(eventIds, likesPayload);
+    syncRepostsFromRelay(eventIds, repostsPayload);
+  }, [eventIds, relayLikes, relayReposts]);
+
+  // ---- settle optimistic entries when relay catches up ----
 
   useEffect(() => {
-    for (const eventId of eventIds) {
-      const likeOpt = optimisticLikesByEventId[eventId];
-      if (likeOpt && !likeOpt.pending) {
-        const baseLiked = !!likesByEventId[eventId];
-        const baseCount = getBaseMetrics(eventId).likeCount;
-        const expectedCount = likeOpt.expectedCount;
-        const countSettled = expectedCount === undefined || baseCount === expectedCount;
-        const ageMs = Date.now() - (likeOpt.updatedAt || 0);
-        const isAgedOut = ageMs >= OPTIMISTIC_SETTLE_GRACE_MS;
-        if (baseLiked === likeOpt.value && (countSettled || isAgedOut)) {
-          clearLikeOptimistic(eventId);
-        }
-      }
+    const { clearLikeOptimistic, clearRepostOptimistic } = actions.current;
 
-      const repostOpt = optimisticRepostsByEventId[eventId];
-      if (repostOpt && !repostOpt.pending) {
-        const baseReposted = !!repostsByEventId[eventId];
-        const baseCount = getBaseMetrics(eventId).repostCount;
-        const expectedCount = repostOpt.expectedCount;
-        const countSettled = expectedCount === undefined || baseCount === expectedCount;
-        const ageMs = Date.now() - (repostOpt.updatedAt || 0);
-        const isAgedOut = ageMs >= OPTIMISTIC_SETTLE_GRACE_MS;
-        if (baseReposted === repostOpt.value && (countSettled || isAgedOut)) {
-          clearRepostOptimistic(eventId);
-        }
-      }
+    for (const eventId of eventIds) {
+      settleOptimistic(
+        optimisticLikesByEventId[eventId],
+        !!likesByEventId[eventId],
+        getBaseMetrics(eventId).likeCount,
+        () => clearLikeOptimistic(eventId)
+      );
+      settleOptimistic(
+        optimisticRepostsByEventId[eventId],
+        !!repostsByEventId[eventId],
+        getBaseMetrics(eventId).repostCount,
+        () => clearRepostOptimistic(eventId)
+      );
     }
   }, [
-    clearLikeOptimistic,
-    clearRepostOptimistic,
     eventIds,
     getBaseMetrics,
     likesByEventId,
@@ -207,41 +357,38 @@ export function useNostrEngagement(
     repostsByEventId,
   ]);
 
+  // ---- DEV stale-optimistic warning ----
+
   useEffect(() => {
     if (!__DEV__) return;
     const now = Date.now();
     if (now - lastStaleWarningRef.current < 10_000) return;
 
-    let staleLikes = 0;
-    let staleReposts = 0;
+    let staleCount = 0;
     for (const eventId of eventIds) {
-      const likeOpt = optimisticLikesByEventId[eventId];
-      if (likeOpt && now - (likeOpt.updatedAt || 0) >= OPTIMISTIC_STALE_WARN_MS) staleLikes++;
-      const repostOpt = optimisticRepostsByEventId[eventId];
-      if (repostOpt && now - (repostOpt.updatedAt || 0) >= OPTIMISTIC_STALE_WARN_MS) staleReposts++;
+      for (const opt of [optimisticLikesByEventId[eventId], optimisticRepostsByEventId[eventId]]) {
+        if (opt && now - (opt.updatedAt || 0) >= OPTIMISTIC_STALE_WARN_MS) staleCount++;
+      }
     }
-
-    if (staleLikes > 0 || staleReposts > 0) {
+    if (staleCount > 0) {
       lastStaleWarningRef.current = now;
-      console.warn('useNostrEngagement: stale optimistic entries detected', {
-        staleLikes,
-        staleReposts,
-      });
+      console.warn('useNostrEngagement: stale optimistic entries detected', { staleCount });
     }
   }, [eventIds, optimisticLikesByEventId, optimisticRepostsByEventId]);
+
+  // ---- engagement revision (for consumer cache-busting) ----
 
   const engagementRevision = useMemo(() => {
     let revision = 0;
     for (const eventId of eventIds) {
-      const likeBase = likesByEventId[eventId];
-      const repostBase = repostsByEventId[eventId];
-      const likeOpt = optimisticLikesByEventId[eventId];
-      const repostOpt = optimisticRepostsByEventId[eventId];
-
-      if (likeBase) revision += likeBase.updatedAt || 1;
-      if (repostBase) revision += repostBase.updatedAt || 1;
-      if (likeOpt) revision += likeOpt.updatedAt || 1;
-      if (repostOpt) revision += repostOpt.updatedAt || 1;
+      for (const entry of [
+        likesByEventId[eventId],
+        repostsByEventId[eventId],
+        optimisticLikesByEventId[eventId],
+        optimisticRepostsByEventId[eventId],
+      ]) {
+        if (entry) revision += (entry as { updatedAt?: number }).updatedAt || 1;
+      }
     }
     return revision;
   }, [
@@ -251,6 +398,8 @@ export function useNostrEngagement(
     optimisticLikesByEventId,
     optimisticRepostsByEventId,
   ]);
+
+  // ---- public getters ----
 
   const getEngagementState = useCallback(
     (eventId: string): EngagementState => {
@@ -293,86 +442,32 @@ export function useNostrEngagement(
     [getBaseMetrics, optimisticLikesByEventId, optimisticRepostsByEventId]
   );
 
+  // ---- toggle actions (unified via toggleEngagement) ----
+
   const toggleLike = useCallback(
     async (target: FeedEvent) => {
       if (!nostrKeys?.pubkey || !ndk) {
         popup({ message: 'Unable to update like right now', type: 'error' });
         return;
       }
-
-      const eventId = target.id;
-      const current = getEngagementState(eventId);
-      if (current.likePending) return;
-
-      const previous = optimisticLikesByEventId[eventId];
-      const nextLiked = !current.liked;
-      const displayedLikeCount = getDisplayMetrics(eventId).likeCount;
-      const expectedLikeCount = Math.max(0, displayedLikeCount + (nextLiked ? 1 : -1));
-      const nextLikeDelta = expectedLikeCount - getBaseMetrics(eventId).likeCount;
-      setLikeOptimistic(eventId, {
-        value: nextLiked,
-        pending: true,
-        delta: nextLikeDelta,
-        expectedCount: expectedLikeCount,
-        relatedEventId: previous?.relatedEventId || likesByEventId[eventId]?.reactionEventId,
+      const state = getEngagementState(target.id);
+      await toggleEngagement({
+        target,
+        ndk,
+        kind: Reaction,
+        currentState: state.liked,
+        isPending: state.likePending,
+        previousOptimistic: optimisticLikesByEventId[target.id],
+        relatedEventIdFromStore: likesByEventId[target.id]?.reactionEventId,
+        displayedCount: getDisplayMetrics(target.id).likeCount,
+        baseCount: getBaseMetrics(target.id).likeCount,
+        setOptimistic: actions.current.setLikeOptimistic,
+        clearOptimistic: actions.current.clearLikeOptimistic,
+        buildContent: () => '+',
+        label: 'like',
       });
-
-      try {
-        if (nextLiked) {
-          const reactionEvent = new NDKEvent(ndk);
-          reactionEvent.kind = Reaction;
-          reactionEvent.content = '+';
-          reactionEvent.tags = [
-            ['e', target.id],
-            ['p', target.pubkey],
-          ];
-          reactionEvent.created_at = Math.floor(Date.now() / 1000);
-          await reactionEvent.publish();
-          setLikeOptimistic(eventId, {
-            value: nextLiked,
-            pending: false,
-            delta: nextLikeDelta,
-            expectedCount: expectedLikeCount,
-            relatedEventId: reactionEvent.id,
-          });
-          return;
-        }
-
-        const likeEventId = previous?.relatedEventId || likesByEventId[eventId]?.reactionEventId;
-        if (!likeEventId) throw new Error('Like event not found');
-
-        const deleteEvent = new NDKEvent(ndk);
-        deleteEvent.kind = EventDeletion;
-        deleteEvent.content = 'Deleted by the author';
-        deleteEvent.tags = [
-          ['e', likeEventId],
-          ['k', String(Reaction)],
-        ];
-        deleteEvent.created_at = Math.floor(Date.now() / 1000);
-        await deleteEvent.publish();
-        setLikeOptimistic(eventId, {
-          value: nextLiked,
-          pending: false,
-          delta: nextLikeDelta,
-          expectedCount: expectedLikeCount,
-        });
-      } catch {
-        if (previous) {
-          setLikeOptimistic(eventId, {
-            value: previous.value,
-            pending: previous.pending,
-            delta: previous.delta,
-            expectedCount: previous.expectedCount,
-            relatedEventId: previous.relatedEventId,
-          });
-        } else {
-          clearLikeOptimistic(eventId);
-        }
-        popup({ message: 'Failed to update like. Please try again.', type: 'error' });
-      }
     },
     [
-      clearLikeOptimistic,
       getBaseMetrics,
       getDisplayMetrics,
       getEngagementState,
@@ -380,7 +475,6 @@ export function useNostrEngagement(
       ndk,
       nostrKeys?.pubkey,
       optimisticLikesByEventId,
-      setLikeOptimistic,
     ]
   );
 
@@ -390,92 +484,33 @@ export function useNostrEngagement(
         popup({ message: 'Unable to update repost right now', type: 'error' });
         return;
       }
-
-      const eventId = target.id;
-      const current = getEngagementState(eventId);
-      if (current.repostPending) return;
-
-      const previous = optimisticRepostsByEventId[eventId];
-      const nextReposted = !current.reposted;
-      const displayedRepostCount = getDisplayMetrics(eventId).repostCount;
-      const expectedRepostCount = Math.max(0, displayedRepostCount + (nextReposted ? 1 : -1));
-      const nextRepostDelta = expectedRepostCount - getBaseMetrics(eventId).repostCount;
-      setRepostOptimistic(eventId, {
-        value: nextReposted,
-        pending: true,
-        delta: nextRepostDelta,
-        expectedCount: expectedRepostCount,
-        relatedEventId: previous?.relatedEventId || repostsByEventId[eventId]?.repostEventId,
+      const state = getEngagementState(target.id);
+      await toggleEngagement({
+        target,
+        ndk,
+        kind: Repost,
+        currentState: state.reposted,
+        isPending: state.repostPending,
+        previousOptimistic: optimisticRepostsByEventId[target.id],
+        relatedEventIdFromStore: repostsByEventId[target.id]?.repostEventId,
+        displayedCount: getDisplayMetrics(target.id).repostCount,
+        baseCount: getBaseMetrics(target.id).repostCount,
+        setOptimistic: actions.current.setRepostOptimistic,
+        clearOptimistic: actions.current.clearRepostOptimistic,
+        buildContent: (t) => JSON.stringify(t),
+        onActivated: () => actions.current.unmarkRepostDeleted(target.id),
+        onDeactivated: () => actions.current.markRepostDeleted(target.id),
+        label: 'repost',
       });
-
-      try {
-        if (nextReposted) {
-          const repostEvent = new NDKEvent(ndk);
-          repostEvent.kind = Repost;
-          repostEvent.content = JSON.stringify(target);
-          repostEvent.tags = [
-            ['e', target.id],
-            ['p', target.pubkey],
-          ];
-          repostEvent.created_at = Math.floor(Date.now() / 1000);
-          await repostEvent.publish();
-          unmarkRepostDeleted(eventId);
-          setRepostOptimistic(eventId, {
-            value: nextReposted,
-            pending: false,
-            delta: nextRepostDelta,
-            expectedCount: expectedRepostCount,
-            relatedEventId: repostEvent.id,
-          });
-          return;
-        }
-
-        const repostEventId = previous?.relatedEventId || repostsByEventId[eventId]?.repostEventId;
-        if (!repostEventId) throw new Error('Repost event not found');
-
-        const deleteEvent = new NDKEvent(ndk);
-        deleteEvent.kind = EventDeletion;
-        deleteEvent.content = 'Deleted by the author';
-        deleteEvent.tags = [
-          ['e', repostEventId],
-          ['k', String(Repost)],
-        ];
-        deleteEvent.created_at = Math.floor(Date.now() / 1000);
-        await deleteEvent.publish();
-        markRepostDeleted(eventId);
-        setRepostOptimistic(eventId, {
-          value: nextReposted,
-          pending: false,
-          delta: nextRepostDelta,
-          expectedCount: expectedRepostCount,
-        });
-      } catch {
-        if (previous) {
-          setRepostOptimistic(eventId, {
-            value: previous.value,
-            pending: previous.pending,
-            delta: previous.delta,
-            expectedCount: previous.expectedCount,
-            relatedEventId: previous.relatedEventId,
-          });
-        } else {
-          clearRepostOptimistic(eventId);
-        }
-        popup({ message: 'Failed to update repost. Please try again.', type: 'error' });
-      }
     },
     [
-      clearRepostOptimistic,
       getBaseMetrics,
       getDisplayMetrics,
       getEngagementState,
-      markRepostDeleted,
       ndk,
       nostrKeys?.pubkey,
       optimisticRepostsByEventId,
       repostsByEventId,
-      setRepostOptimistic,
-      unmarkRepostDeleted,
     ]
   );
 
@@ -486,4 +521,20 @@ export function useNostrEngagement(
     toggleRepost,
     engagementRevision,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Optimistic settlement helper
+// ---------------------------------------------------------------------------
+
+function settleOptimistic(
+  opt: { value: boolean; pending: boolean; expectedCount?: number; updatedAt?: number } | undefined,
+  baseValue: boolean,
+  baseCount: number,
+  clear: () => void
+) {
+  if (!opt || opt.pending) return;
+  const countSettled = opt.expectedCount === undefined || baseCount === opt.expectedCount;
+  const isAgedOut = Date.now() - (opt.updatedAt || 0) >= OPTIMISTIC_SETTLE_GRACE_MS;
+  if (baseValue === opt.value && (countSettled || isAgedOut)) clear();
 }

@@ -13,8 +13,7 @@ const MessageComponent = ({ message, isReceived }: { message: Message; isReceive
   return (
     <View
       className={`relative my-2 ${isReceived ? 'self-start' : 'self-end'}`}
-      style={{ minHeight: 60 }}
-    >
+      style={{ minHeight: 60 }}>
       <View
         className="absolute -bottom-1 h-2 w-2"
         style={{
@@ -31,9 +30,9 @@ const MessageComponent = ({ message, isReceived }: { message: Message; isReceive
           maxWidth: '75%',
           minHeight: 50,
         }}>
-        <Text className="mb-2 text-base font-black text-foreground">{message.content}</Text>
+        <Text className="text-foreground mb-2 text-base font-black">{message.content}</Text>
         <HStack className="justify-end">
-          <Text className="text-xs font-bold text-foreground opacity-75">
+          <Text className="text-foreground text-xs font-bold opacity-75">
             {message.created_at ? convertTime(new Date(message.created_at * 1000)) : 'Unknown time'}
           </Text>
         </HStack>

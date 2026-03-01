@@ -261,7 +261,12 @@ export const TransferStepChain = React.memo(
     middleLabel = 'Send',
     progressVariant = 'default',
   }: TransferStepChainProps) => {
-    const [foreground, muted, successColor, dangerColor] = useThemeColor(['foreground', 'muted', 'success', 'danger'] as const);
+    const [foreground, muted, successColor, dangerColor] = useThemeColor([
+      'foreground',
+      'muted',
+      'success',
+      'danger',
+    ] as const);
 
     const greenColor = successColor;
     const orangeColor = '#fb923c';

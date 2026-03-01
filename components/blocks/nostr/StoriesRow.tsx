@@ -6,7 +6,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Circle as SvgCircle } from 'react-native-svg';
 import { Metadata } from 'nostr-tools/kinds';
 import { router } from 'expo-router';
@@ -119,6 +119,86 @@ function StoriesRowSkeleton() {
 }
 
 // ============================================================================
+// Data fetching
+// ============================================================================
+
+async function fetchStoryUsers(
+  userPubkey: string,
+  signal: { cancelled: boolean }
+): Promise<StoryUser[]> {
+  const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
+  const rp = Date.now().toString(36);
+
+  try {
+    const spec = JSON.stringify({
+      id: 'feed',
+      kind: 'notes',
+      notes: 'follows',
+      pubkey: userPubkey,
+    });
+    const rawEvents: RawPrimalEvent[] = await client.request(`${rp}_stories`, {
+      cache: ['mega_feed_directive', { spec, limit: 50, user_pubkey: userPubkey }],
+    });
+
+    if (signal.cancelled) return [];
+
+    const profiles = new Map<string, ProfileInfo>();
+    const events: FeedEvent[] = [];
+
+    for (const raw of rawEvents) {
+      if (raw.kind === Metadata) {
+        const result = parseProfileFromRaw(raw);
+        if (result) profiles.set(result[0], result[1]);
+        continue;
+      }
+      const ev = normalizeFeedEvent(raw);
+      if (ev && ev.kind === 1) events.push(ev);
+    }
+
+    const userVideoMap = new Map<string, VideoPostRecord[]>();
+    for (const ev of events) {
+      const videoUrls = getVideoUrlsFromContent(ev.content);
+      if (videoUrls.length === 0) continue;
+      const existing = userVideoMap.get(ev.pubkey) || [];
+      existing.push({
+        eventId: ev.id,
+        videoUrl: videoUrls[0]!,
+        content: ev.content,
+        pubkey: ev.pubkey,
+        created_at: ev.created_at,
+      });
+      userVideoMap.set(ev.pubkey, existing);
+    }
+
+    const users: StoryUser[] = [];
+    for (const [pubkey, videoPosts] of userVideoMap) {
+      users.push({ pubkey, profile: profiles.get(pubkey), videoPosts });
+    }
+
+    const missingPubkeys = users.filter((u) => !u.profile).map((u) => u.pubkey);
+    if (missingPubkeys.length > 0) {
+      try {
+        const profileRawEvents: RawPrimalEvent[] = await client.request(`${rp}_sp`, {
+          cache: ['user_infos', { pubkeys: missingPubkeys }],
+        });
+        for (const raw of profileRawEvents) {
+          if (raw.kind !== Metadata) continue;
+          const result = parseProfileFromRaw(raw);
+          if (result) profiles.set(result[0], result[1]);
+        }
+        for (const u of users) {
+          if (!u.profile) u.profile = profiles.get(u.pubkey);
+        }
+      } catch {}
+    }
+
+    return users;
+  } finally {
+    client.close();
+  }
+}
+
+// ============================================================================
 // StoriesRow
 // ============================================================================
 
@@ -131,6 +211,8 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
   const [storyUsers, setStoryUsers] = useState<StoryUser[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const nameColor = { color: opacity(foreground, 0.7) };
+
   useEffect(() => {
     prefetchImages(storyUsers.map((user) => user.profile?.picture));
   }, [storyUsers]);
@@ -141,99 +223,20 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
       return;
     }
 
-    let cancelled = false;
-    const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
-    const rp = Date.now().toString(36);
-
-    (async () => {
-      try {
-        // Fetch latest from follows
-        const spec = JSON.stringify({
-          id: 'feed',
-          kind: 'notes',
-          notes: 'follows',
-          pubkey: userPubkey,
-        });
-        const rawEvents: RawPrimalEvent[] = await client.request(`${rp}_stories`, {
-          cache: ['mega_feed_directive', { spec, limit: 50, user_pubkey: userPubkey }],
-        });
-
-        if (cancelled) return;
-
-        // Parse events and profiles
-        const profiles = new Map<string, ProfileInfo>();
-        const events: FeedEvent[] = [];
-
-        for (const raw of rawEvents) {
-          if (raw.kind === Metadata) {
-            const result = parseProfileFromRaw(raw);
-            if (result) profiles.set(result[0], result[1]);
-            continue;
-          }
-          const ev = normalizeFeedEvent(raw);
-          if (ev && ev.kind === 1) events.push(ev);
-        }
-
-        // Filter to video posts and group by author
-        const userVideoMap = new Map<string, VideoPostRecord[]>();
-
-        for (const ev of events) {
-          const videoUrls = getVideoUrlsFromContent(ev.content);
-          if (videoUrls.length === 0) continue;
-          const existing = userVideoMap.get(ev.pubkey) || [];
-          existing.push({
-            eventId: ev.id,
-            videoUrl: videoUrls[0]!,
-            content: ev.content,
-            pubkey: ev.pubkey,
-            created_at: ev.created_at,
-          });
-          userVideoMap.set(ev.pubkey, existing);
-        }
-
-        // Build StoryUser array
-        const users: StoryUser[] = [];
-        for (const [pubkey, videoPosts] of userVideoMap) {
-          users.push({
-            pubkey,
-            profile: profiles.get(pubkey),
-            videoPosts,
-          });
-        }
-
-        // Fetch missing profiles
-        const missingPubkeys = users.filter((u) => !u.profile).map((u) => u.pubkey);
-        if (missingPubkeys.length > 0) {
-          try {
-            const profileRawEvents: RawPrimalEvent[] = await client.request(`${rp}_sp`, {
-              cache: ['user_infos', { pubkeys: missingPubkeys }],
-            });
-            for (const raw of profileRawEvents) {
-              if (raw.kind !== Metadata) continue;
-              const result = parseProfileFromRaw(raw);
-              if (result) profiles.set(result[0], result[1]);
-            }
-            // Update profile refs
-            for (const u of users) {
-              if (!u.profile) u.profile = profiles.get(u.pubkey);
-            }
-          } catch {}
-        }
-
-        if (!cancelled) {
+    const signal = { cancelled: false };
+    fetchStoryUsers(userPubkey, signal)
+      .then((users) => {
+        if (!signal.cancelled) {
           setStoryUsers(users);
           setLoading(false);
         }
-      } catch (error) {
-        console.error('StoriesRow: failed to fetch stories', error);
-        if (!cancelled) setLoading(false);
-      } finally {
-        client.close();
-      }
-    })();
+      })
+      .catch(() => {
+        if (!signal.cancelled) setLoading(false);
+      });
 
     return () => {
-      cancelled = true;
+      signal.cancelled = true;
     };
   }, [userPubkey]);
 
@@ -263,11 +266,10 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
         {storyUsers.map((user, index) => {
           const name = user.profile?.name || user.pubkey.slice(0, 8) + '…';
           return (
-            <TouchableOpacity
+            <Pressable
               key={user.pubkey}
               style={styles.storyItem}
-              onPress={() => handleStoryPress(index)}
-              activeOpacity={0.7}>
+              onPress={() => handleStoryPress(index)}>
               <GradientRing>
                 <Avatar
                   picture={user.profile?.picture}
@@ -277,13 +279,10 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
                   variant="person"
                 />
               </GradientRing>
-              <Text
-                size={11}
-                numberOfLines={1}
-                style={[styles.storyName, { color: opacity(foreground, 0.7) }]}>
+              <Text size={11} numberOfLines={1} style={[styles.storyName, nameColor]}>
                 {name}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           );
         })}
       </ScrollView>

@@ -1,15 +1,3 @@
-/**
- * @fileoverview Mint Info Modal Screen - Performance Optimized
- *
- * Key optimizations:
- * 1. ALL animations use useNativeDriver: true (opacity, transform only)
- * 2. Replaced width animations with scaleX transforms (native driver compatible)
- * 3. Removed expensive counting animations (text value updates)
- * 4. SVG progress ring uses static values with fade-in (strokeDashoffset doesn't support native driver)
- * 5. Minimized state updates during animations
- * 6. All components memoized with React.memo
- */
-
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   ScrollView,
@@ -27,7 +15,7 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
-import { npubToPubkey } from 'components/blocks/Transaction';
+import { npubToPubkey } from 'helper/nostrClient';
 import { useAuditedMint } from 'hooks/coco/useAuditedMint';
 import { useKYMMint } from 'hooks/coco/useKYMMint';
 import { Card } from 'components/ui/Card';
@@ -36,6 +24,7 @@ import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from 'components/ui/Avatar';
 import { Badge } from 'components/ui/Badge';
 import { truncateMiddle } from 'helper/strings';
+import { getMintDisplayName } from 'helper/url';
 import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from 'components/ui/Skeleton';
 import { BottomButtons } from 'components/ui/BottomButtons';
@@ -48,10 +37,6 @@ import opacity from 'hex-color-opacity';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/hooks/useThemeColor';
 
-// ============================================================================
-// Simple Progress Ring using SVG - Static (no animation for better performance)
-// Note: SVG strokeDashoffset doesn't support native driver, so we show final state
-// ============================================================================
 function ProgressRingComponent({
   size = 84,
   strokeWidth = 3,
@@ -71,10 +56,7 @@ function ProgressRingComponent({
   const circumference = 2 * Math.PI * radius;
   const center = size / 2;
 
-  // Calculate final stroke offset (no animation - SVG props don't support native driver)
   const strokeDashoffset = circumference * (1 - progress);
-
-  // Fade in the ring with native driver
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -90,7 +72,6 @@ function ProgressRingComponent({
     <View style={{ width: size, height: size, position: 'relative' }}>
       <Animated.View style={{ opacity: fadeAnim }}>
         <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-          {/* Background circle */}
           <Circle
             cx={center}
             cy={center}
@@ -99,7 +80,6 @@ function ProgressRingComponent({
             strokeWidth={strokeWidth}
             fill="transparent"
           />
-          {/* Progress circle - static final value */}
           <Circle
             cx={center}
             cy={center}
@@ -119,9 +99,6 @@ function ProgressRingComponent({
 }
 const ProgressRing = React.memo(ProgressRingComponent);
 
-// ============================================================================
-// Animated Avatar with status badge
-// ============================================================================
 function AnimatedAvatarComponent({
   picture,
   name,
@@ -162,7 +139,7 @@ function AnimatedAvatarComponent({
   }, [status, isLoading, badgeAnim]);
 
   return (
-    <View style={{ position: 'relative' }}>
+    <View className="relative">
       <Avatar
         picture={picture}
         size={size}
@@ -188,9 +165,6 @@ function AnimatedAvatarComponent({
 }
 const AnimatedAvatar = React.memo(AnimatedAvatarComponent);
 
-// ============================================================================
-// Stats Grid - Optimized with native driver only (no counting animation)
-// ============================================================================
 function StatsGridComponent({
   successRate,
   avgTimeMs,
@@ -198,7 +172,6 @@ function StatsGridComponent({
   swapTotal,
   totalMints,
   totalMelts,
-  isLoading: _isLoading,
 }: {
   successRate?: number;
   avgTimeMs?: number;
@@ -206,9 +179,12 @@ function StatsGridComponent({
   swapTotal?: number;
   totalMints?: number;
   totalMelts?: number;
-  isLoading: boolean;
 }) {
-  const [foreground, surfaceSecondary, surfaceTertiary] = useThemeColor(['foreground', 'surface-secondary', 'surface-tertiary'] as const);
+  const [foreground, surfaceSecondary, surfaceTertiary] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'surface-tertiary',
+  ] as const);
 
   const displayValues = useMemo(
     () => ({
@@ -220,41 +196,11 @@ function StatsGridComponent({
     [successRate, avgTimeMs, totalMints, totalMelts]
   );
 
-  // Single staggered fade animation using native driver
-  const fadeAnims = useRef([
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-  ]).current;
-
-  // Check if we have any valid data
   const hasValidData =
     successRate !== undefined ||
     avgTimeMs !== undefined ||
     totalMints !== undefined ||
     totalMelts !== undefined;
-
-  // Trigger staggered fade-in when data loads
-  const hasAnimatedRef = useRef(false);
-  useEffect(() => {
-    if (hasValidData && !hasAnimatedRef.current) {
-      hasAnimatedRef.current = true;
-
-      // Staggered fade animations - all use native driver
-      const animations = fadeAnims.map((anim, index) =>
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: 400,
-          delay: index * 80,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        })
-      );
-
-      Animated.stagger(80, animations).start();
-    }
-  }, [hasValidData, fadeAnims]);
 
   const stats = useMemo(
     () => [
@@ -289,15 +235,13 @@ function StatsGridComponent({
     [displayValues, swapSuccess, swapTotal]
   );
 
-  // Show skeleton if we don't have valid data yet
   const showSkeleton = !hasValidData;
 
   return (
     <View style={styles.statsGrid}>
       {[0, 2].map((rowStart) => (
         <View key={rowStart} style={styles.statsRow}>
-          {stats.slice(rowStart, rowStart + 2).map((stat, i) => {
-            const index = rowStart + i;
+          {stats.slice(rowStart, rowStart + 2).map((stat) => {
             return (
               <View key={stat.label} style={styles.statItem}>
                 <View
@@ -309,49 +253,30 @@ function StatsGridComponent({
                       borderColor: surfaceTertiary,
                     },
                   ]}>
-                  {showSkeleton ? (
-                    <>
-                      <Skeleton
-                        style={[styles.skeletonLabel, { backgroundColor: surfaceTertiary }]}
-                      />
-                      <Skeleton
-                        style={[
-                          styles.skeletonValue,
-                          {
-                            backgroundColor: surfaceTertiary,
-                            width: stat.accent ? 100 : 60,
-                          },
-                        ]}
-                      />
-                      <Skeleton
-                        style={[styles.skeletonDesc, { backgroundColor: surfaceTertiary }]}
-                      />
-                    </>
-                  ) : (
-                    <Animated.View style={{ opacity: fadeAnims[index] }}>
-                      <Text
-                        bold
-                        overpass
-                        size={12}
-                        style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
-                        {stat.label.toUpperCase()}
-                      </Text>
-                      <Text
-                        bold
-                        overpass
-                        size={stat.accent ? 24 : 20}
-                        style={{ color: foreground, marginBottom: 2 }}>
-                        {stat.value}
-                      </Text>
-                      <Text
-                        bold
-                        overpass
-                        size={12}
-                        style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
-                        {stat.description}
-                      </Text>
-                    </Animated.View>
-                  )}
+                  <Text
+                    loading={showSkeleton}
+                    placeholder="SUCCESS RATE"
+                    bold
+                    size={12}
+                    style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
+                    {stat.label.toUpperCase()}
+                  </Text>
+                  <Text
+                    loading={showSkeleton}
+                    placeholder="100%"
+                    bold
+                    size={stat.accent ? 24 : 20}
+                    style={{ color: foreground, marginBottom: 2 }}>
+                    {stat.value}
+                  </Text>
+                  <Text
+                    loading={showSkeleton}
+                    placeholder="Completion rate"
+                    bold
+                    size={12}
+                    style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
+                    {stat.description}
+                  </Text>
                 </View>
               </View>
             );
@@ -363,18 +288,13 @@ function StatsGridComponent({
 }
 const StatsGrid = React.memo(StatsGridComponent);
 
-// ============================================================================
-// Rating Display - Optimized with native driver (scaleX instead of width)
-// ============================================================================
-function RatingDisplayComponent({
-  score,
-  isLoading: _isLoading,
-}: {
-  score: number;
-  recommendations?: any[];
-  isLoading: boolean;
-}) {
-  const [foreground, defaultColor, surfaceTertiary, warning] = useThemeColor(['foreground', 'default', 'surface-tertiary', 'yellow-300'] as const);
+function RatingDisplayComponent({ score }: { score: number }) {
+  const [foreground, defaultColor, surfaceTertiary, warning] = useThemeColor([
+    'foreground',
+    'default',
+    'surface-tertiary',
+    'yellow-300',
+  ] as const);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const barScaleAnim = useRef(new Animated.Value(0)).current;
@@ -387,13 +307,11 @@ function RatingDisplayComponent({
 
   const formattedScore = isValidScore ? score.toFixed(1) : '0.0';
 
-  // Trigger animation when score loads - all native driver
   const hasAnimatedRef = useRef(false);
   useEffect(() => {
     if (isValidScore && !hasAnimatedRef.current) {
       hasAnimatedRef.current = true;
 
-      // Reset
       fadeAnim.setValue(0);
       barScaleAnim.setValue(0);
 
@@ -403,7 +321,6 @@ function RatingDisplayComponent({
           duration: 400,
           useNativeDriver: true,
         }),
-        // Use scaleX instead of width - supports native driver
         Animated.timing(barScaleAnim, {
           toValue: goldPercentage,
           duration: 800,
@@ -417,27 +334,12 @@ function RatingDisplayComponent({
 
   if (showSkeleton) {
     return (
-      <HStack align="center" gap={16} style={{ width: '100%', paddingHorizontal: 16 }}>
+      <HStack align="center" gap={16} className="w-full px-4">
         <VStack align="center" style={{ width: 60 }}>
-          <Skeleton
-            style={{
-              width: 48,
-              height: 32,
-              borderRadius: 4,
-              backgroundColor: surfaceTertiary,
-            }}
-          />
-          <Skeleton
-            style={{
-              width: 40,
-              height: 14,
-              marginTop: 8,
-              borderRadius: 4,
-              backgroundColor: surfaceTertiary,
-            }}
-          />
+          <Skeleton className="bg-surface-tertiary h-8 w-12 rounded" />
+          <Skeleton className="bg-surface-tertiary mt-2 h-3.5 w-10 rounded" />
         </VStack>
-        <VStack gap={4} style={{ flex: 1 }}>
+        <VStack gap={4} className="flex-1">
           {[5, 4, 3, 2, 1].map((stars) => (
             <HStack key={stars} align="center" gap={8}>
               <HStack gap={2}>
@@ -461,7 +363,7 @@ function RatingDisplayComponent({
   }
 
   return (
-    <HStack align="center" gap={16} style={{ width: '100%', paddingHorizontal: 16 }}>
+    <HStack align="center" gap={16} className="w-full px-4">
       <VStack align="center" style={{ width: 60 }}>
         <Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
           <Text heavy size={28} style={{ color: foreground }}>
@@ -473,7 +375,7 @@ function RatingDisplayComponent({
         </Animated.View>
       </VStack>
 
-      <VStack gap={4} style={{ flex: 1 }}>
+      <VStack gap={4} className="flex-1">
         {[5, 4, 3, 2, 1].map((stars) => {
           const isTargetRow = stars === targetRow;
           return (
@@ -504,9 +406,7 @@ function RatingDisplayComponent({
                       height: '100%',
                       backgroundColor: warning,
                       borderRadius: 4,
-                      // Use scaleX with left origin instead of width animation
                       transform: [{ scaleX: barScaleAnim }],
-                      // Transform origin left - scale from left edge
                       transformOrigin: 'left center',
                     }}
                   />
@@ -521,29 +421,8 @@ function RatingDisplayComponent({
 }
 const RatingDisplay = React.memo(RatingDisplayComponent);
 
-// ============================================================================
-// Helper
-// ============================================================================
-const getMintDisplayName = (
-  mintInfo?: any,
-  auditMintInfo?: any,
-  auditInfo?: any,
-  mintUrl?: string
-): string => {
-  return (
-    mintInfo?.name ||
-    auditMintInfo?.name ||
-    auditInfo?.auditorData?.name ||
-    mintUrl?.split('//')[1]?.split('/')[0] ||
-    'Unknown Mint'
-  );
-};
-
-// ============================================================================
-// Main Component
-// ============================================================================
 function MintInfoModal() {
-  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const foreground = useThemeColor('foreground');
   const [danger, success, warning] = useThemeColor(['danger', 'success', 'yellow-300'] as const);
   const insets = useSafeAreaInsets();
   const { mintUrl, fromScan, fromAccepter, token } = useLocalSearchParams<{
@@ -570,11 +449,7 @@ function MintInfoModal() {
     mintInfo: auditMintInfo,
     loading: auditLoading,
   } = useAuditedMint(mintUrl || '');
-  const {
-    score: kymScore,
-    recommendations: kymRecommendations,
-    loading: kymLoading,
-  } = useKYMMint(mintUrl || '');
+  const { score: kymScore } = useKYMMint(mintUrl || '');
 
   const handleCopy = useCallback(async (text: string) => {
     try {
@@ -626,7 +501,6 @@ function MintInfoModal() {
     fetchMintInfo();
   }, [mintUrl, getMintInfo]);
 
-  // Check if mint is already known/trusted
   useEffect(() => {
     const checkIfKnown = async () => {
       if (!mintUrl) {
@@ -644,7 +518,6 @@ function MintInfoModal() {
     checkIfKnown();
   }, [mintUrl, isKnownMint]);
 
-  // Handler to add mint
   const handleAddMint = useCallback(async () => {
     if (!mintUrl) return;
     setAddingMint(true);
@@ -670,7 +543,6 @@ function MintInfoModal() {
 
   const isLoading = loading || auditLoading;
 
-  // Calculate stats
   const { successRate, totalMints, totalMelts } = useMemo(() => {
     const mints = auditInfo?.auditorData?.mints;
     const melts = auditInfo?.auditorData?.melts;
@@ -687,13 +559,13 @@ function MintInfoModal() {
     return { successRate: rate, totalMints: mints, totalMelts: melts };
   }, [auditInfo]);
 
-  const displayName = useMemo(
-    () => getMintDisplayName(mintInfo, auditMintInfo, auditInfo, mintUrl),
-    [mintInfo, auditMintInfo, auditInfo, mintUrl]
-  );
+  const displayName = useMemo(() => {
+    const name = mintInfo?.name || auditMintInfo?.name || auditInfo?.auditorData?.name;
+    return getMintDisplayName(mintUrl || '', name ? { name } : undefined);
+  }, [mintInfo, auditMintInfo, auditInfo, mintUrl]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: background }}>
+    <View className="bg-background flex-1">
       <Stack.Screen
         options={{
           title: fromAccepter === '1' ? 'Verify Mint' : isLoading ? 'Mint Details' : displayName,
@@ -716,15 +588,14 @@ function MintInfoModal() {
       />
 
       <ScrollView
-        style={{ flex: 1 }}
+        className="flex-1"
         contentContainerStyle={{
           paddingTop: insets.top + 16,
           paddingHorizontal: 16,
           paddingBottom: 120,
         }}
         showsVerticalScrollIndicator={false}>
-        {/* Header Section */}
-        <VStack align="center" style={{ paddingVertical: 24, paddingBottom: 32 }}>
+        <VStack align="center" className="pb-8 pt-6">
           {/* Progress Ring with Avatar */}
           <ProgressRing
             size={84}
@@ -743,14 +614,8 @@ function MintInfoModal() {
 
           <Spacer size={16} />
 
-          {/* Rating Display */}
-          <RatingDisplay
-            score={kymScore ?? -1}
-            recommendations={kymRecommendations}
-            isLoading={kymLoading}
-          />
+          <RatingDisplay score={kymScore ?? -1} />
 
-          {/* Stats Grid */}
           <StatsGrid
             successRate={successRate}
             avgTimeMs={auditInfo?.avgTimeMs}
@@ -758,7 +623,6 @@ function MintInfoModal() {
             swapTotal={auditInfo?.swapTotal}
             totalMints={totalMints}
             totalMelts={totalMelts}
-            isLoading={isLoading}
           />
         </VStack>
 
@@ -809,11 +673,7 @@ function MintInfoModal() {
                             color={opacity(foreground, 0.4)}
                           />
                         ) : contact.method.toUpperCase() === 'EMAIL' ? (
-                          <Icon
-                            name="mdi:at"
-                            size={20}
-                            color={opacity(foreground, 0.4)}
-                          />
+                          <Icon name="mdi:at" size={20} color={opacity(foreground, 0.4)} />
                         ) : undefined}
                       </ListGroup.ItemPrefix>
                       <ListGroup.ItemContent>
@@ -833,8 +693,6 @@ function MintInfoModal() {
           </Section>
         )}
 
-        {/* Settings: entry point for mint distribution + rebalance tooling.
-            We only show this for known/added mints (not random scanned mints). */}
         {isKnownMintState && fromAccepter !== '1' && (
           <Section title="Settings">
             <ListGroup variant="secondary">

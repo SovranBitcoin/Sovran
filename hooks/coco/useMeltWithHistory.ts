@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+
 import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import type { MeltHistoryEntry } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
@@ -6,8 +7,11 @@ import { useManager } from 'coco-cashu-react';
 type MeltStatus = 'idle' | 'creating' | 'paying' | 'success' | 'error';
 
 /**
- * Type for the prepared melt operation returned by prepareMeltBolt11.
- * We define this inline since PreparedMeltOperation is not exported from coco-cashu-core.
+ * Subset of coco's PreparedMeltOperation used to build UI-facing quote/history data.
+ *
+ * COCO EXCEPTION: PreparedMeltOperation is not exported from coco-cashu-core's
+ * public API (operations/index.ts cherry-picks only MeltOperationService).
+ * Flag for extraction into coco's public exports.
  */
 interface PreparedMeltOp {
   id: string;
@@ -20,7 +24,6 @@ interface PreparedMeltOp {
 interface MeltQuoteResult {
   quote: MeltQuoteBolt11Response;
   historyEntry: MeltHistoryEntry;
-  /** The prepared melt operation ID (used for executeMelt) */
   operationId: string;
 }
 
@@ -31,8 +34,9 @@ interface MeltOptions {
 }
 
 /**
- * Converts a prepared melt operation to MeltQuoteBolt11Response format.
- * The v3 API uses operations instead of raw quote responses.
+ * COCO EXCEPTION: MeltQuoteBolt11Response is not re-exported from coco-cashu-core.
+ * This shim builds one from the prepared operation so downstream screens
+ * (MeltQuoteScreen) can render quote details.
  */
 function operationToQuote(operation: PreparedMeltOp, invoice: string): MeltQuoteBolt11Response {
   return {
@@ -49,9 +53,9 @@ function operationToQuote(operation: PreparedMeltOp, invoice: string): MeltQuote
 }
 
 /**
- * Constructs a MeltHistoryEntry from a prepared melt operation.
+ * Builds a MeltHistoryEntry from a prepared operation.
  * The v3 prepareMeltBolt11 flow does not create history entries,
- * so we build one locally for UI display and location tracking.
+ * so we construct one locally for UI display and location tracking.
  */
 function operationToHistoryEntry(operation: PreparedMeltOp): MeltHistoryEntry {
   return {
@@ -67,12 +71,11 @@ function operationToHistoryEntry(operation: PreparedMeltOp): MeltHistoryEntry {
 }
 
 /**
- * Hook for the v3 two-step melt flow:
- * 1. prepareMeltBolt11() - prepares the operation and reserves proofs
- * 2. executeMelt() - executes the prepared operation
+ * Two-step melt flow hook: `prepareMeltQuote` → `executeMeltQuote`.
  *
- * Constructs quote and history entry data directly from the operation
- * response returned by prepareMeltBolt11.
+ * Constructs quote and history entry data from the operation returned by
+ * `manager.quotes.prepareMeltBolt11`, then `executeMelt` completes payment.
+ * Also exposes a one-shot `melt()` for flows that don't need intermediate UI.
  */
 export function useMeltWithHistory() {
   const manager = useManager();
@@ -81,10 +84,6 @@ export function useMeltWithHistory() {
   const [data, setData] = useState<MeltQuoteResult | null>(null);
   const isProcessingRef = useRef(false);
 
-  /**
-   * Prepare a melt operation.
-   * Returns quote and history entry data constructed from the operation response.
-   */
   const prepareMeltQuote = useCallback(
     async (mintUrl: string, invoice: string, opts: MeltOptions = {}): Promise<MeltQuoteResult> => {
       if (isProcessingRef.current) {
@@ -138,13 +137,6 @@ export function useMeltWithHistory() {
     [manager]
   );
 
-  /**
-   * Execute a prepared melt operation.
-   * This is the second step of the two-step melt flow.
-   *
-   * @param operationId - The operation ID from prepareMeltQuote
-   * @param quoteId - The quote ID (used for backwards compatibility with old API consumers)
-   */
   const executeMeltQuote = useCallback(
     async (operationId: string, quoteId: string, opts: MeltOptions = {}): Promise<void> => {
       if (isProcessingRef.current) {
@@ -158,10 +150,8 @@ export function useMeltWithHistory() {
       setError(null);
 
       try {
-        // Execute the melt operation using the new v3 API
         await manager.quotes.executeMelt(operationId);
 
-        // Update our data with the latest state if we have it
         if (data && data.historyEntry.quoteId === quoteId) {
           setData({
             ...data,
@@ -184,10 +174,6 @@ export function useMeltWithHistory() {
     [manager, data]
   );
 
-  /**
-   * Prepare and execute a melt operation in one call.
-   * This is the recommended way to melt when you don't need to show intermediate UI.
-   */
   const melt = useCallback(
     async (mintUrl: string, invoice: string, opts: MeltOptions = {}): Promise<MeltQuoteResult> => {
       const result = await prepareMeltQuote(mintUrl, invoice, opts);
@@ -200,10 +186,9 @@ export function useMeltWithHistory() {
   /**
    * Cancel (rollback) a prepared or pending melt operation and free its reserved proofs.
    *
-   * For prepared (UNPAID) operations this immediately releases the proofs.
-   * For pending operations it first checks with the mint — if the quote is
-   * still UNPAID the proofs are released; if it's PAID or still in-flight
-   * the cancel is rejected.
+   * For prepared (UNPAID) operations this immediately releases proofs.
+   * For pending operations it checks with the mint first — if the quote is
+   * still UNPAID the proofs are released; if PAID or in-flight, cancel is rejected.
    */
   const cancelMeltQuote = useCallback(
     async (opts: { operationId?: string; mintUrl?: string; quoteId?: string }): Promise<void> => {
@@ -229,7 +214,6 @@ export function useMeltWithHistory() {
 
       await manager.quotes.rollbackMelt(resolvedId, 'User cancelled');
 
-      // Update local state so the UI reflects the cancellation
       if (data && data.operationId === resolvedId) {
         setData(null);
       }
@@ -246,19 +230,16 @@ export function useMeltWithHistory() {
   }, []);
 
   return {
-    // Core operations
     prepareMeltQuote,
     executeMeltQuote,
     cancelMeltQuote,
     melt,
 
-    // Current state
     data,
     quote: data?.quote ?? null,
     historyEntry: data?.historyEntry ?? null,
     operationId: data?.operationId ?? null,
 
-    // Status
     status,
     error,
     isCreating: status === 'creating',
@@ -267,7 +248,6 @@ export function useMeltWithHistory() {
     isError: status === 'error',
     isSuccess: status === 'success',
 
-    // Utilities
     reset,
   };
 }

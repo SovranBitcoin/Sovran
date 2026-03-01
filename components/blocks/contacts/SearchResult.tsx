@@ -1,4 +1,3 @@
-import React from 'react';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
@@ -7,6 +6,7 @@ import opacity from 'hex-color-opacity';
 import { UserProfile } from 'helper/apiClient';
 import { ProfileImage } from './ProfileImage';
 import { useThemeColor } from 'hooks/useThemeColor';
+
 interface SearchResultProps {
   result: {
     pubkey: string;
@@ -30,18 +30,20 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
       <HStack spacing={8} align="center">
         <ProfileImage loading={loading} profile={result.profile} />
         <VStack spacing={4} className="flex-1">
-          <Text loading={loading} overpass bold size={16} color={opacity(foreground, 0.9)}>
+          <Text
+            loading={loading}
+            placeholder="Display Name"
+            bold
+            size={16}
+            color={opacity(foreground, 0.9)}>
             {title}
           </Text>
           {result.profile?.nip05 && (
             <Text
               loading={loading}
-              overpass
-              regular
+              placeholder="user@relay.example"
               size={12}
-              style={{
-                color: result.profile.nip05Valid ? success : danger,
-              }}>
+              color={result.profile.nip05Valid ? success : danger}>
               {result.profile.nip05Valid ? '✓ ' : '✗ '}
               {result.profile.nip05}
             </Text>
