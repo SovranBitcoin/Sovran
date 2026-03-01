@@ -209,6 +209,8 @@ declare module "@monicon/icon-loader" {
 	| "mdi:qrcode-scan"
 	| "mdi:refresh"
 	| "mdi:send"
+	| "mdi:broadcast"
+	| "mdi:shield-check"
 	| "mdi:shield-refresh"
 	| "mdi:skip-next"
 	| "mdi:swap-horizontal"
