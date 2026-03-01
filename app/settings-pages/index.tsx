@@ -3,7 +3,6 @@ import { ScrollView, Linking, Alert } from 'react-native';
 import { Text } from 'components/ui/Text';
 import { useSettingsStore } from 'stores/settingsStore';
 
-import { ActionSheetProvider, connectActionSheet } from '@expo/react-native-action-sheet';
 import { Link, router } from 'expo-router';
 import { truncateMiddle } from 'helper/strings';
 import Container from 'components/blocks/Container';
@@ -33,18 +32,16 @@ export const Section: React.FC<{
   children: React.ReactNode;
   isDanger?: boolean;
 }> = ({ title, children, isDanger }) => {
-  const [foreground, danger] = useThemeColor(['foreground', 'danger']);
+  const danger = useThemeColor('danger');
 
   return (
     <View className="py-3">
       <Text
-        className={`my-2 ml-3 uppercase tracking-wide ${isDanger ? '' : ''}`}
+        className="text-foreground/50 my-2 ml-3 uppercase tracking-wide"
         size={13}
         medium
         overpass
-        style={{
-          color: isDanger ? danger : opacity(foreground, 0.5),
-        }}>
+        style={isDanger ? { color: danger } : undefined}>
         {title}
       </Text>
       <View className="overflow-hidden rounded-xl">{children}</View>
@@ -109,7 +106,7 @@ export const RowButton: React.FC<{
         borderColor: surfaceTertiary,
         borderTopWidth: !isFirst ? 1 : 0,
       }}>
-      <HStack align="center" gap={8} style={{ paddingRight: 4 }}>
+      <HStack align="center" gap={8} className="pr-1">
         {leftIcon}
         <Text
           className="tracking-tight"
@@ -220,7 +217,6 @@ const SettingsListActionItem: React.FC<{
 };
 
 const ModalScreen = () => {
-  const foreground = useThemeColor('foreground');
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
   const setSendLocationEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
   const devMode = useSettingsStore((state) => state.experimental);
@@ -272,7 +268,6 @@ const ModalScreen = () => {
             try {
               const result = await CocoManager.freeAllReservedProofs();
 
-              console.log(result);
               popup({
                 message: 'Reserved proofs freed',
                 type: 'success',
@@ -327,7 +322,6 @@ const ModalScreen = () => {
           </ListGroup>
         </Section>
         <Section title="Security">
-          {/* <RowButton label="Passcode" href="/settings-pages/passcode" isFirst /> */}
           <ListGroup variant="secondary">
             <SettingsListLinkItem href="/settings-pages/keyring" title="P2PK Keys" />
           </ListGroup>
@@ -419,24 +413,10 @@ const ModalScreen = () => {
 
         <TouchableOpacity onPress={handleVersionPress}>
           <VStack spacing={4}>
-            <Text
-              className="text-center"
-              overpass
-              bold
-              size={13}
-              style={{
-                color: opacity(foreground, 0.5),
-              }}>
+            <Text className="text-foreground/50 text-center" overpass bold size={13}>
               {name}
             </Text>
-            <Text
-              className="text-center"
-              size={13}
-              overpass
-              medium
-              style={{
-                color: opacity(foreground, 0.5),
-              }}>
+            <Text className="text-foreground/50 text-center" size={13} overpass medium>
               App Version {version} ({buildNumber})
             </Text>
           </VStack>
@@ -446,12 +426,4 @@ const ModalScreen = () => {
   );
 };
 
-const ConnectedModalScreen = connectActionSheet(ModalScreen);
-
-const App = () => (
-  <ActionSheetProvider>
-    <ConnectedModalScreen />
-  </ActionSheetProvider>
-);
-
-export default withSheetProvider(App);
+export default withSheetProvider(ModalScreen);

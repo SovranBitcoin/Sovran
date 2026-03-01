@@ -140,7 +140,7 @@ export default function ModalScreen() {
           );
         })}
 
-        <View className="h-8 w-8 bg-background"></View>
+        <View className="bg-background h-8 w-8"></View>
 
         {/* info message */}
         <Card
@@ -182,11 +182,7 @@ export default function ModalScreen() {
             label="npub1example@npubx.cash"
             onPress={() => {}}
             rightIcon={
-              <Icon
-                name="lets-icons:copy"
-                size={ROW_ICON_SIZE}
-                color={opacity(foreground, 0.4)}
-              />
+              <Icon name="lets-icons:copy" size={ROW_ICON_SIZE} color={opacity(foreground, 0.4)} />
             }
           />
         </Section>
@@ -219,7 +215,7 @@ export default function ModalScreen() {
         />
 
         {/* Examples for different tab counts */}
-        <VStack className="space-y-4" style={{ marginTop: 16 }}>
+        <VStack className="mt-4 space-y-4">
           {[1, 2, 3, 4, 5].map((count) => (
             <Tabs
               key={`example-tabs-${count}`}
@@ -233,12 +229,14 @@ export default function ModalScreen() {
 
         <VStack>
           {chunkArray(icons, 3).map((row, rowIndex) => (
-            <HStack key={rowIndex} className="bg-transparent" style={{ marginBottom: 16 }}>
+            <HStack key={rowIndex} className="mb-4 bg-transparent">
               {row.map((icon) => (
-                <VStack key={icon} className="flex-1 items-center" style={{ margin: 16 }}>
+                <VStack key={icon} className="m-4 flex-1 items-center">
                   <Icon name={icon} size={48} color={foreground} />
                   <Spacer size={8} />
-                  <Text className="w-full truncate text-center text-xs text-foreground">{icon}</Text>
+                  <Text className="text-foreground w-full truncate text-center text-xs">
+                    {icon}
+                  </Text>
                 </VStack>
               ))}
               {/* Fill empty columns if row has less than 3 icons */}
@@ -249,12 +247,7 @@ export default function ModalScreen() {
           ))}
         </VStack>
 
-        <TouchableOpacity
-          style={{
-            marginBottom: 16,
-            paddingHorizontal: 16,
-          }}
-          onPress={toggleCheckbox}>
+        <TouchableOpacity className="mb-4 px-4" onPress={toggleCheckbox}>
           <HStack align="center">
             <Checkbox
               value={isChecked}
@@ -262,14 +255,7 @@ export default function ModalScreen() {
               color={isChecked ? danger : undefined}
             />
             <Spacer size={8} />
-            <Text
-              id="terms-checkbox"
-              size={14}
-              regular
-              style={{
-                flex: 1,
-              }}
-              className="text-foreground">
+            <Text id="terms-checkbox" size={14} regular className="text-foreground flex-1">
               Toggle experimental features
             </Text>
           </HStack>

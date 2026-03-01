@@ -1,15 +1,23 @@
 /**
- * @fileoverview User Profile Info Screen
+ * @fileoverview User Profile Screen
  *
  * Displays Nostr user profile information with:
  * - Banner image with overlapping avatar
  * - Stats grid (Following, Followers, Reputation, Joined)
- * - Actions section (Message User)
+ * - Top followers grid
  * - Profile info section (npub, nip05, lud16, website)
+ * - User feed (notes)
  */
 
 import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import { Animated, Easing, StyleSheet, TouchableOpacity, Dimensions, Linking } from 'react-native';
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  TouchableOpacity,
+  useWindowDimensions,
+  Linking,
+} from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { Text } from 'components/ui/Text';
@@ -17,7 +25,7 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
-import { npubToPubkey } from 'components/blocks/Transaction';
+import { npubToPubkey } from 'helper/nostrClient';
 import { Card } from 'components/ui/Card';
 import { Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
@@ -27,7 +35,6 @@ import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from 'components/ui/Skeleton';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts, Metadata } from 'nostr-tools/kinds';
@@ -53,8 +60,9 @@ import type { StoryUser } from 'components/blocks/nostr/StoriesCarousel';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/hooks/useThemeColor';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BANNER_HEIGHT = 150;
+const AVATAR_SIZE = 90;
+const AVATAR_OVERLAP = AVATAR_SIZE / 4;
 
 function buildUpdatedContactTags(
   existingTags: string[][],
@@ -81,12 +89,10 @@ function buildUpdatedContactTags(
   return deduped;
 }
 
-const AVATAR_SIZE = 90;
-const AVATAR_OVERFLOW = AVATAR_SIZE / 4; // 1/4 overflows below banner
-
 // ============================================================================
 // Profile Stats Grid
 // ============================================================================
+
 function ProfileStatsGridComponent({
   followingCount,
   followerCount,
@@ -100,17 +106,11 @@ function ProfileStatsGridComponent({
   joinedDate?: string;
   isLoading: boolean;
 }) {
-  const [foreground, surfaceTertiary, surfaceSecondary] = useThemeColor(['foreground', 'surface-tertiary', 'surface-secondary'] as const);
-
-  const displayValues = useMemo(
-    () => ({
-      following: followingCount !== undefined ? followingCount.toString() : '0',
-      followers: followerCount !== undefined ? followerCount.toString() : '0',
-      reputation: reputationScore !== undefined ? `${Math.round(reputationScore)} / 100` : 'N/A',
-      joined: joinedDate || 'Unknown',
-    }),
-    [followingCount, followerCount, reputationScore, joinedDate]
-  );
+  const [foreground, surfaceTertiary, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'surface-tertiary',
+    'surface-secondary',
+  ] as const);
 
   const fadeAnims = useRef([
     new Animated.Value(0),
@@ -129,61 +129,52 @@ function ProfileStatsGridComponent({
   useEffect(() => {
     if (hasValidData && !hasAnimatedRef.current) {
       hasAnimatedRef.current = true;
-
-      const animations = fadeAnims.map((anim, index) =>
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: 400,
-          delay: index * 80,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        })
-      );
-
-      Animated.stagger(80, animations).start();
+      Animated.stagger(
+        80,
+        fadeAnims.map((anim, index) =>
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 400,
+            delay: index * 80,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          })
+        )
+      ).start();
     }
   }, [hasValidData, fadeAnims]);
 
-  const stats = useMemo(
-    () => [
-      {
-        label: 'Following',
-        description: 'Users followed',
-        value: displayValues.following,
-        smallValue: false,
-      },
-      {
-        label: 'Followers',
-        description: 'Total count',
-        value: displayValues.followers,
-        smallValue: false,
-      },
-      {
-        label: 'Reputation',
-        description: 'Network score',
-        value: displayValues.reputation,
-        smallValue: false,
-      },
-      {
-        label: 'Joined',
-        description: 'Account created',
-        value: displayValues.joined,
-        smallValue: true,
-      },
-    ],
-    [displayValues]
-  );
+  const stats = [
+    {
+      label: 'Following',
+      description: 'Users followed',
+      value: followingCount?.toString() ?? '0',
+      smallValue: false,
+    },
+    {
+      label: 'Followers',
+      description: 'Total count',
+      value: followerCount?.toString() ?? '0',
+      smallValue: false,
+    },
+    {
+      label: 'Reputation',
+      description: 'Network score',
+      value: reputationScore !== undefined ? `${Math.round(reputationScore)} / 100` : 'N/A',
+      smallValue: false,
+    },
+    {
+      label: 'Joined',
+      description: 'Account created',
+      value: joinedDate || 'Unknown',
+      smallValue: true,
+    },
+  ];
 
   const showSkeleton = isLoading && !hasValidData;
 
-  // Split stats into rows of 2 for proper height matching
-  const rows = [];
-  for (let i = 0; i < stats.length; i += 2) {
-    rows.push(stats.slice(i, i + 2));
-  }
-
   const renderStatCard = (stat: (typeof stats)[0], index: number) => (
-    <View key={index} style={styles.statItem}>
+    <View key={stat.label} style={styles.statItem}>
       <View
         style={[
           styles.statCard,
@@ -211,11 +202,7 @@ function ProfileStatsGridComponent({
               style={{ color: foreground, marginBottom: 2 }}>
               {stat.value}
             </Text>
-            <Text
-              bold
-              overpass
-              size={12}
-              style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
+            <Text bold overpass size={12} style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
               {stat.description}
             </Text>
           </Animated.View>
@@ -226,11 +213,12 @@ function ProfileStatsGridComponent({
 
   return (
     <View style={styles.statsGrid}>
-      {rows.map((row, rowIndex) => (
-        <View key={rowIndex} style={styles.statsRow}>
-          {row.map((stat, colIndex) => renderStatCard(stat, rowIndex * 2 + colIndex))}
-        </View>
-      ))}
+      <View style={styles.statsRow}>
+        {stats.slice(0, 2).map((stat, i) => renderStatCard(stat, i))}
+      </View>
+      <View style={styles.statsRow}>
+        {stats.slice(2, 4).map((stat, i) => renderStatCard(stat, i + 2))}
+      </View>
     </View>
   );
 }
@@ -239,6 +227,7 @@ const ProfileStatsGrid = React.memo(ProfileStatsGridComponent);
 // ============================================================================
 // Top Followers Section
 // ============================================================================
+
 function TopFollowersComponent({
   topFollowers,
   isLoading,
@@ -247,17 +236,15 @@ function TopFollowersComponent({
   isLoading: boolean;
 }) {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
+  const { width: screenWidth } = useWindowDimensions();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  // Calculate responsive avatar size for 3-column grid
-  // Available width = screen width - padding (32) - gaps (24 for 2 gaps between 3 items)
   const GRID_PADDING = 32;
   const GRID_GAP = 12;
   const COLUMNS = 3;
-  const itemWidth = (SCREEN_WIDTH - GRID_PADDING - GRID_GAP * (COLUMNS - 1)) / COLUMNS;
-  const avatarSize = Math.min(itemWidth - 16, 64); // Leave some padding, max 64
+  const itemWidth = (screenWidth - GRID_PADDING - GRID_GAP * (COLUMNS - 1)) / COLUMNS;
+  const avatarSize = Math.min(itemWidth - 16, 64);
 
-  // Filter to only show followers with profile info (max 6 for 3x2 grid)
   const followersWithProfiles = useMemo(
     () => getFollowersWithProfiles(topFollowers).slice(0, 6),
     [topFollowers]
@@ -274,10 +261,7 @@ function TopFollowersComponent({
     }
   }, [followersWithProfiles.length, fadeAnim]);
 
-  // Don't render if no followers with profiles
-  if (!isLoading && followersWithProfiles.length === 0) {
-    return null;
-  }
+  if (!isLoading && followersWithProfiles.length === 0) return null;
 
   const handleFollowerPress = (follower: TopFollower) => {
     router.navigate({
@@ -359,6 +343,7 @@ const TopFollowers = React.memo(TopFollowersComponent);
 // ============================================================================
 // Banner with Overlapping Avatar
 // ============================================================================
+
 function BannerWithAvatarComponent({
   bannerUrl,
   pictureUrl,
@@ -386,22 +371,21 @@ function BannerWithAvatarComponent({
   hasStories?: boolean;
   onAvatarPress?: () => void;
 }) {
-  const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor(['foreground', 'surface-tertiary', 'surface-secondary', 'background'] as const);
+  const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor([
+    'foreground',
+    'surface-tertiary',
+    'surface-secondary',
+    'background',
+  ] as const);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  // Banner image loading state
-  const [bannerLoaded, setBannerLoaded] = useState(false);
   const [bannerError, setBannerError] = useState(false);
 
-  // Reuse the same layered seeded gradient algorithm as Avatar fallback.
   const bannerGradientTheme = useMemo(
     () => generateSeededGradient(`${pubkey || 'default'}:person`, 'person'),
     [pubkey]
   );
 
-  // Reset banner states when URL changes
   useEffect(() => {
-    setBannerLoaded(false);
     setBannerError(false);
   }, [bannerUrl]);
 
@@ -414,26 +398,25 @@ function BannerWithAvatarComponent({
     }).start();
   }, [fadeAnim]);
 
+  const avatarContent = (
+    <View style={[styles.avatarBorder, { borderColor: background, backgroundColor: background }]}>
+      <Avatar
+        picture={pictureUrl}
+        seed={pubkey}
+        size={AVATAR_SIZE}
+        variant="person"
+        name={displayName}
+        loading={isLoading}
+      />
+    </View>
+  );
+
   return (
     <View>
       {/* Banner */}
       <View style={[styles.bannerContainer, { backgroundColor: surfaceSecondary }]}>
-        {/* Hidden image to trigger load/error callbacks */}
-        {bannerUrl && !bannerError && (
-          <ExpoImage
-            source={{ uri: bannerUrl }}
-            style={[styles.bannerImage, !bannerLoaded && { opacity: 0, position: 'absolute' }]}
-            contentFit="cover"
-            cachePolicy="disk"
-            recyclingKey={bannerUrl}
-            transition={200}
-            onLoad={() => setBannerLoaded(true)}
-            onError={() => setBannerError(true)}
-          />
-        )}
-
-        {/* Always render deterministic fallback gradient first paint. */}
-        <View style={styles.bannerPlaceholder}>
+        {/* Gradient fallback (always visible underneath) */}
+        <View style={StyleSheet.absoluteFill}>
           <LinearGradient
             colors={bannerGradientTheme.primaryColors}
             start={bannerGradientTheme.primaryStart}
@@ -447,43 +430,30 @@ function BannerWithAvatarComponent({
             style={StyleSheet.absoluteFill}
           />
         </View>
+
+        {/* Banner image fades in on top via ExpoImage transition */}
+        {bannerUrl && !bannerError && (
+          <ExpoImage
+            source={{ uri: bannerUrl }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            cachePolicy="disk"
+            recyclingKey={bannerUrl}
+            transition={300}
+            onError={() => setBannerError(true)}
+          />
+        )}
       </View>
 
-      {/* Avatar - positioned to overlap */}
+      {/* Avatar - positioned to overlap banner */}
       <Animated.View
         style={[styles.avatarContainer, { opacity: fadeAnim, transform: [{ scale: fadeAnim }] }]}>
-        {hasStories ? (
-          <TouchableOpacity activeOpacity={0.8}>
-            <View
-              style={[
-                styles.avatarBorder,
-                { borderColor: background, backgroundColor: background },
-              ]}>
-              <Avatar
-                picture={pictureUrl}
-                seed={pubkey}
-                size={AVATAR_SIZE}
-                variant="person"
-                name={displayName}
-                loading={isLoading}
-              />
-            </View>
+        {hasStories && onAvatarPress ? (
+          <TouchableOpacity activeOpacity={0.8} onPress={onAvatarPress}>
+            {avatarContent}
           </TouchableOpacity>
         ) : (
-          <View
-            style={[
-              styles.avatarBorder,
-              { borderColor: background, backgroundColor: background },
-            ]}>
-            <Avatar
-              picture={pictureUrl}
-              seed={pubkey}
-              size={AVATAR_SIZE}
-              variant="person"
-              name={displayName}
-              loading={isLoading}
-            />
-          </View>
+          avatarContent
         )}
       </Animated.View>
 
@@ -516,17 +486,13 @@ function BannerWithAvatarComponent({
             </Text>
             {nip05 && (
               <HStack align="center" gap={4}>
-                <Icon
-                  name="mdi:check-decagram"
-                  size={16}
-                  color={opacity(foreground, 0.4)}
-                />
+                <Icon name="mdi:check-decagram" size={16} color={opacity(foreground, 0.4)} />
                 <Text size={14} style={{ color: opacity(foreground, 0.4) }}>
                   {nip05}
                 </Text>
               </HStack>
             )}
-            {showFollowButton ? (
+            {showFollowButton && (
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={onToggleFollow}
@@ -534,12 +500,8 @@ function BannerWithAvatarComponent({
                 style={[
                   styles.followButton,
                   {
-                    backgroundColor: isFollowing
-                      ? opacity(foreground, 0.12)
-                      : foreground,
-                    borderColor: isFollowing
-                      ? opacity(foreground, 0.25)
-                      : foreground,
+                    backgroundColor: isFollowing ? opacity(foreground, 0.12) : foreground,
+                    borderColor: isFollowing ? opacity(foreground, 0.25) : foreground,
                   },
                   isFollowLoading && styles.followButtonDisabled,
                 ]}>
@@ -553,7 +515,7 @@ function BannerWithAvatarComponent({
                   {isFollowing ? 'Following' : 'Follow'}
                 </Text>
               </TouchableOpacity>
-            ) : null}
+            )}
           </>
         )}
       </VStack>
@@ -565,24 +527,22 @@ const BannerWithAvatar = React.memo(BannerWithAvatarComponent);
 // ============================================================================
 // Main Component
 // ============================================================================
+
 function UserProfileScreen() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
-  const _insets = useSafeAreaInsets();
   const { npub: npubParam, pubkey: pubkeyParam } = useLocalSearchParams<{
     npub?: string;
     pubkey?: string;
   }>();
 
-  // Convert npub to pubkey if needed
   const pubkey = useMemo(() => {
     if (pubkeyParam) return pubkeyParam;
     if (npubParam) return npubToPubkey(npubParam);
     return '';
   }, [npubParam, pubkeyParam]);
 
-  // Convert pubkey to npub for display
   const npub = useMemo(() => {
     if (npubParam) return npubParam;
     if (pubkey) {
@@ -601,18 +561,8 @@ function UserProfileScreen() {
   // NOSTR SUBSCRIPTIONS & API
   // ===========================
 
-  // Profile metadata (kind 0) - PRIORITY: Load this first
   const metadataFilters = useMemo(
-    () =>
-      pubkey
-        ? [
-            {
-              authors: [pubkey],
-              kinds: [Metadata],
-              limit: 1,
-            },
-          ]
-        : null,
+    () => (pubkey ? [{ authors: [pubkey], kinds: [Metadata], limit: 1 }] : null),
     [pubkey]
   );
   const { events: metadataEvents, eose: metadataEose } = useSubscribe({
@@ -621,15 +571,7 @@ function UserProfileScreen() {
 
   const contactListFilters = useMemo(
     () =>
-      nostrKeys?.pubkey
-        ? [
-            {
-              authors: [nostrKeys.pubkey],
-              kinds: [Contacts],
-              limit: 20,
-            },
-          ]
-        : null,
+      nostrKeys?.pubkey ? [{ authors: [nostrKeys.pubkey], kinds: [Contacts], limit: 20 }] : null,
     [nostrKeys?.pubkey]
   );
   const { events: contactListEvents } = useSubscribe({ filters: contactListFilters });
@@ -657,28 +599,29 @@ function UserProfileScreen() {
     return Math.max(0, count);
   });
 
-  // Fetch profile stats from Sovran API (followers, following, top followers, rank)
   const { data: profileData, isLoading: isProfileApiLoading } = useNostrProfile(pubkey || null);
 
   // ===========================
   // DERIVED STATE
   // ===========================
-  const userInfo = metadataEvents?.[0] ? JSON.parse(metadataEvents[0].content) : null;
+
+  const userInfo = useMemo(() => {
+    if (!metadataEvents?.[0]) return null;
+    try {
+      return JSON.parse(metadataEvents[0].content);
+    } catch {
+      return null;
+    }
+  }, [metadataEvents]);
+
   const displayName = isOwnProfile
     ? getUsername(pubkey || '')
     : userInfo?.display_name || userInfo?.name || truncateMiddle(npub, 8);
   const isMetadataLoading = !metadataEose;
 
-  // Follower count from API
   const followerCount = profileData?.followers;
-
-  // Reputation score from API rank (formatted as percentage)
   const reputationScore = profileData?.score;
-
-  // Joined date from profile created_at
   const joinedDate = formatDate((profileData?.created_at || 0) * 1000);
-
-  const isStatsLoading = isProfileApiLoading;
 
   const latestContactListEvent = useMemo(() => {
     if (!nostrKeys?.pubkey) return null;
@@ -717,6 +660,7 @@ function UserProfileScreen() {
   // ===========================
   // VIDEO STORIES STATE
   // ===========================
+
   const [userVideoPosts, setUserVideoPosts] = useState<VideoPostRecord[]>([]);
   const hasStories = userVideoPosts.length > 0;
 
@@ -743,6 +687,7 @@ function UserProfileScreen() {
   // ===========================
   // HANDLERS
   // ===========================
+
   const handleCopy = useCallback(async (text: string, message: string) => {
     try {
       await Clipboard.setStringAsync(text);
@@ -771,21 +716,21 @@ function UserProfileScreen() {
     const shouldFollow = !isFollowingProfile;
     setFollowOptimistic(pubkey, shouldFollow, true);
 
-    const sourceTags = contactsTags.map((tag) => [...tag]);
-    const sourceContent = contactsContent;
-
-    const nextTags = buildUpdatedContactTags(sourceTags, pubkey, shouldFollow);
-
+    const nextTags = buildUpdatedContactTags(
+      contactsTags.map((tag) => [...tag]),
+      pubkey,
+      shouldFollow
+    );
     const createdAt = Math.floor(Date.now() / 1000);
 
     try {
       const contactEvent = new NDKEvent(ndk);
       contactEvent.kind = Contacts;
       contactEvent.tags = nextTags;
-      contactEvent.content = sourceContent;
+      contactEvent.content = contactsContent;
       contactEvent.created_at = createdAt;
       await contactEvent.publish();
-      setContactsFromRelay({ tags: nextTags, content: sourceContent, createdAt });
+      setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAt });
       clearFollowOptimistic(pubkey);
     } catch {
       clearFollowOptimistic(pubkey);
@@ -803,6 +748,62 @@ function UserProfileScreen() {
     setContactsFromRelay,
     clearFollowOptimistic,
   ]);
+
+  // ===========================
+  // PROFILE INFO ITEMS (data-driven)
+  // ===========================
+
+  const iconColor = opacity(foreground, 0.4);
+
+  const profileInfoItems = useMemo(() => {
+    const items: {
+      key: string;
+      prefix: React.ReactNode;
+      title: string;
+      suffixIcon: string;
+      onPress: () => void;
+    }[] = [
+      {
+        key: 'npub',
+        prefix: <CurrencyIcon colors={[iconColor]} width={20} currency="nostr" />,
+        title: truncateMiddle(npub, 10),
+        suffixIcon: 'lets-icons:copy',
+        onPress: () => handleCopy(npub, 'npub_copied'),
+      },
+    ];
+
+    if (userInfo?.nip05) {
+      items.push({
+        key: 'nip05',
+        prefix: <Icon name="mdi:check-decagram" size={20} color={iconColor} />,
+        title: userInfo.nip05,
+        suffixIcon: 'lets-icons:copy',
+        onPress: () => handleCopy(userInfo.nip05, 'nip05_copied'),
+      });
+    }
+
+    if (userInfo?.lud16) {
+      items.push({
+        key: 'lud16',
+        prefix: <Icon name="mdi:lightning-bolt" size={20} color={iconColor} />,
+        title: userInfo.lud16,
+        suffixIcon: 'lets-icons:copy',
+        onPress: () => handleCopy(userInfo.lud16, 'lud16_copied'),
+      });
+    }
+
+    if (userInfo?.website) {
+      items.push({
+        key: 'website',
+        prefix: <Icon name="mdi:web" size={20} color={iconColor} />,
+        title: userInfo.website,
+        suffixIcon: 'mdi:open-in-new',
+        onPress: () => handleOpenLink(userInfo.website),
+      });
+    }
+
+    return items;
+  }, [npub, userInfo, handleCopy, handleOpenLink, iconColor]);
 
   return (
     <View style={{ flex: 1, backgroundColor: background }}>
@@ -851,7 +852,6 @@ function UserProfileScreen() {
           onVideoPostsReady={handleVideoPostsReady}
           ListHeaderComponent={
             <View>
-              {/* Banner with Overlapping Avatar */}
               <BannerWithAvatar
                 bannerUrl={userInfo?.banner}
                 pictureUrl={userInfo?.picture}
@@ -876,7 +876,7 @@ function UserProfileScreen() {
                   followerCount={followerCount}
                   reputationScore={reputationScore}
                   joinedDate={joinedDate}
-                  isLoading={isStatsLoading}
+                  isLoading={isProfileApiLoading}
                 />
               </View>
 
@@ -896,158 +896,26 @@ function UserProfileScreen() {
                 </View>
               )}
 
-              {/* Actions Section */}
-              <View style={{ paddingHorizontal: 16 }}>
-                <Section title="Actions">
-                  <ListGroup variant="secondary">
-                    <PressableFeedback
-                      animation={false}
-                      onPress={() => {
-                        router.navigate({
-                          pathname: '/(user-flow)/userMessages' as any,
-                          params: { pubkey },
-                        });
-                      }}>
-                      <PressableFeedback.Scale>
-                        <ListGroup.Item disabled>
-                          <ListGroup.ItemPrefix>
-                            <Icon
-                              name="mdi:message-text"
-                              size={20}
-                              color={opacity(foreground, 0.4)}
-                            />
-                          </ListGroup.ItemPrefix>
-                          <ListGroup.ItemContent>
-                            <ListGroup.ItemTitle>Message User</ListGroup.ItemTitle>
-                          </ListGroup.ItemContent>
-                          <ListGroup.ItemSuffix />
-                        </ListGroup.Item>
-                      </PressableFeedback.Scale>
-                      <PressableFeedback.Ripple />
-                    </PressableFeedback>
-                  </ListGroup>
-                </Section>
-              </View>
-
-              <Spacer size={8} />
-
               {/* Profile Info Section */}
               <View style={{ paddingHorizontal: 16 }}>
                 <Section title="Profile Info">
                   <ListGroup variant="secondary">
-                    <PressableFeedback
-                      animation={false}
-                      onPress={() => handleCopy(npub, 'npub_copied')}>
-                      <PressableFeedback.Scale>
-                        <ListGroup.Item disabled>
-                          <ListGroup.ItemPrefix>
-                            <CurrencyIcon
-                              colors={[opacity(foreground, 0.4)]}
-                              width={20}
-                              currency="nostr"
-                            />
-                          </ListGroup.ItemPrefix>
-                          <ListGroup.ItemContent>
-                            <ListGroup.ItemTitle>{truncateMiddle(npub, 10)}</ListGroup.ItemTitle>
-                          </ListGroup.ItemContent>
-                          <ListGroup.ItemSuffix>
-                            <Icon
-                              name="lets-icons:copy"
-                              size={20}
-                              color={opacity(foreground, 0.4)}
-                            />
-                          </ListGroup.ItemSuffix>
-                        </ListGroup.Item>
-                      </PressableFeedback.Scale>
-                      <PressableFeedback.Ripple />
-                    </PressableFeedback>
-
-                    {userInfo?.nip05 && (
-                      <PressableFeedback
-                        animation={false}
-                        onPress={() => handleCopy(userInfo.nip05, 'nip05_copied')}>
+                    {profileInfoItems.map((item) => (
+                      <PressableFeedback key={item.key} animation={false} onPress={item.onPress}>
                         <PressableFeedback.Scale>
                           <ListGroup.Item disabled>
-                            <ListGroup.ItemPrefix>
-                              <Icon
-                                name="mdi:check-decagram"
-                                size={20}
-                                color={opacity(foreground, 0.4)}
-                              />
-                            </ListGroup.ItemPrefix>
+                            <ListGroup.ItemPrefix>{item.prefix}</ListGroup.ItemPrefix>
                             <ListGroup.ItemContent>
-                              <ListGroup.ItemTitle>{userInfo.nip05}</ListGroup.ItemTitle>
+                              <ListGroup.ItemTitle>{item.title}</ListGroup.ItemTitle>
                             </ListGroup.ItemContent>
                             <ListGroup.ItemSuffix>
-                              <Icon
-                                name="lets-icons:copy"
-                                size={20}
-                                color={opacity(foreground, 0.4)}
-                              />
+                              <Icon name={item.suffixIcon} size={20} color={iconColor} />
                             </ListGroup.ItemSuffix>
                           </ListGroup.Item>
                         </PressableFeedback.Scale>
                         <PressableFeedback.Ripple />
                       </PressableFeedback>
-                    )}
-
-                    {userInfo?.lud16 && (
-                      <PressableFeedback
-                        animation={false}
-                        onPress={() => handleCopy(userInfo.lud16, 'lud16_copied')}>
-                        <PressableFeedback.Scale>
-                          <ListGroup.Item disabled>
-                            <ListGroup.ItemPrefix>
-                              <Icon
-                                name="mdi:lightning-bolt"
-                                size={20}
-                                color={opacity(foreground, 0.4)}
-                              />
-                            </ListGroup.ItemPrefix>
-                            <ListGroup.ItemContent>
-                              <ListGroup.ItemTitle>{userInfo.lud16}</ListGroup.ItemTitle>
-                            </ListGroup.ItemContent>
-                            <ListGroup.ItemSuffix>
-                              <Icon
-                                name="lets-icons:copy"
-                                size={20}
-                                color={opacity(foreground, 0.4)}
-                              />
-                            </ListGroup.ItemSuffix>
-                          </ListGroup.Item>
-                        </PressableFeedback.Scale>
-                        <PressableFeedback.Ripple />
-                      </PressableFeedback>
-                    )}
-
-                    {userInfo?.website && (
-                      <PressableFeedback
-                        animation={false}
-                        onPress={() => handleOpenLink(userInfo.website)}>
-                        <PressableFeedback.Scale>
-                          <ListGroup.Item disabled>
-                            <ListGroup.ItemPrefix>
-                              <Icon
-                                name="mdi:web"
-                                size={20}
-                                color={opacity(foreground, 0.4)}
-                              />
-                            </ListGroup.ItemPrefix>
-                            <ListGroup.ItemContent>
-                              <ListGroup.ItemTitle>{userInfo.website}</ListGroup.ItemTitle>
-                            </ListGroup.ItemContent>
-                            <ListGroup.ItemSuffix>
-                              <Icon
-                                name="mdi:open-in-new"
-                                size={20}
-                                color={opacity(foreground, 0.4)}
-                              />
-                            </ListGroup.ItemSuffix>
-                          </ListGroup.Item>
-                        </PressableFeedback.Scale>
-                        <PressableFeedback.Ripple />
-                      </PressableFeedback>
-                    )}
+                    ))}
                   </ListGroup>
                 </Section>
               </View>
@@ -1080,21 +948,13 @@ function UserProfileScreen() {
 
 const styles = StyleSheet.create({
   bannerContainer: {
-    width: SCREEN_WIDTH,
+    width: '100%',
     height: BANNER_HEIGHT,
     overflow: 'hidden',
   },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  bannerPlaceholder: {
-    width: '100%',
-    height: '100%',
-  },
   avatarContainer: {
     alignItems: 'center',
-    marginTop: -(AVATAR_SIZE - AVATAR_OVERFLOW),
+    marginTop: -(AVATAR_SIZE - AVATAR_OVERLAP),
   },
   avatarBorder: {
     borderRadius: AVATAR_SIZE / 2 + 4,

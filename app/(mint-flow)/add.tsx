@@ -1,14 +1,3 @@
-/**
- * @fileoverview Add Mints screen for Mint Flow
- *
- * REFACTORED VERSION:
- * - Uses ModalLayoutWrapper for consistent modal styling
- * - Liquid glass search input in header (iOS) with Android fallback
- * - MintCurrencyTabs as sticky content with scroll-based animations
- * - LegendList for virtualized rendering with scroll animations support
- * - Batch loads audit data for all mints at once
- */
-
 import React, { useState, useMemo, useCallback, memo, useRef, useEffect } from 'react';
 import {
   TouchableOpacity,
@@ -31,7 +20,12 @@ import { useNostrDiscoveredMints } from 'hooks/coco/useNostrDiscoveredMints';
 import { useSovranDiscoveredMints } from 'hooks/coco/useSovranDiscoveredMints';
 import { useKYMMints } from 'hooks/coco/useKYMMints';
 import { filterMints } from 'helper/fuzzySearch';
-import { extractDomain, getMintDisplayName } from 'helper/url';
+import {
+  extractDomain,
+  getMintDisplayName,
+  normalizeMintUrlKey,
+  normalizeUrlForApi,
+} from 'helper/url';
 import { CocoManager } from 'helper/coco/manager';
 import { popup } from 'helper/popup';
 import { BottomButtons } from 'components/ui/BottomButtons';
@@ -89,7 +83,7 @@ const NativeSearchHeader = memo(function NativeSearchHeader({
   clearKey: number;
 }) {
   const foreground = useThemeColor('foreground');
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSearchChangeRef = useRef(onSearchChange);
   const latestTextRef = useRef('');
 
@@ -120,7 +114,7 @@ const NativeSearchHeader = memo(function NativeSearchHeader({
   }, []);
 
   return (
-    <View style={{ alignItems: 'center' }}>
+    <View className="items-center">
       <Host style={{ zIndex: 10, height: 44, width }} matchContents={false}>
         <SwiftUIVStack
           modifiers={[
@@ -164,7 +158,11 @@ const FallbackSearchHeader = memo(function FallbackSearchHeader({
   onFocus?: () => void;
   onBlur?: () => void;
 }) {
-  const [foreground, defaultColor, surfaceSecondary] = useThemeColor(['foreground', 'default', 'surface-secondary'] as const);
+  const [foreground, defaultColor, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'default',
+    'surface-secondary',
+  ] as const);
   const [green400, danger] = useThemeColor(['green-400', 'danger'] as const);
 
   const getStatusColor = () => {
@@ -227,24 +225,30 @@ const LoadingMintsList = memo(function LoadingMintsList({ count = 5 }: { count?:
   return (
     <VStack spacing={0}>
       {Array.from({ length: count }).map((_, index) => (
-        <View
-          key={index}
-          className="bg-surface"
-          style={{ padding: 16, marginBottom: 4, borderRadius: 16 }}>
+        <View key={index} className="bg-surface mb-1 rounded-2xl p-4">
           <VStack gap={12}>
             <View className="flex-row items-center gap-3">
               <Skeleton
-                className="h-[42px] w-[42px] bg-surface-tertiary"
+                className="bg-surface-tertiary h-[42px] w-[42px]"
                 style={{ borderRadius: 42 * 0.25 }}
               />
               <VStack flex={1} gap={8}>
-                <Skeleton className="h-[16px] bg-surface-tertiary" style={{ width: 150 }} />
-                <Skeleton className="h-[20px] rounded-full bg-surface-tertiary" style={{ width: 80 }} />
+                <Skeleton className="bg-surface-tertiary h-[16px]" style={{ width: 150 }} />
+                <Skeleton
+                  className="bg-surface-tertiary h-[20px] rounded-full"
+                  style={{ width: 80 }}
+                />
               </VStack>
             </View>
             <View className="flex-row gap-2">
-              <Skeleton className="h-[24px] rounded-full bg-surface-tertiary" style={{ width: 56 }} />
-              <Skeleton className="h-[24px] rounded-full bg-surface-tertiary" style={{ width: 60 }} />
+              <Skeleton
+                className="bg-surface-tertiary h-[24px] rounded-full"
+                style={{ width: 56 }}
+              />
+              <Skeleton
+                className="bg-surface-tertiary h-[24px] rounded-full"
+                style={{ width: 60 }}
+              />
             </View>
           </VStack>
         </View>
@@ -307,43 +311,29 @@ const MintItem = memo(function MintItem({
     return state === 'ERROR' ? 'error' : 'success';
   }, [auditData.auditInfo?.auditorData?.state]);
 
-  // Helper for opacity color calculation
-  const opacityColor = useCallback((color: string, opacityValue: number) => {
-    return color.replace('ff', Math.round(opacityValue * 255).toString(16)).concat('ff');
-  }, []);
-
   const auditLoading = auditData.loading;
 
   return (
     <TouchableOpacity
-      className="bg-surface"
-      style={{
-        padding: 16,
-        marginBottom: 4,
-        borderRadius: 16,
-        opacity: 1,
-      }}
+      className="bg-surface mb-1 rounded-2xl p-4"
       onPress={onPress}
       disabled={globalLoading}>
       <VStack gap={12}>
-        {/* Top section: Logo, name, URL, checkbox */}
         <HStack align="center" gap={12}>
-          <View style={{ position: 'relative' }}>
-            <Avatar
-              picture={mint.mintInfo?.icon_url || undefined}
-              size={42}
-              variant="mint"
-              name={displayName}
-              alt={`${displayName} mint`}
-            />
-          </View>
+          <Avatar
+            picture={mint.mintInfo?.icon_url || undefined}
+            size={42}
+            variant="mint"
+            name={displayName}
+            alt={`${displayName} mint`}
+          />
 
           <VStack flex={1}>
             <Text className="text-foreground" size={16} bold overpass>
               {displayName}
             </Text>
 
-            <View style={{ alignSelf: 'flex-start' }}>
+            <View className="self-start">
               <Text heavy size={14} style={{ color: opacity(foreground, 0.5) }}>
                 {extractDomain(mint.url)}
               </Text>
@@ -360,7 +350,6 @@ const MintItem = memo(function MintItem({
 
         {/* Bottom section: Score and Success Rate badges */}
         <HStack gap={8}>
-          {/* Score badge - show when available, skeleton when loading without value */}
           {displayScore ? (
             <Badge className="h-[24px] w-[56px]" variant="star" icon="ic:round-star" size={14}>
               {displayScore}
@@ -368,11 +357,10 @@ const MintItem = memo(function MintItem({
           ) : kymLoading ? (
             <Skeleton
               className="h-[24px] w-[56px] rounded-full"
-              style={{ backgroundColor: opacityColor(warning, 0.2) }}
+              style={{ backgroundColor: opacity(warning, 0.2) }}
             />
           ) : null}
 
-          {/* Success rate badge - show when available, skeleton when loading without value */}
           {successRate !== undefined ? (
             <Badge
               className="h-[24px] w-[60px]"
@@ -384,7 +372,7 @@ const MintItem = memo(function MintItem({
           ) : auditLoading ? (
             <Skeleton
               className="h-[24px] w-[60px] rounded-full"
-              style={{ backgroundColor: opacityColor(success, 0.2) }}
+              style={{ backgroundColor: opacity(success, 0.2) }}
             />
           ) : null}
         </HStack>
@@ -416,37 +404,6 @@ function AddMintsScreen() {
     mintInfo: customMintInfo,
   } = useDebouncedMintValidation(800);
 
-  // Normalize URL by removing protocol, www, trailing slash
-  // Only lowercases the domain, preserves path case (e.g., /Bitcoin stays /Bitcoin)
-  const normalizeUrl = useCallback((u: string): string => {
-    const withoutProtocol = u.replace(/^https?:\/\//, '');
-    const slashIndex = withoutProtocol.indexOf('/');
-    if (slashIndex === -1) {
-      // No path, just domain
-      return withoutProtocol
-        .toLowerCase()
-        .replace(/^www\./, '')
-        .replace(/\/$/, '');
-    }
-    const domain = withoutProtocol
-      .slice(0, slashIndex)
-      .toLowerCase()
-      .replace(/^www\./, '');
-    const path = withoutProtocol.slice(slashIndex).replace(/\/$/, '');
-    return domain + path;
-  }, []);
-
-  // Normalize URL for API calls by ensuring https:// prefix
-  const normalizeUrlForApi = useCallback(
-    (rawUrl: string): string => {
-      const normalized = normalizeUrl(rawUrl);
-      return `https://${normalized}`;
-    },
-    [normalizeUrl]
-  );
-
-  console.log({ normalizeUrlForApi });
-
   const { mints: nostrDiscoveredMints, loading: nostrLoading } = useNostrDiscoveredMints();
   const { mints: sovranDiscoveredMints, loading: sovranLoading } = useSovranDiscoveredMints();
 
@@ -456,14 +413,14 @@ function AddMintsScreen() {
     const seenUrls = new Set<string>();
     const uniqueMints: any[] = [];
     for (const mint of allMints) {
-      const norm = normalizeUrl(mint.url);
+      const norm = normalizeMintUrlKey(mint.url);
       if (!seenUrls.has(norm)) {
         seenUrls.add(norm);
         uniqueMints.push(mint);
       }
     }
     return uniqueMints;
-  }, [nostrDiscoveredMints, sovranDiscoveredMints, normalizeUrl]);
+  }, [nostrDiscoveredMints, sovranDiscoveredMints]);
 
   const discoveryLoading = nostrLoading || sovranLoading;
 
@@ -471,16 +428,16 @@ function AddMintsScreen() {
 
   // Filter out known mints and apply search
   const filteredMints = useMemo((): SearchableMint[] => {
-    const knownMintUrls = new Set(knownMints.map((mint) => normalizeUrl(mint.mintUrl)));
+    const knownMintUrls = new Set(knownMints.map((mint) => normalizeMintUrlKey(mint.mintUrl)));
     const searchable = discoveredMints
-      .filter((mint) => !knownMintUrls.has(normalizeUrl(mint.url)))
+      .filter((mint) => !knownMintUrls.has(normalizeMintUrlKey(mint.url)))
       .map(adaptDiscoveredMint);
 
     if (!url.trim()) return searchable;
 
     const filtered = filterMints(searchable, url);
-    const normalizedUrl = normalizeUrl(url);
-    const urlExists = filtered.some((mint) => normalizeUrl(mint.url) === normalizedUrl);
+    const normalizedUrl = normalizeMintUrlKey(url);
+    const urlExists = filtered.some((mint) => normalizeMintUrlKey(mint.url) === normalizedUrl);
 
     if (validationState.isValid === true && customMintInfo !== null && !urlExists) {
       // Use normalized URL with https:// for the mint
@@ -495,15 +452,7 @@ function AddMintsScreen() {
     }
 
     return filtered;
-  }, [
-    discoveredMints,
-    knownMints,
-    url,
-    customMintInfo,
-    validationState,
-    normalizeUrl,
-    normalizeUrlForApi,
-  ]);
+  }, [discoveredMints, knownMints, url, customMintInfo, validationState]);
 
   // Filter by currency
   const currencyFilteredMints = useMemo(() => {
@@ -569,8 +518,8 @@ function AddMintsScreen() {
 
       const successRateA = getSuccessRate(auditA);
       const successRateB = getSuccessRate(auditB);
-      const kymScoreA = kymScores[normalizeUrl(a.url)]?.score;
-      const kymScoreB = kymScores[normalizeUrl(b.url)]?.score;
+      const kymScoreA = kymScores[normalizeMintUrlKey(a.url)]?.score;
+      const kymScoreB = kymScores[normalizeMintUrlKey(b.url)]?.score;
 
       if (successRateA !== undefined && successRateB !== undefined && successRateA !== successRateB)
         return successRateB - successRateA;
@@ -581,7 +530,7 @@ function AddMintsScreen() {
       if (kymScoreB !== undefined) return 1;
       return 0;
     });
-  }, [currencyFilteredMints, kymScores, getAuditData, normalizeUrl]);
+  }, [currencyFilteredMints, kymScores, getAuditData]);
 
   const handleToggleMint = useCallback((mintUrl: string) => {
     setSelectedMints((prev) => {
@@ -593,11 +542,6 @@ function AddMintsScreen() {
       }
       return next;
     });
-  }, []);
-
-  // Handle currency change
-  const handleCurrencyChange = useCallback((currency: string) => {
-    setSelectedCurrency(currency);
   }, []);
 
   const handleSearchChange = useCallback(
@@ -682,10 +626,8 @@ function AddMintsScreen() {
     } finally {
       setIsAdding(false);
     }
-  }, [selectedMints, isAdding, normalizeUrlForApi]);
+  }, [selectedMints, isAdding]);
 
-  // Regular scroll handler for LegendList - updates scrollY for currency tab animations
-  // Note: Using regular callback since LegendList doesn't support Reanimated worklets
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       scrollY.value = Math.max(0, event.nativeEvent.contentOffset.y);
@@ -693,10 +635,9 @@ function AddMintsScreen() {
     [scrollY]
   );
 
-  // Render item for LegendList
   const renderItem = useCallback(
     ({ item }: { item: SearchableMint }) => {
-      const normalizedUrl = normalizeUrl(item.url);
+      const normalizedUrl = normalizeMintUrlKey(item.url);
       const kymData = kymScores[normalizedUrl];
 
       return (
@@ -711,35 +652,30 @@ function AddMintsScreen() {
         />
       );
     },
-    [selectedMints, handleToggleMint, kymScores, kymLoading, getAuditData, isAdding, normalizeUrl]
+    [selectedMints, handleToggleMint, kymScores, kymLoading, getAuditData, isAdding]
   );
 
   const keyExtractor = useCallback((item: SearchableMint) => item.url, []);
 
-  // Show content as soon as discovery completes, don't wait for audit/kym
   const showContent = !discoveryLoading || discoveredMints.length > 0;
   const isSearching = url.trim().length > 0;
   const showCancelButton = isInputFocused || isSearching;
 
-  // Calculate header width for search input
   const headerWidth = windowWidth - 124 - 24;
 
-  const primaryColor0 = foreground;
-
-  // Sticky currency tabs component (same as MintListScreen)
+  // Sticky currency tabs
   const currencyTabs = useMemo(
     () => (
       <MintCurrencyTabs
         currencies={availableCurrencies}
         selectedCurrency={selectedCurrency}
-        onCurrencyChange={handleCurrencyChange}
+        onCurrencyChange={setSelectedCurrency}
         scrollY={scrollY}
       />
     ),
-    [availableCurrencies, selectedCurrency, handleCurrencyChange, scrollY]
+    [availableCurrencies, selectedCurrency, setSelectedCurrency, scrollY]
   );
 
-  // Bottom buttons
   const bottomButtons = useMemo(
     () => (
       <BottomButtons>
@@ -763,17 +699,15 @@ function AddMintsScreen() {
     [isAdding, selectedMints.size, handleSave]
   );
 
-  // List header spacer to push content below sticky header + currency tabs
   const listHeader = useMemo(
     () => <View style={{ height: totalHeaderHeight }} />,
     [totalHeaderHeight]
   );
 
-  // Empty state component
   const emptyComponent = useMemo(
     () => (
-      <View style={{ paddingTop: 20, alignItems: 'center' }}>
-        <Text style={{ color: primaryColor0, textAlign: 'center' }}>
+      <View className="items-center pt-5">
+        <Text className="text-foreground text-center">
           {url.trim()
             ? 'No mints found matching your search'
             : selectedCurrency === 'ALL'
@@ -782,11 +716,9 @@ function AddMintsScreen() {
         </Text>
       </View>
     ),
-    [url, selectedCurrency, primaryColor0]
+    [url, selectedCurrency]
   );
 
-  // Memoize iOS header to prevent re-renders that cause focus loss
-  // Only depends on stable references (headerWidth, handleSearchChange, clearKey)
   const iosHeaderTitle = useMemo(
     () => (
       <NativeSearchHeader
@@ -798,7 +730,6 @@ function AddMintsScreen() {
     [headerWidth, handleSearchChange, clearKey]
   );
 
-  // Android header needs url for controlled input
   const androidHeaderTitle = useMemo(
     () => (
       <FallbackSearchHeader
@@ -812,7 +743,6 @@ function AddMintsScreen() {
     [url, handleSearchChange, validationState, handleInputFocus, handleInputBlur]
   );
 
-  // Memoize header right button
   const headerRightButton = useMemo(
     () =>
       showCancelButton ? (
@@ -823,7 +753,6 @@ function AddMintsScreen() {
     [showCancelButton, handleClearSearch, foreground]
   );
 
-  // Memoize header callbacks to prevent React Navigation from re-rendering
   const renderHeaderTitle = useCallback(
     () => (Platform.OS === 'ios' ? iosHeaderTitle : androidHeaderTitle),
     [iosHeaderTitle, androidHeaderTitle]
@@ -851,9 +780,8 @@ function AddMintsScreen() {
         onHeaderHeightChange={setTotalHeaderHeight}
         bottomContent={bottomButtons}>
         <Spacer size={16} />
-        {/* Virtualized list with scroll-linked animations */}
         {!showContent ? (
-          <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: totalHeaderHeight }}>
+          <View className="flex-1 px-4" style={{ paddingTop: totalHeaderHeight }}>
             <LoadingMintsList />
           </View>
         ) : (

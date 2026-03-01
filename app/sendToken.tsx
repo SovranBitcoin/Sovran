@@ -14,16 +14,7 @@ function ModalScreen() {
   const { sendHistoryEntry } = useLocalSearchParams<{ sendHistoryEntry: string }>();
 
   return (
-    <SendTokenScreen
-      sendHistoryEntry={sendHistoryEntry}
-      onNavigateBack={() => router.back()}
-      onNavigateToMessages={(pubkey) =>
-        router.navigate({
-          pathname: '/userMessages',
-          params: { pubkey },
-        })
-      }
-    />
+    <SendTokenScreen sendHistoryEntry={sendHistoryEntry} onNavigateBack={() => router.back()} />
   );
 }
 

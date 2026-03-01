@@ -75,7 +75,6 @@ const ThemeCard = React.memo(
     cardWidth,
     cardHeight,
   }: ThemeCardProps) => {
-    const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
     const displayName = themeNameMap[themeName] || themeName;
 
     // Get colors for this specific theme
@@ -94,15 +93,8 @@ const ThemeCard = React.memo(
         style={{ width: cardWidth, height: cardHeight }}>
         <PressableFeedback.Scale className="h-full w-full">
           <View
-            style={[
-              styles.cardInner,
-              {
-                width: cardWidth,
-                height: cardHeight,
-                borderColor: isSelected ? muted : 'transparent',
-                borderWidth: isSelected ? 2 : 0,
-              },
-            ]}>
+            className={isSelected ? 'border-muted border-2' : ''}
+            style={[styles.cardInner, { width: cardWidth, height: cardHeight }]}>
             {/* Background */}
             {isBackgroundTheme && backgroundImageThemes[themeName] ? (
               <Image
@@ -306,11 +298,7 @@ function ThemeSettings() {
 
         {!hasResults && (
           <VStack style={styles.emptyState} spacing={8}>
-            <Icon
-              name="mingcute:search-3-line"
-              size={48}
-              color={opacity(foreground, 0.33)}
-            />
+            <Icon name="mingcute:search-3-line" size={48} color={opacity(foreground, 0.33)} />
             <Text size={16} style={{ color: opacity(foreground, 0.4) }}>
               No themes found
             </Text>
@@ -368,11 +356,6 @@ const styles = StyleSheet.create({
   },
   row: {
     marginBottom: CARD_GAP,
-  },
-  card: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
   },
   cardInner: {
     borderRadius: 16,

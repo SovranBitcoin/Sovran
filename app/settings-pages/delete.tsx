@@ -140,38 +140,24 @@ const DeleteScreen: React.FC = () => {
     await Updates.reloadAsync();
   }, [dispatch]);
 
-  const handleCancel = useCallback(() => {
-    router.back();
-  }, []);
-
   return (
     <Container>
       <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
         <VStack spacing={24} className="flex-1 items-center justify-center px-6">
           <View
-            style={{
-              backgroundColor: danger,
-              width: 96,
-              height: 96,
-              borderRadius: 48,
-              alignItems: 'center',
-              justifyContent: 'center',
-              alignSelf: 'center',
-            }}>
+            className="h-24 w-24 items-center justify-center self-center rounded-full"
+            style={{ backgroundColor: danger }}>
             <Icon name="mdi:trash-can-outline" size={48} color={red400} />
           </View>
 
           <VStack spacing={8} className="items-center">
-            <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
+            <Text size={24} bold className="text-foreground text-center">
               Delete Account
             </Text>
             <Text
               size={16}
-              style={{
-                color: opacity(foreground, 0.5),
-                textAlign: 'center',
-                lineHeight: 24,
-              }}>
+              className="text-center leading-6"
+              style={{ color: opacity(foreground, 0.5) }}>
               Are you sure you want to delete your profile? This action cannot be reversed.
             </Text>
           </VStack>
@@ -204,7 +190,7 @@ const DeleteScreen: React.FC = () => {
               textColor={foreground}
               iconColor={danger}
             />
-            <Button variant="secondary" className="w-full" onPress={handleCancel}>
+            <Button variant="secondary" className="w-full" onPress={() => router.back()}>
               <Button.Label>Cancel</Button.Label>
             </Button>
           </VStack>

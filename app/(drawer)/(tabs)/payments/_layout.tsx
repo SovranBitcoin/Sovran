@@ -62,7 +62,10 @@ function NativeSearchHeader({ width, clearKey }: { width: number; clearKey: numb
 
 // Fallback search header for Android - uses uncontrolled pattern for better responsiveness
 function FallbackSearchHeader({ clearKey }: { clearKey: number }) {
-  const [foreground, surfaceSecondary] = useThemeColor(['foreground', 'surface-secondary'] as const);
+  const [foreground, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+  ] as const);
   const { onSearchChange } = usePaymentsSearch();
   const inputRef = useRef<TextInput>(null);
 

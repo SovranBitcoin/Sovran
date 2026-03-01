@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Button } from 'components/ui/Button';
-import { ScrollView, Switch } from 'react-native';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { ScrollView, View } from 'react-native';
+
+import { Button, Card, ControlField, Label } from 'heroui-native';
+
 import Container from 'components/blocks/Container';
 import { VStack } from 'components/ui/View/VStack';
-import { HStack } from 'components/ui/View/HStack';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { Text } from 'components/ui/Text';
 
 const terms = `IMPORTANT NOTICE: THESE TERMS OF SERVICE INCLUDE A MEDIATION-FIRST CLAUSE REQUIRING MEDIATION BEFORE ARBITRATION OR LITIGATION. PLEASE READ THESE TERMS CAREFULLY. IF YOU DO NOT AGREE, DO NOT USE SOVRAN.
@@ -153,59 +152,40 @@ export default function TermsAndConditions({
   checkboxText = 'I have read and agree to the Terms and Conditions',
   showCheckbox = true,
 }: TermsAndConditionsProps) {
-  const [foreground, danger, surfaceSecondary, surfaceTertiary] = useThemeColor(['foreground', 'danger', 'surface-secondary', 'surface-tertiary'] as const);
   const [isChecked, setIsChecked] = useState(false);
-
-  const toggleCheckbox = () => setIsChecked(!isChecked);
 
   return (
     <Container className="bg-surface">
       <VStack spacing={16} flex={1} className="p-4">
-        {/* Header - fixed at top */}
-        <Text overpass bold size={32} className="py-2 text-center text-foreground">
+        <Text overpass bold size={32} className="text-foreground py-2 text-center">
           {title}
         </Text>
 
-        {/* Scrollable terms content */}
-        <ScrollView
-          style={{
-            flex: 1,
-            backgroundColor: surfaceSecondary,
-            borderRadius: 12,
-          }}
-          contentContainerStyle={{ padding: 16 }}>
-          <Text overpass size={14} className="leading-[22px] text-foreground">
-            {terms}
-          </Text>
-        </ScrollView>
+        <Card variant="secondary" className="flex-1">
+          <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
+            <Text overpass size={14} className="text-foreground leading-[22px]">
+              {terms}
+            </Text>
+          </ScrollView>
+        </Card>
 
-        {/* Fixed bottom section */}
         <VStack spacing={16}>
           {showCheckbox && (
-            <TouchableOpacity onPress={toggleCheckbox}>
-              <HStack align="center" spacing={12}>
-                <Switch
-                  value={isChecked}
-                  onValueChange={toggleCheckbox}
-                  trackColor={{
-                    false: surfaceTertiary,
-                    true: danger,
-                  }}
-                  thumbColor={foreground}
-                />
-                <Text id="terms-checkbox" overpass size={14} className="flex-1 text-foreground">
-                  {checkboxText}
-                </Text>
-              </HStack>
-            </TouchableOpacity>
+            <ControlField isSelected={isChecked} onSelectedChange={setIsChecked}>
+              <View className="flex-1">
+                <Label>{checkboxText}</Label>
+              </View>
+              <ControlField.Indicator />
+            </ControlField>
           )}
 
           <Button
             variant="primary"
-            text={buttonText}
+            className="w-full"
             onPress={onClose}
-            disabled={showCheckbox ? !isChecked : false}
-          />
+            isDisabled={showCheckbox ? !isChecked : false}>
+            <Button.Label>{buttonText}</Button.Label>
+          </Button>
         </VStack>
       </VStack>
     </Container>

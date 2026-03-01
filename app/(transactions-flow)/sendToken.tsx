@@ -16,16 +16,7 @@ function ModalScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'Send Ecash' }} />
-      <SendTokenScreen
-        sendHistoryEntry={sendHistoryEntry}
-        onNavigateBack={() => router.back()}
-        onNavigateToMessages={(pubkey) =>
-          router.navigate({
-            pathname: '/userMessages',
-            params: { pubkey },
-          })
-        }
-      />
+      <SendTokenScreen sendHistoryEntry={sendHistoryEntry} onNavigateBack={() => router.back()} />
     </>
   );
 }

@@ -60,7 +60,12 @@ const getMarkerColor = (icon: string): string => {
 };
 
 export default function MerchantDetailScreen() {
-  const [foreground, defaultColor, surfaceSecondary, background] = useThemeColor(['foreground', 'default', 'surface-secondary', 'background'] as const);
+  const [foreground, defaultColor, surfaceSecondary, background] = useThemeColor([
+    'foreground',
+    'default',
+    'surface-secondary',
+    'background',
+  ] as const);
   const insets = useSafeAreaInsets();
   const { placeId } = useLocalSearchParams<{ placeId: string }>();
   const { fetchPlaceDetails, getCachedPlaceDetails } = useBTCMapStore(
@@ -268,11 +273,7 @@ export default function MerchantDetailScreen() {
                     <ListGroup.ItemTitle>On-chain</ListGroup.ItemTitle>
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix>
-                    <Icon
-                      name="mdi:check-circle"
-                      size={20}
-                      color={opacity(foreground, 0.4)}
-                    />
+                    <Icon name="mdi:check-circle" size={20} color={opacity(foreground, 0.4)} />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
               )}
@@ -285,11 +286,7 @@ export default function MerchantDetailScreen() {
                     <ListGroup.ItemTitle>Lightning</ListGroup.ItemTitle>
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix>
-                    <Icon
-                      name="mdi:check-circle"
-                      size={20}
-                      color={opacity(foreground, 0.4)}
-                    />
+                    <Icon name="mdi:check-circle" size={20} color={opacity(foreground, 0.4)} />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
               )}
@@ -302,11 +299,7 @@ export default function MerchantDetailScreen() {
                     <ListGroup.ItemTitle>Contactless</ListGroup.ItemTitle>
                   </ListGroup.ItemContent>
                   <ListGroup.ItemSuffix>
-                    <Icon
-                      name="mdi:check-circle"
-                      size={20}
-                      color={opacity(foreground, 0.4)}
-                    />
+                    <Icon name="mdi:check-circle" size={20} color={opacity(foreground, 0.4)} />
                   </ListGroup.ItemSuffix>
                 </ListGroup.Item>
               )}
@@ -328,11 +321,7 @@ export default function MerchantDetailScreen() {
                   <PressableFeedback.Scale>
                     <ListGroup.Item disabled>
                       <ListGroup.ItemPrefix>
-                        <Icon
-                          name={contact.icon}
-                          size={20}
-                          color={opacity(foreground, 0.4)}
-                        />
+                        <Icon name={contact.icon} size={20} color={opacity(foreground, 0.4)} />
                       </ListGroup.ItemPrefix>
                       <ListGroup.ItemContent>
                         <ListGroup.ItemTitle>{contact.info}</ListGroup.ItemTitle>
@@ -356,9 +345,7 @@ export default function MerchantDetailScreen() {
                 padding: 16,
                 borderRadius: 12,
               }}>
-              <Text
-                size={14}
-                style={{ color: opacity(foreground, 0.66), lineHeight: 22 }}>
+              <Text size={14} style={{ color: opacity(foreground, 0.66), lineHeight: 22 }}>
                 {place.opening_hours}
               </Text>
             </View>
@@ -374,9 +361,7 @@ export default function MerchantDetailScreen() {
                 padding: 16,
                 borderRadius: 12,
               }}>
-              <Text
-                size={14}
-                style={{ color: opacity(foreground, 0.66), lineHeight: 22 }}>
+              <Text size={14} style={{ color: opacity(foreground, 0.66), lineHeight: 22 }}>
                 {place.description}
               </Text>
             </View>

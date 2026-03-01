@@ -1,12 +1,5 @@
-/**
- * @fileoverview Mint Reviews Modal Screen
- *
- * Displays all reviews/recommendations for a mint with pagination.
- * Uses KYM (Know Your Mint) data to show user reviews and ratings.
- */
-
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { FlatList, StyleSheet } from 'react-native';
+import { FlatList } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { Text } from 'components/ui/Text';
@@ -25,9 +18,6 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
 
-// ============================================================================
-// Star Rating Component
-// ============================================================================
 const StarRating = React.memo(function StarRating({
   score,
   size = 16,
@@ -52,9 +42,6 @@ const StarRating = React.memo(function StarRating({
   );
 });
 
-// ============================================================================
-// Review Item Component
-// ============================================================================
 const ReviewItem = React.memo(function ReviewItem({
   review,
   isLast,
@@ -62,14 +49,15 @@ const ReviewItem = React.memo(function ReviewItem({
   review: any;
   isLast: boolean;
 }) {
-  const [foreground, surfaceSecondary] = useThemeColor(['foreground', 'surface-secondary'] as const);
+  const [foreground, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+  ] as const);
 
-  // Extract review data
   const reviewText = review.comment?.split(']')[1] || review.comment;
   const reviewScore = review.score ?? 0;
   const displayName = getUsername(review.pubkey);
 
-  // Format date if available
   const formattedDate = review.created_at
     ? new Date(review.created_at * 1000).toLocaleDateString(undefined, {
         year: 'numeric',
@@ -79,21 +67,19 @@ const ReviewItem = React.memo(function ReviewItem({
     : null;
 
   return (
-    <View style={styles.reviewItem}>
-      <HStack align="flex-start" gap={12} style={{ flex: 1 }}>
-        {/* Avatar */}
-        <View style={{ flexShrink: 0 }}>
+    <View className="py-4">
+      <HStack align="flex-start" gap={12} className="flex-1">
+        <View className="shrink-0">
           <Avatar seed={review.pubkey} name={displayName} size={48} variant="person" />
         </View>
 
-        {/* Review content */}
-        <VStack spacing={6} style={{ flex: 1, minWidth: 0 }}>
-          {/* User name and date */}
-          <HStack align="center" justify="space-between" style={{ flex: 1 }}>
+        <VStack spacing={6} className="min-w-0 flex-1">
+          <HStack align="center" justify="space-between" className="flex-1">
             <Text
               size={15}
               bold
-              style={{ color: foreground, flex: 1 }}
+              className="flex-1"
+              style={{ color: foreground }}
               numberOfLines={1}
               ellipsizeMode="tail">
               {displayName}
@@ -118,14 +104,11 @@ const ReviewItem = React.memo(function ReviewItem({
         </VStack>
       </HStack>
 
-      {!isLast && <View style={[styles.divider, { backgroundColor: surfaceSecondary }]} />}
+      {!isLast && <View className="mt-4 h-px" style={{ backgroundColor: surfaceSecondary }} />}
     </View>
   );
 });
 
-// ============================================================================
-// Loading Skeleton - Matches ReviewItem layout
-// ============================================================================
 const ReviewSkeleton = React.memo(function ReviewSkeleton({
   isLast = false,
 }: {
@@ -134,9 +117,9 @@ const ReviewSkeleton = React.memo(function ReviewSkeleton({
   const surfaceSecondary = useThemeColor('surface-secondary');
 
   return (
-    <View style={styles.reviewItem}>
-      <HStack align="flex-start" gap={12} style={{ flex: 1 }}>
-        <View style={{ flexShrink: 0 }}>
+    <View className="py-4">
+      <HStack align="flex-start" gap={12} className="flex-1">
+        <View className="shrink-0">
           <Skeleton
             style={{
               width: 48,
@@ -147,8 +130,8 @@ const ReviewSkeleton = React.memo(function ReviewSkeleton({
           />
         </View>
 
-        <VStack spacing={6} style={{ flex: 1, minWidth: 0 }}>
-          <HStack align="center" justify="space-between" style={{ flex: 1 }}>
+        <VStack spacing={6} className="min-w-0 flex-1">
+          <HStack align="center" justify="space-between" className="flex-1">
             <Skeleton
               style={{
                 width: 120,
@@ -202,19 +185,16 @@ const ReviewSkeleton = React.memo(function ReviewSkeleton({
         </VStack>
       </HStack>
 
-      {!isLast && <View style={[styles.divider, { backgroundColor: surfaceSecondary }]} />}
+      {!isLast && <View className="mt-4 h-px" style={{ backgroundColor: surfaceSecondary }} />}
     </View>
   );
 });
 
-// ============================================================================
-// Empty State
-// ============================================================================
 const EmptyState = React.memo(function EmptyState() {
   const [foreground, yellow500] = useThemeColor(['foreground', 'yellow-500'] as const);
 
   return (
-    <VStack align="center" justify="center" style={styles.emptyState}>
+    <VStack align="center" justify="center" className="flex-1 py-12">
       <Icon name="ic:round-star" size={64} color={yellow500} />
       <Spacer size={16} />
       <Text size={18} bold style={{ color: foreground, textAlign: 'center' }}>
@@ -234,9 +214,6 @@ const EmptyState = React.memo(function EmptyState() {
   );
 });
 
-// ============================================================================
-// Header Stats
-// ============================================================================
 const HeaderStats = React.memo(function HeaderStats({
   score,
   totalReviews,
@@ -246,13 +223,17 @@ const HeaderStats = React.memo(function HeaderStats({
   totalReviews: number;
   loading: boolean;
 }) {
-  const [foreground, surfaceSecondary, warning] = useThemeColor(['foreground', 'surface-secondary', 'yellow-300'] as const);
+  const [foreground, surfaceSecondary, warning] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'yellow-300',
+  ] as const);
 
   const displayScore = score !== null ? score.toFixed(1) : '0.0';
   const hasScore = score !== null && score >= 0;
 
   return (
-    <View style={styles.headerStats}>
+    <View className="items-center pb-6 pt-4">
       <VStack align="center" spacing={4}>
         {loading && !hasScore ? (
           <Skeleton
@@ -307,41 +288,29 @@ const HeaderStats = React.memo(function HeaderStats({
   );
 });
 
-// ============================================================================
-// Main Component
-// ============================================================================
 function MintReviewsModal() {
   const background = useThemeColor('background');
   const insets = useSafeAreaInsets();
   const { mintUrl } = useLocalSearchParams<{ mintUrl: string }>();
 
-  // Fetch KYM data
   const {
     score: kymScore,
     recommendations: kymRecommendations,
     loading: kymLoading,
   } = useKYMMint(mintUrl || '');
 
-  // Timeout fallback - if loading takes more than 5 seconds, consider done
   const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
     const timeout = setTimeout(() => {
-      if (kymLoading) {
-        console.log('⏱️ Reviews loading timeout');
-        setTimedOut(true);
-      }
+      if (kymLoading) setTimedOut(true);
     }, 5000);
     return () => clearTimeout(timeout);
   }, [kymLoading]);
 
-  // Consider loading if KYM is loading AND we haven't timed out
   const isLoading = kymLoading && !timedOut;
-
-  // Memoize recommendations list
   const reviews = useMemo(() => kymRecommendations || [], [kymRecommendations]);
   const totalReviews = reviews.length;
 
-  // Render item - reviews show as they come in
   const renderItem = useCallback(
     ({ item, index }: { item: any; index: number }) => (
       <ReviewItem review={item} isLast={!isLoading && index === reviews.length - 1} />
@@ -349,22 +318,18 @@ function MintReviewsModal() {
     [reviews.length, isLoading]
   );
 
-  // Key extractor
   const keyExtractor = useCallback(
     (item: any, index: number) => item.pubkey || `review-${index}`,
     []
   );
 
-  // List header
   const ListHeader = useMemo(
     () => <HeaderStats score={kymScore ?? null} totalReviews={totalReviews} loading={isLoading} />,
     [kymScore, totalReviews, isLoading]
   );
 
-  // List footer - show skeletons while loading
   const ListFooter = useMemo(() => {
     if (!isLoading) return null;
-    // Show fewer skeletons if we already have some reviews
     const skeletonCount = reviews.length > 0 ? 2 : 3;
     return (
       <View>
@@ -375,15 +340,14 @@ function MintReviewsModal() {
     );
   }, [isLoading, reviews.length]);
 
-  // Show empty state only when done loading and no reviews
   const showEmptyState = !isLoading && totalReviews === 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: background }]}>
+    <View className="flex-1" style={{ backgroundColor: background }}>
       <Stack.Screen options={{ title: 'Reviews' }} />
 
       {showEmptyState ? (
-        <View style={[styles.content, { paddingTop: insets.top + 48 }]}>
+        <View className="flex-1 px-4" style={{ paddingTop: insets.top + 48 }}>
           {ListHeader}
           <EmptyState />
         </View>
@@ -394,10 +358,11 @@ function MintReviewsModal() {
           keyExtractor={keyExtractor}
           ListHeaderComponent={ListHeader}
           ListFooterComponent={ListFooter}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingTop: insets.top + 48, paddingBottom: 120 },
-          ]}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: insets.top + 48,
+            paddingBottom: 120,
+          }}
           showsVerticalScrollIndicator={false}
           initialNumToRender={10}
           maxToRenderPerBatch={10}
@@ -419,34 +384,5 @@ function MintReviewsModal() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-  },
-  headerStats: {
-    paddingTop: 16,
-    paddingBottom: 24,
-    alignItems: 'center',
-  },
-  reviewItem: {
-    paddingVertical: 16,
-  },
-  divider: {
-    height: 1,
-    marginTop: 16,
-  },
-  emptyState: {
-    flex: 1,
-    paddingVertical: 48,
-  },
-});
 
 export default withSheetProvider(MintReviewsModal);

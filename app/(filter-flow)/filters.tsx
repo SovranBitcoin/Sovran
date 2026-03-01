@@ -46,20 +46,12 @@ const Chip: React.FC<ChipProps> = ({ label, icon, isSelected, onPress }) => {
       style={[
         styles.chip,
         {
-          backgroundColor: isSelected
-            ? opacity(foreground, 0.15)
-            : opacity(foreground, 0.05),
-          borderColor: isSelected
-            ? opacity(foreground, 0.25)
-            : opacity(foreground, 0.08),
+          backgroundColor: isSelected ? opacity(foreground, 0.15) : opacity(foreground, 0.05),
+          borderColor: isSelected ? opacity(foreground, 0.25) : opacity(foreground, 0.08),
         },
       ]}>
       {icon ? (
-        <Icon
-          name={icon}
-          size={16}
-          color={isSelected ? foreground : opacity(foreground, 0.4)}
-        />
+        <Icon name={icon} size={16} color={isSelected ? foreground : opacity(foreground, 0.4)} />
       ) : null}
       <Text
         size={14}
@@ -122,12 +114,8 @@ const MintSelectorChip: React.FC<MintSelectorChipProps> = ({
       style={[
         styles.mintChip,
         {
-          backgroundColor: isSelected
-            ? opacity(foreground, 0.15)
-            : opacity(foreground, 0.05),
-          borderColor: isSelected
-            ? opacity(foreground, 0.25)
-            : opacity(foreground, 0.08),
+          backgroundColor: isSelected ? opacity(foreground, 0.15) : opacity(foreground, 0.05),
+          borderColor: isSelected ? opacity(foreground, 0.25) : opacity(foreground, 0.08),
         },
       ]}>
       {showIcon ? (

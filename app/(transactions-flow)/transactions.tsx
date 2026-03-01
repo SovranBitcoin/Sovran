@@ -25,7 +25,7 @@ function FilterButton() {
   const { openFilterSheet, hasActiveFilters, activeFilterCount } = useTransactionsFilter();
 
   return (
-    <TouchableOpacity onPress={openFilterSheet} style={{ padding: 8, position: 'relative' }}>
+    <TouchableOpacity onPress={openFilterSheet} className="relative p-2">
       <Icon
         name="fluent:filter-16-filled"
         size={22}
@@ -33,17 +33,8 @@ function FilterButton() {
       />
       {hasActiveFilters && (
         <View
-          style={{
-            position: 'absolute',
-            top: 4,
-            right: 4,
-            backgroundColor: accent,
-            borderRadius: 10,
-            minWidth: 16,
-            height: 16,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
+          className="absolute right-1 top-1 h-4 min-w-4 items-center justify-center rounded-[10px]"
+          style={{ backgroundColor: accent }}>
           <Text
             size={10}
             style={{

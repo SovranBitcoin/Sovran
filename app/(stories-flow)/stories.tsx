@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -29,8 +29,6 @@ export default function StoriesScreen() {
   const handleClose = () => {
     if (closeRequestedRef.current) return;
     closeRequestedRef.current = true;
-    // Unmount all VideoViews first (isClosing hides them), then navigate after delay.
-    // Navigating while VideoViews are mounted triggers expo-video native crash.
     setIsClosing(true);
   };
 
@@ -52,7 +50,8 @@ export default function StoriesScreen() {
 
   return (
     <View
-      style={[styles.container, { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 6 }]}>
+      className="flex-1 bg-black"
+      style={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 6 }}>
       <StoriesCarousel
         storyUsers={storyUsers}
         startIndex={Number(startIndex) || 0}
@@ -62,10 +61,3 @@ export default function StoriesScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-});
