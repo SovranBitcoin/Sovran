@@ -3,16 +3,7 @@ import { useState, useEffect } from 'react';
 import { useCameraPermissions } from 'expo-camera';
 import { Linking } from 'react-native';
 
-import { popup } from '@/helper/popup';
-
-function showPermissionDeniedPopup(message: string) {
-  popup({
-    message,
-    emoji: '🚨',
-    type: 'error',
-    buttons: [{ text: 'Open Settings', onPress: () => Linking.openURL('app-settings:') }],
-  });
-}
+import { popup, cameraPermissionPopup } from '@/helper/popup';
 
 export function useHandleCameraPermission() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -29,14 +20,21 @@ export function useHandleCameraPermission() {
     if (permission.canAskAgain) {
       const res = await requestPermission();
       if (res.granted) {
-        popup({ message: 'camera_permission_granted', type: 'success' });
+        cameraPermissionPopup('granted');
         return true;
       }
-      showPermissionDeniedPopup('camera_permission_denied');
-      return false;
     }
 
-    showPermissionDeniedPopup('camera_permission_blocked');
+    // For both denied and blocked, show error with Open Settings button
+    popup({
+      message: permission.canAskAgain ? 'Camera Permission Denied' : 'Camera Permission Blocked',
+      text: permission.canAskAgain
+        ? 'Camera access is denied. Please enable it in your device settings.'
+        : 'Camera access is blocked. Please enable it in your device settings.',
+      emoji: '🚨',
+      type: 'error',
+      buttons: [{ text: 'Open Settings', onPress: () => Linking.openURL('app-settings:') }],
+    });
     return false;
   };
 

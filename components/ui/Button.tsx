@@ -333,7 +333,7 @@ export const Button = ({
     useThemeColor([
       'foreground',
       'surface-foreground',
-      'foreground-secondary',
+      'muted',
       'surface-tertiary',
       'background',
       'danger',

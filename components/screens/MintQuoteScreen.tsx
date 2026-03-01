@@ -12,7 +12,7 @@ import * as Clipboard from 'expo-clipboard';
 
 import type { MintHistoryEntry } from 'coco-cashu-core';
 
-import { popup } from '@/helper/popup';
+import { copyPopup } from '@/helper/popup';
 import { truncateMiddle } from 'helper/strings';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { HistoryEntryRefresh } from 'components/blocks/Transaction/HistoryEntryRefresh';
@@ -59,7 +59,7 @@ export function MintQuoteScreen({
 
   const handleCopy = async (close: (event: any) => void) => {
     await Clipboard.setStringAsync(currentTransaction.paymentRequest);
-    popup({ message: 'lightning_address_copied', type: 'success', onClose: () => close({}) });
+    copyPopup('lightningAddress', { onClose: () => close({}) });
   };
 
   const handleShare = async (close: (event: any) => void) => {
@@ -106,7 +106,7 @@ export function MintQuoteScreen({
             setUri={setUri}
             data={[{ name: 'Lightning', value: currentTransaction.paymentRequest }]}
             unit={currentTransaction.unit}
-            popupMessage={[{ name: 'lightning_address_copied' }]}
+            copyTarget="lightningAddress"
           />
         )}
 

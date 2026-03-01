@@ -31,7 +31,7 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
-import { popup } from 'helper/popup';
+import { rollbackSuccessPopup, rollbackPartialPopup } from '@/helper/popup';
 import { useMints, usePaginatedHistory, useManager } from 'coco-cashu-react';
 import { useHeroTransition } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { PendingEcashCardFrame } from 'components/blocks/pending/PendingEcashCardFrame';
@@ -410,18 +410,19 @@ export default function PendingEcashScreen() {
     setIsSweeping(false);
 
     if (failCount === 0) {
-      popup({
-        message: `Successfully rolled back ${successCount} transaction${successCount !== 1 ? 's' : ''}`,
-        type: 'success',
-        emoji: '🎉',
-        onClose: () => {
-          router.back();
-        },
-      });
+      rollbackSuccessPopup(
+        { count: successCount },
+        {
+          onClose: () => {
+            router.back();
+          },
+        }
+      );
     } else {
-      popup({
-        message: `Rolled back ${successCount}, failed ${failCount}`,
-        type: failCount === displayedTransactions.length ? 'error' : 'warning',
+      rollbackPartialPopup({
+        success: successCount,
+        failed: failCount,
+        total: displayedTransactions.length,
       });
     }
   }, [isSweeping, displayedTransactions, manager]);

@@ -49,7 +49,20 @@
  * @see FiatAmountDisplay - handles the decimal placeholder rendering
  */
 
-import { popup } from '@/helper/popup';
+import {
+  noMintSelectedPopup,
+  nostrPaymentSentPopup,
+  noClipboardAddressPopup,
+  routstrTopUpSuccessPopup,
+  routstrWalletCreatedPopup,
+  routstrInitializedPopup,
+  routstrTransactionFailedPopup,
+  noLightningAddressPopup,
+  noPaymentRequestPopup,
+  invalidNostrTransportPopup,
+  invalidRecipientPopup,
+  sendPaymentFailedPopup,
+} from '@/helper/popup';
 import {
   getEncodedTokenV4,
   decodePaymentRequest,
@@ -413,7 +426,7 @@ export function CurrencyScreen({
 
   const handleLightningReceive = async () => {
     if (!selectedMint) {
-      popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
+      noMintSelectedPopup();
       return;
     }
 
@@ -432,7 +445,7 @@ export function CurrencyScreen({
 
   const handleEcashSend = async () => {
     if (!selectedMint) {
-      popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
+      noMintSelectedPopup();
       return;
     }
 
@@ -456,10 +469,8 @@ export function CurrencyScreen({
           console.log('Routstr top-up: Using existing wallet, calling topUpBalance');
           const topUpResult = await topUpBalance(currentApiKey, encodedToken);
           setBalance(balance ? balance + topUpResult.added_amount : topUpResult.added_amount);
-          popup({
-            message: `Balance topped up! New balance: ${(balance ? balance + topUpResult.added_amount : topUpResult.added_amount / 1000).toFixed(0)} sats`,
-            emoji: '🎉',
-            type: 'success',
+          routstrTopUpSuccessPopup({
+            balance: `${(balance ? balance + topUpResult.added_amount : topUpResult.added_amount / 1000).toFixed(0)} sats`,
           });
           onRoutstrSuccess?.();
           return;
@@ -475,10 +486,8 @@ export function CurrencyScreen({
             console.log('Routstr top-up: Wallet created via /wallet/create');
             setApiKey(walletResponse.api_key);
             setBalance(walletResponse.balance);
-            popup({
-              message: `Wallet created! Balance: ${(walletResponse.balance / 1000).toFixed(0)} sats`,
-              emoji: '🎉',
-              type: 'success',
+            routstrWalletCreatedPopup({
+              balance: `${(walletResponse.balance / 1000).toFixed(0)} sats`,
             });
             onRoutstrSuccess?.();
             return;
@@ -500,31 +509,21 @@ export function CurrencyScreen({
               persistentKey !== encodedToken ? 'persistent key from server' : 'token as key'
             );
 
-            popup({
-              message: `Routstr wallet initialized! Balance: ${(balanceData.balance / 1000).toFixed(0)} sats`,
-              emoji: '🎉',
-              type: 'success',
+            routstrInitializedPopup({
+              balance: `${(balanceData.balance / 1000).toFixed(0)} sats`,
             });
           } catch (balanceError) {
             console.error('Failed to check balance:', balanceError);
             // Still store the token as API key - it may work for subsequent requests
             setApiKey(encodedToken);
-            popup({
-              message: 'Routstr wallet initialized! You can now use Routstr AI.',
-              emoji: '🎉',
-              type: 'success',
-            });
+            routstrInitializedPopup();
           }
           onRoutstrSuccess?.();
           return;
         }
       } catch (error: any) {
         console.error('Failed to handle Routstr top-up:', error);
-        popup({
-          message: error.error?.message || 'Failed to process Routstr transaction',
-          emoji: '🚨',
-          type: 'error',
-        });
+        routstrTransactionFailedPopup({ text: error.error?.message });
       }
     }
 
@@ -566,7 +565,7 @@ export function CurrencyScreen({
         // Navigate to MeltQuoteScreen with lnUrlOrAddress and amount
         // The screen will handle LNURL resolution and quote creation
         if (!params.lnUrlOrAddress) {
-          popup({ message: 'No lightning address provided', emoji: '🚨', type: 'error' });
+          noLightningAddressPopup();
           setLoading(false);
           return;
         }
@@ -577,7 +576,7 @@ export function CurrencyScreen({
       case 'paymentRequest':
         // Handle NUT-18 payment request: create token, send via Nostr, navigate to SendTokenScreen
         if (!params.paymentRequest) {
-          popup({ message: 'No payment request provided', emoji: '🚨', type: 'error' });
+          noPaymentRequestPopup();
           setLoading(false);
           return;
         }
@@ -590,7 +589,7 @@ export function CurrencyScreen({
           );
 
           if (!nostrTransport?.target) {
-            popup({ message: 'Invalid payment request - no Nostr transport', type: 'error' });
+            invalidNostrTransportPopup();
             setLoading(false);
             return;
           }
@@ -598,7 +597,7 @@ export function CurrencyScreen({
           // Decode nprofile to get pubkey and relays
           const decoded = nip19.decode(nostrTransport.target);
           if ((decoded.type as string) !== 'nprofile') {
-            popup({ message: 'Invalid recipient in payment request', type: 'error' });
+            invalidRecipientPopup();
             setLoading(false);
             return;
           }
@@ -607,7 +606,7 @@ export function CurrencyScreen({
           // 2. Determine mint to use
           const mintToUse = params.selectedMintUrl || selectedMint;
           if (!mintToUse) {
-            popup({ message: 'No mint selected', emoji: '🚨', type: 'error' });
+            noMintSelectedPopup();
             setLoading(false);
             return;
           }
@@ -632,21 +631,14 @@ export function CurrencyScreen({
           await captureAndStoreLocation(historyEntry.id);
 
           // 7. Show success and navigate to SendTokenScreen
-          popup({
-            message: 'Payment sent successfully via Nostr',
-            type: 'success',
-            emoji: '🚀',
-          });
+          nostrPaymentSentPopup();
 
           // Navigate to SendTokenScreen with the history entry + token
           // Pass nostrSent: true so it shows the payment request timeline
           onSendTokenCreated({ ...historyEntry, token }, { nostrSent: true });
         } catch (err) {
           console.error('[CurrencyScreen] Failed to send payment request:', err);
-          popup({
-            message: err instanceof Error ? err.message : 'Failed to send payment',
-            type: 'error',
-          });
+          sendPaymentFailedPopup({ text: err instanceof Error ? err.message : undefined });
         } finally {
           setLoading(false);
         }
@@ -666,7 +658,7 @@ export function CurrencyScreen({
   const handlePastePress = async () => {
     const text = await Clipboard.getStringAsync();
     if (!text) {
-      popup({ message: 'no_clipboard_address', emoji: '🚨', type: 'error' });
+      noClipboardAddressPopup();
       return;
     }
 

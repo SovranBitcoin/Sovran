@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import * as Linking from 'expo-linking';
 import { useMintStore } from '../stores/mintStore';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { popup } from '@/helper/popup';
+import { deeplinkFailedPopup } from '@/helper/popup';
 import { useProcessPaymentString } from './coco/useProcessPaymentString';
 
 export const useDeeplink = () => {
@@ -36,11 +36,7 @@ export const useDeeplink = () => {
         try {
           await processPaymentString({ data: hostname, type: 'deeplink' });
         } catch (error) {
-          popup({
-            message: error instanceof Error ? error.message : 'Unknown error',
-            emoji: '🚨',
-            type: 'error',
-          });
+          deeplinkFailedPopup({ text: error instanceof Error ? error.message : undefined });
         }
       }
     })();

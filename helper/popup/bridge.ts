@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import type { PopupIcon } from './icons';
+import type { PopupTextSegment } from './format';
 import { usePopupStore } from '@/stores/popupStore';
 
 type ToastVariant = 'default' | 'accent' | 'success' | 'warning' | 'danger';
@@ -24,9 +26,8 @@ export type ToastConfig = {
 
 export type SheetConfig = {
   message: string;
-  submessage?: ReactNode;
-  icon?: ReactNode;
-  emoji?: string;
+  submessage?: ReactNode | PopupTextSegment[];
+  icon?: PopupIcon;
   dismissable?: boolean;
   duration?: number;
   buttons?: { text: string; page?: string; onPress?: () => void }[];

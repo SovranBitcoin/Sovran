@@ -33,7 +33,32 @@ import { SheetManager } from 'react-native-actions-sheet';
 
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
-import { popup } from '@/helper/popup';
+import {
+  nfcEcashSharedPopup,
+  nfcConnectionLostPopup,
+  nfcSendFailedPopup,
+  copyPopup,
+  tokenCannotCancelPopup,
+  tokenAlreadyRedeemedPopup,
+  tokenCannotReclaimPopup,
+  fundsReclaimedPopup,
+  reclaimFailedPopup,
+  transactionCancelledPopup,
+  tokenCannotCheckStatusPopup,
+  tokenRedeemedPopup,
+  tokenStillPendingPopup,
+  tokenMixedStatesPopup,
+  tokenCheckFailedPopup,
+  tokenRedeemedByRecipientPopup,
+  transactionAlreadyCancelledPopup,
+  tokenPendingNotRedeemedPopup,
+  nostrPaymentSentPopup,
+  cancelTransactionFailedPopup,
+  operationNotFoundPopup,
+  operationInvalidStatePopup,
+  invalidPaymentRequestPopup,
+  sendPaymentFailedPopup,
+} from '@/helper/popup';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
@@ -260,7 +285,7 @@ export function SendTokenScreen({
       if (!token) return;
       const writeResult = await writeTokenToNFC(getEncodedTokenV4(token));
       if (writeResult.success) {
-        popup({ message: 'ecash_token_shared_via_nfc', type: 'success', onClose: () => close({}) });
+        nfcEcashSharedPopup({ onClose: () => close({}) });
         return;
       }
 
@@ -272,26 +297,20 @@ export function SendTokenScreen({
       if (lostConnection && operationId) {
         try {
           await manager.send.rollback(operationId);
-          popup({
-            message: 'NFC connection lost. Send was rolled back.',
-            type: 'warning',
-          });
+          nfcConnectionLostPopup();
           return;
         } catch (rollbackError) {
           console.error('[SendTokenScreen] NFC rollback failed:', rollbackError);
-          popup({
-            message: 'NFC send failed and rollback failed',
+          nfcSendFailedPopup({
+            rollbackFailed: true,
             text: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-            type: 'error',
           });
           return;
         }
       }
 
-      popup({
-        message: 'NFC send failed',
+      nfcSendFailedPopup({
         text: writeResult.errorMessage || 'Unable to write token via NFC.',
-        type: 'error',
       });
     },
     [token, currentTransaction?.operationId, manager]
@@ -301,7 +320,7 @@ export function SendTokenScreen({
     async (onClose: (event: any) => void) => {
       if (!token) return;
       await Clipboard.setStringAsync(getEncodedTokenV4(token));
-      popup({ message: 'ecash_token_copied', type: 'success', onClose: () => onClose({}) });
+      copyPopup('ecashToken', { onClose: () => onClose({}) });
     },
     [token]
   );
@@ -322,12 +341,7 @@ export function SendTokenScreen({
       // --- Legacy fallback: no operationId but we have a token ---
       if (!currentTransaction?.operationId) {
         if (!token) {
-          popup({
-            message: 'Cannot Cancel',
-            text: 'No operation ID and no token available to reclaim.',
-            type: 'warning',
-            onClose: () => onClose({}),
-          });
+          tokenCannotCancelPopup({ onClose: () => onClose({}) });
           return;
         }
         try {
@@ -343,12 +357,7 @@ export function SendTokenScreen({
           const allSpent = proofStates.every((s) => s.state === 'SPENT');
           if (allSpent) {
             await updateLegacyHistoryState(currentTransaction, 'finalized', mintUrl, manager);
-            popup({
-              message: 'Token Already Redeemed',
-              text: 'All proofs are spent — the recipient already claimed it. Nothing to reclaim.',
-              type: 'info',
-              onClose: () => onClose({}),
-            });
+            tokenAlreadyRedeemedPopup({ onClose: () => onClose({}) });
             return;
           }
 
@@ -357,12 +366,7 @@ export function SendTokenScreen({
 
           if (unspentProofs.length === 0) {
             // All proofs are PENDING at the mint
-            popup({
-              message: 'Cannot Reclaim Yet',
-              text: 'All proofs are in a pending state at the mint. Try again shortly.',
-              type: 'warning',
-              onClose: () => onClose({}),
-            });
+            tokenCannotReclaimPopup({ onClose: () => onClose({}) });
             return;
           }
 
@@ -372,18 +376,14 @@ export function SendTokenScreen({
           await updateLegacyHistoryState(currentTransaction, 'rolledBack', mintUrl, manager);
 
           const amt = unspentProofs.reduce((s, p) => s + p.amount, 0);
-          popup({
-            message: 'Funds Reclaimed',
-            text: `${amt} ${currentTransaction?.unit || 'sat'} reclaimed back into your wallet.`,
-            type: 'success',
-            onClose: () => onClose({}),
-          });
+          fundsReclaimedPopup(
+            { amount: amt, unit: currentTransaction?.unit || 'sat' },
+            { onClose: () => onClose({}) }
+          );
         } catch (error) {
           console.error('[SendTokenScreen] Legacy cancel failed:', error);
-          popup({
-            message: 'Reclaim Failed',
+          reclaimFailedPopup({
             text: error instanceof Error ? error.message : String(error),
-            type: 'error',
             onClose: () => onClose({}),
           });
         }
@@ -393,10 +393,10 @@ export function SendTokenScreen({
       // --- Normal path: operationId exists ---
       try {
         await manager.send.rollback(currentTransaction.operationId);
-        popup({ message: 'Transaction cancelled successfully', onClose: () => onClose({}) });
+        transactionCancelledPopup({ onClose: () => onClose({}) });
       } catch (error) {
-        popup({
-          message: error instanceof Error ? error.message : 'Failed to cancel transaction',
+        cancelTransactionFailedPopup({
+          text: error instanceof Error ? error.message : undefined,
           onClose: () => onClose({}),
         });
       }
@@ -409,12 +409,7 @@ export function SendTokenScreen({
       // --- Legacy fallback: no operationId but we have a token ---
       if (!currentTransaction?.operationId) {
         if (!token) {
-          popup({
-            message: 'Cannot Check Status',
-            text: 'No operation ID and no token available to verify.',
-            type: 'warning',
-            onClose: () => onClose({}),
-          });
+          tokenCannotCheckStatusPopup({ onClose: () => onClose({}) });
           return;
         }
         setIsCheckingStatus(true);
@@ -434,33 +429,19 @@ export function SendTokenScreen({
 
           if (spentCount === total) {
             await updateLegacyHistoryState(currentTransaction, 'finalized', mintUrl, manager);
-            popup({
-              message: 'Token Redeemed',
-              text: 'All proofs are spent — the recipient has claimed this token.',
-              type: 'success',
-              onClose: () => onClose({}),
-            });
+            tokenRedeemedPopup({ onClose: () => onClose({}) });
           } else if (unspentCount === total) {
-            popup({
-              message: 'Token Still Pending',
-              text: 'All proofs are unspent — the recipient has not claimed this token yet. You can cancel to reclaim the funds.',
-              type: 'info',
-              onClose: () => onClose({}),
-            });
+            tokenStillPendingPopup({ onClose: () => onClose({}) });
           } else {
-            popup({
-              message: 'Mixed Proof States',
-              text: `${spentCount}/${total} spent, ${unspentCount}/${total} unspent, ${pendingCount}/${total} pending.`,
-              type: 'warning',
-              onClose: () => onClose({}),
-            });
+            tokenMixedStatesPopup(
+              { spent: spentCount, unspent: unspentCount, pending: pendingCount, total },
+              { onClose: () => onClose({}) }
+            );
           }
         } catch (error) {
           console.error('[SendTokenScreen] Legacy check status failed:', error);
-          popup({
-            message: 'Check Status Failed',
+          tokenCheckFailedPopup({
             text: error instanceof Error ? error.message : String(error),
-            type: 'error',
             onClose: () => onClose({}),
           });
         } finally {
@@ -474,33 +455,22 @@ export function SendTokenScreen({
       try {
         const operation = await manager.send.getOperation(currentTransaction.operationId);
         if (!operation) {
-          popup({ message: 'Operation not found', onClose: () => onClose({}) });
+          operationNotFoundPopup({ onClose: () => onClose({}) });
           return;
         }
 
         if (operation.state === 'finalized') {
-          popup({
-            message: 'Token was already redeemed by recipient',
-            type: 'success',
-            onClose: () => onClose({}),
-          });
+          tokenRedeemedByRecipientPopup({ onClose: () => onClose({}) });
           return;
         }
 
         if (operation.state === 'rolled_back') {
-          popup({
-            message: 'Transaction was already cancelled',
-            type: 'info',
-            onClose: () => onClose({}),
-          });
+          transactionAlreadyCancelledPopup({ onClose: () => onClose({}) });
           return;
         }
 
         if (operation.state !== 'pending') {
-          popup({
-            message: `Cannot check status for operation in state: ${operation.state}`,
-            onClose: () => onClose({}),
-          });
+          operationInvalidStatePopup({ state: operation.state }, { onClose: () => onClose({}) });
           return;
         }
 
@@ -508,21 +478,13 @@ export function SendTokenScreen({
 
         const updatedOperation = await manager.send.getOperation(currentTransaction.operationId);
         if (updatedOperation?.state === 'finalized') {
-          popup({
-            message: 'Token was redeemed by recipient',
-            type: 'success',
-            onClose: () => onClose({}),
-          });
+          tokenRedeemedByRecipientPopup({ onClose: () => onClose({}) });
         } else {
-          popup({
-            message: 'Token is still pending - not yet redeemed',
-            type: 'info',
-            onClose: () => onClose({}),
-          });
+          tokenPendingNotRedeemedPopup({ onClose: () => onClose({}) });
         }
       } catch (error) {
-        popup({
-          message: error instanceof Error ? error.message : 'Failed to check status',
+        tokenCheckFailedPopup({
+          text: error instanceof Error ? error.message : undefined,
           onClose: () => onClose({}),
         });
       } finally {
@@ -548,7 +510,7 @@ export function SendTokenScreen({
   // Handle send payment (payment request mode)
   const handleSendPayment = useCallback(async () => {
     if (!paymentRequest || !decodedRequest || !nostrTransport || !recipientInfo) {
-      popup({ message: 'Invalid payment request', type: 'error' });
+      invalidPaymentRequestPopup();
       return;
     }
 
@@ -586,17 +548,10 @@ export function SendTokenScreen({
       await captureAndStoreLocation(historyEntry.id);
 
       // 5. Show success
-      popup({
-        message: 'Payment sent successfully via Nostr',
-        type: 'success',
-        emoji: '🚀',
-      });
+      nostrPaymentSentPopup();
     } catch (err) {
       console.error('[SendTokenScreen] Failed to send payment:', err);
-      popup({
-        message: err instanceof Error ? err.message : 'Failed to send payment',
-        type: 'error',
-      });
+      sendPaymentFailedPopup({ text: err instanceof Error ? err.message : undefined });
     } finally {
       setIsSendingPayment(false);
     }
@@ -782,7 +737,7 @@ export function SendTokenScreen({
         {!isPaymentRequestMode && !isPaid && token && (
           <PaymentInfo
             setUri={setUri}
-            popupMessage="ecash_token_copied"
+            copyTarget="ecashToken"
             unit={unit}
             data={formattedToken}
             animated={isLongToken}

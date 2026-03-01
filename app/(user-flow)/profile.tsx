@@ -39,7 +39,13 @@ import { withSheetProvider } from 'hocs/withSheetProvider';
 import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts, Metadata } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
-import { popup } from '@/helper/popup';
+import {
+  copyPopup,
+  copyFailedPopup,
+  openLinkFailedPopup,
+  engagementUpdateFailedPopup,
+  type CopyTarget,
+} from '@/helper/popup';
 import {
   useNostrProfile,
   getFollowersWithProfiles,
@@ -679,12 +685,12 @@ function UserProfileScreen() {
   // HANDLERS
   // ===========================
 
-  const handleCopy = useCallback(async (text: string, message: string) => {
+  const handleCopy = useCallback(async (text: string, target: CopyTarget) => {
     try {
       await Clipboard.setStringAsync(text);
-      popup({ message, type: 'success' });
+      copyPopup(target);
     } catch {
-      popup({ message: 'Failed to copy', type: 'error' });
+      copyFailedPopup();
     }
   }, []);
 
@@ -693,13 +699,13 @@ function UserProfileScreen() {
       const fullUrl = url.startsWith('http') ? url : `https://${url}`;
       await Linking.openURL(fullUrl);
     } catch {
-      popup({ message: 'Failed to open link', type: 'error' });
+      openLinkFailedPopup();
     }
   }, []);
 
   const handleToggleFollow = useCallback(async () => {
     if (!pubkey || !nostrKeys?.pubkey || !ndk) {
-      popup({ message: 'Unable to update follow right now', type: 'error' });
+      engagementUpdateFailedPopup('follow');
       return;
     }
     if (nostrKeys.pubkey === pubkey || followInFlight) return;
@@ -725,7 +731,7 @@ function UserProfileScreen() {
       clearFollowOptimistic(pubkey);
     } catch {
       clearFollowOptimistic(pubkey);
-      popup({ message: 'Failed to update follow. Please try again.', type: 'error' });
+      engagementUpdateFailedPopup('follow');
     }
   }, [
     pubkey,
@@ -759,7 +765,7 @@ function UserProfileScreen() {
         prefix: <CurrencyIcon colors={[iconColor]} width={20} currency="nostr" />,
         title: truncateMiddle(npub, 10),
         suffixIcon: 'lets-icons:copy',
-        onPress: () => handleCopy(npub, 'npub_copied'),
+        onPress: () => handleCopy(npub, 'npub'),
       },
     ];
 
@@ -769,7 +775,7 @@ function UserProfileScreen() {
         prefix: <Icon name="mdi:check-decagram" size={20} color={iconColor} />,
         title: userInfo.nip05,
         suffixIcon: 'lets-icons:copy',
-        onPress: () => handleCopy(userInfo.nip05, 'nip05_copied'),
+        onPress: () => handleCopy(userInfo.nip05, 'nip05'),
       });
     }
 
@@ -779,7 +785,7 @@ function UserProfileScreen() {
         prefix: <Icon name="mdi:lightning-bolt" size={20} color={iconColor} />,
         title: userInfo.lud16,
         suffixIcon: 'lets-icons:copy',
-        onPress: () => handleCopy(userInfo.lud16, 'lud16_copied'),
+        onPress: () => handleCopy(userInfo.lud16, 'lud16'),
       });
     }
 

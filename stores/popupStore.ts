@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ReactNode } from 'react';
+import type { PopupIcon, PopupTextSegment } from '@/helper/popup';
 
 export type SheetButton = {
   text: string;
@@ -9,9 +10,8 @@ export type SheetButton = {
 
 export type SheetPayload = {
   message: string;
-  submessage?: ReactNode;
-  icon?: ReactNode;
-  emoji?: string;
+  submessage?: ReactNode | PopupTextSegment[];
+  icon?: PopupIcon;
   dismissable?: boolean;
   duration?: number;
   buttons?: SheetButton[];

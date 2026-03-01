@@ -25,7 +25,7 @@ import { ModalLayoutWrapper } from 'app/debugModal';
 import { Mint } from 'coco-cashu-core';
 import { useKYMMints } from 'hooks/coco/useKYMMints';
 import { normalizeMintUrlKey } from 'helper/url';
-import { popup } from 'helper/popup';
+import { insufficientBalancePopup, generalErrorPopup } from '@/helper/popup';
 import { BottomButtons } from 'components/ui/BottomButtons';
 import { ButtonHandler } from 'components/ui/ButtonHandler';
 import _ from 'lodash';
@@ -226,26 +226,20 @@ export function MintListScreen({
 
       // Check if balance is required and mint has no balance
       if (requireBalance && mint.amount === 0) {
-        popup({
-          message: 'insufficient_balance',
-          params: {
-            amount: mint.amount,
-            unit: mint.unit,
-            fee: 0,
-          },
+        insufficientBalancePopup({
+          amount: mint.amount,
+          unit: mint.unit,
+          fee: 0,
         });
         return;
       }
 
       // Check if mint has sufficient balance for minAmount
       if (minAmount !== undefined && minAmount > 0 && mint.amount < minAmount) {
-        popup({
-          message: 'insufficient_balance',
-          params: {
-            amount: mint.amount,
-            unit: mint.unit,
-            fee: 0,
-          },
+        insufficientBalancePopup({
+          amount: mint.amount,
+          unit: mint.unit,
+          fee: 0,
         });
         return;
       }
@@ -257,10 +251,7 @@ export function MintListScreen({
         }
         await onMintSelect(mint);
       } catch {
-        popup({
-          message: 'general_error',
-          emoji: '🚨',
-        });
+        generalErrorPopup();
       } finally {
         setLoadingId(null);
       }

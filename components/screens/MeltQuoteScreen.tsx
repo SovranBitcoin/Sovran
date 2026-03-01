@@ -19,7 +19,7 @@ import { useManager } from 'coco-cashu-react';
 import { HistoryEntryHeader } from '@/components/blocks/Transaction/HistoryEntryHeader';
 import { useTransactionSource } from '@/components/blocks/Transaction/TransactionSourceSection';
 import { getLightningTimestamp, requestInvoiceFromLnurl } from '@/helper/coco/utils';
-import { popup } from '@/helper/popup';
+import { paymentCancelledPopup, couldNotCancelPopup, sendSuccessPopup } from '@/helper/popup';
 import { useHistoryEntry } from '@/hooks/coco/useHistoryEntry';
 import { useMeltWithHistory } from '@/hooks/coco/useMeltWithHistory';
 import { useBeforeRemoveCleanup } from '@/hooks/useBeforeRemoveCleanup';
@@ -298,11 +298,7 @@ export function MeltQuoteScreen({
         mintUrl: currentTransaction?.mintUrl,
         quoteId: currentTransaction?.quoteId,
       });
-      popup({
-        message: 'Payment cancelled',
-        type: 'success',
-        text: 'Reserved proofs have been freed.',
-      });
+      paymentCancelledPopup();
       onCancel();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -315,7 +311,7 @@ export function MeltQuoteScreen({
         onCancel();
         return;
       }
-      popup({ message: 'Could not cancel', type: 'error', text: msg });
+      couldNotCancelPopup({ text: msg });
     } finally {
       setIsCancelling(false);
     }
@@ -342,12 +338,7 @@ export function MeltQuoteScreen({
 
     successRef.current = true;
     // Show success popup and close modal after
-    popup({
-      message: 'funds_sent',
-      params: { amount: currentTransaction.amount, unit: currentTransaction.unit },
-      emoji: '🎉',
-      onClose: onSendSuccess,
-    });
+    sendSuccessPopup({ icon: 'emoji:🎉', onClose: onSendSuccess });
   };
 
   // Error states

@@ -11,7 +11,7 @@ import { Section } from 'app/settings-pages';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { View } from 'components/ui/View/View';
 import * as Clipboard from 'expo-clipboard';
-import { popup } from '@/helper/popup';
+import { copyPopup } from '@/helper/popup';
 import { truncateMiddle } from 'helper/strings';
 import opacity from 'hex-color-opacity';
 import { ModalLayoutWrapper } from 'app/debugModal';
@@ -25,7 +25,7 @@ export const SHARE_CONFIGS = {
     title: 'Profile Details',
     sectionTitle: 'PROFILE',
     unit: 'nostr',
-    popupMessage: 'npub_copied',
+    copyTarget: 'npub' as const,
     dataKey: 'npub',
     iconCurrency: 'nostr',
     iconName: null,
@@ -34,7 +34,7 @@ export const SHARE_CONFIGS = {
     title: 'P2PK Public Key',
     sectionTitle: 'PUBLIC KEY',
     unit: 'p2pk',
-    popupMessage: 'p2pk_copied',
+    copyTarget: 'p2pk' as const,
     dataKey: 'publicKey',
     iconCurrency: 'p2pk',
     iconName: null,
@@ -43,7 +43,7 @@ export const SHARE_CONFIGS = {
     title: 'Nostr Public Key',
     sectionTitle: 'NPUB',
     unit: 'nostr',
-    popupMessage: 'npub_copied',
+    copyTarget: 'npub' as const,
     dataKey: 'npub',
     iconCurrency: 'nostr',
     iconName: null,
@@ -52,7 +52,7 @@ export const SHARE_CONFIGS = {
     title: 'Lightning Address',
     sectionTitle: 'LIGHTNING',
     unit: 'sat',
-    popupMessage: 'lud16_copied',
+    copyTarget: 'lud16' as const,
     dataKey: 'lud16',
     iconCurrency: null,
     iconName: 'mdi:lightning-bolt',
@@ -134,8 +134,8 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
 
   const handleCopy = useCallback(async () => {
     await Clipboard.setStringAsync(activeData);
-    popup({ message: config.popupMessage, type: 'success' });
-  }, [activeData, config.popupMessage]);
+    copyPopup(config.copyTarget);
+  }, [activeData, config.copyTarget]);
 
   return (
     <ModalLayoutWrapper>
@@ -146,7 +146,7 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
         </View>
       )}
 
-      <PaymentInfo popupMessage={config.popupMessage} data={activeData} unit={config.unit} />
+      <PaymentInfo copyTarget={config.copyTarget} data={activeData} unit={config.unit} />
 
       <Section title={config.sectionTitle}>
         <ListGroup variant="secondary">

@@ -4,7 +4,7 @@ import * as Application from 'expo-application';
 import semver from 'semver';
 
 import { getLatestVersion } from 'helper/apiClient';
-import { popup } from 'helper/popup';
+import { newVersionPopup } from '@/helper/popup';
 
 /**
  * Checks for app updates on mount and shows a popup when a newer version exists.
@@ -28,7 +28,7 @@ export const useVersionCheck = () => {
         'version' in payload &&
         semver.gt(payload.version, currentVersion)
       ) {
-        popup({ message: 'latest_version', params: { version: payload.version } });
+        newVersionPopup({ version: payload.version });
       }
     };
 
