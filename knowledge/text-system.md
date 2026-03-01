@@ -17,7 +17,7 @@ Two font families are loaded (`hooks/useFonts.ts`):
 | Font | Weights | Purpose |
 |------|---------|---------|
 | **Oxygen** | Light, Regular, Bold | Default for all UI text |
-| **Overpass** | Thin → Heavy + Mono | Balance / amount / monetary displays |
+| **Overpass** | Light → Heavy | Balance / amount / monetary displays |
 
 Oxygen is the default. Pass `overpass` to opt into Overpass for a specific element.
 
@@ -27,7 +27,7 @@ Boolean props map to the closest available weight:
 
 | Prop | Oxygen | Overpass |
 |------|--------|----------|
-| `thin`, `extralight`, `light` | OxygenLight | OverpassThin/Extralight/Light |
+| `thin`, `extralight`, `light` | OxygenLight | OverpassLight |
 | *(default)* | OxygenRegular | OverpassRegular |
 | `medium`, `semibold` | OxygenBold | OverpassSemibold |
 | `bold` | OxygenBold | OverpassBold |

@@ -149,8 +149,8 @@ function getOxygenFamily(props: CustomTextProps): string {
  */
 function getOverpassFamily(props: CustomTextProps): string {
   const WEIGHT_MAP: Record<string, string> = {
-    thin: 'OverpassThin',
-    extralight: 'OverpassExtralight',
+    thin: 'OverpassLight',
+    extralight: 'OverpassLight',
     light: 'OverpassLight',
     regular: 'OverpassRegular',
     medium: 'OverpassSemibold',
@@ -159,7 +159,6 @@ function getOverpassFamily(props: CustomTextProps): string {
     extrabold: 'OverpassExtrabold',
     heavy: 'OverpassHeavy',
     black: 'OverpassHeavy',
-    mono: 'OverpassMono',
   };
 
   if (props.weight && WEIGHT_MAP[props.weight]) return WEIGHT_MAP[props.weight];
