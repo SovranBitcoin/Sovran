@@ -1,6 +1,5 @@
 import {
   DarkTheme,
-  DefaultTheme,
   ThemeProvider as NavigationThemeProvider,
 } from '@react-navigation/native';
 import { Stack, router } from 'expo-router';
@@ -13,7 +12,6 @@ import 'intl/locale-data/jsonp/en';
 import 'react-native-reanimated';
 
 import { registerAllSheets } from '@/components/blocks/sheets/registerSheets';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useFonts } from '@/hooks/useFonts';
 import { initLog } from '@/helper/initTiming';
 import Icon from 'assets/icons';
@@ -114,7 +112,6 @@ function ProfileBalanceSync() {
 
 // Inner component that can access theme context
 function RootLayoutContent() {
-  const colorScheme = useColorScheme();
   const { currentTheme } = useTheme();
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -189,7 +186,7 @@ function RootLayoutContent() {
   const contentBackgroundColor = useLiquidGlass ? 'transparent' : background;
 
   return (
-    <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <NavigationThemeProvider value={DarkTheme}>
       <ProfileBalanceSync />
       <StatusBar
         backgroundColor={background}
