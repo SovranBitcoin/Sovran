@@ -1,4 +1,6 @@
 export { RebalanceStepRow, type StepStatus } from './RebalanceStepRow';
+export { RebalanceChainCard } from './RebalanceChainCard';
+export { groupStepsForDisplay, type StepState } from './groupSteps';
 export {
   computeRebalancePlan,
   isAlreadyBalanced,

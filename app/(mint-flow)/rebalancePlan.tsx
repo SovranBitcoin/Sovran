@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import opacity from 'hex-color-opacity';
+import Animated, { LinearTransition } from 'react-native-reanimated';
+
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
@@ -15,10 +17,13 @@ import { useMints, useBalanceContext, useManager } from 'coco-cashu-react';
 import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { useLightningOperations } from '@/hooks/coco/useLightningOperations';
 import { MIN_FEE_RESERVE } from 'components/blocks/rebalance';
+
 import { useMintDistributionStore } from 'stores/mintDistributionStore';
 import { useSwapTransactionsStore, type SwapLegLocalStatus } from 'stores/swapTransactionsStore';
 import {
   RebalanceStepRow,
+  RebalanceChainCard,
+  groupStepsForDisplay,
   computeRebalancePlan,
   isAlreadyBalanced,
   buildSwapGraph,
@@ -28,6 +33,7 @@ import {
   type TransferStep,
   type RebalancePlan,
   type StepStatus,
+  type StepState,
 } from 'components/blocks/rebalance';
 import { AmountFormatter } from 'components/ui/AmountFormatter';
 import { BlurCardFrame } from 'components/ui/BlurCardFrame';
@@ -37,21 +43,7 @@ import Icon from 'assets/icons';
 import { auditMint, type AuditMintResponse } from 'helper/apiClient';
 import { extractDomain } from 'helper/url';
 
-interface StepState {
-  status: StepStatus;
-  errorMessage?: string;
-  invoice?: string;
-  operationId?: string;
-  routeSuggestion?: {
-    status: 'searching' | 'found' | 'none';
-    /** Full path including source and destination: [A, via1, ..., B]. */
-    path?: string[];
-    /** Human-readable names for each mint in the path (parallel array). */
-    pathNames?: string[];
-  };
-  // Auto-routing state
-  routingDetail?: string;
-}
+// StepState is imported from components/blocks/rebalance (groupSteps.ts)
 
 function RebalancePlanScreen() {
   const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor([
@@ -1724,50 +1716,68 @@ function RebalancePlanScreen() {
         )}
 
         {plan.steps.length > 0 && (
-          <VStack gap={0} className="pt-2">
-            {plan.steps.map((step) => {
-              const state = runPlan
-                ? stepStates[step.id] || { status: 'pending' }
-                : { status: 'pending' as StepStatus };
-              return (
-                <RebalanceStepRow
-                  key={step.id}
-                  id={step.id}
-                  fromMintUrl={step.fromMintUrl}
-                  fromMintInfo={mintInfoMap[step.fromMintUrl]}
-                  toMintUrl={step.toMintUrl}
-                  toMintInfo={mintInfoMap[step.toMintUrl]}
-                  amount={step.amount}
-                  unit={unit}
-                  status={state.status}
-                  errorMessage={state.errorMessage}
-                  routeSuggestion={state.routeSuggestion}
-                  routingDetail={state.routingDetail}
-                  onRouteThrough={
-                    runStatus !== 'running' ? () => handleRouteThrough(step) : undefined
-                  }
-                  onRetry={
-                    runStatus !== 'running' &&
-                    state.status === 'failed' &&
-                    !String(state.errorMessage ?? '').startsWith('Payment pending.')
-                      ? () => handleRetry(step)
-                      : undefined
-                  }
-                  onSkip={runStatus !== 'running' ? () => handleSkip(step) : undefined}
-                  chainInfo={
-                    step.chainId && step.chainPath
-                      ? {
-                          chainId: step.chainId,
-                          chainPath: step.chainPath,
-                          chainHopIndex: step.chainHopIndex ?? 0,
-                          pathMintInfos: step.chainPath.map((url) => mintInfoMap[url] ?? null),
-                        }
-                      : undefined
-                  }
-                />
-              );
-            })}
-          </VStack>
+          <Animated.View layout={LinearTransition.duration(280)}>
+            <VStack gap={0} className="pt-2">
+              {groupStepsForDisplay(plan.steps, runPlan ? stepStates : {}).map((group) => {
+                if (group.chainId && group.steps.length > 1) {
+                  return (
+                    <RebalanceChainCard
+                      key={group.id}
+                      group={group}
+                      stepStates={runPlan ? stepStates : {}}
+                      mintInfoMap={mintInfoMap}
+                      unit={unit}
+                      isRunning={runStatus === 'running'}
+                      onRetry={handleRetry}
+                      onSkip={handleSkip}
+                    />
+                  );
+                }
+
+                const step = group.steps[0];
+                const state = runPlan
+                  ? stepStates[step.id] || { status: 'pending' }
+                  : { status: 'pending' as StepStatus };
+                return (
+                  <RebalanceStepRow
+                    key={step.id}
+                    id={step.id}
+                    fromMintUrl={step.fromMintUrl}
+                    fromMintInfo={mintInfoMap[step.fromMintUrl]}
+                    toMintUrl={step.toMintUrl}
+                    toMintInfo={mintInfoMap[step.toMintUrl]}
+                    amount={step.amount}
+                    unit={unit}
+                    status={state.status}
+                    errorMessage={state.errorMessage}
+                    routeSuggestion={state.routeSuggestion}
+                    routingDetail={state.routingDetail}
+                    onRouteThrough={
+                      runStatus !== 'running' ? () => handleRouteThrough(step) : undefined
+                    }
+                    onRetry={
+                      runStatus !== 'running' &&
+                      state.status === 'failed' &&
+                      !String(state.errorMessage ?? '').startsWith('Payment pending.')
+                        ? () => handleRetry(step)
+                        : undefined
+                    }
+                    onSkip={runStatus !== 'running' ? () => handleSkip(step) : undefined}
+                    chainInfo={
+                      step.chainId && step.chainPath
+                        ? {
+                            chainId: step.chainId,
+                            chainPath: step.chainPath,
+                            chainHopIndex: step.chainHopIndex ?? 0,
+                            pathMintInfos: step.chainPath.map((url) => mintInfoMap[url] ?? null),
+                          }
+                        : undefined
+                    }
+                  />
+                );
+              })}
+            </VStack>
+          </Animated.View>
         )}
 
         {runStatus === 'finished' && plan.steps.length > 0 && swapGroupIdRef.current && (

@@ -200,7 +200,6 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
           status={status}
           routingDetail={routingDetail}
           middleLabel={chainInfo ? 'Swap' : 'Send'}
-          progressVariant={chainInfo ? 'swap' : 'default'}
         />
 
         <TransferEntryRow

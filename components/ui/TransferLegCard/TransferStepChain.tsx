@@ -1,44 +1,35 @@
 /**
- * @fileoverview Horizontal step chain between send and receive rows
+ * @fileoverview Animated horizontal step chain between send and receive rows
  *
- * Shows a horizontal progress chain of dots and lines representing
- * the execution stages of a transfer: Invoice → Send → Done.
- * Matches HistoryEntryTimeline's exact dot/line/icon dimensions.
+ * Shows a horizontal progress chain: Invoice → Send → Done.
+ * Transitions are sequenced so they cascade left→right:
+ *   dot completes → line fills → next dot activates
  *
- * Dimensions (from HistoryEntryTimeline):
- * - Dot container: 20×20, borderRadius: 7 (squircle, NOT circle)
- * - Icon size: 14
- * - Future dot: 7×7 solid circle
- * - Line thickness: 3
- *
- * Icons (from HistoryEntryTimeline):
- * - complete/success/current: fluent:checkmark-16-filled (green)
- * - next-pending: mdi:clock-outline (white 70%)
- * - future: no icon (small solid dot)
- * - failed: material-symbols:close-rounded (red)
- *
- * Used by RebalanceStepRow between the two TransferEntryRow components.
+ * On forward progression (e.g. creatingInvoice → melting), each element
+ * receives a stagger delay via Reanimated's withDelay so the wavefront
+ * feels sequential rather than simultaneous. Backwards jumps (failed,
+ * reset) snap instantly with no stagger.
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
+
 import opacity from 'hex-color-opacity';
+
 import { useThemeColor } from 'hooks/useThemeColor';
 import { View } from 'components/ui/View/View';
+import { HStack } from 'components/ui/View/HStack';
 import { UntranslatedText } from 'components/ui/Text';
+import { Spinner } from 'components/ui/Spinner';
 import Icon from 'assets/icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
-  cancelAnimation,
-  useAnimatedProps,
+  useAnimatedStyle,
   useSharedValue,
-  withRepeat,
+  withDelay,
   withTiming,
-  type SharedValue,
 } from 'react-native-reanimated';
 
-// Step status values from the rebalancer
 type StepStatus =
   | 'pending'
   | 'creatingInvoice'
@@ -51,14 +42,9 @@ type StepStatus =
   | 'skipped';
 
 interface TransferStepChainProps {
-  /** Current step status from the rebalancer */
   status: StepStatus;
-  /** Optional routing detail text shown below the chain when routing */
   routingDetail?: string;
-  /** Optional middle step label override (default: Send) */
   middleLabel?: string;
-  /** Progress accent variant for animated connector */
-  progressVariant?: 'default' | 'swap';
 }
 
 // ---------- internal types ----------
@@ -76,7 +62,10 @@ function isCompleteish(type: NodeType): boolean {
   return type === 'complete' || type === 'current' || type === 'success';
 }
 
-/** Map a rebalancer StepStatus to a chain of 3 nodes. */
+function isDoneNode(type: NodeType): boolean {
+  return type === 'complete' || type === 'success';
+}
+
 function buildChain(status: StepStatus, middleLabel: string): ChainNode[] {
   const labels = ['Invoice', middleLabel, 'Done'];
 
@@ -130,137 +119,226 @@ function buildChain(status: StepStatus, middleLabel: string): ChainNode[] {
   });
 }
 
-// ---------- constants (matching HistoryEntryTimeline exactly) ----------
+function statusToCurrentIdx(status: StepStatus): number {
+  switch (status) {
+    case 'creatingInvoice':
+    case 'invoiceReady':
+      return 0;
+    case 'melting':
+    case 'verifying':
+    case 'routing':
+      return 1;
+    case 'done':
+      return 2;
+    default:
+      return -1;
+  }
+}
 
-/** Used only for borderRadius — gives the squircle shape (7 on a 20×20 container) */
+// ---------- constants ----------
+
 const DOT_RADIUS_REF = 14;
 const DOT_CONTAINER = 20;
 const ICON_SIZE = 14;
-const SMALL_DOT = ICON_SIZE / 2; // 7 — matches HistoryEntryTimeline's future-small
+const SMALL_DOT = ICON_SIZE / 2;
 const LINE_THICKNESS = 3;
-const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
-function ChainLine({
-  isAnimated,
-  greenColor,
-  progressAccentColor,
-  greyColor,
-  animationStop,
-}: {
-  isAnimated: boolean;
-  greenColor: string;
-  progressAccentColor: string;
-  greyColor: string;
-  animationStop: SharedValue<number>;
-}) {
-  const animatedProps = useAnimatedProps(() => ({
-    locations: [0, animationStop.get(), 1] as [number, number, number],
-  }));
+const DOT_ANIM_MS = 300;
+const LINE_ANIM_MS = 360;
 
-  if (!isAnimated) {
-    return <View style={[styles.line, { backgroundColor: greyColor }]} />;
-  }
+const DOT_TIMING = { duration: DOT_ANIM_MS, easing: Easing.out(Easing.cubic) };
+const FAST_TIMING = { duration: 200, easing: Easing.out(Easing.cubic) };
+const LINE_TIMING = { duration: LINE_ANIM_MS, easing: Easing.inOut(Easing.cubic) };
 
-  return (
-    <View style={styles.line}>
-      <AnimatedLinearGradient
-        animatedProps={animatedProps}
-        colors={[greenColor, progressAccentColor, greyColor]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={StyleSheet.absoluteFillObject}
-      />
-    </View>
-  );
+// ---------- delayed animation helper ----------
+
+function timed(target: number, delayMs: number, config: { duration: number; easing: any }) {
+  return delayMs > 0 ? withDelay(delayMs, withTiming(target, config)) : withTiming(target, config);
 }
 
-// ---------- sub-components ----------
+// ---------- Animated dot ----------
 
-function ChainDot({
+function AnimatedChainDot({
   type,
+  delayMs,
   greenColor,
   redColor,
   greyColor,
 }: {
   type: NodeType;
+  delayMs: number;
   greenColor: string;
   redColor: string;
   greyColor: string;
 }) {
-  // Future: small solid grey dot (no container, no border, no icon)
-  // Matches HistoryEntryTimeline's future-small exactly
-  if (type === 'future') {
-    return (
-      <View
-        style={{
-          width: SMALL_DOT,
-          height: SMALL_DOT,
-          borderRadius: SMALL_DOT,
-          backgroundColor: greyColor,
-          // Horizontal margin so the total width matches DOT_CONTAINER (20),
-          // keeping lines aligned with full-size dots.
-          marginHorizontal: (DOT_CONTAINER - SMALL_DOT) / 2,
-        }}
-      />
-    );
-  }
+  const isFuture = type === 'future';
+  const isComplete = isCompleteish(type);
+  const isPending = type === 'next-pending';
+  const isFailed = type === 'failed';
 
-  // Next pending: grey tinted bg + clock icon
-  if (type === 'next-pending') {
-    return (
-      <View
-        style={[
-          styles.dot,
-          {
-            backgroundColor: opacity(greyColor, 0.18),
-            borderColor: opacity(greyColor, 0.32),
-          },
-        ]}>
-        <Icon name="mdi:clock-outline" color={opacity('#FFFFFF', 0.7)} size={ICON_SIZE} />
-      </View>
-    );
-  }
+  const futureOp = useSharedValue(isFuture ? 1 : 0);
+  const pendingOp = useSharedValue(isPending ? 1 : 0);
+  const completeOp = useSharedValue(isComplete ? 1 : 0);
+  const failedOp = useSharedValue(isFailed ? 1 : 0);
+  const dotScale = useSharedValue(isFuture ? SMALL_DOT / DOT_CONTAINER : 1);
 
-  // Failed: red tinted bg + close icon
-  if (type === 'failed') {
-    return (
-      <View
-        style={[
-          styles.dot,
-          {
-            backgroundColor: opacity(redColor, 0.18),
-            borderColor: opacity(redColor, 0.32),
-          },
-        ]}>
-        <Icon name="material-symbols:close-rounded" color={redColor} size={ICON_SIZE} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    futureOp.set(timed(isFuture ? 1 : 0, delayMs, FAST_TIMING));
+    pendingOp.set(timed(isPending ? 1 : 0, delayMs, DOT_TIMING));
+    completeOp.set(timed(isComplete ? 1 : 0, delayMs, DOT_TIMING));
+    failedOp.set(timed(isFailed ? 1 : 0, delayMs, DOT_TIMING));
+    dotScale.set(timed(isFuture ? SMALL_DOT / DOT_CONTAINER : 1, delayMs, DOT_TIMING));
+  }, [
+    type,
+    delayMs,
+    isFuture,
+    isPending,
+    isComplete,
+    isFailed,
+    futureOp,
+    pendingOp,
+    completeOp,
+    failedOp,
+    dotScale,
+  ]);
 
-  // Complete / current / success: green tinted bg + checkmark (no spinner)
+  const scaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: dotScale.get() }],
+  }));
+  const futureStyle = useAnimatedStyle(() => ({ opacity: futureOp.get() }));
+  const pendingStyle = useAnimatedStyle(() => ({ opacity: pendingOp.get() }));
+  const completeStyle = useAnimatedStyle(() => ({ opacity: completeOp.get() }));
+  const failedStyle = useAnimatedStyle(() => ({ opacity: failedOp.get() }));
+
+  const greenBg = useMemo(() => opacity(greenColor, 0.18), [greenColor]);
+  const greenBorder = useMemo(() => opacity(greenColor, 0.32), [greenColor]);
+  const greyBg = useMemo(() => opacity(greyColor, 0.18), [greyColor]);
+  const greyBorder = useMemo(() => opacity(greyColor, 0.32), [greyColor]);
+  const redBg = useMemo(() => opacity(redColor, 0.18), [redColor]);
+  const redBorder = useMemo(() => opacity(redColor, 0.32), [redColor]);
+  const clockColor = useMemo(() => opacity('#FFFFFF', 0.7), []);
+
   return (
-    <View
-      style={[
-        styles.dot,
-        {
-          backgroundColor: opacity(greenColor, 0.18),
-          borderColor: opacity(greenColor, 0.32),
-        },
-      ]}>
-      <Icon name="fluent:checkmark-16-filled" color={greenColor} size={ICON_SIZE} />
+    <Animated.View style={[styles.dotWrapper, scaleStyle]}>
+      <Animated.View
+        style={[
+          styles.dotLayer,
+          { borderRadius: DOT_CONTAINER, backgroundColor: greyColor },
+          futureStyle,
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.dotLayer,
+          styles.dot,
+          { backgroundColor: greyBg, borderColor: greyBorder },
+          pendingStyle,
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.dotLayer,
+          styles.dot,
+          { backgroundColor: greenBg, borderColor: greenBorder },
+          completeStyle,
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.dotLayer,
+          styles.dot,
+          { backgroundColor: redBg, borderColor: redBorder },
+          failedStyle,
+        ]}
+      />
+
+      <Animated.View style={[styles.iconLayer, pendingStyle]}>
+        <Icon name="mdi:clock-outline" color={clockColor} size={ICON_SIZE} />
+      </Animated.View>
+      <Animated.View style={[styles.iconLayer, completeStyle]}>
+        <Icon name="fluent:checkmark-16-filled" color={greenColor} size={ICON_SIZE} />
+      </Animated.View>
+      <Animated.View style={[styles.iconLayer, failedStyle]}>
+        <Icon name="material-symbols:close-rounded" color={redColor} size={ICON_SIZE} />
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+// ---------- Animated line ----------
+
+function AnimatedChainLine({
+  filled,
+  delayMs,
+  greenColor,
+  greyColor,
+}: {
+  filled: boolean;
+  delayMs: number;
+  greenColor: string;
+  greyColor: string;
+}) {
+  const fillWidth = useSharedValue(filled ? 1 : 0);
+
+  useEffect(() => {
+    fillWidth.set(timed(filled ? 1 : 0, delayMs, LINE_TIMING));
+  }, [filled, delayMs, fillWidth]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${fillWidth.get() * 100}%`,
+  }));
+
+  return (
+    <View style={[styles.line, { backgroundColor: greyColor }]}>
+      <Animated.View
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: greenColor }, fillStyle]}
+      />
     </View>
+  );
+}
+
+// ---------- Animated label ----------
+
+function AnimatedLabel({
+  label,
+  active,
+  delayMs,
+  isCurrent,
+  labelColor,
+  dimColor,
+}: {
+  label: string;
+  active: boolean;
+  delayMs: number;
+  isCurrent: boolean;
+  labelColor: string;
+  dimColor: string;
+}) {
+  const op = useSharedValue(active ? 1 : 0.5);
+
+  useEffect(() => {
+    op.set(timed(active ? 1 : 0.5, delayMs, FAST_TIMING));
+  }, [active, delayMs, op]);
+
+  const animStyle = useAnimatedStyle(() => ({ opacity: op.get() }));
+
+  return (
+    <Animated.View style={[styles.label, animStyle]}>
+      <UntranslatedText
+        size={9}
+        bold={isCurrent}
+        color={active ? labelColor : dimColor}
+        style={{ textAlign: 'center' }}>
+        {label}
+      </UntranslatedText>
+    </Animated.View>
   );
 }
 
 // ---------- main component ----------
 
 export const TransferStepChain = React.memo(
-  ({
-    status,
-    routingDetail,
-    middleLabel = 'Send',
-    progressVariant = 'default',
-  }: TransferStepChainProps) => {
+  ({ status, routingDetail, middleLabel = 'Send' }: TransferStepChainProps) => {
     const [foreground, muted, successColor, dangerColor] = useThemeColor([
       'foreground',
       'muted',
@@ -269,92 +347,95 @@ export const TransferStepChain = React.memo(
     ] as const);
 
     const greenColor = successColor;
-    const orangeColor = '#fb923c';
-    const progressAccentColor = progressVariant === 'swap' ? orangeColor : greenColor;
     const redColor = dangerColor;
     const greyColor = muted;
     const labelColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
+    const dimLabelColor = useMemo(() => opacity(foreground, 0.25), [foreground]);
 
     const chain = useMemo(() => buildChain(status, middleLabel), [middleLabel, status]);
-    const animationStop = useSharedValue(0.3);
-    const currentIdx = useMemo(() => chain.findIndex((item) => item.type === 'current'), [chain]);
-    const animatedLineIdx = useMemo(() => {
-      if (currentIdx < 0) return -1;
-      if (currentIdx >= chain.length - 1) return -1;
-      return currentIdx;
-    }, [chain.length, currentIdx]);
+    const currentIdx = statusToCurrentIdx(status);
+
+    // ── Stagger delay computation ──
+    // Track previous currentIdx to detect forward progression.
+    // On forward steps (e.g. 0→1), stagger: dot(0ms) → line(DOT) → next dot(DOT+LINE).
+    // On non-forward changes (failed, reset, initial), all delays = 0.
+    const prevIdxRef = useRef(currentIdx);
+
+    const isForward = currentIdx > prevIdxRef.current && prevIdxRef.current >= 0;
+    const wavefrontOrigin = isForward ? prevIdxRef.current : -1;
+
+    // Compute per-node and per-line delays
+    const nodeDelays = useMemo(() => {
+      const delays = new Array(chain.length).fill(0) as number[];
+      if (wavefrontOrigin < 0) return delays;
+
+      for (let i = 0; i < chain.length; i++) {
+        if (i <= wavefrontOrigin) {
+          delays[i] = 0;
+        } else {
+          delays[i] = DOT_ANIM_MS + LINE_ANIM_MS;
+        }
+      }
+      return delays;
+    }, [chain.length, wavefrontOrigin]);
+
+    const lineDelays = useMemo(() => {
+      const delays = new Array(Math.max(0, chain.length - 1)).fill(0) as number[];
+      if (wavefrontOrigin < 0) return delays;
+
+      for (let i = 0; i < delays.length; i++) {
+        if (i < wavefrontOrigin) {
+          delays[i] = 0;
+        } else if (i === wavefrontOrigin) {
+          delays[i] = DOT_ANIM_MS;
+        } else {
+          delays[i] = DOT_ANIM_MS + LINE_ANIM_MS;
+        }
+      }
+      return delays;
+    }, [chain.length, wavefrontOrigin]);
+
+    // Update ref after delay computation (useEffect runs after render)
+    useEffect(() => {
+      prevIdxRef.current = currentIdx;
+    }, [currentIdx]);
 
     const isRouting = status === 'routing';
-    const isInProgress =
-      status === 'creatingInvoice' ||
-      status === 'invoiceReady' ||
-      status === 'melting' ||
-      status === 'verifying' ||
-      status === 'routing';
-
-    useEffect(() => {
-      if (!isInProgress) {
-        cancelAnimation(animationStop);
-        animationStop.set(0.3);
-        return;
-      }
-
-      animationStop.set(
-        withRepeat(
-          withTiming(0.6, {
-            duration: 900,
-            easing: Easing.inOut(Easing.quad),
-          }),
-          -1,
-          true
-        )
-      );
-
-      return () => {
-        cancelAnimation(animationStop);
-      };
-    }, [animationStop, isInProgress]);
 
     return (
       <View style={styles.container}>
-        {/* Row of [node-col] [line] [node-col] [line] [node-col]
-          Each node-col is a VStack so the label sits directly under its dot. */}
         <View style={styles.chainRow}>
           {chain.map((node, idx) => {
             const isLast = idx === chain.length - 1;
-            const nextNode = !isLast ? chain[idx + 1] : null;
-            const lineComplete =
-              nextNode != null && isCompleteish(node.type) && isCompleteish(nextNode.type);
             const isActive = isCompleteish(node.type);
-            const isAnimatedLine = idx === animatedLineIdx;
+            const lineFilled = isDoneNode(node.type);
 
             return (
               <React.Fragment key={node.label}>
-                {/* Node column: dot + label stacked vertically */}
                 <View style={styles.nodeColumn}>
-                  <ChainDot
+                  <AnimatedChainDot
                     type={node.type}
+                    delayMs={nodeDelays[idx]}
                     greenColor={greenColor}
                     redColor={redColor}
                     greyColor={greyColor}
                   />
-                  <UntranslatedText
-                    size={9}
-                    bold={node.type === 'current'}
-                    color={isActive ? labelColor : opacity(labelColor, 0.5)}
-                    style={styles.label}>
-                    {node.label}
-                  </UntranslatedText>
+                  <AnimatedLabel
+                    label={node.label}
+                    active={isActive}
+                    delayMs={nodeDelays[idx]}
+                    isCurrent={node.type === 'current'}
+                    labelColor={labelColor}
+                    dimColor={dimLabelColor}
+                  />
                 </View>
 
-                {/* Line between nodes — vertically centered with the dot */}
                 {!isLast && (
-                  <ChainLine
-                    isAnimated={isInProgress && isAnimatedLine}
+                  <AnimatedChainLine
+                    filled={lineFilled}
+                    delayMs={lineDelays[idx]}
                     greenColor={greenColor}
-                    progressAccentColor={progressAccentColor}
-                    greyColor={lineComplete ? greenColor : greyColor}
-                    animationStop={animationStop}
+                    greyColor={greyColor}
                   />
                 )}
               </React.Fragment>
@@ -362,11 +443,15 @@ export const TransferStepChain = React.memo(
           })}
         </View>
 
-        {/* Routing detail subtitle */}
         {isRouting && routingDetail ? (
-          <UntranslatedText size={10} color="#c084fc" style={styles.routingDetail}>
-            {routingDetail}
-          </UntranslatedText>
+          <View style={[styles.routingBanner, { backgroundColor: opacity(foreground, 0.08) }]}>
+            <HStack spacing={6} align="center" justify="center">
+              <Spinner size={12} />
+              <UntranslatedText size={11} color={labelColor}>
+                {routingDetail}
+              </UntranslatedText>
+            </HStack>
+          </View>
         ) : null}
       </View>
     );
@@ -381,18 +466,35 @@ const styles = StyleSheet.create({
   },
   chainRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start', // so lines can be offset to center with dots
+    alignItems: 'flex-start',
   },
   nodeColumn: {
     alignItems: 'center',
   },
+  dotWrapper: {
+    width: DOT_CONTAINER,
+    height: DOT_CONTAINER,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dotLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
   dot: {
     width: DOT_CONTAINER,
     height: DOT_CONTAINER,
-    borderRadius: DOT_RADIUS_REF / 2, // 7 — squircle, matching HistoryEntryTimeline
+    borderRadius: DOT_RADIUS_REF / 2,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  iconLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   line: {
     flex: 1,
@@ -400,16 +502,16 @@ const styles = StyleSheet.create({
     borderRadius: LINE_THICKNESS / 2,
     overflow: 'hidden',
     marginHorizontal: 4,
-    // Center the line vertically with the dot:
-    // (DOT_CONTAINER - LINE_THICKNESS) / 2 = (20 - 3) / 2 = 8.5
     marginTop: (DOT_CONTAINER - LINE_THICKNESS) / 2,
   },
   label: {
     marginTop: 4,
-    textAlign: 'center',
   },
-  routingDetail: {
-    textAlign: 'center',
-    marginTop: 4,
+  routingBanner: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignSelf: 'center',
   },
 });
