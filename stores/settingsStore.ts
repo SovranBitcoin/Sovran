@@ -243,6 +243,7 @@ export const useSettingsStore = create<SettingsStore>()(
         mockMode: state.mockMode,
         mockOffline: state.mockOffline,
         termsAccepted: state.termsAccepted,
+        hasSeenOnboarding: state.hasSeenOnboarding,
         quickAccessP2PK: state.quickAccessP2PK,
         regenerateP2PKOnReceive: state.regenerateP2PKOnReceive,
         sendLocationEnabled: state.sendLocationEnabled,
