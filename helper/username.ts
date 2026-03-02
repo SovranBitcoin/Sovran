@@ -929,5 +929,6 @@ export const getUsername = (seed: string) =>
   uniqueUsernameGenerator({
     seed,
     separator: '-',
+    length: 64,
     dictionaries: [[...adjectives, ...verbs], nouns],
   });
