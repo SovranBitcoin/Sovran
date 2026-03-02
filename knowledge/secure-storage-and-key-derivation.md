@@ -83,8 +83,11 @@ From the [NIP-06 spec](https://github.com/nostr-protocol/nips/blob/master/06.md)
 | **nsec** | `nsec10allq0gjx7fddtzef0ax00mdps9t2kmtrldkyjfs8l5xruwvh2dq0lhhkp` | `nsec1c9wh8xy5eqdzln7n5t0ctgxjcrdug73gp5yj0x03gntn67h83twssdfhel` |
 | **public key** | `17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917` | `d41b22899549e1f3d335a31002cfd382174006e166d3e658e3a5eecdb6463573` |
 | **npub** | `npub1zutzeysacnf9rru6zqwmxd54mud0k44tst6l70ja5mhv8jjumytsd2x7nu` | `npub16sdj9zv4f8sl85e45vgq9n7nsgt5qphpvmf7vk8r5hhvmdjxx4es8rq74h` |
+| **username** | `napping-eclipse` | `surviving-ladybug` |
+| **cashu mnemonic** | `bitter session sketch page tissue silent purity mix begin series arrow various pigeon destroy woman judge agree marine seek crush change alone liar tortoise` | `local police room final depart this dragon joke game olive steak degree energy kiss mention barely render broken horror episode razor reason arch hockey` |
+| **cashu wallet seed** | `1a1721f6118d4acf240ed1674d9f26ab3f504fe2ea9c95741f98b344eacb18421d87ad400927a43369409638272adccd538a96632c1d0858c471ba01183886f0` | `3d27e379e3737180498046207d6bea97e03b677d320a822478519dc74b6426189ef041cc74b9246e5a64cbb46ad7b9443f95079b5176162c113b77b086435185` |
 
-These can be used to verify that the derivation implementation produces correct output.
+These vectors are verified by `npm test` (see `__tests__/keyDerivation.test.ts`). To regenerate all values including account index 1, run `npx tsx scripts/generate-test-vectors.ts`.
 
 ### Why they're needed
 
@@ -97,6 +100,7 @@ These can be used to verify that the derivation implementation produces correct 
 
 ### Where they're consumed
 
+- **`helper/keyDerivation.ts`** — `deriveNostrKeys(M, N)` is the single source of truth; all consumers below use keys derived through this function
 - **`NostrNDKProvider`** — `new NDKPrivateKeySigner(privateKey)` to authenticate with relays
 - **`CocoManager`** — `new NsecSigner(privateKey)` → wraps in `NPCPlugin` for signing Cashu NPC events
 - **DM screens** — `privateKey` signs/encrypts gift-wrap messages (NIP-44)
@@ -146,7 +150,8 @@ The coco-cashu-core `Manager` requires a deterministic seed to:
 
 ### Where it's consumed
 
-- **`CocoManager.initialize()`** — The `seedGetter` callback converts the cashu mnemonic to a 64-byte seed: `bip39.mnemonicToSeedSync(cashuMnemonic, "")`, passed to the `Manager` constructor
+- **`helper/keyDerivation.ts`** — `deriveCashuMnemonic(M, N)` is the single source of truth
+- **`CocoManager.initialize()`** — The `seedGetter` callback converts the cashu mnemonic to a 64-byte seed via `deriveCashuWalletSeed()`, passed to the `Manager` constructor
 - **`settings-pages/profile.tsx`** — Displayed in settings for user backup
 
 ## 3. Cashu Wallet Seed
@@ -243,31 +248,41 @@ The active account index is stored in `profileStore.activeAccountIndex` (persist
 
 ## Reproduction Steps
 
-To reproduce all derived data from a mnemonic `M` and account index `N`:
+All derivation logic lives in `helper/keyDerivation.ts` — every consumer (`NostrKeysProvider`, `CocoManager`) calls through these functions. To reproduce all derived data from a mnemonic `M` and account index `N`:
 
 ```ts
-import * as nip06 from 'nostr-tools/nip06';
-import { nip19 } from 'nostr-tools';
-import { HDKey } from '@scure/bip32';
-import * as bip39 from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
+import {
+  deriveNostrKeys,
+  deriveCashuMnemonic,
+  deriveCashuWalletSeed,
+  deriveCashuWalletSeedFromRoot,
+} from 'helper/keyDerivation';
 
-// 1. Nostr private key + public key (NIP-06: m/44'/1237'/N'/0/0)
-//    https://github.com/nostr-protocol/nips/blob/master/06.md
-const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(M, undefined, N);
+// 1. Nostr keys (NIP-06: m/44'/1237'/N'/0/0)
+const { privateKey, pubkey, npub, nsec } = deriveNostrKeys(M, N);
 
-// 2. Bech32 encodings
-const npub = nip19.npubEncode(pk);
-const nsec = nip19.nsecEncode(sk);
+// 2. Cashu mnemonic (BIP-32: m/44'/129372'/0'/N'/0/0 → 24-word mnemonic)
+const cashuMnemonic = deriveCashuMnemonic(M, N);
 
-// 3. Cashu mnemonic
-const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(M));
-const child = root.derive(`m/44'/129372'/0'/${N}'/0/0`);
-const cashuMnemonic = bip39.entropyToMnemonic(child.privateKey, wordlist);
+// 3. Cashu wallet seed (64 bytes, used by coco-cashu-core Manager)
+const walletSeed = deriveCashuWalletSeed(cashuMnemonic);
 
-// 4. Cashu wallet seed (64 bytes, used by coco-cashu-core Manager)
-const walletSeed = bip39.mnemonicToSeedSync(cashuMnemonic, '');
+// Or the full chain in one call:
+const walletSeedDirect = deriveCashuWalletSeedFromRoot(M, N);
 ```
+
+## Testing
+
+Run `npm test` to execute the full key derivation test suite (`__tests__/keyDerivation.test.ts`). Tests verify:
+
+- NIP-06 Nostr key derivation against the spec test vectors
+- Fallback username generation from pubkeys
+- Cashu mnemonic derivation (24-word output, determinism, account isolation)
+- Cashu wallet seed derivation (64-byte output, determinism)
+- Pinned vectors for cashu mnemonics and wallet seeds across accounts 0 and 1
+- seedGetter path equivalence (fast path via cashu mnemonic = fallback path from root mnemonic)
+
+To regenerate all test vector values: `npx tsx scripts/generate-test-vectors.ts`
 
 ## Libraries
 
