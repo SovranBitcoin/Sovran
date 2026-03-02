@@ -50,6 +50,7 @@
     "@legendapp/list": "^3.0.0-beta.33",
     "@monicon/metro": "^2.0.7",
     "@monicon/native": "^1.2.2",
+    "@noble/hashes": "^2.0.1",
     "@nostr-dev-kit/ndk-mobile": "^0.2.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-masked-view/masked-view": "0.3.2",
