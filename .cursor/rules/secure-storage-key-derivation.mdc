@@ -36,16 +36,42 @@ Given mnemonic `M` and account index `N` (0, 1, 2, ...):
 ```
 user_mnemonic (M)
 │
-├─ Nostr Keys (NIP-06: m/44'/1237'/<account>'/0/0)
-│   Used for: signing Nostr events, NDK authentication, user identity,
-│             DM encryption, NPC plugin event signing, mint selection
+├─ Derived Profiles (chain 0)
+│   ├─ Nostr Keys (NIP-06: m/44'/1237'/<N>'/0/0)
+│   │   Used for: signing Nostr events, NDK authentication, user identity
+│   │
+│   └─ Cashu Mnemonic (BIP-32: m/44'/129372'/0'/<N>'/0/0)
+│       └─ Cashu Wallet Seed (bip39.mnemonicToSeedSync(cashuMnemonic, ""))
 │
-└─ Cashu Mnemonic (BIP-32: m/44'/129372'/0'/<account>'/0/0)
-    │   A 24-word mnemonic derived from the private key at this path
+└─ Imported nsec Profiles (chain 1)
+    ├─ Nostr Keys — loaded directly from stored nsec (no derivation)
     │
-    └─ Cashu Wallet Seed (bip39.mnemonicToSeedSync(cashuMnemonic, ""))
-        Used for: passed to coco-cashu-core Manager as the seedGetter callback
+    └─ Cashu Mnemonic (BIP-32: m/44'/129372'/0'/<npubNumber>'/1/0)
+        └─ Cashu Wallet Seed (bip39.mnemonicToSeedSync(cashuMnemonic, ""))
 ```
+
+### Imported nsec Profiles
+
+Imported profiles use an externally-provided nsec as the Nostr identity (no mnemonic derivation). Only the Cashu mnemonic is derived from the root mnemonic, using **external chain 1** instead of 0.
+
+The `<npubNumber>` is a deterministic 31-bit integer derived from the full 32-byte pubkey. **There is no official Nostr NIP for pubkey-to-number conversion** — this is a custom mapping. Uses BigInt to handle the full hex without JS number precision loss.
+
+```ts
+function pubkeyToAccountNumber(pubkeyHex: string): number {
+  const full = BigInt('0x' + pubkeyHex);
+  return Number(full % 0x80000000n) & 0x7fffffff;
+}
+```
+
+This number serves as both:
+- The account segment in the Cashu derivation path: `m/44'/129372'/0'/<npubNumber>'/1/0`
+- The `accountIndex` used for profile scoping (DB naming, AsyncStorage keys, etc.)
+
+Imported nsec is stored securely at SecureStore key `imported_nsec_<pubkeyHex>`. Profile entries have `source: 'imported'` and `externalChain: 1` in the profile store.
+
+**External chain display rule**: `externalChain` is implicitly 0 when omitted (derived profiles). For chain 1 and higher, we store and display it. UI shows "chain N" only when `externalChain >= 1` (e.g. profile switcher, settings profile page).
+
+Duplicate protection: before import, check all existing profile pubkeys. Reject if the identity already exists in any profile (derived or imported).
 
 ## 1. Nostr Keys (NIP-06)
 
@@ -198,6 +224,7 @@ All keys stored in `expo-secure-store`:
 | `user_mnemonic` | `string` (12 space-separated words) | Global | Root secret — all other values derive from this |
 | `derived_keys_{N}` | JSON ([schema below](#cachedDerivedkeys-schema)) | Per account | Performance cache for Nostr keys (avoids re-deriving on every launch) |
 | `cashu_mnemonic_{N}` | JSON ([schema below](#cashu_mnemonic_n-schema)) | Per account | Performance cache for Cashu mnemonic (avoids re-deriving on every launch) |
+| `imported_nsec_{pubkeyHex}` | `string` (bech32 nsec) | Per imported profile | Securely stored imported Nostr private key |
 | `migrations_complete_{N}` | `"true"` | Per account | Skip Redux migration check on subsequent launches |
 | `migrations_complete` | `"true"` | Legacy (account 0 only) | Old global flag, auto-promoted to `migrations_complete_0` on read |
 
@@ -244,19 +271,20 @@ On startup, if the stored hash doesn't match the current mnemonic's hash, the ca
 
 Each account index `N` gets its own isolated set of resources:
 
-| Resource | Account 0 | Account N (N > 0) |
-|----------|-----------|-------------------|
-| Nostr keys | Path `m/44'/1237'/0'/0/0` | Path `m/44'/1237'/N'/0/0` |
-| Cashu mnemonic | Path `m/44'/129372'/0'/0'/0/0` | Path `m/44'/129372'/0'/N'/0/0` |
-| Cashu wallet seed | `mnemonicToSeedSync(cashu_mnemonic_0, "")` | `mnemonicToSeedSync(cashu_mnemonic_N, "")` |
-| SQLite database | `coco.db` | `coco-N.db` |
-| SecureStore cache | `derived_keys_0`, `cashu_mnemonic_0` | `derived_keys_N`, `cashu_mnemonic_N` |
-| Migration flag | `migrations_complete_0` | `migrations_complete_N` |
-| Coco migration | `profileStore.cocoMigrationComplete[0]` | `profileStore.cocoMigrationComplete[N]` |
-| Default mints bootstrap | Stored/checked in Coco trusted mint state (idempotent add) | Stored/checked in Coco trusted mint state (idempotent add) |
-| Selected mint | `mintStore.selectedMints[pubkey_0]` | `mintStore.selectedMints[pubkey_N]` |
+| Resource | Derived Account 0 | Derived Account N (N > 0) | Imported Profile |
+|----------|--------------------|---------------------------|------------------|
+| Nostr keys | Path `m/44'/1237'/0'/0/0` | Path `m/44'/1237'/N'/0/0` | Loaded from `imported_nsec_{pubkey}` |
+| Cashu mnemonic | Path `m/44'/129372'/0'/0'/0/0` | Path `m/44'/129372'/0'/N'/0/0` | Path `m/44'/129372'/0'/<npubNumber>'/1/0` |
+| Cashu wallet seed | `mnemonicToSeedSync(cashu_mnemonic, "")` | Same | Same |
+| SQLite database | `coco.db` | `coco-N.db` | `coco-<npubNumber>.db` |
+| SecureStore cache | `derived_keys_0`, `cashu_mnemonic_0` | `derived_keys_N`, `cashu_mnemonic_N` | `imported_nsec_{pubkey}`, `cashu_mnemonic_{npubNumber}` |
+| Profile entry | `source: undefined`, `externalChain` omitted (implicit 0) | Same | `source: 'imported'`, `externalChain: 1` |
+| Account index | `0` | `N` | `npubNumber` (31-bit int from pubkey) |
+| Profile-scoped storage | Bare key | `{key}:profile:{N}` | `{key}:profile:{npubNumber}` |
 
 The active account index is stored in `profileStore.activeAccountIndex` (persisted via Zustand + AsyncStorage). Switching accounts remounts the inner provider tree with a new `accountIndex` prop.
+
+**Account index 0 is valid**: Derived profile 0 and imported profiles whose pubkey maps to 0 both use `accountIndex === 0`. Never use truthy checks (`if (accountIndex)`, `accountIndex || default`) — use explicit comparisons (`accountIndex === 0`, `accountIndex >= 0`).
 
 ## Reproduction Steps
 
@@ -268,8 +296,12 @@ import {
   deriveCashuMnemonic,
   deriveCashuWalletSeed,
   deriveCashuWalletSeedFromRoot,
+  pubkeyToAccountNumber,
+  deriveCashuMnemonicForImported,
+  deriveCashuWalletSeedForImported,
 } from 'helper/keyDerivation';
 
+// ── Derived profiles ──
 // 1. Nostr keys (NIP-06: m/44'/1237'/N'/0/0)
 const { privateKey, pubkey, npub, nsec } = deriveNostrKeys(M, N);
 
@@ -281,6 +313,13 @@ const walletSeed = deriveCashuWalletSeed(cashuMnemonic);
 
 // Or the full chain in one call:
 const walletSeedDirect = deriveCashuWalletSeedFromRoot(M, N);
+
+// ── Imported nsec profiles ──
+// Nostr keys: loaded directly from the imported nsec (no derivation)
+// Cashu derivation uses the root mnemonic with chain 1:
+const npubNumber = pubkeyToAccountNumber(importedPubkeyHex);
+const importedCashu = deriveCashuMnemonicForImported(M, npubNumber);
+const importedSeed = deriveCashuWalletSeedForImported(M, npubNumber);
 ```
 
 ## Testing
@@ -293,6 +332,8 @@ Run `npm test` to execute the full key derivation test suite (`__tests__/keyDeri
 - Cashu wallet seed derivation (64-byte output, determinism)
 - Pinned vectors for cashu mnemonics and wallet seeds across accounts 0 and 1
 - seedGetter path equivalence (fast path via cashu mnemonic = fallback path from root mnemonic)
+- `pubkeyToAccountNumber`: 31-bit range, determinism, uniqueness, manual parse equivalence
+- Imported profile Cashu derivation (chain 1): 24-word output, determinism, chain isolation, npubNumber isolation, full-chain shortcut equivalence
 
 To regenerate all test vector values: `npx tsx scripts/generate-test-vectors.ts`
 

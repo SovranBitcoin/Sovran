@@ -51,6 +51,18 @@ export default function WalletHeaderTitle({
   const { mints } = useMintManagement();
   const { balance: liveBalances } = useBalanceContext();
 
+  const selectedMints = useMintStore((state) => state.selectedMints);
+  const selectedMintUrl = pubkey ? selectedMints[pubkey] : undefined;
+
+  const selectedMintData = useMemo(
+    () => (selectedMintUrl ? mints.find((m) => m.mintUrl === selectedMintUrl) : undefined),
+    [mints, selectedMintUrl]
+  );
+
+  const resolvedMintName = selectedMintData?.mintInfo?.name || selectedMintData?.name;
+  const resolvedMintIconUrl = (selectedMintData?.mintInfo as any)?.icon_url as string | undefined;
+  const isMintLoading = Boolean(selectedMintUrl && !selectedMintData);
+
   const topMints = useMemo(() => {
     if (!mints || mints.length === 0) return [];
 
@@ -123,6 +135,9 @@ export default function WalletHeaderTitle({
     allowedMints,
     contentWidth: resolvedContentWidth,
     contentHeight: resolvedContentHeight,
+    mintName: resolvedMintName,
+    mintIconUrl: resolvedMintIconUrl,
+    isLoadingMint: isMintLoading,
   };
 
   if (!supportsLiquidGlass()) {

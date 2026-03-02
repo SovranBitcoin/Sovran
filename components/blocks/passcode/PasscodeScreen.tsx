@@ -9,7 +9,7 @@ import { View } from 'components/ui/View/View';
 import { Text } from 'components/ui/Text';
 import AnimatedSpriteBackground from 'components/ui/SpriteView';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { getUsername } from '@/helper/username';
+import { useProfileDisplay } from '@/hooks/useProfileDisplay';
 import { useThemeColor } from 'hooks/useThemeColor';
 
 interface Props {
@@ -42,6 +42,7 @@ const AVATAR_SHADOW = {
 
 const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   const { keys: nostrKeys } = useNostrKeysContext();
+  const profileDisplay = useProfileDisplay(nostrKeys?.pubkey || '');
   const [value, setValue] = useState('');
   const [keyIdx, setKeyIdx] = useState(0);
   const opacity = useRef(new Animated.Value(1)).current;
@@ -109,14 +110,15 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
           <View style={AVATAR_SHADOW}>
             <Avatar
               seed={nostrKeys?.pubkey}
-              name={getUsername(nostrKeys?.pubkey || '')}
+              picture={profileDisplay.picture}
+              name={profileDisplay.displayName}
               size={AVATAR_SIZE}
               variant="person"
             />
           </View>
 
           <Text size={18} weight="bold" className="text-foreground" style={TEXT_SHADOW}>
-            {`Welcome back, ${getUsername(nostrKeys?.pubkey || '')}`}
+            {`Welcome back, ${profileDisplay.displayName}`}
           </Text>
 
           <HStack>

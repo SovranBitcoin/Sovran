@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import { Link } from 'expo-router';
 import { useMintStore } from 'stores/mintStore';
@@ -7,13 +7,11 @@ import { HStack } from 'components/ui/View/HStack';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { supportsLiquidGlass } from '@/helper/version';
 import { useBalanceContext } from 'coco-cashu-react';
-import { useMintManagement } from '@/hooks/coco/useMintManagement';
 import { VStack } from '../ui/View/VStack';
 import { View } from '../ui/View/View';
 import Icon from '@/assets/icons';
 import { AmountFormatter } from '../ui/AmountFormatter';
 import { extractDomain } from '@/helper/url';
-import { Skeleton } from '../ui/Skeleton';
 import { Avatar } from '../ui/Avatar';
 import { Text } from '../ui/Text';
 import { useThemeColor } from 'hooks/useThemeColor';
@@ -28,11 +26,9 @@ interface MintBalanceDisplayProps {
   showDetailsButton?: boolean;
   contentWidth?: number;
   contentHeight?: number;
-}
-
-interface LoadedMintInfo {
-  name?: string;
-  icon_url?: string | null;
+  mintName?: string;
+  mintIconUrl?: string;
+  isLoadingMint?: boolean;
 }
 
 const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
@@ -44,6 +40,9 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   showDetailsButton = false,
   contentWidth,
   contentHeight,
+  mintName,
+  mintIconUrl,
+  isLoadingMint = false,
   style,
 }) => {
   const [foreground, defaultColor, surfaceSecondary] = useThemeColor([
@@ -56,39 +55,8 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 
-  const { getMintInfo } = useMintManagement();
   const { balance: liveBalances } = useBalanceContext();
-
-  const [mintInfo, setMintInfo] = useState<LoadedMintInfo | null>(null);
-  const [isLoadingMintInfo, setIsLoadingMintInfo] = useState(false);
-
   const balance = selectedMint ? liveBalances[selectedMint] || 0 : 0;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!selectedMint) {
-      setMintInfo(null);
-      return;
-    }
-
-    const load = async () => {
-      setIsLoadingMintInfo(true);
-      try {
-        const info = await getMintInfo(selectedMint);
-        if (!cancelled) setMintInfo(info);
-      } catch {
-        if (!cancelled) setMintInfo(null);
-      } finally {
-        if (!cancelled) setIsLoadingMintInfo(false);
-      }
-    };
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedMint, getMintInfo]);
 
   const isMintAllowed = useMemo(
     () => (allowedMints && selectedMint ? allowedMints.includes(selectedMint) : true),
@@ -114,6 +82,8 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   const innerHeight = contentHeight ?? 36;
   const innerWidth = contentWidth;
 
+  const displayName = mintName || extractDomain(selectedMint || '');
+
   const mintInfoContent = (
     <HStack
       align="center"
@@ -123,30 +93,27 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         {showMintInfo ? (
           <>
             <View className="mr-1">
-              {isLoadingMintInfo ? (
-                <Skeleton className="bg-surface-tertiary h-[32px] w-[32px]" />
-              ) : (
-                <Avatar
-                  picture={mintInfo?.icon_url || undefined}
-                  size={32}
-                  variant="mint"
-                  name={mintInfo?.name}
-                  alt={`${mintInfo?.name || 'Mint'} icon`}
-                />
-              )}
+              <Avatar
+                picture={mintIconUrl}
+                size={32}
+                variant="mint"
+                name={mintName}
+                loading={isLoadingMint}
+                alt={`${mintName || 'Mint'} icon`}
+              />
             </View>
             <VStack align="flex-start">
               <Text
-                loading={isLoadingMintInfo}
+                loading={isLoadingMint}
                 placeholder="Mint Name"
                 style={{ color: foreground }}
                 size={12}
                 bold>
-                {mintInfo?.name || extractDomain(selectedMint || '') || 'Unknown Mint'}
+                {displayName || undefined}
               </Text>
-              {isLoadingMintInfo ? (
+              {isLoadingMint ? (
                 <Text loading placeholder="1,000 sats" size={12} bold>
-                  {'\u00A0'}
+                  {null}
                 </Text>
               ) : (
                 <AmountFormatter

@@ -14,7 +14,10 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface ProfileEntry {
-  /** BIP-44 account index used for key derivation */
+  /**
+   * For derived profiles: sequential BIP-44 account index (0, 1, 2, ...).
+   * For imported profiles: deterministic 31-bit int from npub bytes.
+   */
   accountIndex: number;
   /** Nostr public key (hex) — used for deterministic avatar rendering */
   pubkey: string;
@@ -22,6 +25,20 @@ export interface ProfileEntry {
   addedAt: number;
   /** Last-known balance in sats (updated while profile is active) */
   cachedBalanceSats?: number;
+  /**
+   * `'derived'` — keys derived from root mnemonic (default / backward compat).
+   * `'imported'` — Nostr identity from an imported nsec; Cashu uses chain 1.
+   */
+  source?: 'derived' | 'imported';
+  /**
+   * BIP-32 external chain index for Cashu derivation.
+   * Implicitly 0 when undefined (derived profiles). Must be 1+ for imported.
+   */
+  externalChain?: number;
+  /** Cached Nostr kind-0 display name (display_name or name) */
+  cachedDisplayName?: string;
+  /** Cached Nostr kind-0 profile picture URL */
+  cachedPicture?: string;
 }
 
 interface ProfileState {
@@ -35,12 +52,17 @@ interface ProfileState {
 
 interface ProfileActions {
   /** Add a new profile entry (idempotent — skips if accountIndex already exists) */
-  addProfile: (accountIndex: number, pubkey: string) => void;
+  addProfile: (
+    accountIndex: number,
+    pubkey: string,
+    source?: 'derived' | 'imported',
+    externalChain?: number
+  ) => void;
   /** Set the active account index (caller is responsible for cleanup/resetStages before this) */
   switchProfile: (accountIndex: number) => void;
   /** Remove a profile (cannot remove the last profile or the currently active one) */
   removeProfile: (accountIndex: number) => boolean;
-  /** Get the next available account index */
+  /** Get the next available account index (only considers derived profiles) */
   getNextAccountIndex: () => number;
   /** Update the cached balance for a profile (called by ProfileBalanceSync) */
   updateProfileBalance: (accountIndex: number, balanceSats: number) => void;
@@ -48,6 +70,12 @@ interface ProfileActions {
   isCocoMigrationComplete: (accountIndex: number) => boolean;
   /** Mark the Redux-to-Coco migration as done for an account. */
   markCocoMigrationComplete: (accountIndex: number) => void;
+  /** Update cached Nostr kind-0 metadata for a profile */
+  updateProfileMetadata: (accountIndex: number, displayName?: string, picture?: string) => void;
+  /** Check if a pubkey is already used by any profile */
+  hasPubkey: (pubkey: string) => boolean;
+  /** Get the active profile entry */
+  getActiveProfile: () => ProfileEntry | undefined;
 }
 
 type ProfileStore = ProfileState & ProfileActions;
@@ -59,12 +87,17 @@ export const useProfileStore = create<ProfileStore>()(
       profiles: [],
       cocoMigrationComplete: {},
 
-      addProfile: (accountIndex: number, pubkey: string) => {
+      addProfile: (
+        accountIndex: number,
+        pubkey: string,
+        source?: 'derived' | 'imported',
+        externalChain?: number
+      ) => {
         set((state) => {
-          // Skip if this accountIndex already exists
           if (state.profiles.some((p) => p.accountIndex === accountIndex)) {
             return state;
           }
+          const effectiveChain = externalChain ?? (source === 'imported' ? 1 : undefined);
           return {
             profiles: [
               ...state.profiles,
@@ -72,6 +105,10 @@ export const useProfileStore = create<ProfileStore>()(
                 accountIndex,
                 pubkey,
                 addedAt: Date.now(),
+                ...(source ? { source } : {}),
+                ...(effectiveChain != null && effectiveChain >= 1
+                  ? { externalChain: effectiveChain }
+                  : {}),
               },
             ],
           };
@@ -108,8 +145,9 @@ export const useProfileStore = create<ProfileStore>()(
 
       getNextAccountIndex: () => {
         const { profiles } = get();
-        if (profiles.length === 0) return 0;
-        const maxIndex = Math.max(...profiles.map((p) => p.accountIndex));
+        const derived = profiles.filter((p) => p.source !== 'imported');
+        if (derived.length === 0) return 0;
+        const maxIndex = Math.max(...derived.map((p) => p.accountIndex));
         return maxIndex + 1;
       },
 
@@ -132,6 +170,25 @@ export const useProfileStore = create<ProfileStore>()(
             [accountIndex]: true,
           },
         }));
+      },
+
+      updateProfileMetadata: (accountIndex: number, displayName?: string, picture?: string) => {
+        set((state) => ({
+          profiles: state.profiles.map((p) =>
+            p.accountIndex === accountIndex
+              ? { ...p, cachedDisplayName: displayName, cachedPicture: picture }
+              : p
+          ),
+        }));
+      },
+
+      hasPubkey: (pubkey: string) => {
+        return get().profiles.some((p) => p.pubkey === pubkey);
+      },
+
+      getActiveProfile: () => {
+        const { profiles, activeAccountIndex } = get();
+        return profiles.find((p) => p.accountIndex === activeAccountIndex);
       },
     }),
     {

@@ -7,6 +7,7 @@ import {
   deriveNostrKeys,
   deriveCashuWalletSeed,
   deriveCashuWalletSeedFromRoot,
+  deriveCashuWalletSeedForImported,
 } from 'helper/keyDerivation';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
@@ -44,12 +45,15 @@ export class CocoManager {
   private static isFreeingReservedProofs = false;
   /** Current account index — controls which DB file and NPC signer to use */
   private static accountIndex = 0;
+  /** True when the active profile is an imported nsec (affects signer/seed fallback paths) */
+  private static isImportedProfile = false;
 
   /** Clear sensitive in-memory state that should not survive profile switches. */
   private static clearSensitiveRuntimeState(): void {
     this.signerKey = null;
     this.cashuMnemonic = null;
     this.npcPlugin = null;
+    this.isImportedProfile = false;
   }
 
   /**
@@ -57,8 +61,9 @@ export class CocoManager {
    * Must be called before initialize().
    * Account 0 uses 'coco.db' (backward compatible), N>0 uses 'coco-N.db'.
    */
-  static setAccountIndex(index: number): void {
+  static setAccountIndex(index: number, imported = false): void {
     this.accountIndex = index;
+    this.isImportedProfile = imported;
   }
 
   /** Get the SQLite database name for the current account index */
@@ -118,13 +123,18 @@ export class CocoManager {
       initLog('CocoManager', 'DB + repos initialized');
 
       // 2. Seed getter (lazy — no crypto work until first call)
+      const accountIndex = this.accountIndex;
+      const isImported = this.isImportedProfile;
       const seedGetter = async (): Promise<Uint8Array> => {
         if (this.cashuMnemonic) {
           return deriveCashuWalletSeed(this.cashuMnemonic);
         }
         const mnemonic = await retrieveMnemonic();
         if (!mnemonic) throw new Error('No mnemonic found in secure storage');
-        return deriveCashuWalletSeedFromRoot(mnemonic, this.accountIndex);
+        if (isImported) {
+          return deriveCashuWalletSeedForImported(mnemonic, accountIndex);
+        }
+        return deriveCashuWalletSeedFromRoot(mnemonic, accountIndex);
       };
 
       // 3. NPC plugin (constructor only — no network call)
@@ -300,6 +310,26 @@ export class CocoManager {
         return new NsecSigner(this.signerKey);
       }
 
+      if (this.isImportedProfile) {
+        initLog('CocoManager', 'signerKey not set — loading imported nsec (slow path)');
+        const { useProfileStore } = await import('@/stores/profileStore');
+        const activeProfile = useProfileStore.getState().getActiveProfile();
+        if (!activeProfile) {
+          console.warn('No active profile found for imported signer');
+          return null;
+        }
+        const { retrieveImportedNsec } = await import('helper/secureStorage');
+        const { nip19 } = await import('nostr-tools');
+        const nsecValue = await retrieveImportedNsec(activeProfile.pubkey);
+        if (!nsecValue) {
+          console.warn('Imported nsec not found in SecureStore');
+          return null;
+        }
+        const decoded = nip19.decode(nsecValue);
+        if (decoded.type !== 'nsec') return null;
+        return new NsecSigner(decoded.data);
+      }
+
       initLog('CocoManager', 'signerKey not set — deriving from mnemonic (slow path)');
       const mnemonic = await retrieveMnemonic();
       if (!mnemonic) {
@@ -361,58 +391,41 @@ export class CocoManager {
   }
 
   /**
-   * Clear all data from the SQLite database
-   * This will delete the entire database file and all associated files
+   * Delete a single coco database by name.
+   */
+  private static async deleteDatabase(dbName: string): Promise<void> {
+    try {
+      await SQLite.deleteDatabaseAsync(dbName);
+      console.log(`✅ Deleted coco database: ${dbName}`);
+    } catch (error) {
+      console.warn(`⚠️ SQLite.deleteDatabaseAsync failed for ${dbName}:`, error);
+      try {
+        const dbDirectory = FileSystem.documentDirectory;
+        const dbPath = `${dbDirectory}SQLite/${dbName}`;
+        const filesToDelete = [dbPath, `${dbPath}-journal`, `${dbPath}-wal`, `${dbPath}-shm`];
+        for (const filePath of filesToDelete) {
+          await FileSystem.deleteAsync(filePath, { idempotent: true });
+        }
+        console.log(`✅ Deleted ${dbName} via FileSystem fallback`);
+      } catch (fsError) {
+        console.warn(`⚠️ FileSystem fallback failed for ${dbName}:`, fsError);
+      }
+    }
+  }
+
+  /**
+   * Clear all data from the SQLite database (current account only).
+   * This will delete the entire database file and all associated files.
    */
   static async clearAllData(): Promise<void> {
     try {
-      // First, close any existing database connections
       if (this.instance) {
         await this.disableWatchers();
         this.instance = null;
         this.isInitializing = false;
       }
-
       const dbName = this.getDbName();
-      console.log('Deleting database:', dbName);
-
-      try {
-        // Use SQLite.deleteDatabaseAsync as the primary method
-        await SQLite.deleteDatabaseAsync(dbName);
-        console.log('✅ Coco database deleted successfully using SQLite.deleteDatabaseAsync');
-      } catch (error) {
-        console.warn('⚠️ SQLite.deleteDatabaseAsync failed:', error);
-
-        // Fallback: try to delete using FileSystem with legacy API
-        try {
-          const dbDirectory = FileSystem.documentDirectory;
-          const dbPath = `${dbDirectory}SQLite/${dbName}`;
-          const journalPath = `${dbPath}-journal`;
-          const walPath = `${dbPath}-wal`;
-          const shmPath = `${dbPath}-shm`;
-
-          console.log('Trying FileSystem fallback for:', { dbPath, journalPath, walPath, shmPath });
-
-          // Delete all SQLite-related files using legacy FileSystem API
-          const filesToDelete = [dbPath, journalPath, walPath, shmPath];
-
-          for (const filePath of filesToDelete) {
-            try {
-              await FileSystem.deleteAsync(filePath, { idempotent: true });
-              console.log(`Deleted: ${filePath}`);
-            } catch {
-              console.log(`File not found or already deleted: ${filePath}`);
-            }
-          }
-
-          console.log('✅ Coco database deleted successfully using FileSystem fallback');
-        } catch (fsError) {
-          console.warn('⚠️ FileSystem fallback also failed:', fsError);
-          // Continue even if both methods fail
-        }
-      }
-
-      console.log('All Coco SQLite data cleared successfully');
+      await this.deleteDatabase(dbName);
     } catch (error) {
       console.error('Failed to clear Coco data:', error);
       throw error;
@@ -430,17 +443,27 @@ export class CocoManager {
   }
 
   /**
-   * Complete reset: clear all data and reset the manager
-   * This is used for the "Delete everything" functionality
+   * Complete reset: delete ALL coco databases (all profiles including imported)
+   * and reset the manager. Used for "Delete Account" / full app reset.
+   * @param accountIndexes All profile account indexes (derived 0,1,2... and imported npubNumbers).
    */
-  static async completeReset(): Promise<void> {
+  static async completeReset(accountIndexes: number[]): Promise<void> {
     try {
-      // Clear all data first
-      await this.clearAllData();
+      if (this.instance) {
+        await this.disableWatchers();
+        this.instance = null;
+        this.isInitializing = false;
+      }
 
-      // Then reset the manager
+      const dbNames = new Set<string>();
+      for (const i of accountIndexes) {
+        dbNames.add(i === 0 ? 'coco.db' : `coco-${i}.db`);
+      }
+      for (const dbName of dbNames) {
+        await this.deleteDatabase(dbName);
+      }
+
       await this.reset();
-
       console.log('CocoManager complete reset finished');
     } catch (error) {
       console.error('Failed to complete reset CocoManager:', error);

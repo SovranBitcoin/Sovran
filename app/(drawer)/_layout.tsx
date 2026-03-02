@@ -22,6 +22,7 @@ import { View } from 'components/ui/View/View';
 import { Spacer } from 'components/ui/View/Spacer';
 import { Avatar } from 'components/ui/Avatar';
 import { getUsername } from 'helper/username';
+import { useProfileDisplay } from '@/hooks/useProfileDisplay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfileStore, ProfileEntry } from '@/stores/profileStore';
 import { CocoManager } from '@/helper/coco/manager';
@@ -154,15 +155,40 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
     }
   }, [getKeysForAccount, closeDrawer, resetStages, cancelResetStages]);
 
+  const handleImportProfile = useCallback(
+    async (npubNumber: number) => {
+      if (switchInProgress.current) return;
+      switchInProgress.current = true;
+
+      try {
+        closeDrawer();
+        resetStages();
+
+        // Profile entry already created by ImportNsec component.
+        // Clean up and switch to the imported profile.
+        await CocoManager.cleanup();
+        useProfileStore.getState().switchProfile(npubNumber);
+        await rehydrateProfileStores();
+      } catch (error) {
+        console.error('Failed to switch to imported profile:', error);
+        cancelResetStages();
+      } finally {
+        switchInProgress.current = false;
+      }
+    },
+    [closeDrawer, resetStages, cancelResetStages]
+  );
+
   const handleOpenProfileSheet = useCallback(() => {
     SheetManager.show('profile-switcher', {
       context: 'global',
       payload: {
         onSwitchProfile: handleSwitchProfile,
         onAddProfile: handleAddProfile,
+        onImportProfile: handleImportProfile,
       },
     });
-  }, [handleSwitchProfile, handleAddProfile]);
+  }, [handleSwitchProfile, handleAddProfile, handleImportProfile]);
 
   // Only show selector if there are profiles (should always be true after first launch)
   if (profiles.length === 0) return null;
@@ -171,6 +197,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
     <HStack align="center" spacing={4} style={styles.profileSelector}>
       {profiles
         .filter((profile: ProfileEntry) => profile.accountIndex !== activeAccountIndex)
+        .sort((a, b) => (a.source === 'imported' ? 0 : 1) - (b.source === 'imported' ? 0 : 1))
         .slice(0, 3)
         .map((profile: ProfileEntry) => {
           const isActive = profile.accountIndex === activeAccountIndex;
@@ -187,7 +214,8 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
               ]}>
               <Avatar
                 seed={profile.pubkey}
-                name={getUsername(profile.pubkey)}
+                picture={profile.cachedPicture}
+                name={profile.cachedDisplayName || getUsername(profile.pubkey)}
                 size={30}
                 variant="person"
               />
@@ -214,6 +242,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
   const { keys: nostrKeys } = useNostrKeysContext();
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const insets = useSafeAreaInsets();
+  const { displayName, picture } = useProfileDisplay(nostrKeys?.pubkey || '');
 
   const handlePress = useCallback(() => {
     if (nostrKeys?.pubkey) {
@@ -240,13 +269,14 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
             <VStack align="center" spacing={16}>
               <Avatar
                 seed={nostrKeys?.pubkey}
-                name={getUsername(nostrKeys?.pubkey)}
+                picture={picture}
+                name={displayName}
                 size={64}
                 variant="person"
               />
               <VStack align="center" spacing={8}>
                 <Text bold size={20} style={{ textAlign: 'center', color: foreground }}>
-                  {getUsername(nostrKeys?.pubkey)}
+                  {displayName}
                 </Text>
                 <Icon size={42} name="stash:qr-code" color={foreground} />
               </VStack>

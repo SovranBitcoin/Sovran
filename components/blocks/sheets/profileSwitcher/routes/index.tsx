@@ -16,6 +16,7 @@
 
 import { Route, SheetDefinition, RouteDefinition } from 'react-native-actions-sheet';
 import ProfileList from './profileList';
+import ImportNsec from './importNsec';
 
 export const sheetName = 'profile-switcher';
 
@@ -24,6 +25,10 @@ export const routes: Route[] = [
     name: 'profile-list',
     component: ProfileList,
   },
+  {
+    name: 'import-nsec',
+    component: ImportNsec,
+  },
 ];
 
 declare module 'react-native-actions-sheet' {
@@ -31,10 +36,12 @@ declare module 'react-native-actions-sheet' {
     [sheetName]: SheetDefinition<{
       routes: {
         'profile-list': RouteDefinition;
+        'import-nsec': RouteDefinition;
       };
       payload: {
         onSwitchProfile: (accountIndex: number) => void;
         onAddProfile: () => void;
+        onImportProfile?: (npubNumber: number) => void;
       };
     }>;
   }

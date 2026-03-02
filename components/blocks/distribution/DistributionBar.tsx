@@ -1,13 +1,11 @@
 import React, { useMemo, useEffect, useState } from 'react';
-import { StyleSheet, View, LayoutChangeEvent, Platform } from 'react-native';
+import { StyleSheet, View, LayoutChangeEvent } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getColors } from 'react-native-image-colors';
 import { Avatar } from 'components/ui/Avatar';
 import { TOTAL_BASIS_POINTS } from 'stores/mintDistributionStore';
-import { darken } from 'polished';
 import { useThemeColor } from 'hooks/useThemeColor';
-import { hexToRgb, getContrastColors, FALLBACK_COLORS } from './colorUtils';
+import { getContrastColors, FALLBACK_COLORS, useDominantColor } from './colorUtils';
 
 const MIN_PERCENTAGE_FOR_AVATAR = 12;
 const AVATAR_SIZE = 20;
@@ -21,119 +19,6 @@ const SPRING_CONFIG = {
 
 const INNER_SHADOW_TOP = ['rgba(0,0,0,0.25)', 'rgba(0,0,0,0.08)', 'transparent'] as const;
 const INNER_HIGHLIGHT_BOTTOM = ['transparent', 'rgba(0,0,0,0.03)', 'rgba(0,0,0,0.08)'] as const;
-
-// ============================================
-// COLOR HELPERS (used only by useDominantColor)
-// ============================================
-
-function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
-  r /= 255;
-  g /= 255;
-  b /= 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r:
-        h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-        break;
-      case g:
-        h = ((b - r) / d + 2) / 6;
-        break;
-      case b:
-        h = ((r - g) / d + 4) / 6;
-        break;
-    }
-  }
-  return { h, s, l };
-}
-
-function isCornerColor(hex: string | undefined): boolean {
-  if (!hex) return true;
-
-  const { r, g, b } = hexToRgb(hex);
-  const { s, l } = rgbToHsl(r, g, b);
-
-  if (l < 0.12) return true;
-  if (l > 0.95) return true;
-  if (s < 0.08 && l > 0.1 && l < 0.9) return true;
-
-  return false;
-}
-
-function clampColor(hex: string): string {
-  const { r, g, b } = hexToRgb(hex);
-  const { s, l } = rgbToHsl(r, g, b);
-
-  if (l > 0.6 || s > 0.85) {
-    return darken(0.25, hex);
-  }
-  return hex;
-}
-
-// ============================================
-// COLOR EXTRACTION HOOK (Spotify-style)
-// ============================================
-
-function useDominantColor(
-  imageUrl: string | undefined,
-  fallbackIndex: number
-): { baseColors: string[]; baseColor: string; hasLoaded: boolean } {
-  const fallback = FALLBACK_COLORS[fallbackIndex % FALLBACK_COLORS.length];
-  const [baseColor, setBaseColor] = useState<string>(fallback);
-  const [baseColors, setBaseColors] = useState<string[]>([fallback]);
-  const [hasLoaded, setHasLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!imageUrl) {
-      setHasLoaded(true);
-      return;
-    }
-
-    let mounted = true;
-
-    getColors(imageUrl, {
-      fallback: fallback,
-      cache: true,
-      key: imageUrl,
-    })
-      .then((res: any) => {
-        if (!mounted || !res) return;
-
-        let picked: string | undefined;
-        let candidates: string[] = [];
-
-        if (Platform.OS === 'android') {
-          candidates = [res.vibrant, res.dominant, res.lightVibrant, res.muted, res.average];
-          picked = candidates.find((c: string | undefined) => c && !isCornerColor(c));
-        } else {
-          candidates = [res.background, res.primary, res.secondary, res.detail];
-          picked = candidates.find((c: string | undefined) => c && !isCornerColor(c));
-        }
-
-        if (picked) {
-          setBaseColors(candidates);
-          setBaseColor(clampColor(picked));
-        }
-        setHasLoaded(true);
-      })
-      .catch(() => {
-        setHasLoaded(true);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [imageUrl, fallback]);
-
-  return { baseColors, baseColor, hasLoaded };
-}
 
 // ============================================
 // COMPONENTS
