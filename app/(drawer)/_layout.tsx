@@ -24,7 +24,6 @@ import { Avatar } from 'components/ui/Avatar';
 import { getUsername } from 'helper/username';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfileStore, ProfileEntry } from '@/stores/profileStore';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { CocoManager } from '@/helper/coco/manager';
 import { rehydrateProfileStores } from '@/helper/profileScopedStorage';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -80,7 +79,6 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
   ] as const);
   const { getKeysForAccount } = useNostrKeysContext();
   const { resetStages, cancelResetStages } = useInitializationReset();
-  const devMode = useSettingsStore((s) => s.experimental);
   const profiles = useProfileStore((s) => s.profiles);
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
 
@@ -165,9 +163,6 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
       },
     });
   }, [handleSwitchProfile, handleAddProfile]);
-
-  // Profile selector is only available when experimental/dev mode is enabled
-  if (!devMode) return null;
 
   // Only show selector if there are profiles (should always be true after first launch)
   if (profiles.length === 0) return null;
