@@ -54,9 +54,14 @@ export function useNfcEcashPayment({
   const [error, setError] = useState<NfcErrorMessage | null>(null);
 
   const lastNfcSendEntryRef = useRef<SendHistoryEntry | null>(null);
+  const availableMintsRef = useRef<Record<string, number>>(availableMints);
   const [pendingNfcFinalizationOperationId, setPendingNfcFinalizationOperationId] = useState<
     string | null
   >(null);
+
+  useEffect(() => {
+    availableMintsRef.current = availableMints;
+  }, [availableMints]);
 
   useEffect(() => {
     if (!manager || !pendingNfcFinalizationOperationId) return;
@@ -128,7 +133,7 @@ export function useNfcEcashPayment({
             return getEncodedTokenV4(token);
           },
           recoverToken: rollbackPendingSend,
-          availableMints,
+          getAvailableMints: () => availableMintsRef.current,
           preferredMint: mintToUse,
           maxAmountSats,
           onScanRead: (raw) => {

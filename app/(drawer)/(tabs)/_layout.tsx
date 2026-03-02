@@ -1,7 +1,8 @@
-import { Tabs } from 'expo-router';
+import { router, Tabs, usePathname } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { BackgroundProvider } from 'providers/BackgroundProvider';
 import { DynamicColorIOS, Platform, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { OfflineProvider } from '@/providers/OfflineProvider';
 import {
@@ -13,13 +14,24 @@ import {
   isExpo55NativeTabsSupported,
 } from '@/components/navigation/expoRouter55';
 
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 // Fallback tab bar background for pre-liquid glass devices
 const TabBarBackground = () => (
   <BlurView tint="dark" intensity={75} style={[StyleSheet.absoluteFill, { borderRadius: 8 }]} />
 );
 
 export default function TabLayout() {
+  const pathname = usePathname();
   const hasAndroidLiquidGlass = Platform.OS === 'android' && isLiquidGlassTabBarAvailable();
+
+  useEffect(() => {
+    if (pathname === '/(drawer)/(tabs)' || pathname === '/(drawer)/(tabs)/') {
+      router.replace('/(drawer)/(tabs)/index');
+    }
+  }, [pathname]);
 
   // Use wrapped NativeTabs for iOS liquid-glass devices.
   if (isExpo55NativeTabsSupported()) {
@@ -92,6 +104,7 @@ export default function TabLayout() {
       <OfflineProvider>
         <View style={{ flex: 1 }}>
           <Tabs
+            initialRouteName="index"
             screenOptions={{
               headerShown: false,
               ...(!hasAndroidLiquidGlass && { tabBarBackground: () => <TabBarBackground /> }),

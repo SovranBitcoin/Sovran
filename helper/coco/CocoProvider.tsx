@@ -218,8 +218,6 @@ export function CocoProvider({ children }: CocoProviderProps) {
           await manager.recoverPendingSendOperations();
           initLog('Coco-bg', 'recoverPendingMeltOperations...');
           await manager.recoverPendingMeltOperations();
-          initLog('Coco-bg', 'freeAllReservedProofs...');
-          await CocoManager.freeAllReservedProofs();
           initLog('Coco-bg', 'recovery done');
         } catch (recoveryErr) {
           initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);

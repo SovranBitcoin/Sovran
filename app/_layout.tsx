@@ -45,6 +45,10 @@ import { useProfileStore } from '@/stores/profileStore';
 import { useAppBalance } from '@/hooks/useAppBalance';
 import PopupHost from '@/components/blocks/popup/PopupHost';
 
+export const unstable_settings = {
+  initialRouteName: '(drawer)',
+};
+
 // Prevent splash screen from auto-hiding until fonts are loaded
 SplashScreen.preventAutoHideAsync();
 
@@ -53,6 +57,14 @@ initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called')
 registerAllSheets({ context: 'global' });
 
 LogBox.ignoreAllLogs();
+
+const IOS_SPLASH_IMAGE_WIDTH = 390;
+const REINIT_SPLASH_IMAGE = require('../assets/images/splash.png');
+const REINIT_SPLASH_IMAGE_SIZE = Image.resolveAssetSource(REINIT_SPLASH_IMAGE);
+const PROFILE_SWITCH_SPLASH_BOX_SIZE =
+  REINIT_SPLASH_IMAGE_SIZE?.width && REINIT_SPLASH_IMAGE_SIZE?.height
+    ? IOS_SPLASH_IMAGE_WIDTH * (REINIT_SPLASH_IMAGE_SIZE.height / REINIT_SPLASH_IMAGE_SIZE.width)
+    : IOS_SPLASH_IMAGE_WIDTH;
 
 // Outer providers — stable across profile switches, never remount.
 // InitializationProvider is first so the splash screen renders immediately
@@ -266,9 +278,12 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
             zIndex: 9999,
           }}>
           <Image
-            source={require('../assets/images/splash.png')}
+            source={REINIT_SPLASH_IMAGE}
             resizeMode="contain"
-            style={{ width: 800, height: 800 }}
+            style={{
+              width: PROFILE_SWITCH_SPLASH_BOX_SIZE,
+              height: PROFILE_SWITCH_SPLASH_BOX_SIZE,
+            }}
           />
         </View>
       ) : null}

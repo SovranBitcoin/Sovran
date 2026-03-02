@@ -27,12 +27,14 @@ export const useDeeplink = () => {
       const parsed = Linking.parse(url);
       const { scheme, hostname } = parsed;
 
-      // scheme can be null, so check explicitly; hostname can be null, so guard it too
       const isOurScheme = scheme === 'cashu' || scheme === 'sovran';
-      const isValidHost = hostname !== null && hostname !== 'expo-development-client';
+      if (!isOurScheme) return;
 
-      if (isOurScheme && isValidHost) {
-        // TS knows hostname is string here
+      const isRouterHandled = hostname === 'camera';
+      if (isRouterHandled) return;
+
+      const isValidHost = hostname !== null && hostname !== 'expo-development-client';
+      if (isValidHost) {
         try {
           await processPaymentString({ data: hostname, type: 'deeplink' });
         } catch (error) {

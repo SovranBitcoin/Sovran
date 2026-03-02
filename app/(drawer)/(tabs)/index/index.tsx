@@ -1,6 +1,5 @@
 import { useHistoryWithMelts } from 'hooks/coco/useHistoryWithMelts';
 import { AccountPagerView } from 'components/blocks/AccountPagerView';
-import { DevPopupPanel } from 'components/blocks/DevPopupPanel';
 import { BitcoinNearYou } from 'components/blocks/BitcoinNearYou';
 import { ReceivedThisMonth, SpentThisMonth } from 'components/blocks/MonthlyChart';
 import { Transactions } from 'components/blocks/Transactions';
@@ -49,8 +48,6 @@ function TabOneScreen() {
       <ScrollableGradientOverlay contentHeight={contentHeight} />
 
       <AccountPagerView accounts={ACCOUNTS} setAccount={setAccount} account={account} />
-
-      {devMode ? <DevPopupPanel /> : null}
 
       <View
         className="p-4 pb-24 pt-4"
