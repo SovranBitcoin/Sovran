@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml)
 
-[https://sovran.money](https://sovran.money)
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/68de325f-05ac-46d9-bbac-eb25325fe5cf" />
 
 <img width="100%" src="./sovran.png" />
 
