@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
 import { NPCClient, JWTAuthProvider } from 'npubcash-sdk';
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
+
+import { createProfileScopedStorage } from '@/helper/profileScopedStorage';
+import { useProfileStore } from '@/stores/profileStore';
 
 const NPC_BASE_URL = 'https://npubx.cash';
 const NPC_DEFAULT_MINT_URL = 'https://mint.minibits.cash/Bitcoin';
@@ -22,26 +24,21 @@ interface NpcInfo {
 }
 
 interface NpcMintActions {
-  getMintUrl: (pubkey: string) => string | undefined;
+  getActiveMintUrl: () => string | undefined;
 
   /**
    * Fetch the current mint URL from the NPC server and cache locally.
    * Returns the mint URL on success, or the cached/default value on failure.
    */
-  syncFromServer: (
-    pubkey: string,
-    manager: { ext?: { npc?: { getInfo: () => Promise<NpcInfo> } } }
-  ) => Promise<string | undefined>;
+  syncFromServer: (manager: {
+    ext?: { npc?: { getInfo: () => Promise<NpcInfo> } };
+  }) => Promise<string | undefined>;
 
   /**
    * Update the NPC server with a new mint URL, then cache locally.
    * Returns true on success.
    */
-  updateServerMint: (
-    pubkey: string,
-    newMintUrl: string,
-    privateKey: Uint8Array
-  ) => Promise<boolean>;
+  updateServerMint: (newMintUrl: string, privateKey: Uint8Array) => Promise<boolean>;
 }
 
 type NpcMintStore = NpcMintState & NpcMintActions;
@@ -57,6 +54,11 @@ function getOrDefault(mintUrls: Record<string, string | undefined>, pubkey: stri
   return mintUrls[pubkey] ?? NPC_DEFAULT_MINT_URL;
 }
 
+function getActiveProfilePubkey(): string | undefined {
+  const { activeAccountIndex, profiles } = useProfileStore.getState();
+  return profiles.find((profile) => profile.accountIndex === activeAccountIndex)?.pubkey;
+}
+
 export const useNpcMintStore = create<NpcMintStore>()(
   persist(
     (set, get) => ({
@@ -65,9 +67,15 @@ export const useNpcMintStore = create<NpcMintStore>()(
       isSyncing: false,
       isUpdating: false,
 
-      getMintUrl: (pubkey) => getOrDefault(get().mintUrls, pubkey),
+      getActiveMintUrl: () => {
+        const pubkey = getActiveProfilePubkey();
+        if (!pubkey) return undefined;
+        return getOrDefault(get().mintUrls, pubkey);
+      },
 
-      syncFromServer: async (pubkey, manager) => {
+      syncFromServer: async (manager) => {
+        const pubkey = getActiveProfilePubkey();
+        if (!pubkey) return undefined;
         if (get().isSyncing) return getOrDefault(get().mintUrls, pubkey);
 
         set({ isSyncing: true });
@@ -95,7 +103,9 @@ export const useNpcMintStore = create<NpcMintStore>()(
         }
       },
 
-      updateServerMint: async (pubkey, newMintUrl, privateKey) => {
+      updateServerMint: async (newMintUrl, privateKey) => {
+        const pubkey = getActiveProfilePubkey();
+        if (!pubkey) return false;
         if (get().isUpdating) return false;
 
         set({ isUpdating: true });
