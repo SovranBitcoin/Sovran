@@ -26,7 +26,7 @@ import {
 } from 'helper/keyDerivation';
 import { nip19, getPublicKey } from 'nostr-tools';
 import { CocoManager } from 'helper/coco/manager';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { useInitializationStage } from './InitializationProvider';
 import { useProfileStore } from '@/stores/profileStore';
 import { initLog } from '@/helper/initTiming';
