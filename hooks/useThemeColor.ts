@@ -21,7 +21,8 @@ type StaticScale =
   | `green-${Shade}`
   | `yellow-${Shade}`
   | `blue-${Shade}`
-  | `purple-${Shade}`;
+  | `purple-${Shade}`
+  | `orange-${Shade}`;
 
 type SemanticToken =
   | 'background'
