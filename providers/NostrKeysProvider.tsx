@@ -17,11 +17,10 @@ import {
   hashMnemonic,
   type CachedDerivedKeys,
 } from 'helper/secureStorage';
-import * as nip06 from 'nostr-tools/nip06';
-import { nip19 } from 'nostr-tools';
-import { HDKey } from '@scure/bip32';
-import * as bip39 from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
+import {
+  deriveNostrKeys,
+  deriveCashuMnemonic as deriveCashuMnemonicPure,
+} from 'helper/keyDerivation';
 import { CocoManager } from 'helper/coco/manager';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { useInitializationStage } from './InitializationProvider';
@@ -141,30 +140,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           return cachedKeys.get(accountIndex)!;
         }
 
-        // Generate keys from mnemonic using NIP-06
-        console.log('Deriving keys from mnemonic for account index:', accountIndex);
-        console.log('Mnemonic length:', mnemonic.split(' ').length, 'words');
-
-        const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
-          mnemonic,
-          undefined,
-          accountIndex
-        );
-
-        console.log('Derived keys - pubkey length:', pk.length, 'privateKey length:', sk.length);
-
-        // Encode the keys
-        console.log('Encoding keys...');
-        const nsec = nip19.nsecEncode(sk);
-        const npub = nip19.npubEncode(pk);
-        console.log('Encoded nsec:', nsec, 'npub:', npub);
-
-        const derivedKeys: NostrKeys = {
-          npub,
-          nsec,
-          pubkey: pk,
-          privateKey: sk,
-        };
+        const derivedKeys: NostrKeys = deriveNostrKeys(mnemonic, accountIndex);
 
         // Cache the keys
         setCachedKeys((prev) => new Map(prev).set(accountIndex, derivedKeys));
@@ -191,16 +167,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           return cachedCashuMnemonics.get(accountIndex)!;
         }
 
-        // Generate HD root key from mnemonic
-        const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic));
-
-        // Derive the specific path for this account index
-        const DERIVATION_PATH = `m/44'/129372'`;
-        const path = `${DERIVATION_PATH}/0'/${accountIndex}'/0/0`;
-        const seed = root.derive(path);
-
-        // Generate the cashu mnemonic from the derived private key
-        const derivedCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Buffer, wordlist);
+        const derivedCashuMnemonic = deriveCashuMnemonicPure(mnemonic, accountIndex);
 
         // Cache the mnemonic
         setCachedCashuMnemonics((prev) => new Map(prev).set(accountIndex, derivedCashuMnemonic));
@@ -356,32 +323,19 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           // Derive from scratch and persist to SecureStore
           stage.log('Deriving keys...');
           initLog('NostrKeys', 'cache miss — deriving NIP-06 keys...');
-
-          const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
-            mnemonicToUse,
-            undefined,
-            defaultAccountIndex
-          );
-          initLog('NostrKeys', 'NIP-06 accountFromSeedWords done');
-          const nsec = nip19.nsecEncode(sk);
-          const npub = nip19.npubEncode(pk);
-          defaultKeys = { npub, nsec, pubkey: pk, privateKey: sk };
-          initLog('NostrKeys', 'nip19 encode done');
+          defaultKeys = deriveNostrKeys(mnemonicToUse, defaultAccountIndex);
+          initLog('NostrKeys', 'NIP-06 keys derived');
 
           initLog('NostrKeys', 'deriving Cashu mnemonic (BIP32)...');
-          const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonicToUse));
-          const DERIVATION_PATH = `m/44'/129372'`;
-          const path = `${DERIVATION_PATH}/0'/${defaultAccountIndex}'/0/0`;
-          const seed = root.derive(path);
-          defaultCashuMnemonic = bip39.entropyToMnemonic(seed.privateKey as Buffer, wordlist);
+          defaultCashuMnemonic = deriveCashuMnemonicPure(mnemonicToUse, defaultAccountIndex);
           initLog('NostrKeys', 'Cashu mnemonic derived');
 
           // Persist to SecureStore in the background (don't block)
           const cachePayload: CachedDerivedKeys = {
-            npub,
-            nsec,
-            pubkey: pk,
-            privateKeyHex: bytesToHex(sk),
+            npub: defaultKeys.npub,
+            nsec: defaultKeys.nsec,
+            pubkey: defaultKeys.pubkey,
+            privateKeyHex: bytesToHex(defaultKeys.privateKey),
             mnemonicHash: mHash,
           };
           Promise.all([

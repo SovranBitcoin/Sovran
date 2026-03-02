@@ -3,10 +3,11 @@ import { ExpoSqliteRepositories } from 'coco-cashu-expo-sqlite';
 import * as SQLite from 'expo-sqlite';
 import { retrieveMnemonic } from 'helper/secureStorage';
 import { NPCPlugin } from 'coco-cashu-plugin-npc';
-import * as nip06 from 'nostr-tools/nip06';
-import { HDKey } from '@scure/bip32';
-import * as bip39 from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
+import {
+  deriveNostrKeys,
+  deriveCashuWalletSeed,
+  deriveCashuWalletSeedFromRoot,
+} from 'helper/keyDerivation';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
@@ -112,18 +113,11 @@ export class CocoManager {
       // 2. Seed getter (lazy — no crypto work until first call)
       const seedGetter = async (): Promise<Uint8Array> => {
         if (this.cashuMnemonic) {
-          return bip39.mnemonicToSeedSync(this.cashuMnemonic, '');
+          return deriveCashuWalletSeed(this.cashuMnemonic);
         }
         const mnemonic = await retrieveMnemonic();
         if (!mnemonic) throw new Error('No mnemonic found in secure storage');
-        const root = HDKey.fromMasterSeed(bip39.mnemonicToSeedSync(mnemonic, ''));
-        const path = `m/44'/129372'/0'/${this.accountIndex}'/0/0`;
-        const seed = root.derive(path);
-        const derivedCashuMnemonic = bip39.entropyToMnemonic(
-          seed.privateKey as Uint8Array,
-          wordlist
-        );
-        return bip39.mnemonicToSeedSync(derivedCashuMnemonic, '');
+        return deriveCashuWalletSeedFromRoot(mnemonic, this.accountIndex);
       };
 
       // 3. NPC plugin (constructor only — no network call)
@@ -303,8 +297,8 @@ export class CocoManager {
         return null;
       }
 
-      const { privateKey: sk } = nip06.accountFromSeedWords(mnemonic, undefined, this.accountIndex);
-      return new NsecSigner(sk);
+      const { privateKey } = deriveNostrKeys(mnemonic, this.accountIndex);
+      return new NsecSigner(privateKey);
     } catch (error) {
       console.error('Failed to create signer for NPC plugin:', error);
       return null;
