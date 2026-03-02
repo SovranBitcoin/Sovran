@@ -33,3 +33,6 @@ jobs:
       - name: Knip
         run: npm run knip
 
+      - name: Test
+        run: npm test
+

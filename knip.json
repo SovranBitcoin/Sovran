@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["shim.js", "polyfills.js", "app/**/*.{ts,tsx}", "scripts/*.js", "plugins/**/*.js"],
+  "entry": ["shim.js", "polyfills.js", "app/**/*.{ts,tsx}", "scripts/*.{js,ts}", "plugins/**/*.js"],
   "project": ["**/*.{ts,tsx,js,jsx}"],
   "ignore": [
     ".agents/**",
