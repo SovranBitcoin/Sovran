@@ -402,12 +402,7 @@ export class CocoManager {
       try {
         const dbDirectory = FileSystem.documentDirectory;
         const dbPath = `${dbDirectory}SQLite/${dbName}`;
-        const filesToDelete = [
-          dbPath,
-          `${dbPath}-journal`,
-          `${dbPath}-wal`,
-          `${dbPath}-shm`,
-        ];
+        const filesToDelete = [dbPath, `${dbPath}-journal`, `${dbPath}-wal`, `${dbPath}-shm`];
         for (const filePath of filesToDelete) {
           await FileSystem.deleteAsync(filePath, { idempotent: true });
         }

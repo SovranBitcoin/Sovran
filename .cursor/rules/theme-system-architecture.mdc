@@ -315,3 +315,43 @@ On app launch, `ThemeProvider` reads the persisted theme from the store and appl
 ---
 
 If you need a color value in a style prop, use `useThemeColor` from `hooks/useThemeColor`. If you need it in a className, use the Tailwind class (`text-danger`, `bg-shade-300`, etc.). Both resolve from the same CSS variables registered by `themeEngine.ts`.
+
+---
+
+## Image Color Extraction
+
+For deriving gradients or accent tints from user-provided images (profile pictures, banners, mint icons), use the hooks in `helper/colorExtraction.ts`. Distribution components re-export them from `components/blocks/distribution/colorUtils.ts` for convenience.
+
+### Hooks
+
+| Hook | Best for | Filtering | Returns |
+|------|----------|-----------|---------|
+| `useExtractedColors(url, fallbackIndex?)` | Small images (mint icons) | None — picks primary palette color directly | `{ baseColor, gradientColors, borderColor, isLoading, hasExtractedColors }` |
+| `useDominantColor(url, fallbackIndex)` | Large images (banners, PFPs) | Rejects corner colors (too dark/light/grey), clamps overly bright colors | `{ baseColor, baseColors, hasLoaded, hasExtractedColors }` |
+
+Both hooks use `react-native-image-colors` under the hood. Results are cached by URL.
+
+### Fallback chain for banner gradients
+
+When composing a gradient from image colors with a deterministic fallback:
+
+1. **PFP colors** (`useDominantColor(pictureUrl, ...)`) — preferred source; most users have a PFP.
+2. **Banner colors** (`useDominantColor(bannerUrl, ...)`) — only extracted when no PFP is available.
+3. **Seeded gradient** (`generateSeededGradient(pubkey, 'person')` from `helper/avatarGradient.ts`) — deterministic fallback when no image colors are available.
+
+Check `hasExtractedColors` (not just `hasLoaded`) before choosing a source — `hasLoaded` is `true` even when extraction failed or only corner colors were found.
+
+### Pure helpers (also exported)
+
+| Function | Purpose |
+|----------|---------|
+| `getContrastColors(hex, amount?)` | Returns a contrast color and border color for a given hex. Uses luminance to decide whether to lighten or darken. |
+| `hexToRgb(hex)` | Hex string to `{ r, g, b }`. |
+| `FALLBACK_COLORS` | 8-color palette used as fallback when extraction fails. Index with a deterministic value (e.g. `pubkey` hash). |
+
+### Rules
+
+1. **Import from `helper/colorExtraction.ts`** for screens and hooks. Distribution components may import from the local re-export barrel (`./colorUtils`).
+2. **Don't call both hooks for the same image** — pick the one that fits your use case.
+3. **Always check `hasExtractedColors`** before using extracted colors as a gradient source — fall through to the next source or a deterministic fallback if extraction failed.
+4. **Don't reimplement color extraction** — extend the shared hooks if you need different behavior.
