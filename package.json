@@ -36,6 +36,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "screenshots": "node scripts/resize-screenshots.js",
+    "test": "jest",
     "release:freedomstore:pr": "bash scripts/create-freedomstore-pr.sh"
   },
   "dependencies": {
@@ -150,6 +151,7 @@
   "devDependencies": {
     "@babel/core": "^7.20.0",
     "@expo/metro-config": "~55.0.5",
+    "@types/jest": "^30.0.0",
     "@types/lodash": "^4.17.20",
     "@types/react": "~19.2.2",
     "@types/semver": "^7.7.0",
@@ -163,6 +165,8 @@
     "eslint-plugin-prettier": "^5.5.0",
     "eslint-plugin-unused-imports": "^4.1.4",
     "get-image-colors": "^4.0.1",
+    "jest": "^30.2.0",
+    "jest-expo": "^55.0.9",
     "knip": "^5.71.0",
     "metro-minify-terser": "0.83.3",
     "patch-package": "^8.0.1",
