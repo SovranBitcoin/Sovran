@@ -23,6 +23,7 @@ import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { CocoManager } from 'helper/coco/manager';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { useInitializationStage } from './InitializationProvider';
 import { useProfileStore } from '@/stores/profileStore';
 import { initLog } from '@/helper/initTiming';
@@ -65,20 +66,6 @@ function getMnemonicFromRedux(): string | null {
     console.error('Failed to get mnemonic from Redux store:', error);
     return null;
   }
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-  }
-  return bytes;
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
 }
 
 interface NostrKeys {
