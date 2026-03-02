@@ -72,9 +72,7 @@ export function ReceiveScreen({
   const [latestKeypair, setLatestKeypair] = useState<Keypair | null>(null);
 
   // NPC mint store — persisted offline-first source of truth
-  const npcMintUrl = useNpcMintStore((s) =>
-    nostrKeys?.pubkey ? s.getMintUrl(nostrKeys.pubkey) : undefined
-  );
+  const npcMintUrl = useNpcMintStore((s) => s.getActiveMintUrl());
   const isUpdatingMint = useNpcMintStore((s) => s.isUpdating);
   const syncFromServer = useNpcMintStore((s) => s.syncFromServer);
   const updateServerMint = useNpcMintStore((s) => s.updateServerMint);
@@ -96,9 +94,9 @@ export function ReceiveScreen({
 
   // Sync NPC mint URL from server on mount (cached value renders instantly)
   useEffect(() => {
-    if (!nostrKeys?.pubkey || !manager) return;
-    syncFromServer(nostrKeys.pubkey, manager);
-  }, [manager, nostrKeys?.pubkey, syncFromServer]);
+    if (!manager) return;
+    syncFromServer(manager);
+  }, [manager, syncFromServer]);
 
   // Load cashu mint info whenever the NPC mint URL changes
   useEffect(() => {
@@ -191,7 +189,7 @@ export function ReceiveScreen({
     previousSelectedMintRef.current = selectedMint;
     hasOpenedMintSelector.current = false;
 
-    updateServerMint(nostrKeys.pubkey, selectedMint, nostrKeys.privateKey).then((ok) => {
+    updateServerMint(selectedMint, nostrKeys.privateKey).then((ok) => {
       if (ok) {
         receiveMintUpdatedPopup();
       } else {

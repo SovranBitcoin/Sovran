@@ -71,3 +71,8 @@ sovran.money/
 .cursor/skills
 .cursor/skills/**/.git/
 .cursor/skills/**/.git/**
+
+# Apple widget target generated files (expo prebuild / apple-targets)
+targets/widget/generated.entitlements
+targets/widget/Assets.xcassets/AppIcon.appiconset/
+targets/widget/Assets.xcassets/$*.colorset/

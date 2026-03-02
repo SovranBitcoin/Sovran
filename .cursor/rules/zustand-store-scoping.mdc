@@ -1,0 +1,166 @@
+---
+description: Zustand store scoping, persistence boundaries, and profile-switch/reset contracts.
+globs:
+  - "stores/**/*.ts"
+  - "helper/profileScopedStorage.ts"
+  - "redux/store/index.ts"
+alwaysApply: false
+---
+
+# Zustand Scoping and Storage Rules
+
+This document defines how Zustand stores are scoped in Sovran, where they persist, and what must happen during profile switch and full account deletion.
+
+Use this as the default policy before adding or changing any store.
+
+---
+
+## Scope Model
+
+Sovran uses three state scopes:
+
+1. **Global scope**
+   - Shared across all profiles on the same device.
+   - Persists with plain `AsyncStorage`.
+   - Examples: app settings, profile index metadata, global caches.
+
+2. **Profile-scoped state**
+   - Isolated by `activeAccountIndex`.
+   - Persists via `createProfileScopedStorage()` (base key for account 0, `:profile:N` suffix for account `N > 0`).
+   - Must be reset + rehydrated on profile switch.
+
+3. **Runtime-only state**
+   - Not persisted.
+   - Used for short-lived UI/session state.
+
+---
+
+## Security Boundary (Non-Negotiable)
+
+Zustand is **not** for wallet secrets or key material.
+
+Never store these in Zustand (persisted or runtime):
+- Root mnemonic
+- Nostr private keys (`nsec`, raw private key bytes/hex)
+- Cashu mnemonic/seed material
+- Any derivation intermediate that can reconstruct keys
+
+Security-critical storage and derivation live in:
+- `.cursor/rules/secure-storage-key-derivation.mdc`
+- `helper/secureStorage.ts`
+- `helper/keyDerivation.ts`
+
+Use `expo-secure-store` for secrets. Treat Zustand as app state/cache only.
+
+---
+
+## Current Store Inventory and Scope
+
+### Global persisted stores (`AsyncStorage`)
+
+- `stores/settingsStore.ts` (`settings-store`)
+- `stores/profileStore.ts` (`profile-store`)
+- `stores/pricelistStore.ts` (`pricelist-store`)
+- `stores/btcMapStore.ts` (`btcmap-store`)
+- `stores/kymMintStore.ts` (`kym-mint-store`)
+- `stores/auditMintStore.ts` (`audit-mint-store`)
+
+### Profile-scoped persisted stores (`createProfileScopedStorage`)
+
+- `stores/mintStore.ts` (`mint-store`)
+- `stores/mintDistributionStore.ts` (`mint-distribution-store`)
+- `stores/npcMintStore.ts` (`npc-mint-store`)
+- `stores/routstrStore.ts` (`routstr-store`)
+- `stores/scanHistoryStore.ts` (`scan-history-store`)
+- `stores/searchHistoryStore.ts` (`search-history-store`)
+- `stores/swapTransactionsStore.ts` (`swap-transactions-store`)
+- `stores/transactionLocationStore.ts` (`transaction-location-store`)
+- `stores/nostrSocialStore.ts` (`nostr-social-store`)
+
+### Runtime-only (non-persisted)
+
+- `stores/popupStore.ts`
+- `stores/mockDataStore.ts`
+
+---
+
+## Profile Switch Contract
+
+Profile switch must produce a clean profile-local session.
+
+Current flow:
+- Triggered from `app/(drawer)/_layout.tsx`
+- Account-scoped providers remount via key in `app/_layout.tsx`
+- Profile-scoped Zustand stores are reset + rehydrated in `helper/profileScopedStorage.ts` (`rehydrateProfileStores()`)
+
+Rules:
+- Every store using `createProfileScopedStorage()` must be included in:
+  - `PROFILE_SCOPED_STORE_KEYS`
+  - reset state in `rehydrateProfileStores()`
+  - `persist.rehydrate()` call set
+- If a profile-scoped store is missing from any of the above, stale in-memory state can leak between profiles.
+- For profile-scoped domain actions, derive identity from active session context where possible (avoid manual pubkey threading from UI callsites).
+
+---
+
+## Full Account Deletion Contract
+
+Full reset must remove all profile data across all known profile indexes.
+
+Current reset orchestration:
+- `redux/store/index.ts` (`resetApp`)
+- `helper/profileScopedStorage.ts` (`clearAllProfileScopedData(maxProfileIndex)`)
+- `helper/secureStorage.ts` (`clearAllSecureData(maxAccountIndex)`)
+
+Rules:
+- Always compute max known account index from `profileStore` and pass it into broad-clear helpers.
+- Do not rely on fixed upper bounds for profile-indexed keys.
+- For profile-scoped stores, rely on both:
+  - in-memory clear for active profile where needed
+  - multi-profile key deletion for all profile suffixes
+
+---
+
+## When to Use Global vs Profile Scope
+
+Use **global** when state should remain identical regardless of active profile:
+- App appearance/theme
+- Feature flags and app-wide preferences
+- Public non-user-specific caches
+
+Use **profile-scoped** when data is identity/account dependent:
+- Selected mints
+- Transactions, history, social graph, conversations
+- Any state keyed by current profile pubkey/account index
+
+If unsure, default to profile-scoped for user-derived data.
+
+---
+
+## Before Creating a New Store
+
+Do this checklist first:
+
+1. Search existing stores for overlap (avoid duplicate sources of truth).
+2. If data already exists in a store, extend that store instead of creating a new one.
+3. Decide scope explicitly (global vs profile-scoped vs runtime-only).
+4. Choose persistence backend explicitly:
+   - `AsyncStorage` for global non-sensitive data
+   - `createProfileScopedStorage()` for profile-local non-sensitive data
+   - `expo-secure-store` for secrets (not Zustand)
+5. If profile-scoped, update profile-switch and full-reset contracts immediately.
+6. Add or update comments/JSDoc only when they capture real invariants and lifecycle behavior.
+
+---
+
+## Implementation Pattern (Profile-Scoped Store)
+
+For a new profile-scoped Zustand store:
+
+1. Use `persist(..., { storage: createJSONStorage(() => createProfileScopedStorage()) })`.
+2. Add store key to `PROFILE_SCOPED_STORE_KEYS` in `helper/profileScopedStorage.ts`.
+3. Add reset state + `persist.rehydrate()` handling in `rehydrateProfileStores()`.
+4. Ensure full reset clears all profile variants via `clearAllProfileScopedData(maxProfileIndex)`.
+
+If any of these steps are skipped, profile isolation is incomplete.
+

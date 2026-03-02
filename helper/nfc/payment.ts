@@ -16,7 +16,9 @@ import { isLightningInvoice, lnTrim, getLightningAmount } from '@/helper/coco/ut
 export interface PaymentOptions {
   createToken: (mintUrl: string, amount: number) => Promise<string>;
   recoverToken: (token: string) => Promise<void>;
-  availableMints: Record<string, number>;
+  getAvailableMints?: () => Record<string, number>;
+  /** @deprecated Use getAvailableMints for live state reads. */
+  availableMints?: Record<string, number>;
   preferredMint?: string;
   maxAmountSats?: number;
   onScanRead?: (raw: string) => void;
@@ -29,10 +31,36 @@ export interface PaymentResult {
   amount: number;
 }
 
+const MINT_READINESS_TIMEOUT_MS = 5000;
+const MINT_READINESS_POLL_MS = 200;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForAvailableMints(
+  resolveMints: () => Record<string, number>,
+  timeoutMs: number = MINT_READINESS_TIMEOUT_MS,
+  pollMs: number = MINT_READINESS_POLL_MS
+): Promise<Record<string, number>> {
+  const start = Date.now();
+  let latestMints = resolveMints();
+  if (Object.keys(latestMints).length > 0) return latestMints;
+
+  while (Date.now() - start < timeoutMs) {
+    await sleep(pollMs);
+    latestMints = resolveMints();
+    if (Object.keys(latestMints).length > 0) return latestMints;
+  }
+
+  return latestMints;
+}
+
 export async function performNfcPayment(options: PaymentOptions): Promise<PaymentResult> {
   const {
     createToken,
     recoverToken,
+    getAvailableMints,
     availableMints,
     preferredMint,
     maxAmountSats,
@@ -41,14 +69,8 @@ export async function performNfcPayment(options: PaymentOptions): Promise<Paymen
   } = options;
 
   log('Starting NFC payment flow...');
-
-  const availableMintUrls = Object.keys(availableMints);
-  if (availableMintUrls.length === 0) {
-    throw new NfcError(
-      'No mints available. Please add a mint to your wallet first.',
-      'NO_AVAILABLE_MINTS'
-    );
-  }
+  const resolveAvailableMints = (): Record<string, number> =>
+    (getAvailableMints ? getAvailableMints() : availableMints) ?? {};
 
   if (preferredMint) log(`Preferred mint: ${preferredMint}`);
   if (maxAmountSats !== undefined) log(`Max amount: ${maxAmountSats} sats`);
@@ -212,7 +234,15 @@ export async function performNfcPayment(options: PaymentOptions): Promise<Paymen
       );
     }
 
-    const mintSelection = selectBestMint(allowedMints, availableMints, amount, preferredMint);
+    const liveAvailableMints = await waitForAvailableMints(resolveAvailableMints);
+    if (Object.keys(liveAvailableMints).length === 0) {
+      throw new NfcError(
+        'No mints available. Please add a mint to your wallet first.',
+        'NO_AVAILABLE_MINTS'
+      );
+    }
+
+    const mintSelection = selectBestMint(allowedMints, liveAvailableMints, amount, preferredMint);
     selectedMint = mintSelection.mintUrl;
     log(`Selected mint: ${selectedMint} (balance: ${mintSelection.balance} sats)`);
 

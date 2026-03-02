@@ -43,9 +43,10 @@ export interface ScanningData {
 interface CameraScreenProps {
   onScan: (data: ScanningData) => Promise<void | { urInProgress: boolean; progress?: number }>;
   onReset?: () => void;
+  scanLocked?: boolean;
 }
 
-export function CameraScreen({ onScan, onReset }: CameraScreenProps) {
+export function CameraScreen({ onScan, onReset, scanLocked = false }: CameraScreenProps) {
   const foreground = useThemeColor('foreground');
   const insets = useSafeAreaInsets();
   const [progress, setProgress] = useState<number>(0);
@@ -82,6 +83,10 @@ export function CameraScreen({ onScan, onReset }: CameraScreenProps) {
 
   const handleScan = useCallback(
     async (data: ScanningData) => {
+      if (scanLocked) {
+        return;
+      }
+
       // For UR codes, allow processing even when isProcessingRef is true
       // to accumulate multiple parts
       const isUrCode = data.data.toLowerCase().startsWith('ur:');
@@ -127,7 +132,7 @@ export function CameraScreen({ onScan, onReset }: CameraScreenProps) {
         isProcessingRef.current = false;
       }
     },
-    [onScan, isFocused]
+    [onScan, isFocused, scanLocked]
   );
 
   const toggleFlashlight = useCallback((): void => {
@@ -197,7 +202,7 @@ export function CameraScreen({ onScan, onReset }: CameraScreenProps) {
           barcodeTypes: ['qr'],
         }}
         onCameraReady={handleCameraReady}
-        onBarcodeScanned={handleScan}
+        onBarcodeScanned={scanLocked ? undefined : handleScan}
       />
 
       {/* Scanning overlay with white corners and progress text */}

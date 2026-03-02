@@ -4,7 +4,7 @@ import { VStack } from 'components/ui/View/VStack';
 import { HStack } from 'components/ui/View/HStack';
 import { Text } from 'components/ui/Text';
 import { Avatar } from 'components/ui/Avatar';
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import { PUBLIC_KEYS } from '@/helper/constants';
 import { getMintDisplayName } from '@/helper/url';
@@ -55,6 +55,7 @@ export const ContactItem = React.memo(function ContactItem({
   profile,
   isLoadingProfile = false,
 }: ContactItemProps) {
+  const router = useRouter();
   const foreground = useThemeColor('foreground');
   // Get display info
   const displayInfo = useMemo(() => {
@@ -83,16 +84,7 @@ export const ContactItem = React.memo(function ContactItem({
     prefetchImage(displayInfo.picture);
   }, [displayInfo.picture]);
 
-  const linkHref = useMemo(
-    () =>
-      item.pubkey
-        ? {
-            pathname: '/(user-flow)/profile' as const,
-            params: { pubkey: item.pubkey },
-          }
-        : null,
-    [item.pubkey]
-  );
+  const canNavigateToProfile = Boolean(item.pubkey);
 
   const content = (
     <HStack align="center" justify="space-between" style={styles.row}>
@@ -133,13 +125,18 @@ export const ContactItem = React.memo(function ContactItem({
     </HStack>
   );
 
-  if (linkHref) {
-    return (
-      <Link href={linkHref as any} asChild>
-        <Pressable style={styles.contactItem}>{content}</Pressable>
-      </Link>
-    );
-  }
-
-  return <Pressable style={styles.contactItem}>{content}</Pressable>;
+  return (
+    <Pressable
+      style={styles.contactItem}
+      disabled={!canNavigateToProfile}
+      onPress={() => {
+        if (!item.pubkey) return;
+        router.navigate({
+          pathname: '/(user-flow)/profile' as const,
+          params: { pubkey: item.pubkey },
+        });
+      }}>
+      {content}
+    </Pressable>
+  );
 });

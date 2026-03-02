@@ -1,12 +1,10 @@
-import React, { createContext, useEffect, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { relays } from 'components/ndk';
+import { useProfileStore } from '@/stores/profileStore';
 import { useInitializationStage } from './InitializationProvider';
 import { useNostrKeysContext } from './NostrKeysProvider';
 import { initLog } from '@/helper/initTiming';
-
-// Cache adapter at module level
-const cacheAdapter = new NDKCacheAdapterSqlite('nostr');
 
 interface NostrNDKContextValue {
   isInitialized: boolean;
@@ -23,8 +21,14 @@ interface NostrNDKProviderProps {
 export function NostrNDKProvider({ children }: NostrNDKProviderProps) {
   const { init: initializeNDK } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
+  const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
   const hasInitialized = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const cacheAdapter = useMemo(
+    () =>
+      new NDKCacheAdapterSqlite(activeAccountIndex === 0 ? 'nostr' : `nostr-${activeAccountIndex}`),
+    [activeAccountIndex]
+  );
 
   // Non-blocking: starts after all blocking stages complete so it doesn't
   // compete for the JS thread during splash. App is already visible.

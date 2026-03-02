@@ -116,9 +116,12 @@ export const MODAL_SCREENS: ModalConfig[] = [
     name: 'camera',
     title: 'Scan QR',
     options: {
+      presentation: 'modal',
       headerShown: true,
       headerTransparent: true,
       headerStyle: { backgroundColor: 'transparent' },
+      headerBackButtonDisplayMode: 'minimal',
+      gestureDirection: 'vertical',
     },
   },
   {

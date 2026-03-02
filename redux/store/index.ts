@@ -623,7 +623,11 @@ export const resetApp = (): AppThunk => {
       // 2. Clear secure storage
       try {
         const { clearAllSecureData } = await import('helper/secureStorage');
-        const cleared = await clearAllSecureData();
+        const { useProfileStore } = await import('stores/profileStore');
+        const profiles = useProfileStore.getState().profiles;
+        const maxAccountIndex =
+          profiles.length > 0 ? Math.max(...profiles.map((p) => p.accountIndex)) : 0;
+        const cleared = await clearAllSecureData(maxAccountIndex);
         if (cleared) {
           console.log('✅ Secure storage cleared successfully');
         } else {

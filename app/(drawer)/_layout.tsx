@@ -49,7 +49,7 @@ const MENU_ITEMS: MenuItem[] = [
   {
     icon: 'fluent:wallet-20-filled',
     label: 'Wallet',
-    route: '(drawer)/(tabs)',
+    route: '(drawer)/(tabs)/index',
     drawerLabel: 'wallet',
   },
   {
@@ -305,8 +305,8 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 
   const isRouteActive = useCallback(
     (route: string) => {
-      // Wallet is (drawer)/(tabs) - the index tab (no "wallet" in path, it's index)
-      if (route === '(drawer)/(tabs)') {
+      // Wallet route points to tab index; keep legacy checks for grouped paths.
+      if (route === '(drawer)/(tabs)' || route === '(drawer)/(tabs)/index') {
         return (
           pathname === '/' ||
           pathname === '/index' ||
