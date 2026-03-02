@@ -60,6 +60,7 @@ interface EcashStatusPillProps {
   totalAmount: number;
   unit: string;
   sfSymbol: React.ComponentProps<typeof SwiftUIImage>['systemName'];
+  tintColor?: string;
   onPress?: () => void;
 }
 
@@ -68,9 +69,11 @@ function EcashStatusPill({
   totalAmount,
   unit,
   sfSymbol,
+  tintColor,
   onPress,
 }: EcashStatusPillProps): React.ReactElement | null {
-  const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
+  const [foreground] = useThemeColor(['foreground'] as const);
+  const tint = tintColor ?? foreground;
 
   if (totalAmount <= 0) return null;
 
@@ -86,18 +89,18 @@ function EcashStatusPill({
             frame({ height: PILL_IOS_HEIGHT, width: iosWidth, alignment: 'center' }),
             glassEffect({
               shape: 'capsule',
-              glass: { tint: opacity(accent, 0.15), variant: 'regular', interactive: false },
+              glass: { tint: opacity(tint, 0.15), variant: 'regular', interactive: false },
             }),
           ]}>
           <SwiftUIHStack
             alignment="center"
             spacing={5}
             modifiers={[frame({ width: iosWidth, alignment: 'center' })]}>
-            <SwiftUIImage systemName={sfSymbol} size={12} color={opacity(foreground, 0.75)} />
+            <SwiftUIImage systemName={sfSymbol} size={12} color={opacity(tint, 0.85)} />
             <SwiftUIText
               modifiers={[
                 font({ size: PILL_TEXT_SIZE, design: 'monospaced', weight: 'bold' }),
-                foregroundStyle(opacity(foreground, 0.75)),
+                foregroundStyle(opacity(tint, 0.85)),
               ]}>
               {text}
             </SwiftUIText>
@@ -115,18 +118,18 @@ function EcashStatusPill({
         gap={6}
         className="overflow-hidden rounded-full"
         style={{
-          backgroundColor: opacity(accent, 0.3),
+          backgroundColor: tintColor ? opacity(tint, 0.3) : opacity(foreground, 0.08),
           borderWidth: 1,
-          borderColor: opacity(accent, 0.3),
+          borderColor: tintColor ? opacity(tint, 0.3) : opacity(foreground, 0.12),
           paddingHorizontal: 12,
           paddingVertical: 5,
         }}>
-        <Icon name="majesticons:coins" size={14} color={opacity(foreground, 0.66)} />
+        <Icon name="majesticons:coins" size={14} color={opacity(tint, 0.8)} />
         <UntranslatedText
           overpass
           bold
           size={PILL_TEXT_SIZE}
-          color={opacity(foreground, 0.66)}
+          color={opacity(tint, 0.8)}
           style={{ letterSpacing: 0.5 }}>
           {text}
         </UntranslatedText>
@@ -156,6 +159,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
   const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
+  const warning = useThemeColor('warning');
   const { reservedTotal } = useReservedProofs();
   const pendingSends = history.filter(
     (entry): entry is SendHistoryEntry =>
@@ -226,6 +230,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
         totalAmount={reservedTotal}
         unit="sat"
         sfSymbol="lock.fill"
+        tintColor={warning}
         onPress={handleReservedPress}
       />
     </VStack>
