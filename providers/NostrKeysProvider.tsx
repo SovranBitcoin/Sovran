@@ -42,7 +42,7 @@ function getMnemonicFromRedux(): string | null {
     if (nostrState.profiles && nostrState.profiles.length > 0) {
       const profile0 = nostrState.profiles[0];
       if (profile0 && profile0.mnemonic) {
-        console.log('Found main mnemonic in Redux store (profile 0):', profile0.mnemonic);
+        console.log('Found main mnemonic in Redux store (profile 0)');
 
         // Validate the mnemonic format
         const words = profile0.mnemonic.split(' ');
@@ -53,7 +53,7 @@ function getMnemonicFromRedux(): string | null {
           console.warn('Redux mnemonic has invalid format:', words.length, 'words');
         }
       } else {
-        console.log('Profile 0 exists but no mnemonic found:', profile0);
+        console.log('Profile 0 exists but no mnemonic found');
       }
     } else {
       console.log('No profiles found in Redux store');

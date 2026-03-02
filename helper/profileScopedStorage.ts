@@ -53,6 +53,7 @@ export function createProfileScopedStorage(): StateStorage {
 const PROFILE_SCOPED_STORE_KEYS = [
   'mint-store',
   'mint-distribution-store',
+  'npc-mint-store',
   'routstr-store',
   'scan-history-store',
   'search-history-store',
@@ -104,6 +105,7 @@ export async function rehydrateProfileStores(): Promise<void> {
   const { useSwapTransactionsStore } = await import('@/stores/swapTransactionsStore');
   const { useTransactionLocationStore } = await import('@/stores/transactionLocationStore');
   const { useNostrSocialStore } = await import('@/stores/nostrSocialStore');
+  const { useNpcMintStore } = await import('@/stores/npcMintStore');
 
   // Reset each store to its initial state.
   // Skip persist writes so the empty reset state doesn't overwrite
@@ -126,6 +128,12 @@ export async function rehydrateProfileStores(): Promise<void> {
     useSearchHistoryStore.setState({ recentSearches: {} });
     useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} });
     useTransactionLocationStore.setState({ locations: {} });
+    useNpcMintStore.setState({
+      mintUrls: {},
+      lastSyncedAt: {},
+      isSyncing: false,
+      isUpdating: false,
+    });
     useNostrSocialStore.setState({
       contactsTags: [],
       contactsContent: '',
@@ -133,6 +141,7 @@ export async function rehydrateProfileStores(): Promise<void> {
       followingPubkeys: {},
       likesByEventId: {},
       repostsByEventId: {},
+      deletedRepostOriginalIds: {},
       optimisticFollowsByPubkey: {},
       optimisticLikesByEventId: {},
       optimisticRepostsByEventId: {},
@@ -150,6 +159,7 @@ export async function rehydrateProfileStores(): Promise<void> {
     useSearchHistoryStore.persist.rehydrate(),
     useSwapTransactionsStore.persist.rehydrate(),
     useTransactionLocationStore.persist.rehydrate(),
+    useNpcMintStore.persist.rehydrate(),
     useNostrSocialStore.persist.rehydrate(),
   ]);
 

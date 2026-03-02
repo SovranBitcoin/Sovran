@@ -45,6 +45,13 @@ export class CocoManager {
   /** Current account index — controls which DB file and NPC signer to use */
   private static accountIndex = 0;
 
+  /** Clear sensitive in-memory state that should not survive profile switches. */
+  private static clearSensitiveRuntimeState(): void {
+    this.signerKey = null;
+    this.cashuMnemonic = null;
+    this.npcPlugin = null;
+  }
+
   /**
    * Set the account index for per-profile database isolation.
    * Must be called before initialize().
@@ -242,6 +249,7 @@ export class CocoManager {
    */
   static async cleanup(): Promise<void> {
     if (!this.instance) {
+      this.clearSensitiveRuntimeState();
       return;
     }
 
@@ -272,9 +280,11 @@ export class CocoManager {
 
       // Clear the instance
       this.instance = null;
+      this.clearSensitiveRuntimeState();
       console.log('Coco Manager cleanup completed');
     } catch (error) {
       console.error('Failed to cleanup Coco Manager:', error);
+      this.clearSensitiveRuntimeState();
     }
   }
 
@@ -415,8 +425,7 @@ export class CocoManager {
   static async reset(): Promise<void> {
     await this.disableWatchers();
     this.instance = null;
-    this.npcPlugin = null;
-    this.signerKey = null;
+    this.clearSensitiveRuntimeState();
     this.isInitializing = false;
   }
 
