@@ -610,24 +610,28 @@ export const resetApp = (): AppThunk => {
     try {
       console.log('Starting complete app reset...');
 
-      // 1. Clear Coco SQLite database and reset manager
+      // Get profile data first (before any clearing)
+      const { useProfileStore } = await import('stores/profileStore');
+      const profiles = useProfileStore.getState().profiles;
+      const accountIndexes = profiles.map((p) => p.accountIndex);
+      const importedPubkeys = profiles
+        .filter((p) => p.source === 'imported')
+        .map((p) => p.pubkey);
+
+      // 1. Clear ALL Coco SQLite databases (coco.db, coco-N.db for every profile)
       try {
         const { CocoManager } = await import('helper/coco/manager');
-        await CocoManager.completeReset();
-        console.log('✅ Coco database and manager reset successfully');
+        await CocoManager.completeReset(accountIndexes);
+        console.log('✅ Coco databases and manager reset successfully');
       } catch (error) {
-        console.warn('⚠️ Failed to reset Coco database:', error);
+        console.warn('⚠️ Failed to reset Coco databases:', error);
         // Continue with other cleanup even if this fails
       }
 
-      // 2. Clear secure storage
+      // 2. Clear secure storage (mnemonic, derived keys, cashu mnemonics, imported nsecs)
       try {
         const { clearAllSecureData } = await import('helper/secureStorage');
-        const { useProfileStore } = await import('stores/profileStore');
-        const profiles = useProfileStore.getState().profiles;
-        const maxAccountIndex =
-          profiles.length > 0 ? Math.max(...profiles.map((p) => p.accountIndex)) : 0;
-        const cleared = await clearAllSecureData(maxAccountIndex);
+        const cleared = await clearAllSecureData(accountIndexes, importedPubkeys);
         if (cleared) {
           console.log('✅ Secure storage cleared successfully');
         } else {
@@ -692,28 +696,36 @@ export const resetApp = (): AppThunk => {
       }
 
       // 3b. Clear profile-scoped store data for ALL profiles (not just active)
-      // clearAllData() above only removes the current profile's AsyncStorage key.
-      // This ensures no orphaned data remains for other profiles after a full reset.
       try {
         const { clearAllProfileScopedData } = await import('helper/profileScopedStorage');
-        const { useProfileStore } = await import('stores/profileStore');
-        const profiles = useProfileStore.getState().profiles;
-        const maxIndex = profiles.length > 0 ? Math.max(...profiles.map((p) => p.accountIndex)) : 0;
-        await clearAllProfileScopedData(maxIndex);
+        await clearAllProfileScopedData(accountIndexes);
         console.log('✅ All profile-scoped store data cleared across all profiles');
       } catch (error) {
         console.warn('⚠️ Failed to clear profile-scoped data:', error);
         // Continue with other cleanup even if this fails
       }
 
-      // 4. Clear persisted redux data
+      // 4. Clear profile store (Zustand + AsyncStorage)
+      try {
+        useProfileStore.setState({
+          activeAccountIndex: 0,
+          profiles: [],
+          cocoMigrationComplete: {},
+        });
+        await AsyncStorage.removeItem('profile-store');
+        console.log('✅ Profile store cleared successfully');
+      } catch (error) {
+        console.warn('⚠️ Failed to clear profile store:', error);
+      }
+
+      // 5. Clear persisted redux data
       await persistor.purge();
       console.log('✅ Redux data cleared successfully');
 
-      // 5. Dispatch the reset action to clear the in-memory state
+      // 6. Dispatch the reset action to clear the in-memory state
       dispatch({ type: RESET_APP });
 
-      // 6. Restart persistence after reset
+      // 7. Restart persistence after reset
       persistor.persist();
 
       console.log('Complete app reset finished successfully');

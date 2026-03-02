@@ -6,12 +6,29 @@ import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import Container from 'components/blocks/Container';
 import Icon from 'assets/icons';
 import { copyPopup, type CopyTarget } from '@/helper/popup';
+import { pubkeyToAccountNumber } from '@/helper/keyDerivation';
+import opacity from 'hex-color-opacity';
 import { Text } from 'components/ui/Text';
 import { View } from 'components/ui/View/View';
 import { Avatar } from 'components/ui/Avatar';
 import { Button, Card, Description, Input, Label, TextField } from 'heroui-native';
 import { useThemeColor } from '@/hooks/useThemeColor';
-import { getUsername } from '@/helper/username';
+import { useProfileDisplay } from '@/hooks/useProfileDisplay';
+import { useProfileStore } from '@/stores/profileStore';
+
+const DebugRow: React.FC<{ label: string; value: string }> = ({ label, value }) => {
+  const foreground = useThemeColor('foreground');
+  return (
+    <View>
+      <Text size={11} style={{ color: opacity(foreground, 0.5) }} className="uppercase">
+        {label}
+      </Text>
+      <Text size={13} style={{ color: opacity(foreground, 0.85) }} className="mt-0.5 font-mono">
+        {value}
+      </Text>
+    </View>
+  );
+};
 
 const Profile = () => {
   const { value: mnemonic, loading: mnemonicLoading } = useMnemonic();
@@ -38,7 +55,11 @@ const Profile = () => {
     }));
   };
 
-  const username = getUsername(nostrKeys?.pubkey || '');
+  const { displayName: username, picture: profilePicture } = useProfileDisplay(
+    nostrKeys?.pubkey || ''
+  );
+  const activeProfile = useProfileStore((s) => s.getActiveProfile());
+  const chain = activeProfile?.externalChain ?? (activeProfile?.source === 'imported' ? 1 : 0);
 
   const renderCopyableDetail = (
     label: string,
@@ -110,11 +131,22 @@ const Profile = () => {
         </Text>
         <Card variant="secondary" className="mb-4">
           <Card.Body className="items-center py-5">
-            <Avatar seed={nostrKeys?.pubkey || ''} name={username} size={72} variant="person" />
+            <Avatar
+              seed={nostrKeys?.pubkey || ''}
+              picture={profilePicture}
+              name={username}
+              size={72}
+              variant="person"
+            />
             <Card.Title className="mt-3">{username}</Card.Title>
             <Card.Description className="mt-1">
               {nostrKeysLoading ? 'Loading public key...' : nostrKeys?.npub || 'N/A'}
             </Card.Description>
+            {chain >= 1 && (
+              <Text size={12} medium className="text-foreground/50 mt-1 uppercase tracking-wide">
+                chain {chain}
+              </Text>
+            )}
           </Card.Body>
         </Card>
 
@@ -152,6 +184,54 @@ const Profile = () => {
           'cashuMnemonic',
           'This is a mnemonic you can use in other cashu wallets to recover your funds if you ever want to stop using Sovran.',
           cashuMnemonicLoading
+        )}
+
+        {__DEV__ && activeProfile && (
+          <View className="mt-4">
+            <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
+              Debug (dev only)
+            </Text>
+            <Card variant="secondary" className="mb-3">
+              <Card.Body className="gap-3">
+                <DebugRow
+                  label="Coco DB"
+                  value={
+                    activeProfile.accountIndex === 0
+                      ? 'coco.db'
+                      : `coco-${activeProfile.accountIndex}.db`
+                  }
+                />
+                <DebugRow label="Account index" value={String(activeProfile.accountIndex)} />
+                <DebugRow
+                  label="Source"
+                  value={activeProfile.source === 'imported' ? 'imported' : 'derived'}
+                />
+                <DebugRow label="External chain" value={String(chain)} />
+                <DebugRow
+                  label="Nostr path"
+                  value={
+                    activeProfile.source === 'imported'
+                      ? 'Imported nsec (no mnemonic derivation)'
+                      : `m/44'/1237'/${activeProfile.accountIndex}'/0/0`
+                  }
+                />
+                <DebugRow
+                  label="Cashu path"
+                  value={
+                    activeProfile.source === 'imported'
+                      ? `m/44'/129372'/0'/${activeProfile.accountIndex}'/1/0`
+                      : `m/44'/129372'/0'/${activeProfile.accountIndex}'/0/0`
+                  }
+                />
+                {activeProfile.source === 'imported' && (
+                  <DebugRow
+                    label="npubNumber (from pubkey)"
+                    value={String(pubkeyToAccountNumber(activeProfile.pubkey))}
+                  />
+                )}
+              </Card.Body>
+            </Card>
+          </View>
         )}
       </ScrollView>
     </Container>

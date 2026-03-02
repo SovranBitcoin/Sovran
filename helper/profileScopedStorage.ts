@@ -69,12 +69,16 @@ const PROFILE_SCOPED_STORE_KEYS = [
  * Each store's `clearAllData()` only removes the *active* profile's key;
  * this helper removes the base key (account 0) and every `:profile:N` suffix
  * so no orphaned data is left behind.
+ *
+ * @param profileIndexes Explicit list of account indexes (supports both
+ *   sequential derived indexes and large imported-profile npubNumbers).
  */
-export async function clearAllProfileScopedData(maxProfileIndex: number): Promise<void> {
+export async function clearAllProfileScopedData(profileIndexes: number[]): Promise<void> {
   const keysToRemove: string[] = [];
   for (const base of PROFILE_SCOPED_STORE_KEYS) {
     keysToRemove.push(base); // account 0 uses the bare key
-    for (let i = 1; i <= maxProfileIndex; i++) {
+    for (const i of profileIndexes) {
+      if (i === 0) continue; // bare key already added above
       keysToRemove.push(`${base}:profile:${i}`);
     }
   }
@@ -84,7 +88,7 @@ export async function clearAllProfileScopedData(maxProfileIndex: number): Promis
   }
 
   console.log(
-    `[ProfileScopedStorage] Cleared ${keysToRemove.length} keys across ${maxProfileIndex + 1} profiles`
+    `[ProfileScopedStorage] Cleared ${keysToRemove.length} keys across ${profileIndexes.length} profiles`
   );
 }
 

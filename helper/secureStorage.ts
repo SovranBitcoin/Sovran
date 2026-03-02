@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   MIGRATIONS_COMPLETE_LEGACY: 'migrations_complete',
   DERIVED_KEYS_PREFIX: 'derived_keys_',
   CASHU_MNEMONIC_PREFIX: 'cashu_mnemonic_',
+  IMPORTED_NSEC_PREFIX: 'imported_nsec_',
 } as const;
 
 export interface CachedDerivedKeys {
@@ -128,10 +129,14 @@ export async function ensureMnemonicExists(): Promise<string | null> {
 
 /**
  * Clears all data from secure storage including per-account keys.
- * @param maxAccountIndex Upper bound of account indexes to clear (default 10).
+ * @param accountIndexes Explicit list of account indexes to clear.
+ * @param importedPubkeys Hex pubkeys of imported profiles whose nsec records should be deleted.
  * @returns Promise<boolean> True if cleared successfully, false otherwise
  */
-export async function clearAllSecureData(maxAccountIndex: number = 10): Promise<boolean> {
+export async function clearAllSecureData(
+  accountIndexes: number[],
+  importedPubkeys: string[] = []
+): Promise<boolean> {
   try {
     const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
 
@@ -140,9 +145,12 @@ export async function clearAllSecureData(maxAccountIndex: number = 10): Promise<
       STORAGE_KEYS.MIGRATIONS_COMPLETE_LEGACY,
     ];
 
-    // Per-account keys for every possible account index
-    for (let i = 0; i <= maxAccountIndex; i++) {
+    for (const i of accountIndexes) {
       keysToDelete.push(migrationsCompleteKey(i), derivedKeysKey(i), cashuMnemonicKey(i));
+    }
+
+    for (const pubkey of importedPubkeys) {
+      keysToDelete.push(importedNsecKey(pubkey));
     }
 
     const clearPromises = keysToDelete.map((key) =>
@@ -285,6 +293,44 @@ export async function setMigrationsComplete(accountIndex: number = 0): Promise<b
     return true;
   } catch (error) {
     console.error('Failed to set migrations complete flag:', error);
+    return false;
+  }
+}
+
+// ── Imported Nsec Storage ───────────────────────────────────────
+
+function importedNsecKey(pubkeyHex: string): string {
+  return `${STORAGE_KEYS.IMPORTED_NSEC_PREFIX}${pubkeyHex}`;
+}
+
+export async function storeImportedNsec(pubkeyHex: string, nsecValue: string): Promise<boolean> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+    await SecureStore.setItemAsync(importedNsecKey(pubkeyHex), nsecValue, options);
+    return true;
+  } catch (error) {
+    console.error('Failed to store imported nsec:', error);
+    return false;
+  }
+}
+
+export async function retrieveImportedNsec(pubkeyHex: string): Promise<string | null> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+    return await SecureStore.getItemAsync(importedNsecKey(pubkeyHex), options);
+  } catch (error) {
+    console.error('Failed to retrieve imported nsec:', error);
+    return null;
+  }
+}
+
+export async function deleteImportedNsec(pubkeyHex: string): Promise<boolean> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+    await SecureStore.deleteItemAsync(importedNsecKey(pubkeyHex), options);
+    return true;
+  } catch (error) {
+    console.error('Failed to delete imported nsec:', error);
     return false;
   }
 }

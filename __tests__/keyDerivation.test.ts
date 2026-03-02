@@ -3,8 +3,12 @@ import {
   deriveCashuMnemonic,
   deriveCashuWalletSeed,
   deriveCashuWalletSeedFromRoot,
+  pubkeyToAccountNumber,
+  deriveCashuMnemonicForImported,
+  deriveCashuWalletSeedForImported,
 } from '../helper/keyDerivation';
 import { getUsername } from '../helper/username';
+import { nip19, getPublicKey } from 'nostr-tools';
 
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -211,4 +215,118 @@ describe('seedGetter path equivalence', () => {
       expect(toHex(fastPath)).toBe(toHex(fallbackPath));
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Imported nsec profile: pubkeyToAccountNumber
+// ---------------------------------------------------------------------------
+
+describe('pubkeyToAccountNumber', () => {
+  it('returns a 31-bit integer (0 .. 2^31 - 1)', () => {
+    for (const vec of NIP06_VECTORS) {
+      const n = pubkeyToAccountNumber(vec.publicKeyHex);
+      expect(n).toBeGreaterThanOrEqual(0);
+      expect(n).toBeLessThan(2 ** 31);
+    }
+  });
+
+  it('is deterministic', () => {
+    const n1 = pubkeyToAccountNumber(NIP06_VECTORS[0].publicKeyHex);
+    const n2 = pubkeyToAccountNumber(NIP06_VECTORS[0].publicKeyHex);
+    expect(n1).toBe(n2);
+  });
+
+  it('differs for different pubkeys', () => {
+    const n0 = pubkeyToAccountNumber(NIP06_VECTORS[0].publicKeyHex);
+    const n1 = pubkeyToAccountNumber(NIP06_VECTORS[1].publicKeyHex);
+    expect(n0).not.toBe(n1);
+  });
+
+  it('uses full 64-char hex via BigInt modulo 2^31', () => {
+    const hex = NIP06_VECTORS[0].publicKeyHex;
+    const expected = Number(BigInt('0x' + hex) % 0x80000000n) & 0x7fffffff;
+    expect(pubkeyToAccountNumber(hex)).toBe(expected);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// nsec → pubkey → npub, nsec → pubkey → number (imported profile flow)
+// Note: number is lossy (reduced from 256-bit); you cannot go number → npub.
+// ---------------------------------------------------------------------------
+
+const NSEC_TEST_VECTOR = 'nsec1jlpx0y7gffw63zrhv8fu2lawrcxl7evtz6w5v67urh59j4l0fsys7hr66h';
+const NSEC_EXPECTED_NPUB = 'npub1n95ewwes70sezt4pvp7n77l2kyw8e4er46fj63gmmw7ee6wu907q7jze9g';
+const NSEC_EXPECTED_NUMBER = 1776036860;
+
+describe('nsec decode (imported profile flow)', () => {
+  it('nsec → pubkey → npub and nsec → pubkey → number (pinned)', () => {
+    const decoded = nip19.decode(NSEC_TEST_VECTOR);
+    expect(decoded.type).toBe('nsec');
+    const pubkeyHex = getPublicKey(decoded.data);
+    const npub = nip19.npubEncode(pubkeyHex);
+    const number = pubkeyToAccountNumber(pubkeyHex);
+
+    expect(pubkeyHex).toMatch(/^[0-9a-f]{64}$/);
+    expect(npub).toBe(NSEC_EXPECTED_NPUB);
+    expect(number).toBe(NSEC_EXPECTED_NUMBER);
+  });
+
+  it('npub decodes back to same pubkey', () => {
+    const decoded = nip19.decode(NSEC_TEST_VECTOR);
+    const pubkeyHex = getPublicKey(decoded.data);
+    const npub = nip19.npubEncode(pubkeyHex);
+    const npubDecoded = nip19.decode(npub);
+    const pubkeyFromNpub =
+      typeof npubDecoded.data === 'string'
+        ? npubDecoded.data
+        : toHex(npubDecoded.data as Uint8Array);
+    expect(pubkeyFromNpub).toBe(pubkeyHex);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Imported nsec profile: Cashu mnemonic (chain 1) derivation
+// Path: m/44'/129372'/0'/<npubNumber>'/1/0
+// ---------------------------------------------------------------------------
+
+describe('Imported profile Cashu derivation (chain 1)', () => {
+  const rootMnemonic = NIP06_VECTORS[0].mnemonic;
+  const npubNumber = pubkeyToAccountNumber(NIP06_VECTORS[0].publicKeyHex);
+
+  it('produces a valid 24-word mnemonic', () => {
+    const cashu = deriveCashuMnemonicForImported(rootMnemonic, npubNumber);
+    expect(cashu.split(' ')).toHaveLength(24);
+  });
+
+  it('is deterministic', () => {
+    const a = deriveCashuMnemonicForImported(rootMnemonic, npubNumber);
+    const b = deriveCashuMnemonicForImported(rootMnemonic, npubNumber);
+    expect(a).toBe(b);
+  });
+
+  it('differs from chain-0 derivation with the same account number', () => {
+    const chain0 = deriveCashuMnemonic(rootMnemonic, npubNumber);
+    const chain1 = deriveCashuMnemonicForImported(rootMnemonic, npubNumber);
+    expect(chain0).not.toBe(chain1);
+  });
+
+  it('differs per npubNumber', () => {
+    const npubNumber2 = pubkeyToAccountNumber(NIP06_VECTORS[1].publicKeyHex);
+    const a = deriveCashuMnemonicForImported(rootMnemonic, npubNumber);
+    const b = deriveCashuMnemonicForImported(rootMnemonic, npubNumber2);
+    expect(a).not.toBe(b);
+  });
+
+  it('full-chain shortcut matches stepwise derivation', () => {
+    const cashuMnemonic = deriveCashuMnemonicForImported(rootMnemonic, npubNumber);
+    const stepwise = deriveCashuWalletSeed(cashuMnemonic);
+    const shortcut = deriveCashuWalletSeedForImported(rootMnemonic, npubNumber);
+    expect(toHex(stepwise)).toBe(toHex(shortcut));
+  });
+
+  it('wallet seed is 64 bytes', () => {
+    const seed = deriveCashuWalletSeedForImported(rootMnemonic, npubNumber);
+    expect(seed).toBeInstanceOf(Uint8Array);
+    expect(seed.length).toBe(64);
+  });
 });

@@ -63,3 +63,41 @@ export function deriveCashuWalletSeedFromRoot(
 ): Uint8Array {
   return deriveCashuWalletSeed(deriveCashuMnemonic(mnemonic, accountIndex));
 }
+
+// ── Imported nsec profile derivation ────────────────────────────
+
+/**
+ * Derive a deterministic 31-bit account number from a hex public key.
+ * Uses the full 32-byte (64-char) pubkey with BigInt to avoid JS number precision loss.
+ * Result is valid BIP-32 hardened index (0 .. 2^31 - 1).
+ *
+ * There is no official Nostr NIP for pubkey-to-number conversion. This is a
+ * custom deterministic mapping. Changing this breaks existing imported profiles.
+ */
+export function pubkeyToAccountNumber(pubkeyHex: string): number {
+  const full = BigInt('0x' + pubkeyHex);
+  return Number(full % 0x80000000n) & 0x7fffffff;
+}
+
+/**
+ * Derive a Cashu mnemonic for an imported nsec profile.
+ * Path: m/44'/129372'/0'/<npubNumber>'/1/0
+ *
+ * Identical to {@link deriveCashuMnemonic} except:
+ *  - Account segment is `npubNumber` (from {@link pubkeyToAccountNumber}).
+ *  - External chain is `1` instead of `0`, distinguishing imported profiles.
+ */
+export function deriveCashuMnemonicForImported(mnemonic: string, npubNumber: number): string {
+  const seed = bip39.mnemonicToSeedSync(mnemonic);
+  const root = HDKey.fromMasterSeed(seed);
+  const path = `${CASHU_DERIVATION_PREFIX}/0'/${npubNumber}'/1/0`;
+  const child = root.derive(path);
+  return bip39.entropyToMnemonic(child.privateKey as Uint8Array, wordlist);
+}
+
+/**
+ * Full chain for imported profiles: root mnemonic + npubNumber → 64-byte Cashu wallet seed.
+ */
+export function deriveCashuWalletSeedForImported(mnemonic: string, npubNumber: number): Uint8Array {
+  return deriveCashuWalletSeed(deriveCashuMnemonicForImported(mnemonic, npubNumber));
+}

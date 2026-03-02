@@ -14,13 +14,17 @@ import {
   storeDerivedKeys,
   retrieveCashuMnemonic,
   storeCashuMnemonic,
+  retrieveImportedNsec,
   hashMnemonic,
   type CachedDerivedKeys,
 } from 'helper/secureStorage';
 import {
   deriveNostrKeys,
   deriveCashuMnemonic as deriveCashuMnemonicPure,
+  deriveCashuMnemonicForImported,
+  pubkeyToAccountNumber,
 } from 'helper/keyDerivation';
+import { nip19, getPublicKey } from 'nostr-tools';
 import { CocoManager } from 'helper/coco/manager';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
 import { useInitializationStage } from './InitializationProvider';
@@ -224,8 +228,8 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
       setKeys(defaultKeys);
       setCashuMnemonic(defaultCashuMnemonic);
 
-      // Update account index and cashu mnemonic in CocoManager
-      CocoManager.setAccountIndex(defaultAccountIndex);
+      const refreshProfile = useProfileStore.getState().getActiveProfile();
+      CocoManager.setAccountIndex(defaultAccountIndex, refreshProfile?.source === 'imported');
       if (defaultCashuMnemonic) {
         CocoManager.setCashuMnemonic(defaultCashuMnemonic);
       }
@@ -297,51 +301,101 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         let defaultKeys: NostrKeys | null = null;
         let defaultCashuMnemonic: string | null = null;
 
-        // Try loading cached keys from SecureStore (fast path)
-        initLog('NostrKeys', 'reading cached keys from SecureStore...');
-        const [cachedDerived, cachedCashu] = await Promise.all([
-          retrieveDerivedKeys(defaultAccountIndex),
-          retrieveCashuMnemonic(defaultAccountIndex),
-        ]);
-        initLog('NostrKeys', `cache read done — derived=${!!cachedDerived} cashu=${!!cachedCashu}`);
+        // Check if the active profile is an imported nsec profile
+        const activeProfile = useProfileStore.getState().getActiveProfile();
+        const isImported = activeProfile?.source === 'imported';
 
-        const cacheValid =
-          cachedDerived?.mnemonicHash === mHash && cachedCashu?.mnemonicHash === mHash;
-        initLog('NostrKeys', `cache valid: ${cacheValid}`);
+        if (isImported && activeProfile) {
+          // ── Imported nsec profile: load identity from SecureStore ──
+          stage.log('Loading imported profile...');
+          initLog('NostrKeys', 'imported profile — loading nsec from SecureStore');
 
-        if (cacheValid && cachedDerived && cachedCashu) {
-          stage.log('Loading cached keys...');
-          initLog('NostrKeys', 'using cached keys (fast path)');
+          const nsecValue = await retrieveImportedNsec(activeProfile.pubkey);
+          if (!nsecValue) {
+            throw new Error('Imported nsec not found in secure storage');
+          }
+
+          const decoded = nip19.decode(nsecValue);
+          if (decoded.type !== 'nsec') {
+            throw new Error('Stored imported key is not a valid nsec');
+          }
+
+          const privateKey = decoded.data;
+          const pubkeyHex = getPublicKey(privateKey);
+
           defaultKeys = {
-            npub: cachedDerived.npub,
-            nsec: cachedDerived.nsec,
-            pubkey: cachedDerived.pubkey,
-            privateKey: hexToBytes(cachedDerived.privateKeyHex),
+            npub: nip19.npubEncode(pubkeyHex),
+            nsec: nsecValue,
+            pubkey: pubkeyHex,
+            privateKey,
           };
-          defaultCashuMnemonic = cachedCashu.value;
+
+          const npubNumber = pubkeyToAccountNumber(pubkeyHex);
+          initLog(
+            'NostrKeys',
+            `imported npubNumber=${npubNumber}, deriving Cashu mnemonic (chain 1)...`
+          );
+
+          // Try cached Cashu mnemonic first
+          const cachedCashu = await retrieveCashuMnemonic(defaultAccountIndex);
+          if (cachedCashu?.mnemonicHash === mHash) {
+            defaultCashuMnemonic = cachedCashu.value;
+          } else {
+            defaultCashuMnemonic = deriveCashuMnemonicForImported(mnemonicToUse, npubNumber);
+            storeCashuMnemonic(defaultAccountIndex, defaultCashuMnemonic, mHash).catch((e) =>
+              initLog('NostrKeys', `imported cashu cache write failed: ${e}`)
+            );
+          }
+          initLog('NostrKeys', 'imported profile keys loaded');
         } else {
-          // Derive from scratch and persist to SecureStore
-          stage.log('Deriving keys...');
-          initLog('NostrKeys', 'cache miss — deriving NIP-06 keys...');
-          defaultKeys = deriveNostrKeys(mnemonicToUse, defaultAccountIndex);
-          initLog('NostrKeys', 'NIP-06 keys derived');
+          // ── Derived profile: existing NIP-06 derivation path ──
+          // Try loading cached keys from SecureStore (fast path)
+          initLog('NostrKeys', 'reading cached keys from SecureStore...');
+          const [cachedDerived, cachedCashu] = await Promise.all([
+            retrieveDerivedKeys(defaultAccountIndex),
+            retrieveCashuMnemonic(defaultAccountIndex),
+          ]);
+          initLog(
+            'NostrKeys',
+            `cache read done — derived=${!!cachedDerived} cashu=${!!cachedCashu}`
+          );
 
-          initLog('NostrKeys', 'deriving Cashu mnemonic (BIP32)...');
-          defaultCashuMnemonic = deriveCashuMnemonicPure(mnemonicToUse, defaultAccountIndex);
-          initLog('NostrKeys', 'Cashu mnemonic derived');
+          const cacheValid =
+            cachedDerived?.mnemonicHash === mHash && cachedCashu?.mnemonicHash === mHash;
+          initLog('NostrKeys', `cache valid: ${cacheValid}`);
 
-          // Persist to SecureStore in the background (don't block)
-          const cachePayload: CachedDerivedKeys = {
-            npub: defaultKeys.npub,
-            nsec: defaultKeys.nsec,
-            pubkey: defaultKeys.pubkey,
-            privateKeyHex: bytesToHex(defaultKeys.privateKey),
-            mnemonicHash: mHash,
-          };
-          Promise.all([
-            storeDerivedKeys(defaultAccountIndex, cachePayload),
-            storeCashuMnemonic(defaultAccountIndex, defaultCashuMnemonic, mHash),
-          ]).catch((e) => initLog('NostrKeys', `cache write failed: ${e}`));
+          if (cacheValid && cachedDerived && cachedCashu) {
+            stage.log('Loading cached keys...');
+            initLog('NostrKeys', 'using cached keys (fast path)');
+            defaultKeys = {
+              npub: cachedDerived.npub,
+              nsec: cachedDerived.nsec,
+              pubkey: cachedDerived.pubkey,
+              privateKey: hexToBytes(cachedDerived.privateKeyHex),
+            };
+            defaultCashuMnemonic = cachedCashu.value;
+          } else {
+            stage.log('Deriving keys...');
+            initLog('NostrKeys', 'cache miss — deriving NIP-06 keys...');
+            defaultKeys = deriveNostrKeys(mnemonicToUse, defaultAccountIndex);
+            initLog('NostrKeys', 'NIP-06 keys derived');
+
+            initLog('NostrKeys', 'deriving Cashu mnemonic (BIP32)...');
+            defaultCashuMnemonic = deriveCashuMnemonicPure(mnemonicToUse, defaultAccountIndex);
+            initLog('NostrKeys', 'Cashu mnemonic derived');
+
+            const cachePayload: CachedDerivedKeys = {
+              npub: defaultKeys.npub,
+              nsec: defaultKeys.nsec,
+              pubkey: defaultKeys.pubkey,
+              privateKeyHex: bytesToHex(defaultKeys.privateKey),
+              mnemonicHash: mHash,
+            };
+            Promise.all([
+              storeDerivedKeys(defaultAccountIndex, cachePayload),
+              storeCashuMnemonic(defaultAccountIndex, defaultCashuMnemonic, mHash),
+            ]).catch((e) => initLog('NostrKeys', `cache write failed: ${e}`));
+          }
         }
 
         initLog('NostrKeys', 'setting keys in state...');
@@ -349,13 +403,13 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         setCashuMnemonic(defaultCashuMnemonic);
 
         initLog('NostrKeys', 'setting CocoManager account index & cashu mnemonic...');
-        CocoManager.setAccountIndex(defaultAccountIndex);
+        CocoManager.setAccountIndex(defaultAccountIndex, isImported);
         if (defaultCashuMnemonic) {
           CocoManager.setCashuMnemonic(defaultCashuMnemonic);
         }
         initLog('NostrKeys', 'CocoManager configured');
 
-        if (defaultKeys?.pubkey) {
+        if (defaultKeys?.pubkey && !isImported) {
           initLog('NostrKeys', 'adding profile to profileStore...');
           useProfileStore.getState().addProfile(defaultAccountIndex, defaultKeys.pubkey);
         }
