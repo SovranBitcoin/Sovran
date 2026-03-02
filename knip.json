@@ -30,6 +30,10 @@
     "helper/nfc/**": ["exports", "types"],
     "helper/nfc.ts": ["exports", "types"],
     "stores/nostrSocialStore.ts": ["exports"],
-    "components/blocks/rebalance/demoRunner.ts": ["files"]
+    "components/blocks/rebalance/demoRunner.ts": ["files"],
+    "components/blocks/DebugBalancePanel.tsx": ["files"],
+    "components/blocks/DevPopupPanel.tsx": ["files"],
+    "helper/popup/popups.ts": ["exports"],
+    "helper/secureStorage.ts": ["exports"]
   }
 }

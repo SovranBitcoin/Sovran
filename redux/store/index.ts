@@ -614,9 +614,7 @@ export const resetApp = (): AppThunk => {
       const { useProfileStore } = await import('stores/profileStore');
       const profiles = useProfileStore.getState().profiles;
       const accountIndexes = profiles.map((p) => p.accountIndex);
-      const importedPubkeys = profiles
-        .filter((p) => p.source === 'imported')
-        .map((p) => p.pubkey);
+      const importedPubkeys = profiles.filter((p) => p.source === 'imported').map((p) => p.pubkey);
 
       // 1. Clear ALL Coco SQLite databases (coco.db, coco-N.db for every profile)
       try {

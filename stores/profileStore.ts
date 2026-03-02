@@ -71,11 +71,7 @@ interface ProfileActions {
   /** Mark the Redux-to-Coco migration as done for an account. */
   markCocoMigrationComplete: (accountIndex: number) => void;
   /** Update cached Nostr kind-0 metadata for a profile */
-  updateProfileMetadata: (
-    accountIndex: number,
-    displayName?: string,
-    picture?: string
-  ) => void;
+  updateProfileMetadata: (accountIndex: number, displayName?: string, picture?: string) => void;
   /** Check if a pubkey is already used by any profile */
   hasPubkey: (pubkey: string) => boolean;
   /** Get the active profile entry */
@@ -101,8 +97,7 @@ export const useProfileStore = create<ProfileStore>()(
           if (state.profiles.some((p) => p.accountIndex === accountIndex)) {
             return state;
           }
-          const effectiveChain =
-            externalChain ?? (source === 'imported' ? 1 : undefined);
+          const effectiveChain = externalChain ?? (source === 'imported' ? 1 : undefined);
           return {
             profiles: [
               ...state.profiles,
@@ -177,11 +172,7 @@ export const useProfileStore = create<ProfileStore>()(
         }));
       },
 
-      updateProfileMetadata: (
-        accountIndex: number,
-        displayName?: string,
-        picture?: string
-      ) => {
+      updateProfileMetadata: (accountIndex: number, displayName?: string, picture?: string) => {
         set((state) => ({
           profiles: state.profiles.map((p) =>
             p.accountIndex === accountIndex
