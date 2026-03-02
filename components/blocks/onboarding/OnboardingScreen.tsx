@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
+import { PressableFeedback } from 'heroui-native';
 
 import Animated, {
   Extrapolation,
@@ -39,22 +40,23 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
 
-  const [background, foreground, muted, shade300, purple300, blue300] = useThemeColor([
+  const [background, foreground, muted, orange300, purple300, blue300, shade300] = useThemeColor([
     'background',
     'foreground',
     'muted',
-    'shade-300',
+    'orange-300',
     'purple-300',
     'blue-300',
+    'shade-300',
   ] as const);
 
   const slides: OnboardingSlide[] = [
     {
-      bgColor: shade300,
+      bgColor: orange300,
       duration: 3000,
       title: 'Bitcoin That Feels Like Cash',
       description:
-        'Send and receive instantly, with zero fees and full privacy \u2014 anytime, anywhere.',
+        'Send and receive instantly with near-zero fees. Ecash bearer tokens live on your device \u2014 like digital cash.',
       icon: 'mdi:bitcoin',
     },
     {
@@ -62,15 +64,15 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       duration: 3000,
       title: 'Powered by Nostr',
       description:
-        'SOVRAN runs on Nostr, a resilient network that can\u2019t be shut down or censored.',
+        'SOVRAN runs on Nostr, a decentralized network that can\u2019t be shut down or censored.',
       icon: 'mdi:broadcast',
     },
     {
       bgColor: blue300,
       duration: 3000,
-      title: 'Your Keys, Your Money',
+      title: 'Private by Design',
       description:
-        'Non-custodial by design. Only you hold the keys \u2014 no middlemen, no permission needed.',
+        'Blind signatures mean mints can\u2019t link your transactions. Choose mints you trust \u2014 spread your balance across many.',
       icon: 'mdi:key-variant',
     },
     {
@@ -165,14 +167,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   }));
 
   const onGetStartedPress = () => {
-    if (translateY.get() === -TOP_CAROUSEL_OFFSET) {
-      onComplete();
-      return;
-    }
-
-    isDragging.set(true);
-    gestureStartY.set(translateY.get());
-    translateY.set(withTiming(-TOP_CAROUSEL_OFFSET, { duration: 300 }));
+    onComplete();
   };
 
   const onChevronDownPress = () => {
@@ -194,7 +189,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         </Text>
       </Animated.View>
 
-      <Pressable
+      <PressableFeedback
         onPress={onGetStartedPress}
         style={{
           height: 48,
@@ -204,11 +199,13 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
           marginHorizontal: 80,
           marginTop: 24,
           backgroundColor: foreground,
+          overflow: 'hidden',
         }}>
+        <PressableFeedback.Highlight />
         <Text bold size={16} style={{ color: background }}>
           Get Started
         </Text>
-      </Pressable>
+      </PressableFeedback>
 
       <GestureDetector gesture={Gesture.Race(panGesture, singleTap)}>
         <OnboardingInnerCarousel

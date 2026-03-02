@@ -28,6 +28,7 @@
     "constants/wallet-header.ts": ["exports"],
     "helper/nfc/**": ["exports", "types"],
     "helper/nfc.ts": ["exports", "types"],
-    "stores/nostrSocialStore.ts": ["exports"]
+    "stores/nostrSocialStore.ts": ["exports"],
+    "components/blocks/rebalance/demoRunner.ts": ["files"]
   }
 }

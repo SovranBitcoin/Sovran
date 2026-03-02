@@ -72,8 +72,7 @@
         {
           "image": "./assets/images/production.png",
           "backgroundColor": "#000000",
-          "resizeMode": "cover",
-          "enableFullScreenImage_legacy": true
+          "resizeMode": "contain"
         }
       ],
       "expo-build-properties",

@@ -64,9 +64,9 @@ export const TransferEntryRow = React.memo(
     onPress,
     statusIcon,
   }: TransferEntryRowProps) => {
-    const [foreground, accent, danger, success] = useThemeColor([
+    const [foreground, surfaceSecondary, danger, success] = useThemeColor([
       'foreground',
-      'accent',
+      'surface-secondary',
       'danger',
       'success',
     ] as const);
@@ -80,7 +80,7 @@ export const TransferEntryRow = React.memo(
         {/* Avatar with small arrow overlay */}
         <View style={styles.avatarWrapper}>
           <Avatar picture={mintIconUrl} size={36} variant="mint" name={mintName} />
-          <View style={[styles.arrowBadge, { backgroundColor: accent }]}>
+          <View style={[styles.arrowBadge, { backgroundColor: surfaceSecondary }]}>
             <Icon
               name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}
               size={10}

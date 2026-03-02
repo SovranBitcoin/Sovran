@@ -53,6 +53,12 @@ const STATIC_COLOR_VALUES: Record<string, string> = {
   'yellow-300': '#EDED0C',
   'yellow-400': '#BFBF01',
   'yellow-500': '#9A9A00',
+
+  'orange-100': '#FEF0DC',
+  'orange-200': '#FCC46A',
+  'orange-300': '#F7931A',
+  'orange-400': '#C87614',
+  'orange-500': '#9A5A0F',
 };
 
 const STATIC_COLORS: SemanticVars = Object.fromEntries(
