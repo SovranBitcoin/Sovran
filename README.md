@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/SovranBitcoin/Sovran/actions/workflows/ci.yml)
 
-<img width="100%" alt="image" src="https://github.com/user-attachments/assets/68de325f-05ac-46d9-bbac-eb25325fe5cf" />
-
 <img width="100%" src="./sovran.png" />
+
+<img width="100%" alt="image" src="https://github.com/user-attachments/assets/68de325f-05ac-46d9-bbac-eb25325fe5cf" />
 
 A privacy-first Bitcoin wallet built on Cashu ecash, Nostr identity, and NFC payments.
 
