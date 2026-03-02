@@ -1,0 +1,238 @@
+---
+description: Git and GitHub workflow standards for branches, commits, PRs, and issues. Use when performing repository operations.
+globs:
+  - ".git/**"
+  - ".github/**"
+alwaysApply: false
+---
+
+# GitHub Workflow
+
+Clean commits, PRs, and issues for a React Native / Expo codebase. The agent decides when and how to commit — no user confirmation needed unless ambiguous.
+
+---
+
+## Recon (always run first)
+
+Before planning anything, gather full context:
+
+```bash
+git status
+git diff --stat
+git diff
+git diff --staged
+git log --oneline --decorate -n 20
+git branch --show-current
+```
+
+Then write a **3–7 bullet summary** of what changed:
+- 2–4 user-facing bullets (what the user would notice)
+- 1–3 technical bullets (architecture, perf, cleanup)
+
+This summary drives commit messages, PR body, and issue descriptions.
+
+---
+
+## Secret Scanning (non-negotiable)
+
+Before staging ANY file, scan diffs for secrets. **Refuse to commit** if found:
+
+- Passwords, API keys, tokens, session cookies
+- Mnemonics (12–24 words), `xprv`, WIF, raw private keys
+- Nostr secrets (`nsec1...`), hex private keys
+- `.env` contents, credential files
+
+If found: remove from diff, confirm `.gitignore` coverage, advise secret rotation. If already committed: rewrite history, force-push, and note it clearly.
+
+---
+
+## Branch Rules
+
+**Never commit to `main` or `master`.** If on one, branch off immediately:
+
+```bash
+git checkout -b <type>/<scope>-<short-kebab>
+```
+
+Rename if scope evolves:
+
+```bash
+git branch -m <type>/<new-scope>-<short-kebab>
+```
+
+Branch naming: `type/scope-description` — e.g. `feat/nfc-payment-flow`, `fix/mint-reconnect`, `refactor/popup-engine`.
+
+---
+
+## Commit Conventions
+
+### Format
+
+```
+type(scope): imperative subject (≤72 chars)
+
+Optional body — why, tradeoffs, edge cases.
+Keep it short. Use when subject alone isn't enough.
+```
+
+### Types
+
+`feat` `fix` `refactor` `perf` `test` `docs` `style` `build` `ci` `chore`
+
+### Scope
+
+Derive from diff paths first, then feature intent. Pick **one** primary scope per commit.
+
+**Known scopes** (from project history):
+
+| Scope | Covers |
+|---|---|
+| `ui` | `components/ui/*`, general visual/layout, pill styling, skeleton, text |
+| `app` | `app/*` top-level, offline shell, launch, widget target, release automation |
+| `camera` | QR scanning, camera permissions, camera lock |
+| `nfc` | NFC payment flow, NFC rollback, NFC tap |
+| `mint` | Mint info, trust sheets, mint selection, mint sync |
+| `npc` | NPC plugin, NPC mint store, NPC signing |
+| `wallet` | Wallet operations, DMs, transaction history |
+| `receive` | Receive flow, token redeem, ecash receive |
+| `rebalance` | Rebalance chain cards, step grouping |
+| `transactions` | Transaction screens, source/P2PK details |
+| `keyring` | P2PK key regeneration, keyring settings |
+| `keys` | Key derivation, NIP-06, NUT-13, `helper/keyDerivation*` |
+| `profile` | Account session isolation, multi-profile, profile switch |
+| `settings` | Settings pages, dev mode, preferences |
+| `home` | Dashboard widgets, native headers |
+| `explore` | Explore tab, wallet health modal |
+| `map` | Map flow, BTC Map, map performance |
+| `lists` | LegendList, virtualized feeds |
+| `popup` | `helper/popup/*`, toast/sheet system |
+| `theme` | Theme engine, HeroUI semantics, `themeEngine.ts` |
+| `providers` | `providers/*`, NDK, ThemeProvider |
+| `store` | `stores/*`, Zustand stores |
+| `hooks` | `hooks/*` |
+| `blocks` | `components/blocks/*` |
+| `tx` | Transaction timeline, history rerenders |
+| `widget` | iOS/Android widget target |
+| `repo` | Repo-level docs, commit guidance |
+| `tooling` | Lint, knip, prettier, quality gate |
+| `ci` | GitHub Actions, CI alignment |
+| `patches` | `patches/*` |
+| `metro` | `metro.config.*` |
+| `rules` | `.cursor/rules/*` docs |
+| `readme` | README changes |
+
+**Create new scopes freely** when the change doesn't fit an existing one. Derive from the most specific directory or feature name — don't force-fit into the table above. New scopes are cheap; vague scopes are expensive.
+
+### When to commit
+
+Commit if any are true:
+- UI or user behavior changed
+- Non-trivial fix, perf improvement, or refactor
+- New files added or risky logic touched (payments, keys, storage, networking)
+- Config, tooling, patches, or lockfile changed
+
+Skip only if truly trivial or user explicitly says no.
+
+### Staging
+
+Stage precisely — use `git add -p` for mixed files. Plan 2–6 commits for non-trivial work. Keep deps/lockfiles/patches in separate commits.
+
+Never commit a broken state (partial syntax, missing imports).
+
+---
+
+## Validation Gate
+
+Run **all four** before every commit:
+
+```bash
+npm run lint
+npm run type-check
+npm run pretty:check
+npm run knip
+```
+
+If formatting fails, fix with `npm run pretty` then re-check. If any other check fails, fix and `git commit --amend`. Only claim what you actually ran.
+
+---
+
+## PR Creation
+
+Push and open PR when work is ready for review:
+
+```bash
+git push -u origin $(git branch --show-current)
+gh pr create --title "<type>(scope): subject" --body "$(cat <<'EOF'
+## What / Why
+- <2-3 bullets: problem solved or feature added>
+
+## What changed
+- <3-5 bullets: key code changes>
+
+## Test plan
+1. <concrete verification steps>
+
+## Notes / Risks
+- <anything reviewers should watch for, or "None">
+EOF
+)"
+```
+
+### PR rules
+- Title = final conventional commit subject (this becomes the squash-merge message)
+- Body is the commit message body — concise, scannable, no filler
+- Use `gh pr edit` to update if scope changes after opening
+- Link related issues: `Closes #N` or `Related: #N`
+
+---
+
+## GitHub Issues (rare — unresolved bugs only)
+
+File an issue **only** when:
+- A bug was investigated but couldn't be fixed in the current session
+- The root cause is identified but the fix is out of scope or risky
+- A flaky behavior needs tracking for future debugging
+
+```bash
+gh issue create --title "<type>(scope): concise problem statement" --body "$(cat <<'EOF'
+## Problem
+<1-2 sentences: what's broken and when it happens>
+
+## Reproduction
+1. <minimal steps>
+
+## Investigation so far
+- <what was tried, what was ruled out>
+- <root cause hypothesis if any>
+
+## Relevant code
+- `path/to/file.ts` — <what's relevant there>
+
+## Suggested fix
+- <approach if known, or "Needs further investigation">
+EOF
+)"
+```
+
+### Issue rules
+- Title is a conventional commit subject (so it reads well in lists)
+- Body captures agent context — the investigation is the value
+- Label if `gh` labels are available: `bug`, `investigation`, `help-wanted`
+- Never file issues for feature requests or tasks — only unresolved bugs from the current session
+
+---
+
+## Quick Reference
+
+| Action | Command |
+|---|---|
+| New branch | `git checkout -b type/scope-desc` |
+| Stage hunks | `git add -p` |
+| Commit | `git commit -m "type(scope): subject"` |
+| Amend | `git commit --amend` |
+| Push | `git push -u origin $(git branch --show-current)` |
+| Force push (rewrite) | `git push --force-with-lease` |
+| Open PR | `gh pr create --title "..." --body "..."` |
+| Update PR | `gh pr edit --title "..." --body "..."` |
+| File issue | `gh issue create --title "..." --body "..."` |
+| View PR status | `gh pr status` |
