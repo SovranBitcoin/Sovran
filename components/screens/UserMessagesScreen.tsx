@@ -96,6 +96,7 @@ import {
 import opacity from 'hex-color-opacity';
 import { truncateMiddle } from '@/helper/strings';
 import { getUsername } from 'helper/username';
+import { useProfileDisplay } from '@/hooks/useProfileDisplay';
 import { useThemeColor } from 'hooks/useThemeColor';
 
 export type TimelineItemType = Message;
@@ -864,7 +865,8 @@ export function UserMessagesScreen({
     : userInfo?.display_name || userInfo?.name || getUsername(pubkey);
   const userPicture = userInfo?.picture;
   const lud16 = userInfo?.lud16;
-  const myName = getUsername(nostrKeys?.pubkey || '');
+  const myProfile = useProfileDisplay(nostrKeys?.pubkey || '');
+  const myName = myProfile.displayName;
   const isMetadataLoading = !metadataEose;
   const shouldShowAvatarLoading = !isRoutstrMode && isMetadataLoading && !userInfo;
 
@@ -2239,7 +2241,13 @@ export function UserMessagesScreen({
                 <Icon name="fluent:add-24-filled" size={24} color={foreground} />
               </Pressable>
             ) : (
-              <Avatar size={40} seed={nostrKeys?.pubkey} name={myName} variant="person" />
+              <Avatar
+                size={40}
+                seed={nostrKeys?.pubkey}
+                picture={myProfile.picture}
+                name={myName}
+                variant="person"
+              />
             )}
 
             <TextInput

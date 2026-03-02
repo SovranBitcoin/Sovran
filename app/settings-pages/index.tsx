@@ -15,7 +15,7 @@ import { Spacer } from 'components/ui/View/Spacer';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from 'components/ui/TouchableOpacity';
 import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { getUsername } from '@/helper/username';
+import { useProfileDisplay } from '@/hooks/useProfileDisplay';
 import { CocoManager } from 'helper/coco/manager';
 import { devModePopup, reservedProofsFreedPopup, reservedProofsFailedPopup } from '@/helper/popup';
 import opacity from 'hex-color-opacity';
@@ -50,7 +50,7 @@ export const Section: React.FC<{
 
 const ProfileButton = () => {
   const { keys: nostrKeys } = useNostrKeysContext();
-  const username = getUsername(nostrKeys?.pubkey || '');
+  const { displayName, picture } = useProfileDisplay(nostrKeys?.pubkey || '');
 
   return (
     <ListGroup variant="secondary">
@@ -60,10 +60,16 @@ const ProfileButton = () => {
         <PressableFeedback.Scale>
           <ListGroup.Item disabled>
             <ListGroup.ItemPrefix>
-              <Avatar seed={nostrKeys?.pubkey || ''} name={username} size={40} variant="person" />
+              <Avatar
+                seed={nostrKeys?.pubkey || ''}
+                picture={picture}
+                name={displayName}
+                size={40}
+                variant="person"
+              />
             </ListGroup.ItemPrefix>
             <ListGroup.ItemContent>
-              <ListGroup.ItemTitle>{username}</ListGroup.ItemTitle>
+              <ListGroup.ItemTitle>{displayName}</ListGroup.ItemTitle>
               <ListGroup.ItemDescription>
                 {truncateMiddle(nostrKeys?.npub || '', 14)}
               </ListGroup.ItemDescription>

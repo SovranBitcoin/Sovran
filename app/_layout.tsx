@@ -43,6 +43,8 @@ import { CocoProvider } from '@/helper/coco/CocoProvider';
 import { HeroTransitionProvider } from '@/components/ui/hero-transition/HeroTransitionProvider';
 import { useProfileStore } from '@/stores/profileStore';
 import { useAppBalance } from '@/hooks/useAppBalance';
+import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { Metadata } from 'nostr-tools/kinds';
 import PopupHost from '@/components/blocks/popup/PopupHost';
 
 export const unstable_settings = {
@@ -115,6 +117,33 @@ function ProfileBalanceSync() {
   useEffect(() => {
     useProfileStore.getState().updateProfileBalance(activeAccountIndex, balance);
   }, [balance, activeAccountIndex]);
+
+  return null;
+}
+
+/** Invisible component that syncs the active profile's Nostr kind-0 metadata to profileStore */
+function ProfileMetadataSync() {
+  const { keys: nostrKeys } = useNostrKeysContext();
+  const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
+
+  const filters = useMemo(
+    () => (nostrKeys?.pubkey ? [{ kinds: [Metadata], authors: [nostrKeys.pubkey], limit: 1 }] : []),
+    [nostrKeys?.pubkey]
+  );
+
+  const { events } = useSubscribe({ filters });
+
+  useEffect(() => {
+    if (!events?.length) return;
+    try {
+      const parsed = JSON.parse(events[0].content);
+      const displayName = parsed.display_name || parsed.name || undefined;
+      const picture = parsed.picture || undefined;
+      useProfileStore.getState().updateProfileMetadata(activeAccountIndex, displayName, picture);
+    } catch {
+      // Malformed kind-0 content — ignore
+    }
+  }, [events, activeAccountIndex]);
 
   return null;
 }
@@ -197,6 +226,7 @@ function RootLayoutContent() {
   return (
     <NavigationThemeProvider value={DarkTheme}>
       <ProfileBalanceSync />
+      <ProfileMetadataSync />
       <StatusBar
         backgroundColor={background}
         style={currentTheme.includes('light') ? 'dark' : 'light'}

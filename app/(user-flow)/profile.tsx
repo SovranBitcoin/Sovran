@@ -61,6 +61,7 @@ import { useNostrKeysContext } from 'providers/NostrKeysProvider';
 import { selectIsFollowingPubkey, useNostrSocialStore } from '@/stores/nostrSocialStore';
 import { getUsername } from '@/helper/username';
 import { generateSeededGradient } from '@/helper/avatarGradient';
+import { useDominantColor, getContrastColors } from '@/helper/colorExtraction';
 import type { VideoPostRecord } from 'components/blocks/nostr/shared';
 import type { StoryUser } from 'components/blocks/nostr/StoriesCarousel';
 import { ListGroup, PressableFeedback, Skeleton as HeroSkeleton } from 'heroui-native';
@@ -381,10 +382,39 @@ function BannerWithAvatarComponent({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [bannerError, setBannerError] = useState(false);
 
+  const fallbackIndex = useMemo(
+    () => (pubkey ? parseInt(pubkey.slice(0, 8), 16) % 8 : 0),
+    [pubkey]
+  );
+  const hasBannerImage = Boolean(bannerUrl && !bannerError);
+  const pfpColors = useDominantColor(pictureUrl, fallbackIndex);
+  const bannerColors = useDominantColor(
+    !pictureUrl && hasBannerImage ? bannerUrl : undefined,
+    fallbackIndex
+  );
+
   const bannerGradientTheme = useMemo(
     () => generateSeededGradient(`${pubkey || 'default'}:person`, 'person'),
     [pubkey]
   );
+
+  const gradientSource = useMemo(() => {
+    if (pictureUrl && pfpColors.hasExtractedColors) return 'pfp';
+    if (hasBannerImage && bannerColors.hasExtractedColors) return 'banner';
+    return 'seeded';
+  }, [pictureUrl, hasBannerImage, pfpColors.hasExtractedColors, bannerColors.hasExtractedColors]);
+
+  const imageGradientColors = useMemo(() => {
+    if (gradientSource === 'pfp') {
+      const { contrastColor } = getContrastColors(pfpColors.baseColor, 0.3);
+      return [pfpColors.baseColor, contrastColor] as const;
+    }
+    if (gradientSource === 'banner') {
+      const { contrastColor } = getContrastColors(bannerColors.baseColor, 0.3);
+      return [bannerColors.baseColor, contrastColor] as const;
+    }
+    return null;
+  }, [gradientSource, pfpColors.baseColor, bannerColors.baseColor]);
 
   useEffect(() => {
     setBannerError(false);
@@ -412,37 +442,92 @@ function BannerWithAvatarComponent({
     </View>
   );
 
+  const seededGradientFill = (
+    <View style={StyleSheet.absoluteFill}>
+      <LinearGradient
+        colors={bannerGradientTheme.primaryColors}
+        start={bannerGradientTheme.primaryStart}
+        end={bannerGradientTheme.primaryEnd}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={bannerGradientTheme.overlayColors}
+        start={bannerGradientTheme.overlayStart}
+        end={bannerGradientTheme.overlayEnd}
+        style={StyleSheet.absoluteFill}
+      />
+    </View>
+  );
+
   return (
     <View>
       {/* Banner */}
       <View style={[styles.bannerContainer, { backgroundColor: surfaceSecondary }]}>
-        {/* Gradient fallback (always visible underneath) */}
-        <View style={StyleSheet.absoluteFill}>
-          <LinearGradient
-            colors={bannerGradientTheme.primaryColors}
-            start={bannerGradientTheme.primaryStart}
-            end={bannerGradientTheme.primaryEnd}
-            style={StyleSheet.absoluteFill}
+        {isLoading ? (
+          <Skeleton
+            style={[StyleSheet.absoluteFill, { height: BANNER_HEIGHT, borderRadius: 0 }]}
+            className="w-full"
           />
-          <LinearGradient
-            colors={bannerGradientTheme.overlayColors}
-            start={bannerGradientTheme.overlayStart}
-            end={bannerGradientTheme.overlayEnd}
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-
-        {/* Banner image fades in on top via ExpoImage transition */}
-        {bannerUrl && !bannerError && (
-          <ExpoImage
-            source={{ uri: bannerUrl }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            cachePolicy="disk"
-            recyclingKey={bannerUrl}
-            transition={300}
-            onError={() => setBannerError(true)}
-          />
+        ) : hasBannerImage ? (
+          <>
+            <ExpoImage
+              source={{ uri: bannerUrl }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              cachePolicy="disk"
+              recyclingKey={bannerUrl}
+              transition={300}
+              onError={() => setBannerError(true)}
+            />
+            {imageGradientColors ? (
+              <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                <View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { backgroundColor: opacity(imageGradientColors[0], 0.05) },
+                  ]}
+                />
+                <LinearGradient
+                  colors={[opacity(imageGradientColors[0], 0.28), 'transparent']}
+                  locations={[0, 0.8]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <LinearGradient
+                  colors={[
+                    opacity(imageGradientColors[1], 0.2),
+                    'transparent',
+                    opacity(imageGradientColors[0], 0.18),
+                  ]}
+                  locations={[0, 0.55, 1]}
+                  start={{ x: 1, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.06)', 'transparent']}
+                  locations={[0, 0.7]}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </View>
+            ) : (
+              seededGradientFill
+            )}
+          </>
+        ) : imageGradientColors ? (
+          <View style={StyleSheet.absoluteFill}>
+            <LinearGradient
+              colors={imageGradientColors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
+        ) : (
+          seededGradientFill
         )}
       </View>
 
@@ -612,7 +697,7 @@ function UserProfileScreen() {
   }, [metadataEvents]);
 
   const displayName = isOwnProfile
-    ? getUsername(pubkey || '')
+    ? userInfo?.display_name || userInfo?.name || getUsername(pubkey || '')
     : userInfo?.display_name || userInfo?.name || truncateMiddle(npub, 8);
   const isMetadataLoading = !metadataEose;
 
