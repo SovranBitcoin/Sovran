@@ -103,7 +103,7 @@ const Camera: React.FC = () => {
           ),
         }}
       />
-      <CameraScreen onScan={handleScan} onReset={reset} />
+      <CameraScreen onScan={handleScan} onReset={reset} scanLocked={nfc.isPaying} />
     </>
   );
 };
