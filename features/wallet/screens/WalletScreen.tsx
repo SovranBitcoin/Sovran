@@ -2,13 +2,17 @@ import { useCallback, useState } from 'react';
 import { RefreshControl, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useHistoryWithMelts } from '@/features/transactions';
+import {
+  useHistoryWithMelts,
+  ReceivedThisMonth,
+  SpentThisMonth,
+  Transactions,
+} from '@/features/transactions';
 import { useDeeplink } from '@/shared/hooks/useDeeplink';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { AccountPagerView } from '@/features/wallet/components/AccountPagerView';
 import { BitcoinNearYou } from '@/features/wallet/components/BitcoinNearYou';
-import { ReceivedThisMonth, SpentThisMonth, Transactions } from '@/features/transactions';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
 import { View } from '@/shared/ui/primitives/View/View';

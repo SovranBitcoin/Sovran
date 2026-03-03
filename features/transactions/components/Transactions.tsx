@@ -20,7 +20,10 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/time';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useSwapTransactionsStore, type SwapGroup } from '@/shared/stores/profile/swapTransactionsStore';
+import {
+  useSwapTransactionsStore,
+  type SwapGroup,
+} from '@/shared/stores/profile/swapTransactionsStore';
 
 // ---------------------------------------------------------------------------
 // Timeline item: a discriminated union so transactions and swap groups can

@@ -51,13 +51,16 @@ import {
   getFollowerDisplayName,
   getFollowerPicture,
   TopFollower,
+  UserFeed,
 } from '@/features/feed';
 import { formatDate } from '@/shared/lib/time';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
-import { UserFeed } from '@/features/feed';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { selectIsFollowingPubkey, useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
+import {
+  selectIsFollowingPubkey,
+  useNostrSocialStore,
+} from '@/shared/stores/profile/nostrSocialStore';
 import { getUsername } from '@/shared/lib/username';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { useDominantColor, getContrastColors } from '@/shared/lib/colorExtraction';

@@ -31,7 +31,14 @@ import { Metadata } from 'nostr-tools/kinds';
 import type { ProfilePointer } from 'nostr-tools/nip19';
 import { SheetManager } from 'react-native-actions-sheet';
 
-import { HistoryEntryHeader, useTransactionSource } from '@/features/transactions';
+import {
+  HistoryEntryHeader,
+  useTransactionSource,
+  useHistoryEntry,
+  HistoryEntryRefresh,
+  HistoryEntryTimeline,
+  TransactionLocationSection,
+} from '@/features/transactions';
 import {
   nfcEcashSharedPopup,
   nfcConnectionLostPopup,
@@ -58,12 +65,6 @@ import {
   invalidPaymentRequestPopup,
   sendPaymentFailedPopup,
 } from '@/shared/lib/popup';
-import {
-  useHistoryEntry,
-  HistoryEntryRefresh,
-  HistoryEntryTimeline,
-  TransactionLocationSection,
-} from '@/features/transactions';
 import { useMintManagement } from '@/features/mint';
 import { useSendWithHistory } from '@/features/send';
 import { useNostrDirectMessage } from '@/features/user';

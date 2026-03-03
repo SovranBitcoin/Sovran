@@ -13,21 +13,22 @@ import { getDecodedToken } from '@cashu/cashu-ts';
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
 import { useReceive, useManager } from 'coco-cashu-react';
 
-import { HistoryEntryHeader, useTransactionSource } from '@/features/transactions';
+import {
+  HistoryEntryHeader,
+  useTransactionSource,
+  useHistoryEntry,
+  HistoryEntryRefresh,
+  HistoryEntryTimeline,
+  TransactionLocationSection,
+} from '@/features/transactions';
 import {
   unsupportedTokenUnitPopup,
   receiveFailedPopup,
   receiveSuccessPopup,
 } from '@/shared/lib/popup';
-import { useHistoryEntry } from '@/features/transactions';
 import { useMintManagement } from '@/features/mint';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
-import {
-  HistoryEntryRefresh,
-  HistoryEntryTimeline,
-  TransactionLocationSection,
-} from '@/features/transactions';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';

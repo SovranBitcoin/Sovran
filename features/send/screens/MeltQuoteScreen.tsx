@@ -16,20 +16,21 @@ import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import { MeltHistoryEntry } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
 
-import { HistoryEntryHeader, useTransactionSource } from '@/features/transactions';
+import {
+  HistoryEntryHeader,
+  useTransactionSource,
+  useHistoryEntry,
+  HistoryEntryRefresh,
+  HistoryEntryTimeline,
+  TransactionLocationSection,
+} from '@/features/transactions';
 import { getLightningTimestamp, requestInvoiceFromLnurl } from '@/shared/lib/cashu/utils';
 import { paymentCancelledPopup, couldNotCancelPopup, sendSuccessPopup } from '@/shared/lib/popup';
-import { useHistoryEntry } from '@/features/transactions';
 import { useMeltWithHistory } from '@/features/send';
 import { useBeforeRemoveCleanup } from '@/shared/hooks/useBeforeRemoveCleanup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
-import {
-  HistoryEntryRefresh,
-  HistoryEntryTimeline,
-  TransactionLocationSection,
-} from '@/features/transactions';
 import { WalletHeaderTitle } from '@/features/wallet';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';

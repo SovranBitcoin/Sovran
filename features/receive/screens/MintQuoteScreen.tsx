@@ -19,6 +19,8 @@ import {
   HistoryEntryRefresh,
   HistoryEntryTimeline,
   TransactionLocationSection,
+  useHistoryEntry,
+  useTransactionSource,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -30,7 +32,6 @@ import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
-import { useHistoryEntry, useTransactionSource } from '@/features/transactions';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
 interface MintQuoteScreenProps {

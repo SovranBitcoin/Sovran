@@ -1,6 +1,9 @@
 import React, { useCallback } from 'react';
 import { ScrollView, View } from 'react-native';
-import { useSettingsStore, type MiddlemanRoutingSettings } from '@/shared/stores/global/settingsStore';
+import {
+  useSettingsStore,
+  type MiddlemanRoutingSettings,
+} from '@/shared/stores/global/settingsStore';
 import Container from '@/shared/blocks/Container';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';

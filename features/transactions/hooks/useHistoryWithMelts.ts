@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useManager, usePaginatedHistory } from 'coco-cashu-react';
-import type { MeltHistoryEntry, HistoryEntry } from 'coco-cashu-core';
+import type { MeltHistoryEntry } from 'coco-cashu-core';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 

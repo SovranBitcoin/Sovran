@@ -30,7 +30,10 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { useHistoryWithMelts } from '@/features/transactions';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
-import { useSwapTransactionsStore, type SwapLeg } from '@/shared/stores/profile/swapTransactionsStore';
+import {
+  useSwapTransactionsStore,
+  type SwapLeg,
+} from '@/shared/stores/profile/swapTransactionsStore';
 import opacity from 'hex-color-opacity';
 import { Section } from '@/shared/ui/composed/Section';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
