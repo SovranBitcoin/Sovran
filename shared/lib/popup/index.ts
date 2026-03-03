@@ -9,7 +9,8 @@
  */
 
 export { popup } from './engine';
-export { registerToast } from './bridge';
+export { registerToast, showActionSheet } from './bridge';
+export type { ActionSheetPayloads } from './bridge';
 export { fmt, isAmountSegment } from './format';
 export type { PopupTextSegment } from './format';
 export { resolvePopupIcon } from './icons';

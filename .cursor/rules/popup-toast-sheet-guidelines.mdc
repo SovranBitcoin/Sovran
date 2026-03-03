@@ -14,7 +14,7 @@ Sovran uses a centralized popup system for all user-facing notifications. Every 
 **Always import from the barrel:**
 
 ```tsx
-import { copyPopup, sendSuccessPopup, fmt } from '@/helper/popup';
+import { copyPopup, sendSuccessPopup, fmt, profileSwitcherPopup, emojiPickerPopup, buttonHandlerPopup } from '@/shared/lib/popup';
 ```
 
 ---
@@ -33,21 +33,47 @@ A detached bottom sheet (HeroUI `BottomSheet`). Shows an **icon**, **title**, op
 
 A popup becomes a sheet when it has **buttons** or **`variant: 'sheet'`** is set explicitly.
 
+### Action sheets (custom sheet content)
+
+Action sheets are a popup variant with **custom content** instead of the standard icon/title/buttons layout. Use the named popup functions (same pattern as `copyPopup`, `sendSuccessPopup`, etc.):
+
+| Function | Payload | Use case |
+|----------|---------|----------|
+| `profileSwitcherPopup` | `{ onSwitchProfile, onAddProfile, onImportProfile? }` | Profile list + import nsec |
+| `emojiPickerPopup` | `{ token: string }` | Encode token as emoji, copy to clipboard |
+| `buttonHandlerPopup` | `{ buttons: ButtonHandlerButton[] }` | Dynamic button actions |
+
+**Example:**
+
+```tsx
+import { profileSwitcherPopup } from '@/shared/lib/popup';
+
+profileSwitcherPopup({
+  onSwitchProfile: (accountIndex) => { ... },
+  onAddProfile: () => { ... },
+  onImportProfile: (npubNumber) => { ... },
+});
+```
+
+PopupHost renders all sheets (standard + action) in one place. No separate registration or sheet provider.
+
 ---
 
 ## File structure
 
 ```
-helper/popup/
-  index.ts       Barrel — the only import path external code should use
-  engine.tsx     popup() function, runtime error matching, toast/sheet routing
-  bridge.ts      showToast/showSheet, type definitions, toast manager registration
-  format.ts      fmt tagged template, PopupTextSegment, flattenSegments
-  icons.tsx      PopupIcon type, resolvePopupIcon, CUSTOM_ICONS registry
-  popups.ts      All named popup functions (the source of truth for copy)
+shared/lib/popup/
+  index.ts         Barrel — the only import path external code should use
+  engine.tsx       popup() function, runtime error matching, toast/sheet routing
+  bridge.ts        showToast/showSheet/showActionSheet, type definitions
+  actionSheetTypes.ts  ActionSheetPayloads type for custom sheets
+  format.ts        fmt tagged template, PopupTextSegment, flattenSegments
+  icons.tsx        PopupIcon type, resolvePopupIcon, CUSTOM_ICONS registry
+  popups.ts        All named popup functions (the source of truth for copy)
 
-stores/popupStore.ts                Zustand store for sheet open/close state
-components/blocks/popup/PopupHost.tsx   Renders toasts + sheets (mounted in app layout)
+shared/stores/runtime/popupStore.ts   Zustand store for sheet open/close state
+shared/blocks/popup/PopupHost.tsx     Renders toasts + standard sheets + action sheets
+sheets/                              Action sheet content (profileSwitcher, emoji-picker, buttonHandler)
 ```
 
 ### Roles
@@ -56,7 +82,7 @@ components/blocks/popup/PopupHost.tsx   Renders toasts + sheets (mounted in app 
 |------|------|-----------|
 | `popups.ts` | Every popup's copy, type, and icon | All app code |
 | `engine.tsx` | Routing logic (toast vs sheet) + runtime error matching | `popups.ts` only |
-| `bridge.ts` | Toast manager ref + Zustand store connection | `engine.tsx`, `PopupHost` |
+| `bridge.ts` | Toast manager ref + showActionSheet (internal) + Zustand store connection | `popups.ts`, `PopupHost` |
 | `format.ts` | Amount formatting for popup text | `popups.ts`, `engine.tsx`, `PopupHost` |
 | `icons.tsx` | Icon resolution (emoji/monicon/custom) | `PopupHost` |
 | `popupStore.ts` | Sheet open/close state | `bridge.ts`, `PopupHost` |

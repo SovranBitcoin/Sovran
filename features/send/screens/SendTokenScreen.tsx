@@ -29,7 +29,7 @@ import { useReceive, useManager } from 'coco-cashu-react';
 import { nip19 } from 'nostr-tools';
 import { Metadata } from 'nostr-tools/kinds';
 import type { ProfilePointer } from 'nostr-tools/nip19';
-import { SheetManager } from 'react-native-actions-sheet';
+import { emojiPickerPopup } from '@/shared/lib/popup';
 
 import {
   HistoryEntryHeader,
@@ -497,14 +497,9 @@ export function SendTokenScreen({
   );
 
   const handleCopyEmoji = useCallback(
-    async (onClose: (event: any) => void) => {
+    async (_close: (event: any) => void) => {
       if (!token) return;
-      SheetManager.show('emoji-picker', {
-        payload: {
-          token: getEncodedTokenV4(token),
-        },
-        onClose,
-      });
+      emojiPickerPopup({ token: getEncodedTokenV4(token) });
     },
     [token]
   );

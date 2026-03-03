@@ -58,7 +58,7 @@
 import React, { useState } from 'react';
 import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
 import { Button } from '@/shared/ui/primitives/Button';
-import { SheetManager } from 'react-native-actions-sheet';
+import { buttonHandlerPopup } from '@/shared/lib/popup';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -203,9 +203,7 @@ export function ButtonHandler({
     if (visibleButtons.length === 3) {
       await handleButtonPress(visibleButtons[2]);
     } else {
-      SheetManager.show('button-handler', {
-        payload: { buttons: visibleButtons },
-      });
+      buttonHandlerPopup({ buttons: visibleButtons });
     }
   };
 

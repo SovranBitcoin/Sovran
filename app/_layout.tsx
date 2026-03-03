@@ -8,7 +8,6 @@ import 'intl';
 import 'intl/locale-data/jsonp/en';
 import 'react-native-reanimated';
 
-import { registerAllSheets } from '@/sheets/registerSheets';
 import { useFonts } from '@/shared/hooks/useFonts';
 import { initLog } from '@/shared/lib/initTiming';
 import Icon from 'assets/icons';
@@ -32,7 +31,6 @@ import { PricelistProvider } from '@/shared/providers/PricelistProvider';
 import { ThemeProvider, useTheme } from '@/shared/providers/ThemeProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { SheetProvider } from 'react-native-actions-sheet';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
@@ -55,8 +53,6 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called');
-
-registerAllSheets({ context: 'global' });
 
 LogBox.ignoreAllLogs();
 
@@ -98,7 +94,6 @@ function AccountScopedProviders({
         NostrNDKProvider,
         CocoProvider,
         ActionSheetProvider,
-        [SheetProvider, { context: 'global' }],
         PricelistProvider,
         PasscodeGate,
         AppGate,

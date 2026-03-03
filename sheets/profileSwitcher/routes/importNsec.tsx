@@ -3,17 +3,22 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import opacity from 'hex-color-opacity';
-import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { nip19, getPublicKey } from 'nostr-tools';
 import { Button, Input, Label, TextField } from 'heroui-native';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
 import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
+import type { ActionSheetPayloads } from '@/shared/lib/popup';
 
-const ImportNsec = ({ router }: RouteScreenProps<'profile-switcher', 'import-nsec'>) => {
+interface ImportNsecProps {
+  payload: ActionSheetPayloads['profile-switcher'];
+  close: () => void;
+  onBack: () => void;
+}
+
+export function ImportNsec({ payload, close, onBack }: ImportNsecProps) {
   const [foreground, muted, danger] = useThemeColor(['foreground', 'muted', 'danger'] as const);
-  const payload = useSheetPayload('profile-switcher');
   const [nsecInput, setNsecInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -72,7 +77,7 @@ const ImportNsec = ({ router }: RouteScreenProps<'profile-switcher', 'import-nse
       useProfileStore.getState().addProfile(npubNumber, pubkeyHex, 'imported');
 
       // Close the sheet and trigger the switch
-      router?.close();
+      close();
       setTimeout(() => {
         payload.onImportProfile?.(npubNumber);
       }, 100);
@@ -82,7 +87,7 @@ const ImportNsec = ({ router }: RouteScreenProps<'profile-switcher', 'import-nse
     } finally {
       setIsImporting(false);
     }
-  }, [nsecInput, router, payload]);
+  }, [nsecInput, close, payload]);
 
   return (
     <View
@@ -119,9 +124,10 @@ const ImportNsec = ({ router }: RouteScreenProps<'profile-switcher', 'import-nse
         <Button onPress={handleImport} isDisabled={isImporting || !nsecInput.trim()}>
           <Button.Label>{isImporting ? 'Importing...' : 'Import'}</Button.Label>
         </Button>
+        <Button variant="tertiary" onPress={onBack}>
+          <Button.Label>Back</Button.Label>
+        </Button>
       </VStack>
     </View>
   );
-};
-
-export default ImportNsec;
+}

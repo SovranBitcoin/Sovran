@@ -33,6 +33,24 @@ const liquidGlassEntryPath = path.resolve(
   'build',
   'index.js'
 );
+const herouiNativeEntryPath = path.resolve(
+  __dirname,
+  'node_modules',
+  'heroui-native',
+  'lib',
+  'module',
+  'index.js'
+);
+const herouiNativeProviderPath = path.resolve(
+  __dirname,
+  'node_modules',
+  'heroui-native',
+  'lib',
+  'module',
+  'providers',
+  'hero-ui-native',
+  'index.js'
+);
 
 // Save Uniwind's resolver before adding ours — Uniwind intercepts CSS
 // imports and swaps them for platform-specific JS. Overwriting it causes a
@@ -50,6 +68,18 @@ uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
     return {
       type: 'sourceFile',
       filePath: liquidGlassEntryPath,
+    };
+  }
+  if (moduleName === 'heroui-native') {
+    return {
+      type: 'sourceFile',
+      filePath: herouiNativeEntryPath,
+    };
+  }
+  if (moduleName === 'heroui-native/provider') {
+    return {
+      type: 'sourceFile',
+      filePath: herouiNativeProviderPath,
     };
   }
   // Chain to Uniwind's resolver to preserve CSS interop styling

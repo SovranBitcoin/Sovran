@@ -2,6 +2,9 @@ import type { ReactNode } from 'react';
 import type { PopupIcon } from './icons';
 import type { PopupTextSegment } from './format';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
+import type { ActionSheetPayloads } from './actionSheetTypes';
+
+export type { ActionSheetPayloads } from './actionSheetTypes';
 
 type ToastVariant = 'default' | 'accent' | 'success' | 'warning' | 'danger';
 
@@ -51,4 +54,11 @@ export function showToast(config: ToastConfig) {
 
 export function showSheet(config: SheetConfig) {
   usePopupStore.getState().open(config);
+}
+
+export function showActionSheet<K extends keyof ActionSheetPayloads>(
+  sheetId: K,
+  payload: ActionSheetPayloads[K]
+): void {
+  usePopupStore.getState().open({ sheetId, payload });
 }

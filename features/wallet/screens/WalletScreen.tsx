@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { RefreshControl, useWindowDimensions } from 'react-native';
+import { Alert, RefreshControl, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -13,8 +13,11 @@ import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { AccountPagerView } from '@/features/wallet/components/AccountPagerView';
 import { BitcoinNearYou } from '@/features/wallet/components/BitcoinNearYou';
+import { buttonHandlerPopup, nfcPaymentSentPopup } from '@/shared/lib/popup';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
+import { Button } from '@/shared/ui/primitives/Button';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { isAndroidLiquidHeaderSupported } from '@/navigation/nativeTabs';
 import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
@@ -61,6 +64,48 @@ export function WalletScreen() {
         <SpentThisMonth history={history} unit={account.unit} />
         <ReceivedThisMonth history={history} unit={account.unit} />
         <BitcoinNearYou />
+        {__DEV__ && (
+          <HStack spacing={8} className="pt-4" style={{ flexWrap: 'wrap' }}>
+            <View style={{ flex: 1, minWidth: 120 }}>
+              <Button
+                text="Alert"
+                variant="secondary"
+                onPress={() => Alert.alert('Popup Test', 'Wallet test buttons are firing.')}
+              />
+            </View>
+            <View style={{ flex: 1, minWidth: 120 }}>
+              <Button
+                text="Test Sheet"
+                variant="secondary"
+                onPress={() =>
+                  nfcPaymentSentPopup({
+                    text: 'Standard sheet test',
+                    icon: 'icon:mdi:send-check',
+                    duration: 2600,
+                    onClose: () => {},
+                  })
+                }
+              />
+            </View>
+            <View style={{ flex: 1, minWidth: 120 }}>
+              <Button
+                text="Test Action"
+                variant="secondary"
+                onPress={() =>
+                  buttonHandlerPopup({
+                    buttons: [
+                      {
+                        text: 'Action A',
+                        variant: 'primary',
+                        onPress: async (close) => close({} as any),
+                      },
+                    ],
+                  })
+                }
+              />
+            </View>
+          </HStack>
+        )}
       </View>
     </LayoutDebugWrapper>
   );

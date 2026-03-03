@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { popup } from './engine';
+import { showActionSheet } from './bridge';
+import type { ActionSheetPayloads } from './actionSheetTypes';
 import type { PopupIcon } from './icons';
 import type { PopupTextSegment } from './format';
 
@@ -72,6 +74,22 @@ export type CopyTarget = keyof typeof COPY_CONFIGS;
 export function copyPopup(target: CopyTarget, overrides?: BaseOverrides): void {
   const config = COPY_CONFIGS[target];
   popup({ message: config.title, text: config.text, type: 'success', ...overrides });
+}
+
+// ---------------------------------------------------------------------------
+// Action sheet popups (custom bottom sheet content)
+// ---------------------------------------------------------------------------
+
+export function profileSwitcherPopup(payload: ActionSheetPayloads['profile-switcher']): void {
+  showActionSheet('profile-switcher', payload);
+}
+
+export function emojiPickerPopup(payload: ActionSheetPayloads['emoji-picker']): void {
+  showActionSheet('emoji-picker', payload);
+}
+
+export function buttonHandlerPopup(payload: ActionSheetPayloads['button-handler']): void {
+  showActionSheet('button-handler', payload);
 }
 
 // ---------------------------------------------------------------------------
@@ -846,6 +864,19 @@ export function routstrTransactionFailedPopup(overrides?: TextOverrides): void {
 // ---------------------------------------------------------------------------
 // Dev mode popups
 // ---------------------------------------------------------------------------
+
+/** Standard sheet for testing popup system on wallet screen. Dev only. */
+export function testSheetPopup(overrides?: PopupOverrides): void {
+  popup({
+    message: 'Test Sheet',
+    text: 'If you see this, the popup sheet system is working.',
+    icon: 'icon:mdi:check-circle',
+    type: 'success',
+    variant: 'sheet',
+    buttons: [{ text: 'Close', onPress: () => {} }],
+    ...overrides,
+  });
+}
 
 export function devModePopup(enabled: boolean): void {
   popup({

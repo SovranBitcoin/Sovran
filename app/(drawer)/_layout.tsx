@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfileStore, ProfileEntry } from '@/shared/stores/global/profileStore';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { rehydrateProfileStores } from '@/shared/lib/cashu/profileScopedStorage';
-import { SheetManager } from 'react-native-actions-sheet';
+import { profileSwitcherPopup } from '@/shared/lib/popup';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 320);
@@ -180,13 +180,10 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
   );
 
   const handleOpenProfileSheet = useCallback(() => {
-    SheetManager.show('profile-switcher', {
-      context: 'global',
-      payload: {
-        onSwitchProfile: handleSwitchProfile,
-        onAddProfile: handleAddProfile,
-        onImportProfile: handleImportProfile,
-      },
+    profileSwitcherPopup({
+      onSwitchProfile: handleSwitchProfile,
+      onAddProfile: handleAddProfile,
+      onImportProfile: handleImportProfile,
     });
   }, [handleSwitchProfile, handleAddProfile, handleImportProfile]);
 

@@ -1,18 +1,9 @@
 import React from 'react';
-import { SheetProvider } from 'react-native-actions-sheet';
 
+/**
+ * @deprecated Action sheets now use the popup system (PopupHost in _layout).
+ * This HOC is a no-op — sheets work without it.
+ */
 export const withSheetProvider = <P extends object>(
   Wrapped: React.ComponentType<P>
-): React.ComponentType<P> => {
-  const Component = (props: P) => (
-    <SheetProvider>
-      <Wrapped {...props} />
-    </SheetProvider>
-  );
-
-  Component.displayName = `withSheetProvider(${
-    Wrapped.displayName || Wrapped.name || 'Component'
-  })`;
-
-  return Component;
-};
+): React.ComponentType<P> => Wrapped;

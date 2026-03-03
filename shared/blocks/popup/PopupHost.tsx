@@ -5,7 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Text } from '@/shared/ui/primitives/Text';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { usePopupStore, type SheetPayload } from '@/shared/stores/runtime/popupStore';
+import {
+  usePopupStore,
+  isCustomSheetPayload,
+  type StandardSheetPayload,
+} from '@/shared/stores/runtime/popupStore';
 import {
   registerToast,
   resolvePopupIcon,
@@ -19,6 +23,9 @@ import Animated, {
   Easing,
   cancelAnimation,
 } from 'react-native-reanimated';
+import { ButtonHandlerContent } from '@/sheets/buttonHandler';
+import { EmojiPickerContent } from '@/sheets/emoji-picker';
+import { ProfileSwitcherContent } from '@/sheets/profileSwitcher';
 
 function ToastRegistrar() {
   const { toast } = useToast();
@@ -54,7 +61,7 @@ function DurationBar({ duration }: { duration: number }) {
   );
 }
 
-function SubmessageRenderer({ submessage }: { submessage: SheetPayload['submessage'] }) {
+function SubmessageRenderer({ submessage }: { submessage: StandardSheetPayload['submessage'] }) {
   if (!submessage) return null;
 
   if (typeof submessage === 'string') {
@@ -86,14 +93,33 @@ function SubmessageRenderer({ submessage }: { submessage: SheetPayload['submessa
   return <>{submessage}</>;
 }
 
+const CUSTOM_SHEET_CONTENT: Record<
+  string,
+  React.ComponentType<{ payload: unknown; close: () => void }>
+> = {
+  'profile-switcher': ProfileSwitcherContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+  }>,
+  'emoji-picker': EmojiPickerContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+  }>,
+  'button-handler': ButtonHandlerContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+  }>,
+};
+
 function SheetPopup() {
   const insets = useSafeAreaInsets();
   const current = usePopupStore((s) => s.current);
   const isOpen = usePopupStore((s) => s.isOpen);
   const close = usePopupStore((s) => s.close);
 
-  const lastPayloadRef = useRef<SheetPayload | null>(null);
+  const lastPayloadRef = useRef<typeof current>(null);
   const wasOpenRef = useRef(false);
+  const ignoreFirstCloseEventRef = useRef(false);
   const [openCycle, setOpenCycle] = useState(0);
   if (current) {
     lastPayloadRef.current = current;
@@ -102,50 +128,116 @@ function SheetPopup() {
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
       setOpenCycle((value) => value + 1);
+      ignoreFirstCloseEventRef.current = true;
     }
     wasOpenRef.current = isOpen;
   }, [isOpen]);
 
+  const payload = current ?? lastPayloadRef.current;
+  const isCustom = isCustomSheetPayload(payload);
+
   useEffect(() => {
-    if (!current?.duration || !isOpen) {
+    const standard = !isCustom ? (current as StandardSheetPayload) : null;
+    if (!standard?.duration || !isOpen) {
       return;
     }
 
     const timer = setTimeout(() => {
       usePopupStore.getState().close();
-    }, current.duration);
+    }, standard.duration);
 
     return () => clearTimeout(timer);
-  }, [current, isOpen]);
+  }, [current, isOpen, isCustom]);
 
-  const payload = current ?? lastPayloadRef.current;
-  const dismissable = payload?.dismissable ?? true;
-  const showDuration = isOpen && current?.duration != null && current.duration > 0;
+  const dismissable = true;
+  const standardPayload = !isCustom ? (payload as StandardSheetPayload) : null;
+  const showDuration = isOpen && standardPayload?.duration != null && standardPayload.duration > 0;
+
+  const handleOpenChange = (open: boolean) => {
+    if (open) {
+      ignoreFirstCloseEventRef.current = false;
+      return;
+    }
+
+    if (ignoreFirstCloseEventRef.current) {
+      ignoreFirstCloseEventRef.current = false;
+      return;
+    }
+
+    if (isOpen) {
+      close();
+    }
+  };
+
+  if (!payload) {
+    return null;
+  }
+
+  if (isCustom) {
+    const ContentComponent = CUSTOM_SHEET_CONTENT[payload.sheetId];
+    if (!ContentComponent) {
+      return null;
+    }
+
+    const isProfileSwitcher = payload.sheetId === 'profile-switcher';
+
+    return (
+      <BottomSheet
+        isOpen={isOpen}
+        onOpenChange={(open) => {
+          handleOpenChange(open);
+        }}>
+        <BottomSheet.Portal disableFullWindowOverlay={__DEV__}>
+          <BottomSheet.Overlay isCloseOnPress={dismissable} />
+          {isProfileSwitcher ? (
+            <BottomSheet.Content
+              snapPoints={['25%', '50%', '90%']}
+              detached
+              bottomInset={insets.bottom}
+              className="mx-4"
+              backgroundClassName="rounded-[32px]">
+              <ContentComponent payload={payload.payload} close={close} />
+            </BottomSheet.Content>
+          ) : (
+            <BottomSheet.Content
+              detached
+              bottomInset={insets.bottom}
+              className="mx-4"
+              backgroundClassName="rounded-[32px]">
+              <ContentComponent payload={payload.payload} close={close} />
+            </BottomSheet.Content>
+          )}
+        </BottomSheet.Portal>
+      </BottomSheet>
+    );
+  }
 
   return (
     <BottomSheet
       isOpen={isOpen}
       onOpenChange={(open) => {
-        if (!open && isOpen) {
-          close();
-        }
+        handleOpenChange(open);
       }}>
-      <BottomSheet.Portal>
-        <BottomSheet.Overlay isCloseOnPress={dismissable} />
+      <BottomSheet.Portal disableFullWindowOverlay={__DEV__}>
+        <BottomSheet.Overlay isCloseOnPress={standardPayload?.dismissable ?? dismissable} />
         <BottomSheet.Content
           detached
           bottomInset={insets.bottom}
           className="mx-4"
           backgroundClassName="rounded-[32px]">
           <View className="items-center gap-2 px-1 pb-1">
-            <View key={`sheet-icon-${openCycle}`}>{resolvePopupIcon(payload?.icon, 88)}</View>
-            <BottomSheet.Title className="text-center">{payload?.message || ''}</BottomSheet.Title>
-            <SubmessageRenderer submessage={payload?.submessage} />
+            <View key={`sheet-icon-${openCycle}`}>
+              {resolvePopupIcon(standardPayload?.icon, 88)}
+            </View>
+            <BottomSheet.Title className="text-center">
+              {standardPayload?.message || ''}
+            </BottomSheet.Title>
+            <SubmessageRenderer submessage={standardPayload?.submessage} />
           </View>
 
-          {(payload?.buttons?.length ?? 0) > 0 ? (
+          {(standardPayload?.buttons?.length ?? 0) > 0 ? (
             <View className="mt-4 gap-2">
-              {payload?.buttons?.map((button, index) => (
+              {standardPayload?.buttons?.map((button, index) => (
                 <Button
                   key={`${button.text}-${index}`}
                   variant={index === 0 ? 'primary' : 'tertiary'}
@@ -163,7 +255,7 @@ function SheetPopup() {
             </View>
           ) : null}
 
-          {showDuration ? <DurationBar duration={current!.duration!} /> : null}
+          {showDuration ? <DurationBar duration={standardPayload!.duration!} /> : null}
         </BottomSheet.Content>
       </BottomSheet.Portal>
     </BottomSheet>

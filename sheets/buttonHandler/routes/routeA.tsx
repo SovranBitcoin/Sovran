@@ -1,25 +1,12 @@
 /**
- * @fileoverview RouteA - Dynamic button action interface
- *
- * @module components/blocks/sheets/buttonHandler/routes/route-a
+ * @fileoverview ButtonHandlerContent - Dynamic button action interface
  *
  * @description
  * Displays dynamic button actions with processing states and custom styling.
  * Supports async operations, button reordering (Next buttons last), and
- * disabled states during processing. Handles both sync and async button actions.
- *
- * **Navigation:**
- * - From: Initial route (sheet opens here)
- * - To: Closes after button action execution
- * - Close: `router?.goBack()` or `router?.close()`
- *
- * **Data:**
- * - Payload: `useSheetPayload('button-handler')` - Button configuration array
- * - Params: None (single route)
+ * disabled states during processing.
  *
  * **Flow:** Display buttons → user selects → execute action → close
- *
- * @see {@link ./index}
  */
 
 import React, { useState } from 'react';
@@ -30,13 +17,17 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-import { RouteScreenProps, useSheetPayload } from 'react-native-actions-sheet';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import type { ActionSheetPayloads } from '@/shared/lib/popup';
 
-const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
+interface ButtonHandlerContentProps {
+  payload: ActionSheetPayloads['button-handler'];
+  close: () => void;
+}
+
+export function ButtonHandlerContent({ payload, close }: ButtonHandlerContentProps) {
   const [foreground, muted, danger] = useThemeColor(['foreground', 'muted', 'danger'] as const);
-  const payload = useSheetPayload('button-handler');
   const [processingButtonIndex, setProcessingButtonIndex] = useState<number>();
 
   const handleButtonPress = (
@@ -46,7 +37,7 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
     setProcessingButtonIndex(index);
 
     const result = onPress(() => {
-      router?.goBack();
+      close();
     });
 
     if (result && typeof result.then === 'function') {
@@ -55,7 +46,7 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
       });
     } else {
       setProcessingButtonIndex(undefined);
-      router?.close();
+      close();
     }
   };
 
@@ -100,6 +91,4 @@ const RouteA = ({ router }: RouteScreenProps<'button-handler', 'route-a'>) => {
       </VStack>
     </View>
   );
-};
-
-export default RouteA;
+}

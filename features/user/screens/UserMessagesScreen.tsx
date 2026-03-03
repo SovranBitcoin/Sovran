@@ -22,7 +22,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { SheetManager } from 'react-native-actions-sheet';
+import { buttonHandlerPopup } from '@/shared/lib/popup';
 import { nip19 } from 'nostr-tools';
 import {
   NDKEvent,
@@ -1598,45 +1598,43 @@ export function UserMessagesScreen({
     console.log('[LIGHTNING-FLOW] handleSendMoney called', { lud16, userInfo: userInfo?.name });
     if (!lud16 || !userInfo) return;
 
-    SheetManager.show('button-handler', {
-      payload: {
-        buttons: [
-          {
-            text: 'Send Ecash',
-            icon: 'ph:coins',
-            variant: 'primary' as const,
-            onPress: async (close) => {
-              router.navigate({
-                pathname: '/(send-flow)/currency',
-                params: {
-                  to: 'sendToken',
-                },
-              });
-              close({} as any);
-            },
+    buttonHandlerPopup({
+      buttons: [
+        {
+          text: 'Send Ecash',
+          icon: 'ph:coins',
+          variant: 'primary' as const,
+          onPress: async (close) => {
+            router.navigate({
+              pathname: '/(send-flow)/currency',
+              params: {
+                to: 'sendToken',
+              },
+            });
+            close({} as any);
           },
-          {
-            text: 'Send Lightning',
-            icon: 'mingcute:lightning-fill',
-            variant: 'primary' as const,
-            onPress: async (close) => {
-              console.log('[LIGHTNING-FLOW] Send Lightning button pressed', {
-                lnUrlOrAddress: lud16,
+        },
+        {
+          text: 'Send Lightning',
+          icon: 'mingcute:lightning-fill',
+          variant: 'primary' as const,
+          onPress: async (close) => {
+            console.log('[LIGHTNING-FLOW] Send Lightning button pressed', {
+              lnUrlOrAddress: lud16,
+              to: 'meltQuote',
+            });
+            router.navigate({
+              pathname: '/(send-flow)/currency',
+              params: {
                 to: 'meltQuote',
-              });
-              router.navigate({
-                pathname: '/(send-flow)/currency',
-                params: {
-                  to: 'meltQuote',
-                  lnUrlOrAddress: lud16,
-                  profile: JSON.stringify(userInfo),
-                },
-              });
-              close({} as any);
-            },
+                lnUrlOrAddress: lud16,
+                profile: JSON.stringify(userInfo),
+              },
+            });
+            close({} as any);
           },
-        ],
-      },
+        },
+      ],
     });
   };
 

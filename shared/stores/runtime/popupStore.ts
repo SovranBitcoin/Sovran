@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ReactNode } from 'react';
 import type { PopupIcon, PopupTextSegment } from '@/shared/lib/popup';
+import type { ActionSheetPayloads } from '@/shared/lib/popup/actionSheetTypes';
 
 export type SheetButton = {
   text: string;
@@ -8,7 +9,8 @@ export type SheetButton = {
   onPress?: () => void;
 };
 
-export type SheetPayload = {
+/** Standard popup sheet: icon, title, submessage, buttons */
+export type StandardSheetPayload = {
   message: string;
   submessage?: ReactNode | PopupTextSegment[];
   icon?: PopupIcon;
@@ -17,6 +19,18 @@ export type SheetPayload = {
   buttons?: SheetButton[];
   onClose?: (data: unknown) => void;
 };
+
+/** Custom action sheet: sheetId + typed payload */
+export type CustomSheetPayload<K extends keyof ActionSheetPayloads = keyof ActionSheetPayloads> = {
+  sheetId: K;
+  payload: ActionSheetPayloads[K];
+};
+
+export type SheetPayload = StandardSheetPayload | CustomSheetPayload;
+
+export function isCustomSheetPayload(p: SheetPayload | null): p is CustomSheetPayload {
+  return p != null && 'sheetId' in p && 'payload' in p;
+}
 
 type PopupStore = {
   current: SheetPayload | null;
@@ -33,7 +47,7 @@ export const usePopupStore = create<PopupStore>((set, get) => ({
   },
   close: () => {
     const { current } = get();
-    if (current?.onClose) {
+    if (current && !isCustomSheetPayload(current) && current.onClose) {
       try {
         current.onClose({ reason: 'dismiss' });
       } catch (error) {
