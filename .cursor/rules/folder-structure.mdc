@@ -40,6 +40,8 @@ features/<domain>/
 - **Stateless util, no UI** → `shared/lib/` (or `features/<domain>/lib/` if domain-specific).
 - **Primitive UI (View, Text, Button)** → `shared/ui/primitives/`.
 - **Composed UI (AmountFormatter, QRCode)** → `shared/ui/composed/`.
+- **Provider / context** → `shared/providers/`.
+- **Domain-specific composed blocks** (transfer, claim, pending) → `shared/blocks/<domain>/`.
 
 ## Colocation
 
@@ -51,4 +53,6 @@ features/<domain>/
 - **Must** use barrel exports (`index.ts`) for feature public API. Internals stay internal.
 - **Must not** put screens in `components/screens/` — they belong in `features/<domain>/screens/`.
 - **Must not** put domain logic in `helper/` — use `shared/lib/` or `features/<domain>/lib/`.
+- **Must not** use `utils/` — stateless utils go in `shared/lib/` or `features/<domain>/lib/`.
 - **Must not** create god files. Decompose when a file exceeds ~500 LOC or exports 5+ unrelated things.
+- **Must not** put providers or domain blocks in `shared/ui/` — use `shared/providers/` or `shared/blocks/`.

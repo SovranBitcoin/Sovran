@@ -36,7 +36,7 @@ import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { usePaginatedHistory } from 'coco-cashu-react';
 import { WalletHealthCard } from '@/features/health';
-import { useHeroTransition } from '@/shared/ui/hero-transition/HeroTransitionProvider';
+import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
 import { PendingEcashCardFrame } from '@/shared/blocks/pending/PendingEcashCardFrame';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -468,7 +468,7 @@ const MapTeaserCard = () => {
     const timer = setTimeout(() => {
       task = InteractionManager.runAfterInteractions(async () => {
         // Lazy import to avoid pulling clustering code into initial Explore render
-        const { prewarmBTCMapClusterManager } = await import('@/utils/btcMapClusterCache');
+        const { prewarmBTCMapClusterManager } = await import('@/shared/lib/map/btcMapClusterCache');
         const points = placesCache.data.map((p) => ({
           id: p.id,
           lat: p.lat,

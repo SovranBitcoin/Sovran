@@ -2,7 +2,7 @@
 description: Theme architecture, semantic color mapping, and runtime token usage guidance.
 globs:
   - "themes.ts"
-  - "helper/themeEngine.ts"
+  - "shared/lib/themeEngine.ts"
   - "providers/ThemeProvider.tsx"
   - "hooks/useThemeColor.ts"
   - "global.css"
@@ -24,7 +24,7 @@ Sovran uses a single-source-of-truth theme system built on **HeroUI Native** sem
 themes.ts                       40+ palettes (typed 0-950 shade records)
     │
     ▼
-helper/themeEngine.ts           Maps each palette → HeroUI semantic CSS vars
+shared/lib/themeEngine.ts       Maps each palette → HeroUI semantic CSS vars
     │                           Also registers static color scales + wallpaper vars
     ▼
 providers/ThemeProvider.tsx      React context. Calls Uniwind.updateCSSVariables()
@@ -46,7 +46,7 @@ Components                      Use Tailwind classes: bg-background, text-foregr
 | File | Role |
 |------|------|
 | `themes.ts` | Defines every theme as a `ThemePalette` (shade 0-950 → hex). Exports typed `THEMES`, `THEME_NAMES`, `ThemeName`. |
-| `helper/themeEngine.ts` | The **single theme engine**. `getThemeVariables(name)` returns all CSS variables: semantic tokens, static color scales, and wallpaper vars. Pre-computes all themes at import time via `themeVariables`. Also contains `STATIC_COLOR_VALUES` — the single source of truth for all static hex values. |
+| `shared/lib/themeEngine.ts` | The **single theme engine**. `getThemeVariables(name)` returns all CSS variables: semantic tokens, static color scales, and wallpaper vars. Pre-computes all themes at import time via `themeVariables`. Also contains `STATIC_COLOR_VALUES` — the single source of truth for all static hex values. |
 | `providers/ThemeProvider.tsx` | Thin React context. Reads theme from `settingsStore`, calls `Uniwind.updateCSSVariables()`. Exposes `currentTheme`, `setTheme()`, `availableThemes`. |
 | `global.css` | Imports `tailwindcss`, `uniwind`, and `heroui-native/styles`. Maps static color scales via `var()` references so Tailwind can generate utility classes. |
 | `tailwind.config.js` | Extends Tailwind with wallpaper-only colors (`dominant`, `gradient`). All other colors come from HeroUI's auto-generated tokens or `global.css @theme`. |
@@ -74,7 +74,7 @@ Both the `'light'` and `'dark'` adaptive roots are updated simultaneously so var
 
 ---
 
-## The Theme Engine (`helper/themeEngine.ts`)
+## The Theme Engine (`shared/lib/themeEngine.ts`)
 
 This is the **only place** where palette shades are mapped to semantic meaning and where static color hex values are declared. Everything flows from here into Uniwind's runtime store.
 
@@ -228,7 +228,7 @@ setTheme('navy');
 
 ### How static colors work
 
-Static color hex values are declared once in `themeEngine.ts` (`STATIC_COLOR_VALUES`). The engine registers them with Uniwind under both `--shade-300` and `--color-shade-300` forms. `global.css @theme` maps `--color-shade-300: var(--shade-300)` so Tailwind can generate utility classes like `text-shade-300` and `bg-shade-300`.
+Static color hex values are declared once in `shared/lib/themeEngine.ts` (`STATIC_COLOR_VALUES`). The engine registers them with Uniwind under both `--shade-300` and `--color-shade-300` forms. `global.css @theme` maps `--color-shade-300: var(--shade-300)` so Tailwind can generate utility classes like `text-shade-300` and `bg-shade-300`.
 
 This dual registration is necessary because:
 - `className` (`bg-shade-300`) needs the `@theme` token → resolves `var(--shade-300)` at runtime
@@ -314,7 +314,7 @@ On app launch, `ThemeProvider` reads the persisted theme from the store and appl
 
 ---
 
-If you need a color value in a style prop, use `useThemeColor` from `hooks/useThemeColor`. If you need it in a className, use the Tailwind class (`text-danger`, `bg-shade-300`, etc.). Both resolve from the same CSS variables registered by `themeEngine.ts`.
+If you need a color value in a style prop, use `useThemeColor` from `hooks/useThemeColor`. If you need it in a className, use the Tailwind class (`text-danger`, `bg-shade-300`, etc.). Both resolve from the same CSS variables registered by `shared/lib/themeEngine.ts`.
 
 ---
 

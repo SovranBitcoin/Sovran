@@ -16,7 +16,7 @@ import { NDKEvent, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { nip19 } from 'nostr-tools';
 import type { ProfilePointer } from 'nostr-tools/nip19';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { buildGiftWrappedDM } from 'utils/nip17';
+import { buildGiftWrappedDM } from '@/shared/lib/nostr/nip17';
 
 // Default relay for payment requests
 const DEFAULT_PAYMENT_RELAY = 'wss://relay.vertexlab.io';

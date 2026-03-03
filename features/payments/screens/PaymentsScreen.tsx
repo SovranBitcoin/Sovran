@@ -1,5 +1,5 @@
 import { NDKEvent, NDKPrivateKeySigner, NDKUser, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { unwrapGiftWrap } from 'utils/nip17';
+import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
 import { Mint } from 'coco-cashu-core';
 import { SearchResult, DraggableContactsList, NoResultsFound } from '@/features/payments';
 import { npubToPubkey } from '@/shared/lib/nostr/client';

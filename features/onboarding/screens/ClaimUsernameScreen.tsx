@@ -32,7 +32,7 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { finalizeEvent } from 'nostr-tools';
-import { useHeroTransition } from '@/shared/ui/hero-transition/HeroTransitionProvider';
+import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {

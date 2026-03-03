@@ -1,2 +1,2 @@
-// shared/ui barrel — re-export primitives, composed, transfer, hero-transition
-// Imports will need to be updated when wiring up the redesign
+// shared/ui barrel — primitives and composed only.
+// Providers live in shared/providers/, domain blocks in shared/blocks/.

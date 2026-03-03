@@ -19,7 +19,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { useHeroTransition } from '@/shared/ui/hero-transition/HeroTransitionProvider';
+import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 import { useWalletHealthData } from '../hooks/useWalletHealthData';

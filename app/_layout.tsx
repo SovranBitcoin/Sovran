@@ -40,7 +40,7 @@ import { persistor, store } from 'redux/store';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
-import { HeroTransitionProvider } from '@/shared/ui/hero-transition/HeroTransitionProvider';
+import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useAppBalance } from '@/features/wallet';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';

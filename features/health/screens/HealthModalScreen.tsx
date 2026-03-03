@@ -13,7 +13,7 @@ import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { WalletHealthModalContent } from '@/features/health/components/WalletHealthModalContent';
 import type { HealthCta } from '@/features/health/lib/walletHealth';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useHeroTransition } from '@/shared/ui/hero-transition/HeroTransitionProvider';
+import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { useMints } from 'coco-cashu-react';
 
 const DEFAULT_CURRENCIES = ['SAT'];

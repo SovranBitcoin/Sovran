@@ -18,7 +18,7 @@ import {
   TransferEntryRow,
   TransferStepChain,
   TransferErrorBanner,
-} from '@/shared/ui/transfer';
+} from '@/shared/blocks/transfer';
 import Icon from 'assets/icons';
 
 import { getMintDisplayName } from '@/shared/lib/url';

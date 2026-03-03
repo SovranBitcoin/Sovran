@@ -49,10 +49,10 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
-import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from 'utils/mapClustering';
+import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from '@/shared/lib/map/mapClustering';
 import { useShallow } from 'zustand/react/shallow';
-import { getOrBuildBTCMapClusterManager } from 'utils/btcMapClusterCache';
-import { applySafetyOffset } from 'utils/locationPrivacy';
+import { getOrBuildBTCMapClusterManager } from '@/shared/lib/map/btcMapClusterCache';
+import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 
 // ============================================================================
 // Types & Constants

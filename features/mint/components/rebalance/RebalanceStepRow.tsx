@@ -26,7 +26,7 @@ import {
   TransferEntryRow,
   TransferStepChain,
   TransferErrorBanner,
-} from '@/shared/ui/transfer';
+} from '@/shared/blocks/transfer';
 import Icon from 'assets/icons';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

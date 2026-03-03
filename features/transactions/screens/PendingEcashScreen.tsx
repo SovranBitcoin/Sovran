@@ -33,7 +33,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { rollbackSuccessPopup, rollbackPartialPopup } from '@/shared/lib/popup';
 import { useMints, usePaginatedHistory, useManager } from 'coco-cashu-react';
-import { useHeroTransition } from '@/shared/ui/hero-transition/HeroTransitionProvider';
+import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { PendingEcashCardFrame } from '@/shared/blocks/pending/PendingEcashCardFrame';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';

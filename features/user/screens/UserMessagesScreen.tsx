@@ -32,7 +32,7 @@ import {
   useSubscribe,
 } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata, EncryptedDirectMessage } from 'nostr-tools/kinds';
-import { buildGiftWrappedDMPair, unwrapGiftWrap } from 'utils/nip17';
+import { buildGiftWrappedDMPair, unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
 import { LegendList } from '@legendapp/list';
 
 // Custom hooks and providers

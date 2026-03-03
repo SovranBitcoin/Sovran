@@ -40,7 +40,7 @@ import {
   TransferSeparator,
   TransferCard,
   TransferErrorBanner,
-} from '@/shared/ui/transfer';
+} from '@/shared/blocks/transfer';
 import { convertTime } from '@/shared/lib/time';
 import { formatAmount } from '@/shared/lib/currency';
 import { getMintDisplayName } from '@/shared/lib/url';

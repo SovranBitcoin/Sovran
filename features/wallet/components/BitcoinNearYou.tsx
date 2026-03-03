@@ -11,7 +11,7 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { applySafetyOffset } from 'utils/locationPrivacy';
+import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 import { useShallow } from 'zustand/react/shallow';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
