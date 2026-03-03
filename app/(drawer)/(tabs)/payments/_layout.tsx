@@ -1,5 +1,5 @@
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Stack } from 'expo-router';
 import { Pressable, Platform, useWindowDimensions, TextInput } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
@@ -7,8 +7,8 @@ import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
 import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
 import opacity from 'hex-color-opacity';
-import { View } from 'components/ui/View/View';
-import { buildExpoRouterHeaderOptions } from '@/components/navigation/expoRouter55';
+import { View } from '@/shared/ui/primitives/View/View';
+import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 
 // Search context for sharing state between layout and index
 interface PaymentsSearchContextValue {

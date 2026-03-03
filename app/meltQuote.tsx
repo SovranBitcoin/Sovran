@@ -10,7 +10,7 @@
 import React from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { MeltQuoteScreen } from 'components/screens/MeltQuoteScreen';
+import { MeltQuoteScreen } from '@/features/send';
 
 function ModalScreen() {
   const { meltHistoryEntry, invoice, lnUrlOrAddress, amount } = useLocalSearchParams<{

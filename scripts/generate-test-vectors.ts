@@ -8,7 +8,7 @@ import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { bytesToHex } from '@noble/hashes/utils.js';
-import { getUsername } from '../helper/username';
+import { getUsername } from '@/shared/lib/username';
 
 const MNEMONICS = [
   'leader monkey parrot ring guide accident before fence cannon height naive bean',

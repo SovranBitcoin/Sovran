@@ -8,29 +8,29 @@ import 'intl';
 import 'intl/locale-data/jsonp/en';
 import 'react-native-reanimated';
 
-import { registerAllSheets } from '@/components/blocks/sheets/registerSheets';
-import { useFonts } from '@/hooks/useFonts';
-import { initLog } from '@/helper/initTiming';
+import { registerAllSheets } from '@/sheets/registerSheets';
+import { useFonts } from '@/shared/hooks/useFonts';
+import { initLog } from '@/shared/lib/initTiming';
 import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Image, LogBox, TouchableOpacity, Platform, View } from 'react-native';
-import { supportsLiquidGlass } from '@/helper/version';
+import { supportsLiquidGlass } from '@/shared/lib/version';
 
-import AppGate from '@/components/blocks/AppGate';
-import MigrationGate from '@/components/blocks/MigrationGate';
+import AppGate from '@/shared/blocks/AppGate';
+import MigrationGate from '@/shared/blocks/MigrationGate';
 import {
   InitializationProvider,
   INITIALIZATION_DISPLAY_TYPE,
   useInitializationState,
-} from '@/providers/InitializationProvider';
+} from '@/shared/providers/InitializationProvider';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
-import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
-import { compose } from 'helper/utils';
-import { NostrKeysProvider, useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { NostrNDKProvider } from 'providers/NostrNDKProvider';
-import { PricelistProvider } from 'providers/PricelistProvider';
-import { ThemeProvider, useTheme } from 'providers/ThemeProvider';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { PasscodeGate } from '@/features/auth';
+import { compose } from '@/shared/lib/utils';
+import { NostrKeysProvider, useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
+import { PricelistProvider } from '@/shared/providers/PricelistProvider';
+import { ThemeProvider, useTheme } from '@/shared/providers/ThemeProvider';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { SheetProvider } from 'react-native-actions-sheet';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -39,13 +39,13 @@ import { PersistGate } from 'redux-persist/integration/react';
 import { persistor, store } from 'redux/store';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
-import { CocoProvider } from '@/helper/coco/CocoProvider';
-import { HeroTransitionProvider } from '@/components/ui/hero-transition/HeroTransitionProvider';
-import { useProfileStore } from '@/stores/profileStore';
-import { useAppBalance } from '@/hooks/useAppBalance';
+import { CocoProvider } from '@/shared/providers/CocoProvider';
+import { HeroTransitionProvider } from '@/shared/ui/hero-transition/HeroTransitionProvider';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { useAppBalance } from '@/features/wallet';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
-import PopupHost from '@/components/blocks/popup/PopupHost';
+import PopupHost from '@/shared/blocks/popup/PopupHost';
 
 export const unstable_settings = {
   initialRouteName: '(drawer)',
@@ -194,6 +194,7 @@ function RootLayoutContent() {
       return {
         ...baseHeaderOptions,
         ...screen.options,
+        headerShown: true,
         ...headerStyleOverride,
         ...(screen.title !== undefined ? { headerTitle: screen.title } : {}),
         // Add close button for modal presentations (only when header is shown)

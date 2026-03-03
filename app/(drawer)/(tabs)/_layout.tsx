@@ -1,18 +1,15 @@
 import { router, Tabs, usePathname } from 'expo-router';
 import { BlurView } from 'expo-blur';
-import { BackgroundProvider } from 'providers/BackgroundProvider';
+import { BackgroundProvider } from '@/shared/providers/BackgroundProvider';
 import { DynamicColorIOS, Platform, StyleSheet, View } from 'react-native';
 import { useEffect } from 'react';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { OfflineProvider } from '@/providers/OfflineProvider';
+import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
+import { OfflineProvider } from '@/shared/providers/OfflineProvider';
 import {
   GlobalLiquidGlassTabsOverlay,
   isLiquidGlassTabBarAvailable,
-} from '@/components/LiquidGlassTabBar';
-import {
-  Expo55NativeTabs,
-  isExpo55NativeTabsSupported,
-} from '@/components/navigation/expoRouter55';
+} from '@/shared/blocks/LiquidGlassTabBar';
+import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -86,11 +83,6 @@ export default function TabLayout() {
                 />
                 <Expo55NativeTabs.Trigger.Label>Explore</Expo55NativeTabs.Trigger.Label>
               </Expo55NativeTabs.Trigger>
-
-              {/* <Expo55NativeTabs.Trigger name="example">
-          <Expo55NativeTabs.Trigger.Icon sf={{ default: 'paperplane', selected: 'paperplane.fill' }} />
-          <Expo55NativeTabs.Trigger.Label>Example</Expo55NativeTabs.Trigger.Label>
-        </Expo55NativeTabs.Trigger> */}
             </Expo55NativeTabs>
           </View>
         </OfflineProvider>
@@ -148,12 +140,6 @@ export default function TabLayout() {
               name="explore"
               options={{
                 ...(hasAndroidLiquidGlass ? {} : { href: null }),
-              }}
-            />
-            <Tabs.Screen
-              name="example"
-              options={{
-                href: null,
               }}
             />
           </Tabs>

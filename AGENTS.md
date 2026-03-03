@@ -8,6 +8,7 @@ Read `.cursor/rules/` docs before touching their domains. The index is `.cursor/
 
 | Domain | Read first |
 |---|---|
+| Folder structure, where to add files | `.cursor/rules/folder-structure.mdc` |
 | Popups, toasts, sheets | `.cursor/rules/popup-toast-sheet-guidelines.mdc` |
 | Mnemonic, keys, secure storage | `.cursor/rules/secure-storage-key-derivation.mdc` |
 | Text component, fonts, skeletons | `.cursor/rules/text-typography-skeleton-guidelines.mdc` |
@@ -36,10 +37,11 @@ Expo SDK + Expo Router, TypeScript, HeroUI Native, Uniwind (Tailwind v4 for RN),
 ## Architecture (short form)
 
 - `app/` — routes + orchestration (thin screens)
-- `components/ui/` — primitives, `components/blocks/` — composed product UI
-- `hooks/` — reusable hooks, `hooks/coco/` — cashu hook composition
-- `helper/` — stateless utils, `helper/coco/` — cashu integration glue
+- `features/` — domain modules (screens, components, hooks per domain)
+- `shared/` — cross-cutting UI, hooks, stores, providers, lib
 - `stores/` — Zustand (global, profile-scoped, or runtime-only)
+
+Full structure: `.cursor/rules/folder-structure.mdc`
 - `.cursor/rules/` — agent-facing rule docs (self-improving, see below)
 - `coco-cashu-core` is the source of truth for cashu types and logic. Never redefine coco types. Compose coco hooks, don't reimplement them. Import from coco, not `@cashu/cashu-ts`.
 

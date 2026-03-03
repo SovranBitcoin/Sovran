@@ -7,7 +7,7 @@
 import React from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { ReceiveScreen, getFormattedReceiveTitle } from 'components/screens/ReceiveScreen';
+import { ReceiveScreen, getFormattedReceiveTitle } from '@/features/receive';
 
 const EcashLightningReceiver = () => {
   const { unit } = useLocalSearchParams<{ unit: string }>();

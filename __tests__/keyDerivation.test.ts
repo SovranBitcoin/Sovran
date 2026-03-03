@@ -6,8 +6,8 @@ import {
   pubkeyToAccountNumber,
   deriveCashuMnemonicForImported,
   deriveCashuWalletSeedForImported,
-} from '../helper/keyDerivation';
-import { getUsername } from '../helper/username';
+} from '@/shared/lib/nostr/keyDerivation';
+import { getUsername } from '@/shared/lib/username';
 import { nip19, getPublicKey } from 'nostr-tools';
 
 function toHex(bytes: Uint8Array): string {

@@ -100,7 +100,7 @@ Three formats, in order of preference:
 | Format | Syntax | When to use |
 |--------|--------|-------------|
 | **Monicon** | `'icon:mdi:check-circle'` | Default choice. Themed, consistent, sharp. Browse at [icones.js.org](https://icones.js.org). |
-| **Custom** | `'custom:nfc-success'` | Animated or complex SVG. Must be registered in `icons.tsx` `CUSTOM_ICONS`. |
+| **Custom** | `'custom:X'` | Animated or complex SVG. Must be registered in `icons.tsx` `CUSTOM_ICONS`. |
 | **Emoji** | `'emoji:🎉'` | Only when the emoji is genuinely more expressive than any icon. Rare. |
 
 Icon naming conventions already used in the codebase:
@@ -111,7 +111,7 @@ Icon naming conventions already used in the codebase:
 | Keys | `solar:key-bold`, `mdi:key-alert`, `mdi:key-remove` |
 | Mints | `mdi:bank-check`, `mdi:bank-off`, `mdi:bank-remove` |
 | Wallet | `mdi:wallet-outline`, `mdi:wallet-check`, `mdi:wallet-plus` |
-| NFC | `mdi:nfc`, `mdi:nfc-off`, `custom:nfc-success` |
+| NFC | `mdi:nfc`, `mdi:nfc-off`, `mdi:send-check` |
 | Camera | `mdi:camera-check`, `mdi:camera-off`, `mdi:camera-lock` |
 | Errors | `mdi:alert-circle`, `mdi:alert-circle-outline` |
 | Info | `mdi:information-outline`, `mdi:help-circle-outline` |
@@ -201,7 +201,7 @@ Pass `duration` (ms) to auto-close a sheet. A progress bar renders at the bottom
 ```ts
 nfcPaymentSentPopup({
   text: fmt`${{ amount: 100, unit: 'sat' }} sent`,
-  icon: 'custom:nfc-success',
+  icon: 'icon:mdi:send-check',
   duration: 2600,
 });
 ```

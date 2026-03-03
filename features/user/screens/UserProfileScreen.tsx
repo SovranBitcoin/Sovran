@@ -1,0 +1,1103 @@
+/**
+ * @fileoverview User Profile Screen
+ *
+ * Displays Nostr user profile information with:
+ * - Banner image with overlapping avatar
+ * - Stats grid (Following, Followers, Reputation, Joined)
+ * - Top followers grid
+ * - Profile info section (npub, nip05, lud16, website)
+ * - User feed (notes)
+ */
+
+import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  TouchableOpacity,
+  useWindowDimensions,
+  Linking,
+} from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
+import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
+import { Text } from '@/shared/ui/primitives/Text';
+import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { View } from '@/shared/ui/primitives/View/View';
+import { Spacer } from '@/shared/ui/primitives/View/Spacer';
+import { npubToPubkey } from '@/shared/lib/nostr/client';
+import { Card } from '@/shared/ui/composed/Card';
+import { Section } from '@/features/settings';
+import Icon, { CurrencyIcon } from 'assets/icons';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { truncateMiddle } from '@/shared/lib/strings';
+import * as Clipboard from 'expo-clipboard';
+import { Skeleton } from '@/shared/ui/primitives/Skeleton';
+import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
+import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
+import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { Contacts, Metadata } from 'nostr-tools/kinds';
+import { nip19 } from 'nostr-tools';
+import {
+  copyPopup,
+  copyFailedPopup,
+  openLinkFailedPopup,
+  engagementUpdateFailedPopup,
+  type CopyTarget,
+} from '@/shared/lib/popup';
+import {
+  useNostrProfile,
+  getFollowersWithProfiles,
+  getFollowerDisplayName,
+  getFollowerPicture,
+  TopFollower,
+} from '@/features/feed';
+import { formatDate } from '@/shared/lib/time';
+import { LinearGradient } from 'expo-linear-gradient';
+import opacity from 'hex-color-opacity';
+import { UserFeed } from '@/features/feed';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { selectIsFollowingPubkey, useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
+import { getUsername } from '@/shared/lib/username';
+import { generateSeededGradient } from '@/shared/lib/avatarGradient';
+import { useDominantColor, getContrastColors } from '@/shared/lib/colorExtraction';
+import type { VideoPostRecord, StoryUser } from '@/features/feed';
+import { ListGroup, PressableFeedback, Skeleton as HeroSkeleton } from 'heroui-native';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+
+const BANNER_HEIGHT = 150;
+const AVATAR_SIZE = 90;
+const AVATAR_OVERLAP = AVATAR_SIZE / 4;
+
+function buildUpdatedContactTags(
+  existingTags: string[][],
+  targetPubkey: string,
+  shouldFollow: boolean
+): string[][] {
+  const nextTags = existingTags.filter((tag) => !(tag[0] === 'p' && tag[1] === targetPubkey));
+  if (shouldFollow) {
+    nextTags.push(['p', targetPubkey]);
+  }
+  // Keep one p-tag per pubkey while preserving order for NIP-02 contact lists.
+  const seenP = new Set<string>();
+  const deduped: string[][] = [];
+  for (const tag of nextTags) {
+    if (tag[0] !== 'p') {
+      deduped.push(tag);
+      continue;
+    }
+    const pk = tag[1];
+    if (!pk || seenP.has(pk)) continue;
+    seenP.add(pk);
+    deduped.push(tag);
+  }
+  return deduped;
+}
+
+// ============================================================================
+// Profile Stats Grid
+// ============================================================================
+
+function ProfileStatsGridComponent({
+  followingCount,
+  followerCount,
+  reputationScore,
+  joinedDate,
+  isLoading,
+}: {
+  followingCount?: number;
+  followerCount?: number;
+  reputationScore?: number;
+  joinedDate?: string;
+  isLoading: boolean;
+}) {
+  const [foreground, surfaceTertiary, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'surface-tertiary',
+    'surface-secondary',
+  ] as const);
+
+  const fadeAnims = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+
+  const hasValidData =
+    followingCount !== undefined ||
+    followerCount !== undefined ||
+    reputationScore !== undefined ||
+    joinedDate !== undefined;
+
+  const hasAnimatedRef = useRef(false);
+  useEffect(() => {
+    if (hasValidData && !hasAnimatedRef.current) {
+      hasAnimatedRef.current = true;
+      Animated.stagger(
+        80,
+        fadeAnims.map((anim, index) =>
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: 400,
+            delay: index * 80,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          })
+        )
+      ).start();
+    }
+  }, [hasValidData, fadeAnims]);
+
+  const stats = [
+    {
+      label: 'Following',
+      description: 'Users followed',
+      value: followingCount?.toString() ?? '0',
+      smallValue: false,
+    },
+    {
+      label: 'Followers',
+      description: 'Total count',
+      value: followerCount?.toString() ?? '0',
+      smallValue: false,
+    },
+    {
+      label: 'Reputation',
+      description: 'Network score',
+      value: reputationScore !== undefined ? `${Math.round(reputationScore)} / 100` : 'N/A',
+      smallValue: false,
+    },
+    {
+      label: 'Joined',
+      description: 'Account created',
+      value: joinedDate || 'Unknown',
+      smallValue: true,
+    },
+  ];
+
+  const showSkeleton = isLoading && !hasValidData;
+
+  const renderStatCard = (stat: (typeof stats)[0], _index: number) => (
+    <View key={stat.label} style={styles.statItem}>
+      <View
+        style={[
+          styles.statCard,
+          { backgroundColor: surfaceSecondary, borderColor: surfaceTertiary },
+        ]}>
+        <Text
+          loading={showSkeleton}
+          placeholder="FOLLOWING"
+          bold
+          size={12}
+          style={{ color: opacity(foreground, 0.66), marginBottom: 4 }}>
+          {stat.label.toUpperCase()}
+        </Text>
+        <Text
+          loading={showSkeleton}
+          placeholder="1,234"
+          bold
+          size={stat.smallValue ? 16 : 20}
+          style={{ color: foreground, marginBottom: 2 }}>
+          {stat.value}
+        </Text>
+        <Text
+          loading={showSkeleton}
+          placeholder="Network score"
+          bold
+          size={12}
+          style={{ color: opacity(foreground, 0.5), opacity: 0.8 }}>
+          {stat.description}
+        </Text>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.statsGrid}>
+      <View style={styles.statsRow}>
+        {stats.slice(0, 2).map((stat, i) => renderStatCard(stat, i))}
+      </View>
+      <View style={styles.statsRow}>
+        {stats.slice(2, 4).map((stat, i) => renderStatCard(stat, i + 2))}
+      </View>
+    </View>
+  );
+}
+const ProfileStatsGrid = React.memo(ProfileStatsGridComponent);
+
+// ============================================================================
+// Top Followers Section
+// ============================================================================
+
+function TopFollowersComponent({
+  topFollowers,
+  isLoading,
+}: {
+  topFollowers: TopFollower[];
+  isLoading: boolean;
+}) {
+  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
+  const { width: screenWidth } = useWindowDimensions();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const GRID_PADDING = 32;
+  const GRID_GAP = 12;
+  const COLUMNS = 3;
+  const itemWidth = (screenWidth - GRID_PADDING - GRID_GAP * (COLUMNS - 1)) / COLUMNS;
+  const avatarSize = Math.min(itemWidth - 16, 64);
+
+  const followersWithProfiles = useMemo(
+    () => getFollowersWithProfiles(topFollowers).slice(0, 6),
+    [topFollowers]
+  );
+
+  useEffect(() => {
+    if (followersWithProfiles.length > 0) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [followersWithProfiles.length, fadeAnim]);
+
+  if (!isLoading && followersWithProfiles.length === 0) return null;
+
+  const handleFollowerPress = (follower: TopFollower) => {
+    router.navigate({
+      pathname: '/(user-flow)/profile' as any,
+      params: { npub: follower.npub },
+    });
+  };
+
+  const renderItem = (follower: TopFollower) => (
+    <TouchableOpacity
+      key={follower.pubkey}
+      style={[styles.topFollowerGridItem, { width: itemWidth }]}
+      onPress={() => handleFollowerPress(follower)}
+      activeOpacity={0.7}>
+      <Avatar
+        picture={getFollowerPicture(follower)}
+        seed={follower.pubkey}
+        size={avatarSize}
+        variant="person"
+        name={getFollowerDisplayName(follower)}
+      />
+      <Text
+        size={11}
+        bold
+        numberOfLines={1}
+        style={{
+          color: opacity(foreground, 0.66),
+          marginTop: 6,
+          textAlign: 'center',
+          width: itemWidth - 8,
+        }}>
+        {getFollowerDisplayName(follower)}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderSkeleton = (index: number) => (
+    <View key={index} style={[styles.topFollowerGridItem, { width: itemWidth }]}>
+      <Skeleton
+        style={[
+          styles.topFollowerAvatar,
+          { width: avatarSize, height: avatarSize, backgroundColor: surfaceTertiary },
+        ]}
+      />
+      <Skeleton
+        style={{
+          width: itemWidth - 24,
+          height: 12,
+          borderRadius: 4,
+          marginTop: 6,
+          backgroundColor: surfaceTertiary,
+        }}
+      />
+    </View>
+  );
+
+  return (
+    <View style={{ paddingHorizontal: 16 }}>
+      <Text
+        bold
+        size={12}
+        style={{ color: opacity(foreground, 0.4), marginBottom: 12, marginLeft: 4 }}>
+        TOP FOLLOWERS
+      </Text>
+      {isLoading ? (
+        <View style={styles.topFollowersGrid}>{[0, 1, 2, 3, 4, 5].map(renderSkeleton)}</View>
+      ) : (
+        <Animated.View style={{ opacity: fadeAnim }}>
+          <View style={styles.topFollowersGrid}>{followersWithProfiles.map(renderItem)}</View>
+        </Animated.View>
+      )}
+      <Spacer size={16} />
+    </View>
+  );
+}
+const TopFollowers = React.memo(TopFollowersComponent);
+
+// ============================================================================
+// Banner with Overlapping Avatar
+// ============================================================================
+
+function BannerWithAvatarComponent({
+  bannerUrl,
+  pictureUrl,
+  pubkey,
+  displayName,
+  nip05,
+  isLoading,
+  showFollowButton,
+  isFollowing,
+  isFollowLoading,
+  onToggleFollow,
+  hasStories,
+  onAvatarPress,
+}: {
+  bannerUrl?: string;
+  pictureUrl?: string;
+  pubkey: string;
+  displayName: string;
+  nip05?: string;
+  isLoading: boolean;
+  showFollowButton: boolean;
+  isFollowing: boolean;
+  isFollowLoading: boolean;
+  onToggleFollow: () => void;
+  hasStories?: boolean;
+  onAvatarPress?: () => void;
+}) {
+  const [foreground, surfaceSecondary, background] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+    'background',
+  ] as const);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [bannerError, setBannerError] = useState(false);
+
+  const fallbackIndex = useMemo(
+    () => (pubkey ? parseInt(pubkey.slice(0, 8), 16) % 8 : 0),
+    [pubkey]
+  );
+  const hasBannerImage = Boolean(bannerUrl && !bannerError);
+  const pfpColors = useDominantColor(pictureUrl, fallbackIndex);
+  const bannerColors = useDominantColor(
+    !pictureUrl && hasBannerImage ? bannerUrl : undefined,
+    fallbackIndex
+  );
+
+  const bannerGradientTheme = useMemo(
+    () => generateSeededGradient(`${pubkey || 'default'}:person`, 'person'),
+    [pubkey]
+  );
+
+  const gradientSource = useMemo(() => {
+    if (pictureUrl && pfpColors.hasExtractedColors) return 'pfp';
+    if (hasBannerImage && bannerColors.hasExtractedColors) return 'banner';
+    return 'seeded';
+  }, [pictureUrl, hasBannerImage, pfpColors.hasExtractedColors, bannerColors.hasExtractedColors]);
+
+  const imageGradientColors = useMemo(() => {
+    if (gradientSource === 'pfp') {
+      const { contrastColor } = getContrastColors(pfpColors.baseColor, 0.3);
+      return [pfpColors.baseColor, contrastColor] as const;
+    }
+    if (gradientSource === 'banner') {
+      const { contrastColor } = getContrastColors(bannerColors.baseColor, 0.3);
+      return [bannerColors.baseColor, contrastColor] as const;
+    }
+    return null;
+  }, [gradientSource, pfpColors.baseColor, bannerColors.baseColor]);
+
+  useEffect(() => {
+    setBannerError(false);
+  }, [bannerUrl]);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
+
+  const avatarContent = (
+    <View style={[styles.avatarBorder, { borderColor: background, backgroundColor: background }]}>
+      <Avatar
+        picture={pictureUrl}
+        seed={pubkey}
+        size={AVATAR_SIZE}
+        variant="person"
+        name={displayName}
+        loading={isLoading}
+      />
+    </View>
+  );
+
+  const seededGradientFill = (
+    <View style={StyleSheet.absoluteFill}>
+      <LinearGradient
+        colors={bannerGradientTheme.primaryColors}
+        start={bannerGradientTheme.primaryStart}
+        end={bannerGradientTheme.primaryEnd}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={bannerGradientTheme.overlayColors}
+        start={bannerGradientTheme.overlayStart}
+        end={bannerGradientTheme.overlayEnd}
+        style={StyleSheet.absoluteFill}
+      />
+    </View>
+  );
+
+  return (
+    <View>
+      {/* Banner */}
+      <View style={[styles.bannerContainer, { backgroundColor: surfaceSecondary }]}>
+        {isLoading ? (
+          <Skeleton
+            style={[StyleSheet.absoluteFill, { height: BANNER_HEIGHT, borderRadius: 0 }]}
+            className="w-full"
+          />
+        ) : hasBannerImage ? (
+          <>
+            <ExpoImage
+              source={{ uri: bannerUrl }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              cachePolicy="disk"
+              recyclingKey={bannerUrl}
+              transition={300}
+              onError={() => setBannerError(true)}
+            />
+            {imageGradientColors ? (
+              <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                <View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { backgroundColor: opacity(imageGradientColors[0], 0.05) },
+                  ]}
+                />
+                <LinearGradient
+                  colors={[opacity(imageGradientColors[0], 0.28), 'transparent']}
+                  locations={[0, 0.8]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <LinearGradient
+                  colors={[
+                    opacity(imageGradientColors[1], 0.2),
+                    'transparent',
+                    opacity(imageGradientColors[0], 0.18),
+                  ]}
+                  locations={[0, 0.55, 1]}
+                  start={{ x: 1, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.06)', 'transparent']}
+                  locations={[0, 0.7]}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </View>
+            ) : (
+              seededGradientFill
+            )}
+          </>
+        ) : imageGradientColors ? (
+          <View style={StyleSheet.absoluteFill}>
+            <LinearGradient
+              colors={imageGradientColors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
+        ) : (
+          seededGradientFill
+        )}
+      </View>
+
+      {/* Avatar - positioned to overlap banner */}
+      <Animated.View
+        style={[styles.avatarContainer, { opacity: fadeAnim, transform: [{ scale: fadeAnim }] }]}>
+        {hasStories && onAvatarPress ? (
+          <TouchableOpacity activeOpacity={0.8} onPress={onAvatarPress}>
+            {avatarContent}
+          </TouchableOpacity>
+        ) : (
+          avatarContent
+        )}
+      </Animated.View>
+
+      {/* Name and NIP-05 */}
+      <VStack align="center" style={{ marginTop: 8 }}>
+        <Text
+          loading={isLoading}
+          placeholder="Display Name"
+          bold
+          size={22}
+          style={{
+            color: foreground,
+            includeFontPadding: false,
+            lineHeight: Math.round(22 * 1.25),
+          }}>
+          {displayName}
+        </Text>
+        {(isLoading || nip05) && (
+          <HStack align="center" gap={4}>
+            {!isLoading && (
+              <Icon name="mdi:check-decagram" size={16} color={opacity(foreground, 0.4)} />
+            )}
+            <Text
+              loading={isLoading}
+              placeholder="username@relay.example"
+              size={14}
+              style={{ color: opacity(foreground, 0.4) }}>
+              {nip05 || '\u00A0'}
+            </Text>
+          </HStack>
+        )}
+        {showFollowButton &&
+          (isLoading ? (
+            <HeroSkeleton
+              className="h-[34px] min-w-[108px] rounded-full"
+              style={{ marginTop: 10 }}
+            />
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={onToggleFollow}
+              disabled={isFollowLoading}
+              style={[
+                styles.followButton,
+                {
+                  backgroundColor: isFollowing ? opacity(foreground, 0.12) : foreground,
+                  borderColor: isFollowing ? opacity(foreground, 0.25) : foreground,
+                },
+                isFollowLoading && styles.followButtonDisabled,
+              ]}>
+              <Text
+                bold
+                size={13}
+                style={{
+                  color: isFollowing ? foreground : background,
+                }}>
+                {isFollowing ? 'Following' : 'Follow'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+      </VStack>
+    </View>
+  );
+}
+const BannerWithAvatar = React.memo(BannerWithAvatarComponent);
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+export function UserProfileScreen() {
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
+  const { ndk } = useNDK();
+  const { keys: nostrKeys } = useNostrKeysContext();
+  const { npub: npubParam, pubkey: pubkeyParam } = useLocalSearchParams<{
+    npub?: string;
+    pubkey?: string;
+  }>();
+
+  const pubkey = useMemo(() => {
+    if (pubkeyParam) return pubkeyParam;
+    if (npubParam) return npubToPubkey(npubParam);
+    return '';
+  }, [npubParam, pubkeyParam]);
+
+  const npub = useMemo(() => {
+    if (npubParam) return npubParam;
+    if (pubkey) {
+      try {
+        return nip19.npubEncode(pubkey);
+      } catch {
+        return '';
+      }
+    }
+    return '';
+  }, [npubParam, pubkey]);
+
+  const isOwnProfile = !!nostrKeys?.pubkey && nostrKeys.pubkey === pubkey;
+
+  // ===========================
+  // NOSTR SUBSCRIPTIONS & API
+  // ===========================
+
+  const metadataFilters = useMemo(
+    () => (pubkey ? [{ authors: [pubkey], kinds: [Metadata], limit: 1 }] : null),
+    [pubkey]
+  );
+  const { events: metadataEvents, eose: metadataEose } = useSubscribe({
+    filters: metadataFilters,
+  });
+
+  const contactListFilters = useMemo(
+    () =>
+      nostrKeys?.pubkey ? [{ authors: [nostrKeys.pubkey], kinds: [Contacts], limit: 20 }] : null,
+    [nostrKeys?.pubkey]
+  );
+  const { events: contactListEvents } = useSubscribe({ filters: contactListFilters });
+
+  const contactsTags = useNostrSocialStore((state) => state.contactsTags);
+  const contactsContent = useNostrSocialStore((state) => state.contactsContent);
+  const setContactsFromRelay = useNostrSocialStore((state) => state.setContactsFromRelay);
+  const setFollowOptimistic = useNostrSocialStore((state) => state.setFollowOptimistic);
+  const clearFollowOptimistic = useNostrSocialStore((state) => state.clearFollowOptimistic);
+  const clearSettledFollowOptimistic = useNostrSocialStore(
+    (state) => state.clearSettledFollowOptimistic
+  );
+  const followOptimisticEntry = useNostrSocialStore((state) =>
+    pubkey ? state.optimisticFollowsByPubkey[pubkey] : undefined
+  );
+  const ownFollowingCount = useNostrSocialStore((state) => {
+    let count = Object.keys(state.followingPubkeys).length;
+
+    for (const [followedPubkey, optimistic] of Object.entries(state.optimisticFollowsByPubkey)) {
+      const baseIsFollowing = !!state.followingPubkeys[followedPubkey];
+      if (optimistic.value === baseIsFollowing) continue;
+      count += optimistic.value ? 1 : -1;
+    }
+
+    return Math.max(0, count);
+  });
+
+  const { data: profileData, isLoading: isProfileApiLoading } = useNostrProfile(pubkey || null);
+
+  // ===========================
+  // DERIVED STATE
+  // ===========================
+
+  const userInfo = useMemo(() => {
+    if (!metadataEvents?.[0]) return null;
+    try {
+      return JSON.parse(metadataEvents[0].content);
+    } catch {
+      return null;
+    }
+  }, [metadataEvents]);
+
+  const displayName = isOwnProfile
+    ? userInfo?.display_name || userInfo?.name || getUsername(pubkey || '')
+    : userInfo?.display_name || userInfo?.name || truncateMiddle(npub, 8);
+  const isMetadataLoading = !metadataEose;
+
+  const followerCount = profileData?.followers;
+  const reputationScore = profileData?.score;
+  const joinedDate = formatDate((profileData?.created_at || 0) * 1000);
+
+  const latestContactListEvent = useMemo(() => {
+    if (!nostrKeys?.pubkey) return null;
+    const candidates = (contactListEvents || []).filter(
+      (event) => event.kind === Contacts && event.pubkey === nostrKeys.pubkey
+    );
+    if (candidates.length === 0) return null;
+    return [...candidates].sort((a, b) => {
+      const byCreatedAt = (b.created_at || 0) - (a.created_at || 0);
+      if (byCreatedAt !== 0) return byCreatedAt;
+      return (b.id || '').localeCompare(a.id || '');
+    })[0];
+  }, [contactListEvents, nostrKeys?.pubkey]);
+
+  useEffect(() => {
+    if (!latestContactListEvent) return;
+    const tags = Array.isArray(latestContactListEvent.tags)
+      ? (latestContactListEvent.tags as string[][])
+      : [];
+    const content =
+      typeof latestContactListEvent.content === 'string' ? latestContactListEvent.content : '';
+    setContactsFromRelay({
+      tags,
+      content,
+      createdAt: latestContactListEvent.created_at || 0,
+    });
+    clearSettledFollowOptimistic();
+  }, [latestContactListEvent, setContactsFromRelay, clearSettledFollowOptimistic]);
+
+  const followingCount = isOwnProfile ? ownFollowingCount : profileData?.follows;
+  const isFollowingProfile = useNostrSocialStore(
+    useMemo(() => selectIsFollowingPubkey(pubkey || ''), [pubkey])
+  );
+  const followInFlight = !!followOptimisticEntry?.pending;
+
+  // ===========================
+  // VIDEO STORIES STATE
+  // ===========================
+
+  const [userVideoPosts, setUserVideoPosts] = useState<VideoPostRecord[]>([]);
+  const hasStories = userVideoPosts.length > 0;
+
+  const handleVideoPostsReady = useCallback((videoPosts: VideoPostRecord[]) => {
+    setUserVideoPosts(videoPosts);
+  }, []);
+
+  const handleAvatarStoryPress = useCallback(() => {
+    if (userVideoPosts.length === 0) return;
+    const storyUser: StoryUser = {
+      pubkey,
+      profile: userInfo ? { name: displayName, picture: userInfo.picture } : undefined,
+      videoPosts: userVideoPosts,
+    };
+    router.navigate({
+      pathname: '/(stories-flow)/stories' as any,
+      params: {
+        startIndex: '0',
+        storyUsersJson: JSON.stringify([storyUser]),
+      },
+    });
+  }, [userVideoPosts, pubkey, userInfo, displayName]);
+
+  // ===========================
+  // HANDLERS
+  // ===========================
+
+  const handleCopy = useCallback(async (text: string, target: CopyTarget) => {
+    try {
+      await Clipboard.setStringAsync(text);
+      copyPopup(target);
+    } catch {
+      copyFailedPopup();
+    }
+  }, []);
+
+  const handleOpenLink = useCallback(async (url: string) => {
+    try {
+      const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+      await Linking.openURL(fullUrl);
+    } catch {
+      openLinkFailedPopup();
+    }
+  }, []);
+
+  const handleToggleFollow = useCallback(async () => {
+    if (!pubkey || !nostrKeys?.pubkey || !ndk) {
+      engagementUpdateFailedPopup('follow');
+      return;
+    }
+    if (nostrKeys.pubkey === pubkey || followInFlight) return;
+
+    const shouldFollow = !isFollowingProfile;
+    setFollowOptimistic(pubkey, shouldFollow, true);
+
+    const nextTags = buildUpdatedContactTags(
+      contactsTags.map((tag) => [...tag]),
+      pubkey,
+      shouldFollow
+    );
+    const createdAt = Math.floor(Date.now() / 1000);
+
+    try {
+      const contactEvent = new NDKEvent(ndk);
+      contactEvent.kind = Contacts;
+      contactEvent.tags = nextTags;
+      contactEvent.content = contactsContent;
+      contactEvent.created_at = createdAt;
+      await contactEvent.publish();
+      setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAt });
+      clearFollowOptimistic(pubkey);
+    } catch {
+      clearFollowOptimistic(pubkey);
+      engagementUpdateFailedPopup('follow');
+    }
+  }, [
+    pubkey,
+    nostrKeys?.pubkey,
+    ndk,
+    followInFlight,
+    isFollowingProfile,
+    contactsTags,
+    contactsContent,
+    setFollowOptimistic,
+    setContactsFromRelay,
+    clearFollowOptimistic,
+  ]);
+
+  // ===========================
+  // PROFILE INFO ITEMS (data-driven)
+  // ===========================
+
+  const iconColor = opacity(foreground, 0.4);
+
+  const profileInfoItems = useMemo(() => {
+    const items: {
+      key: string;
+      prefix: React.ReactNode;
+      title: string;
+      suffixIcon: string;
+      onPress: () => void;
+    }[] = [
+      {
+        key: 'npub',
+        prefix: <CurrencyIcon colors={[iconColor]} width={20} currency="nostr" />,
+        title: truncateMiddle(npub, 10),
+        suffixIcon: 'lets-icons:copy',
+        onPress: () => handleCopy(npub, 'npub'),
+      },
+    ];
+
+    if (userInfo?.nip05) {
+      items.push({
+        key: 'nip05',
+        prefix: <Icon name="mdi:check-decagram" size={20} color={iconColor} />,
+        title: userInfo.nip05,
+        suffixIcon: 'lets-icons:copy',
+        onPress: () => handleCopy(userInfo.nip05, 'nip05'),
+      });
+    }
+
+    if (userInfo?.lud16) {
+      items.push({
+        key: 'lud16',
+        prefix: <Icon name="mdi:lightning-bolt" size={20} color={iconColor} />,
+        title: userInfo.lud16,
+        suffixIcon: 'lets-icons:copy',
+        onPress: () => handleCopy(userInfo.lud16, 'lud16'),
+      });
+    }
+
+    if (userInfo?.website) {
+      items.push({
+        key: 'website',
+        prefix: <Icon name="mdi:web" size={20} color={iconColor} />,
+        title: userInfo.website,
+        suffixIcon: 'mdi:open-in-new',
+        onPress: () => handleOpenLink(userInfo.website),
+      });
+    }
+
+    return items;
+  }, [npub, userInfo, handleCopy, handleOpenLink, iconColor]);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: background }}>
+      <Stack.Screen
+        options={{
+          title: isMetadataLoading ? 'Profile' : displayName,
+          headerRight: () => (
+            <HStack gap={4}>
+              {profileData?.mintUrl && (
+                <Link
+                  href={{
+                    pathname: '/(mint-flow)/info' as any,
+                    params: { mintUrl: profileData.mintUrl },
+                  }}
+                  asChild>
+                  <TouchableOpacity style={{ padding: 8 }}>
+                    <Icon name="mdi:bank" size={24} color={foreground} />
+                  </TouchableOpacity>
+                </Link>
+              )}
+              <Link
+                href={{
+                  pathname: '/(user-flow)/share' as any,
+                  params: {
+                    type: 'npub',
+                    data: npub,
+                    ...(userInfo?.lud16 && { lud16: userInfo.lud16 }),
+                  },
+                }}
+                asChild>
+                <TouchableOpacity style={{ padding: 8 }}>
+                  <Icon name="mdi:qrcode" size={24} color={foreground} />
+                </TouchableOpacity>
+              </Link>
+            </HStack>
+          ),
+        }}
+      />
+
+      {pubkey ? (
+        <UserFeed
+          pubkey={pubkey}
+          authorName={displayName}
+          authorPicture={userInfo?.picture}
+          isOwnProfile={isOwnProfile}
+          onVideoPostsReady={handleVideoPostsReady}
+          ListHeaderComponent={
+            <View>
+              <BannerWithAvatar
+                bannerUrl={userInfo?.banner}
+                pictureUrl={userInfo?.picture}
+                pubkey={pubkey}
+                displayName={displayName}
+                nip05={userInfo?.nip05}
+                isLoading={isMetadataLoading}
+                showFollowButton={!isOwnProfile && !!pubkey}
+                isFollowing={isFollowingProfile}
+                isFollowLoading={followInFlight}
+                onToggleFollow={handleToggleFollow}
+                hasStories={hasStories}
+                onAvatarPress={handleAvatarStoryPress}
+              />
+
+              <Spacer size={16} />
+
+              {/* Stats Grid */}
+              <View style={{ paddingHorizontal: 16 }}>
+                <ProfileStatsGrid
+                  followingCount={followingCount}
+                  followerCount={followerCount}
+                  reputationScore={reputationScore}
+                  joinedDate={joinedDate}
+                  isLoading={isProfileApiLoading}
+                />
+              </View>
+
+              <Spacer size={16} />
+
+              {/* Top Followers */}
+              <TopFollowers
+                topFollowers={profileData?.topFollowers || []}
+                isLoading={isProfileApiLoading}
+              />
+
+              {/* About Card */}
+              {userInfo?.about && (
+                <View style={{ paddingHorizontal: 16 }}>
+                  <Card variant="info" message={userInfo.about} />
+                  <Spacer size={16} />
+                </View>
+              )}
+
+              {/* Profile Info Section */}
+              <View style={{ paddingHorizontal: 16 }}>
+                <Section title="Profile Info">
+                  <ListGroup variant="secondary">
+                    {profileInfoItems.map((item) => (
+                      <PressableFeedback key={item.key} animation={false} onPress={item.onPress}>
+                        <PressableFeedback.Scale>
+                          <ListGroup.Item disabled>
+                            <ListGroup.ItemPrefix>{item.prefix}</ListGroup.ItemPrefix>
+                            <ListGroup.ItemContent>
+                              <ListGroup.ItemTitle>{item.title}</ListGroup.ItemTitle>
+                            </ListGroup.ItemContent>
+                            <ListGroup.ItemSuffix>
+                              <Icon name={item.suffixIcon} size={20} color={iconColor} />
+                            </ListGroup.ItemSuffix>
+                          </ListGroup.Item>
+                        </PressableFeedback.Scale>
+                        <PressableFeedback.Ripple />
+                      </PressableFeedback>
+                    ))}
+                  </ListGroup>
+                </Section>
+              </View>
+
+              <Spacer size={8} />
+            </View>
+          }
+        />
+      ) : null}
+
+      <BottomButtons>
+        <ButtonHandler
+          buttons={[
+            {
+              text: 'Send Message',
+              variant: 'primary',
+              onPress: async () => {
+                router.navigate({
+                  pathname: '/(user-flow)/userMessages' as any,
+                  params: { pubkey },
+                });
+              },
+            },
+          ]}
+        />
+      </BottomButtons>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  bannerContainer: {
+    width: '100%',
+    height: BANNER_HEIGHT,
+    overflow: 'hidden',
+  },
+  avatarContainer: {
+    alignItems: 'center',
+    marginTop: -(AVATAR_SIZE - AVATAR_OVERLAP),
+  },
+  avatarBorder: {
+    borderRadius: AVATAR_SIZE / 2 + 4,
+    borderWidth: 4,
+    padding: 0,
+  },
+  statsGrid: {
+    marginHorizontal: -6,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  statItem: {
+    flex: 1,
+    padding: 6,
+  },
+  statCard: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'flex-start',
+  },
+  skeletonLabel: {
+    width: 80,
+    height: 14,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonValue: {
+    height: 28,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  skeletonDesc: {
+    width: 120,
+    height: 14,
+    borderRadius: 4,
+  },
+  topFollowersGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  topFollowerGridItem: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  topFollowerAvatar: {
+    borderRadius: 32,
+  },
+  followButton: {
+    marginTop: 10,
+    minWidth: 108,
+    height: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  followButtonDisabled: {
+    opacity: 0.6,
+  },
+});

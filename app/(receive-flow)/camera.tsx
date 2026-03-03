@@ -7,10 +7,10 @@
 
 import React, { useCallback } from 'react';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useMintStore } from 'stores/mintStore';
-import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
-import { CameraScreen, ScanningData } from 'components/screens/CameraScreen';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useProcessPaymentString } from '@/features/send';
+import { CameraScreen, ScanningData } from '@/features/camera';
 
 const Camera: React.FC = () => {
   const { unit } = useLocalSearchParams<{ unit: string }>();

@@ -39,6 +39,10 @@ Canonical text component rules, font/weight usage, and built-in skeleton/loading
 
 Zustand state scoping policy (global vs profile vs runtime), persistence boundaries, and profile switch/reset contracts. Read this before adding or modifying stores.
 
+### `.cursor/rules/folder-structure.mdc`
+
+Folder structure, layer boundaries (app, features, shared), and where to place new code. Read this before adding files outside existing patterns.
+
 ---
 
 ## How to Write a Rule Doc

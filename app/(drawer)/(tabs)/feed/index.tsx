@@ -1,12 +1,5 @@
-import { View } from 'react-native';
-import { HomeFeed } from 'components/blocks/HomeFeed';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { FeedScreen } from '@/features/feed';
 
-export default function FeedScreen() {
-  const surface = useThemeColor('surface');
-  return (
-    <View style={{ flex: 1, backgroundColor: surface }}>
-      <HomeFeed />
-    </View>
-  );
+export default function FeedRoute() {
+  return <FeedScreen />;
 }

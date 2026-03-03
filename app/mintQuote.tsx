@@ -8,7 +8,7 @@ import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
 import type { MintHistoryEntry } from 'coco-cashu-core';
-import { MintQuoteScreen } from 'components/screens/MintQuoteScreen';
+import { MintQuoteScreen } from '@/features/receive';
 
 function ModalScreen() {
   const { mintHistoryEntry: mintHistoryEntryString } = useLocalSearchParams<{
@@ -17,11 +17,7 @@ function ModalScreen() {
 
   const mintHistoryEntry = JSON.parse(mintHistoryEntryString) as MintHistoryEntry;
 
-  return (
-    <>
-      <MintQuoteScreen mintHistoryEntry={mintHistoryEntry} />
-    </>
-  );
+  return <MintQuoteScreen mintHistoryEntry={mintHistoryEntry} />;
 }
 
 export default withSheetProvider(ModalScreen);

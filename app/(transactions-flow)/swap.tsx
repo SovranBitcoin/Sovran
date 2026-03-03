@@ -7,7 +7,7 @@
 import React from 'react';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { SwapTransactionScreen } from 'components/screens/SwapTransactionScreen';
+import { SwapTransactionScreen } from '@/features/transactions';
 
 function ModalScreen() {
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();

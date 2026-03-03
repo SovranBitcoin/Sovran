@@ -1,6 +1,6 @@
 import { CashuState } from './types';
 import type { AnyAction, Reducer } from 'redux';
-import { typedUpdate } from 'helper/typedUpdate';
+import { typedUpdate } from '@/shared/lib/typedUpdate';
 import { cashuState } from 'redux/store/migrationTest';
 
 const initialState: CashuState = {

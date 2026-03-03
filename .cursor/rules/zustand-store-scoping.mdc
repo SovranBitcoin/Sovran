@@ -1,8 +1,8 @@
 ---
 description: Zustand store scoping, persistence boundaries, and profile-switch/reset contracts.
 globs:
-  - "stores/**/*.ts"
-  - "helper/profileScopedStorage.ts"
+  - "shared/stores/**/*.ts"
+  - "shared/lib/cashu/profileScopedStorage.ts"
   - "redux/store/index.ts"
 alwaysApply: false
 ---
@@ -56,31 +56,34 @@ Use `expo-secure-store` for secrets. Treat Zustand as app state/cache only.
 
 ## Current Store Inventory and Scope
 
-### Global persisted stores (`AsyncStorage`)
+Stores are organized by scope in `shared/stores/{global,profile,runtime}/`.
 
-- `stores/settingsStore.ts` (`settings-store`)
-- `stores/profileStore.ts` (`profile-store`)
-- `stores/pricelistStore.ts` (`pricelist-store`)
-- `stores/btcMapStore.ts` (`btcmap-store`)
-- `stores/kymMintStore.ts` (`kym-mint-store`)
-- `stores/auditMintStore.ts` (`audit-mint-store`)
+### Global persisted stores (`AsyncStorage`) — `shared/stores/global/`
 
-### Profile-scoped persisted stores (`createProfileScopedStorage`)
+- `settingsStore.ts` (`settings-store`)
+- `profileStore.ts` (`profile-store`)
+- `pricelistStore.ts` (`pricelist-store`)
+- `btcMapStore.ts` (`btcmap-store`)
+- `kymMintStore.ts` (`kym-mint-store`)
+- `auditMintStore.ts` (`audit-mint-store`)
+- `migrateSettings.ts` (migration utility, not a store)
 
-- `stores/mintStore.ts` (`mint-store`)
-- `stores/mintDistributionStore.ts` (`mint-distribution-store`)
-- `stores/npcMintStore.ts` (`npc-mint-store`)
-- `stores/routstrStore.ts` (`routstr-store`)
-- `stores/scanHistoryStore.ts` (`scan-history-store`)
-- `stores/searchHistoryStore.ts` (`search-history-store`)
-- `stores/swapTransactionsStore.ts` (`swap-transactions-store`)
-- `stores/transactionLocationStore.ts` (`transaction-location-store`)
-- `stores/nostrSocialStore.ts` (`nostr-social-store`)
+### Profile-scoped persisted stores (`createProfileScopedStorage`) — `shared/stores/profile/`
 
-### Runtime-only (non-persisted)
+- `mintStore.ts` (`mint-store`)
+- `mintDistributionStore.ts` (`mint-distribution-store`)
+- `npcMintStore.ts` (`npc-mint-store`)
+- `routstrStore.ts` (`routstr-store`)
+- `scanHistoryStore.ts` (`scan-history-store`)
+- `searchHistoryStore.ts` (`search-history-store`)
+- `swapTransactionsStore.ts` (`swap-transactions-store`)
+- `transactionLocationStore.ts` (`transaction-location-store`)
+- `nostrSocialStore.ts` (`nostr-social-store`)
 
-- `stores/popupStore.ts`
-- `stores/mockDataStore.ts`
+### Runtime-only (non-persisted) — `shared/stores/runtime/`
+
+- `popupStore.ts`
+- `mockDataStore.ts`
 
 ---
 
@@ -91,7 +94,7 @@ Profile switch must produce a clean profile-local session.
 Current flow:
 - Triggered from `app/(drawer)/_layout.tsx`
 - Account-scoped providers remount via key in `app/_layout.tsx`
-- Profile-scoped Zustand stores are reset + rehydrated in `helper/profileScopedStorage.ts` (`rehydrateProfileStores()`)
+- Profile-scoped Zustand stores are reset + rehydrated in `shared/lib/cashu/profileScopedStorage.ts` (`rehydrateProfileStores()`)
 
 Rules:
 - Every store using `createProfileScopedStorage()` must be included in:
@@ -109,7 +112,7 @@ Full reset must remove all profile data across all known profile indexes.
 
 Current reset orchestration:
 - `redux/store/index.ts` (`resetApp`)
-- `helper/profileScopedStorage.ts` (`clearAllProfileScopedData(maxProfileIndex)`)
+- `shared/lib/cashu/profileScopedStorage.ts` (`clearAllProfileScopedData(maxProfileIndex)`)
 - `helper/secureStorage.ts` (`clearAllSecureData(maxAccountIndex)`)
 
 Rules:
@@ -158,7 +161,7 @@ Do this checklist first:
 For a new profile-scoped Zustand store:
 
 1. Use `persist(..., { storage: createJSONStorage(() => createProfileScopedStorage()) })`.
-2. Add store key to `PROFILE_SCOPED_STORE_KEYS` in `helper/profileScopedStorage.ts`.
+2. Add store key to `PROFILE_SCOPED_STORE_KEYS` in `shared/lib/cashu/profileScopedStorage.ts`.
 3. Add reset state + `persist.rehydrate()` handling in `rehydrateProfileStores()`.
 4. Ensure full reset clears all profile variants via `clearAllProfileScopedData(maxProfileIndex)`.
 

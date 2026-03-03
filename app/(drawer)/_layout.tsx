@@ -11,22 +11,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useInitializationReset } from 'providers/InitializationProvider';
-import { Text } from 'components/ui/Text';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { VStack } from 'components/ui/View/VStack';
-import { HStack } from 'components/ui/View/HStack';
-import { View } from 'components/ui/View/View';
-import { Spacer } from 'components/ui/View/Spacer';
-import { Avatar } from 'components/ui/Avatar';
-import { getUsername } from 'helper/username';
-import { useProfileDisplay } from '@/hooks/useProfileDisplay';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useInitializationReset } from '@/shared/providers/InitializationProvider';
+import { Text } from '@/shared/ui/primitives/Text';
+import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { View } from '@/shared/ui/primitives/View/View';
+import { Spacer } from '@/shared/ui/primitives/View/Spacer';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { getUsername } from '@/shared/lib/username';
+import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useProfileStore, ProfileEntry } from '@/stores/profileStore';
-import { CocoManager } from '@/helper/coco/manager';
-import { rehydrateProfileStores } from '@/helper/profileScopedStorage';
+import { useProfileStore, ProfileEntry } from '@/shared/stores/global/profileStore';
+import { CocoManager } from '@/shared/lib/cashu/manager';
+import { rehydrateProfileStores } from '@/shared/lib/cashu/profileScopedStorage';
 import { SheetManager } from 'react-native-actions-sheet';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -67,7 +67,7 @@ const MENU_ITEMS: MenuItem[] = [
   {
     icon: 'material-symbols:settings-rounded',
     label: 'Settings',
-    route: 'settings-pages',
+    route: '(settings-flow)',
     drawerLabel: 'settings',
   },
 ];

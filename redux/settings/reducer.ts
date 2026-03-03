@@ -8,7 +8,7 @@ import {
   SET_BACKGROUND_IMAGE,
 } from './actionTypes';
 import type { AnyAction, Reducer } from 'redux';
-import { typedUpdate } from 'helper/typedUpdate';
+import { typedUpdate } from '@/shared/lib/typedUpdate';
 
 interface TermsAccepted {
   termsAccepted: boolean;

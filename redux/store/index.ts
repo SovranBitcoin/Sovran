@@ -2,13 +2,13 @@ import { applyMiddleware, createStore, Dispatch } from 'redux';
 import { createMigrate, persistStore, persistReducer, type PersistedState } from 'redux-persist';
 import rootReducer, { RootState, AppThunk, RESET_APP } from './reducer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PUBLIC_KEYS } from 'helper/constants';
+import { PUBLIC_KEYS } from '@/shared/lib/constants';
 import _ from 'lodash/fp';
 import { Alert } from 'react-native';
 import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { storeMnemonic } from 'helper/secureStorage';
+import { storeMnemonic } from '@/shared/lib/nostr/secureStorage';
 
 const thunkMiddleware = require('redux-thunk').thunk;
 
@@ -564,7 +564,7 @@ const migrations = {
 
     try {
       // Import the migration function dynamically to avoid circular dependencies
-      import('stores/migrateSettings')
+      import('@/shared/stores/global/migrateSettings')
         .then(({ migrateSettingsFromRedux }) => {
           migrateSettingsFromRedux(rootState)
             .then(() => {
@@ -611,14 +611,14 @@ export const resetApp = (): AppThunk => {
       console.log('Starting complete app reset...');
 
       // Get profile data first (before any clearing)
-      const { useProfileStore } = await import('stores/profileStore');
+      const { useProfileStore } = await import('@/shared/stores/global/profileStore');
       const profiles = useProfileStore.getState().profiles;
       const accountIndexes = profiles.map((p) => p.accountIndex);
       const importedPubkeys = profiles.filter((p) => p.source === 'imported').map((p) => p.pubkey);
 
       // 1. Clear ALL Coco SQLite databases (coco.db, coco-N.db for every profile)
       try {
-        const { CocoManager } = await import('helper/coco/manager');
+        const { CocoManager } = await import('@/shared/lib/cashu/manager');
         await CocoManager.completeReset(accountIndexes);
         console.log('✅ Coco databases and manager reset successfully');
       } catch (error) {
@@ -628,7 +628,7 @@ export const resetApp = (): AppThunk => {
 
       // 2. Clear secure storage (mnemonic, derived keys, cashu mnemonics, imported nsecs)
       try {
-        const { clearAllSecureData } = await import('helper/secureStorage');
+        const { clearAllSecureData } = await import('@/shared/lib/nostr/secureStorage');
         const cleared = await clearAllSecureData(accountIndexes, importedPubkeys);
         if (cleared) {
           console.log('✅ Secure storage cleared successfully');
@@ -642,18 +642,18 @@ export const resetApp = (): AppThunk => {
 
       // 3. Clear ALL Zustand stores (in-memory + current profile AsyncStorage)
       try {
-        const { useMintStore } = await import('stores/mintStore');
-        const { useSettingsStore } = await import('stores/settingsStore');
-        const { usePricelistStore } = await import('stores/pricelistStore');
-        const { useSwapTransactionsStore } = await import('stores/swapTransactionsStore');
-        const { useSearchHistoryStore } = await import('stores/searchHistoryStore');
-        const { useBTCMapStore } = await import('stores/btcMapStore');
-        const { useScanHistoryStore } = await import('stores/scanHistoryStore');
-        const { useMintDistributionStore } = await import('stores/mintDistributionStore');
-        const { useRoutstrStore } = await import('stores/routstrStore');
-        const { useAuditMintStore } = await import('stores/auditMintStore');
-        const { useTransactionLocationStore } = await import('stores/transactionLocationStore');
-        const { useKYMMintStore } = await import('stores/kymMintStore');
+        const { useMintStore } = await import('@/shared/stores/profile/mintStore');
+        const { useSettingsStore } = await import('@/shared/stores/global/settingsStore');
+        const { usePricelistStore } = await import('@/shared/stores/global/pricelistStore');
+        const { useSwapTransactionsStore } = await import('@/shared/stores/profile/swapTransactionsStore');
+        const { useSearchHistoryStore } = await import('@/shared/stores/profile/searchHistoryStore');
+        const { useBTCMapStore } = await import('@/shared/stores/global/btcMapStore');
+        const { useScanHistoryStore } = await import('@/shared/stores/profile/scanHistoryStore');
+        const { useMintDistributionStore } = await import('@/shared/stores/profile/mintDistributionStore');
+        const { useRoutstrStore } = await import('@/shared/stores/profile/routstrStore');
+        const { useAuditMintStore } = await import('@/shared/stores/global/auditMintStore');
+        const { useTransactionLocationStore } = await import('@/shared/stores/profile/transactionLocationStore');
+        const { useKYMMintStore } = await import('@/shared/stores/global/kymMintStore');
 
         // Clear each store (both in-memory state and AsyncStorage)
         const storesToClear = [
@@ -695,7 +695,7 @@ export const resetApp = (): AppThunk => {
 
       // 3b. Clear profile-scoped store data for ALL profiles (not just active)
       try {
-        const { clearAllProfileScopedData } = await import('helper/profileScopedStorage');
+        const { clearAllProfileScopedData } = await import('@/shared/lib/cashu/profileScopedStorage');
         await clearAllProfileScopedData(accountIndexes);
         console.log('✅ All profile-scoped store data cleared across all profiles');
       } catch (error) {

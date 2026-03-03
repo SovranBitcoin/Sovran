@@ -8,7 +8,7 @@
 import React from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { withSheetProvider } from 'hocs/withSheetProvider';
-import { ReceiveTokenScreen } from 'components/screens/ReceiveTokenScreen';
+import { ReceiveTokenScreen } from '@/features/receive';
 
 function ModalScreen() {
   const { receiveHistoryEntry } = useLocalSearchParams<{ receiveHistoryEntry: string }>();

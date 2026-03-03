@@ -26,7 +26,7 @@
   "ignoreIssues": {
     "components/blocks/nostr/**": ["exports", "types", "duplicates"],
     "components/blocks/UserFeed.tsx": ["exports", "types"],
-    "constants/wallet-header.ts": ["exports"],
+    "features/wallet/lib/walletHeader.ts": ["exports"],
     "helper/nfc/**": ["exports", "types"],
     "helper/nfc.ts": ["exports", "types"],
     "stores/nostrSocialStore.ts": ["exports"],
