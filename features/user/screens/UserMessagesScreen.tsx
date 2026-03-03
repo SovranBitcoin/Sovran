@@ -22,7 +22,18 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { buttonHandlerPopup } from '@/shared/lib/popup';
+import {
+  buttonHandlerPopup,
+  popup,
+  invalidTokenPopup,
+  balanceRefreshedPopup,
+  balanceRefreshFailedPopup,
+  noWalletAvailablePopup,
+  noApiKeyPopup,
+  sendMessageFailedPopup,
+  modelSwitchedPopup,
+  photoPickerComingSoonPopup,
+} from '@/shared/lib/popup';
 import { nip19 } from 'nostr-tools';
 import {
   NDKEvent,
@@ -66,17 +77,6 @@ import { isValidEcashToken } from '@/shared/lib/cashu/utils';
 import { ROUTSTR_PUBKEY } from '@/shared/lib/constants';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { checkBalance, sendMessage, getModels, RoutstrModel } from '@/shared/lib/routstr/api';
-import {
-  popup,
-  invalidTokenPopup,
-  balanceRefreshedPopup,
-  balanceRefreshFailedPopup,
-  noWalletAvailablePopup,
-  noApiKeyPopup,
-  sendMessageFailedPopup,
-  modelSwitchedPopup,
-  photoPickerComingSoonPopup,
-} from '@/shared/lib/popup';
 import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
 import { Proof } from '@cashu/cashu-ts';
 import { formatAmount } from '@/shared/lib/currency';

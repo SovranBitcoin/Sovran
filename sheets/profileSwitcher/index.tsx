@@ -33,13 +33,7 @@ export function ProfileSwitcherContent({ payload, close }: ProfileSwitcherConten
   const [route, setRoute] = useState<ProfileSwitcherRoute>('profile-list');
 
   if (route === 'import-nsec') {
-    return (
-      <ImportNsec
-        payload={payload}
-        close={close}
-        onBack={() => setRoute('profile-list')}
-      />
-    );
+    return <ImportNsec payload={payload} close={close} onBack={() => setRoute('profile-list')} />;
   }
 
   return (
