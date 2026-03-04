@@ -1,5 +1,3 @@
-export type AvatarGradientVariant = 'person' | 'mint';
-
 type GradientPoint = { x: number; y: number };
 
 export type SeededGradientTheme = {
@@ -38,10 +36,7 @@ function hsl(h: number, s: number, l: number, a = 1): string {
   return `hsla(${hue}, ${sat}%, ${light}%, ${a})`;
 }
 
-export function generateSeededGradient(
-  seedInput: string,
-  variant: AvatarGradientVariant
-): SeededGradientTheme {
+export function generateSeededGradient(seedInput: string): SeededGradientTheme {
   const random = createSeededRandom(seedInput);
 
   const baseHue = random() * 360;
@@ -56,8 +51,8 @@ export function generateSeededGradient(
       ? baseHue + (110 + random() * 24) * direction
       : baseHue + spreadB * direction;
 
-  const saturationBase = variant === 'person' ? 58 + random() * 16 : 52 + random() * 16;
-  const lightBase = variant === 'person' ? 44 + random() * 9 : 40 + random() * 10;
+  const saturationBase = 58 + random() * 16;
+  const lightBase = 44 + random() * 9;
 
   const c1 = hsl(baseHue, saturationBase - 6 + random() * 6, lightBase + 9);
   const c2 = hsl(hueA, saturationBase, lightBase + 2);

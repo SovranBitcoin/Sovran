@@ -27,4 +27,3 @@ export type CustomSheetSharedProps = {
   canPop: boolean;
   setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
 };
-

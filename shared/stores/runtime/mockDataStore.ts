@@ -13,7 +13,10 @@
 
 import { create } from 'zustand';
 import { useScanHistoryStore, type ScanSource } from '@/shared/stores/profile/scanHistoryStore';
-import { useSwapTransactionsStore, type SwapGroup } from '@/shared/stores/profile/swapTransactionsStore';
+import {
+  useSwapTransactionsStore,
+  type SwapGroup,
+} from '@/shared/stores/profile/swapTransactionsStore';
 import { useTransactionLocationStore } from '@/shared/stores/profile/transactionLocationStore';
 import type { HistoryEntry } from 'coco-cashu-core';
 

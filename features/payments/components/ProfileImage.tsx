@@ -11,7 +11,6 @@ export function ProfileImage({ profile, loading }: ProfileImageProps) {
     <Avatar
       picture={profile?.picture}
       size={48}
-      variant="person"
       alt={profile?.name || 'User'}
       name={profile?.name}
       loading={loading}

@@ -1,7 +1,7 @@
-import { Avatar as HeroAvatar } from 'heroui-native/avatar';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Skeleton } from 'heroui-native/skeleton';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Image as RNImage, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, View } from 'react-native';
 
 import { UntranslatedText } from '@/shared/ui/primitives/Text';
 
@@ -10,20 +10,18 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { prefetchImage } from '@/shared/lib/imageCache';
 import { Badge } from './Badge';
-import { Skeleton } from './Skeleton';
-
-type AvatarVariant = 'person' | 'mint';
 
 interface AvatarProps {
   picture?: string;
   size?: number;
-  variant?: AvatarVariant;
   alt?: string;
   name?: string;
   status?: string;
   seed?: string;
   loading?: boolean;
 }
+
+type ImageStatus = 'idle' | 'loading' | 'loaded' | 'failed';
 
 function getGradientTextColor(gradientColor: string): string {
   const match = gradientColor.match(/hsla?\((\d+)/i);
@@ -53,10 +51,59 @@ function getFallbackText(name: string | undefined, seed: string | undefined, siz
   return '';
 }
 
+function FallbackContent({
+  fallbackText,
+  gradientTheme,
+  gradientTextColor,
+  fallbackIcon,
+  borderRadius,
+  size,
+}: {
+  fallbackText: string;
+  gradientTheme: ReturnType<typeof generateSeededGradient>;
+  gradientTextColor: string;
+  fallbackIcon: string;
+  borderRadius: number;
+  size: number;
+}) {
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        StyleSheet.absoluteFillObject,
+        { borderRadius, justifyContent: 'center', alignItems: 'center' },
+      ]}>
+      <LinearGradient
+        colors={gradientTheme.primaryColors}
+        start={gradientTheme.primaryStart}
+        end={gradientTheme.primaryEnd}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={gradientTheme.overlayColors}
+        start={gradientTheme.overlayStart}
+        end={gradientTheme.overlayEnd}
+        style={StyleSheet.absoluteFill}
+      />
+      {fallbackText ? (
+        <UntranslatedText
+          bold
+          style={{ color: gradientTextColor }}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.65}>
+          {fallbackText}
+        </UntranslatedText>
+      ) : (
+        <Icon name={fallbackIcon} size={Math.max(14, Math.round(size * 0.46))} color="#FFFFFF" />
+      )}
+    </View>
+  );
+}
+
 export const Avatar = ({
   picture,
   size = 48,
-  variant = 'person',
   alt,
   name,
   status,
@@ -67,28 +114,23 @@ export const Avatar = ({
     prefetchImage(picture);
   }, [picture]);
 
-  // Track whether the current picture has finished loading (or erroring).
-  // Resets synchronously when the picture URL changes so the skeleton
-  // persists seamlessly across metadata-loading → image-loading.
-  const [imageSettled, setImageSettled] = useState(!picture);
-  const prevPicRef = useRef(picture);
-  if (picture !== prevPicRef.current) {
-    prevPicRef.current = picture;
-    setImageSettled(!picture);
-  }
+  const [imageStatus, setImageStatus] = useState<ImageStatus>(() => (picture ? 'loading' : 'idle'));
 
-  const handleImageSettled = useCallback(() => setImageSettled(true), []);
+  useEffect(() => {
+    setImageStatus(picture ? 'loading' : 'idle');
+  }, [picture]);
 
-  const showSkeleton = loading || !imageSettled;
+  const handleImageLoad = useCallback(() => setImageStatus('loaded'), []);
+  const handleImageError = useCallback(() => setImageStatus('failed'), []);
 
-  const borderRadius = variant === 'person' ? size / 2 : Math.round(size * 0.25);
+  const borderRadius = size / 2;
   const statusIconSize = size * 0.33;
   const avatarStyle = { width: size, height: size, borderRadius, overflow: 'hidden' } as const;
 
   const fallbackText = getFallbackText(name, seed, size);
   const gradientTheme = useMemo(
-    () => generateSeededGradient(`${seed ?? name ?? ''}:${variant}`, variant),
-    [name, seed, variant]
+    () => generateSeededGradient(`${seed ?? name ?? ''}`),
+    [name, seed]
   );
   const gradientTextColor = useMemo(
     () => getGradientTextColor(gradientTheme.primaryColors[1]),
@@ -109,102 +151,101 @@ export const Avatar = ({
     return statusConfig[status] ?? null;
   }, [status]);
 
-  const fallbackIcon = variant === 'person' ? 'ph:user-bold' : 'majesticons:coins';
-  const defaultAlt = variant === 'person' ? 'User Avatar' : 'Mint Avatar';
+  const fallbackIcon = 'ph:user-bold';
 
-  return (
-    <VStack style={{ position: 'relative' }}>
-      <HeroAvatar
-        alt={alt || defaultAlt}
-        variant="soft"
-        color="accent"
-        animation={showSkeleton ? 'disable-all' : undefined}
-        style={avatarStyle}>
-        {picture ? (
-          <HeroAvatar.Image
-            source={{ uri: picture }}
-            style={avatarStyle}
-            onLoadEnd={handleImageSettled}
-          />
-        ) : null}
-        <HeroAvatar.Fallback
-          delayMs={0}
-          styles={{
-            container: {
-              ...avatarStyle,
-              justifyContent: 'center',
-              alignItems: 'center',
-            },
-            text: {
-              color: '#FFFFFF',
-              fontWeight: '700',
-              fontSize:
-                fallbackText.length >= 8
-                  ? Math.max(10, Math.round(size * 0.2))
-                  : Math.max(12, Math.round(size * 0.34)),
-              letterSpacing: 0.25,
-            },
-          }}>
-          <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { borderRadius }]}>
-            <LinearGradient
-              colors={gradientTheme.primaryColors}
-              start={gradientTheme.primaryStart}
-              end={gradientTheme.primaryEnd}
-              style={StyleSheet.absoluteFill}
-            />
-            <LinearGradient
-              colors={gradientTheme.overlayColors}
-              start={gradientTheme.overlayStart}
-              end={gradientTheme.overlayEnd}
-              style={StyleSheet.absoluteFill}
-            />
-          </View>
-          {fallbackText ? (
-            <UntranslatedText
-              bold
-              style={{
-                color: gradientTextColor,
-              }}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.65}>
-              {fallbackText}
-            </UntranslatedText>
-          ) : (
-            <Icon
-              name={fallbackIcon}
-              size={Math.max(14, Math.round(size * 0.46))}
-              color="#FFFFFF"
-            />
-          )}
-        </HeroAvatar.Fallback>
-      </HeroAvatar>
+  const showSkeleton =
+    loading || (!!picture && imageStatus !== 'loaded' && imageStatus !== 'failed');
+  const hasPicture = !!picture;
 
-      {showSkeleton ? (
-        <Skeleton
-          style={{
-            ...avatarStyle,
-            position: 'absolute',
-            zIndex: 10,
-          }}
+  const StatusBadgeWrapper = statusBadge ? (
+    <VStack
+      style={{
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        zIndex: 50,
+      }}>
+      {statusBadge.badge ? (
+        <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={statusIconSize} />
+      ) : (
+        <Icon name={statusBadge.icon} size={statusIconSize} />
+      )}
+    </VStack>
+  ) : null;
+
+  const fallbackContainerStyle = {
+    ...avatarStyle,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  };
+
+  const fallbackContent = (
+    <FallbackContent
+      fallbackText={fallbackText}
+      gradientTheme={gradientTheme}
+      gradientTextColor={gradientTextColor}
+      fallbackIcon={fallbackIcon}
+      borderRadius={borderRadius}
+      size={size}
+    />
+  );
+
+  const SkeletonOverlay = (
+    <Skeleton
+      isLoading
+      className="bg-skeleton rounded-full"
+      style={[StyleSheet.absoluteFillObject, avatarStyle]}
+    />
+  );
+
+  // 1. Skeleton only — parent loading and no picture yet (nothing to load)
+  if (loading && !hasPicture) {
+    return (
+      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+        <Skeleton isLoading className="bg-skeleton rounded-full" style={avatarStyle} />
+        {StatusBadgeWrapper}
+      </VStack>
+    );
+  }
+
+  const defaultAlt = 'Avatar';
+  const imageAlt = alt || defaultAlt;
+
+  // 2. Picture loading — skeleton + hidden Image. Never render HeroAvatar here so we avoid
+  //    its initial status='error' which would flash the fallback for one frame.
+  if (hasPicture && showSkeleton) {
+    return (
+      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+        <RNImage
+          source={{ uri: picture }}
+          style={[avatarStyle, { opacity: 0 }]}
+          accessibilityLabel={imageAlt}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
         />
-      ) : null}
+        {SkeletonOverlay}
+        {StatusBadgeWrapper}
+      </VStack>
+    );
+  }
 
-      {statusBadge ? (
-        <VStack
-          style={{
-            position: 'absolute',
-            bottom: -2,
-            right: -2,
-            zIndex: 50,
-          }}>
-          {statusBadge.badge ? (
-            <Badge variant={statusBadge.variant} icon={statusBadge.icon} size={statusIconSize} />
-          ) : (
-            <Icon name={statusBadge.icon} size={statusIconSize} />
-          )}
-        </VStack>
-      ) : null}
+  // 3. Image loaded — show the image
+  if (hasPicture && imageStatus === 'loaded') {
+    return (
+      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+        <RNImage source={{ uri: picture }} style={avatarStyle} accessibilityLabel={imageAlt} />
+        {StatusBadgeWrapper}
+      </VStack>
+    );
+  }
+
+  // 4. Fallback — no picture or image failed to load
+  return (
+    <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+      <View style={fallbackContainerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>
+        {fallbackContent}
+      </View>
+      {StatusBadgeWrapper}
     </VStack>
   );
 };

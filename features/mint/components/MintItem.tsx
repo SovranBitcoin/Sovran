@@ -167,7 +167,6 @@ const MintItem: React.FC<MintItemProps> = ({
               key={mint.mintUrl}
               picture={mint.mintInfo?.icon_url || undefined}
               size={42}
-              variant="mint"
               name={displayName}
               alt={`${displayName} mint`}
             />

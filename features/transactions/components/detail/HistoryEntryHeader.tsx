@@ -73,7 +73,6 @@ export function HistoryEntryHeader({
             picture={recipientProfile.picture}
             seed={recipientProfile.pubkey}
             size={avatarSize}
-            variant="person"
             name={recipientProfile.displayName}
           />
           <View

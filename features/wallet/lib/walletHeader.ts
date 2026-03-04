@@ -48,6 +48,14 @@ export function getHeaderContentWidthFromWidth(windowWidth: number): number {
   return getHeaderTitleWidthFromWidth(windowWidth) - HEADER_LAYOUT.CONTENT_PADDING_HORIZONTAL;
 }
 
+/** Content width derived from button width (e.g. for MintBalanceDisplay inside header). */
+export function getContentWidthFromButtonWidth(
+  buttonWidth: number | undefined
+): number | undefined {
+  if (buttonWidth === undefined) return undefined;
+  return Math.max(0, buttonWidth - HEADER_LAYOUT.CONTENT_PADDING_HORIZONTAL);
+}
+
 export function getHeaderContentHeight(): number {
   return getHeaderTitleHeight() - HEADER_LAYOUT.CONTENT_PADDING_VERTICAL;
 }

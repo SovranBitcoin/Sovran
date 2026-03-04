@@ -245,13 +245,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
           });
         }}
         style={styles.authorRow}>
-        <Avatar
-          picture={profile?.picture}
-          seed={event.pubkey}
-          size={32}
-          variant="person"
-          name={displayName}
-        />
+        <Avatar picture={profile?.picture} seed={event.pubkey} size={32} name={displayName} />
         <View style={styles.authorTextWrap}>
           <Text bold size={14} style={{ color: PANEL_TEXT }} numberOfLines={1}>
             {displayName}
@@ -350,7 +344,7 @@ export const ImageOverlayBottomPanelReply = React.memo(function ImageOverlayBott
 }) {
   return (
     <Pressable onPress={onReplyPress} style={styles.replyRow}>
-      <Avatar seed={currentUserPubkey ?? ''} size={28} variant="person" name="" />
+      <Avatar seed={currentUserPubkey ?? ''} size={28} name="" />
       <View style={styles.replyInputWrap}>
         <Text size={14} style={{ color: PANEL_TEXT_MUTED }}>
           Post your reply
@@ -398,13 +392,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
           });
         }}
         style={styles.authorRow}>
-        <Avatar
-          picture={profile?.picture}
-          seed={event.pubkey}
-          size={28}
-          variant="person"
-          name={displayName}
-        />
+        <Avatar picture={profile?.picture} seed={event.pubkey} size={28} name={displayName} />
         <View style={styles.authorTextWrap}>
           <Text bold size={13} style={{ color: PANEL_TEXT }} numberOfLines={1}>
             {displayName}

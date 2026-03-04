@@ -193,7 +193,6 @@ export const PostCard = React.memo(function PostCard({
                 picture={profile?.picture}
                 seed={event.pubkey}
                 size={AVATAR_SIZE}
-                variant="person"
                 name={displayName}
               />
               <VStack style={sharedStyles.flex1}>
@@ -265,7 +264,6 @@ export const PostCard = React.memo(function PostCard({
             picture={profile?.picture}
             seed={event.pubkey}
             size={AVATAR_SIZE}
-            variant="person"
             name={displayName}
           />
         </Pressable>

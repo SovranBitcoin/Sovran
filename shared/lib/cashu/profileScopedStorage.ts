@@ -121,8 +121,7 @@ export async function migrateProfileScopedKeys(): Promise<void> {
     }
 
     const parsed = JSON.parse(raw);
-    const profiles: { accountIndex: number; pubkey: string }[] =
-      parsed?.state?.profiles ?? [];
+    const profiles: { accountIndex: number; pubkey: string }[] = parsed?.state?.profiles ?? [];
 
     if (profiles.length === 0) {
       await AsyncStorage.setItem(MIGRATION_FLAG, '1');
@@ -171,12 +170,15 @@ export async function migrateProfileScopedKeys(): Promise<void> {
 export async function rehydrateProfileStores(): Promise<void> {
   // Lazy imports to avoid circular dependencies
   const { useMintStore } = await import('@/shared/stores/profile/mintStore');
-  const { useMintDistributionStore } = await import('@/shared/stores/profile/mintDistributionStore');
+  const { useMintDistributionStore } =
+    await import('@/shared/stores/profile/mintDistributionStore');
   const { useRoutstrStore } = await import('@/shared/stores/profile/routstrStore');
   const { useScanHistoryStore } = await import('@/shared/stores/profile/scanHistoryStore');
   const { useSearchHistoryStore } = await import('@/shared/stores/profile/searchHistoryStore');
-  const { useSwapTransactionsStore } = await import('@/shared/stores/profile/swapTransactionsStore');
-  const { useTransactionLocationStore } = await import('@/shared/stores/profile/transactionLocationStore');
+  const { useSwapTransactionsStore } =
+    await import('@/shared/stores/profile/swapTransactionsStore');
+  const { useTransactionLocationStore } =
+    await import('@/shared/stores/profile/transactionLocationStore');
   const { useNostrSocialStore } = await import('@/shared/stores/profile/nostrSocialStore');
   const { useNpcMintStore } = await import('@/shared/stores/profile/npcMintStore');
 

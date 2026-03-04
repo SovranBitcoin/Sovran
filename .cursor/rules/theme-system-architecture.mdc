@@ -337,7 +337,7 @@ When composing a gradient from image colors with a deterministic fallback:
 
 1. **PFP colors** (`useDominantColor(pictureUrl, ...)`) — preferred source; most users have a PFP.
 2. **Banner colors** (`useDominantColor(bannerUrl, ...)`) — only extracted when no PFP is available.
-3. **Seeded gradient** (`generateSeededGradient(pubkey, 'person')` from `shared/lib/avatarGradient.ts`) — deterministic fallback when no image colors are available.
+3. **Seeded gradient** (`generateSeededGradient(pubkey)` from `shared/lib/avatarGradient.ts`) — deterministic fallback when no image colors are available.
 
 Check `hasExtractedColors` (not just `hasLoaded`) before choosing a source — `hasLoaded` is `true` even when extraction failed or only corner colors were found.
 

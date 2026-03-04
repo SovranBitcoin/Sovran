@@ -69,7 +69,7 @@ const ReviewItem = React.memo(function ReviewItem({
     <View className="py-4">
       <HStack align="flex-start" gap={12} className="flex-1">
         <View className="shrink-0">
-          <Avatar seed={review.pubkey} name={displayName} size={48} variant="person" />
+          <Avatar seed={review.pubkey} name={displayName} size={48} />
         </View>
 
         <VStack spacing={6} className="min-w-0 flex-1">

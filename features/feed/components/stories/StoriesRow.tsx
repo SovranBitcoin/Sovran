@@ -276,7 +276,6 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
                   seed={user.pubkey}
                   name={user.profile?.name}
                   size={AVATAR_SIZE}
-                  variant="person"
                 />
               </GradientRing>
               <Text size={11} numberOfLines={1} style={[styles.storyName, nameColor]}>

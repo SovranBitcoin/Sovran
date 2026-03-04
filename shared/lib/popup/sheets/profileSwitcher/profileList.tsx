@@ -49,7 +49,6 @@ export function ProfileList({ payload, close }: ProfileListProps) {
             picture={profile.cachedPicture}
             name={displayName}
             size={40}
-            variant="person"
           />
         </ListGroup.ItemPrefix>
         <ListGroup.ItemContent>

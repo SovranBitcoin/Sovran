@@ -93,7 +93,6 @@ export const ContactItem = React.memo(function ContactItem({
           <Avatar
             picture={displayInfo.picture}
             seed={item.pubkey}
-            variant={displayInfo.isMint ? 'mint' : 'person'}
             status={
               item.pubkey && Object.values(PUBLIC_KEYS).includes(item.pubkey as any)
                 ? 'VERIFIED'

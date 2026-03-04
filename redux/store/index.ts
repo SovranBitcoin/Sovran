@@ -645,14 +645,18 @@ export const resetApp = (): AppThunk => {
         const { useMintStore } = await import('@/shared/stores/profile/mintStore');
         const { useSettingsStore } = await import('@/shared/stores/global/settingsStore');
         const { usePricelistStore } = await import('@/shared/stores/global/pricelistStore');
-        const { useSwapTransactionsStore } = await import('@/shared/stores/profile/swapTransactionsStore');
-        const { useSearchHistoryStore } = await import('@/shared/stores/profile/searchHistoryStore');
+        const { useSwapTransactionsStore } =
+          await import('@/shared/stores/profile/swapTransactionsStore');
+        const { useSearchHistoryStore } =
+          await import('@/shared/stores/profile/searchHistoryStore');
         const { useBTCMapStore } = await import('@/shared/stores/global/btcMapStore');
         const { useScanHistoryStore } = await import('@/shared/stores/profile/scanHistoryStore');
-        const { useMintDistributionStore } = await import('@/shared/stores/profile/mintDistributionStore');
+        const { useMintDistributionStore } =
+          await import('@/shared/stores/profile/mintDistributionStore');
         const { useRoutstrStore } = await import('@/shared/stores/profile/routstrStore');
         const { useAuditMintStore } = await import('@/shared/stores/global/auditMintStore');
-        const { useTransactionLocationStore } = await import('@/shared/stores/profile/transactionLocationStore');
+        const { useTransactionLocationStore } =
+          await import('@/shared/stores/profile/transactionLocationStore');
         const { useKYMMintStore } = await import('@/shared/stores/global/kymMintStore');
 
         // Clear each store (both in-memory state and AsyncStorage)
@@ -695,7 +699,8 @@ export const resetApp = (): AppThunk => {
 
       // 3b. Clear profile-scoped store data for ALL profiles (not just active)
       try {
-        const { clearAllProfileScopedData } = await import('@/shared/lib/cashu/profileScopedStorage');
+        const { clearAllProfileScopedData } =
+          await import('@/shared/lib/cashu/profileScopedStorage');
         const pubkeys = profiles.map((p) => p.pubkey);
         await clearAllProfileScopedData(pubkeys);
         console.log('✅ All profile-scoped store data cleared across all profiles');

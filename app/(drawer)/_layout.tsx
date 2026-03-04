@@ -165,7 +165,6 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
                 picture={profile.cachedPicture}
                 name={profile.cachedDisplayName || getUsername(profile.pubkey)}
                 size={30}
-                variant="person"
               />
             </TouchableOpacity>
           );
@@ -215,13 +214,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
         <TouchableOpacity style={styles.profileTouchable} onPress={handlePress}>
           {nostrKeys?.pubkey && (
             <VStack align="center" spacing={16}>
-              <Avatar
-                seed={nostrKeys?.pubkey}
-                picture={picture}
-                name={displayName}
-                size={64}
-                variant="person"
-              />
+              <Avatar seed={nostrKeys?.pubkey} picture={picture} name={displayName} size={64} />
               <VStack align="center" spacing={8}>
                 <Text bold size={20} style={{ textAlign: 'center', color: foreground }}>
                   {displayName}

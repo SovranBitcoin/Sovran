@@ -37,7 +37,6 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
         <Avatar
           picture={mintInfo?.icon_url || undefined}
           size={40}
-          variant="mint"
           name={mintInfo?.name}
           alt={`${mintInfo?.name || 'Mint'} icon`}
         />

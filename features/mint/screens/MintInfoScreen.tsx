@@ -139,14 +139,7 @@ function AnimatedAvatarComponent({
 
   return (
     <View className="relative">
-      <Avatar
-        picture={picture}
-        size={size}
-        variant="person"
-        name={name}
-        alt={alt}
-        loading={isLoading}
-      />
+      <Avatar picture={picture} size={size} name={name} alt={alt} loading={isLoading} />
       {statusBadge && (
         <Animated.View
           style={{
@@ -287,7 +280,8 @@ function StatsGridComponent({
 }
 const StatsGrid = React.memo(StatsGridComponent);
 
-function RatingDisplayComponent({ score }: { score: number }) {
+/** Score with staggered star rows and distribution bars to the edge. */
+function RatingBarChartComponent({ score }: { score: number }) {
   const [foreground, defaultColor, surfaceTertiary, warning] = useThemeColor([
     'foreground',
     'default',
@@ -333,26 +327,22 @@ function RatingDisplayComponent({ score }: { score: number }) {
 
   if (showSkeleton) {
     return (
-      <HStack align="center" gap={16} className="w-full px-4">
-        <VStack align="center" style={{ width: 60 }}>
+      <HStack align="center" gap={16} className="w-full self-stretch px-4">
+        <VStack align="center" className="shrink-0">
           <Skeleton className="bg-surface-tertiary h-8 w-12 rounded" />
           <Skeleton className="bg-surface-tertiary mt-2 h-3.5 w-10 rounded" />
         </VStack>
-        <VStack gap={4} className="flex-1">
+        <VStack gap={4} className="min-w-0 flex-1" style={{ flex: 1 }}>
           {[5, 4, 3, 2, 1].map((stars) => (
-            <HStack key={stars} align="center" gap={8}>
-              <HStack gap={2}>
+            <HStack key={stars} align="center" gap={2} className="w-full min-w-0">
+              <HStack gap={2} className="shrink-0">
                 {Array.from({ length: stars }).map((_, i) => (
                   <Icon key={i} name="ic:round-star" size={12} color={defaultColor} />
                 ))}
               </HStack>
               <View
-                style={{
-                  flex: 1,
-                  height: 8,
-                  backgroundColor: surfaceTertiary,
-                  borderRadius: 4,
-                }}
+                className="bg-surface-tertiary min-w-0 flex-1 rounded"
+                style={{ height: 8, minWidth: 24 }}
               />
             </HStack>
           ))}
@@ -362,8 +352,8 @@ function RatingDisplayComponent({ score }: { score: number }) {
   }
 
   return (
-    <HStack align="center" gap={16} className="w-full px-4">
-      <VStack align="center" style={{ width: 60 }}>
+    <HStack align="center" gap={16} className="w-full self-stretch px-4">
+      <VStack align="center" className="shrink-0">
         <Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
           <Text heavy size={28} style={{ color: foreground }}>
             {formattedScore}
@@ -374,12 +364,12 @@ function RatingDisplayComponent({ score }: { score: number }) {
         </Animated.View>
       </VStack>
 
-      <VStack gap={4} className="flex-1">
+      <VStack gap={4} className="min-w-0 flex-1" style={{ flex: 1 }}>
         {[5, 4, 3, 2, 1].map((stars) => {
           const isTargetRow = stars === targetRow;
           return (
-            <HStack key={stars} align="center" gap={8}>
-              <HStack gap={2}>
+            <HStack key={stars} align="center" gap={2} className="w-full min-w-0">
+              <HStack gap={2} className="shrink-0">
                 {Array.from({ length: stars }).map((_, i) => (
                   <Animated.View key={i} style={{ opacity: isTargetRow ? fadeAnim : 1 }}>
                     <Icon
@@ -391,12 +381,12 @@ function RatingDisplayComponent({ score }: { score: number }) {
                 ))}
               </HStack>
               <View
+                className="min-w-0 flex-1 overflow-hidden rounded"
                 style={{
-                  flex: 1,
                   height: 8,
+                  minWidth: 24,
                   backgroundColor: surfaceTertiary,
                   borderRadius: 4,
-                  overflow: 'hidden',
                 }}>
                 {isTargetRow && (
                   <Animated.View
@@ -418,7 +408,7 @@ function RatingDisplayComponent({ score }: { score: number }) {
     </HStack>
   );
 }
-const RatingDisplay = React.memo(RatingDisplayComponent);
+const RatingBarChart = React.memo(RatingBarChartComponent);
 
 export function MintInfoScreen() {
   const foreground = useThemeColor('foreground');
@@ -594,7 +584,7 @@ export function MintInfoScreen() {
           paddingBottom: 120,
         }}
         showsVerticalScrollIndicator={false}>
-        <VStack align="center" className="pb-8 pt-6">
+        <VStack align="center" className="w-full pb-8 pt-6">
           {/* Progress Ring with Avatar */}
           <ProgressRing
             size={84}
@@ -613,7 +603,7 @@ export function MintInfoScreen() {
 
           <Spacer size={16} />
 
-          <RatingDisplay score={kymScore ?? -1} />
+          <RatingBarChart score={kymScore ?? -1} />
 
           <StatsGrid
             successRate={successRate}

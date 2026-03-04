@@ -45,7 +45,8 @@ export function ProfileSwitcherContent({
 }: ProfileSwitcherContentProps) {
   const entering =
     navDirection === 'forward' ? SlideInRight.duration(220) : SlideInLeft.duration(220);
-  const exiting = navDirection === 'forward' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220);
+  const exiting =
+    navDirection === 'forward' ? SlideOutLeft.duration(220) : SlideOutRight.duration(220);
 
   return (
     <View style={{ flex: 1, overflow: 'hidden' }}>

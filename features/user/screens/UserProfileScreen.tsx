@@ -285,7 +285,6 @@ function TopFollowersComponent({
         picture={getFollowerPicture(follower)}
         seed={follower.pubkey}
         size={avatarSize}
-        variant="person"
         name={getFollowerDisplayName(follower)}
       />
       <Text
@@ -395,7 +394,7 @@ function BannerWithAvatarComponent({
   );
 
   const bannerGradientTheme = useMemo(
-    () => generateSeededGradient(`${pubkey || 'default'}:person`, 'person'),
+    () => generateSeededGradient(`${pubkey || 'default'}`),
     [pubkey]
   );
 
@@ -436,7 +435,6 @@ function BannerWithAvatarComponent({
         picture={pictureUrl}
         seed={pubkey}
         size={AVATAR_SIZE}
-        variant="person"
         name={displayName}
         loading={isLoading}
       />

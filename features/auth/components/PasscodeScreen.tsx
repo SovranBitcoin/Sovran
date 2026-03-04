@@ -113,7 +113,6 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
               picture={profileDisplay.picture}
               name={profileDisplay.displayName}
               size={AVATAR_SIZE}
-              variant="person"
             />
           </View>
 

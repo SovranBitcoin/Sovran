@@ -11,6 +11,8 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { useBalanceContext } from 'coco-cashu-react';
 import { useMintManagement } from '@/features/mint';
+import { useWalletHeaderState } from '@/features/wallet/hooks/useWalletHeaderState';
+import { getContentWidthFromButtonWidth } from '@/features/wallet/lib/walletHeader';
 
 interface WalletHeaderTitleProps {
   width?: number;
@@ -48,20 +50,19 @@ export default function WalletHeaderTitle({
   const pubkey = keys?.pubkey;
   const setSelectedMint = useMintStore((state) => state.setSelectedMint);
 
-  const { mints } = useMintManagement();
+  const { mints, isLoading: isMintsLoading } = useMintManagement();
   const { balance: liveBalances } = useBalanceContext();
 
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMintUrl = pubkey ? selectedMints[pubkey] : undefined;
+  const balanceForMint = selectedMintUrl ? liveBalances[selectedMintUrl] || 0 : 0;
 
-  const selectedMintData = useMemo(
-    () => (selectedMintUrl ? mints.find((m) => m.mintUrl === selectedMintUrl) : undefined),
-    [mints, selectedMintUrl]
-  );
-
-  const resolvedMintName = selectedMintData?.mintInfo?.name || selectedMintData?.name;
-  const resolvedMintIconUrl = (selectedMintData?.mintInfo as any)?.icon_url as string | undefined;
-  const isMintLoading = Boolean(selectedMintUrl && !selectedMintData);
+  const header = useWalletHeaderState({
+    selectedMint: selectedMintUrl,
+    balanceForMint,
+    mints,
+    isMintsLoading,
+  });
 
   const topMints = useMemo(() => {
     if (!mints || mints.length === 0) return [];
@@ -108,41 +109,56 @@ export default function WalletHeaderTitle({
 
   const { width: windowWidth } = useWindowDimensions();
 
-  const styleWidth =
-    style && typeof style === 'object' && 'width' in style ? style.width : undefined;
-  const styleHeight =
-    style && typeof style === 'object' && 'height' in style ? style.height : undefined;
+  const dimensions = useMemo(() => {
+    const styleWidth =
+      style && typeof style === 'object' && 'width' in style ? style.width : undefined;
+    const styleHeight =
+      style && typeof style === 'object' && 'height' in style ? style.height : undefined;
+    const buttonWidth =
+      typeof styleWidth === 'number'
+        ? styleWidth
+        : typeof explicitWidth === 'number'
+          ? explicitWidth
+          : undefined;
+    const resolvedContentWidth = contentWidth ?? getContentWidthFromButtonWidth(buttonWidth);
+    const resolvedContentHeight = contentHeight ?? 36;
+    return {
+      buttonWidth,
+      styleHeight,
+      contentWidth: resolvedContentWidth,
+      contentHeight: resolvedContentHeight,
+    };
+  }, [style, explicitWidth, contentWidth, contentHeight]);
 
-  const buttonWidth =
-    typeof styleWidth === 'number'
-      ? styleWidth
-      : typeof explicitWidth === 'number'
-        ? explicitWidth
-        : undefined;
-
-  const resolvedContentHeight = contentHeight ?? 36;
-  const resolvedContentWidth = useMemo(() => {
-    if (contentWidth !== undefined) return contentWidth;
-    if (typeof buttonWidth === 'number') return Math.max(0, buttonWidth - 16);
-    return undefined;
-  }, [contentWidth, buttonWidth]);
+  const linkHref = useMemo(
+    () => ({
+      pathname: '/list' as const,
+      params: {
+        requireBalance: String(requireBalance),
+        showAddMintsButton: String(showAddMintsButton),
+        showDetailsButton: String(showDetailsButton),
+        onSelectAction: 'goBack',
+        ...(allowedMints && { allowedMints: JSON.stringify(allowedMints) }),
+      },
+    }),
+    [requireBalance, showAddMintsButton, showDetailsButton, allowedMints]
+  );
 
   const mintDisplayProps = {
     unit,
-    requireBalance,
-    showAddMintsButton,
-    showDetailsButton,
-    allowedMints,
-    contentWidth: resolvedContentWidth,
-    contentHeight: resolvedContentHeight,
-    mintName: resolvedMintName,
-    mintIconUrl: resolvedMintIconUrl,
-    isLoadingMint: isMintLoading,
+    mintName: header.headerMintInfo?.name || header.headerMintName,
+    mintIconUrl: header.headerMintInfo?.icon_url,
+    balance: balanceForMint,
+    isLoadingMint: header.isLoading || !selectedMintUrl,
+    contentWidth: dimensions.contentWidth,
+    contentHeight: dimensions.contentHeight,
+    linkHref,
   };
 
   if (!supportsLiquidGlass()) {
     const headerWidth = windowWidth - 124 - 16;
-    const fallbackWidth = typeof buttonWidth === 'number' ? buttonWidth : headerWidth;
+    const fallbackWidth =
+      typeof dimensions.buttonWidth === 'number' ? dimensions.buttonWidth : headerWidth;
 
     return (
       <View
@@ -160,7 +176,7 @@ export default function WalletHeaderTitle({
 
   const buttonModifiers = [
     buttonStyle('glass'),
-    frame({ height: 50, width: buttonWidth, alignment: 'center' }),
+    frame({ height: 50, width: dimensions.buttonWidth, alignment: 'center' }),
     ...(liquidGlass ? [] : [glassEffect({ shape: 'capsule' })]),
   ];
 
@@ -170,11 +186,11 @@ export default function WalletHeaderTitle({
         alignSelf: 'center',
         alignItems: 'center',
         justifyContent: 'center',
-        width: buttonWidth,
-        height: typeof styleHeight === 'number' ? styleHeight : undefined,
+        width: dimensions.buttonWidth,
+        height: typeof dimensions.styleHeight === 'number' ? dimensions.styleHeight : undefined,
         ...style,
       }}>
-      <Host style={{ zIndex: 10, height: 50, width: buttonWidth }} matchContents>
+      <Host style={{ zIndex: 10, height: 50, width: dimensions.buttonWidth }} matchContents>
         <ContextMenu>
           <ContextMenu.Items>
             {topMints.map((mint) => (
@@ -197,7 +213,9 @@ export default function WalletHeaderTitle({
           <ContextMenu.Trigger>
             <HStack
               modifiers={
-                liquidGlass || typeof buttonWidth === 'number' ? [] : [padding({ horizontal: 64 })]
+                liquidGlass || typeof dimensions.buttonWidth === 'number'
+                  ? []
+                  : [padding({ horizontal: 64 })]
               }>
               <SwiftUIButton modifiers={buttonModifiers}>
                 <MintBalanceDisplay {...mintDisplayProps} />

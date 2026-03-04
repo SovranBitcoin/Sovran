@@ -209,7 +209,6 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
           <Avatar
             picture={mintInfo?.icon_url}
             size={40}
-            variant="mint"
             name={displayName}
             alt={`${displayName} icon`}
           />

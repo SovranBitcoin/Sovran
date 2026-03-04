@@ -172,7 +172,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
       {/* Row 1: [mint a] → [mint b] — equal width */}
       <HStack spacing={8} align="center">
         <HStack spacing={8} align="center" flex={1}>
-          <Avatar picture={srcInfo?.icon_url} size={28} variant="mint" name={srcName} />
+          <Avatar picture={srcInfo?.icon_url} size={28} name={srcName} />
           <UntranslatedText
             bold
             size={13}
@@ -186,7 +186,7 @@ const CollapsedLegGroup = React.memo(({ legGroup, mintInfoMap }: CollapsedLegGro
           <Icon name="mdi:arrow-right" size={10} color="#fff" />
         </View>
         <HStack spacing={8} align="center" flex={1}>
-          <Avatar picture={dstInfo?.icon_url} size={28} variant="mint" name={dstName} />
+          <Avatar picture={dstInfo?.icon_url} size={28} name={dstName} />
           <UntranslatedText
             bold
             size={13}

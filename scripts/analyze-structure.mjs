@@ -38,48 +38,68 @@ const ROOT = join(__dirname, '..');
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const IGNORE_DIRS = new Set([
-  'node_modules', 'ios', 'android', 'dist', '.git', 'coco',
-  'sovran.money', 'targets', '.expo', 'build', 'coverage',
-  'screenshots-output', '.cursor',
+  'node_modules',
+  'ios',
+  'android',
+  'dist',
+  '.git',
+  'coco',
+  'sovran.money',
+  'targets',
+  '.expo',
+  'build',
+  'coverage',
+  'screenshots-output',
+  '.cursor',
 ]);
 
-const IGNORE_FILES = new Set([
-  'package-lock.json', 'yarn.lock',
-]);
+const IGNORE_FILES = new Set(['package-lock.json', 'yarn.lock']);
 
 const TS_EXTS = new Set(['.ts', '.tsx', '.js', '.mjs', '.jsx']);
 
 // Extensions to try when resolving imports (in order)
-const RESOLVE_EXTS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '/index.ts', '/index.tsx', '/index.js', '/index.jsx'];
+const RESOLVE_EXTS = [
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '/index.ts',
+  '/index.tsx',
+  '/index.js',
+  '/index.jsx',
+];
 
 // ─── CLI args ─────────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
-const showJson     = args.includes('--json');
-const hideTypes    = args.includes('--no-types');
-const hideSame     = args.includes('--no-reexport');
-const showImports  = args.includes('--imports');
+const showJson = args.includes('--json');
+const hideTypes = args.includes('--no-types');
+const hideSame = args.includes('--no-reexport');
+const showImports = args.includes('--imports');
 const hideExternal = args.includes('--no-ext');
-const showLoc      = args.includes('--loc');
+const showLoc = args.includes('--loc');
 
 // New dependency analysis flags
-const showFanin    = args.includes('--fanin');
+const showFanin = args.includes('--fanin');
 const showCoupling = args.includes('--coupling');
-const showCycles   = args.includes('--cycles');
-const showOrphans  = args.includes('--orphans');
+const showCycles = args.includes('--cycles');
+const showOrphans = args.includes('--orphans');
 const showColocate = args.includes('--colocate');
 
 // --boundary <folderA> <folderB>
-const boundaryIdx  = args.indexOf('--boundary');
+const boundaryIdx = args.indexOf('--boundary');
 let boundaryA = null;
 let boundaryB = null;
 if (boundaryIdx !== -1) {
   // Grab the next two non-flag args after --boundary
-  const remaining = args.slice(boundaryIdx + 1).filter(a => !a.startsWith('--'));
+  const remaining = args.slice(boundaryIdx + 1).filter((a) => !a.startsWith('--'));
   boundaryA = remaining[0] || null;
   boundaryB = remaining[1] || null;
   if (!boundaryA || !boundaryB) {
-    console.error('Error: --boundary requires two folder paths, e.g. --boundary features/mints features/payments');
+    console.error(
+      'Error: --boundary requires two folder paths, e.g. --boundary features/mints features/payments'
+    );
     process.exit(1);
   }
 }
@@ -92,16 +112,33 @@ function getNumericArg(flag, defaultVal) {
   return isNaN(val) ? defaultVal : val;
 }
 
-const faninMin          = getNumericArg('--fanin-min', 1);
-const couplingDepth     = getNumericArg('--coupling-depth', 1);
+const faninMin = getNumericArg('--fanin-min', 1);
+const couplingDepth = getNumericArg('--coupling-depth', 1);
 const colocateThreshold = getNumericArg('--colocate-threshold', 0.7);
 
 // Target directory — skip all flags and their value args
-const flagsWithValue = new Set(['--fanin-min', '--coupling-depth', '--colocate-threshold', '--boundary']);
+const flagsWithValue = new Set([
+  '--fanin-min',
+  '--coupling-depth',
+  '--colocate-threshold',
+  '--boundary',
+]);
 const allFlags = new Set([
-  '--json', '--no-types', '--no-reexport', '--imports', '--no-ext', '--loc',
-  '--fanin', '--coupling', '--cycles', '--orphans', '--colocate',
-  '--fanin-min', '--coupling-depth', '--colocate-threshold', '--boundary',
+  '--json',
+  '--no-types',
+  '--no-reexport',
+  '--imports',
+  '--no-ext',
+  '--loc',
+  '--fanin',
+  '--coupling',
+  '--cycles',
+  '--orphans',
+  '--colocate',
+  '--fanin-min',
+  '--coupling-depth',
+  '--colocate-threshold',
+  '--boundary',
 ]);
 
 let targetArg = null;
@@ -120,7 +157,8 @@ for (let i = 0; i < args.length; i++) {
 const targetDir = targetArg ? join(ROOT, targetArg) : ROOT;
 
 // Whether any analysis mode is active
-const anyAnalysis = showFanin || showCoupling || showCycles || showOrphans || showColocate || !!boundaryA;
+const anyAnalysis =
+  showFanin || showCoupling || showCycles || showOrphans || showColocate || !!boundaryA;
 
 // ─── Import path resolution ──────────────────────────────────────────────────
 
@@ -172,20 +210,29 @@ function tryResolveFile(base) {
 }
 
 function isFile(p) {
-  try { return statSync(p).isFile(); } catch { return false; }
+  try {
+    return statSync(p).isFile();
+  } catch {
+    return false;
+  }
 }
 
 // ─── LOC counting (cloc-style: blank / comment / code) ───────────────────────
 
 function countLines(src) {
   const lines = src.split('\n');
-  let blank = 0, comment = 0, code = 0;
+  let blank = 0,
+    comment = 0,
+    code = 0;
   let inBlock = false;
 
   for (const raw of lines) {
     const t = raw.trim();
 
-    if (t === '') { blank++; continue; }
+    if (t === '') {
+      blank++;
+      continue;
+    }
 
     if (inBlock) {
       comment++;
@@ -200,7 +247,10 @@ function countLines(src) {
       continue;
     }
 
-    if (t.startsWith('//')) { comment++; continue; }
+    if (t.startsWith('//')) {
+      comment++;
+      continue;
+    }
 
     code++;
     const openIdx = t.indexOf('/*');
@@ -218,9 +268,7 @@ function countLines(src) {
 function extractExports(src, filePath) {
   const results = [];
 
-  const stripped = src
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/.*/g, '');
+  const stripped = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*/g, '');
 
   const add = (kind, name, tag) => results.push({ kind, name, tag });
 
@@ -235,7 +283,7 @@ function extractExports(src, filePath) {
     add('default', `${m[1]}(${m[2]})`, classify(m[2], 'wrapped'));
   }
   for (const m of stripped.matchAll(/export\s+default\s+(?!function|class|async|new)(\w+)\s*;/g)) {
-    if (!results.some(r => r.kind === 'default' && r.name.endsWith(m[1] + ')'))) {
+    if (!results.some((r) => r.kind === 'default' && r.name.endsWith(m[1] + ')'))) {
       add('default', m[1], classify(m[1], 'value'));
     }
   }
@@ -247,7 +295,10 @@ function extractExports(src, filePath) {
   for (const m of stripped.matchAll(/^export\s+(?:const|let|var)\s+(\w+)/gm)) {
     const idx = m.index + m[0].length;
     const rest = stripped.slice(idx, idx + 120);
-    const isArrowComponent = /=\s*(?:React\.memo\(|React\.forwardRef\(|\([\w,\s:={}[\]]*\)\s*(?::\s*\w[\w.<>|&, ]*?)?\s*=>)/.test(rest);
+    const isArrowComponent =
+      /=\s*(?:React\.memo\(|React\.forwardRef\(|\([\w,\s:={}[\]]*\)\s*(?::\s*\w[\w.<>|&, ]*?)?\s*=>)/.test(
+        rest
+      );
     add('named', m[1], classify(m[1], isArrowComponent ? 'fn' : 'const'));
   }
   for (const m of stripped.matchAll(/^export\s+class\s+(\w+)/gm)) {
@@ -262,7 +313,15 @@ function extractExports(src, filePath) {
       add('type', m[1], 'interface');
     }
     for (const m of stripped.matchAll(/^export\s+type\s+\{([^}]+)\}/gm)) {
-      for (const name of m[1].split(',').map(s => s.trim().replace(/\s+as\s+\w+/, '').trim()).filter(Boolean)) {
+      for (const name of m[1]
+        .split(',')
+        .map((s) =>
+          s
+            .trim()
+            .replace(/\s+as\s+\w+/, '')
+            .trim()
+        )
+        .filter(Boolean)) {
         add('type', name, 'type');
       }
     }
@@ -283,7 +342,7 @@ function extractExports(src, filePath) {
   }
 
   const seen = new Set();
-  return results.filter(r => {
+  return results.filter((r) => {
     const key = `${r.kind}:${r.name}`;
     if (seen.has(key)) return false;
     seen.add(key);
@@ -295,7 +354,7 @@ function extractExports(src, filePath) {
 
 function extractImports(src) {
   const stripped = src
-    .replace(/\/\*[\s\S]*?\*\//g, m => ' '.repeat(m.length))
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => ' '.repeat(m.length))
     .replace(/\/\/.*/g, '');
 
   const byModule = new Map();
@@ -303,9 +362,9 @@ function extractImports(src) {
   const RE = /^import\s+(type\s+)?([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/gm;
 
   for (const m of stripped.matchAll(RE)) {
-    const isType   = !!m[1];
-    const clause   = m[2].replace(/\s+/g, ' ').trim();
-    const mod      = m[3];
+    const isType = !!m[1];
+    const clause = m[2].replace(/\s+/g, ' ').trim();
+    const mod = m[3];
     const isExternal = !mod.startsWith('.') && !mod.startsWith('@/');
 
     if (!byModule.has(mod)) {
@@ -320,11 +379,12 @@ function extractImports(src) {
       continue;
     }
 
-    const braceOpen  = clause.indexOf('{');
+    const braceOpen = clause.indexOf('{');
     const braceClose = clause.lastIndexOf('}');
 
     const beforeBrace = (braceOpen === -1 ? clause : clause.slice(0, braceOpen))
-      .replace(/,\s*$/, '').trim();
+      .replace(/,\s*$/, '')
+      .trim();
 
     if (beforeBrace) entry.names.push(beforeBrace);
 
@@ -332,7 +392,7 @@ function extractImports(src) {
       const inside = clause.slice(braceOpen + 1, braceClose);
       for (const chunk of inside.split(',')) {
         const parts = chunk.trim().split(/\s+as\s+/);
-        const name  = (parts[parts.length - 1] || '').trim();
+        const name = (parts[parts.length - 1] || '').trim();
         if (name) entry.names.push(name);
       }
     }
@@ -354,28 +414,28 @@ function classify(name, hint) {
 
 const ICONS = {
   component: '⚛',
-  hook:      'ʰ',
-  fn:        'ƒ',
-  wrapped:   '⚛',
-  class:     '◆',
-  type:      '⊤',
+  hook: 'ʰ',
+  fn: 'ƒ',
+  wrapped: '⚛',
+  class: '◆',
+  type: '⊤',
   interface: '⊤',
-  const:     '·',
-  constant:  '·',
-  value:     '·',
-  reexport:  '↗',
-  default:   '·',
+  const: '·',
+  constant: '·',
+  value: '·',
+  reexport: '↗',
+  default: '·',
 };
 
 const KIND_LABEL = {
-  default:  '[default]',
-  named:    '[export]',
-  type:     '[type]',
+  default: '[default]',
+  named: '[export]',
+  type: '[type]',
   reexport: '[re-export]',
 };
 
 function formatExport(exp) {
-  const icon  = ICONS[exp.tag] || '·';
+  const icon = ICONS[exp.tag] || '·';
   const label = KIND_LABEL[exp.kind] || '';
   return `${icon} ${exp.name} ${label}`.trimEnd();
 }
@@ -390,8 +450,8 @@ function formatLoc(loc) {
 function formatImport(imp) {
   const MAX_NAMES = 6;
   const prefix = imp.isType ? '⊤ ' : '← ';
-  const mod    = imp.module;
-  const names  = imp.names;
+  const mod = imp.module;
+  const names = imp.names;
 
   let nameStr;
   if (names.length === 0) {
@@ -421,7 +481,7 @@ function walk(dirPath, prefix = '') {
     return [];
   }
 
-  const filtered = entries.filter(e => {
+  const filtered = entries.filter((e) => {
     if (e.startsWith('.')) return false;
     if (IGNORE_DIRS.has(e)) return false;
     if (IGNORE_FILES.has(e)) return false;
@@ -432,12 +492,16 @@ function walk(dirPath, prefix = '') {
 
   filtered.forEach((entry, idx) => {
     const fullPath = join(dirPath, entry);
-    const isLast   = idx === filtered.length - 1;
+    const isLast = idx === filtered.length - 1;
     const connector = isLast ? '└── ' : '├── ';
-    const childPfx  = prefix + (isLast ? '    ' : '│   ');
+    const childPfx = prefix + (isLast ? '    ' : '│   ');
 
     let stat;
-    try { stat = statSync(fullPath); } catch { return; }
+    try {
+      stat = statSync(fullPath);
+    } catch {
+      return;
+    }
 
     if (stat.isDirectory()) {
       const children = walk(fullPath, childPfx);
@@ -451,11 +515,19 @@ function walk(dirPath, prefix = '') {
         exports = extractExports(src, fullPath);
         imports = extractImports(src);
         loc = countLines(src);
-      } catch { /* skip unreadable */ }
+      } catch {
+        /* skip unreadable */
+      }
 
       nodes.push({
-        type: 'file', name: entry, connector, prefix, childPfx,
-        exports, imports, loc,
+        type: 'file',
+        name: entry,
+        connector,
+        prefix,
+        childPfx,
+        exports,
+        imports,
+        loc,
         fullPath, // needed for dependency analysis
       });
     } else {
@@ -480,17 +552,17 @@ function renderTree(nodes) {
       lines.push(`${node.prefix}${node.connector}${node.name}${locBadge}`);
 
       const imps = showImports
-        ? (node.imports || []).filter(i => !(hideExternal && i.isExternal))
+        ? (node.imports || []).filter((i) => !(hideExternal && i.isExternal))
         : [];
 
-      const exps = node.exports.filter(e => {
+      const exps = node.exports.filter((e) => {
         if (hideSame && e.kind === 'named' && e.tag === 'reexport') return false;
         return true;
       });
 
       const all = [
-        ...imps.map(i => ({ _imp: true, i })),
-        ...exps.map(e => ({ _imp: false, e })),
+        ...imps.map((i) => ({ _imp: true, i })),
+        ...exps.map((e) => ({ _imp: false, e })),
       ];
 
       all.forEach(({ _imp, i, e }, idx) => {
@@ -510,12 +582,23 @@ function renderTree(nodes) {
 // ─── JSON output ──────────────────────────────────────────────────────────────
 
 function toJson(nodes, dirPath) {
-  return nodes.map(node => {
+  return nodes.map((node) => {
     if (node.type === 'dir') {
-      return { type: 'dir', name: node.name, children: toJson(node.children, join(dirPath, node.name)) };
+      return {
+        type: 'dir',
+        name: node.name,
+        children: toJson(node.children, join(dirPath, node.name)),
+      };
     }
     if (node.type === 'file') {
-      return { type: 'file', name: node.name, fullPath: node.fullPath, loc: node.loc || null, imports: node.imports || [], exports: node.exports };
+      return {
+        type: 'file',
+        name: node.name,
+        fullPath: node.fullPath,
+        loc: node.loc || null,
+        imports: node.imports || [],
+        exports: node.exports,
+      };
     }
     return { type: 'other', name: node.name };
   });
@@ -528,17 +611,17 @@ function collectTotals(nodes) {
   for (const node of nodes) {
     if (node.type === 'dir') {
       const sub = collectTotals(node.children);
-      totals.files   += sub.files;
-      totals.code    += sub.code;
-      totals.blank   += sub.blank;
+      totals.files += sub.files;
+      totals.code += sub.code;
+      totals.blank += sub.blank;
       totals.comment += sub.comment;
-      totals.total   += sub.total;
+      totals.total += sub.total;
     } else if (node.type === 'file' && node.loc) {
       totals.files++;
-      totals.code    += node.loc.code;
-      totals.blank   += node.loc.blank;
+      totals.code += node.loc.code;
+      totals.blank += node.loc.blank;
       totals.comment += node.loc.comment;
-      totals.total   += node.loc.total;
+      totals.total += node.loc.total;
     }
   }
   return totals;
@@ -600,7 +683,7 @@ function buildDependencyGraph(allFiles) {
     const relPath = relative(targetDir, f.fullPath);
     fileToFolder.set(f.fullPath, getTopFolder(relPath, couplingDepth));
 
-    for (const imp of (f.imports || [])) {
+    for (const imp of f.imports || []) {
       if (imp.isExternal) continue;
 
       const resolved = resolveImport(imp.module, f.fullPath);
@@ -646,11 +729,11 @@ function renderFanin(faninMap, fileToFolder) {
   const entries = [...faninMap.entries()]
     .map(([file, importers]) => ({
       file: relative(targetDir, file),
-      importers: importers.map(i => relative(targetDir, i)),
+      importers: importers.map((i) => relative(targetDir, i)),
       count: importers.length,
-      folders: [...new Set(importers.map(i => fileToFolder.get(i) || '?'))],
+      folders: [...new Set(importers.map((i) => fileToFolder.get(i) || '?'))],
     }))
-    .filter(e => e.count >= faninMin)
+    .filter((e) => e.count >= faninMin)
     .sort((a, b) => b.count - a.count);
 
   if (entries.length === 0) {
@@ -663,11 +746,14 @@ function renderFanin(faninMap, fileToFolder) {
 
   for (const e of entries) {
     const bar = '█'.repeat(Math.min(e.count, 40));
-    const folderTag = e.folders.length === 1
-      ? `\x1b[2m(only from ${e.folders[0]})\x1b[0m`
-      : `\x1b[33m(${e.folders.length} folders: ${e.folders.join(', ')})\x1b[0m`;
+    const folderTag =
+      e.folders.length === 1
+        ? `\x1b[2m(only from ${e.folders[0]})\x1b[0m`
+        : `\x1b[33m(${e.folders.length} folders: ${e.folders.join(', ')})\x1b[0m`;
 
-    lines.push(`  \x1b[1m${String(e.count).padStart(countWidth)}\x1b[0m  \x1b[32m${bar}\x1b[0m  ${e.file}  ${folderTag}`);
+    lines.push(
+      `  \x1b[1m${String(e.count).padStart(countWidth)}\x1b[0m  \x1b[32m${bar}\x1b[0m  ${e.file}  ${folderTag}`
+    );
   }
 
   lines.push('');
@@ -681,7 +767,9 @@ function renderCoupling(edges, fileToFolder) {
   const lines = [];
   lines.push('');
   lines.push('\x1b[1;36m══ Coupling: Inter-Folder Dependency Matrix ══\x1b[0m');
-  lines.push(`\x1b[2mCross-boundary import counts (folder depth: ${couplingDepth}). Read as: row → imports from → column\x1b[0m`);
+  lines.push(
+    `\x1b[2mCross-boundary import counts (folder depth: ${couplingDepth}). Read as: row → imports from → column\x1b[0m`
+  );
   lines.push('');
 
   // Build matrix
@@ -706,17 +794,19 @@ function renderCoupling(edges, fileToFolder) {
   }
 
   // Find max folder name length for padding
-  const maxNameLen = Math.max(...folders.map(f => f.length), 6);
-  const colWidth = Math.max(...folders.map(f => f.length), 4);
+  const maxNameLen = Math.max(...folders.map((f) => f.length), 6);
+  const colWidth = Math.max(...folders.map((f) => f.length), 4);
 
   // Header row
-  const header = ' '.repeat(maxNameLen + 2) + folders.map(f => f.slice(0, colWidth).padStart(colWidth)).join('  ');
+  const header =
+    ' '.repeat(maxNameLen + 2) +
+    folders.map((f) => f.slice(0, colWidth).padStart(colWidth)).join('  ');
   lines.push(`  \x1b[2m${header}\x1b[0m`);
 
   // Data rows
   for (const sf of folders) {
     const row = matrix.get(sf) || new Map();
-    const cells = folders.map(tf => {
+    const cells = folders.map((tf) => {
       if (sf === tf) return '\x1b[2m-\x1b[0m'.padStart(colWidth + 6); // account for ANSI
       const count = row.get(tf) || 0;
       if (count === 0) return '\x1b[2m·\x1b[0m'.padStart(colWidth + 6);
@@ -758,7 +848,7 @@ function detectCycles(edges) {
     stack.push(v);
     onStack.add(v);
 
-    for (const w of (adj.get(v) || [])) {
+    for (const w of adj.get(v) || []) {
       if (!indices.has(w)) {
         strongconnect(w);
         lowlinks.set(v, Math.min(lowlinks.get(v), lowlinks.get(w)));
@@ -794,7 +884,9 @@ function renderCycles(edges) {
   const lines = [];
   lines.push('');
   lines.push('\x1b[1;36m══ Cycles: Circular Import Detection ══\x1b[0m');
-  lines.push('\x1b[2mStrongly connected components in the import graph (files that import each other)\x1b[0m');
+  lines.push(
+    '\x1b[2mStrongly connected components in the import graph (files that import each other)\x1b[0m'
+  );
   lines.push('');
 
   const sccs = detectCycles(edges);
@@ -831,14 +923,14 @@ function renderOrphans(allFiles, faninMap) {
   const importedPaths = new Set(faninMap.keys());
 
   const orphans = allFiles
-    .filter(f => {
+    .filter((f) => {
       if (importedPaths.has(f.fullPath)) return false;
       // Exclude app/ route files — they're entry points by design
       const rel = relative(targetDir, f.fullPath);
       if (rel.startsWith('app/') || rel.startsWith('app\\')) return true; // include app files that aren't _layout or index
       return true;
     })
-    .map(f => {
+    .map((f) => {
       const rel = relative(targetDir, f.fullPath);
       const isEntryPoint = /^app[/\\]/.test(rel);
       return { file: rel, isEntryPoint, loc: f.loc?.code || 0 };
@@ -854,8 +946,8 @@ function renderOrphans(allFiles, faninMap) {
     return lines;
   }
 
-  const nonEntry = orphans.filter(o => !o.isEntryPoint);
-  const entryPoints = orphans.filter(o => o.isEntryPoint);
+  const nonEntry = orphans.filter((o) => !o.isEntryPoint);
+  const entryPoints = orphans.filter((o) => o.isEntryPoint);
 
   if (nonEntry.length > 0) {
     lines.push(`  \x1b[33mPotentially dead code (${nonEntry.length} files):\x1b[0m`);
@@ -881,7 +973,9 @@ function renderColocate(faninMap, fileToFolder) {
   const lines = [];
   lines.push('');
   lines.push('\x1b[1;36m══ Colocate: Suggested File Moves ══\x1b[0m');
-  lines.push(`\x1b[2mFiles where ≥${Math.round(colocateThreshold * 100)}% of importers live in a single folder (and ≥2 importers)\x1b[0m`);
+  lines.push(
+    `\x1b[2mFiles where ≥${Math.round(colocateThreshold * 100)}% of importers live in a single folder (and ≥2 importers)\x1b[0m`
+  );
   lines.push('');
 
   const suggestions = [];
@@ -922,7 +1016,9 @@ function renderColocate(faninMap, fileToFolder) {
   for (const s of suggestions) {
     lines.push(`  \x1b[33mMOVE?\x1b[0m  ${s.file}`);
     lines.push(`         \x1b[2mcurrently in:\x1b[0m ${s.currentFolder}`);
-    lines.push(`         \x1b[2m→ move to:\x1b[0m   \x1b[1m${s.suggestedFolder}\x1b[0m  (${s.topCount}/${s.importerCount} importers = ${s.pct}%)`);
+    lines.push(
+      `         \x1b[2m→ move to:\x1b[0m   \x1b[1m${s.suggestedFolder}\x1b[0m  (${s.topCount}/${s.importerCount} importers = ${s.pct}%)`
+    );
     lines.push('');
   }
 
@@ -1011,10 +1107,10 @@ if (showJson) {
         .map(([file, importers]) => ({
           file: relative(targetDir, file),
           count: importers.length,
-          importers: importers.map(i => relative(targetDir, i)),
-          folders: [...new Set(importers.map(i => fileToFolder.get(i) || '?'))],
+          importers: importers.map((i) => relative(targetDir, i)),
+          folders: [...new Set(importers.map((i) => fileToFolder.get(i) || '?'))],
         }))
-        .filter(e => e.count >= faninMin)
+        .filter((e) => e.count >= faninMin)
         .sort((a, b) => b.count - a.count);
     }
 
@@ -1031,14 +1127,14 @@ if (showJson) {
     }
 
     if (showCycles) {
-      jsonOutput.cycles = detectCycles(edges).map(scc => scc.map(f => relative(targetDir, f)));
+      jsonOutput.cycles = detectCycles(edges).map((scc) => scc.map((f) => relative(targetDir, f)));
     }
 
     if (showOrphans) {
       const importedPaths = new Set(faninMap.keys());
       jsonOutput.orphans = allFiles
-        .filter(f => !importedPaths.has(f.fullPath))
-        .map(f => relative(targetDir, f.fullPath));
+        .filter((f) => !importedPaths.has(f.fullPath))
+        .map((f) => relative(targetDir, f.fullPath));
     }
 
     if (showColocate) {
@@ -1055,7 +1151,13 @@ if (showJson) {
         const [topFolder, topCount] = sorted[0] || [];
         const total = importers.length;
         if (topCount / total >= colocateThreshold && topFolder !== currentFolder) {
-          suggestions.push({ file: relative(targetDir, file), currentFolder, suggestedFolder: topFolder, importerCount: total, topCount });
+          suggestions.push({
+            file: relative(targetDir, file),
+            currentFolder,
+            suggestedFolder: topFolder,
+            importerCount: total,
+            topCount,
+          });
         }
       }
       jsonOutput.colocate = suggestions;
@@ -1065,17 +1167,19 @@ if (showJson) {
       const absA = resolve(targetDir, boundaryA);
       const absB = resolve(targetDir, boundaryB);
       const isIn = (fp, abs) => fp.startsWith(abs + '/') || fp === abs;
-      const aToB = [], bToA = [];
+      const aToB = [],
+        bToA = [];
       for (const { source, target } of edges) {
-        if (isIn(source, absA) && isIn(target, absB)) aToB.push({ from: relative(targetDir, source), to: relative(targetDir, target) });
-        if (isIn(source, absB) && isIn(target, absA)) bToA.push({ from: relative(targetDir, source), to: relative(targetDir, target) });
+        if (isIn(source, absA) && isIn(target, absB))
+          aToB.push({ from: relative(targetDir, source), to: relative(targetDir, target) });
+        if (isIn(source, absB) && isIn(target, absA))
+          bToA.push({ from: relative(targetDir, source), to: relative(targetDir, target) });
       }
       jsonOutput.boundary = { folderA: boundaryA, folderB: boundaryB, aToB, bToA };
     }
   }
 
   console.log(JSON.stringify(jsonOutput, null, 2));
-
 } else {
   // ── Terminal mode ──
 
@@ -1089,11 +1193,12 @@ if (showJson) {
     const allFiles = collectAllFiles(nodes);
     const { faninMap, edges, fileToFolder } = buildDependencyGraph(allFiles);
 
-    if (showFanin)    console.log(renderFanin(faninMap, fileToFolder).join('\n'));
+    if (showFanin) console.log(renderFanin(faninMap, fileToFolder).join('\n'));
     if (showCoupling) console.log(renderCoupling(edges, fileToFolder).join('\n'));
-    if (showCycles)   console.log(renderCycles(edges).join('\n'));
-    if (showOrphans)  console.log(renderOrphans(allFiles, faninMap).join('\n'));
+    if (showCycles) console.log(renderCycles(edges).join('\n'));
+    if (showOrphans) console.log(renderOrphans(allFiles, faninMap).join('\n'));
     if (showColocate) console.log(renderColocate(faninMap, fileToFolder).join('\n'));
-    if (boundaryA && boundaryB) console.log(renderBoundary(edges, allFiles, boundaryA, boundaryB).join('\n'));
+    if (boundaryA && boundaryB)
+      console.log(renderBoundary(edges, allFiles, boundaryA, boundaryB).join('\n'));
   }
 }

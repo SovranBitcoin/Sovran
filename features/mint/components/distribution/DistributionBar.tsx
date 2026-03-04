@@ -120,7 +120,6 @@ const AnimatedSegment: React.FC<SegmentProps> = ({
             <Avatar
               picture={mintIcon}
               size={AVATAR_SIZE}
-              variant="mint"
               name={mintName}
               alt={`${mintName} icon`}
             />

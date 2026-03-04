@@ -5,45 +5,17 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ],
-      "@/shared/*": [
-        "./shared/*"
-      ],
-      "@/features/*": [
-        "./features/*"
-      ],
-      "@/sheets/*": [
-        "./shared/lib/popup/sheets/*"
-      ],
-      "@/navigation/*": [
-        "./navigation/*"
-      ],
-      "@/config/*": [
-        "./config/*"
-      ],
-      "@/redux/*": [
-        "./redux/*"
-      ],
-      "@/themes": [
-        "./themes"
-      ],
-      "~/*": [
-        "src/*"
-      ]
+      "@/*": ["./*"],
+      "@/shared/*": ["./shared/*"],
+      "@/features/*": ["./features/*"],
+      "@/sheets/*": ["./shared/lib/popup/sheets/*"],
+      "@/navigation/*": ["./navigation/*"],
+      "@/config/*": ["./config/*"],
+      "@/redux/*": ["./redux/*"],
+      "@/themes": ["./themes"],
+      "~/*": ["src/*"]
     }
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts",
-    "nativewind-env.d.ts"
-  ],
-  "exclude": [
-    "sovran.money/**",
-    "coco/**",
-    "eNuts/**"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],
+  "exclude": ["sovran.money/**", "coco/**", "eNuts/**"]
 }

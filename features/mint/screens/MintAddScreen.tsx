@@ -327,7 +327,6 @@ const MintItem = memo(function MintItem({
           <Avatar
             picture={mint.mintInfo?.icon_url || undefined}
             size={42}
-            variant="mint"
             name={displayName}
             alt={`${displayName} mint`}
           />

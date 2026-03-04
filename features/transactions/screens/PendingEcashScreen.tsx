@@ -103,7 +103,6 @@ function AnimatedMintTab({
             <Avatar
               picture={mint.mintInfo?.icon_url || undefined}
               size={LARGE_ICON_SIZE}
-              variant="mint"
               name={displayName}
               alt={`${displayName} icon`}
             />

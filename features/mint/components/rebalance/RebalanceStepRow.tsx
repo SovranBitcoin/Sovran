@@ -162,13 +162,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                       align="center"
                       gap={3}
                       className={`min-w-0 shrink ${!isActiveNode ? 'opacity-40' : ''}`}>
-                      <Avatar
-                        picture={info?.icon_url}
-                        size={20}
-                        variant="mint"
-                        name={name}
-                        alt={`${name} icon`}
-                      />
+                      <Avatar picture={info?.icon_url} size={20} name={name} alt={`${name} icon`} />
                       <Text
                         size={10}
                         numberOfLines={1}

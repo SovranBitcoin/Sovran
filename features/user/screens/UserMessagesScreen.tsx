@@ -502,7 +502,6 @@ function MessageBubble({
             picture={userPicture}
             seed={message.pubkey}
             name={isMe ? myName : userName}
-            variant="person"
             loading={isLoadingMetadata}
           />
         )}
@@ -579,7 +578,7 @@ function MessageBubble({
           </HStack>
         </VStack>
 
-        {isMe && <Avatar size={32} seed={message.pubkey} name={myName} variant="person" />}
+        {isMe && <Avatar size={32} seed={message.pubkey} name={myName} />}
       </HStack>
     </VStack>
   );
@@ -1846,7 +1845,6 @@ export function UserMessagesScreen({
                         picture={userPicture}
                         seed={pubkey}
                         name={displayName}
-                        variant="person"
                         loading={shouldShowAvatarLoading}
                       />
                       <View
@@ -1913,7 +1911,6 @@ export function UserMessagesScreen({
                   picture={userPicture}
                   seed={pubkey}
                   name={displayName}
-                  variant="person"
                   loading={shouldShowAvatarLoading}
                 />
                 <VStack
@@ -2247,7 +2244,6 @@ export function UserMessagesScreen({
                 seed={nostrKeys?.pubkey}
                 picture={myProfile.picture}
                 name={myName}
-                variant="person"
               />
             )}
 

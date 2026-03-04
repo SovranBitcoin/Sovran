@@ -36,7 +36,7 @@ export default function HomeLayout() {
   const useAndroidLiquidHeader = isAndroidLiquidHeaderSupported();
   const { send } = useSendWithHistory();
   const manager = useManager();
-  const { mints } = useMintManagement();
+  const { mints, isLoading: isMintsLoading } = useMintManagement();
   const { keys } = useNostrKeysContext();
   const getSelectedMint = useMintStore((state) => state.getSelectedMint);
   const selectedMint = keys?.pubkey ? getSelectedMint(keys.pubkey) : undefined;
@@ -56,6 +56,7 @@ export default function HomeLayout() {
     selectedMint,
     balanceForMint: headerBalance,
     mints,
+    isMintsLoading,
   });
 
   const usdToSats = useCallback(

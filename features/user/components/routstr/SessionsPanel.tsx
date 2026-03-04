@@ -469,7 +469,6 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                         picture={userPicture}
                         seed={userPubkey}
                         name={username}
-                        variant="person"
                         loading={isMetadataLoading}
                       />
                       <VStack spacing={2} className="min-w-0 flex-1">

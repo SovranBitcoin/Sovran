@@ -21,12 +21,14 @@ interface UseWalletHeaderStateArgs {
   selectedMint: string | undefined;
   balanceForMint: number;
   mints: Mint[];
+  isMintsLoading?: boolean;
 }
 
 export function useWalletHeaderState({
   selectedMint,
   balanceForMint,
   mints,
+  isMintsLoading = false,
 }: UseWalletHeaderStateArgs) {
   const displayBtc = useSettingsStore((s) => s.displayBtc);
 
@@ -48,7 +50,7 @@ export function useWalletHeaderState({
     ? getMintDisplayName(selectedMint, { name: headerMintInfo?.name })
     : 'Change Mint';
 
-  const isLoading = Boolean(selectedMint && !selectedMintData);
+  const isLoading = Boolean(isMintsLoading || (selectedMint && !selectedMintData));
 
   const headerAmountLabel = useMemo(
     () => formatAmount({ amount: balanceForMint, unit: 'sat' }, { useUserPreference: true }),
@@ -60,5 +62,6 @@ export function useWalletHeaderState({
     headerAmountLabel,
     headerMintInfo,
     isLoading,
+    selectedMintData,
   };
 }
