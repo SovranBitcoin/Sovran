@@ -244,7 +244,6 @@ function RootLayoutContent() {
           <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
         ))}
       </Stack>
-      <PopupHost />
     </NavigationThemeProvider>
   );
 }
@@ -353,6 +352,10 @@ export default function RootLayout() {
             <RootLayoutContent />
           </AccountScopedProviders>
         </NativeSplashLayoutGate>
+        {/* PopupHost lives outside AccountScopedProviders so it is never unmounted
+            during profile switches. This prevents the BottomSheet from being torn
+            down mid-animation, which would leave a native overlay blocking touches. */}
+        <PopupHost />
       </OuterProviders>
     </GestureHandlerRootView>
   );

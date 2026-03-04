@@ -39,6 +39,8 @@ export class NsecSigner implements Signer {
 export class CocoManager {
   private static instance: Manager | null = null;
   private static isInitializing = false;
+  /** Tracks an in-flight cleanup() call so initialize() can await it before proceeding. */
+  private static pendingCleanup: Promise<void> | null = null;
   private static cashuMnemonic: string | null = null;
   private static signerKey: Uint8Array | null = null;
   private static npcPlugin: NPCPlugin | null = null;
@@ -94,6 +96,14 @@ export class CocoManager {
    * to start watchers, processors, and the initial NPC sync.
    */
   static async initialize(): Promise<Manager> {
+    // If a cleanup() call is still running (e.g. fire-and-forget from CocoProvider
+    // unmount during hot reload), wait for it to finish before we decide whether
+    // to return the existing instance or start a fresh one.
+    if (this.pendingCleanup) {
+      initLog('CocoManager', 'cleanup in progress, waiting before initialize...');
+      await this.pendingCleanup;
+    }
+
     if (this.instance) {
       initLog('CocoManager', 'already initialized, returning existing instance');
       return this.instance;
@@ -255,46 +265,59 @@ export class CocoManager {
   }
 
   /**
-   * Cleanup method to properly shutdown watchers and prevent transaction conflicts
+   * Cleanup method to properly shutdown watchers and prevent transaction conflicts.
+   *
+   * Stores the promise in `pendingCleanup` so that a concurrent `initialize()` call
+   * (e.g. from a new CocoProvider mounting during hot reload) can await it rather than
+   * racing against an in-flight teardown.
    */
   static async cleanup(): Promise<void> {
-    if (!this.instance) {
-      this.clearSensitiveRuntimeState();
-      return;
-    }
+    const doCleanup = async () => {
+      if (!this.instance) {
+        this.clearSensitiveRuntimeState();
+        return;
+      }
 
+      try {
+        console.log('Cleaning up Coco Manager...');
+
+        // Disable watchers in reverse order to prevent conflicts
+        try {
+          await this.instance.disableProofStateWatcher();
+          console.log('Proof state watcher disabled');
+        } catch (error) {
+          console.warn('Failed to disable proof state watcher:', error);
+        }
+
+        try {
+          await this.instance.disableMintQuoteProcessor();
+          console.log('Mint quote processor disabled');
+        } catch (error) {
+          console.warn('Failed to disable mint quote processor:', error);
+        }
+
+        try {
+          await this.instance.disableMintQuoteWatcher();
+          console.log('Mint quote watcher disabled');
+        } catch (error) {
+          console.warn('Failed to disable mint quote watcher:', error);
+        }
+
+        // Clear the instance
+        this.instance = null;
+        this.clearSensitiveRuntimeState();
+        console.log('Coco Manager cleanup completed');
+      } catch (error) {
+        console.error('Failed to cleanup Coco Manager:', error);
+        this.clearSensitiveRuntimeState();
+      }
+    };
+
+    this.pendingCleanup = doCleanup();
     try {
-      console.log('Cleaning up Coco Manager...');
-
-      // Disable watchers in reverse order to prevent conflicts
-      try {
-        await this.instance.disableProofStateWatcher();
-        console.log('Proof state watcher disabled');
-      } catch (error) {
-        console.warn('Failed to disable proof state watcher:', error);
-      }
-
-      try {
-        await this.instance.disableMintQuoteProcessor();
-        console.log('Mint quote processor disabled');
-      } catch (error) {
-        console.warn('Failed to disable mint quote processor:', error);
-      }
-
-      try {
-        await this.instance.disableMintQuoteWatcher();
-        console.log('Mint quote watcher disabled');
-      } catch (error) {
-        console.warn('Failed to disable mint quote watcher:', error);
-      }
-
-      // Clear the instance
-      this.instance = null;
-      this.clearSensitiveRuntimeState();
-      console.log('Coco Manager cleanup completed');
-    } catch (error) {
-      console.error('Failed to cleanup Coco Manager:', error);
-      this.clearSensitiveRuntimeState();
+      await this.pendingCleanup;
+    } finally {
+      this.pendingCleanup = null;
     }
   }
 
