@@ -333,7 +333,7 @@ export const SettingsKeyringScreen: React.FC = () => {
           },
         },
       ],
-      'plain-text'
+      'secure-text'
     );
   };
 

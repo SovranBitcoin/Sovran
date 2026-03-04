@@ -73,6 +73,7 @@ export function ImportNsec({ payload, close, onFooterStateChange }: ImportNsecPr
       const npubNumber = pubkeyToAccountNumber(pubkeyHex);
       useProfileStore.getState().addProfile(npubNumber, pubkeyHex, 'imported');
 
+      setNsecInput('');
       close();
       setTimeout(() => {
         payload.onImportProfile(npubNumber);
@@ -105,6 +106,7 @@ export function ImportNsec({ payload, close, onFooterStateChange }: ImportNsecPr
             placeholder="nsec1..."
             autoCapitalize="none"
             autoCorrect={false}
+            secureTextEntry
           />
         </TextField>
 

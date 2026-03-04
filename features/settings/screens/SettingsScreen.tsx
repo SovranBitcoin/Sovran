@@ -372,8 +372,6 @@ export const SettingsScreen = () => {
                 onPress={handleFreeReservedProofs}
               />
               <Separator className="mx-4" />
-              <SettingsListLinkItem href="/(settings-flow)/storage" title="Storage Inspector" />
-              <Separator className="mx-4" />
               <PressableFeedback animation={false} onPress={() => setMockMode(!mockMode)}>
                 <PressableFeedback.Scale>
                   <ListGroup.Item disabled>
