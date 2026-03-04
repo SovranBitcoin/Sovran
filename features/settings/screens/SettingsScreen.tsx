@@ -16,11 +16,7 @@ import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import {
-  devModePopup,
-  reservedProofsFreedPopup,
-  reservedProofsFailedPopup,
-} from '@/shared/lib/popup';
+import { devModePopup } from '@/shared/lib/popup';
 import opacity from 'hex-color-opacity';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
@@ -258,38 +254,6 @@ export const SettingsScreen = () => {
     }
   };
 
-  const handleFreeReservedProofs = () => {
-    Alert.alert(
-      'Free Reserved Proofs',
-      'This will attempt to rollback any operations holding reserved proofs, and release orphaned reservations. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Continue',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const result = await CocoManager.freeAllReservedProofs();
-
-              reservedProofsFreedPopup({
-                text:
-                  `Reserved proofs found: ${result.totalReservedProofs}\n` +
-                  `Rolled back send ops: ${result.rolledBackSendOperations}\n` +
-                  `Rolled back melt ops: ${result.rolledBackMeltOperations}\n` +
-                  `Orphaned reservations released: ${result.releasedOrphanedReservations}\n` +
-                  `Errors: ${result.errors.length}`,
-              });
-            } catch (error) {
-              reservedProofsFailedPopup({
-                text: error instanceof Error ? error.message : 'Unknown error',
-              });
-            }
-          },
-        },
-      ]
-    );
-  };
-
   return (
     <Container>
       <ScrollView className="px-4">
@@ -354,22 +318,10 @@ export const SettingsScreen = () => {
         </Section>
 
         {devMode ? (
-          <Section title="Recovery">
-            <ListGroup variant="secondary">
-              <SettingsListLinkItem href="/(settings-flow)/recovery" title="Recover Wallet" />
-            </ListGroup>
-          </Section>
-        ) : null}
-
-        {devMode ? (
           <Section title="Developer">
             <ListGroup variant="secondary">
               <SettingsListActionItem title="Export Database" onPress={handleExportDatabase} />
               <Separator className="mx-4" />
-              <SettingsListActionItem
-                title="Free Reserved Proofs"
-                onPress={handleFreeReservedProofs}
-              />
               <Separator className="mx-4" />
               <SettingsListLinkItem
                 href="/(settings-flow)/storage"
