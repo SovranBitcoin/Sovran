@@ -25,8 +25,9 @@ Sovran uses three state scopes:
    - Examples: app settings, profile index metadata, global caches.
 
 2. **Profile-scoped state**
-   - Isolated by `activeAccountIndex`.
-   - Persists via `createProfileScopedStorage()` (base key for account 0, `:profile:N` suffix for account `N > 0`).
+   - Isolated by the active profile's hex pubkey.
+   - Persists via `createProfileScopedStorage()` using key format `{name}:profile:{pubkey}` for all profiles.
+   - Falls back to bare `{name}` only during first-launch bootstrap before a profile entry exists.
    - Must be reset + rehydrated on profile switch.
 
 3. **Runtime-only state**
@@ -108,19 +109,18 @@ Rules:
 
 ## Full Account Deletion Contract
 
-Full reset must remove all profile data across all known profile indexes.
+Full reset must remove all profile data across all known profiles.
 
 Current reset orchestration:
 - `redux/store/index.ts` (`resetApp`)
-- `shared/lib/cashu/profileScopedStorage.ts` (`clearAllProfileScopedData(maxProfileIndex)`)
+- `shared/lib/cashu/profileScopedStorage.ts` (`clearAllProfileScopedData(pubkeys)`)
 - `shared/lib/nostr/secureStorage.ts` (`clearAllSecureData(maxAccountIndex)`)
 
 Rules:
-- Always compute max known account index from `profileStore` and pass it into broad-clear helpers.
-- Do not rely on fixed upper bounds for profile-indexed keys.
+- Collect all profile pubkeys from `profileStore` and pass them to `clearAllProfileScopedData`.
 - For profile-scoped stores, rely on both:
   - in-memory clear for active profile where needed
-  - multi-profile key deletion for all profile suffixes
+  - multi-profile key deletion for all profile pubkey suffixes
 
 ---
 
@@ -163,7 +163,19 @@ For a new profile-scoped Zustand store:
 1. Use `persist(..., { storage: createJSONStorage(() => createProfileScopedStorage()) })`.
 2. Add store key to `PROFILE_SCOPED_STORE_KEYS` in `shared/lib/cashu/profileScopedStorage.ts`.
 3. Add reset state + `persist.rehydrate()` handling in `rehydrateProfileStores()`.
-4. Ensure full reset clears all profile variants via `clearAllProfileScopedData(maxProfileIndex)`.
+4. Ensure full reset clears all profile variants via `clearAllProfileScopedData(pubkeys)`.
 
 If any of these steps are skipped, profile isolation is incomplete.
+
+---
+
+## Storage Key Migration (v2)
+
+Profile-scoped storage was migrated from index-based keys to pubkey-based keys.
+
+- Old format: bare `{name}` for account 0, `{name}:profile:{accountIndex}` for N>0.
+- New format: `{name}:profile:{pubkey}` for all profiles.
+- Migration function: `migrateProfileScopedKeys()` in `profileScopedStorage.ts`.
+- Runs in `MigrationGate` on every launch; idempotent via `profile-scoped-storage-v2` flag in AsyncStorage.
+- Reads raw `profile-store` JSON from AsyncStorage to avoid Zustand hydration timing issues.
 

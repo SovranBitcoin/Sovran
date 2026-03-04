@@ -2,14 +2,17 @@
  * @fileoverview Profile-Scoped Zustand Storage
  *
  * Provides a custom StateStorage adapter that prefixes AsyncStorage keys
- * with the active account index from profileStore. This ensures that
- * per-profile Zustand stores read/write to isolated AsyncStorage keys.
+ * with the active profile's hex pubkey. This ensures that per-profile
+ * Zustand stores read/write to isolated AsyncStorage keys.
  *
- * Account 0 uses the original key (backward compatible).
- * Account N>0 uses `{name}:profile:{N}`.
+ * Key format: `{name}:profile:{pubkey}` for all profiles.
+ * Falls back to bare `{name}` only during first-launch bootstrap before
+ * a profile entry exists.
  *
  * Also provides `rehydrateProfileStores()` to reset + reload all
- * profile-scoped stores during a profile switch.
+ * profile-scoped stores during a profile switch, and
+ * `migrateProfileScopedKeys()` to move data from old index-based keys
+ * to new pubkey-based keys.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,6 +27,11 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
  */
 let _skipPersistWrite = false;
 
+function getActiveProfilePubkey(): string | undefined {
+  const state = useProfileStore.getState();
+  return state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey;
+}
+
 /**
  * Create a StateStorage adapter that scopes read/write to the active profile.
  * Use this with `createJSONStorage(() => createProfileScopedStorage())` in Zustand persist.
@@ -31,19 +39,19 @@ let _skipPersistWrite = false;
 export function createProfileScopedStorage(): StateStorage {
   return {
     getItem: async (name: string) => {
-      const index = useProfileStore.getState().activeAccountIndex;
-      const key = index === 0 ? name : `${name}:profile:${index}`;
+      const pubkey = getActiveProfilePubkey();
+      const key = pubkey ? `${name}:profile:${pubkey}` : name;
       return AsyncStorage.getItem(key);
     },
     setItem: async (name: string, value: string) => {
       if (_skipPersistWrite) return;
-      const index = useProfileStore.getState().activeAccountIndex;
-      const key = index === 0 ? name : `${name}:profile:${index}`;
+      const pubkey = getActiveProfilePubkey();
+      const key = pubkey ? `${name}:profile:${pubkey}` : name;
       await AsyncStorage.setItem(key, value);
     },
     removeItem: async (name: string) => {
-      const index = useProfileStore.getState().activeAccountIndex;
-      const key = index === 0 ? name : `${name}:profile:${index}`;
+      const pubkey = getActiveProfilePubkey();
+      const key = pubkey ? `${name}:profile:${pubkey}` : name;
       await AsyncStorage.removeItem(key);
     },
   };
@@ -67,19 +75,17 @@ const PROFILE_SCOPED_STORE_KEYS = [
  *
  * Use this during a full app reset / delete account flow.
  * Each store's `clearAllData()` only removes the *active* profile's key;
- * this helper removes the base key (account 0) and every `:profile:N` suffix
+ * this helper removes the bare key (legacy) and every `:profile:{pubkey}`
  * so no orphaned data is left behind.
  *
- * @param profileIndexes Explicit list of account indexes (supports both
- *   sequential derived indexes and large imported-profile npubNumbers).
+ * @param pubkeys Hex pubkeys of all known profiles.
  */
-export async function clearAllProfileScopedData(profileIndexes: number[]): Promise<void> {
+export async function clearAllProfileScopedData(pubkeys: string[]): Promise<void> {
   const keysToRemove: string[] = [];
   for (const base of PROFILE_SCOPED_STORE_KEYS) {
-    keysToRemove.push(base); // account 0 uses the bare key
-    for (const i of profileIndexes) {
-      if (i === 0) continue; // bare key already added above
-      keysToRemove.push(`${base}:profile:${i}`);
+    keysToRemove.push(base); // legacy bare key cleanup
+    for (const pubkey of pubkeys) {
+      keysToRemove.push(`${base}:profile:${pubkey}`);
     }
   }
 
@@ -88,8 +94,71 @@ export async function clearAllProfileScopedData(profileIndexes: number[]): Promi
   }
 
   console.log(
-    `[ProfileScopedStorage] Cleared ${keysToRemove.length} keys across ${profileIndexes.length} profiles`
+    `[ProfileScopedStorage] Cleared ${keysToRemove.length} keys across ${pubkeys.length} profiles`
   );
+}
+
+const MIGRATION_FLAG = 'profile-scoped-storage-v2';
+
+/**
+ * One-time migration from index-based AsyncStorage keys to pubkey-based keys.
+ *
+ * Old format: bare `{name}` for account 0, `{name}:profile:{accountIndex}` for N>0.
+ * New format: `{name}:profile:{pubkey}` for all profiles.
+ *
+ * Reads raw profile-store JSON from AsyncStorage (no Zustand hydration dependency)
+ * so it can run safely before any profile-scoped store is accessed.
+ */
+export async function migrateProfileScopedKeys(): Promise<void> {
+  try {
+    const flag = await AsyncStorage.getItem(MIGRATION_FLAG);
+    if (flag) return;
+
+    const raw = await AsyncStorage.getItem('profile-store');
+    if (!raw) {
+      await AsyncStorage.setItem(MIGRATION_FLAG, '1');
+      return;
+    }
+
+    const parsed = JSON.parse(raw);
+    const profiles: { accountIndex: number; pubkey: string }[] =
+      parsed?.state?.profiles ?? [];
+
+    if (profiles.length === 0) {
+      await AsyncStorage.setItem(MIGRATION_FLAG, '1');
+      return;
+    }
+
+    let migratedCount = 0;
+
+    for (const profile of profiles) {
+      for (const base of PROFILE_SCOPED_STORE_KEYS) {
+        const oldKey =
+          profile.accountIndex === 0 ? base : `${base}:profile:${profile.accountIndex}`;
+        const newKey = `${base}:profile:${profile.pubkey}`;
+
+        if (oldKey === newKey) continue;
+
+        const oldData = await AsyncStorage.getItem(oldKey);
+        if (!oldData) continue;
+
+        const existing = await AsyncStorage.getItem(newKey);
+        if (!existing) {
+          await AsyncStorage.setItem(newKey, oldData);
+          migratedCount++;
+        }
+        await AsyncStorage.removeItem(oldKey);
+      }
+    }
+
+    await AsyncStorage.setItem(MIGRATION_FLAG, '1');
+    console.log(
+      `[ProfileScopedStorage] Migration complete: moved ${migratedCount} keys across ${profiles.length} profiles`
+    );
+  } catch (error) {
+    console.error('[ProfileScopedStorage] Migration failed:', error);
+    await AsyncStorage.setItem(MIGRATION_FLAG, '1');
+  }
 }
 
 /**

@@ -2,6 +2,7 @@ import React, { useState, useEffect, ReactNode, useRef } from 'react';
 import { store } from '@/redux/store';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { isMigrationsComplete, setMigrationsComplete } from '@/shared/lib/nostr/secureStorage';
+import { migrateProfileScopedKeys } from '@/shared/lib/cashu/profileScopedStorage';
 import { initLog } from '@/shared/lib/initTiming';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
@@ -40,6 +41,7 @@ export default function MigrationGate({ children }: MigrationGateProps) {
         const alreadyDone = await isMigrationsComplete(accountIndex);
         initLog('MigrationGate', `SecureStore flag = ${alreadyDone}`);
         if (alreadyDone) {
+          await migrateProfileScopedKeys();
           setMigrationsCompleteDone(true);
           stage.log('Migrations already complete');
           stage.complete();
@@ -100,6 +102,8 @@ export default function MigrationGate({ children }: MigrationGateProps) {
         if (attempts >= maxAttempts) {
           initLog('MigrationGate', 'TIMEOUT — proceeding anyway');
         }
+
+        await migrateProfileScopedKeys();
 
         initLog('MigrationGate', `persisting completion flag for account ${accountIndex}...`);
         await setMigrationsComplete(accountIndex);

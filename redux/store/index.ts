@@ -696,7 +696,8 @@ export const resetApp = (): AppThunk => {
       // 3b. Clear profile-scoped store data for ALL profiles (not just active)
       try {
         const { clearAllProfileScopedData } = await import('@/shared/lib/cashu/profileScopedStorage');
-        await clearAllProfileScopedData(accountIndexes);
+        const pubkeys = profiles.map((p) => p.pubkey);
+        await clearAllProfileScopedData(pubkeys);
         console.log('✅ All profile-scoped store data cleared across all profiles');
       } catch (error) {
         console.warn('⚠️ Failed to clear profile-scoped data:', error);
