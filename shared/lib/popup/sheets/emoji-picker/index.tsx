@@ -13,4 +13,4 @@
  * ```
  */
 
-export { EmojiPickerContent } from './routes/routeA';
+export { EmojiPickerContent } from './content';

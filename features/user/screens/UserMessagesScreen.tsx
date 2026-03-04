@@ -24,7 +24,6 @@ import { router, Stack } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import {
   buttonHandlerPopup,
-  popup,
   invalidTokenPopup,
   balanceRefreshedPopup,
   balanceRefreshFailedPopup,
@@ -1454,21 +1453,25 @@ export function UserMessagesScreen({
             .forEach((msg: any) => addMessage(msg));
         }
 
-        popup({
-          message: `Insufficient balance. Need ${needed} sats to continue.`,
-          emoji: '💰',
-          type: 'warning',
+        buttonHandlerPopup({
+          title: 'Insufficient balance',
+          description: `Need ${needed} sats to continue.`,
           buttons: [
             {
               text: 'Top Up',
-              onPress: async () => {
+              icon: 'mdi:cash-plus',
+              variant: 'primary',
+              onPress: async (close: any) => {
+                close({} as any);
                 pendingMessageRef.current = userMessage;
                 await handleTopUp();
               },
             },
             {
               text: 'Cancel',
-              onPress: () => {},
+              icon: 'mdi:close-circle-outline',
+              variant: 'secondary',
+              onPress: async (close: any) => close({} as any),
             },
           ],
         });
@@ -1604,7 +1607,7 @@ export function UserMessagesScreen({
           text: 'Send Ecash',
           icon: 'ph:coins',
           variant: 'primary' as const,
-          onPress: async (close) => {
+          onPress: async (close: any) => {
             router.navigate({
               pathname: '/(send-flow)/currency',
               params: {
@@ -1618,7 +1621,7 @@ export function UserMessagesScreen({
           text: 'Send Lightning',
           icon: 'mingcute:lightning-fill',
           variant: 'primary' as const,
-          onPress: async (close) => {
+          onPress: async (close: any) => {
             console.log('[LIGHTNING-FLOW] Send Lightning button pressed', {
               lnUrlOrAddress: lud16,
               to: 'meltQuote',

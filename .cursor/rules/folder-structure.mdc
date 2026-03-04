@@ -18,7 +18,7 @@ Organize by domain, not file type. Code lives near its consumers. Top-level name
 | `shared/` | Cross-cutting primitives. UI, hooks, stores, providers, lib. | Used by 3+ features. No feature-specific logic. |
 | `config/` | App-level config (non-navigation). | |
 | `navigation/` | Navigation infra (flowLayoutOptions, nativeTabs). | Near `app/` but shared. |
-| `sheets/` | Global bottom-sheet registry. | Triggered from anywhere. |
+| `shared/lib/popup/sheets/` | Custom action sheet content (profile-switcher, emoji-picker, button-handler). | Colocated with popup API. Triggered via `showActionSheet` from anywhere. |
 | `redux/` | Legacy. Migrate to Zustand over time. | Do not add new code. |
 
 ## Feature layout

@@ -97,7 +97,27 @@ export function WalletScreen() {
                       {
                         text: 'Action A',
                         variant: 'primary',
-                        onPress: async (close) => close({} as any),
+                        onPress: async (close: any) => close({} as any),
+                      },
+                    ],
+                  })
+                }
+              />
+            </View>
+            <View style={{ flex: 1, minWidth: 120 }}>
+              <Button
+                text="Test Nested"
+                variant="secondary"
+                onPress={() =>
+                  buttonHandlerPopup({
+                    buttons: [
+                      {
+                        text: 'Open Emoji Picker',
+                        variant: 'primary',
+                        pushSheet: {
+                          sheetId: 'emoji-picker',
+                          payload: { token: 'test-token-for-emoji-picker' },
+                        },
                       },
                     ],
                   })

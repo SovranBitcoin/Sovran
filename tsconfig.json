@@ -15,7 +15,7 @@
         "./features/*"
       ],
       "@/sheets/*": [
-        "./sheets/*"
+        "./shared/lib/popup/sheets/*"
       ],
       "@/navigation/*": [
         "./navigation/*"

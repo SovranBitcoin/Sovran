@@ -58,7 +58,7 @@
 import React, { useState } from 'react';
 import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
 import { Button } from '@/shared/ui/primitives/Button';
-import { buttonHandlerPopup } from '@/shared/lib/popup';
+import { buttonHandlerPopup, emojiPickerPopup } from '@/shared/lib/popup';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -88,10 +88,19 @@ export interface ButtonHandlerButton {
   /** Text content for the button */
   text: string;
   /** Press event handler with close function parameter */
-  onPress: (close: (event: GestureResponderEvent) => void) => Promise<void>;
+  onPress?: (close: (event: GestureResponderEvent) => void) => Promise<void>;
+  /** Optional nested action-sheet target for custom sheet navigation */
+  pushSheet?: ButtonHandlerPushTarget;
   /** Whether the button should be visible (default: true) */
   condition?: boolean;
 }
+
+type ButtonHandlerPushTarget = {
+  sheetId: 'emoji-picker';
+  payload: { token: string };
+};
+
+export type ButtonHandlerActionButton = ButtonHandlerButton;
 
 /**
  * Props for the ButtonHandler component
@@ -105,7 +114,7 @@ interface ButtonHandlerProps {
   /** Context for styling adjustments ('tab' or 'sheet') */
   context?: 'tab' | 'sheet';
   /** Array of button configurations */
-  buttons: ButtonHandlerButton[];
+  buttons: ButtonHandlerActionButton[];
   /** Additional style overrides */
   style?: StyleProp<ViewStyle>;
   /** Custom gradient color (defaults to theme primary color) */
@@ -173,12 +182,18 @@ export function ButtonHandler({
    * @example
    * handleButtonPress(button) // Executes button.onPress with loading management
    */
-  const handleButtonPress = async (button: ButtonHandlerButton) => {
+  const handleButtonPress = async (button: ButtonHandlerActionButton) => {
     if (button.disabled) return;
+    if (button.pushSheet) {
+      if (button.pushSheet.sheetId === 'emoji-picker') {
+        emojiPickerPopup(button.pushSheet.payload);
+      }
+      return;
+    }
 
     setLoading(true);
     try {
-      await button.onPress(() => {});
+      await button.onPress?.(() => {});
     } finally {
       setLoading(false);
     }
@@ -200,11 +215,7 @@ export function ButtonHandler({
    * handleMorePress() // Executes third button or opens sheet
    */
   const handleMorePress = async () => {
-    if (visibleButtons.length === 3) {
-      await handleButtonPress(visibleButtons[2]);
-    } else {
-      buttonHandlerPopup({ buttons: visibleButtons });
-    }
+    buttonHandlerPopup({ buttons: visibleButtons });
   };
 
   return (

@@ -1,24 +1,27 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { View } from '@/shared/ui/primitives/View/View';
-import opacity from 'hex-color-opacity';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { nip19, getPublicKey } from 'nostr-tools';
-import { Button, Input, Label, TextField } from 'heroui-native';
+import { BottomSheet, Input, Label, TextField } from 'heroui-native';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
 import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
-import type { ActionSheetPayloads } from '@/shared/lib/popup';
+import type { ActionSheetPayloads } from '../../actionSheetTypes';
+
+interface ImportNsecFooterState {
+  onImport: () => void;
+  isDisabled: boolean;
+  isImporting: boolean;
+}
 
 interface ImportNsecProps {
   payload: ActionSheetPayloads['profile-switcher'];
   close: () => void;
-  onBack: () => void;
+  onFooterStateChange: (state: ImportNsecFooterState) => void;
 }
 
-export function ImportNsec({ payload, close, onBack }: ImportNsecProps) {
-  const [foreground, muted, danger] = useThemeColor(['foreground', 'muted', 'danger'] as const);
+export function ImportNsec({ payload, close, onFooterStateChange }: ImportNsecProps) {
   const [nsecInput, setNsecInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -32,7 +35,6 @@ export function ImportNsec({ payload, close, onBack }: ImportNsecProps) {
       return;
     }
 
-    // Validate nsec format
     let privateKeyBytes: Uint8Array;
     try {
       const decoded = nip19.decode(trimmed);
@@ -46,7 +48,6 @@ export function ImportNsec({ payload, close, onBack }: ImportNsecProps) {
       return;
     }
 
-    // Derive pubkey from the private key
     let pubkeyHex: string;
     try {
       pubkeyHex = getPublicKey(privateKeyBytes);
@@ -55,7 +56,6 @@ export function ImportNsec({ payload, close, onBack }: ImportNsecProps) {
       return;
     }
 
-    // Check for duplicate (same pubkey already exists as any profile type)
     if (useProfileStore.getState().hasPubkey(pubkeyHex)) {
       setError('This identity already exists as a profile.');
       return;
@@ -63,20 +63,15 @@ export function ImportNsec({ payload, close, onBack }: ImportNsecProps) {
 
     setIsImporting(true);
     try {
-      // Securely store the imported nsec
       const stored = await storeImportedNsec(pubkeyHex, trimmed);
       if (!stored) {
         setError('Failed to store nsec securely.');
         return;
       }
 
-      // Compute the deterministic account number from the pubkey
       const npubNumber = pubkeyToAccountNumber(pubkeyHex);
-
-      // Add profile to the store
       useProfileStore.getState().addProfile(npubNumber, pubkeyHex, 'imported');
 
-      // Close the sheet and trigger the switch
       close();
       setTimeout(() => {
         payload.onImportProfile?.(npubNumber);
@@ -89,16 +84,23 @@ export function ImportNsec({ payload, close, onBack }: ImportNsecProps) {
     }
   }, [nsecInput, close, payload]);
 
+  useEffect(() => {
+    onFooterStateChange({
+      onImport: handleImport,
+      isDisabled: isImporting || !nsecInput.trim(),
+      isImporting,
+    });
+  }, [handleImport, isImporting, nsecInput, onFooterStateChange]);
+
   return (
-    <View
-      className="bg-surface-secondary mx-4 mb-3 overflow-hidden rounded-[20px] border"
-      style={{ borderColor: opacity(muted, 0.2) }}>
-      <VStack spacing={16} style={{ padding: 16 }}>
+    <View style={{ flex: 1 }}>
+      <VStack spacing={16} className="flex-1">
+        <View className="flex-row items-center justify-between">
+          <BottomSheet.Title className="text-lg font-bold">Import NSEC</BottomSheet.Title>
+          <BottomSheet.Close />
+        </View>
         <VStack spacing={4}>
-          <Text className="text-foreground" size={18} weight="bold">
-            Import nsec
-          </Text>
-          <Text style={{ color: opacity(foreground, 0.5) }} size={13}>
+          <Text className="text-foreground/50 text-sm">
             Paste your Nostr private key to create an imported profile.
           </Text>
         </VStack>
@@ -111,22 +113,10 @@ export function ImportNsec({ payload, close, onBack }: ImportNsecProps) {
             placeholder="nsec1..."
             autoCapitalize="none"
             autoCorrect={false}
-            autoFocus
           />
         </TextField>
 
-        {error && (
-          <Text style={{ color: danger }} size={13}>
-            {error}
-          </Text>
-        )}
-
-        <Button onPress={handleImport} isDisabled={isImporting || !nsecInput.trim()}>
-          <Button.Label>{isImporting ? 'Importing...' : 'Import'}</Button.Label>
-        </Button>
-        <Button variant="tertiary" onPress={onBack}>
-          <Button.Label>Back</Button.Label>
-        </Button>
+        {error && <Text className="text-danger text-sm">{error}</Text>}
       </VStack>
     </View>
   );

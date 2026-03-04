@@ -10,7 +10,7 @@ module.exports = function (api) {
       alias: {
         '@/shared': './shared',
         '@/features': './features',
-        '@/sheets': './sheets',
+        '@/sheets': './shared/lib/popup/sheets',
         '@/navigation': './navigation',
         '@/config': './config',
         '@/redux': './redux',

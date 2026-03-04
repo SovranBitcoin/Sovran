@@ -73,7 +73,7 @@ shared/lib/popup/
 
 shared/stores/runtime/popupStore.ts   Zustand store for sheet open/close state
 shared/blocks/popup/PopupHost.tsx     Renders toasts + standard sheets + action sheets
-sheets/                              Action sheet content (profileSwitcher, emoji-picker, buttonHandler)
+shared/lib/popup/sheets/              Action sheet content (profileSwitcher, emoji-picker, button-handler)
 ```
 
 ### Roles

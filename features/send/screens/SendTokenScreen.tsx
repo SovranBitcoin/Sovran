@@ -30,7 +30,6 @@ import { nip19 } from 'nostr-tools';
 import { Metadata } from 'nostr-tools/kinds';
 import type { ProfilePointer } from 'nostr-tools/nip19';
 import {
-  emojiPickerPopup,
   nfcEcashSharedPopup,
   nfcConnectionLostPopup,
   nfcSendFailedPopup,
@@ -496,14 +495,6 @@ export function SendTokenScreen({
     [currentTransaction, manager, token]
   );
 
-  const handleCopyEmoji = useCallback(
-    async (_close: (event: any) => void) => {
-      if (!token) return;
-      emojiPickerPopup({ token: getEncodedTokenV4(token) });
-    },
-    [token]
-  );
-
   // Handle send payment (payment request mode)
   const handleSendPayment = useCallback(async () => {
     if (!paymentRequest || !decodedRequest || !nostrTransport || !recipientInfo) {
@@ -627,37 +618,40 @@ export function SendTokenScreen({
             // Normal mode buttons
             {
               text: 'Close',
-              icon: 'ri:close-circle-line',
+              icon: 'mdi:close-circle-outline',
               variant: 'secondary',
               onPress: async () => onNavigateBack(),
               condition: !isPaymentRequestMode && isPaid,
             },
             {
               text: 'Copy',
-              icon: 'lets-icons:copy',
+              icon: 'mdi:content-copy',
               variant: 'primary',
               onPress: handleCopy,
               condition: !isPaymentRequestMode && !isPaid && !!token,
             },
             {
               text: 'Share',
-              icon: 'ri:share-fill',
+              icon: 'mdi:share-variant',
               variant: 'secondary',
               onPress: handleShare,
               condition: !isPaymentRequestMode && !isPaid && !!token,
             },
             {
               text: 'NFC',
-              icon: 'ph:contactless-payment-fill',
+              icon: 'mdi:nfc',
               variant: 'secondary',
               onPress: handleNFCSend,
               condition: !isPaymentRequestMode && !isPaid && !!token,
             },
             {
               text: 'Copy as Emoji',
-              icon: 'fluent:emoji-24-filled',
+              icon: 'mdi:emoticon-happy-outline',
               variant: 'primary',
-              onPress: handleCopyEmoji,
+              pushSheet: {
+                sheetId: 'emoji-picker',
+                payload: { token: formattedToken },
+              },
               condition: !isPaymentRequestMode && !isPaid && !!token,
             },
             {

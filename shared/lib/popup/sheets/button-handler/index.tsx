@@ -18,4 +18,4 @@
  * ```
  */
 
-export { ButtonHandlerContent } from './routes/routeA';
+export { ButtonHandlerContent } from './content';

@@ -4,7 +4,7 @@ module.exports = {
   moduleNameMapper: {
     '^@/shared/(.*)$': '<rootDir>/shared/$1',
     '^@/features/(.*)$': '<rootDir>/features/$1',
-    '^@/sheets/(.*)$': '<rootDir>/sheets/$1',
+    '^@/sheets/(.*)$': '<rootDir>/shared/lib/popup/sheets/$1',
     '^@/navigation/(.*)$': '<rootDir>/navigation/$1',
     '^@/config/(.*)$': '<rootDir>/config/$1',
     '^@/redux/(.*)$': '<rootDir>/redux/$1',
