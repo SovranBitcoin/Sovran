@@ -10,15 +10,16 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { BottomSheet, ListGroup, PressableFeedback } from 'heroui-native';
-import { Text } from '@/shared/ui/primitives/Text';
-import { View } from '@/shared/ui/primitives/View/View';
-import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
+import { ListGroup, PressableFeedback } from 'heroui-native';
+import Icon from 'assets/icons';
+import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { SheetContent } from '../SheetContent';
 import type { ActionSheetPayloads } from '../../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../types';
+
+const STICKY_FOOTER_SAFE_PADDING_BOTTOM = 16;
 
 interface ButtonHandlerContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['button-handler'];
@@ -28,6 +29,7 @@ export function ButtonHandlerContent({
   payload,
   close,
   pushCustomPage,
+  canPop,
   setFooterConfig,
 }: ButtonHandlerContentProps) {
   const [foreground, muted, danger] = useThemeColor(['foreground', 'muted', 'danger'] as const);
@@ -41,41 +43,47 @@ export function ButtonHandlerContent({
     [payload.buttons]
   );
 
-  const handleButtonPress = useCallback((index: number) => {
-    const button = reorderedButtons[index];
-    if (!button) return;
-    setProcessingButtonIndex(index);
+  const handleButtonPress = useCallback(
+    (index: number) => {
+      const button = reorderedButtons[index];
+      if (!button) return;
+      setProcessingButtonIndex(index);
 
-    if (button.pushSheet) {
-      pushCustomPage(button.pushSheet.sheetId, button.pushSheet.payload);
-      setProcessingButtonIndex(undefined);
+      if (button.pushSheet) {
+        pushCustomPage(button.pushSheet.sheetId, button.pushSheet.payload);
+        setProcessingButtonIndex(undefined);
+        return;
+      }
+
+      const result = button.onPress?.(() => {
+        close();
+      });
+
+      if (result && typeof result.then === 'function') {
+        result.finally(() => {
+          setProcessingButtonIndex(undefined);
+        });
+      } else {
+        setProcessingButtonIndex(undefined);
+        close();
+      }
+    },
+    [close, pushCustomPage, reorderedButtons]
+  );
+
+  useEffect(() => {
+    if (!canPop) {
+      setFooterConfig(null);
       return;
     }
 
-    const result = button.onPress?.(() => {
-      close();
-    });
-
-    if (result && typeof result.then === 'function') {
-      result.finally(() => {
-        setProcessingButtonIndex(undefined);
-      });
-    } else {
-      setProcessingButtonIndex(undefined);
-      close();
-    }
-  }, [close, pushCustomPage, reorderedButtons]);
-
-  useEffect(() => {
     setFooterConfig({
       buttons: reorderedButtons.map((button, index) => {
         const isProcessing = processingButtonIndex !== undefined;
-        const isDisabled =
-          button.disabled || (isProcessing && processingButtonIndex !== index);
+        const isDisabled = button.disabled || (isProcessing && processingButtonIndex !== index);
 
         return {
-          label:
-            processingButtonIndex === index ? `${button.text}...` : button.text,
+          label: processingButtonIndex === index ? `${button.text}...` : button.text,
           variant: index === 0 ? 'primary' : 'tertiary',
           isDisabled,
           onPress: () => handleButtonPress(index),
@@ -84,66 +92,59 @@ export function ButtonHandlerContent({
     });
 
     return () => setFooterConfig(null);
-  }, [setFooterConfig, reorderedButtons, processingButtonIndex, handleButtonPress]);
+  }, [canPop, setFooterConfig, reorderedButtons, processingButtonIndex, handleButtonPress]);
 
   return (
-    <View style={{ flex: 1 }}>
-      <View className="flex-row items-center justify-between">
-        <BottomSheet.Title className="text-lg font-bold">
-          {payload.title || 'Select action'}
-        </BottomSheet.Title>
-        <BottomSheet.Close />
-      </View>
-      {payload.description ? (
-        <Text className="text-foreground/50 pt-1 text-sm">{payload.description}</Text>
-      ) : null}
-      <BottomSheetScrollView
-        style={{ flex: 1, paddingTop: 16 }}
-        showsVerticalScrollIndicator={false}>
-        <ListGroup variant="secondary">
-          {reorderedButtons.map((button, i) => {
-            const isDangerous = button.variant === 'dangerous';
+    <SheetContent
+      title={payload.title || 'Select action'}
+      description={payload.description}
+      scrollProps={{
+        contentContainerStyle: { paddingBottom: canPop ? STICKY_FOOTER_SAFE_PADDING_BOTTOM : 12 },
+        enableFooterMarginAdjustment: canPop,
+      }}>
+      <ListGroup variant="secondary">
+        {reorderedButtons.map((button, i) => {
+          const isDangerous = button.variant === 'dangerous';
 
-            return (
-              <PressableFeedback
-                key={i}
-                animation={false}
-                onPress={() => handleButtonPress(i)}
-                isDisabled={processingButtonIndex !== undefined}>
-                <PressableFeedback.Scale>
-                  <ListGroup.Item testID={button.testID} disabled>
-                    <ListGroup.ItemPrefix>
-                      <View
-                        className="rounded-full p-1"
-                        style={{ backgroundColor: opacity(muted, 0.25) }}>
-                        {button.icon ? (
-                          <Icon
-                            color={isDangerous ? danger : foreground}
-                            name={button.icon}
-                            size={24}
-                          />
-                        ) : (
-                          <Icon
-                            color={isDangerous ? danger : foreground}
-                            name="mdi:gesture-tap-button"
-                            size={24}
-                          />
-                        )}
-                      </View>
-                    </ListGroup.ItemPrefix>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>
-                        {processingButtonIndex === i ? `${button.text}...` : button.text}
-                      </ListGroup.ItemTitle>
-                    </ListGroup.ItemContent>
-                  </ListGroup.Item>
-                </PressableFeedback.Scale>
-                <PressableFeedback.Ripple />
-              </PressableFeedback>
-            );
-          })}
-        </ListGroup>
-      </BottomSheetScrollView>
-    </View>
+          return (
+            <PressableFeedback
+              key={i}
+              animation={false}
+              onPress={() => handleButtonPress(i)}
+              isDisabled={processingButtonIndex !== undefined}>
+              <PressableFeedback.Scale>
+                <ListGroup.Item testID={button.testID} disabled>
+                  <ListGroup.ItemPrefix>
+                    <View
+                      className="rounded-full p-1"
+                      style={{ backgroundColor: opacity(muted, 0.25) }}>
+                      {button.icon ? (
+                        <Icon
+                          color={isDangerous ? danger : foreground}
+                          name={button.icon}
+                          size={24}
+                        />
+                      ) : (
+                        <Icon
+                          color={isDangerous ? danger : foreground}
+                          name="mdi:gesture-tap-button"
+                          size={24}
+                        />
+                      )}
+                    </View>
+                  </ListGroup.ItemPrefix>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>
+                      {processingButtonIndex === i ? `${button.text}...` : button.text}
+                    </ListGroup.ItemTitle>
+                  </ListGroup.ItemContent>
+                </ListGroup.Item>
+              </PressableFeedback.Scale>
+              <PressableFeedback.Ripple />
+            </PressableFeedback>
+          );
+        })}
+      </ListGroup>
+    </SheetContent>
   );
 }

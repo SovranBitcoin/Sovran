@@ -10,20 +10,19 @@
 
 import React, { useEffect } from 'react';
 import { TouchableOpacity } from 'react-native';
-import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { BottomSheet } from 'heroui-native';
-import { View } from '@/shared/ui/primitives/View/View';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
+import * as Clipboard from 'expo-clipboard';
+import chunk from 'lodash/chunk';
+import { copyPopup } from '@/shared/lib/popup';
+import { encode } from '@/shared/lib/third-party/emoji';
+import { Card } from '@/shared/ui/composed/Card';
+import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import { Text } from '@/shared/ui/primitives/Text';
-import chunk from 'lodash/chunk';
-import { encode } from '@/shared/lib/third-party/emoji';
-import * as Clipboard from 'expo-clipboard';
-import { Card } from '@/shared/ui/composed/Card';
-import { copyPopup } from '@/shared/lib/popup';
+import { View } from '@/shared/ui/primitives/View/View';
+import { SheetContent } from '../SheetContent';
 import type { ActionSheetPayloads } from '../../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../types';
+import { Description } from 'heroui-native';
 
 interface EmojiPickerContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['emoji-picker'];
@@ -42,6 +41,8 @@ const EMOJIS = [
   { id: 'badger', emoji: '🦡' },
   { id: 'ape', emoji: '🦍' },
 ];
+
+const STICKY_FOOTER_SAFE_PADDING_BOTTOM = 16;
 
 export function EmojiPickerContent({
   payload,
@@ -76,37 +77,32 @@ export function EmojiPickerContent({
   };
 
   return (
-    <View>
+    <SheetContent
+      title="Emoji picker"
+      scrollProps={{
+        contentContainerStyle: { paddingBottom: canPop ? STICKY_FOOTER_SAFE_PADDING_BOTTOM : 12 },
+        enableFooterMarginAdjustment: canPop,
+      }}>
       <View>
-        <View className="flex-row items-center justify-between">
-          <BottomSheet.Title className="text-lg font-bold">Emoji picker</BottomSheet.Title>
-          <BottomSheet.Close />
-        </View>
-        <Text className="text-foreground/50 pt-1 text-sm">
-          Pick an emoji to encode and copy your token.
-        </Text>
-      </View>
-      <VStack className="pb-2 pt-4">
+        <Description>Pick an emoji to encode and copy your token.</Description>
         <Card message={"These encoded emoji's don't work on every platform."} variant="info" />
         <Spacer size={10} />
-        <BottomSheetScrollView>
-          {emojiRows.map((row, rowIndex) => (
-            <HStack key={rowIndex} justify="space-between" className="mb-3">
-              {row.map((emoji, colIndex) => (
-                <TouchableOpacity
-                  testID={emoji.id}
-                  key={colIndex}
-                  className={`bg-surface-secondary flex-1 rounded-lg p-3 ${colIndex > 0 ? 'ml-2' : ''}`}
-                  onPress={() => handleEmojiSelect(emoji.emoji)}>
-                  <VStack align="center" justify="center" flex={1}>
-                    <Text className="text-2xl">{emoji.emoji}</Text>
-                  </VStack>
-                </TouchableOpacity>
-              ))}
-            </HStack>
-          ))}
-        </BottomSheetScrollView>
-      </VStack>
-    </View>
+        {emojiRows.map((row, rowIndex) => (
+          <HStack key={rowIndex} justify="space-between" className="mb-3">
+            {row.map((emoji, colIndex) => (
+              <TouchableOpacity
+                testID={emoji.id}
+                key={colIndex}
+                className={`bg-surface-secondary flex-1 rounded-lg p-3 ${colIndex > 0 ? 'ml-2' : ''}`}
+                onPress={() => handleEmojiSelect(emoji.emoji)}>
+                <View className="items-center justify-center">
+                  <Text className="text-2xl">{emoji.emoji}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </HStack>
+        ))}
+      </View>
+    </SheetContent>
   );
 }

@@ -59,7 +59,7 @@ interface ProfileActions {
     externalChain?: number
   ) => void;
   /** Set the active account index (caller is responsible for cleanup/resetStages before this) */
-  switchProfile: (accountIndex: number) => void;
+  switchProfile: (accountIndex: number) => boolean;
   /** Remove a profile (cannot remove the last profile or the currently active one) */
   removeProfile: (accountIndex: number) => boolean;
   /** Get the next available account index (only considers derived profiles) */
@@ -120,9 +120,10 @@ export const useProfileStore = create<ProfileStore>()(
         // Only switch if the profile exists
         if (!profiles.some((p) => p.accountIndex === accountIndex)) {
           console.warn(`ProfileStore: Cannot switch to unknown profile ${accountIndex}`);
-          return;
+          return false;
         }
         set({ activeAccountIndex: accountIndex });
+        return true;
       },
 
       removeProfile: (accountIndex: number) => {

@@ -7,15 +7,16 @@
 
 import React from 'react';
 import { View } from 'react-native';
-import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { BottomSheet, ListGroup, PressableFeedback } from 'heroui-native';
+import { ListGroup, PressableFeedback } from 'heroui-native';
 import Icon from 'assets/icons';
+import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { formatAmount } from '@/shared/lib/currency';
 import { getUsername } from '@/shared/lib/username';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { SheetContent } from '../SheetContent';
 import type { ActionSheetPayloads } from '../../actionSheetTypes';
+import { Section } from '@/features/settings/screens/SettingsScreen';
 
 interface ProfileListProps {
   payload: ActionSheetPayloads['profile-switcher'];
@@ -54,12 +55,16 @@ export function ProfileList({ payload, close }: ProfileListProps) {
         <ListGroup.ItemContent>
           <ListGroup.ItemTitle>{displayName}</ListGroup.ItemTitle>
           <ListGroup.ItemDescription>
-            {profile.cachedBalanceSats != null
-              ? formatAmount(
-                  { amount: profile.cachedBalanceSats, unit: 'sat' },
-                  { useUserPreference: true }
-                )
-              : '—'}
+            {profile.cachedBalanceSats != null ? (
+              <AmountFormatter
+                amount={profile.cachedBalanceSats}
+                unit="sat"
+                size={12}
+                weight="heavy"
+              />
+            ) : (
+              '—'
+            )}
           </ListGroup.ItemDescription>
         </ListGroup.ItemContent>
         <ListGroup.ItemSuffix>
@@ -86,22 +91,13 @@ export function ProfileList({ payload, close }: ProfileListProps) {
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <View className="flex-row items-center justify-between">
-        <BottomSheet.Title className="text-lg font-bold">Select profile</BottomSheet.Title>
-        <BottomSheet.Close />
-      </View>
-      <BottomSheetScrollView
-        style={{ flex: 1, paddingTop: 16 }}
-        showsVerticalScrollIndicator={false}>
-        <ListGroup variant="secondary">
-          {imported.map(renderProfile)}
-          {imported.length > 0 && native.length > 0 && (
-            <View className="bg-surface-secondary my-2 h-px" />
-          )}
-          {native.map(renderProfile)}
-        </ListGroup>
-      </BottomSheetScrollView>
-    </View>
+    <SheetContent title="Select profile">
+      <Section title="IMPORTED">
+        <ListGroup variant="secondary">{imported.map(renderProfile)}</ListGroup>
+      </Section>
+      <Section title="DERIVED">
+        <ListGroup variant="secondary">{native.map(renderProfile)}</ListGroup>
+      </Section>
+    </SheetContent>
   );
 }

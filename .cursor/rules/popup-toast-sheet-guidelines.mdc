@@ -39,7 +39,7 @@ Action sheets are a popup variant with **custom content** instead of the standar
 
 | Function | Payload | Use case |
 |----------|---------|----------|
-| `profileSwitcherPopup` | `{ onSwitchProfile, onAddProfile, onImportProfile? }` | Profile list + import nsec |
+| `profileSwitcherPopup` | `{ onSwitchProfile, onAddProfile, onImportProfile }` | Profile list + import nsec |
 | `emojiPickerPopup` | `{ token: string }` | Encode token as emoji, copy to clipboard |
 | `buttonHandlerPopup` | `{ buttons: ButtonHandlerButton[] }` | Dynamic button actions |
 

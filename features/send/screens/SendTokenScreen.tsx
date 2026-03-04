@@ -618,14 +618,14 @@ export function SendTokenScreen({
             // Normal mode buttons
             {
               text: 'Close',
-              icon: 'mdi:close-circle-outline',
+              icon: 'mdi:close-circle',
               variant: 'secondary',
               onPress: async () => onNavigateBack(),
               condition: !isPaymentRequestMode && isPaid,
             },
             {
               text: 'Copy',
-              icon: 'mdi:content-copy',
+              icon: 'lets-icons:copy',
               variant: 'primary',
               onPress: handleCopy,
               condition: !isPaymentRequestMode && !isPaid && !!token,
@@ -639,14 +639,14 @@ export function SendTokenScreen({
             },
             {
               text: 'NFC',
-              icon: 'mdi:nfc',
+              icon: 'lucide:nfc',
               variant: 'secondary',
               onPress: handleNFCSend,
               condition: !isPaymentRequestMode && !isPaid && !!token,
             },
             {
               text: 'Copy as Emoji',
-              icon: 'mdi:emoticon-happy-outline',
+              icon: 'fluent:emoji-24-filled',
               variant: 'primary',
               pushSheet: {
                 sheetId: 'emoji-picker',

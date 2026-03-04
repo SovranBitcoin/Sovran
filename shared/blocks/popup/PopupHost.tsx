@@ -35,6 +35,7 @@ import {
   EmojiPickerContent,
   ProfileSwitcherContent,
 } from '@/shared/lib/popup/sheets';
+import { IMPORT_NSEC_LABEL } from '@/shared/lib/popup/sheets/profileSwitcher/constants';
 import type {
   CustomSheetFooterConfig,
   CustomSheetPage,
@@ -49,7 +50,7 @@ type ImportFooterState = {
   isImporting: boolean;
 };
 
-const PROFILE_STYLE_SNAP_POINTS = ['50%', '80%'] as const;
+const PROFILE_STYLE_SNAP_POINTS = ['80%'] as const;
 const STICKY_FOOTER_CONTAINER_CLASS = 'bg-background pb-safe-offset-4 px-4 pt-2';
 
 function ToastRegistrar() {
@@ -445,7 +446,7 @@ function SheetPopup() {
                     <Button.Label>Generate new account</Button.Label>
                   </Button>
                   <Button variant="tertiary" onPress={() => pushProfileRoute('import-nsec')}>
-                    <Button.Label>Import nsec</Button.Label>
+                    <Button.Label>{IMPORT_NSEC_LABEL}</Button.Label>
                   </Button>
                 </>
               ) : (
@@ -482,17 +483,19 @@ function SheetPopup() {
 
   return (
     <BottomSheet isOpen={isOpen} onOpenChange={handleOpenChange}>
-      <BottomSheet.Portal disableFullWindowOverlay={__DEV__}>
+      <BottomSheet.Portal disableFullWindowOverlay={false}>
         <BottomSheet.Overlay isCloseOnPress={standardPayload?.dismissable ?? true} />
         <BottomSheet.Content
           detached={!isProfileStyleCustomShell}
           bottomInset={isProfileStyleCustomShell ? undefined : insets.bottom}
           snapPoints={isProfileStyleCustomShell ? profileSnapPoints : undefined}
           enableDynamicSizing={isProfileStyleCustomShell ? false : undefined}
+          enableOverDrag={isProfileStyleCustomShell ? false : undefined}
           footerComponent={isCustom ? renderCustomFooter : undefined}
+          handleComponent={isProfileStyleCustomShell ? () => null : undefined}
           className={isProfileStyleCustomShell ? undefined : 'mx-4'}
           backgroundClassName={isProfileStyleCustomShell ? 'bg-background' : 'rounded-[32px]'}
-          contentContainerClassName={isProfileStyleCustomShell ? 'pt-2' : undefined}>
+          contentContainerClassName={isProfileStyleCustomShell ? 'h-full pt-2' : undefined}>
           <SheetContent
             payload={payload}
             activeCustomPage={activeCustomPage}

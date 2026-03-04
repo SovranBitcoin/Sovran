@@ -5,11 +5,15 @@ import type {
 
 type EmojiPickerPayload = { token: string };
 
+/**
+ * Addressable custom sheet IDs. Nested pages that only exist inside a sheet flow
+ * (for example profile-switcher's import route) should stay internal to that sheet.
+ */
 type BaseActionSheetPayloads = {
   'profile-switcher': {
     onSwitchProfile: (accountIndex: number) => void;
     onAddProfile: () => void;
-    onImportProfile?: (npubNumber: number) => void;
+    onImportProfile: (npubNumber: number) => void;
   };
   'emoji-picker': EmojiPickerPayload;
 };
@@ -24,11 +28,10 @@ type ButtonHandlerPushTarget = {
 export type ActionSheetButtonHandlerActionButton = Omit<
   ButtonHandlerActionButton,
   'onPress' | 'pushSheet'
-> &
-  {
-    onPress?: ButtonHandlerButton['onPress'];
-    pushSheet?: ButtonHandlerPushTarget;
-  };
+> & {
+  onPress?: ButtonHandlerButton['onPress'];
+  pushSheet?: ButtonHandlerPushTarget;
+};
 
 /** Payload types for custom action sheets (profile-switcher, emoji-picker, button-handler) */
 export type ActionSheetPayloads = BaseActionSheetPayloads & {

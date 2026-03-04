@@ -25,8 +25,12 @@ import { getUsername } from '@/shared/lib/username';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfileStore, ProfileEntry } from '@/shared/stores/global/profileStore';
-import { CocoManager } from '@/shared/lib/cashu/manager';
-import { rehydrateProfileStores } from '@/shared/lib/cashu/profileScopedStorage';
+import {
+  createAndSwitchProfile,
+  isProfileTransitionInProgress,
+  switchToExistingProfile,
+  switchToImportedProfile,
+} from '@/shared/lib/profile/profileSessionOrchestrator';
 import { profileSwitcherPopup } from '@/shared/lib/popup';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -83,98 +87,45 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
   const profiles = useProfileStore((s) => s.profiles);
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
 
-  // Guard against concurrent profile switches (double-tap / rapid taps)
-  const switchInProgress = useRef(false);
-
   const handleSwitchProfile = useCallback(
     async (accountIndex: number) => {
       if (accountIndex === activeAccountIndex) return;
-      if (switchInProgress.current) return;
-      switchInProgress.current = true;
+      if (isProfileTransitionInProgress()) return;
 
-      try {
-        // 1. Close drawer immediately
-        closeDrawer();
-
-        // 2. Show loading screen instantly
-        resetStages();
-
-        // 3. Cleanup Coco manager
-        await CocoManager.cleanup();
-
-        // 4. Switch profile (sets activeAccountIndex)
-        useProfileStore.getState().switchProfile(accountIndex);
-
-        // 5. Rehydrate all profile-scoped stores from new profile's storage
-        await rehydrateProfileStores();
-
-        // 6. Key change in _layout.tsx triggers full inner provider remount
-      } catch (error) {
-        console.error('Failed to switch profile:', error);
-        cancelResetStages();
-      } finally {
-        switchInProgress.current = false;
-      }
+      // Close drawer immediately so loading UI is visible.
+      closeDrawer();
+      await switchToExistingProfile({
+        accountIndex,
+        resetStages,
+        cancelResetStages,
+      });
     },
     [activeAccountIndex, closeDrawer, resetStages, cancelResetStages]
   );
 
   const handleAddProfile = useCallback(async () => {
-    if (switchInProgress.current) return;
-    switchInProgress.current = true;
+    if (isProfileTransitionInProgress()) return;
 
-    try {
-      // 1. Close drawer and show loading screen instantly — no perceived delay
-      closeDrawer();
-      resetStages();
-
-      const nextIndex = useProfileStore.getState().getNextAccountIndex();
-
-      // 2. Derive keys (crypto work happens behind the loading screen)
-      const newKeys = await getKeysForAccount(nextIndex);
-      if (!newKeys?.pubkey) {
-        console.warn('Failed to derive keys for new profile');
-        cancelResetStages();
-        return;
-      }
-
-      // 3. Store the new profile
-      useProfileStore.getState().addProfile(nextIndex, newKeys.pubkey);
-
-      // 4. Cleanup Coco, switch profile, rehydrate stores
-      await CocoManager.cleanup();
-      useProfileStore.getState().switchProfile(nextIndex);
-      await rehydrateProfileStores();
-
-      // 5. Key change in _layout.tsx triggers full inner provider remount
-    } catch (error) {
-      console.error('Failed to add profile:', error);
-      cancelResetStages();
-    } finally {
-      switchInProgress.current = false;
-    }
+    // Close drawer immediately so loading UI is visible.
+    closeDrawer();
+    await createAndSwitchProfile({
+      getKeysForAccount,
+      resetStages,
+      cancelResetStages,
+    });
   }, [getKeysForAccount, closeDrawer, resetStages, cancelResetStages]);
 
   const handleImportProfile = useCallback(
     async (npubNumber: number) => {
-      if (switchInProgress.current) return;
-      switchInProgress.current = true;
+      if (isProfileTransitionInProgress()) return;
 
-      try {
-        closeDrawer();
-        resetStages();
-
-        // Profile entry already created by ImportNsec component.
-        // Clean up and switch to the imported profile.
-        await CocoManager.cleanup();
-        useProfileStore.getState().switchProfile(npubNumber);
-        await rehydrateProfileStores();
-      } catch (error) {
-        console.error('Failed to switch to imported profile:', error);
-        cancelResetStages();
-      } finally {
-        switchInProgress.current = false;
-      }
+      // Profile entry is created by ImportNsec before this callback runs.
+      closeDrawer();
+      await switchToImportedProfile({
+        accountIndex: npubNumber,
+        resetStages,
+        cancelResetStages,
+      });
     },
     [closeDrawer, resetStages, cancelResetStages]
   );
