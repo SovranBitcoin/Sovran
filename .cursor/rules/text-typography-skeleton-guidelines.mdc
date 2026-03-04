@@ -1,29 +1,30 @@
 ---
 description: Text component usage, typography rules, and skeleton-loading behavior for UI text.
 globs:
-  - "components/ui/Text.tsx"
-  - "components/ui/AmountFormatter.tsx"
-  - "hooks/useFonts.ts"
-  - "components/**/*.tsx"
+  - "shared/ui/primitives/Text.tsx"
+  - "shared/ui/composed/AmountFormatter.tsx"
+  - "shared/hooks/useFonts.ts"
+  - "shared/**/*.tsx"
+  - "features/**/*.tsx"
   - "app/**/*.tsx"
 alwaysApply: false
 ---
 
 # Text System
 
-Sovran uses a custom `Text` component (`components/ui/Text.tsx`) as the single entry point for all text rendering. It wraps React Native's `Text` with font management, weight resolution, and built-in skeleton loading.
+Sovran uses a custom `Text` component (`shared/ui/primitives/Text.tsx`) as the single entry point for all text rendering. It wraps React Native's `Text` with font management, weight resolution, and built-in skeleton loading.
 
 **Always import from the project, never from `react-native`:**
 
 ```tsx
-import { Text } from 'components/ui/Text';
+import { Text } from '@/shared/ui/primitives/Text';
 ```
 
 ---
 
 ## Fonts
 
-Two font families are loaded (`hooks/useFonts.ts`):
+Two font families are loaded (`shared/hooks/useFonts.ts`):
 
 | Font | Weights | Purpose |
 |------|---------|---------|

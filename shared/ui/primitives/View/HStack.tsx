@@ -1,7 +1,7 @@
 /**
  * @fileoverview HStack Component - Horizontal stack layout with automatic spacing
  *
- * @module components/ui/View/HStack
+ * @module shared/ui/primitives/View/HStack
  *
  * @description
  * **Horizontal stack layout component with intelligent spacing**

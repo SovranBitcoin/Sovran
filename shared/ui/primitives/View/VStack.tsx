@@ -1,7 +1,7 @@
 /**
  * @fileoverview VStack Component - Vertical stack layout with automatic spacing
  *
- * @module components/ui/View/VStack
+ * @module shared/ui/primitives/View/VStack
  *
  * @description
  * **Vertical stack layout component with intelligent spacing**

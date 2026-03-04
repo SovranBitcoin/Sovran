@@ -1,7 +1,7 @@
 /**
  * @fileoverview ButtonHandler Component - Multi-button layout with overflow handling
  *
- * @module components/ui/ButtonHandler
+ * @module shared/ui/composed/ButtonHandler
  *
  * @description
  * **Advanced button layout component with intelligent overflow management**
@@ -51,7 +51,7 @@
  * ```
  *
  * @see {@link ./Button}
- * @see {@link components/blocks/sheets/buttonHandler}
+ * @see {@link shared/lib/popup/sheets/button-handler}
  * @see {@link ./View}
  */
 

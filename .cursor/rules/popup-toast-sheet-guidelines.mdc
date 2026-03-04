@@ -1,15 +1,15 @@
 ---
 description: Popup and toast system conventions, ownership, and copy patterns. Use when adding or changing popup behavior.
 globs:
-  - "helper/popup/**"
-  - "components/blocks/popup/**"
-  - "stores/popupStore.ts"
+  - "shared/lib/popup/**"
+  - "shared/blocks/popup/**"
+  - "shared/stores/runtime/popupStore.ts"
 alwaysApply: false
 ---
 
 # Popup System
 
-Sovran uses a centralized popup system for all user-facing notifications. Every popup in the app is a named function in `helper/popup/popups.ts`, called from anywhere without React context.
+Sovran uses a centralized popup system for all user-facing notifications. Every popup in the app is a named function in `shared/lib/popup/popups.ts`, called from anywhere without React context.
 
 **Always import from the barrel:**
 
@@ -146,9 +146,9 @@ Icon naming conventions already used in the codebase:
 | QR | `mdi:qrcode-remove` |
 | Links | `mdi:link-off` |
 
-### 4. Add to DevPopupPanel
+### 4. Verify in dev mode
 
-Add an entry to the `SECTIONS` array in `components/blocks/DevPopupPanel.tsx` so it can be visually verified. Put it in the matching category section.
+Use the `__DEV__` test buttons on the Wallet screen to visually verify copy, icons, and timing after any change to `popups.ts`.
 
 ---
 
@@ -176,7 +176,7 @@ Overrides spread **after** the defaults, so they win. This means callers can ove
 Use the `fmt` tagged template to embed formatted amounts inline. Objects with `{ amount, unit }` are rendered as `<AmountFormatter>` in sheets and stringified via `formatAmount()` in toasts.
 
 ```ts
-import { fmt } from '@/helper/popup';
+import { fmt } from '@/shared/lib/popup';
 
 nfcPaymentSentPopup({
   text: fmt`${{ amount: 500, unit: 'sat' }} sent`,
@@ -263,4 +263,4 @@ Before adding a new popup, search `popups.ts` for similar ones. The file is orga
 
 ## Testing
 
-The `DevPopupPanel` (`components/blocks/DevPopupPanel.tsx`) shows every popup in the system organized by category. Use it to visually verify copy, icons, and timing after any change to `popups.ts`.
+The Wallet screen has `__DEV__` test buttons for standard sheets and action sheets. Use them to visually verify copy, icons, and timing after any change to `popups.ts`.

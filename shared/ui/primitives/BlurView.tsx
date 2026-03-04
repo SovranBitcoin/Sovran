@@ -1,7 +1,7 @@
 /**
  * @fileoverview BlurView Component - Platform-aware blur effect wrapper
  *
- * @module components/ui/BlurView
+ * @module shared/ui/primitives/BlurView
  *
  * @description
  * **A wrapper around expo-blur's BlurView that automatically handles platform support**

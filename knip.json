@@ -24,16 +24,13 @@
   ],
   "ignoreBinaries": ["eas", "maestro"],
   "ignoreIssues": {
-    "components/blocks/nostr/**": ["exports", "types", "duplicates"],
-    "components/blocks/UserFeed.tsx": ["exports", "types"],
+    "features/feed/components/nostr/**": ["exports", "types", "duplicates"],
+    "features/feed/components/UserFeed.tsx": ["exports", "types"],
     "features/wallet/lib/walletHeader.ts": ["exports"],
-    "helper/nfc/**": ["exports", "types"],
-    "helper/nfc.ts": ["exports", "types"],
-    "stores/nostrSocialStore.ts": ["exports"],
-    "components/blocks/rebalance/demoRunner.ts": ["files"],
-    "components/blocks/DebugBalancePanel.tsx": ["files"],
-    "components/blocks/DevPopupPanel.tsx": ["files"],
-    "helper/popup/popups.ts": ["exports"],
-    "helper/secureStorage.ts": ["exports"]
+    "shared/lib/nfc/**": ["exports", "types"],
+    "shared/stores/profile/nostrSocialStore.ts": ["exports"],
+    "features/mint/components/rebalance/demoRunner.ts": ["files"],
+    "shared/lib/popup/popups.ts": ["exports"],
+    "shared/lib/nostr/secureStorage.ts": ["exports"]
   }
 }

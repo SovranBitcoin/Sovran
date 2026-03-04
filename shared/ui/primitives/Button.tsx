@@ -1,7 +1,7 @@
 /**
  * @fileoverview Button Component - Advanced button with ripple effects and blur support
  *
- * @module components/ui/Button
+ * @module shared/ui/primitives/Button
  *
  * @description
  * **Comprehensive button component with advanced visual effects and multiple modes**

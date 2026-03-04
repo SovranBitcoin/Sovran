@@ -1,7 +1,7 @@
 /**
  * @fileoverview ListRoute - Mint selection with balances
  *
- * @module components/blocks/sheets/mint-balance/routes/list
+ * @module features/mint/components/MintItem
  *
  * @description
  * Displays owned mints with balances, currency filtering, and selection options.

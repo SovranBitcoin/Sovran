@@ -42,7 +42,7 @@ type MessageConfig = {
  * Runtime error-string matching only. These keys are matched against
  * `error.message` strings thrown by cashu/mint libraries at runtime.
  *
- * For all intentional/named popups, use the typed functions in `helper/popup/popups.ts`.
+ * For all intentional/named popups, use the typed functions in `shared/lib/popup/popups.ts`.
  */
 const MESSAGE_CONFIGS: Record<string, MessageConfig> = {
   'outputs have already been signed before.': {

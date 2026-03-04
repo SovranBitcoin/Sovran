@@ -1,7 +1,7 @@
 /**
  * @fileoverview Coco Cashu utility functions for Lightning Network and ecash operations
  *
- * @module helper/coco/utils
+ * @module shared/lib/cashu/utils
  *
  * @description
  * **Comprehensive utility functions for Coco Cashu operations**

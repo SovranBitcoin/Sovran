@@ -1,7 +1,7 @@
 /**
  * @fileoverview SessionsPanel - Animated side panel for Routstr session management
  *
- * @module components/blocks/routstr/SessionsPanel
+ * @module features/user/components/routstr/SessionsPanel
  *
  * @description
  * A React Native Reanimated side panel that slides in from the left to display

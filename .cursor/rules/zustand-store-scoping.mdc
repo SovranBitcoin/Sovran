@@ -47,8 +47,8 @@ Never store these in Zustand (persisted or runtime):
 
 Security-critical storage and derivation live in:
 - `.cursor/rules/secure-storage-key-derivation.mdc`
-- `helper/secureStorage.ts`
-- `helper/keyDerivation.ts`
+- `shared/lib/nostr/secureStorage.ts`
+- `shared/lib/nostr/keyDerivation.ts`
 
 Use `expo-secure-store` for secrets. Treat Zustand as app state/cache only.
 
@@ -113,7 +113,7 @@ Full reset must remove all profile data across all known profile indexes.
 Current reset orchestration:
 - `redux/store/index.ts` (`resetApp`)
 - `shared/lib/cashu/profileScopedStorage.ts` (`clearAllProfileScopedData(maxProfileIndex)`)
-- `helper/secureStorage.ts` (`clearAllSecureData(maxAccountIndex)`)
+- `shared/lib/nostr/secureStorage.ts` (`clearAllSecureData(maxAccountIndex)`)
 
 Rules:
 - Always compute max known account index from `profileStore` and pass it into broad-clear helpers.

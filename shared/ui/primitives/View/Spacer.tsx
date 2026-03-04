@@ -1,7 +1,7 @@
 /**
  * @fileoverview Spacer Component - Simple vertical spacing utility
  *
- * @module components/ui/View/Spacer
+ * @module shared/ui/primitives/View/Spacer
  *
  * @description
  * **Simple spacing component for consistent vertical spacing**

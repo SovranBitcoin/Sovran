@@ -11,7 +11,7 @@ You are a senior React Native + Expo engineer. Ship the requested change with th
 
 ## Execution sequence
 
-1. **Search first** — find existing patterns in `features/`, `shared/`, `components/`, `hooks/`, `helper/` before creating anything new. Investigate deeply. Be 100% sure before implementing.
+1. **Search first** — find existing patterns in `features/`, `shared/` before creating anything new. Investigate deeply. Be 100% sure before implementing.
 2. **Reuse first** — extend existing functions, hooks, components. Smallest possible change.
 3. **No assumptions** — only use: files you've read, user messages, tool results. Missing info? Search, then ask.
 4. **Challenge ideas** — if you see flaws, risks, or better approaches, say so directly. Do not auto-agree.
@@ -20,7 +20,7 @@ You are a senior React Native + Expo engineer. Ship the requested change with th
 ## Before you code
 
 - Identify: screen/flow, state sources, async boundaries, loading/error states, navigation implications.
-- Light scan of relevant files in `app/`, `features/`, `shared/`, `components/`, `hooks/`, `helper/`. Do NOT audit the whole repo.
+- Light scan of relevant files in `app/`, `features/`, `shared/`. Do NOT audit the whole repo.
 - If editing an existing file, run `git diff <file>` first. Restore any lost JSDoc.
 
 ## Architecture boundaries
@@ -28,8 +28,8 @@ You are a senior React Native + Expo engineer. Ship the requested change with th
 - `app/` — routing + orchestration only. Screens stay thin.
 - `features/` — domain modules. Screens + components + hooks per domain.
 - `shared/` — cross-cutting UI, hooks, stores, lib. See `.cursor/rules/folder-structure.mdc`.
-- `hooks/coco/` — compose coco-cashu-react hooks for UX needs. Never reimplement coco internals.
-- `stores/` — Zustand. Check `.cursor/rules/zustand-store-scoping.mdc` for scope rules before adding or modifying any store.
+- `shared/lib/cashu/` — coco integration. Compose coco-cashu-react hooks for UX needs. Never reimplement coco internals.
+- `shared/stores/` — Zustand. Check `.cursor/rules/zustand-store-scoping.mdc` for scope rules before adding or modifying any store.
 - `coco-cashu-core` is the source of truth for cashu types. Import from coco, not `@cashu/cashu-ts`.
 
 ## Naming
@@ -44,7 +44,7 @@ You are a senior React Native + Expo engineer. Ship the requested change with th
 1. React / React Native
 2. Expo / Expo Router
 3. Third-party (alphabetized)
-4. Internal absolute (coco-cashu-core → coco-cashu-react → @/helper/coco → @/hooks/coco → rest, alphabetized)
+4. Internal absolute (coco-cashu-core → coco-cashu-react → @/shared/lib/cashu → @/shared/hooks → rest, alphabetized)
 5. Relative (./ then ../, alphabetized)
 
 Remove unused imports.

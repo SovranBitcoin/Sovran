@@ -1,7 +1,7 @@
 /**
  * @fileoverview View Component - Enhanced React Native View with blur effects
  *
- * @module components/ui/View/View
+ * @module shared/ui/primitives/View/View
  *
  * @description
  * **Enhanced View component with advanced blur effects and background handling**

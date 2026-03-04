@@ -1,7 +1,7 @@
 /**
  * @fileoverview Badge Component - Status indicators and labels with theme integration
  *
- * @module components/ui/Badge
+ * @module shared/ui/primitives/Badge
  *
  * @description
  * **Versatile badge component for status indicators, labels, and visual cues**

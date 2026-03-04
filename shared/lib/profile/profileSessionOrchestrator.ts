@@ -1,3 +1,11 @@
+/**
+ * @fileoverview Profile session orchestration for switch/create/import flows.
+ *
+ * Coordinates CocoManager cleanup, profileStore updates, and profile-scoped store
+ * rehydration. Uses a single transition guard to prevent concurrent profile switches.
+ * Callers must provide resetStages/cancelResetStages from InitializationProvider
+ * to reset the app shell during the transition.
+ */
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { rehydrateProfileStores } from '@/shared/lib/cashu/profileScopedStorage';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
