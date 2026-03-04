@@ -180,7 +180,7 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
   }, [giftWrapEvents, nostrKeys?.privateKey]);
 
   const [decryptedContacts, setDecryptedContacts] = useState<any[]>([]);
-  const [isDecrypting, setIsDecrypting] = useState(false);
+  const [, setIsDecrypting] = useState(false);
 
   // Build recent activity contacts from NIP-04 and NIP-17 events
   const recentActivityContacts = useMemo(() => {
@@ -322,7 +322,7 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
   }, [mints, getMintInfo]);
 
   const [decryptedMints, setDecryptedMints] = useState<any[]>([]);
-  const [isDecryptingMints, setIsDecryptingMints] = useState(false);
+  const [, setIsDecryptingMints] = useState(false);
 
   // Build mints with most recent DM metadata
   const mintsWithMetadata = useMemo(() => {
@@ -389,6 +389,40 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
       cancelled = true;
     };
   }, [mintsWithMetadata, nostrKeys?.pubkey, nostrKeys?.privateKey]);
+
+  // Always use contactsWithDefaults as the base so new contacts appear immediately.
+  // Overlay decrypted message content per-pubkey when available. NIP-17 content is
+  // already decrypted during unwrap, so it shows without waiting for NIP-04 decryption.
+  const displayContacts = useMemo(() => {
+    const decryptedByPubkey = new Map<string, any>();
+    decryptedContacts.forEach((c) => {
+      if (c.pubkey) decryptedByPubkey.set(c.pubkey, c);
+    });
+
+    return contactsWithDefaults.map((c) => {
+      const decrypted = decryptedByPubkey.get(c.pubkey);
+      if (decrypted) return decrypted;
+      return {
+        ...c,
+        dmEvent: c.nip17Content !== undefined ? { content: c.nip17Content } : undefined,
+      };
+    });
+  }, [decryptedContacts, contactsWithDefaults]);
+
+  const displayMints = useMemo(() => {
+    const decryptedByKey = new Map<string, any>();
+    decryptedMints.forEach((m) => {
+      const key = m.pubkey || m.mint?.mintUrl;
+      if (key) decryptedByKey.set(key, m);
+    });
+
+    return mintsWithMetadata.map((m) => {
+      const key = m.pubkey || m.mint?.mintUrl;
+      const decrypted = key ? decryptedByKey.get(key) : undefined;
+      if (decrypted) return decrypted;
+      return { ...m, dmEvent: undefined };
+    });
+  }, [decryptedMints, mintsWithMetadata]);
 
   const pagerRef = useRef<PagerView>(null);
 
@@ -502,18 +536,17 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
     pagerRef.current?.setPage(index);
   }, []);
 
-  // Profile subscription for all visible contacts
+  // Profile subscription — use pre-decryption data so profiles load in parallel with decryption
   const profileFilters = useMemo(() => {
     const allPubkeys = [
-      ...defaultContactPubkeys.map((dc) => dc.pubkey),
-      ...decryptedContacts.map((item: any) => item.pubkey),
-      ...decryptedMints.map((item: any) => item.pubkey),
+      ...contactsWithDefaults.map((item) => item.pubkey),
+      ...mintsWithMetadata.map((item) => item.pubkey),
     ].filter((pubkey): pubkey is string => !!pubkey);
 
     const uniquePubkeys = [...new Set(allPubkeys)];
     if (uniquePubkeys.length === 0) return null;
     return [{ kinds: [0], authors: uniquePubkeys }];
-  }, [decryptedContacts, decryptedMints, defaultContactPubkeys]);
+  }, [contactsWithDefaults, mintsWithMetadata]);
 
   const { events: profileEvents, eose: profilesEose } = useSubscribe({ filters: profileFilters });
   const isLoadingProfiles = !profilesEose;
@@ -547,90 +580,79 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
       <ScrollableGradientOverlay contentHeight={windowHeight * 1.5} />
 
       <SafeAreaView style={layoutStyles.flex1} edges={['bottom']}>
-        <View style={{ flex: 1 }}>
-          <View style={{ position: 'relative', flex: 1, paddingTop: HEADER_HEIGHT }}>
-            {/* Tabs - hidden when searching to avoid layout shift */}
-            <View
-              style={{
-                paddingHorizontal: 12,
-                height: isSearching ? 0 : 'auto',
-                overflow: 'hidden',
-                opacity: isSearching ? 0 : 1,
-              }}>
-              <Tabs
-                tabs={TABS}
-                selectedTab={selectedTab}
-                handleTabPress={handleTabPress}
-                amounts={[String(decryptedContacts.length), String(decryptedMints.length)]}
-              />
-            </View>
-
-            {/* Search results overlay */}
-            {isSearching && (
-              <Pressable style={layoutStyles.flex1} onPress={dismissKeyboard}>
-                <ScrollView
-                  keyboardShouldPersistTaps="handled"
-                  keyboardDismissMode="on-drag"
-                  showsVerticalScrollIndicator={false}
-                  contentContainerStyle={styles.searchContainer}>
-                  <RNView style={[styles.card, { borderColor }]}>
-                    <BlurCardFrame accentColor={muted}>
-                      <View style={styles.searchSectionHeader}>
-                        <Text bold size={14} style={{ color: opacity(foreground, 0.4) }}>
-                          Search results
-                        </Text>
-                      </View>
-                      <View style={styles.cardContent} className="gap-4">
-                        {showNoResults ? (
-                          <NoResultsFound />
-                        ) : (
-                          displayResults.map((item) => (
-                            <SearchResultItem
-                              key={item.pubkey}
-                              result={item}
-                              loading={searchLoading || !hasSearched}
-                              onPress={handleSearchResultPress}
-                            />
-                          ))
-                        )}
-                      </View>
-                    </BlurCardFrame>
-                  </RNView>
-                </ScrollView>
-              </Pressable>
-            )}
-
-            {/* Tab content */}
-            {!isSearching && (
-              <View style={layoutStyles.flex1}>
-                <PagerView
-                  ref={pagerRef}
-                  onPageSelected={onPageSelected}
-                  style={{ flex: 1, minHeight: 1 }}
-                  initialPage={0}
-                  scrollEnabled>
-                  <View key="1" collapsable={false} style={layoutStyles.flex1}>
-                    <DraggableContactsList
-                      data={decryptedContacts}
-                      profilesMap={profilesMap}
-                      isDecrypting={isDecrypting}
-                      isLoadingProfiles={isLoadingProfiles}
-                      emptyMessage="No recent conversations found"
-                    />
-                  </View>
-                  <View key="2" collapsable={false} style={layoutStyles.flex1}>
-                    <DraggableContactsList
-                      data={decryptedMints}
-                      profilesMap={profilesMap}
-                      isDecrypting={mintInfoLoading || isDecryptingMints}
-                      isLoadingProfiles={isLoadingProfiles}
-                      emptyMessage="No mints with nostr contacts found"
-                    />
-                  </View>
-                </PagerView>
-              </View>
-            )}
+        <View style={{ flex: 1, paddingTop: HEADER_HEIGHT }}>
+          {/* Tabs — display:none avoids layout computation while searching */}
+          <View style={{ paddingHorizontal: 12, display: isSearching ? 'none' : 'flex' }}>
+            <Tabs
+              tabs={TABS}
+              selectedTab={selectedTab}
+              handleTabPress={handleTabPress}
+              amounts={[String(displayContacts.length), String(displayMints.length)]}
+            />
           </View>
+
+          {/* Search results overlay */}
+          {isSearching && (
+            <Pressable style={layoutStyles.flex1} onPress={dismissKeyboard}>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.searchContainer}>
+                <RNView style={[styles.card, { borderColor }]}>
+                  <BlurCardFrame accentColor={muted}>
+                    <View style={styles.searchSectionHeader}>
+                      <Text bold size={14} style={{ color: opacity(foreground, 0.4) }}>
+                        Search results
+                      </Text>
+                    </View>
+                    <View style={styles.cardContent} className="gap-4">
+                      {showNoResults ? (
+                        <NoResultsFound />
+                      ) : (
+                        displayResults.map((item) => (
+                          <SearchResultItem
+                            key={item.pubkey}
+                            result={item}
+                            loading={searchLoading || !hasSearched}
+                            onPress={handleSearchResultPress}
+                          />
+                        ))
+                      )}
+                    </View>
+                  </BlurCardFrame>
+                </RNView>
+              </ScrollView>
+            </Pressable>
+          )}
+
+          {/* Tab content */}
+          {!isSearching && (
+            <PagerView
+              ref={pagerRef}
+              onPageSelected={onPageSelected}
+              style={layoutStyles.flex1}
+              initialPage={0}
+              scrollEnabled>
+              <View key="1" collapsable={false} style={layoutStyles.flex1}>
+                <DraggableContactsList
+                  data={displayContacts}
+                  profilesMap={profilesMap}
+                  isLoadingProfiles={isLoadingProfiles}
+                  emptyMessage="No recent conversations found"
+                />
+              </View>
+              <View key="2" collapsable={false} style={layoutStyles.flex1}>
+                <DraggableContactsList
+                  data={displayMints}
+                  profilesMap={profilesMap}
+                  loading={mintInfoLoading}
+                  isLoadingProfiles={isLoadingProfiles}
+                  emptyMessage="No mints with nostr contacts found"
+                />
+              </View>
+            </PagerView>
+          )}
         </View>
       </SafeAreaView>
     </LayoutDebugWrapper>

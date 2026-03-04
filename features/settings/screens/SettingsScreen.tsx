@@ -372,6 +372,12 @@ export const SettingsScreen = () => {
                 onPress={handleFreeReservedProofs}
               />
               <Separator className="mx-4" />
+              <SettingsListLinkItem
+                href="/(settings-flow)/storage"
+                title="Storage Inventory"
+                description="View persisted storage keys and coco database files"
+              />
+              <Separator className="mx-4" />
               <PressableFeedback animation={false} onPress={() => setMockMode(!mockMode)}>
                 <PressableFeedback.Scale>
                   <ListGroup.Item disabled>

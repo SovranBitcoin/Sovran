@@ -23,6 +23,7 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="theme" options={{ title: 'Theme' }} />
       <Stack.Screen name="routing" options={{ title: 'Swap Routing' }} />
       <Stack.Screen name="keyring" options={{ title: 'P2PK Keys' }} />
+      <Stack.Screen name="storage" options={{ title: 'Storage Inventory' }} />
       <Stack.Screen name="recovery" options={{ title: 'Recover Wallet' }} />
       <Stack.Screen name="delete" options={{ title: 'Delete Account' }} />
     </Stack>

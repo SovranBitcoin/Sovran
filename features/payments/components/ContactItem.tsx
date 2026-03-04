@@ -68,9 +68,9 @@ export const ContactItem = React.memo(function ContactItem({
       };
     }
 
-    // Regular contact - use profile data from kind 0 event
     const displayName = profile?.display_name || profile?.name || item.pubkey.slice(0, 16) + '...';
-    const lastMessage = item.dmEvent?.content || 'No messages';
+    const lastMessage =
+      item.dmEvent === undefined ? undefined : item.dmEvent?.content || 'No messages';
 
     return {
       name: displayName,
@@ -78,7 +78,7 @@ export const ContactItem = React.memo(function ContactItem({
       subtitle: lastMessage,
       isMint: false,
     };
-  }, [item.type, item.mint?.mintUrl, item.mintInfo, item.pubkey, item.dmEvent?.content, profile]);
+  }, [item.type, item.mint?.mintUrl, item.mintInfo, item.pubkey, item.dmEvent, profile]);
 
   useEffect(() => {
     prefetchImage(displayInfo.picture);
@@ -116,7 +116,7 @@ export const ContactItem = React.memo(function ContactItem({
             loading={isLoadingProfile}
             placeholder="Last message preview text"
             style={[styles.previewText, { color: opacity(foreground, 0.8) }]}>
-            {displayInfo.subtitle.length > 50
+            {displayInfo.subtitle && displayInfo.subtitle.length > 50
               ? `${displayInfo.subtitle.slice(0, 50)}...`
               : displayInfo.subtitle}
           </Text>
