@@ -21,14 +21,17 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { UntranslatedText } from '@/shared/ui/primitives/Text';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
-import Icon from 'assets/icons';
 import Animated, {
   Easing,
+  type EasingFunction,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
+
+import type { CheckpointDotType } from './AnimatedCheckpointDot';
+import { AnimatedCheckpointDot } from './AnimatedCheckpointDot';
 
 type StepStatus =
   | 'pending'
@@ -137,10 +140,7 @@ function statusToCurrentIdx(status: StepStatus): number {
 
 // ---------- constants ----------
 
-const DOT_RADIUS_REF = 14;
 const DOT_CONTAINER = 20;
-const ICON_SIZE = 14;
-const SMALL_DOT = ICON_SIZE / 2;
 const LINE_THICKNESS = 3;
 
 const DOT_ANIM_MS = 300;
@@ -152,117 +152,16 @@ const LINE_TIMING = { duration: LINE_ANIM_MS, easing: Easing.inOut(Easing.cubic)
 
 // ---------- delayed animation helper ----------
 
-function timed(target: number, delayMs: number, config: { duration: number; easing: any }) {
+function timed(
+  target: number,
+  delayMs: number,
+  config: { duration: number; easing: EasingFunction }
+) {
   return delayMs > 0 ? withDelay(delayMs, withTiming(target, config)) : withTiming(target, config);
 }
 
-// ---------- Animated dot ----------
-
-function AnimatedChainDot({
-  type,
-  delayMs,
-  greenColor,
-  redColor,
-  greyColor,
-}: {
-  type: NodeType;
-  delayMs: number;
-  greenColor: string;
-  redColor: string;
-  greyColor: string;
-}) {
-  const isFuture = type === 'future';
-  const isComplete = isCompleteish(type);
-  const isPending = type === 'next-pending';
-  const isFailed = type === 'failed';
-
-  const futureOp = useSharedValue(isFuture ? 1 : 0);
-  const pendingOp = useSharedValue(isPending ? 1 : 0);
-  const completeOp = useSharedValue(isComplete ? 1 : 0);
-  const failedOp = useSharedValue(isFailed ? 1 : 0);
-  const dotScale = useSharedValue(isFuture ? SMALL_DOT / DOT_CONTAINER : 1);
-
-  useEffect(() => {
-    futureOp.set(timed(isFuture ? 1 : 0, delayMs, FAST_TIMING));
-    pendingOp.set(timed(isPending ? 1 : 0, delayMs, DOT_TIMING));
-    completeOp.set(timed(isComplete ? 1 : 0, delayMs, DOT_TIMING));
-    failedOp.set(timed(isFailed ? 1 : 0, delayMs, DOT_TIMING));
-    dotScale.set(timed(isFuture ? SMALL_DOT / DOT_CONTAINER : 1, delayMs, DOT_TIMING));
-  }, [
-    type,
-    delayMs,
-    isFuture,
-    isPending,
-    isComplete,
-    isFailed,
-    futureOp,
-    pendingOp,
-    completeOp,
-    failedOp,
-    dotScale,
-  ]);
-
-  const scaleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: dotScale.get() }],
-  }));
-  const futureStyle = useAnimatedStyle(() => ({ opacity: futureOp.get() }));
-  const pendingStyle = useAnimatedStyle(() => ({ opacity: pendingOp.get() }));
-  const completeStyle = useAnimatedStyle(() => ({ opacity: completeOp.get() }));
-  const failedStyle = useAnimatedStyle(() => ({ opacity: failedOp.get() }));
-
-  const greenBg = useMemo(() => opacity(greenColor, 0.18), [greenColor]);
-  const greenBorder = useMemo(() => opacity(greenColor, 0.32), [greenColor]);
-  const greyBg = useMemo(() => opacity(greyColor, 0.18), [greyColor]);
-  const greyBorder = useMemo(() => opacity(greyColor, 0.32), [greyColor]);
-  const redBg = useMemo(() => opacity(redColor, 0.18), [redColor]);
-  const redBorder = useMemo(() => opacity(redColor, 0.32), [redColor]);
-  const clockColor = useMemo(() => opacity('#FFFFFF', 0.7), []);
-
-  return (
-    <Animated.View style={[styles.dotWrapper, scaleStyle]}>
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          { borderRadius: DOT_CONTAINER, backgroundColor: greyColor },
-          futureStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: greyBg, borderColor: greyBorder },
-          pendingStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: greenBg, borderColor: greenBorder },
-          completeStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: redBg, borderColor: redBorder },
-          failedStyle,
-        ]}
-      />
-
-      <Animated.View style={[styles.iconLayer, pendingStyle]}>
-        <Icon name="mdi:clock-outline" color={clockColor} size={ICON_SIZE} />
-      </Animated.View>
-      <Animated.View style={[styles.iconLayer, completeStyle]}>
-        <Icon name="fluent:checkmark-16-filled" color={greenColor} size={ICON_SIZE} />
-      </Animated.View>
-      <Animated.View style={[styles.iconLayer, failedStyle]}>
-        <Icon name="material-symbols:close-rounded" color={redColor} size={ICON_SIZE} />
-      </Animated.View>
-    </Animated.View>
-  );
+function nodeTypeToCheckpointDotType(type: NodeType): CheckpointDotType {
+  return type;
 }
 
 // ---------- Animated line ----------
@@ -348,6 +247,7 @@ export const TransferStepChain = React.memo(
 
     const greenColor = successColor;
     const redColor = dangerColor;
+    const orangeColor = '#fb923c';
     const greyColor = muted;
     const labelColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
     const dimLabelColor = useMemo(() => opacity(foreground, 0.25), [foreground]);
@@ -413,11 +313,12 @@ export const TransferStepChain = React.memo(
             return (
               <React.Fragment key={node.label}>
                 <View style={styles.nodeColumn}>
-                  <AnimatedChainDot
-                    type={node.type}
+                  <AnimatedCheckpointDot
+                    type={nodeTypeToCheckpointDotType(node.type)}
                     delayMs={nodeDelays[idx]}
                     greenColor={greenColor}
                     redColor={redColor}
+                    orangeColor={orangeColor}
                     greyColor={greyColor}
                   />
                   <AnimatedLabel
@@ -470,31 +371,6 @@ const styles = StyleSheet.create({
   },
   nodeColumn: {
     alignItems: 'center',
-  },
-  dotWrapper: {
-    width: DOT_CONTAINER,
-    height: DOT_CONTAINER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dotLayer: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  dot: {
-    width: DOT_CONTAINER,
-    height: DOT_CONTAINER,
-    borderRadius: DOT_RADIUS_REF / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  iconLayer: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   line: {
     flex: 1,

@@ -2,6 +2,14 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { MintQuoteState, MeltQuoteState, type MeltQuoteBolt11Response } from '@cashu/cashu-ts';
+import Animated, {
+  Easing,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 
@@ -13,7 +21,7 @@ import type {
   ReceiveHistoryEntry,
 } from 'coco-cashu-core';
 
-import Icon from 'assets/icons';
+import { AnimatedCheckpointDot, type CheckpointDotType } from '@/shared/blocks/transfer';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -376,121 +384,54 @@ function buildTimeline({
 
 // ============ Timeline Components ============
 
-interface TimelineDotProps {
-  stepType: TimelineStepType;
+function timelineStepTypeToCheckpointDotType(stepType: TimelineStepType): CheckpointDotType {
+  return stepType === 'expired' ? 'failed' : stepType;
+}
+
+const LINE_WIDTH = 3;
+const LINE_HEIGHT = 50;
+const LINE_ANIM_MS = 400;
+const LINE_TIMING = { duration: LINE_ANIM_MS, easing: Easing.out(Easing.cubic) };
+
+type TimelineLineType = 'complete' | 'future' | 'expired-gradient' | 'rolled-back-gradient';
+
+interface AnimatedTimelineLineProps {
+  lineType: TimelineLineType;
+  delayMs?: number;
   greenColor: string;
   redColor: string;
   orangeColor: string;
   greyColor: string;
 }
 
-function TimelineDot({ stepType, greenColor, redColor, orangeColor, greyColor }: TimelineDotProps) {
-  const dotSize = 14;
-  const iconSize = 14;
-
-  // Future small dot
-  if (stepType === 'future-small') {
-    return (
-      <View
-        style={{
-          width: iconSize / 2,
-          height: iconSize / 2,
-          borderRadius: iconSize / 2,
-          backgroundColor: greyColor,
-          marginHorizontal: iconSize / 2,
-        }}
-      />
-    );
-  }
-
-  // Next pending with clock icon
-  if (stepType === 'next-pending') {
-    const bg = opacity(greyColor, 0.18);
-    const border = opacity(greyColor, 0.32);
-    return (
-      <View
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: dotSize / 2,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: bg,
-          borderWidth: 1,
-          borderColor: border,
-        }}>
-        <Icon name="mdi:clock-outline" color={opacity('#FFFFFF', 0.7)} size={iconSize} />
-      </View>
-    );
-  }
-
-  let backgroundColor = greenColor;
-  let iconName = 'fluent:checkmark-16-filled';
-
-  switch (stepType) {
-    case 'complete':
-    case 'success':
-    case 'current':
-      backgroundColor = greenColor;
-      iconName = 'fluent:checkmark-16-filled';
-      break;
-    case 'expired':
-      backgroundColor = redColor;
-      iconName = 'material-symbols:close-rounded';
-      break;
-    case 'rolled-back':
-      backgroundColor = orangeColor;
-      iconName = 'ic:round-refresh';
-      break;
-    case 'already-spent':
-      backgroundColor = orangeColor;
-      iconName = 'mdi:alert-circle';
-      break;
-  }
-
-  const bg = opacity(backgroundColor, 0.18);
-  const border = opacity(backgroundColor, 0.32);
-
-  return (
-    <View
-      style={{
-        width: 20,
-        height: 20,
-        borderRadius: dotSize / 2,
-        backgroundColor: bg,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: border,
-      }}>
-      <Icon name={iconName} color={backgroundColor} size={iconSize} />
-    </View>
-  );
-}
-
-interface TimelineLineProps {
-  lineType: 'complete' | 'future' | 'expired-gradient' | 'rolled-back-gradient';
-  greenColor: string;
-  redColor: string;
-  orangeColor: string;
-  greyColor: string;
-}
-
-function TimelineLine({
+const AnimatedTimelineLine = React.memo(function AnimatedTimelineLine({
   lineType,
+  delayMs = 0,
   greenColor,
   redColor,
   orangeColor,
   greyColor,
-}: TimelineLineProps) {
-  const lineWidth = 3;
-  const lineHeight = 50;
+}: AnimatedTimelineLineProps) {
+  const isComplete = lineType === 'complete';
+  const fillHeight = useSharedValue(isComplete ? 1 : 0);
 
-  // Gradient lines for terminal states (using Rect with rounded corners for proper caps)
+  useEffect(() => {
+    const target = lineType === 'complete' ? 1 : 0;
+    fillHeight.value =
+      delayMs > 0
+        ? withDelay(delayMs, withTiming(target, LINE_TIMING))
+        : withTiming(target, LINE_TIMING);
+  }, [lineType, delayMs, fillHeight]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    height: `${fillHeight.value * 100}%`,
+  }));
+
+  // Gradient lines for terminal states
   if (lineType === 'expired-gradient' || lineType === 'rolled-back-gradient') {
     const endColor = lineType === 'expired-gradient' ? redColor : orangeColor;
     return (
-      <Svg width={lineWidth} height={lineHeight} style={{ marginVertical: 4 }}>
+      <Svg width={LINE_WIDTH} height={LINE_HEIGHT} style={{ marginVertical: 4 }}>
         <Defs>
           <LinearGradient id={`gradient-${lineType}`} x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor={greenColor} />
@@ -500,30 +441,40 @@ function TimelineLine({
         <Rect
           x={0}
           y={0}
-          width={lineWidth}
-          height={lineHeight}
-          rx={lineWidth / 2}
-          ry={lineWidth / 2}
+          width={LINE_WIDTH}
+          height={LINE_HEIGHT}
+          rx={LINE_WIDTH / 2}
+          ry={LINE_WIDTH / 2}
           fill={`url(#gradient-${lineType})`}
         />
       </Svg>
     );
   }
 
-  // Solid color lines
-  const color = lineType === 'complete' ? greenColor : greyColor;
+  // Animated solid line: grey background with green fill overlay
   return (
     <View
       style={{
-        width: lineWidth,
-        height: lineHeight,
-        backgroundColor: color,
-        borderRadius: lineWidth / 2,
+        width: LINE_WIDTH,
+        height: LINE_HEIGHT,
+        backgroundColor: greyColor,
+        borderRadius: LINE_WIDTH / 2,
         marginVertical: 4,
-      }}
-    />
+        overflow: 'hidden',
+      }}>
+      <Animated.View
+        style={[
+          {
+            width: LINE_WIDTH,
+            backgroundColor: greenColor,
+            borderRadius: LINE_WIDTH / 2,
+          },
+          fillStyle,
+        ]}
+      />
+    </View>
   );
-}
+});
 
 // Get card label (e.g., "MINT • AWAITING PAYMENT")
 const getCardLabel = (
@@ -787,26 +738,29 @@ export function HistoryEntryTimeline({
           const isFutureState =
             item.stepType === 'next-pending' || item.stepType === 'future-small';
 
-          // Calculate margin to align text with dot center
-          // Normal dots (14px): text needs -3px to align with center
-          // Small dots (6px): text needs more negative margin since dot is smaller
+          // Stagger: dot animates, then line fills, then next dot
+          const dotDelay = index * 300;
+          const lineDelay = dotDelay + 150;
+
           const contentMarginTop = item.stepType === 'future-small' ? -7 : -3;
 
           return (
-            <View key={`${item.state}-${index}`}>
+            <Animated.View key={item.state} entering={FadeInDown.delay(index * 60).duration(250)}>
               <HStack align="flex-start">
                 {/* Timeline Indicator Column */}
                 <VStack align="center" style={{ marginRight: 14 }}>
-                  <TimelineDot
-                    stepType={item.stepType}
+                  <AnimatedCheckpointDot
+                    type={timelineStepTypeToCheckpointDotType(item.stepType)}
+                    delayMs={dotDelay}
                     greenColor={greenColor}
                     redColor={redColor}
                     orangeColor={orangeColor}
                     greyColor={greyColor}
                   />
                   {lineType && (
-                    <TimelineLine
+                    <AnimatedTimelineLine
                       lineType={lineType}
+                      delayMs={lineDelay}
                       greenColor={greenColor}
                       redColor={redColor}
                       orangeColor={orangeColor}
@@ -843,7 +797,7 @@ export function HistoryEntryTimeline({
                   )}
                 </VStack>
               </HStack>
-            </View>
+            </Animated.View>
           );
         })}
       </View>

@@ -5,7 +5,7 @@
  * It is used by both standalone and flow-based route wrappers.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 import { router } from 'expo-router';
 
@@ -16,7 +16,6 @@ import { useReceive, useManager } from 'coco-cashu-react';
 import {
   HistoryEntryHeader,
   useTransactionSource,
-  useHistoryEntry,
   HistoryEntryRefresh,
   HistoryEntryTimeline,
   TransactionLocationSection,
@@ -40,6 +39,8 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
+import { useReceiveHistoryEntry } from '../hooks/useReceiveHistoryEntry';
+
 interface ReceiveTokenScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
   receiveHistoryEntry: ReceiveHistoryEntry | string | undefined;
@@ -56,14 +57,14 @@ export function ReceiveTokenScreen({
   const manager = useManager();
   const { isKnownMint } = useMintManagement();
   const [loading, setLoading] = useState(false);
-  const [isRedeemed, setIsRedeemed] = useState(false);
   const [isAlreadySpent, setIsAlreadySpent] = useState(false);
-  // Holds the real history entry id after redeem (for location lookup)
-  const [finalizedTransactionId, setFinalizedTransactionId] = useState<string | null>(null);
+  const paymentIdRef = useRef<string | null>(null);
 
-  // Use the generic history entry hook for parsing, state, and event subscription
-  const { entry: receiveHistoryEntry, error: parseError } =
-    useHistoryEntry<ReceiveHistoryEntry>(receiveHistoryEntryProp);
+  const {
+    entry: receiveHistoryEntry,
+    error: parseError,
+    finalizedTransactionId,
+  } = useReceiveHistoryEntry(receiveHistoryEntryProp);
   const sourceLabel = useTransactionSource(finalizedTransactionId ?? receiveHistoryEntry?.id);
   const mintInfo = useMintInfo(receiveHistoryEntry?.mintUrl);
 
@@ -88,14 +89,12 @@ export function ReceiveTokenScreen({
     return null;
   }, [receiveHistoryEntry?.token?.proofs]);
 
-  // Detect if this is a scan placeholder (created by useProcessPaymentString before redeem)
+  // Detect if this is a scan placeholder (created by useProcessPaymentString before redeem).
+  // When we have a real entry (from history:updated or resolve), we're redeemed.
   const isScanPlaceholder = receiveHistoryEntry?.id?.startsWith('receive-') ?? false;
-  // A persisted receive history entry is already redeemed.
-  const isPersistedReceive = !isScanPlaceholder;
-  const effectiveIsRedeemed = isPersistedReceive || isRedeemed;
+  const effectiveIsRedeemed = !isScanPlaceholder;
   const effectiveIsAlreadySpent = !effectiveIsRedeemed && isAlreadySpent;
-  // Entry is finalized if it's a real history entry (not scan placeholder) or has been redeemed
-  const isFinalizedReceive = isPersistedReceive || effectiveIsRedeemed;
+  const isFinalizedReceive = effectiveIsRedeemed;
 
   // Determine local UI state for timeline.
   const receiveState = effectiveIsRedeemed
@@ -104,70 +103,25 @@ export function ReceiveTokenScreen({
       ? 'alreadySpent'
       : 'pending';
 
-  // Clear payment status when leaving so retries start fresh
+  // Clear payment status when leaving so retries start fresh. Uses a ref instead of
+  // receiveHistoryEntry?.id to avoid the cleanup firing when useReceiveHistoryEntry resolves
+  // the scan placeholder to the real entry (which changes the id and re-runs the effect).
   useEffect(() => {
+    const ref = paymentIdRef;
     return () => {
+      const pid = ref.current;
+      if (!pid) return;
       const store = usePaymentStatusStore.getState();
-      if (store.active?.id === receiveHistoryEntry?.id) {
+      const active = store.active;
+      if (
+        active?.id === pid &&
+        active?.variant === 'receive-ecash' &&
+        active?.state === 'processing'
+      ) {
         store.setActive(null);
       }
     };
-  }, [receiveHistoryEntry?.id]);
-
-  // Reconcile "already redeemed" state:
-  // - If this screen was opened from Transactions, the receive entry is persisted (non-placeholder id)
-  //   and should immediately render as redeemed.
-  // - If opened from a scan placeholder, try resolving to an already-linked/persisted receive entry.
-  useEffect(() => {
-    if (!receiveHistoryEntry) return;
-
-    if (isPersistedReceive) {
-      setIsRedeemed(true);
-      if (receiveHistoryEntry.id) {
-        setFinalizedTransactionId(receiveHistoryEntry.id);
-      }
-      return;
-    }
-
-    let cancelled = false;
-
-    const resolveExistingRedeem = async () => {
-      const rawToken = (receiveHistoryEntry.metadata as any)?.rawToken as string | undefined;
-      const processedToken = rawToken || tokenString;
-
-      // Search recent receive history entries for an exact token match.
-      if (!tokenString) return;
-      try {
-        const recent = await manager.history.getPaginatedHistory(0, 200);
-        const matchingReceive = recent.find((entry) => {
-          if (entry.type !== 'receive' || !entry.token) return false;
-          try {
-            return manager.wallet.encodeToken(entry.token) === tokenString;
-          } catch {
-            return false;
-          }
-        });
-
-        if (!matchingReceive?.id || cancelled) return;
-
-        setFinalizedTransactionId(matchingReceive.id);
-        setIsRedeemed(true);
-
-        // Persist link for future quick lookups.
-        if (processedToken) {
-          useScanHistoryStore.getState().linkTransaction(processedToken, matchingReceive.id);
-        }
-      } catch (error) {
-        console.error('Failed to resolve existing redeemed token:', error);
-      }
-    };
-
-    resolveExistingRedeem();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [receiveHistoryEntry, isPersistedReceive, tokenString, manager]);
+  }, []);
 
   // Show error state if parsing failed
   if (parseError || !receiveHistoryEntry) {
@@ -178,10 +132,6 @@ export function ReceiveTokenScreen({
       />
     );
   }
-
-  const handleCancel = () => {
-    onNavigateBack();
-  };
 
   const handleRedeem = async () => {
     setLoading(true);
@@ -202,6 +152,9 @@ export function ReceiveTokenScreen({
       const unit = receiveHistoryEntry.unit ?? 'sat';
       const mintUrl = receiveHistoryEntry.mintUrl;
       const id = receiveHistoryEntry.id;
+
+      // Track the payment ID for cleanup — must be set before showing the toast
+      paymentIdRef.current = id;
 
       // Clear any stale failed state so retry shows fresh pending (avoids "goes straight to error")
       const store = usePaymentStatusStore.getState();
@@ -272,13 +225,13 @@ export function ReceiveTokenScreen({
         if (rawToken || tokenString) {
           useScanHistoryStore.getState().linkTransaction(rawToken || tokenString, realEntry.id);
         }
-
-        // Store the real transaction id for location section lookup
-        setFinalizedTransactionId(realEntry.id);
       }
 
-      setIsRedeemed(true);
-      onRedeemSuccess?.();
+      // useReceiveHistoryEntry will update entry/finalizedTransactionId when history:updated fires.
+      // usePaymentStatusListener's receive:created handler confirms the toast automatically.
+
+      // Defer navigation so the timeline and toast can render the final state before dismissal.
+      setTimeout(() => onRedeemSuccess?.(), 0);
     } catch (error) {
       console.error(error);
       const store = usePaymentStatusStore.getState();
@@ -332,7 +285,7 @@ export function ReceiveTokenScreen({
           {
             text: 'Cancel',
             variant: 'secondary',
-            onPress: async () => handleCancel(),
+            onPress: async () => onNavigateBack(),
             condition: !effectiveIsRedeemed && !effectiveIsAlreadySpent,
           },
           {

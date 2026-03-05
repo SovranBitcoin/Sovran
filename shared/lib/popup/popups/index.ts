@@ -73,6 +73,7 @@ export {
   invalidPaymentRequestPopup,
   sendPaymentFailedPopup,
   cancelTransactionFailedPopup,
+  quoteCreationFailedPopup,
   operationNotFoundPopup,
   couldNotCancelPopup,
   operationInvalidStatePopup,

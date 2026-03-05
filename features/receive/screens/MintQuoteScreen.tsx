@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { Share } from 'react-native';
 
 import * as Clipboard from 'expo-clipboard';
+import { router } from 'expo-router';
 
 import type { MintHistoryEntry } from 'coco-cashu-core';
 
@@ -52,7 +53,7 @@ export function MintQuoteScreen({
   const mintInfo = useMintInfo(currentTransaction?.mintUrl);
 
   if (parseError) {
-    return <ScreenErrorState message={parseError} onGoBack={() => {}} />;
+    return <ScreenErrorState message={parseError} onGoBack={() => router.back()} />;
   }
 
   if (!currentTransaction) {

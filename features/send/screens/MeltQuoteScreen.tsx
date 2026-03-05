@@ -10,7 +10,6 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Alert } from 'react-native';
 
 import type { MeltQuoteBolt11Response } from '@cashu/cashu-ts';
 import { MeltHistoryEntry } from 'coco-cashu-core';
@@ -25,7 +24,12 @@ import {
   TransactionLocationSection,
 } from '@/features/transactions';
 import { getLightningTimestamp, requestInvoiceFromLnurl } from '@/shared/lib/cashu/utils';
-import { paymentCancelledPopup, couldNotCancelPopup, paymentStatusPopup } from '@/shared/lib/popup';
+import {
+  paymentCancelledPopup,
+  couldNotCancelPopup,
+  paymentStatusPopup,
+  quoteCreationFailedPopup,
+} from '@/shared/lib/popup';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useMeltWithHistory } from '@/features/send';
 import { useBeforeRemoveCleanup } from '@/shared/hooks/useBeforeRemoveCleanup';
@@ -295,7 +299,7 @@ export function MeltQuoteScreen({
         }
       } catch (err) {
         console.error('Failed to create quote with new mint:', err);
-        Alert.alert('Error', 'Failed to create quote with selected mint');
+        quoteCreationFailedPopup({ text: err instanceof Error ? err.message : undefined });
       }
     }
   };

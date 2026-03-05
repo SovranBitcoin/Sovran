@@ -79,6 +79,15 @@ export function noLightningAddressPopup(): void {
   });
 }
 
+export function quoteCreationFailedPopup(overrides?: TextOverrides): void {
+  popup({
+    message: 'Failed to create quote',
+    icon: 'icon:mdi:file-alert-outline',
+    type: 'error',
+    ...overrides,
+  });
+}
+
 export function noPaymentRequestPopup(): void {
   popup({
     message: 'No payment request provided',
