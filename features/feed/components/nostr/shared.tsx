@@ -84,7 +84,6 @@ export type RelayMessage =
 // ============================================================================
 
 export const SCREEN_WIDTH = Dimensions.get('window').width;
-export const CONTENT_WIDTH = SCREEN_WIDTH;
 
 export const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
 export const DEFAULT_METRICS: NoteMetrics = Object.freeze({

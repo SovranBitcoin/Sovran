@@ -16,4 +16,4 @@ export { parsePaymentError } from './parsePaymentError';
 export type { PopupTextSegment } from './format';
 export { resolvePopupIcon } from './icons';
 export type { PopupIcon } from './icons';
-export * from './popups';
+export * from './popups/index';

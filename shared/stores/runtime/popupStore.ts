@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ReactNode } from 'react';
 import type { PopupIcon, PopupTextSegment } from '@/shared/lib/popup';
-import type { LiveSheetConfig, LiveSheetStatus } from '@/shared/lib/popup/bridge';
+import type { LiveSheetConfig, LiveSheetStatus } from '@/shared/lib/popup/liveSheetTypes';
 import type { ActionSheetPayloads } from '@/shared/lib/popup/actionSheetTypes';
 
 export type SheetButton = {

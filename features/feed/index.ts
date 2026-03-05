@@ -15,5 +15,4 @@ export {
   getFollowerPicture,
   type TopFollower,
 } from './hooks/useNostrProfile';
-export type { FeedEvent, NoteMetrics } from './components/note/shared';
 export type { VideoPostRecord } from './components/note/shared';

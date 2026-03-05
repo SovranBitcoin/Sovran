@@ -10,7 +10,6 @@
 import React, { useCallback } from 'react';
 import { TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
 import { TransactionsScreen, useTransactionsFilter } from '@/features/transactions';
 import { HistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -170,4 +169,4 @@ function TransactionsRoute() {
   );
 }
 
-export default withSheetProvider(TransactionsRoute);
+export default TransactionsRoute;

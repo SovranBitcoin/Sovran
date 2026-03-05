@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
 import { ReceiveScreen, getFormattedReceiveTitle } from '@/features/receive';
 
 const EcashLightningReceiver = () => {
@@ -46,4 +45,4 @@ const EcashLightningReceiver = () => {
   );
 };
 
-export default withSheetProvider(EcashLightningReceiver);
+export default EcashLightningReceiver;

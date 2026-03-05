@@ -51,6 +51,7 @@ const IGNORE_DIRS = new Set([
   'coverage',
   'screenshots-output',
   '.cursor',
+  'heroui-native',
 ]);
 
 const IGNORE_FILES = new Set(['package-lock.json', 'yarn.lock']);

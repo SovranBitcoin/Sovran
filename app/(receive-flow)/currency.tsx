@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
 import { CurrencyScreen, useProcessPaymentString } from '@/features/send';
 import { WalletHeaderTitle } from '@/features/wallet';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -107,4 +106,4 @@ function ModalScreen() {
   );
 }
 
-export default withSheetProvider(ModalScreen);
+export default ModalScreen;

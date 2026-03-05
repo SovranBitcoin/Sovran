@@ -17,5 +17,5 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],
-  "exclude": ["sovran.money/**", "coco/**", "eNuts/**"]
+  "exclude": ["sovran.money/**", "coco/**", "eNuts/**", "heroui-native/**"]
 }

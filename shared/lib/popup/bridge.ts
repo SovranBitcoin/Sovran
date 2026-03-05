@@ -5,6 +5,7 @@ import type { PopupTextSegment } from './format';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import type { ActionSheetPayloads } from './actionSheetTypes';
 import { CompactToast } from './CompactToast';
+import type { LiveSheetConfig } from './liveSheetTypes';
 
 export type { ActionSheetPayloads } from './actionSheetTypes';
 
@@ -35,19 +36,6 @@ export type CustomToastConfig = {
   ) => React.ReactElement;
   duration?: number | 'persistent';
   onHide?: () => void;
-};
-
-export type LiveSheetStatus = 'pending' | 'confirmed' | 'failed';
-
-export type LiveSheetConfig = {
-  /** Returns current display values. Called on subscribe notify. */
-  get: () => Partial<
-    Pick<SheetConfig, 'submessage' | 'icon' | 'message' | 'duration' | 'buttons'> & {
-      status?: LiveSheetStatus;
-    }
-  >;
-  /** Subscribe to data changes. Return unsubscribe. */
-  subscribe: (onUpdate: () => void) => () => void;
 };
 
 export type SheetConfig = {

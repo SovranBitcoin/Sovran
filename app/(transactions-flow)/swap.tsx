@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { useLocalSearchParams, Stack } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
 import { SwapTransactionScreen } from '@/features/transactions';
 
 function ModalScreen() {
@@ -20,4 +19,4 @@ function ModalScreen() {
   );
 }
 
-export default withSheetProvider(ModalScreen);
+export default ModalScreen;

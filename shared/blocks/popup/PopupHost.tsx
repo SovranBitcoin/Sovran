@@ -39,7 +39,7 @@ import {
   EmojiPickerContent,
   ProfileSwitcherContent,
 } from '@/shared/lib/popup/sheets';
-import { IMPORT_NSEC_LABEL } from '@/shared/lib/popup/sheets/profileSwitcher/constants';
+import { IMPORT_NSEC_LABEL } from '@/shared/lib/popup/sheets/profile-switcher/constants';
 import type {
   CustomSheetFooterConfig,
   CustomSheetPage,

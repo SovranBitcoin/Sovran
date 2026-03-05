@@ -1,11 +1,6 @@
 import type { ReactNode } from 'react';
-import {
-  showToast,
-  showSheet,
-  type ToastConfig,
-  type SheetConfig,
-  type LiveSheetConfig,
-} from './bridge';
+import { showToast, showSheet, type ToastConfig, type SheetConfig } from './bridge';
+import type { LiveSheetConfig } from './liveSheetTypes';
 import type { PopupIcon } from './icons';
 import type { PopupTextSegment } from './format';
 import { flattenSegments } from './format';

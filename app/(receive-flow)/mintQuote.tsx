@@ -6,7 +6,6 @@
 
 import React from 'react';
 import { useLocalSearchParams, Stack } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
 import type { MintHistoryEntry } from 'coco-cashu-core';
 import { MintQuoteScreen, getFormattedMintQuoteTitle } from '@/features/receive';
 
@@ -26,4 +25,4 @@ function ModalScreen() {
   );
 }
 
-export default withSheetProvider(ModalScreen);
+export default ModalScreen;

@@ -11,6 +11,7 @@
     "targets/**",
     "coco/**",
     "eNuts/**",
+    "heroui-native/**",
     "node_modules/**"
   ],
   "ignoreDependencies": [
@@ -25,12 +26,25 @@
   "ignoreBinaries": ["eas", "maestro"],
   "ignoreIssues": {
     "features/feed/components/nostr/**": ["exports", "types", "duplicates"],
+    "features/feed/components/note/**": ["exports", "types", "duplicates"],
+    "features/feed/components/image-overlay/**": ["exports", "types"],
     "features/feed/components/UserFeed.tsx": ["exports", "types"],
+    "features/feed/index.ts": ["exports"],
+    "features/auth/**": ["exports"],
+    "features/health/**": ["exports", "types"],
+    "features/mint/**": ["exports", "types"],
+    "features/settings/**": ["exports"],
+    "features/transactions/**": ["exports"],
+    "features/user/**": ["exports"],
+    "features/wallet/**": ["exports"],
     "features/wallet/lib/walletHeader.ts": ["exports"],
+    "assets/icons/**": ["exports"],
     "shared/lib/nfc/**": ["exports", "types"],
+    "shared/lib/popup/**": ["exports"],
+    "shared/lib/debug/**": ["exports", "types"],
     "shared/stores/profile/nostrSocialStore.ts": ["exports"],
-    "features/mint/components/rebalance/demoRunner.ts": ["files"],
-    "shared/lib/popup/popups.ts": ["exports"],
-    "shared/lib/nostr/secureStorage.ts": ["exports"]
+    "shared/stores/runtime/**": ["exports", "types"],
+    "shared/lib/nostr/secureStorage.ts": ["exports"],
+    "features/mint/components/rebalance/demoRunner.ts": ["files"]
   }
 }

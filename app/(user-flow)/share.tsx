@@ -7,7 +7,6 @@
 
 import React, { useCallback, useState } from 'react';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
 import { ShareScreen, SHARE_CONFIGS, ShareType } from '@/features/user';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -48,4 +47,4 @@ function SharePage() {
   );
 }
 
-export default withSheetProvider(SharePage);
+export default SharePage;

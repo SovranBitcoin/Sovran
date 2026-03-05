@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { TouchableOpacity } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -43,4 +42,4 @@ function ShareRoute() {
   );
 }
 
-export default withSheetProvider(ShareRoute);
+export default ShareRoute;

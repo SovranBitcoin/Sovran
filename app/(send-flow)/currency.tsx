@@ -8,7 +8,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Alert, TouchableOpacity } from 'react-native';
-import { withSheetProvider } from 'hocs/withSheetProvider';
 import { CurrencyScreen, useProcessPaymentString } from '@/features/send';
 import { WalletHeaderTitle } from '@/features/wallet';
 import Icon from 'assets/icons';
@@ -185,4 +184,4 @@ function ModalScreen() {
   );
 }
 
-export default withSheetProvider(ModalScreen);
+export default ModalScreen;

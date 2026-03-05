@@ -13,7 +13,6 @@
 import React, { useCallback } from 'react';
 import { Alert } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
 import { MintListScreen } from '@/features/mint';
 import { useMeltWithHistory } from '@/features/send';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
@@ -132,4 +131,4 @@ function MintSelectRoute() {
   );
 }
 
-export default withSheetProvider(MintSelectRoute);
+export default MintSelectRoute;
