@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { BottomSheetFooter } from '@gorhom/bottom-sheet';
 import { BottomSheet, Button, useToast } from 'heroui-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import {
   type StandardSheetPayload,
   type CustomSheetPayload,
 } from '@/shared/stores/runtime/popupStore';
+import { blendColors, sanitizeColor } from '@/shared/lib/colorExtraction';
 import {
   registerToast,
   resolvePopupIcon,
@@ -19,17 +20,20 @@ import {
   type PopupTextSegment,
   type ActionSheetPayloads,
 } from '@/shared/lib/popup';
+import type { SharedValue } from 'react-native-reanimated';
 import Animated, {
+  Easing,
   SlideInLeft,
   SlideInRight,
   SlideOutLeft,
   SlideOutRight,
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
   cancelAnimation,
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   ButtonHandlerContent,
   EmojiPickerContent,
@@ -87,10 +91,103 @@ function DurationBar({ duration }: { duration: number }) {
   );
 }
 
-function SubmessageRenderer({ submessage }: { submessage: StandardSheetPayload['submessage'] }) {
+type ConfirmedAnimation = {
+  progress: SharedValue<number>;
+  colorFrom: string;
+  colorTo: string;
+};
+
+/** Sanitize a RN style object, stripping spurious "px" units from string values. */
+function sanitizeStyle(style: Record<string, unknown>): ViewStyle {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(style)) {
+    result[key] = typeof value === 'string' && value.includes('px') ? sanitizeColor(value) : value;
+  }
+  return result as ViewStyle;
+}
+
+function LiveSheetBackground({
+  style,
+  pointerEvents,
+  animatedStyle,
+}: {
+  style?: ViewStyle;
+  pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
+  animatedIndex?: unknown;
+  animatedPosition?: unknown;
+  animatedStyle: ViewStyle;
+}) {
+  const sanitized = style
+    ? sanitizeStyle(StyleSheet.flatten(style) as Record<string, unknown>)
+    : {};
+  return (
+    <Animated.View
+      pointerEvents={pointerEvents}
+      accessible
+      accessibilityRole="adjustable"
+      accessibilityLabel="Bottom Sheet"
+      style={[sanitized as ViewStyle, animatedStyle]}
+    />
+  );
+}
+
+function LiveSheetHandle({
+  style,
+  indicatorStyle,
+  animatedStyle,
+}: {
+  style?: ViewStyle;
+  indicatorStyle?: ViewStyle;
+  animatedStyle: ViewStyle;
+}) {
+  return (
+    <View style={[style, { padding: 10 }]}>
+      <Animated.View
+        style={[
+          { alignSelf: 'center', width: 36, height: 4, borderRadius: 4 } as ViewStyle,
+          indicatorStyle,
+          animatedStyle,
+        ]}
+      />
+    </View>
+  );
+}
+
+function AnimatedSubmessage({
+  submessage,
+  animation,
+}: {
+  submessage: string;
+  animation: ConfirmedAnimation;
+}) {
+  const animatedStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      animation.progress.get(),
+      [0, 1],
+      [animation.colorFrom, animation.colorTo]
+    ),
+  }));
+
+  return (
+    <Animated.Text style={[{ textAlign: 'center' }, animatedStyle]} className="text-sm">
+      {submessage}
+    </Animated.Text>
+  );
+}
+
+function SubmessageRenderer({
+  submessage,
+  animation,
+}: {
+  submessage: StandardSheetPayload['submessage'];
+  animation?: ConfirmedAnimation;
+}) {
   if (!submessage) return null;
 
   if (typeof submessage === 'string') {
+    if (animation) {
+      return <AnimatedSubmessage submessage={submessage} animation={animation} />;
+    }
     return <BottomSheet.Description className="text-center">{submessage}</BottomSheet.Description>;
   }
 
@@ -162,6 +259,7 @@ function SheetContent({
   activeCustomPage,
   close,
   openCycle,
+  confirmedAnimation,
   profileRoute,
   profileNavDirection,
   customNavDirection,
@@ -176,6 +274,7 @@ function SheetContent({
   activeCustomPage: CustomSheetPage | null;
   close: () => void;
   openCycle: number;
+  confirmedAnimation?: ConfirmedAnimation;
   profileRoute: ProfileRoute;
   profileNavDirection: ProfileNavDirection;
   customNavDirection: CustomSheetNavDirection;
@@ -192,6 +291,19 @@ function SheetContent({
   const isCustom = isCustomSheetPayload(payload);
   const standardPayload = !isCustom ? (payload as StandardSheetPayload | null) : null;
   const showDuration = standardPayload?.duration != null && standardPayload.duration > 0;
+  const hasLiveStatus = standardPayload?.status != null;
+
+  const titleAnimatedStyle = useAnimatedStyle(() =>
+    confirmedAnimation
+      ? {
+          color: interpolateColor(
+            confirmedAnimation.progress.get(),
+            [0, 1],
+            [confirmedAnimation.colorFrom, confirmedAnimation.colorTo]
+          ),
+        }
+      : {}
+  );
 
   if (!payload) return <View />;
 
@@ -239,14 +351,19 @@ function SheetContent({
   }
 
   return (
-    <>
-      <View className="items-center gap-2 px-1 pb-1">
-        <View key={`sheet-icon-${openCycle}`}>{resolvePopupIcon(standardPayload?.icon, 88)}</View>
+    <View className="items-center gap-2 px-1 pb-1">
+      <View key={`sheet-icon-${openCycle}`}>{resolvePopupIcon(standardPayload?.icon, 88)}</View>
+      {hasLiveStatus ? (
+        <Animated.Text
+          style={[{ textAlign: 'center', fontSize: 18, fontWeight: '600' }, titleAnimatedStyle]}>
+          {standardPayload?.message || ''}
+        </Animated.Text>
+      ) : (
         <BottomSheet.Title className="text-center">
           {standardPayload?.message || ''}
         </BottomSheet.Title>
-        <SubmessageRenderer submessage={standardPayload?.submessage} />
-      </View>
+      )}
+      <SubmessageRenderer submessage={standardPayload?.submessage} animation={confirmedAnimation} />
 
       {(standardPayload?.buttons?.length ?? 0) > 0 ? (
         <View className="mt-4 gap-2">
@@ -254,22 +371,26 @@ function SheetContent({
             <Button
               key={`${button.text}-${index}`}
               variant={index === 0 ? 'primary' : 'tertiary'}
-              onPress={() => {
+              className={hasLiveStatus ? 'bg-foreground' : undefined}
+              feedbackVariant={hasLiveStatus ? 'scale' : undefined}
+              onPress={async () => {
                 if (button.onPress) {
-                  button.onPress();
+                  await button.onPress();
                 } else if (button.page) {
                   router.navigate(`/${button.page}` as any);
                 }
                 close();
               }}>
-              <Button.Label>{button.text}</Button.Label>
+              <Button.Label className={hasLiveStatus ? 'text-overlay' : undefined}>
+                {button.text}
+              </Button.Label>
             </Button>
           ))}
         </View>
       ) : null}
 
       {showDuration ? <DurationBar duration={standardPayload!.duration!} /> : null}
-    </>
+    </View>
   );
 }
 
@@ -278,6 +399,7 @@ function SheetPopup() {
   const current = usePopupStore((s) => s.current);
   const isOpen = usePopupStore((s) => s.isOpen);
   const close = usePopupStore((s) => s.close);
+  const update = usePopupStore((s) => s.update);
 
   const lastPayloadRef = useRef<typeof current>(null);
   const wasOpenRef = useRef(false);
@@ -292,6 +414,13 @@ function SheetPopup() {
     }
     wasOpenRef.current = isOpen;
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !current || isCustomSheetPayload(current) || !current.live) return;
+    const { live } = current;
+    const unsubscribe = live.subscribe(() => update(live.get()));
+    return unsubscribe;
+  }, [isOpen, current, update]);
 
   const payload = current ?? lastPayloadRef.current;
   const isCustom = isCustomSheetPayload(payload);
@@ -341,6 +470,44 @@ function SheetPopup() {
     customRootSheetId === 'profile-switcher' || customRootSheetId === 'button-handler';
   const isProfileSwitcher = activeCustomPage?.sheetId === 'profile-switcher';
   const standardPayload = !isCustom ? (payload as StandardSheetPayload | null) : null;
+  const hasLiveStatus = standardPayload?.status != null;
+  const [foreground, overlay, success] = useThemeColor([
+    'foreground',
+    'overlay',
+    'success',
+  ] as const);
+  const confirmedProgress = useSharedValue(standardPayload?.status === 'confirmed' ? 1 : 0);
+
+  // Opaque muted green: blend overlay (card bg) with success. success-soft is transparent; we need solid.
+  const overlayColor = useMemo(() => sanitizeColor(String(overlay)), [overlay]);
+  const successMutedColor = useMemo(() => blendColors(overlay, success, 0.15), [overlay, success]);
+
+  useEffect(() => {
+    if (standardPayload?.status === 'confirmed') {
+      confirmedProgress.set(withTiming(1, { duration: 800, easing: Easing.out(Easing.ease) }));
+    } else if (hasLiveStatus) {
+      confirmedProgress.set(0);
+    }
+  }, [standardPayload?.status, hasLiveStatus, confirmedProgress]);
+
+  const confirmedAnimation: ConfirmedAnimation | undefined = hasLiveStatus
+    ? { progress: confirmedProgress, colorFrom: foreground, colorTo: success }
+    : undefined;
+
+  const liveBackgroundStyle = useAnimatedStyle(
+    () =>
+      hasLiveStatus
+        ? {
+            backgroundColor: interpolateColor(
+              confirmedProgress.get(),
+              [0, 1],
+              [overlayColor, successMutedColor]
+            ),
+          }
+        : {},
+    [hasLiveStatus, overlayColor, successMutedColor]
+  );
+
   const profileSnapPoints = useMemo(() => [...PROFILE_STYLE_SNAP_POINTS], []);
 
   const [profileStack, setProfileStack] = useState<ProfileRoute[]>(['profile-list']);
@@ -492,15 +659,29 @@ function SheetPopup() {
           enableDynamicSizing={isProfileStyleCustomShell ? false : undefined}
           enableOverDrag={isProfileStyleCustomShell ? false : undefined}
           footerComponent={isCustom ? renderCustomFooter : undefined}
-          handleComponent={isProfileStyleCustomShell ? () => null : undefined}
+          handleComponent={
+            isProfileStyleCustomShell
+              ? () => null
+              : hasLiveStatus
+                ? (props: any) => <LiveSheetHandle {...props} animatedStyle={liveBackgroundStyle} />
+                : undefined
+          }
           className={isProfileStyleCustomShell ? undefined : 'mx-4'}
           backgroundClassName={isProfileStyleCustomShell ? 'bg-background' : 'rounded-[32px]'}
+          backgroundComponent={
+            hasLiveStatus
+              ? (props: any) => (
+                  <LiveSheetBackground {...props} animatedStyle={liveBackgroundStyle} />
+                )
+              : undefined
+          }
           contentContainerClassName={isProfileStyleCustomShell ? 'h-full pt-2' : undefined}>
           <SheetContent
             payload={payload}
             activeCustomPage={activeCustomPage}
             close={close}
             openCycle={openCycle}
+            confirmedAnimation={confirmedAnimation}
             profileRoute={profileRoute}
             profileNavDirection={profileNavDirection}
             customNavDirection={customNavDirection}

@@ -41,6 +41,7 @@ import { CocoProvider } from '@/shared/providers/CocoProvider';
 import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useAppBalance } from '@/features/wallet';
+import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
@@ -102,6 +103,12 @@ function AccountScopedProviders({
   );
 
   return <InnerProviders>{children}</InnerProviders>;
+}
+
+/** Subscribes to coco mint-quote events and shows payment status sheet for NPC payments */
+function PaymentStatusListener() {
+  usePaymentStatusListener();
+  return null;
 }
 
 /** Invisible component that syncs the live balance to the profile store for the active profile */
@@ -221,6 +228,7 @@ function RootLayoutContent() {
 
   return (
     <NavigationThemeProvider value={DarkTheme}>
+      <PaymentStatusListener />
       <ProfileBalanceSync />
       <ProfileMetadataSync />
       <StatusBar

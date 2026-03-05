@@ -203,8 +203,8 @@ export function ButtonHandler({
    * Handles "More" button press for overflow actions
    *
    * @description
-   * Manages overflow button behavior. If exactly 3 buttons, executes the third.
-   * Otherwise, opens the button-handler sheet with all visible buttons.
+   * Manages overflow button behavior. If 3 or fewer visible buttons, executes
+   * the third directly. Otherwise, opens the button-handler sheet.
    *
    * **Process:** Check button count → execute third button or open sheet
    * **Effects:** Either executes action or opens overflow sheet
@@ -215,7 +215,11 @@ export function ButtonHandler({
    * handleMorePress() // Executes third button or opens sheet
    */
   const handleMorePress = async () => {
-    buttonHandlerPopup({ buttons: visibleButtons });
+    if (visibleButtons.length <= 3) {
+      await handleButtonPress(visibleButtons[2]);
+    } else {
+      buttonHandlerPopup({ buttons: visibleButtons });
+    }
   };
 
   return (

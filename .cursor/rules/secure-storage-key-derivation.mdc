@@ -73,6 +73,8 @@ Imported nsec is stored securely at SecureStore key `imported_nsec_<pubkeyHex>`.
 
 Duplicate protection: before import, check all existing profile pubkeys. Reject if the identity already exists in any profile (derived or imported).
 
+**Must use npubNumber for imported profiles**: For any imported profile, the `accountIndex` stored in the profile entry and used for DB naming, SecureStore keys (`cashu_mnemonic_{n}`, `migrations_complete_{n}`), and profile-scoped storage MUST be the npubNumber from `pubkeyToAccountNumber(pubkeyHex)`. Never use a sequential index (0, 1, 2...) for imported profiles — that would collide with derived profiles and corrupt data. When adding an imported profile: `addProfile(pubkeyToAccountNumber(pubkeyHex), pubkeyHex, 'imported')`.
+
 ## 1. Nostr Keys (NIP-06)
 
 ### What they are

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ReactNode } from 'react';
 import type { PopupIcon, PopupTextSegment } from '@/shared/lib/popup';
+import type { LiveSheetConfig, LiveSheetStatus } from '@/shared/lib/popup/bridge';
 import type { ActionSheetPayloads } from '@/shared/lib/popup/actionSheetTypes';
 
 export type SheetButton = {
@@ -18,6 +19,9 @@ export type StandardSheetPayload = {
   duration?: number;
   buttons?: SheetButton[];
   onClose?: (data: unknown) => void;
+  live?: LiveSheetConfig;
+  /** Set by live.get() for styling (e.g. animate to green when confirmed). */
+  status?: LiveSheetStatus;
 };
 
 /** Custom action sheet: sheetId + typed payload */
@@ -37,6 +41,7 @@ type PopupStore = {
   isOpen: boolean;
   open: (payload: SheetPayload) => void;
   close: () => void;
+  update: (partial: Partial<StandardSheetPayload>) => void;
 };
 
 export const usePopupStore = create<PopupStore>((set, get) => ({
@@ -44,6 +49,11 @@ export const usePopupStore = create<PopupStore>((set, get) => ({
   isOpen: false,
   open: (payload) => {
     set({ current: payload, isOpen: true });
+  },
+  update: (partial) => {
+    const { current } = get();
+    if (!current || isCustomSheetPayload(current)) return;
+    set({ current: { ...current, ...partial } });
   },
   close: () => {
     const { current } = get();

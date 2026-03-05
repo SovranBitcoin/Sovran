@@ -124,10 +124,10 @@ export class CocoManager {
     this.instance = null;
 
     try {
-      // 1. SQLite database
+      // 1. SQLite database (async to avoid blocking JS thread during profile switch)
       const dbName = this.getDbName();
       initLog('CocoManager', `opening DB: ${dbName}`);
-      const db = SQLite.openDatabaseSync(dbName);
+      const db = await SQLite.openDatabaseAsync(dbName);
       const repositories = new ExpoSqliteRepositories({ database: db });
       await repositories.init();
       initLog('CocoManager', 'DB + repos initialized');

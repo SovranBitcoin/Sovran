@@ -1,0 +1,177 @@
+/**
+ * Subscribes to coco events for payment status.
+ * Receive (mint): mint-quote:state-changed (PAID) or mint-quote:added (PAID) → mint-quote:redeemed.
+ * Receive (ecash): toast shown on redeem button → receive:created updates to confirmed.
+ * Send: send:finalized only (when recipient redeems, not when token is created).
+ * Melt: toast shown on confirm button → melt-op:finalized updates to confirmed.
+ */
+
+import { useEffect } from 'react';
+
+import { useManagerContext } from 'coco-cashu-react';
+
+import { paymentStatusPopup } from '@/shared/lib/popup';
+import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+
+export function usePaymentStatusListener(): void {
+  const { manager } = useManagerContext();
+
+  useEffect(() => {
+    if (!manager) return;
+
+    const offStateChanged = manager.on(
+      'mint-quote:state-changed',
+      async ({ mintUrl, quoteId, state }: { mintUrl: string; quoteId: string; state: string }) => {
+        if (state !== 'PAID') return;
+
+        const history = await manager.history.getPaginatedHistory(0, 100);
+        const entry = history.find(
+          (h) =>
+            h.type === 'mint' && 'quoteId' in h && h.quoteId === quoteId && h.mintUrl === mintUrl
+        );
+        if (!entry || !('amount' in entry)) return;
+
+        const amount = entry.amount ?? 0;
+        const unit = entry.unit ?? 'sat';
+
+        usePaymentStatusStore.getState().setActive({
+          variant: 'receive',
+          id: quoteId,
+          mintUrl,
+          amount,
+          unit,
+          state: 'processing',
+        });
+
+        paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
+      }
+    );
+
+    const offAdded = manager.on(
+      'mint-quote:added',
+      ({
+        mintUrl,
+        quoteId,
+        quote,
+      }: {
+        mintUrl: string;
+        quoteId: string;
+        quote: { state?: string; amount?: number; unit?: string };
+      }) => {
+        if (quote.state !== 'PAID') return;
+
+        const amount = quote.amount ?? 0;
+        const unit = quote.unit ?? 'sat';
+
+        usePaymentStatusStore.getState().setActive({
+          variant: 'receive',
+          id: quoteId,
+          mintUrl,
+          amount,
+          unit,
+          state: 'processing',
+        });
+
+        paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
+      }
+    );
+
+    const offRedeemed = manager.on('mint-quote:redeemed', ({ quoteId }: { quoteId: string }) => {
+      usePaymentStatusStore.getState().setConfirmed(quoteId);
+    });
+
+    const offReceiveCreated = manager.on(
+      'receive:created',
+      async ({ mintUrl, token }: { mintUrl: string; token: { proofs: { amount: number }[] } }) => {
+        const amount = token.proofs.reduce((acc, p) => acc + p.amount, 0);
+        const store = usePaymentStatusStore.getState();
+        const hadPending =
+          store.active?.variant === 'receive-ecash' &&
+          store.active?.amount === amount &&
+          store.active?.mintUrl === mintUrl;
+
+        if (hadPending && store.active) {
+          // Brief delay so HistoryService.handleReceiveCreated can persist the entry
+          await new Promise((r) => setTimeout(r, 50));
+          const history = await manager.history.getPaginatedHistory(0, 20);
+          const realEntry = history.find(
+            (h) => h.type === 'receive' && h.amount === amount && h.mintUrl === mintUrl
+          );
+          if (realEntry?.id) {
+            store.setConfirmed(store.active.id, { receiveEntryId: realEntry.id });
+          }
+        }
+      }
+    );
+
+    const offSendFinalized = manager.on(
+      'send:finalized',
+      ({
+        mintUrl,
+        operationId,
+        operation,
+      }: {
+        mintUrl: string;
+        operationId: string;
+        operation: { amount: number };
+      }) => {
+        const amount = operation.amount;
+        const unit = 'sat';
+
+        usePaymentStatusStore.getState().setActive({
+          variant: 'send',
+          id: operationId,
+          mintUrl,
+          amount,
+          unit,
+          state: 'confirmed',
+        });
+
+        paymentStatusPopup({ variant: 'send', id: operationId, mintUrl, amount, unit });
+      }
+    );
+
+    const offMeltFinalized = manager.on(
+      'melt-op:finalized',
+      ({ mintUrl, operationId, operation }) => {
+        if (!('quoteId' in operation) || !('amount' in operation)) return;
+        const store = usePaymentStatusStore.getState();
+        const hadPending =
+          store.active?.id === operation.quoteId && store.active?.state === 'processing';
+
+        if (hadPending) {
+          store.setConfirmed(operation.quoteId, { operationId });
+        } else {
+          const amount = operation.amount;
+          const unit = 'sat';
+          store.setActive({
+            variant: 'melt',
+            id: operation.quoteId,
+            mintUrl,
+            amount,
+            unit,
+            state: 'confirmed',
+          });
+
+          paymentStatusPopup({
+            variant: 'melt',
+            id: operation.quoteId,
+            mintUrl,
+            amount,
+            unit,
+            operationId,
+          });
+        }
+      }
+    );
+
+    return () => {
+      offStateChanged();
+      offAdded();
+      offRedeemed();
+      offReceiveCreated();
+      offSendFinalized();
+      offMeltFinalized();
+    };
+  }, [manager]);
+}

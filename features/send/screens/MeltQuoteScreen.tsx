@@ -25,7 +25,8 @@ import {
   TransactionLocationSection,
 } from '@/features/transactions';
 import { getLightningTimestamp, requestInvoiceFromLnurl } from '@/shared/lib/cashu/utils';
-import { paymentCancelledPopup, couldNotCancelPopup, sendSuccessPopup } from '@/shared/lib/popup';
+import { paymentCancelledPopup, couldNotCancelPopup, paymentStatusPopup } from '@/shared/lib/popup';
+import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useMeltWithHistory } from '@/features/send';
 import { useBeforeRemoveCleanup } from '@/shared/hooks/useBeforeRemoveCleanup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
@@ -110,6 +111,17 @@ export function MeltQuoteScreen({
       lastQuoteMintRef.current = trackedHistoryEntry.mintUrl;
     }
   }, [trackedHistoryEntry?.mintUrl]);
+
+  // Clear payment status when leaving so retries start fresh
+  const quoteIdForCleanup = createdHistoryEntry?.quoteId ?? trackedHistoryEntry?.quoteId;
+  useEffect(() => {
+    return () => {
+      const store = usePaymentStatusStore.getState();
+      if (quoteIdForCleanup && store.active?.id === quoteIdForCleanup) {
+        store.setActive(null);
+      }
+    };
+  }, [quoteIdForCleanup]);
 
   // The history entry to display - prefer newly created (e.g., after mint change) over initial prop
   const currentTransaction = createdHistoryEntry || trackedHistoryEntry;
@@ -329,18 +341,49 @@ export function MeltQuoteScreen({
       throw new Error('No transaction or mint selected');
     }
 
-    // Use v3 two-step flow: if we have an operationId (created the quote ourselves),
-    // use executeMeltQuote. Otherwise (viewing existing transaction), use executeMeltByQuote.
-    if (createdOperationId && createdHistoryEntry?.quoteId === currentTransaction.quoteId) {
-      await executeMeltQuote(createdOperationId, currentTransaction.quoteId);
-    } else {
-      // For existing transactions, use executeMeltByQuote directly
-      await manager.quotes.executeMeltByQuote(mintUrlForPayment, currentTransaction.quoteId);
+    const amount = currentTransaction.amount ?? displayQuote?.amount ?? 0;
+    const unit = currentTransaction.unit ?? 'sat';
+    const quoteId = currentTransaction.quoteId;
+
+    // Clear any stale failed state so retry shows fresh pending
+    const store = usePaymentStatusStore.getState();
+    if (store.active?.id === quoteId && store.active?.state === 'failed') {
+      store.setActive(null);
     }
 
-    successRef.current = true;
-    // Show success popup and close modal after
-    sendSuccessPopup({ icon: 'emoji:🎉', onClose: onSendSuccess });
+    // Show pending toast immediately on confirm (before execute)
+    store.setActive({
+      variant: 'melt',
+      id: quoteId,
+      mintUrl: mintUrlForPayment,
+      amount,
+      unit,
+      state: 'processing',
+    });
+    paymentStatusPopup({
+      variant: 'melt',
+      id: quoteId,
+      mintUrl: mintUrlForPayment,
+      amount,
+      unit,
+      operationId: createdOperationId ?? undefined,
+    });
+
+    try {
+      // Use v3 two-step flow: if we have an operationId (created the quote ourselves),
+      // use executeMeltQuote. Otherwise (viewing existing transaction), use executeMeltByQuote.
+      if (createdOperationId && createdHistoryEntry?.quoteId === currentTransaction.quoteId) {
+        await executeMeltQuote(createdOperationId, currentTransaction.quoteId);
+      } else {
+        // For existing transactions, use executeMeltByQuote directly
+        await manager.quotes.executeMeltByQuote(mintUrlForPayment, currentTransaction.quoteId);
+      }
+      successRef.current = true;
+      onSendSuccess?.();
+    } catch (err) {
+      store.setFailed(quoteId, err);
+      throw err;
+    }
   };
 
   // Error states

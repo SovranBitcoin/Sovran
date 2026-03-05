@@ -82,6 +82,7 @@ import { writeTokenToNFC } from '@/shared/lib/nfc';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { convertTime } from '@/shared/lib/time';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
 
 // Default relay for payment requests
 const DEFAULT_PAYMENT_RELAY = 'wss://relay.vertexlab.io';
@@ -100,9 +101,9 @@ const FALLBACK_PAYMENT_RELAYS = [
  * update methods all key on (mintUrl, operationId), and NULL = NULL is false
  * in SQL, so they can never match these rows.
  *
- * We open the same coco.db directly and UPDATE by the row's primary key `id`,
+ * We open the account-specific coco DB and UPDATE by the row's primary key `id`,
  * then emit `history:updated` so usePaginatedHistory re-fetches from the
- * now-updated DB.
+ * now-updated DB. Uses openDatabaseAsync to avoid blocking the JS thread.
  */
 async function updateLegacyHistoryState(
   entry: SendHistoryEntry,
@@ -112,11 +113,14 @@ async function updateLegacyHistoryState(
 ) {
   if (!entry.id) return;
   try {
-    const db = SQLite.openDatabaseSync('coco.db');
-    db.runSync(`UPDATE coco_cashu_history SET state = ? WHERE id = ? AND type = 'send'`, [
+    const activeAccountIndex = useProfileStore.getState().activeAccountIndex;
+    const dbName = activeAccountIndex === 0 ? 'coco.db' : `coco-${activeAccountIndex}.db`;
+    const db = await SQLite.openDatabaseAsync(dbName);
+    await db.runAsync(
+      `UPDATE coco_cashu_history SET state = ? WHERE id = ? AND type = 'send'`,
       state,
-      Number(entry.id),
-    ]);
+      Number(entry.id)
+    );
     // Emit so the UI refreshes from the updated DB
     await manager.historyService.handleHistoryUpdated(mintUrl, { ...entry, state } as any);
   } catch (err) {

@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
-import { showToast, showSheet, type ToastConfig, type SheetConfig } from './bridge';
+import {
+  showToast,
+  showSheet,
+  type ToastConfig,
+  type SheetConfig,
+  type LiveSheetConfig,
+} from './bridge';
 import type { PopupIcon } from './icons';
 import type { PopupTextSegment } from './format';
 import { flattenSegments } from './format';
@@ -106,6 +112,7 @@ interface popupConfig {
   buttons?: MessageButton[];
   onClose?: (data: unknown) => void;
   type?: MessageType;
+  live?: LiveSheetConfig;
 }
 
 export const popup = (config: popupConfig | string) => {
@@ -147,7 +154,11 @@ export const popup = (config: popupConfig | string) => {
       duration: options.duration,
       buttons: resolvedButtons,
       onClose: options.onClose,
+      live: options.live,
     };
+    if (options.live) {
+      Object.assign(sheetConfig, options.live.get());
+    }
     showSheet(sheetConfig);
     return;
   }

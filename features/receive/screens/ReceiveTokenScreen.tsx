@@ -24,8 +24,9 @@ import {
 import {
   unsupportedTokenUnitPopup,
   receiveFailedPopup,
-  receiveSuccessPopup,
+  paymentStatusPopup,
 } from '@/shared/lib/popup';
+import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useMintManagement } from '@/features/mint';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
@@ -102,6 +103,16 @@ export function ReceiveTokenScreen({
     : effectiveIsAlreadySpent
       ? 'alreadySpent'
       : 'pending';
+
+  // Clear payment status when leaving so retries start fresh
+  useEffect(() => {
+    return () => {
+      const store = usePaymentStatusStore.getState();
+      if (store.active?.id === receiveHistoryEntry?.id) {
+        store.setActive(null);
+      }
+    };
+  }, [receiveHistoryEntry?.id]);
 
   // Reconcile "already redeemed" state:
   // - If this screen was opened from Transactions, the receive entry is persisted (non-placeholder id)
@@ -187,6 +198,34 @@ export function ReceiveTokenScreen({
         return;
       }
 
+      const amount = receiveHistoryEntry.amount;
+      const unit = receiveHistoryEntry.unit ?? 'sat';
+      const mintUrl = receiveHistoryEntry.mintUrl;
+      const id = receiveHistoryEntry.id;
+
+      // Clear any stale failed state so retry shows fresh pending (avoids "goes straight to error")
+      const store = usePaymentStatusStore.getState();
+      if (store.active?.id === id && store.active?.state === 'failed') {
+        store.setActive(null);
+      }
+
+      // Show pending toast immediately on redeem button
+      store.setActive({
+        variant: 'receive-ecash',
+        id,
+        mintUrl,
+        amount,
+        unit,
+        state: 'processing',
+      });
+      paymentStatusPopup({
+        variant: 'receive-ecash',
+        id,
+        mintUrl,
+        amount,
+        unit,
+      });
+
       await receive(tokenString);
 
       // If the token contained P2PK-locked proofs and the setting is enabled,
@@ -239,12 +278,18 @@ export function ReceiveTokenScreen({
       }
 
       setIsRedeemed(true);
-      receiveSuccessPopup(
-        { amount: receiveHistoryEntry.amount, unit: receiveHistoryEntry.unit },
-        { icon: 'emoji:🎉', onClose: onRedeemSuccess }
-      );
+      onRedeemSuccess?.();
     } catch (error) {
       console.error(error);
+      const store = usePaymentStatusStore.getState();
+      const hadPaymentToast =
+        store.active?.id === receiveHistoryEntry.id && store.active?.state === 'processing';
+      if (hadPaymentToast) {
+        store.setFailed(receiveHistoryEntry.id, error);
+        // Payment status toast shows failed state — do not show unrelated popup
+      } else {
+        receiveFailedPopup({ text: error instanceof Error ? error.message : undefined });
+      }
       const errorMessage = (error instanceof Error ? error.message : String(error)).toLowerCase();
       const tokenAlreadySpent =
         errorMessage.includes('token already spent') ||
@@ -253,7 +298,6 @@ export function ReceiveTokenScreen({
       if (tokenAlreadySpent) {
         setIsAlreadySpent(true);
       }
-      receiveFailedPopup({ text: error instanceof Error ? error.message : undefined });
     }
     setLoading(false);
   };

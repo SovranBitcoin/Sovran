@@ -16,6 +16,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { unstable_batchedUpdates } from 'react-native';
 import { StateStorage } from 'zustand/middleware';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
@@ -182,44 +183,46 @@ export async function rehydrateProfileStores(): Promise<void> {
   const { useNostrSocialStore } = await import('@/shared/stores/profile/nostrSocialStore');
   const { useNpcMintStore } = await import('@/shared/stores/profile/npcMintStore');
 
-  // Reset each store to its initial state.
+  // Reset each store to its initial state. Batched to reduce re-render cascade.
   // Skip persist writes so the empty reset state doesn't overwrite
   // the target profile's stored data before rehydrate() can read it.
   _skipPersistWrite = true;
   try {
-    useMintStore.setState({ selectedMints: {} });
-    useMintDistributionStore.setState({ distributions: {} });
-    useRoutstrStore.setState({
-      apiKey: null,
-      balance: null,
-      conversationHistory: [],
-      selectedModel: null,
-      modelsCache: null,
-      sessions: [],
-      currentSessionId: null,
-      isAnonymousMode: false,
-    });
-    useScanHistoryStore.setState({ entries: [] });
-    useSearchHistoryStore.setState({ recentSearches: {} });
-    useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} });
-    useTransactionLocationStore.setState({ locations: {} });
-    useNpcMintStore.setState({
-      mintUrls: {},
-      lastSyncedAt: {},
-      isSyncing: false,
-      isUpdating: false,
-    });
-    useNostrSocialStore.setState({
-      contactsTags: [],
-      contactsContent: '',
-      contactsUpdatedAt: 0,
-      followingPubkeys: {},
-      likesByEventId: {},
-      repostsByEventId: {},
-      deletedRepostOriginalIds: {},
-      optimisticFollowsByPubkey: {},
-      optimisticLikesByEventId: {},
-      optimisticRepostsByEventId: {},
+    unstable_batchedUpdates(() => {
+      useMintStore.setState({ selectedMints: {} });
+      useMintDistributionStore.setState({ distributions: {} });
+      useRoutstrStore.setState({
+        apiKey: null,
+        balance: null,
+        conversationHistory: [],
+        selectedModel: null,
+        modelsCache: null,
+        sessions: [],
+        currentSessionId: null,
+        isAnonymousMode: false,
+      });
+      useScanHistoryStore.setState({ entries: [] });
+      useSearchHistoryStore.setState({ recentSearches: {} });
+      useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} });
+      useTransactionLocationStore.setState({ locations: {} });
+      useNpcMintStore.setState({
+        mintUrls: {},
+        lastSyncedAt: {},
+        isSyncing: false,
+        isUpdating: false,
+      });
+      useNostrSocialStore.setState({
+        contactsTags: [],
+        contactsContent: '',
+        contactsUpdatedAt: 0,
+        followingPubkeys: {},
+        likesByEventId: {},
+        repostsByEventId: {},
+        deletedRepostOriginalIds: {},
+        optimisticFollowsByPubkey: {},
+        optimisticLikesByEventId: {},
+        optimisticRepostsByEventId: {},
+      });
     });
   } finally {
     _skipPersistWrite = false;

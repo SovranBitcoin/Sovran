@@ -6,6 +6,8 @@
  * Callers must provide resetStages/cancelResetStages from InitializationProvider
  * to reset the app shell during the transition.
  */
+import { InteractionManager } from 'react-native';
+
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { rehydrateProfileStores } from '@/shared/lib/cashu/profileScopedStorage';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -50,6 +52,10 @@ async function runProfileTransition(
       throw new Error(`Target profile does not exist: ${accountIndex}`);
     }
 
+    // Yield to let React flush, then wait for animations (e.g. drawer close) before rehydrating
+    await new Promise<void>((resolve) => {
+      InteractionManager.runAfterInteractions(() => resolve());
+    });
     await rehydrateProfileStores();
     return true;
   } catch (error) {
@@ -102,6 +108,10 @@ export async function createAndSwitchProfile({
       throw new Error(`Failed to activate newly-created profile: ${nextIndex}`);
     }
 
+    // Yield to let React flush, then wait for animations (e.g. drawer close) before rehydrating
+    await new Promise<void>((resolve) => {
+      InteractionManager.runAfterInteractions(() => resolve());
+    });
     await rehydrateProfileStores();
     return true;
   } catch (error) {

@@ -1,8 +1,10 @@
+import React from 'react';
 import type { ReactNode } from 'react';
 import type { PopupIcon } from './icons';
 import type { PopupTextSegment } from './format';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import type { ActionSheetPayloads } from './actionSheetTypes';
+import { CompactToast } from './CompactToast';
 
 export type { ActionSheetPayloads } from './actionSheetTypes';
 
@@ -27,6 +29,27 @@ export type ToastConfig = {
   onHide?: () => void;
 };
 
+export type CustomToastConfig = {
+  component: (
+    props: Record<string, unknown> & { hide: (ids?: string | string[] | 'all') => void }
+  ) => React.ReactElement;
+  duration?: number | 'persistent';
+  onHide?: () => void;
+};
+
+export type LiveSheetStatus = 'pending' | 'confirmed' | 'failed';
+
+export type LiveSheetConfig = {
+  /** Returns current display values. Called on subscribe notify. */
+  get: () => Partial<
+    Pick<SheetConfig, 'submessage' | 'icon' | 'message' | 'duration' | 'buttons'> & {
+      status?: LiveSheetStatus;
+    }
+  >;
+  /** Subscribe to data changes. Return unsubscribe. */
+  subscribe: (onUpdate: () => void) => () => void;
+};
+
 export type SheetConfig = {
   message: string;
   submessage?: ReactNode | PopupTextSegment[];
@@ -35,6 +58,7 @@ export type SheetConfig = {
   duration?: number;
   buttons?: { text: string; page?: string; onPress?: () => void }[];
   onClose?: (data: unknown) => void;
+  live?: LiveSheetConfig;
 };
 
 export function showToast(config: ToastConfig) {
@@ -44,9 +68,29 @@ export function showToast(config: ToastConfig) {
   }
 
   toastManagerRef.show({
-    variant: config.variant,
-    label: config.label,
-    description: config.description,
+    component: (props: Record<string, unknown>) =>
+      React.createElement(CompactToast, {
+        ...props,
+        variant: config.variant,
+        label: config.label,
+        description: config.description,
+      }),
+    duration: config.duration,
+    onHide: config.onHide,
+  });
+}
+
+export function showCustomToast(config: CustomToastConfig) {
+  if (!toastManagerRef) {
+    console.warn('popup: toast manager not registered yet');
+    return;
+  }
+
+  toastManagerRef.show({
+    component: (props: Record<string, unknown>) =>
+      config.component(
+        props as Record<string, unknown> & { hide: (ids?: string | string[] | 'all') => void }
+      ),
     duration: config.duration,
     onHide: config.onHide,
   });
@@ -54,6 +98,11 @@ export function showToast(config: ToastConfig) {
 
 export function showSheet(config: SheetConfig) {
   usePopupStore.getState().open(config);
+}
+
+/** Set duration (ms) on the current sheet. Starts auto-close timer. Call anytime while sheet is open. */
+export function setPopupDuration(ms: number): void {
+  usePopupStore.getState().update({ duration: ms });
 }
 
 export function showActionSheet<K extends keyof ActionSheetPayloads>(

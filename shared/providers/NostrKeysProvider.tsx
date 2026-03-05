@@ -7,6 +7,7 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
+import { InteractionManager } from 'react-native';
 import { useMnemonic } from '@/shared/hooks/useSecureStore';
 import {
   ensureMnemonicExists,
@@ -294,6 +295,11 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
             throw new Error('Failed to generate or retrieve mnemonic');
           }
         }
+
+        // Defer CPU-bound derivation until after animations (e.g. drawer close on profile switch)
+        await new Promise<void>((resolve) => {
+          InteractionManager.runAfterInteractions(() => resolve());
+        });
 
         initLog('NostrKeys', 'hashing mnemonic...');
         const mHash = hashMnemonic(mnemonicToUse);

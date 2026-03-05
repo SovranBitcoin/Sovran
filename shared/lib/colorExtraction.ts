@@ -36,6 +36,39 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
   };
 }
 
+/** Strip spurious "px" units that Uniwind sometimes injects into color values. */
+export function sanitizeColor(value: string): string {
+  return value.replace(/px/g, '');
+}
+
+/** Parse hex or rgba string to RGB. Returns null if unparseable. */
+function parseColorToRgb(color: string): { r: number; g: number; b: number } | null {
+  const cleaned = sanitizeColor(color);
+  if (cleaned.startsWith('#')) {
+    return hexToRgb(cleaned);
+  }
+  const rgba = cleaned.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (rgba) {
+    return {
+      r: parseInt(rgba[1]!, 10),
+      g: parseInt(rgba[2]!, 10),
+      b: parseInt(rgba[3]!, 10),
+    };
+  }
+  return null;
+}
+
+/** Blend two colors. amount 0 = base, 1 = accent. Returns opaque hex. */
+export function blendColors(base: string, accent: string, amount: number): string {
+  const a = parseColorToRgb(base);
+  const b = parseColorToRgb(accent);
+  if (!a || !b) return base.startsWith('#') ? base : '#1a1a1a';
+  const r = Math.round(a.r * (1 - amount) + b.r * amount);
+  const g = Math.round(a.g * (1 - amount) + b.g * amount);
+  const bVal = Math.round(a.b * (1 - amount) + b.b * amount);
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${bVal.toString(16).padStart(2, '0')}`;
+}
+
 function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
   r /= 255;
   g /= 255;
