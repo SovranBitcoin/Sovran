@@ -718,6 +718,23 @@ function getTopFolder(relPath, depth = 1) {
   return parts.slice(0, depth).join('/');
 }
 
+function isReexportLike(exp) {
+  return exp?.tag === 'reexport' || exp?.kind === 'reexport' || exp?.kind === 'type';
+}
+
+function isLikelyBarrelFile(fileNode) {
+  if (!fileNode || !/^index\.[jt]sx?$/.test(fileNode.name)) return false;
+  return (fileNode.exports || []).length > 0;
+}
+
+function isLikelyCompatibilitySurface(fileNode) {
+  if (!fileNode) return false;
+  const exports = fileNode.exports || [];
+  if (exports.length === 0) return false;
+  if (isLikelyBarrelFile(fileNode)) return true;
+  return (fileNode.loc?.code || 0) <= 20 && (fileNode.imports || []).length === 0;
+}
+
 // ─── 1. --fanin ──────────────────────────────────────────────────────────────
 
 function renderFanin(faninMap, fileToFolder) {
@@ -918,7 +935,9 @@ function renderOrphans(allFiles, faninMap) {
   const lines = [];
   lines.push('');
   lines.push('\x1b[1;36m══ Orphans: Files Never Imported ══\x1b[0m');
-  lines.push('\x1b[2mFiles with zero inbound edges (excluding app/ route entry points)\x1b[0m');
+  lines.push(
+    '\x1b[2mFiles with zero inbound edges, separated into likely dead code vs expected entry/barrel surfaces\x1b[0m'
+  );
   lines.push('');
 
   const importedPaths = new Set(faninMap.keys());
@@ -934,11 +953,18 @@ function renderOrphans(allFiles, faninMap) {
     .map((f) => {
       const rel = relative(targetDir, f.fullPath);
       const isEntryPoint = /^app[/\\]/.test(rel);
-      return { file: rel, isEntryPoint, loc: f.loc?.code || 0 };
+      return {
+        file: rel,
+        isEntryPoint,
+        isBarrel: isLikelyBarrelFile(f),
+        isCompatibilitySurface: isLikelyCompatibilitySurface(f),
+        loc: f.loc?.code || 0,
+      };
     })
     .sort((a, b) => {
-      // Entry points last, then by LOC descending
-      if (a.isEntryPoint !== b.isEntryPoint) return a.isEntryPoint ? 1 : -1;
+      const aRank = a.isEntryPoint ? 2 : a.isBarrel || a.isCompatibilitySurface ? 1 : 0;
+      const bRank = b.isEntryPoint ? 2 : b.isBarrel || b.isCompatibilitySurface ? 1 : 0;
+      if (aRank !== bRank) return aRank - bRank;
       return b.loc - a.loc;
     });
 
@@ -947,13 +973,26 @@ function renderOrphans(allFiles, faninMap) {
     return lines;
   }
 
-  const nonEntry = orphans.filter((o) => !o.isEntryPoint);
+  const nonEntry = orphans.filter(
+    (o) => !o.isEntryPoint && !o.isBarrel && !o.isCompatibilitySurface
+  );
+  const barrels = orphans.filter((o) => !o.isEntryPoint && (o.isBarrel || o.isCompatibilitySurface));
   const entryPoints = orphans.filter((o) => o.isEntryPoint);
 
   if (nonEntry.length > 0) {
     lines.push(`  \x1b[33mPotentially dead code (${nonEntry.length} files):\x1b[0m`);
     for (const o of nonEntry) {
       lines.push(`    \x1b[2m${String(o.loc).padStart(5)} loc\x1b[0m  ${o.file}`);
+    }
+    lines.push('');
+  }
+
+  if (barrels.length > 0) {
+    lines.push(
+      `  \x1b[2mExpected public barrels / compatibility surfaces (${barrels.length} files):\x1b[0m`
+    );
+    for (const o of barrels) {
+      lines.push(`    \x1b[2m${String(o.loc).padStart(5)} loc  ${o.file}\x1b[0m`);
     }
     lines.push('');
   }
@@ -970,7 +1009,7 @@ function renderOrphans(allFiles, faninMap) {
 
 // ─── 5. --colocate ───────────────────────────────────────────────────────────
 
-function renderColocate(faninMap, fileToFolder) {
+function renderColocate(faninMap, fileToFolder, pathToNode) {
   const lines = [];
   lines.push('');
   lines.push('\x1b[1;36m══ Colocate: Suggested File Moves ══\x1b[0m');
@@ -983,6 +1022,8 @@ function renderColocate(faninMap, fileToFolder) {
 
   for (const [file, importers] of faninMap) {
     if (importers.length < 2) continue;
+    const fileNode = pathToNode.get(file);
+    if (isLikelyBarrelFile(fileNode) || isLikelyCompatibilitySurface(fileNode)) continue;
 
     const currentFolder = fileToFolder.get(file) || '?';
     const folderCounts = {};
@@ -1101,7 +1142,7 @@ if (showJson) {
 
   if (anyAnalysis) {
     const allFiles = collectAllFiles(nodes);
-    const { faninMap, edges, fileToFolder } = buildDependencyGraph(allFiles);
+    const { faninMap, edges, fileToFolder, pathToNode } = buildDependencyGraph(allFiles);
 
     if (showFanin) {
       jsonOutput.fanin = [...faninMap.entries()]
@@ -1192,13 +1233,13 @@ if (showJson) {
   // 2. Append analysis reports below the tree when any analysis flags are active
   if (anyAnalysis) {
     const allFiles = collectAllFiles(nodes);
-    const { faninMap, edges, fileToFolder } = buildDependencyGraph(allFiles);
+    const { faninMap, edges, fileToFolder, pathToNode } = buildDependencyGraph(allFiles);
 
     if (showFanin) console.log(renderFanin(faninMap, fileToFolder).join('\n'));
     if (showCoupling) console.log(renderCoupling(edges, fileToFolder).join('\n'));
     if (showCycles) console.log(renderCycles(edges).join('\n'));
     if (showOrphans) console.log(renderOrphans(allFiles, faninMap).join('\n'));
-    if (showColocate) console.log(renderColocate(faninMap, fileToFolder).join('\n'));
+    if (showColocate) console.log(renderColocate(faninMap, fileToFolder, pathToNode).join('\n'));
     if (boundaryA && boundaryB)
       console.log(renderBoundary(edges, allFiles, boundaryA, boundaryB).join('\n'));
   }

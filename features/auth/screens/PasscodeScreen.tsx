@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView } from 'react-native';
 import { router } from 'expo-router';
 
-import Container from '@/shared/blocks/Container';
+import Container from '@/shared/ui/composed/Container';
 import { Card } from '@/shared/ui/composed/Card';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';

@@ -2,7 +2,7 @@ import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimate
 
 /**
  * Scroll position tracking via Reanimated shared value.
- * Stays on the UI thread — no JS re-renders during scroll.
+ * Stays on the UI thread without JS re-renders during scroll.
  */
 export function useScrollViewOffset() {
   const scrollOffsetY = useSharedValue(0);

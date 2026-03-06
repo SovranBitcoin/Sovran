@@ -3,7 +3,7 @@
  * Used by provider, overlay, image block, and bottom panel.
  */
 
-import type { useScrollViewOffset } from '@/shared/hooks/useScrollViewOffset';
+import type { useScrollViewOffset } from '@/features/feed/hooks/useScrollViewOffset';
 import type { useDerivedValue, useSharedValue } from 'react-native-reanimated';
 
 /** Post payload for overlay bottom panel (author, content, stats, actions). Kept minimal to avoid circular deps. */

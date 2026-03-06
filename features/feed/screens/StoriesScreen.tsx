@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   StoriesCarousel,
   type StoryUser,
-} from '@/features/feed/components/stories/StoriesCarousel';
+} from '@/features/feed/components/nostr/StoriesCarousel';
 
 const CLOSE_DELAY_MS = 350;
 

@@ -25,7 +25,7 @@ import {
   withTiming,
 } from 'react-native-reanimated';
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
-import { useScrollViewOffset } from '@/shared/hooks/useScrollViewOffset';
+import { useScrollViewOffset } from '@/features/feed/hooks/useScrollViewOffset';
 import type { EngagementViewState } from '@/features/feed/hooks/useNostrEngagement';
 import type { NoteMetrics } from '../shared';
 import {

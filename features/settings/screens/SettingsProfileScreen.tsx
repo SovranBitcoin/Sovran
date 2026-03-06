@@ -3,7 +3,7 @@ import { ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useMnemonic, useCashuMnemonic } from '@/shared/hooks/useSecureStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import Container from '@/shared/blocks/Container';
+import Container from '@/shared/ui/composed/Container';
 import Icon from 'assets/icons';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';

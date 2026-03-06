@@ -5,7 +5,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 import { Link, router } from 'expo-router';
 import { truncateMiddle } from '@/shared/lib/strings';
-import Container from '@/shared/blocks/Container';
+import Container from '@/shared/ui/composed/Container';
 import * as Application from 'expo-application';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';

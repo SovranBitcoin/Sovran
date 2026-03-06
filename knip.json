@@ -26,8 +26,6 @@
   "ignoreBinaries": ["eas", "maestro"],
   "ignoreIssues": {
     "features/feed/components/nostr/**": ["exports", "types", "duplicates"],
-    "features/feed/components/note/**": ["exports", "types", "duplicates"],
-    "features/feed/components/image-overlay/**": ["exports", "types"],
     "features/feed/components/UserFeed.tsx": ["exports", "types"],
     "features/feed/index.ts": ["exports"],
     "features/auth/**": ["exports"],

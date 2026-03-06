@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, ActivityIndicator } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
-import Container from '@/shared/blocks/Container';
+import Container from '@/shared/ui/composed/Container';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';

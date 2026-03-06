@@ -3,7 +3,7 @@ import { RefreshControl, ScrollView } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
-import Container from '@/shared/blocks/Container';
+import Container from '@/shared/ui/composed/Container';
 import {
   getStorageInventorySnapshot,
   type ZustandInventory,

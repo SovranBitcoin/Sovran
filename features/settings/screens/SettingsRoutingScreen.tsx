@@ -4,7 +4,7 @@ import {
   useSettingsStore,
   type MiddlemanRoutingSettings,
 } from '@/shared/stores/global/settingsStore';
-import Container from '@/shared/blocks/Container';
+import Container from '@/shared/ui/composed/Container';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Section } from '@/features/settings';

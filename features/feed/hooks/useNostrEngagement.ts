@@ -4,9 +4,9 @@ import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { EventDeletion, Reaction, Repost } from 'nostr-tools/kinds';
 import { useShallow } from 'zustand/shallow';
 
+import type { FeedEvent, NoteMetrics } from '@/features/feed/components/nostr/shared';
 import { engagementUpdateFailedPopup } from '@/shared/lib/popup';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
-import type { FeedEvent, NoteMetrics } from '@/features/feed/components/note/shared';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
 type EngagementState = {

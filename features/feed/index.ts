@@ -6,7 +6,7 @@ export { StoriesScreen } from './screens/StoriesScreen';
 export { HomeFeed } from './components/HomeFeed';
 export { ThreadView } from './components/ThreadView';
 export { UserFeed } from './components/UserFeed';
-export { StoriesCarousel, type StoryUser } from './components/stories/StoriesCarousel';
+export { StoriesCarousel, type StoryUser } from './components/nostr/StoriesCarousel';
 export { useNostrEngagement } from './hooks/useNostrEngagement';
 export {
   useNostrProfile,
@@ -15,4 +15,4 @@ export {
   getFollowerPicture,
   type TopFollower,
 } from './hooks/useNostrProfile';
-export type { VideoPostRecord } from './components/note/shared';
+export type { VideoPostRecord } from './components/nostr/shared';

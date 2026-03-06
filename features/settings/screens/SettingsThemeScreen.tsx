@@ -10,7 +10,7 @@ import { router } from 'expo-router';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { THEMES } from '@/shared/providers/ThemeProvider';
 import Icon from 'assets/icons';
-import Container from '@/shared/blocks/Container';
+import Container from '@/shared/ui/composed/Container';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   backgroundImageThemes,

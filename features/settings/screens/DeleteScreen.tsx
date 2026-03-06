@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import Container from '@/shared/blocks/Container';
+import Container from '@/shared/ui/composed/Container';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { deleteAllProfiles } from '@/shared/lib/profile/profileSessionOrchestrator';
 import { Text } from '@/shared/ui/primitives/Text';

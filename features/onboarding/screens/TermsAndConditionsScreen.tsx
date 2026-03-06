@@ -3,7 +3,7 @@ import { ScrollView, View } from 'react-native';
 
 import { Button, Card, ControlField, Label } from 'heroui-native';
 
-import Container from '@/shared/blocks/Container';
+import Container from '@/shared/ui/composed/Container';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 
