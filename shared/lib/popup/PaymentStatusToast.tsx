@@ -18,7 +18,7 @@ import { fmt, isAmountSegment, type PopupTextSegment } from './format';
 import { Text } from '@/shared/ui/primitives/Text';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 
-type PaymentStatusToastVariant = 'receive' | 'send' | 'melt' | 'receive-ecash';
+type PaymentStatusToastVariant = 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
 
 const ICON_SIZE = 32;
 
@@ -34,6 +34,14 @@ const CASES = {
   send: {
     message: 'Payment sent',
     submessageConfirmed: (amount: number, unit: string) => fmt`Sent ${{ amount, unit }}`,
+    submessageFailed: 'Payment failed',
+    history: { type: 'send' as const, idField: 'operationId' as const },
+    route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
+  },
+  'payment-request': {
+    message: 'Payment request sent',
+    submessagePending: 'Waiting for recipient',
+    submessageConfirmed: 'Claimed by recipient',
     submessageFailed: 'Payment failed',
     history: { type: 'send' as const, idField: 'operationId' as const },
     route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
@@ -97,14 +105,18 @@ export function PaymentStatusToast({
   // For receive-ecash: receiveEntryId may be set by receive:created after toast mounts
   const effectiveReceiveEntryId =
     variant === 'receive-ecash' ? (active?.receiveEntryId ?? receiveEntryId) : undefined;
+  const confirmedSubmessage =
+    typeof config.submessageConfirmed === 'function'
+      ? config.submessageConfirmed(amount, unit)
+      : config.submessageConfirmed;
 
   const submessage = isConfirmed
-    ? config.submessageConfirmed(amount, unit)
+    ? confirmedSubmessage
     : isFailed
       ? (active?.errorMessage ?? config.submessageFailed)
       : 'submessagePending' in config
         ? config.submessagePending
-        : config.submessageConfirmed(amount, unit);
+        : confirmedSubmessage;
 
   // --- Animated colors ---
   const [foreground, overlay, success, danger] = useThemeColor([

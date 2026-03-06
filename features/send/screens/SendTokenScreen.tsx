@@ -48,11 +48,11 @@ import {
   tokenRedeemedByRecipientPopup,
   transactionAlreadyCancelledPopup,
   tokenPendingNotRedeemedPopup,
-  nostrPaymentSentPopup,
   cancelTransactionFailedPopup,
   operationNotFoundPopup,
   operationInvalidStatePopup,
   invalidPaymentRequestPopup,
+  paymentStatusPopup,
   sendPaymentFailedPopup,
 } from '@/shared/lib/popup';
 
@@ -83,6 +83,7 @@ import { truncateMiddle } from '@/shared/lib/strings';
 import { convertTime } from '@/shared/lib/time';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 
 // Default relay for payment requests
 const DEFAULT_PAYMENT_RELAY = 'wss://relay.vertexlab.io';
@@ -558,8 +559,22 @@ export function SendTokenScreen({
       // 4. Capture location for the transaction
       await captureAndStoreLocation(historyEntry.id);
 
-      // 5. Show success
-      nostrPaymentSentPopup();
+      // 5. Show payment-request status
+      usePaymentStatusStore.getState().setActive({
+        variant: 'payment-request',
+        id: historyEntry.operationId,
+        mintUrl: paymentRequest.mintUrl,
+        amount: paymentRequest.amount,
+        unit: decodedRequest.unit || 'sat',
+        state: 'processing',
+      });
+      paymentStatusPopup({
+        variant: 'payment-request',
+        id: historyEntry.operationId,
+        mintUrl: paymentRequest.mintUrl,
+        amount: paymentRequest.amount,
+        unit: decodedRequest.unit || 'sat',
+      });
     } catch (err) {
       console.error('[SendTokenScreen] Failed to send payment:', err);
       sendPaymentFailedPopup({ text: err instanceof Error ? err.message : undefined });

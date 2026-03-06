@@ -5,7 +5,7 @@ import { parsePaymentError } from '@/shared/lib/popup/parsePaymentError';
 export type PaymentStatusState = 'processing' | 'confirmed' | 'failed';
 
 export interface ActivePaymentStatus {
-  variant: 'receive' | 'send' | 'melt' | 'receive-ecash';
+  variant: 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
   /** quoteId (receive) or operationId (send) or receiveHistoryEntry.id (receive-ecash) */
   id: string;
   mintUrl: string;

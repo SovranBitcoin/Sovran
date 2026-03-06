@@ -11,12 +11,12 @@ import { PaymentStatusIcon } from '../PaymentStatusIcon';
 import { PaymentStatusToast } from '../PaymentStatusToast';
 import type { BaseOverrides, PopupOverrides, TextOverrides } from './types';
 
-type PaymentStatusVariant = 'receive' | 'send' | 'melt' | 'receive-ecash';
+type PaymentStatusVariant = 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
 
 type PaymentStatusCase = {
   message: string;
   submessagePending?: string;
-  submessageConfirmed: (amount: number, unit: string) => string | PopupTextSegment[];
+  submessageConfirmed: string | ((amount: number, unit: string) => string | PopupTextSegment[]);
   submessageFailed: string;
   history: {
     type: 'mint' | 'send' | 'melt' | 'receive';
@@ -37,6 +37,14 @@ const PAYMENT_STATUS_CASES: Record<PaymentStatusVariant, PaymentStatusCase> = {
   send: {
     message: 'Payment sent',
     submessageConfirmed: (amount, unit) => fmt`Sent ${{ amount, unit }}`,
+    submessageFailed: 'Payment failed',
+    history: { type: 'send', idField: 'operationId' },
+    route: { pathname: '/sendToken', paramKey: 'sendHistoryEntry' },
+  },
+  'payment-request': {
+    message: 'Payment request sent',
+    submessagePending: 'Waiting for recipient',
+    submessageConfirmed: 'Claimed by recipient',
     submessageFailed: 'Payment failed',
     history: { type: 'send', idField: 'operationId' },
     route: { pathname: '/sendToken', paramKey: 'sendHistoryEntry' },
@@ -121,6 +129,10 @@ export function paymentStatusPopup(payload: {
   };
 
   const confirmedButtons = [{ text: 'View Transaction', onPress: onPressViewTransaction }];
+  const confirmedSubmessage =
+    typeof config.submessageConfirmed === 'function'
+      ? config.submessageConfirmed(amount, unit)
+      : config.submessageConfirmed;
 
   popup({
     message: config.message,
@@ -137,10 +149,10 @@ export function paymentStatusPopup(payload: {
             : 'pending';
 
         const submessage = isConfirmed
-          ? config.submessageConfirmed(amount, unit)
+          ? confirmedSubmessage
           : isFailed
             ? (active?.errorMessage ?? config.submessageFailed)
-            : (config.submessagePending ?? config.submessageConfirmed(amount, unit));
+            : (config.submessagePending ?? confirmedSubmessage);
 
         return {
           message: config.message,
