@@ -653,7 +653,7 @@ function SheetPopup() {
 
   return (
     <BottomSheet isOpen={isOpen} onOpenChange={handleOpenChange}>
-      <BottomSheet.Portal disableFullWindowOverlay={true}>
+      <BottomSheet.Portal>
         <BottomSheet.Overlay isCloseOnPress={standardPayload?.dismissable ?? true} />
         <BottomSheet.Content
           detached={!isProfileStyleCustomShell}

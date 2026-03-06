@@ -57,6 +57,8 @@ profileSwitcherPopup({
 
 PopupHost renders all sheets (standard + action) in one place. No separate registration or sheet provider.
 
+`PopupHost` sheets must keep HeroUI's default `FullWindowOverlay` behavior enabled so action sheets render above native-stack modals and form sheets. If you need to avoid stale iOS overlay windows during a profile transition, destroy the sheet before restarting rather than disabling the overlay layer globally.
+
 ---
 
 ## File structure

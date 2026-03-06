@@ -118,13 +118,13 @@ The following issues have been identified and fixed in past audits. They are lis
 
 **Files**: `shared/providers/NostrNDKProvider.tsx`, `app/_layout.tsx`
 
-### Ghost FullWindowOverlay blocking touches after reload (HIGH — fixed, then eliminated)
+### Ghost FullWindowOverlay blocking touches after reload (HIGH — fixed)
 
-**Issue**: The profile switcher bottom sheet's `FullWindowOverlay` (native iOS UIWindow) survived JS reload, capturing all touches and making the app unresponsive.
+**Issue**: The profile switcher bottom sheet's `FullWindowOverlay` (native iOS UIWindow) could survive a restart boundary, capture touches, and make the app unresponsive.
 
-**Original Fix**: Added `destroyed` flag and `destroySheet()` to `popupStore`.
+**Fix**: Added `destroyed` flag and `destroySheet()` to `popupStore`, and the profile orchestrator now calls `destroySheet()` before restart so the native overlay tears down cleanly.
 
-**Architecture Redesign**: `BottomSheet.Portal` now uses `disableFullWindowOverlay={true}`, which prevents native iOS UIWindows from being created at all. This eliminates the root cause. The `destroyed` flag and `destroySheet()` are retained as a defense-in-depth measure. Additionally, `restartApp()` now uses `RNRestart.restart()` (native restart) in production instead of `Updates.reloadAsync()`, which eliminates the JS-reload-only restart that left native windows alive.
+**Additional hardening**: `restartApp()` now uses `RNRestart.restart()` in production instead of `Updates.reloadAsync()`, which removes the JS-reload-only path that previously left native windows alive.
 
 **Files**: `shared/blocks/popup/PopupHost.tsx`, `shared/lib/profile/appRestart.ts`
 
