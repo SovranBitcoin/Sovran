@@ -16,7 +16,7 @@
   },
   "scripts": {
     "start": "expo start",
-    "dev": "DEBUG_MNEMONIC=\"leader monkey parrot ring guide accident before fence cannon height naive bean\" EXPO_PUBLIC_ENV=development expo start --clear",
+    "dev": "EXPO_PUBLIC_DEBUG_MNEMONIC=\"leader monkey parrot ring guide accident before fence cannon height naive bean\" EXPO_PUBLIC_ENV=development expo start --clear",
     "start:emulator:ios": "expo run:ios",
     "start:emulator:android": "expo run:android",
     "build:dev:ios": "EAS_NO_VCS=1 eas build --platform ios --profile development --non-interactive",

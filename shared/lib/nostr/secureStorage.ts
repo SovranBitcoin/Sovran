@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import * as bip39 from '@scure/bip39';
@@ -35,18 +34,14 @@ function getDebugMnemonicOverride(): string | null {
     return null;
   }
 
-  const configuredMnemonic =
-    Constants.expoConfig?.extra?.debugMnemonicOverride ??
-    process.env.EXPO_PUBLIC_DEBUG_MNEMONIC ??
-    null;
-  if (!configuredMnemonic) {
+  const mnemonic = process.env.EXPO_PUBLIC_DEBUG_MNEMONIC?.trim();
+  if (!mnemonic) {
     return null;
   }
 
-  const mnemonic = configuredMnemonic.trim();
   const words = mnemonic.split(/\s+/);
   if (words.length !== 12) {
-    throw new Error('debug mnemonic override must be exactly 12 words');
+    throw new Error('EXPO_PUBLIC_DEBUG_MNEMONIC must be exactly 12 words');
   }
 
   return words.join(' ');
