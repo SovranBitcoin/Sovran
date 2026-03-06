@@ -1,8 +1,8 @@
 import { Manager } from 'coco-cashu-core';
 import { CheckStateEnum } from '@cashu/cashu-ts';
-import { store } from '@/redux/store';
-import { RootState } from '@/redux/store/reducer';
-import { CashuProfile } from '@/redux/cashu/types';
+import { store } from '@/redux/store/store.deprecated';
+import { RootState } from '@/redux/store/reducer.deprecated';
+import { CashuProfile } from '@/redux/cashu/types.deprecated';
 
 /**
  * Data migration utility to move from Redux-based Cashu state to Coco repositories.

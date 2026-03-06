@@ -1,12 +1,11 @@
 // In reducer.ts
 import { combineReducers, type Action as ReduxAction } from 'redux';
-import type { ThunkAction } from 'redux-thunk';
-import { settingsReducer } from '../settings/reducer';
-import { cashuReducer } from '../cashu/reducer';
-import { nostrReducer } from '../nostr/reducer';
+import { settingsReducer } from '../settings/reducer.deprecated';
+import { cashuReducer } from '../cashu/reducer.deprecated';
+import { nostrReducer } from '../nostr/reducer.deprecated';
 
 // Action type for reset
-export const RESET_APP = 'RESET_APP' as const;
+const RESET_APP = 'RESET_APP' as const;
 
 interface ResetAppAction {
   type: typeof RESET_APP;
@@ -23,14 +22,6 @@ const appReducer = combineReducers({
 export type RootState = ReturnType<typeof appReducer>;
 
 type Action = ResetAppAction | ReduxAction;
-
-// Define AppThunk type for typed thunk actions
-export type AppThunk<ReturnType = void> = ThunkAction<
-  Promise<ReturnType>,
-  RootState,
-  unknown,
-  Action
->;
 
 // Root reducer with reset functionality and proper typing
 const rootReducer = (state: RootState | undefined, action: Action | ReduxAction): RootState => {

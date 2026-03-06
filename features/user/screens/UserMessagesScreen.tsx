@@ -46,7 +46,7 @@ import { buildGiftWrappedDMPair, unwrapGiftWrap } from '@/shared/lib/nostr/nip17
 import { LegendList } from '@legendapp/list';
 
 // Custom hooks and providers
-import { Message } from 'redux/nostr';
+import { Message } from '@/redux/nostr/reducer.deprecated';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
 // Components

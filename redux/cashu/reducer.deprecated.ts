@@ -1,7 +1,7 @@
-import { CashuState } from './types';
+import { CashuState } from './types.deprecated';
 import type { AnyAction, Reducer } from 'redux';
 import { typedUpdate } from '@/shared/lib/typedUpdate';
-import { cashuState } from 'redux/store/migrationTest';
+import { cashuState } from '@/redux/store/migrationTest.deprecated';
 
 const initialState: CashuState = {
   profiles: [

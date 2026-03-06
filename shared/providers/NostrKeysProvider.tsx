@@ -40,7 +40,7 @@ function getMnemonicFromRedux(): string | null {
   try {
     // Import store dynamically to avoid circular dependencies
     // eslint-disable-next-line
-    const { store } = require('../../redux/store');
+    const { store } = require('../../redux/store/store.deprecated');
     const state = store.getState();
     const nostrState = state.nostr;
 

@@ -3,7 +3,7 @@ description: Zustand store scoping, persistence boundaries, and profile-switch/r
 globs:
   - "shared/stores/**/*.ts"
   - "shared/lib/cashu/profileScopedStorage.ts"
-  - "redux/store/index.ts"
+  - "redux/store/store.deprecated.ts"
 alwaysApply: false
 ---
 
@@ -94,17 +94,17 @@ Profile switch must produce a clean profile-local session.
 
 Current flow:
 - Triggered directly by `profileSessionOrchestrator.ts` functions (no intermediate action queue)
-- Callers (drawer, profile-switcher sheet, delete screen) call `switchToExistingProfile()`, `createAndSwitchProfile()`, `switchToImportedProfile()`, `deleteCurrentProfile()`, or `deleteAllProfiles()` directly
+- Callers (drawer, profile-switcher sheet, destructive settings flows) call `switchToExistingProfile()`, `createAndSwitchProfile()`, `switchToImportedProfile()`, or `deleteAllProfiles()` directly
 - Orchestrator runs `CocoManager.cleanup()` (closes SQLite), updates `profileStore`, flushes to AsyncStorage, then triggers a **native app restart** via `restartApp()` (`RNRestart.restart()` in production, `DevSettings.reload()` in dev)
 - On next launch, `AccountScopedProviders` in `app/_layout.tsx` mounts with the new `accountIndex` key, causing a full remount of all inner providers
 - Profile-scoped Zustand stores rehydrate from their `{name}:profile:{pubkey}` AsyncStorage keys via `createProfileScopedStorage()`
 - `TransitionControlRegistrar` and `KeyDerivationRegistrar` in `app/_layout.tsx` register their functions with the orchestrator so callers don't need to prop-thread `resetStages` or `getKeysForAccount`
 
-Note: `rehydrateProfileStores()` in `profileScopedStorage.ts` is **not currently called** — the native restart makes it unnecessary. It is retained for a potential future non-reload switch path.
+Note: `rehydrateProfileStores()` in `profileScopedStorage.ts` is **not currently called** — the native restart makes it unnecessary. It is retained as an internal helper for a potential future non-reload switch path.
 
 Rules:
 - Every store using `createProfileScopedStorage()` must be included in `PROFILE_SCOPED_STORE_KEYS` and (if `rehydrateProfileStores()` is ever activated) in its reset + rehydrate list.
-- If a profile-scoped store is missing from `PROFILE_SCOPED_STORE_KEYS`, `clearAllProfileScopedData()` will not remove its data on account deletion.
+- If a profile-scoped store is missing from `PROFILE_SCOPED_STORE_KEYS`, migrations and any future targeted profile cleanup will miss it.
 - For profile-scoped domain actions, derive identity from active session context where possible (avoid manual pubkey threading from UI callsites).
 
 ---
@@ -114,15 +114,13 @@ Rules:
 Full reset must remove all profile data across all known profiles.
 
 Current reset orchestration:
-- `redux/store/index.ts` (`resetApp`)
-- `shared/lib/cashu/profileScopedStorage.ts` (`clearAllProfileScopedData(pubkeys)`)
-- `shared/lib/nostr/secureStorage.ts` (`clearAllSecureData(maxAccountIndex)`)
+- `shared/lib/profile/profileSessionOrchestrator.ts` (`deleteAllProfiles()`)
+- `shared/lib/nostr/secureStorage.ts` (`clearAllSecureData(accountIndexes, importedPubkeys)`)
+- `AsyncStorage.clear()` for the final persisted-storage wipe
 
 Rules:
-- Collect all profile pubkeys from `profileStore` and pass them to `clearAllProfileScopedData`.
-- For profile-scoped stores, rely on both:
-  - in-memory clear for active profile where needed
-  - multi-profile key deletion for all profile pubkey suffixes
+- Full account deletion currently relies on the final `AsyncStorage.clear()` wipe rather than per-store deletion.
+- Profile-scoped stores must still use `createProfileScopedStorage()` so their persisted keys remain isolated before the final wipe.
 
 ---
 
@@ -165,7 +163,7 @@ For a new profile-scoped Zustand store:
 1. Use `persist(..., { storage: createJSONStorage(() => createProfileScopedStorage()) })`.
 2. Add store key to `PROFILE_SCOPED_STORE_KEYS` in `shared/lib/cashu/profileScopedStorage.ts`.
 3. If `rehydrateProfileStores()` is ever activated, add reset state + `persist.rehydrate()` handling there.
-4. Ensure full reset clears all profile variants via `clearAllProfileScopedData(pubkeys)`.
+4. Ensure full reset still removes the store's persisted data, whether via the existing `AsyncStorage.clear()` path or any future targeted cleanup helper.
 
 If steps 1, 2, or 4 are skipped, profile isolation is incomplete.
 

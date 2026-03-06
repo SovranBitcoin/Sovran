@@ -6,7 +6,7 @@ import {
   SET_EXPERIMENTAL,
   SET_PASSCODE,
   SET_BACKGROUND_IMAGE,
-} from './actionTypes';
+} from './actionTypes.deprecated';
 import type { AnyAction, Reducer } from 'redux';
 import { typedUpdate } from '@/shared/lib/typedUpdate';
 

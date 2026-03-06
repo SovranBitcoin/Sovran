@@ -1,5 +1,5 @@
 import React, { useState, useEffect, ReactNode, useRef } from 'react';
-import { store } from '@/redux/store';
+import { store } from '@/redux/store/store.deprecated';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { isMigrationsComplete, setMigrationsComplete } from '@/shared/lib/nostr/secureStorage';
 import { migrateProfileScopedKeys } from '@/shared/lib/cashu/profileScopedStorage';

@@ -85,34 +85,6 @@ const PROFILE_SCOPED_STORE_KEYS = [
   'nostr-social-store',
 ];
 
-/**
- * Remove AsyncStorage data for ALL profile-scoped stores across EVERY profile.
- *
- * Use this during a full app reset / delete account flow.
- * Each store's `clearAllData()` only removes the *active* profile's key;
- * this helper removes the bare key (legacy) and every `:profile:{pubkey}`
- * so no orphaned data is left behind.
- *
- * @param pubkeys Hex pubkeys of all known profiles.
- */
-export async function clearAllProfileScopedData(pubkeys: string[]): Promise<void> {
-  const keysToRemove: string[] = [];
-  for (const base of PROFILE_SCOPED_STORE_KEYS) {
-    keysToRemove.push(base); // legacy bare key cleanup
-    for (const pubkey of pubkeys) {
-      keysToRemove.push(`${base}:profile:${pubkey}`);
-    }
-  }
-
-  if (keysToRemove.length > 0) {
-    await AsyncStorage.multiRemove(keysToRemove);
-  }
-
-  console.log(
-    `[ProfileScopedStorage] Cleared ${keysToRemove.length} keys across ${pubkeys.length} profiles`
-  );
-}
-
 const MIGRATION_FLAG = 'profile-scoped-storage-v2';
 
 /**
@@ -186,7 +158,7 @@ export async function migrateProfileScopedKeys(): Promise<void> {
  * If called, must run AFTER setting the new activeAccountIndex
  * in the profile store and BEFORE inner providers remount.
  */
-export async function rehydrateProfileStores(): Promise<void> {
+async function rehydrateProfileStores(): Promise<void> {
   // Lazy imports to avoid circular dependencies
   const { useMintStore } = await import('@/shared/stores/profile/mintStore');
   const { useMintDistributionStore } =

@@ -82,14 +82,6 @@ export function registerKeyDerivation(fn: KeyDerivationFn): void {
   registeredKeyDerivation = fn;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────
-
-export function isProfileTransitionInProgress(): boolean {
-  // Synchronous check — callers use this for UI guards.
-  // The real guard is async (AsyncStorage) so this is optimistic.
-  return false;
-}
-
 async function flushProfileStoreToDisk(): Promise<void> {
   const { activeAccountIndex, profiles, cocoMigrationComplete } = useProfileStore.getState();
   await AsyncStorage.setItem(
@@ -205,75 +197,6 @@ export async function switchToImportedProfile(opts: {
 }
 
 /**
- * Delete the current profile and switch to another.
- * Requires 2+ profiles. Cleans up per-profile data (NOT the root mnemonic), switches, restarts.
- */
-export async function deleteCurrentProfile(opts?: {
-  resetStages?: TransitionControls['resetStages'];
-  cancelResetStages?: TransitionControls['cancelResetStages'];
-}): Promise<boolean> {
-  const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
-  const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
-
-  const { profiles, activeAccountIndex } = useProfileStore.getState();
-  if (profiles.length < 2) {
-    console.error('[ProfileOrchestrator] Cannot delete current profile — only one profile exists');
-    return false;
-  }
-
-  if (!(await beginTransition())) return false;
-  try {
-    resetStages?.({ holdUntilCancel: true });
-    usePopupStore.getState().close();
-
-    const activeProfile = profiles.find((p) => p.accountIndex === activeAccountIndex);
-    const targetProfile = profiles.find((p) => p.accountIndex !== activeAccountIndex);
-    if (!targetProfile) throw new Error('No fallback profile found');
-
-    await CocoManager.cleanup();
-
-    // Clear ONLY per-profile secure data (derived_keys, cashu_mnemonic, migrations flag, imported nsec).
-    // Does NOT delete user_mnemonic — other profiles still need it.
-    try {
-      const { clearPerProfileSecureData } = await import('@/shared/lib/nostr/secureStorage');
-      const importedPubkeys =
-        activeProfile?.source === 'imported' && activeProfile?.pubkey
-          ? [activeProfile.pubkey]
-          : [];
-      await clearPerProfileSecureData([activeAccountIndex], importedPubkeys);
-    } catch (e) {
-      console.warn('[ProfileOrchestrator] Failed to clear secure data for deleted profile:', e);
-    }
-
-    // Clear profile-scoped AsyncStorage keys
-    try {
-      const { clearAllProfileScopedData } =
-        await import('@/shared/lib/cashu/profileScopedStorage');
-      if (activeProfile?.pubkey) {
-        await clearAllProfileScopedData([activeProfile.pubkey]);
-      }
-    } catch (e) {
-      console.warn('[ProfileOrchestrator] Failed to clear profile-scoped data:', e);
-    }
-
-    // Switch to the fallback profile, then remove the old entry
-    useProfileStore.getState().switchProfile(targetProfile.accountIndex);
-    useProfileStore.getState().removeProfile(activeAccountIndex);
-
-    await flushProfileStoreToDisk();
-    const restarted = await teardownAndRestart();
-    if (!restarted) cancelResetStages?.();
-    return true;
-  } catch (error) {
-    console.error('[ProfileOrchestrator] delete current profile failed:', error);
-    cancelResetStages?.();
-    return false;
-  } finally {
-    await endTransition();
-  }
-}
-
-/**
  * Nuclear wipe — delete ALL app data and restart fresh.
  * Clears: all Zustand stores, all AsyncStorage, all SecureStore keys,
  * all SQLite databases, all Redux state. Nothing survives.
@@ -318,7 +241,7 @@ export async function deleteAllProfiles(opts?: {
 
     // 4. Purge Redux persisted state
     try {
-      const { persistor } = await import('@/redux/store');
+      const { persistor } = await import('@/redux/store/store.deprecated');
       await persistor.purge();
     } catch (e) {
       console.warn('[ProfileOrchestrator] Redux persistor.purge() failed:', e);
@@ -335,11 +258,9 @@ export async function deleteAllProfiles(opts?: {
     if (!restarted) {
       cancelResetStages?.();
       const { Alert } = await import('react-native');
-      Alert.alert(
-        'Restart Required',
-        'Please close and reopen the app to complete the reset.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Restart Required', 'Please close and reopen the app to complete the reset.', [
+        { text: 'OK' },
+      ]);
     }
     return true;
   } catch (error) {

@@ -1,5 +1,5 @@
 import { Reducer } from 'react';
-import { nostrState } from 'redux/store/migrationTest';
+import { nostrState } from '@/redux/store/migrationTest.deprecated';
 
 type NostrProfile = {
   created_at: number;
