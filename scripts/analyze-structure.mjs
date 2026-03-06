@@ -976,7 +976,9 @@ function renderOrphans(allFiles, faninMap) {
   const nonEntry = orphans.filter(
     (o) => !o.isEntryPoint && !o.isBarrel && !o.isCompatibilitySurface
   );
-  const barrels = orphans.filter((o) => !o.isEntryPoint && (o.isBarrel || o.isCompatibilitySurface));
+  const barrels = orphans.filter(
+    (o) => !o.isEntryPoint && (o.isBarrel || o.isCompatibilitySurface)
+  );
   const entryPoints = orphans.filter((o) => o.isEntryPoint);
 
   if (nonEntry.length > 0) {

@@ -1,10 +1,6 @@
 export type { CopyTarget } from './copy';
 export { copyPopup } from './copy';
-export {
-  profileSwitcherPopup,
-  emojiPickerPopup,
-  buttonHandlerPopup,
-} from './actionSheets';
+export { profileSwitcherPopup, emojiPickerPopup, buttonHandlerPopup } from './actionSheets';
 export {
   paymentStatusPopup,
   sendSuccessPopup,
@@ -32,11 +28,7 @@ export {
   transactionAlreadyCancelledPopup,
   transactionCancelledPopup,
 } from './token';
-export {
-  cameraPermissionPopup,
-  noQrCodeFoundPopup,
-  qrScanFailedPopup,
-} from './camera';
+export { cameraPermissionPopup, noQrCodeFoundPopup, qrScanFailedPopup } from './camera';
 export {
   insufficientBalancePopup,
   invalidAddressPopup,
