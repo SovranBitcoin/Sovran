@@ -1,162 +1,177 @@
 /**
- * @fileoverview Profile session orchestration for switch/create/import flows.
+ * @fileoverview Profile session orchestration for switch/create/import/delete flows.
  *
- * Coordinates CocoManager cleanup, profileStore updates, and a hard app reload for
- * switch/create/import flows. Uses a single transition guard to prevent concurrent
- * profile switches. Callers must provide resetStages/cancelResetStages from
- * InitializationProvider to keep the app covered until reload or failure fallback.
+ * All profile operations now call the orchestrator directly (no WalletScreen action queue).
+ * The orchestrator coordinates: CocoManager cleanup, profileStore updates, AsyncStorage flush,
+ * and a native app restart via `restartApp()`.
+ *
+ * Transition guard uses AsyncStorage so it survives native restarts and is cleared on next startup.
+ *
+ * Callers can optionally supply resetStages/cancelResetStages (via registerTransitionControls)
+ * to show a splash overlay during the transition. If not registered, transitions proceed without
+ * the splash overlay.
+ *
+ * Key derivation (getKeysForAccount) is registered at runtime by a component inside
+ * AccountScopedProviders via registerKeyDerivation(). This avoids prop-threading from
+ * the drawer/sheet all the way to the orchestrator.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DevSettings } from 'react-native';
-
-import * as Updates from 'expo-updates';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { restartApp } from '@/shared/lib/profile/appRestart';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
+// ── AsyncStorage-based transition guard ──────────────────────────
+const TRANSITION_KEY = 'profile-transition-in-progress';
+const TRANSITION_EXPIRY_MS = 10_000;
+
+type TransitionGuard = { startedAt: number };
+
+async function beginTransition(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(TRANSITION_KEY);
+    if (raw) {
+      const guard: TransitionGuard = JSON.parse(raw);
+      if (Date.now() - guard.startedAt < TRANSITION_EXPIRY_MS) {
+        return false;
+      }
+      console.warn('[ProfileOrchestrator] Stale transition guard expired');
+    }
+    await AsyncStorage.setItem(TRANSITION_KEY, JSON.stringify({ startedAt: Date.now() }));
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+async function endTransition(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(TRANSITION_KEY);
+  } catch {
+    // best-effort
+  }
+}
+
+/** Call on app startup to clear any stale transition guard left by a previous run. */
+export async function clearTransitionGuardOnStartup(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(TRANSITION_KEY);
+  } catch {
+    // best-effort
+  }
+}
+
+// ── Registered controls (set at runtime by layout components) ────
 type TransitionControls = {
   resetStages: (options?: { holdUntilCancel?: boolean }) => void;
   cancelResetStages: () => void;
 };
 
-type ExistingProfileTransition = TransitionControls & {
-  accountIndex: number;
-};
+type KeyDerivationFn = (accountIndex: number) => Promise<{ pubkey: string } | null>;
 
-type CreateProfileTransition = TransitionControls & {
-  getKeysForAccount: (accountIndex: number) => Promise<{ pubkey: string } | null>;
-};
+let registeredControls: TransitionControls | null = null;
+let registeredKeyDerivation: KeyDerivationFn | null = null;
 
-let transitionInProgress = false;
-let transitionStartedAt = 0;
-const TRANSITION_EXPIRY_MS = 10_000;
-const UI_OVERLAY_SETTLE_MS = 350;
-
-function beginTransition(): boolean {
-  if (transitionInProgress) {
-    if (Date.now() - transitionStartedAt > TRANSITION_EXPIRY_MS) {
-      console.warn('[ProfileSessionOrchestrator] Stale transition guard expired');
-      transitionInProgress = false;
-    } else {
-      return false;
-    }
-  }
-  transitionInProgress = true;
-  transitionStartedAt = Date.now();
-  return true;
+export function registerTransitionControls(controls: TransitionControls): void {
+  registeredControls = controls;
 }
 
-function endTransition(): void {
-  transitionInProgress = false;
+export function registerKeyDerivation(fn: KeyDerivationFn): void {
+  registeredKeyDerivation = fn;
 }
 
-async function waitForUiOverlaySettle(): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, UI_OVERLAY_SETTLE_MS);
-  });
+// ── Helpers ──────────────────────────────────────────────────────
+
+export function isProfileTransitionInProgress(): boolean {
+  // Synchronous check — callers use this for UI guards.
+  // The real guard is async (AsyncStorage) so this is optimistic.
+  return false;
 }
 
 async function flushProfileStoreToDisk(): Promise<void> {
   const { activeAccountIndex, profiles, cocoMigrationComplete } = useProfileStore.getState();
-
   await AsyncStorage.setItem(
     'profile-store',
     JSON.stringify({
-      state: {
-        activeAccountIndex,
-        profiles,
-        cocoMigrationComplete,
-      },
+      state: { activeAccountIndex, profiles, cocoMigrationComplete },
       version: 0,
     })
   );
 }
 
-async function reloadAtTransitionEnd(): Promise<boolean> {
+async function teardownAndRestart(): Promise<boolean> {
   usePopupStore.getState().destroySheet();
   usePaymentStatusStore.getState().setActive(null);
-  await waitForUiOverlaySettle();
 
-  if (__DEV__) {
-    DevSettings.reload();
-    return true;
+  const restarted = await restartApp();
+  if (!restarted) {
+    console.error('[ProfileOrchestrator] Restart failed — app will rely on React key remount');
   }
-
-  if (!Updates.isEnabled) {
-    console.warn(
-      '[ProfileSessionOrchestrator] expo-updates is disabled; skipping final app reload'
-    );
-    return false;
-  }
-
-  await Updates.reloadAsync();
-  return true;
+  return restarted;
 }
 
-async function runProfileTransition(
-  accountIndex: number,
-  resetStages: (options?: { holdUntilCancel?: boolean }) => void,
-  cancelResetStages: () => void,
-  flowName: string
-): Promise<boolean> {
+// ── Public API ───────────────────────────────────────────────────
+
+export async function switchToExistingProfile(opts: {
+  accountIndex: number;
+  resetStages?: TransitionControls['resetStages'];
+  cancelResetStages?: TransitionControls['cancelResetStages'];
+}): Promise<boolean> {
+  const resetStages = opts.resetStages ?? registeredControls?.resetStages;
+  const cancelResetStages = opts.cancelResetStages ?? registeredControls?.cancelResetStages;
+
+  if (!(await beginTransition())) return false;
   try {
-    resetStages({ holdUntilCancel: true });
+    resetStages?.({ holdUntilCancel: true });
     usePopupStore.getState().close();
+
     await CocoManager.cleanup();
 
-    const switched = useProfileStore.getState().switchProfile(accountIndex);
+    const switched = useProfileStore.getState().switchProfile(opts.accountIndex);
     if (!switched) {
-      throw new Error(`Target profile does not exist: ${accountIndex}`);
+      throw new Error(`Target profile does not exist: ${opts.accountIndex}`);
     }
 
     await flushProfileStoreToDisk();
-    const reloaded = await reloadAtTransitionEnd();
-    if (!reloaded) {
-      cancelResetStages();
-    }
+    const restarted = await teardownAndRestart();
+    if (!restarted) cancelResetStages?.();
     return true;
   } catch (error) {
-    console.error(`[ProfileSessionOrchestrator] ${flowName} failed:`, error);
-    cancelResetStages();
+    console.error('[ProfileOrchestrator] switch failed:', error);
+    cancelResetStages?.();
+    return false;
+  } finally {
+    await endTransition();
+  }
+}
+
+export async function createAndSwitchProfile(opts?: {
+  getKeysForAccount?: KeyDerivationFn;
+  resetStages?: TransitionControls['resetStages'];
+  cancelResetStages?: TransitionControls['cancelResetStages'];
+}): Promise<boolean> {
+  const getKeysForAccount = opts?.getKeysForAccount ?? registeredKeyDerivation;
+  const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
+  const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
+
+  if (!getKeysForAccount) {
+    console.error('[ProfileOrchestrator] No key derivation function registered');
     return false;
   }
-}
 
-export function isProfileTransitionInProgress(): boolean {
-  return transitionInProgress;
-}
-
-export async function switchToExistingProfile({
-  accountIndex,
-  resetStages,
-  cancelResetStages,
-}: ExistingProfileTransition): Promise<boolean> {
-  if (!beginTransition()) return false;
+  if (!(await beginTransition())) return false;
   try {
-    return await runProfileTransition(accountIndex, resetStages, cancelResetStages, 'switch');
-  } finally {
-    endTransition();
-  }
-}
-
-export async function createAndSwitchProfile({
-  getKeysForAccount,
-  resetStages,
-  cancelResetStages,
-}: CreateProfileTransition): Promise<boolean> {
-  if (!beginTransition()) return false;
-  try {
-    resetStages({ holdUntilCancel: true });
+    resetStages?.({ holdUntilCancel: true });
     usePopupStore.getState().close();
 
     const profileStore = useProfileStore.getState();
     const nextIndex = profileStore.getNextAccountIndex();
     const newKeys = await getKeysForAccount(nextIndex);
     if (!newKeys?.pubkey) {
-      console.warn('[ProfileSessionOrchestrator] Failed to derive keys for new profile');
-      cancelResetStages();
+      console.warn('[ProfileOrchestrator] Failed to derive keys for new profile');
+      cancelResetStages?.();
       return false;
     }
 
@@ -169,29 +184,169 @@ export async function createAndSwitchProfile({
     }
 
     await flushProfileStoreToDisk();
-    const reloaded = await reloadAtTransitionEnd();
-    if (!reloaded) {
-      cancelResetStages();
-    }
+    const restarted = await teardownAndRestart();
+    if (!restarted) cancelResetStages?.();
     return true;
   } catch (error) {
-    console.error('[ProfileSessionOrchestrator] create failed:', error);
-    cancelResetStages();
+    console.error('[ProfileOrchestrator] create failed:', error);
+    cancelResetStages?.();
     return false;
   } finally {
-    endTransition();
+    await endTransition();
   }
 }
 
-export async function switchToImportedProfile({
-  accountIndex,
-  resetStages,
-  cancelResetStages,
-}: ExistingProfileTransition): Promise<boolean> {
-  if (!beginTransition()) return false;
+export async function switchToImportedProfile(opts: {
+  accountIndex: number;
+  resetStages?: TransitionControls['resetStages'];
+  cancelResetStages?: TransitionControls['cancelResetStages'];
+}): Promise<boolean> {
+  return switchToExistingProfile(opts);
+}
+
+/**
+ * Delete the current profile and switch to another.
+ * Requires 2+ profiles. Cleans up per-profile data (NOT the root mnemonic), switches, restarts.
+ */
+export async function deleteCurrentProfile(opts?: {
+  resetStages?: TransitionControls['resetStages'];
+  cancelResetStages?: TransitionControls['cancelResetStages'];
+}): Promise<boolean> {
+  const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
+  const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
+
+  const { profiles, activeAccountIndex } = useProfileStore.getState();
+  if (profiles.length < 2) {
+    console.error('[ProfileOrchestrator] Cannot delete current profile — only one profile exists');
+    return false;
+  }
+
+  if (!(await beginTransition())) return false;
   try {
-    return await runProfileTransition(accountIndex, resetStages, cancelResetStages, 'import');
+    resetStages?.({ holdUntilCancel: true });
+    usePopupStore.getState().close();
+
+    const activeProfile = profiles.find((p) => p.accountIndex === activeAccountIndex);
+    const targetProfile = profiles.find((p) => p.accountIndex !== activeAccountIndex);
+    if (!targetProfile) throw new Error('No fallback profile found');
+
+    await CocoManager.cleanup();
+
+    // Clear ONLY per-profile secure data (derived_keys, cashu_mnemonic, migrations flag, imported nsec).
+    // Does NOT delete user_mnemonic — other profiles still need it.
+    try {
+      const { clearPerProfileSecureData } = await import('@/shared/lib/nostr/secureStorage');
+      const importedPubkeys =
+        activeProfile?.source === 'imported' && activeProfile?.pubkey
+          ? [activeProfile.pubkey]
+          : [];
+      await clearPerProfileSecureData([activeAccountIndex], importedPubkeys);
+    } catch (e) {
+      console.warn('[ProfileOrchestrator] Failed to clear secure data for deleted profile:', e);
+    }
+
+    // Clear profile-scoped AsyncStorage keys
+    try {
+      const { clearAllProfileScopedData } =
+        await import('@/shared/lib/cashu/profileScopedStorage');
+      if (activeProfile?.pubkey) {
+        await clearAllProfileScopedData([activeProfile.pubkey]);
+      }
+    } catch (e) {
+      console.warn('[ProfileOrchestrator] Failed to clear profile-scoped data:', e);
+    }
+
+    // Switch to the fallback profile, then remove the old entry
+    useProfileStore.getState().switchProfile(targetProfile.accountIndex);
+    useProfileStore.getState().removeProfile(activeAccountIndex);
+
+    await flushProfileStoreToDisk();
+    const restarted = await teardownAndRestart();
+    if (!restarted) cancelResetStages?.();
+    return true;
+  } catch (error) {
+    console.error('[ProfileOrchestrator] delete current profile failed:', error);
+    cancelResetStages?.();
+    return false;
   } finally {
-    endTransition();
+    await endTransition();
+  }
+}
+
+/**
+ * Nuclear wipe — delete ALL app data and restart fresh.
+ * Clears: all Zustand stores, all AsyncStorage, all SecureStore keys,
+ * all SQLite databases, all Redux state. Nothing survives.
+ */
+export async function deleteAllProfiles(opts?: {
+  resetStages?: TransitionControls['resetStages'];
+  cancelResetStages?: TransitionControls['cancelResetStages'];
+}): Promise<boolean> {
+  const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
+  const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
+
+  if (!(await beginTransition())) return false;
+  try {
+    resetStages?.({ holdUntilCancel: true });
+    usePopupStore.getState().close();
+
+    const profiles = useProfileStore.getState().profiles;
+    const accountIndexes = profiles.map((p) => p.accountIndex);
+    const importedPubkeys = profiles.filter((p) => p.source === 'imported').map((p) => p.pubkey);
+
+    // 1. Close SQLite and destroy all Coco databases
+    try {
+      await CocoManager.completeReset(accountIndexes);
+    } catch (e) {
+      console.warn('[ProfileOrchestrator] Coco completeReset failed:', e);
+    }
+
+    // 2. Clear ALL secure storage (mnemonic, derived keys, cashu mnemonics, imported nsecs)
+    try {
+      const { clearAllSecureData } = await import('@/shared/lib/nostr/secureStorage');
+      await clearAllSecureData(accountIndexes, importedPubkeys);
+    } catch (e) {
+      console.warn('[ProfileOrchestrator] clearAllSecureData failed:', e);
+    }
+
+    // 3. Nuclear AsyncStorage wipe — every key, every store, everything
+    try {
+      await AsyncStorage.clear();
+    } catch (e) {
+      console.warn('[ProfileOrchestrator] AsyncStorage.clear() failed:', e);
+    }
+
+    // 4. Purge Redux persisted state
+    try {
+      const { persistor } = await import('@/redux/store');
+      await persistor.purge();
+    } catch (e) {
+      console.warn('[ProfileOrchestrator] Redux persistor.purge() failed:', e);
+    }
+
+    // 5. Clear all Zustand in-memory state so nothing bleeds before restart
+    useProfileStore.setState({
+      activeAccountIndex: 0,
+      profiles: [],
+      cocoMigrationComplete: {},
+    });
+
+    const restarted = await teardownAndRestart();
+    if (!restarted) {
+      cancelResetStages?.();
+      const { Alert } = await import('react-native');
+      Alert.alert(
+        'Restart Required',
+        'Please close and reopen the app to complete the reset.',
+        [{ text: 'OK' }]
+      );
+    }
+    return true;
+  } catch (error) {
+    console.error('[ProfileOrchestrator] delete all profiles failed:', error);
+    cancelResetStages?.();
+    return false;
+  } finally {
+    await endTransition();
   }
 }

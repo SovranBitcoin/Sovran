@@ -13,7 +13,7 @@ import Animated, {
 
 import Container from '@/shared/blocks/Container';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useProfileActionStore } from '@/shared/stores/runtime/profileActionStore';
+import { deleteAllProfiles } from '@/shared/lib/profile/profileSessionOrchestrator';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -132,9 +132,8 @@ export function DeleteScreen() {
   const foreground = useThemeColor('foreground');
   const [danger, red400] = useThemeColor(['danger', 'red-400'] as const);
 
-  const handleDeleteProfile = useCallback(async () => {
-    useProfileActionStore.getState().requestDeleteAccount();
-    router.replace('/');
+  const handleDelete = useCallback(async () => {
+    await deleteAllProfiles();
   }, []);
 
   return (
@@ -155,8 +154,8 @@ export function DeleteScreen() {
               size={16}
               className="text-center leading-6"
               style={{ color: opacity(foreground, 0.5) }}>
-              Deleting this account removes your local wallet data on this device. This action
-              cannot be reversed.
+              This will permanently erase all wallet data, all profiles, and all keys from this
+              device. The app will restart as if freshly installed. This action cannot be reversed.
             </Text>
           </VStack>
 
@@ -195,7 +194,7 @@ export function DeleteScreen() {
 
           <VStack spacing={12} className="w-full items-center">
             <SlideToDelete
-              onComplete={handleDeleteProfile}
+              onComplete={handleDelete}
               trackColor={danger}
               thumbColor={foreground}
               textColor={foreground}

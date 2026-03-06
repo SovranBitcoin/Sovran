@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import {
   GestureHandlerRootView,
@@ -24,21 +24,22 @@ import { getUsername } from '@/shared/lib/username';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfileStore, ProfileEntry } from '@/shared/stores/global/profileStore';
-import { isProfileTransitionInProgress } from '@/shared/lib/profile/profileSessionOrchestrator';
+import {
+  switchToExistingProfile,
+  createAndSwitchProfile,
+  switchToImportedProfile,
+} from '@/shared/lib/profile/profileSessionOrchestrator';
 import { keyImportFailedPopup, profileSwitcherPopup } from '@/shared/lib/popup';
 import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
-import { PROFILE_SWITCHER_CLOSE_SETTLE_MS } from '@/shared/lib/popup/sheets/profile-switcher/constants';
 import type { ProfileSwitcherAction } from '@/shared/lib/popup/actionSheetTypes';
-import { useProfileActionStore } from '@/shared/stores/runtime/profileActionStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 320);
-const CANONICAL_WALLET_ROUTE = '/' as any;
 
-function waitForProfileSwitcherDismiss(): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, PROFILE_SWITCHER_CLOSE_SETTLE_MS);
-  });
+const DRAWER_CLOSE_SETTLE_MS = 300;
+
+function waitForDrawerClose(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, DRAWER_CLOSE_SETTLE_MS));
 }
 
 type MenuItem = {
@@ -67,12 +68,6 @@ const MENU_ITEMS: MenuItem[] = [
     route: '(drawer)/(tabs)/payments',
     drawerLabel: 'payments',
   },
-  // {
-  //   icon: 'clarity:internet-of-things-solid',
-  //   label: 'Explore',
-  //   route: '(drawer)/(tabs)/explore',
-  //   drawerLabel: 'explore',
-  // },
   {
     icon: 'material-symbols:settings-rounded',
     label: 'Settings',
@@ -89,26 +84,19 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
   ] as const);
   const profiles = useProfileStore((s) => s.profiles);
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
-  const [pendingAction, setPendingAction] = useState<ProfileSwitcherAction | null>(null);
 
-  const queueWalletActionAfterDrawerDismiss = useCallback(
-    async (
-      action:
-        | { type: 'create' }
-        | { type: 'switch'; accountIndex: number }
-        | { type: 'import'; nsec: string; pubkeyHex: string; accountIndex: number },
-      cancelledRef: { current: boolean }
-    ) => {
+  const executeProfileAction = useCallback(
+    async (action: ProfileSwitcherAction) => {
       closeDrawer();
-      await waitForProfileSwitcherDismiss();
-      if (cancelledRef.current) return;
+      await waitForDrawerClose();
 
       switch (action.type) {
-        case 'create':
-          useProfileActionStore.getState().requestCreateDerivedProfile();
-          break;
         case 'switch':
-          useProfileActionStore.getState().requestSwitchProfile(action.accountIndex);
+          if (action.accountIndex === activeAccountIndex) return;
+          void switchToExistingProfile({ accountIndex: action.accountIndex });
+          break;
+        case 'create':
+          void createAndSwitchProfile();
           break;
         case 'import': {
           if (useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
@@ -122,68 +110,26 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
             return;
           }
 
-          useProfileActionStore
-            .getState()
-            .requestActivateImportedProfile(action.accountIndex, action.pubkeyHex);
+          if (!useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
+            useProfileStore
+              .getState()
+              .addProfile(action.accountIndex, action.pubkeyHex, 'imported');
+          }
+
+          void switchToImportedProfile({ accountIndex: action.accountIndex });
           break;
         }
       }
-
-      router.replace(CANONICAL_WALLET_ROUTE);
     },
-    [closeDrawer]
+    [closeDrawer, activeAccountIndex]
   );
-
-  const handleRequestProfileAction = useCallback((action: ProfileSwitcherAction) => {
-    setPendingAction(action);
-  }, []);
-
-  useEffect(() => {
-    if (!pendingAction) return;
-
-    let cancelled = false;
-    const cancellation = { current: false };
-
-    const runAction = async () => {
-      await waitForProfileSwitcherDismiss();
-      if (cancelled) return;
-
-      switch (pendingAction.type) {
-        case 'switch':
-          if (pendingAction.accountIndex === activeAccountIndex) return;
-          if (isProfileTransitionInProgress()) return;
-          await queueWalletActionAfterDrawerDismiss(pendingAction, cancellation);
-          break;
-        case 'create':
-          if (isProfileTransitionInProgress()) return;
-          await queueWalletActionAfterDrawerDismiss(pendingAction, cancellation);
-          break;
-        case 'import':
-          if (isProfileTransitionInProgress()) return;
-          await queueWalletActionAfterDrawerDismiss(pendingAction, cancellation);
-          break;
-      }
-
-      if (!cancelled) {
-        setPendingAction(null);
-      }
-    };
-
-    void runAction();
-
-    return () => {
-      cancelled = true;
-      cancellation.current = true;
-    };
-  }, [pendingAction, activeAccountIndex, queueWalletActionAfterDrawerDismiss]);
 
   const handleOpenProfileSheet = useCallback(() => {
     profileSwitcherPopup({
-      onRequestAction: handleRequestProfileAction,
+      onRequestAction: executeProfileAction,
     });
-  }, [handleRequestProfileAction]);
+  }, [executeProfileAction]);
 
-  // Only show selector if there are profiles (should always be true after first launch)
   if (profiles.length === 0) return null;
 
   return (
@@ -199,11 +145,10 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
               key={profile.accountIndex}
               onPress={() => {
                 if (profile.accountIndex === activeAccountIndex) return;
-                if (isProfileTransitionInProgress()) return;
-                void queueWalletActionAfterDrawerDismiss(
-                  { type: 'switch', accountIndex: profile.accountIndex },
-                  { current: false }
-                );
+                void executeProfileAction({
+                  type: 'switch',
+                  accountIndex: profile.accountIndex,
+                });
               }}
               style={[
                 styles.profileAvatarButton,
@@ -323,7 +268,6 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 
   const isRouteActive = useCallback(
     (route: string) => {
-      // Wallet route points to tab index; keep legacy checks for grouped paths.
       if (route === '(drawer)/(tabs)' || route === '(drawer)/(tabs)/index') {
         return (
           pathname === '/' ||
@@ -434,8 +378,6 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     backgroundColor: 'transparent',
-    // padding: 16,
-    // paddingTop: 0,
   },
   profileSelector: {
     marginBottom: 16,

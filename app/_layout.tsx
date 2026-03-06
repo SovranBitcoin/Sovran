@@ -21,6 +21,7 @@ import {
   InitializationProvider,
   INITIALIZATION_DISPLAY_TYPE,
   useInitializationState,
+  useInitializationReset,
 } from '@/shared/providers/InitializationProvider';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PasscodeGate } from '@/features/auth';
@@ -45,6 +46,11 @@ import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListene
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
+import {
+  clearTransitionGuardOnStartup,
+  registerTransitionControls,
+  registerKeyDerivation,
+} from '@/shared/lib/profile/profileSessionOrchestrator';
 
 export const unstable_settings = {
   initialRouteName: '(drawer)',
@@ -103,6 +109,36 @@ function AccountScopedProviders({
   );
 
   return <InnerProviders>{children}</InnerProviders>;
+}
+
+/** Registers resetStages/cancelResetStages with the orchestrator so profile transitions can show a splash. */
+function TransitionControlRegistrar() {
+  const { resetStages, cancelResetStages } = useInitializationReset();
+
+  useEffect(() => {
+    registerTransitionControls({ resetStages, cancelResetStages });
+  }, [resetStages, cancelResetStages]);
+
+  return null;
+}
+
+/** Registers key derivation function with the orchestrator so createAndSwitchProfile can derive keys. */
+function KeyDerivationRegistrar() {
+  const { getKeysForAccount } = useNostrKeysContext();
+
+  useEffect(() => {
+    registerKeyDerivation(getKeysForAccount);
+  }, [getKeysForAccount]);
+
+  return null;
+}
+
+/** Clears the AsyncStorage transition guard on app startup (if leftover from a previous restart). */
+function TransitionGuardCleanup() {
+  useEffect(() => {
+    void clearTransitionGuardOnStartup();
+  }, []);
+  return null;
 }
 
 /** Subscribes to coco mint-quote events and shows payment status sheet for NPC payments */
@@ -228,6 +264,7 @@ function RootLayoutContent() {
 
   return (
     <NavigationThemeProvider value={DarkTheme}>
+      <KeyDerivationRegistrar />
       <PaymentStatusListener />
       <ProfileBalanceSync />
       <ProfileMetadataSync />
@@ -353,6 +390,8 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <OuterProviders>
+        <TransitionControlRegistrar />
+        <TransitionGuardCleanup />
         <NativeSplashLayoutGate>
           <AccountScopedProviders
             key={`account-${activeAccountIndex}`}
@@ -360,9 +399,6 @@ export default function RootLayout() {
             <RootLayoutContent />
           </AccountScopedProviders>
         </NativeSplashLayoutGate>
-        {/* PopupHost lives outside AccountScopedProviders so it is never unmounted
-            during profile switches. This prevents the BottomSheet from being torn
-            down mid-animation, which would leave a native overlay blocking touches. */}
         <PopupHost />
       </OuterProviders>
     </GestureHandlerRootView>

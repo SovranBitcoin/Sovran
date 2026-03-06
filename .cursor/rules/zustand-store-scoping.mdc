@@ -93,12 +93,14 @@ Stores are organized by scope in `shared/stores/{global,profile,runtime}/`.
 Profile switch must produce a clean profile-local session.
 
 Current flow:
-- Triggered via `profileSessionOrchestrator.ts` (switch / create / import flows)
-- Orchestrator runs `CocoManager.cleanup()` (closes SQLite), updates `profileStore`, flushes to AsyncStorage, then triggers a **full app reload** (`Updates.reloadAsync()` / `DevSettings.reload()`)
+- Triggered directly by `profileSessionOrchestrator.ts` functions (no intermediate action queue)
+- Callers (drawer, profile-switcher sheet, delete screen) call `switchToExistingProfile()`, `createAndSwitchProfile()`, `switchToImportedProfile()`, `deleteCurrentProfile()`, or `deleteAllProfiles()` directly
+- Orchestrator runs `CocoManager.cleanup()` (closes SQLite), updates `profileStore`, flushes to AsyncStorage, then triggers a **native app restart** via `restartApp()` (`RNRestart.restart()` in production, `DevSettings.reload()` in dev)
 - On next launch, `AccountScopedProviders` in `app/_layout.tsx` mounts with the new `accountIndex` key, causing a full remount of all inner providers
 - Profile-scoped Zustand stores rehydrate from their `{name}:profile:{pubkey}` AsyncStorage keys via `createProfileScopedStorage()`
+- `TransitionControlRegistrar` and `KeyDerivationRegistrar` in `app/_layout.tsx` register their functions with the orchestrator so callers don't need to prop-thread `resetStages` or `getKeysForAccount`
 
-Note: `rehydrateProfileStores()` in `profileScopedStorage.ts` is **not currently called** — the full reload makes it unnecessary. It is retained for a potential future non-reload switch path.
+Note: `rehydrateProfileStores()` in `profileScopedStorage.ts` is **not currently called** — the native restart makes it unnecessary. It is retained for a potential future non-reload switch path.
 
 Rules:
 - Every store using `createProfileScopedStorage()` must be included in `PROFILE_SCOPED_STORE_KEYS` and (if `rehydrateProfileStores()` is ever activated) in its reset + rehydrate list.

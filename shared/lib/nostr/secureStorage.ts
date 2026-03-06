@@ -170,6 +170,44 @@ export async function clearAllSecureData(
   }
 }
 
+/**
+ * Clears ONLY per-profile secure data for the given account indexes.
+ * Does NOT delete the root mnemonic or the legacy migrations flag.
+ * Use this when removing a single profile while keeping others alive.
+ */
+export async function clearPerProfileSecureData(
+  accountIndexes: number[],
+  importedPubkeys: string[] = []
+): Promise<boolean> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+
+    const keysToDelete: string[] = [];
+
+    for (const i of accountIndexes) {
+      keysToDelete.push(migrationsCompleteKey(i), derivedKeysKey(i), cashuMnemonicKey(i));
+    }
+
+    for (const pubkey of importedPubkeys) {
+      keysToDelete.push(importedNsecKey(pubkey));
+    }
+
+    await Promise.all(
+      keysToDelete.map((key) =>
+        SecureStore.deleteItemAsync(key, options).catch((error) => {
+          console.warn(`Failed to clear ${key}:`, error);
+        })
+      )
+    );
+
+    console.log('Per-profile secure data cleared successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to clear per-profile secure storage:', error);
+    return false;
+  }
+}
+
 // ── Derived Keys Cache ──────────────────────────────────────────
 
 function derivedKeysKey(accountIndex: number): string {
