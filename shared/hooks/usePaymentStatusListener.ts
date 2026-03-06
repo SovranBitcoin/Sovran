@@ -2,7 +2,8 @@
  * Subscribes to coco events for payment status.
  * Receive (mint): mint-quote:state-changed (PAID) or mint-quote:added (PAID) → mint-quote:redeemed.
  * Receive (ecash): toast shown on redeem button → receive:created updates to confirmed.
- * Send: send:finalized only (when recipient redeems, not when token is created).
+ * Send: send:finalized confirms an active send/payment-request toast when present,
+ * otherwise shows the standard send confirmation toast.
  * Melt: toast shown on confirm button → melt-op:finalized updates to confirmed.
  */
 
@@ -142,8 +143,17 @@ export function usePaymentStatusListener(): void {
       }) => {
         const amount = operation.amount;
         const unit = 'sat';
+        const store = usePaymentStatusStore.getState();
+        const hadPending =
+          store.active?.id === operationId &&
+          (store.active.variant === 'send' || store.active.variant === 'payment-request');
 
-        usePaymentStatusStore.getState().setActive({
+        if (hadPending) {
+          store.setConfirmed(operationId);
+          return;
+        }
+
+        store.setActive({
           variant: 'send',
           id: operationId,
           mintUrl,

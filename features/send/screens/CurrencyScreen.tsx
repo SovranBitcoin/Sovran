@@ -51,7 +51,6 @@
 
 import {
   noMintSelectedPopup,
-  nostrPaymentSentPopup,
   noClipboardAddressPopup,
   routstrTopUpSuccessPopup,
   routstrWalletCreatedPopup,
@@ -61,6 +60,7 @@ import {
   noPaymentRequestPopup,
   invalidNostrTransportPopup,
   invalidRecipientPopup,
+  paymentStatusPopup,
   sendPaymentFailedPopup,
 } from '@/shared/lib/popup';
 import {
@@ -89,6 +89,7 @@ import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore, DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
 import opacity from 'hex-color-opacity';
@@ -630,8 +631,22 @@ export function CurrencyScreen({
           // 6. Capture location for the transaction
           await captureAndStoreLocation(historyEntry.id);
 
-          // 7. Show success and navigate to SendTokenScreen
-          nostrPaymentSentPopup();
+          // 7. Show payment-request status and navigate to SendTokenScreen
+          usePaymentStatusStore.getState().setActive({
+            variant: 'payment-request',
+            id: historyEntry.operationId,
+            mintUrl: mintToUse,
+            amount,
+            unit: decodedRequest.unit || 'sat',
+            state: 'processing',
+          });
+          paymentStatusPopup({
+            variant: 'payment-request',
+            id: historyEntry.operationId,
+            mintUrl: mintToUse,
+            amount,
+            unit: decodedRequest.unit || 'sat',
+          });
 
           // Navigate to SendTokenScreen with the history entry + token
           // Pass nostrSent: true so it shows the payment request timeline
