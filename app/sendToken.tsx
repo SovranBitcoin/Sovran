@@ -7,8 +7,7 @@
 
 import React from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
-import { SendTokenScreen } from 'components/screens/SendTokenScreen';
+import { SendTokenScreen } from '@/features/send';
 
 function ModalScreen() {
   const { sendHistoryEntry } = useLocalSearchParams<{ sendHistoryEntry: string }>();
@@ -18,4 +17,4 @@ function ModalScreen() {
   );
 }
 
-export default withSheetProvider(ModalScreen);
+export default ModalScreen;

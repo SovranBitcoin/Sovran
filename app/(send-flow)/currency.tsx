@@ -8,20 +8,18 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Alert, TouchableOpacity } from 'react-native';
-import { withSheetProvider } from 'hocs/withSheetProvider';
-import { CurrencyScreen } from 'components/screens/CurrencyScreen';
-import WalletHeaderTitle from 'components/blocks/WalletHeaderTitle';
+import { CurrencyScreen, useProcessPaymentString } from '@/features/send';
+import { WalletHeaderTitle } from '@/features/wallet';
 import Icon from 'assets/icons';
-import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
-import { useMintStore } from 'stores/mintStore';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   getHeaderTitleWidth,
   getHeaderTitleHeight,
   getHeaderContentWidth,
   getHeaderContentHeight,
-} from 'constants/wallet-header';
+} from '@/features/wallet/lib/walletHeader';
 
 type SendMode = 'offline' | 'online';
 
@@ -186,4 +184,4 @@ function ModalScreen() {
   );
 }
 
-export default withSheetProvider(ModalScreen);
+export default ModalScreen;

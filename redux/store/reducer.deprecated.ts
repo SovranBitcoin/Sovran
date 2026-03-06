@@ -1,0 +1,42 @@
+// In reducer.ts
+import { combineReducers, type Action as ReduxAction } from 'redux';
+import { settingsReducer } from '../settings/reducer.deprecated';
+import { cashuReducer } from '../cashu/reducer.deprecated';
+import { nostrReducer } from '../nostr/reducer.deprecated';
+
+// Action type for reset
+const RESET_APP = 'RESET_APP' as const;
+
+interface ResetAppAction {
+  type: typeof RESET_APP;
+}
+
+// Define the app reducer with proper typing
+const appReducer = combineReducers({
+  settings: settingsReducer,
+  cashu: cashuReducer,
+  nostr: nostrReducer,
+});
+
+// Define RootState from the appReducer
+export type RootState = ReturnType<typeof appReducer>;
+
+type Action = ResetAppAction | ReduxAction;
+
+// Root reducer with reset functionality and proper typing
+const rootReducer = (state: RootState | undefined, action: Action | ReduxAction): RootState => {
+  // If the reset action is fired, return undefined state
+  // This will cause each reducer to return their initial state
+  if ('type' in action && action.type === RESET_APP) {
+    // You can selectively preserve some state if needed
+    // const { settings } = state as RootState;
+    state = undefined;
+
+    // If you want to preserve some state, you can do:
+    // state = { settings } as unknown as RootState;
+  }
+
+  return appReducer(state, action as any);
+};
+
+export default rootReducer;

@@ -1,0 +1,171 @@
+---
+description: Safety, security, and reliability audit for profile-scoped state, secrets, database isolation, and cleanup. Run this periodic audit when touching profile switching, Nostr import, profile generation, secure storage, Cashu DB, or any code that crosses profile boundaries.
+globs:
+  - "shared/lib/profile/**"
+  - "shared/lib/cashu/manager.ts"
+  - "shared/lib/cashu/profileScopedStorage.ts"
+  - "shared/providers/NostrKeysProvider.tsx"
+  - "shared/providers/NostrNDKProvider.tsx"
+  - "shared/stores/**"
+  - "features/settings/screens/DeleteScreen.tsx"
+  - "features/wallet/screens/WalletScreen.tsx"
+  - "app/_layout.tsx"
+  - "app/(drawer)/_layout.tsx"
+alwaysApply: false
+---
+
+# Profile Safety, Security & Reliability Audit
+
+This rule governs the integrity of profile-scoped state, secret material, database isolation, and resource cleanup across the app. It exists because profile switching, Nostr import, profile generation, and account deletion are the highest-risk operations in Sovran — mistakes here can corrupt wallet data, leak secrets across profiles, or leave the app in an unrecoverable state.
+
+Read this before touching: profile switching, profile creation, Nostr nsec import, account deletion, CocoManager lifecycle, secure storage keys, profile-scoped Zustand stores, or any code that reads `activeAccountIndex` / profile pubkeys outside of `AccountScopedProviders`.
+
+---
+
+## Periodic Audit Prompt
+
+The following prompt is designed to be run periodically by an agent. It should not assume any specific solution — it should investigate the current state of the codebase and flag concerns. Smarter models may find issues that previous audits missed, or may propose architectural improvements that simplify maintenance.
+
+> **Audit task**: Perform a comprehensive safety, security, and reliability review of profile-scoped code in this project. Investigate the following areas and report any concerns, regressions, or improvement opportunities. Do not limit yourself to previously known issues — approach the codebase with fresh eyes. Architectural changes that make the code simpler, safer, or more maintainable are welcome.
+>
+> **Areas to investigate:**
+>
+> 1. **Secret material isolation**: Are mnemonics, nsecs, private keys, and Cashu seeds properly isolated per profile? Can any code path leak a secret from one profile to another? Check `expo-secure-store` key patterns, `SecureStore` reads/writes, and any in-memory caching of secrets.
+>
+> 2. **Database isolation**: Does CocoManager open and close the correct SQLite database for each profile? Are there any code paths that could read from or write to the wrong `.db` file during or after a profile switch? Check all `openDatabaseAsync` calls and DB name derivation.
+>
+> 3. **Profile-scoped store correctness**: Do all Zustand stores in `shared/stores/profile/` correctly scope their AsyncStorage keys via `createProfileScopedStorage()`? Is there any risk of hydration-order races where a store reads before `profileStore` has finished hydrating? Are all profile-scoped stores registered in `PROFILE_SCOPED_STORE_KEYS`?
+>
+> 4. **Cleanup completeness**: When `CocoManager.cleanup()` runs during a profile switch, does it properly: close the SQLite connection, disable all watchers/processors, null the instance, clear sensitive in-memory state (signer keys, mnemonics, NPC plugin)? Are there any async operations that could outlive cleanup?
+>
+> 5. **Profile switch lifecycle**: Trace the full profile switch flow from user intent (drawer/sheet) through action queuing, wallet-screen execution, orchestrator, and hard reload. Are there race conditions, stuck guards, or timing windows where the old profile's state could bleed into the new session?
+>
+> 6. **Nostr import safety**: When importing an nsec, is the private key stored securely before any profile state is mutated? Is duplicate detection correct? Could a failed import leave partial state (e.g., profile entry without stored nsec, or stored nsec without profile entry)?
+>
+> 7. **NDK and relay connections**: Are NDK instances and relay connections properly torn down before profile switch reload? Could stale relay subscriptions or cached events from profile A appear in profile B's session?
+>
+> 8. **Components outside AccountScopedProviders**: PopupHost, PaymentStatusToast, and other components that live outside the scoped provider tree — do they safely handle the case where CocoManager is not initialized or has been cleaned up? Could they access stale profile data?
+>
+> 9. **Global runtime stores**: Are runtime-only stores (paymentStatusStore, profileActionStore, popupStore) properly cleared during profile transitions? Could stale state from the previous session cause incorrect behavior?
+>
+> 10. **AsyncStorage persistence timing**: When `profileStore` is mutated and then flushed to AsyncStorage before a hard reload, is the flush guaranteed to complete? Could a crash during flush leave the store in an inconsistent state?
+>
+> 11. **Account index correctness**: Are there any code paths that use truthy checks on `accountIndex` (e.g., `if (accountIndex)`) instead of explicit comparisons? Account index 0 is valid and must not be treated as falsy.
+>
+> 12. **Delete account completeness**: Does the delete flow remove all per-profile data: SecureStore keys, AsyncStorage profile-scoped keys, SQLite databases, NDK cache databases? Are there orphaned resources after deletion?
+>
+> Report findings ordered by severity (HIGH / MEDIUM / LOW). For each finding, describe the risk, the affected code path, and a suggested fix. If you find the current implementation is sound, say so explicitly and explain why.
+
+---
+
+## Previously Addressed Concerns
+
+The following issues have been identified and fixed in past audits. They are listed here so future auditors know the history, can verify the fixes are still intact, and can evaluate whether the solutions are still optimal as the codebase evolves.
+
+### SQLite connection lifecycle (HIGH — fixed)
+
+**Issue**: `CocoManager.cleanup()` nulled the instance without closing the SQLite connection, risking "database is locked" errors on profile revisit.
+
+**Fix**: Added `this.db` static field to retain the SQLite reference. `cleanup()` now calls `db.closeAsync()` before nulling. Error path also closes the connection.
+
+**Files**: `shared/lib/cashu/manager.ts`
+
+### Late `activeAccountIndex` read in async callbacks (HIGH — fixed)
+
+**Issue**: `updateLegacyHistoryState` in `SendTokenScreen` read `profileStore.getState().activeAccountIndex` at async callback time, not at send initiation time. A profile switch between send and callback could target the wrong DB.
+
+**Fix**: `accountIndex` is now captured at render time via `useProfileStore` hook and passed as a parameter to `updateLegacyHistoryState`.
+
+**Files**: `features/send/screens/SendTokenScreen.tsx`
+
+### Async handler outliving cleanup (MEDIUM — fixed)
+
+**Issue**: `usePaymentStatusListener`'s `receive:created` handler had a 50ms `setTimeout` that could fire after `CocoManager.cleanup()`, calling methods on a destroyed manager.
+
+**Fix**: Added a `cancelledRef` that is set `true` in effect cleanup. The handler checks it after the delay.
+
+**Files**: `shared/hooks/usePaymentStatusListener.ts`
+
+### Payment status toast persistence across profiles (MEDIUM — fixed)
+
+**Issue**: `paymentStatusStore` (global runtime) was not cleared during profile switch, so toasts from the old profile could appear in the new session.
+
+**Fix**: `reloadAtTransitionEnd()` in the orchestrator now calls `usePaymentStatusStore.getState().setActive(null)` before reload.
+
+**Files**: `shared/lib/profile/profileSessionOrchestrator.ts`
+
+### Hydration order race for profile-scoped stores (MEDIUM — fixed)
+
+**Issue**: `createProfileScopedStorage()` read `getActiveProfilePubkey()` synchronously, but `profileStore` might not have finished Zustand `persist` rehydration yet, causing stores to read from bare keys instead of profile-scoped keys.
+
+**Fix**: Added `ensureProfileStoreHydrated()` which awaits `profileStore.persist.onFinishHydration()`. All storage adapter methods (`getItem`, `setItem`, `removeItem`) now await this before reading the pubkey.
+
+**Files**: `shared/lib/cashu/profileScopedStorage.ts`
+
+### Unguarded CocoManager access from PopupHost (LOW — fixed)
+
+**Issue**: `PaymentStatusToast` and `popups/payment.ts` called `CocoManager.getInstance()` without checking initialization, risking null dereference during transition windows.
+
+**Fix**: Added `CocoManager.isInitialized()` guard before `getInstance()` calls.
+
+**Files**: `shared/lib/popup/PaymentStatusToast.tsx`, `shared/lib/popup/popups/payment.ts`
+
+### NostrNDKProvider reading profileStore directly (LOW — fixed)
+
+**Issue**: `NostrNDKProvider` read `activeAccountIndex` from `profileStore` instead of receiving it as a prop, creating a subtle coupling where the old component could briefly see the new index before remount.
+
+**Fix**: `NostrNDKProvider` now accepts `accountIndex` as an optional prop, passed from `AccountScopedProviders`.
+
+**Files**: `shared/providers/NostrNDKProvider.tsx`, `app/_layout.tsx`
+
+### Ghost FullWindowOverlay blocking touches after reload (HIGH — fixed)
+
+**Issue**: The profile switcher bottom sheet's `FullWindowOverlay` (native iOS UIWindow) could survive a restart boundary, capture touches, and make the app unresponsive.
+
+**Fix**: Added `destroyed` flag and `destroySheet()` to `popupStore`, and the profile orchestrator now calls `destroySheet()` before restart so the native overlay tears down cleanly.
+
+**Additional hardening**: `restartApp()` now uses `RNRestart.restart()` in production instead of `Updates.reloadAsync()`, which removes the JS-reload-only path that previously left native windows alive.
+
+**Files**: `shared/blocks/popup/PopupHost.tsx`, `shared/lib/profile/appRestart.ts`
+
+### Repeat profile switch failure (HIGH — fixed, then redesigned)
+
+**Issue**: Module-level `transitionInProgress` flag survived JS reloads, blocking all subsequent switch attempts until app kill.
+
+**Original Fix**: Added `transitionStartedAt` timestamp and `TRANSITION_EXPIRY_MS` (10s) auto-expiry.
+
+**Architecture Redesign**: The entire WalletScreen action queue pattern was eliminated. The module-level transition guard was replaced with an AsyncStorage-based guard that correctly survives native restarts and is cleared on app startup via `clearTransitionGuardOnStartup()`. Profile actions now call orchestrator functions directly from drawer/sheet instead of queueing through `profileActionStore` → navigate → WalletScreen. `profileActionStore.ts` has been deleted.
+
+**Files**: `shared/lib/profile/profileSessionOrchestrator.ts`, `app/(drawer)/_layout.tsx`, `app/_layout.tsx`
+
+---
+
+## Key Invariants
+
+These are non-negotiable rules that must hold true at all times:
+
+1. **Secrets never cross profiles**: A profile's nsec, private key, mnemonic, or Cashu seed must never be accessible to code running in the context of a different profile.
+2. **Database isolation is absolute**: Each profile's `.db` file must only be opened by CocoManager when that profile is active. No code path should open a database for a non-active profile without explicit justification.
+3. **Cleanup before switch**: `CocoManager.cleanup()` must close the SQLite connection and clear all sensitive in-memory state before any new profile is activated.
+4. **Account index 0 is valid**: Never use truthy checks (`if (accountIndex)`) — always use explicit comparisons (`accountIndex === 0`, `accountIndex >= 0`).
+5. **Profile-scoped stores must be registered**: Every store using `createProfileScopedStorage()` must appear in `PROFILE_SCOPED_STORE_KEYS` for correct cleanup on account deletion.
+6. **Native restart is the profile switch boundary**: Profile switches end with `restartApp()` which uses `RNRestart.restart()` in production (not `Updates.reloadAsync()` which silently fails without expo-updates config). In dev, `DevSettings.reload()` is used. No in-memory state from the previous profile should survive into the new session.
+7. **Imported nsecs use npubNumber**: Imported profiles must use `pubkeyToAccountNumber(pubkeyHex)` as their `accountIndex`, never a sequential integer.
+
+---
+
+## Verification
+
+```bash
+npm test                # Key derivation tests verify isolation
+npm run type-check      # Catches accountIndex type misuse
+npm run lint            # Catches missing dependencies in effects
+```
+
+Manual verification for profile operations:
+- Switch profile from drawer avatars — app responsive after reload
+- Switch profile from bottom sheet — app responsive after reload
+- Generate new derived profile — correct DB created, keys isolated
+- Import nsec — private key stored at correct SecureStore key, Cashu mnemonic uses chain 1
+- Delete account — all per-profile data removed, no orphaned storage
+- Repeat switch multiple times in one session — no stuck guards

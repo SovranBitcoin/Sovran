@@ -1,33 +1,32 @@
 import { useCallback, useMemo } from 'react';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Stack, router } from 'expo-router';
 import { useWindowDimensions, View } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
-import { useMintStore } from 'stores/mintStore';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useBtcPrice } from 'stores/pricelistStore';
-import { useSettingsStore } from 'stores/settingsStore';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useBalanceContext, useManager } from 'coco-cashu-react';
-import { useSendWithHistory } from '@/hooks/coco/useSendWithHistory';
+import { useSendWithHistory } from '@/features/send';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import WalletHeaderTitle from '@/components/blocks/WalletHeaderTitle';
+import { WalletHeaderTitle, useWalletHeaderState } from '@/features/wallet';
+import { useMintManagement } from '@/features/mint';
 import {
   AndroidLiquidHeaderOverlay,
   AndroidLiquidHeaderTitleButton,
   buildExpoRouterHeaderOptions,
   isAndroidLiquidHeaderSupported,
-} from '@/components/navigation/expoRouter55';
-import { useMintManagement } from '@/hooks/coco/useMintManagement';
+} from '@/navigation/nativeTabs';
 import {
   getHeaderTitleWidthFromWidth,
   getHeaderTitleHeight,
   getHeaderContentWidthFromWidth,
   getHeaderContentHeight,
-} from '@/constants/wallet-header';
-import { useWalletHeaderState } from '@/hooks/useWalletHeaderState';
-import { useNfcEcashPayment } from '@/hooks/useNfcEcashPayment';
+} from '@/features/wallet/lib/walletHeader';
+import { useNfcEcashPayment } from '@/shared/hooks/useNfcEcashPayment';
 
-export { HEADER_LAYOUT, MOCK_NFC_SUCCESS_SATS } from '@/constants/wallet-header';
+export { HEADER_LAYOUT, MOCK_NFC_SUCCESS_SATS } from '@/features/wallet/lib/walletHeader';
 
 export default function HomeLayout() {
   const iconColor = useThemeColor('foreground');
@@ -37,7 +36,7 @@ export default function HomeLayout() {
   const useAndroidLiquidHeader = isAndroidLiquidHeaderSupported();
   const { send } = useSendWithHistory();
   const manager = useManager();
-  const { mints } = useMintManagement();
+  const { mints, isLoading: isMintsLoading } = useMintManagement();
   const { keys } = useNostrKeysContext();
   const getSelectedMint = useMintStore((state) => state.getSelectedMint);
   const selectedMint = keys?.pubkey ? getSelectedMint(keys.pubkey) : undefined;
@@ -57,6 +56,7 @@ export default function HomeLayout() {
     selectedMint,
     balanceForMint: headerBalance,
     mints,
+    isMintsLoading,
   });
 
   const usdToSats = useCallback(

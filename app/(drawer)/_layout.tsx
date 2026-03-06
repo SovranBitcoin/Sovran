@@ -11,26 +11,36 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { useInitializationReset } from 'providers/InitializationProvider';
-import { Text } from 'components/ui/Text';
-import { TouchableOpacity } from 'components/ui/TouchableOpacity';
-import { VStack } from 'components/ui/View/VStack';
-import { HStack } from 'components/ui/View/HStack';
-import { View } from 'components/ui/View/View';
-import { Spacer } from 'components/ui/View/Spacer';
-import { Avatar } from 'components/ui/Avatar';
-import { getUsername } from 'helper/username';
-import { useProfileDisplay } from '@/hooks/useProfileDisplay';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { Text } from '@/shared/ui/primitives/Text';
+import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { HStack } from '@/shared/ui/primitives/View/HStack';
+import { View } from '@/shared/ui/primitives/View/View';
+import { Spacer } from '@/shared/ui/primitives/View/Spacer';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { getUsername } from '@/shared/lib/username';
+import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useProfileStore, ProfileEntry } from '@/stores/profileStore';
-import { CocoManager } from '@/helper/coco/manager';
-import { rehydrateProfileStores } from '@/helper/profileScopedStorage';
-import { SheetManager } from 'react-native-actions-sheet';
+import { useProfileStore, ProfileEntry } from '@/shared/stores/global/profileStore';
+import {
+  switchToExistingProfile,
+  createAndSwitchProfile,
+  switchToImportedProfile,
+} from '@/shared/lib/profile/profileSessionOrchestrator';
+import { keyImportFailedPopup, profileSwitcherPopup } from '@/shared/lib/popup';
+import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
+import type { ProfileSwitcherAction } from '@/shared/lib/popup/actionSheetTypes';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 320);
+
+const DRAWER_CLOSE_SETTLE_MS = 300;
+
+function waitForDrawerClose(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, DRAWER_CLOSE_SETTLE_MS));
+}
 
 type MenuItem = {
   icon: string;
@@ -58,16 +68,10 @@ const MENU_ITEMS: MenuItem[] = [
     route: '(drawer)/(tabs)/payments',
     drawerLabel: 'payments',
   },
-  // {
-  //   icon: 'clarity:internet-of-things-solid',
-  //   label: 'Explore',
-  //   route: '(drawer)/(tabs)/explore',
-  //   drawerLabel: 'explore',
-  // },
   {
     icon: 'material-symbols:settings-rounded',
     label: 'Settings',
-    route: 'settings-pages',
+    route: '(settings-flow)',
     drawerLabel: 'settings',
   },
 ];
@@ -78,119 +82,54 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
     'default',
     'shade-400',
   ] as const);
-  const { getKeysForAccount } = useNostrKeysContext();
-  const { resetStages, cancelResetStages } = useInitializationReset();
   const profiles = useProfileStore((s) => s.profiles);
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
 
-  // Guard against concurrent profile switches (double-tap / rapid taps)
-  const switchInProgress = useRef(false);
-
-  const handleSwitchProfile = useCallback(
-    async (accountIndex: number) => {
-      if (accountIndex === activeAccountIndex) return;
-      if (switchInProgress.current) return;
-      switchInProgress.current = true;
-
-      try {
-        // 1. Close drawer immediately
-        closeDrawer();
-
-        // 2. Show loading screen instantly
-        resetStages();
-
-        // 3. Cleanup Coco manager
-        await CocoManager.cleanup();
-
-        // 4. Switch profile (sets activeAccountIndex)
-        useProfileStore.getState().switchProfile(accountIndex);
-
-        // 5. Rehydrate all profile-scoped stores from new profile's storage
-        await rehydrateProfileStores();
-
-        // 6. Key change in _layout.tsx triggers full inner provider remount
-      } catch (error) {
-        console.error('Failed to switch profile:', error);
-        cancelResetStages();
-      } finally {
-        switchInProgress.current = false;
-      }
-    },
-    [activeAccountIndex, closeDrawer, resetStages, cancelResetStages]
-  );
-
-  const handleAddProfile = useCallback(async () => {
-    if (switchInProgress.current) return;
-    switchInProgress.current = true;
-
-    try {
-      // 1. Close drawer and show loading screen instantly — no perceived delay
+  const executeProfileAction = useCallback(
+    async (action: ProfileSwitcherAction) => {
       closeDrawer();
-      resetStages();
+      await waitForDrawerClose();
 
-      const nextIndex = useProfileStore.getState().getNextAccountIndex();
+      switch (action.type) {
+        case 'switch':
+          if (action.accountIndex === activeAccountIndex) return;
+          void switchToExistingProfile({ accountIndex: action.accountIndex });
+          break;
+        case 'create':
+          void createAndSwitchProfile();
+          break;
+        case 'import': {
+          if (useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
+            keyImportFailedPopup({ text: 'This identity already exists as a profile.' });
+            return;
+          }
 
-      // 2. Derive keys (crypto work happens behind the loading screen)
-      const newKeys = await getKeysForAccount(nextIndex);
-      if (!newKeys?.pubkey) {
-        console.warn('Failed to derive keys for new profile');
-        cancelResetStages();
-        return;
-      }
+          const stored = await storeImportedNsec(action.pubkeyHex, action.nsec);
+          if (!stored) {
+            keyImportFailedPopup({ text: 'Failed to store nsec securely.' });
+            return;
+          }
 
-      // 3. Store the new profile
-      useProfileStore.getState().addProfile(nextIndex, newKeys.pubkey);
+          if (!useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
+            useProfileStore
+              .getState()
+              .addProfile(action.accountIndex, action.pubkeyHex, 'imported');
+          }
 
-      // 4. Cleanup Coco, switch profile, rehydrate stores
-      await CocoManager.cleanup();
-      useProfileStore.getState().switchProfile(nextIndex);
-      await rehydrateProfileStores();
-
-      // 5. Key change in _layout.tsx triggers full inner provider remount
-    } catch (error) {
-      console.error('Failed to add profile:', error);
-      cancelResetStages();
-    } finally {
-      switchInProgress.current = false;
-    }
-  }, [getKeysForAccount, closeDrawer, resetStages, cancelResetStages]);
-
-  const handleImportProfile = useCallback(
-    async (npubNumber: number) => {
-      if (switchInProgress.current) return;
-      switchInProgress.current = true;
-
-      try {
-        closeDrawer();
-        resetStages();
-
-        // Profile entry already created by ImportNsec component.
-        // Clean up and switch to the imported profile.
-        await CocoManager.cleanup();
-        useProfileStore.getState().switchProfile(npubNumber);
-        await rehydrateProfileStores();
-      } catch (error) {
-        console.error('Failed to switch to imported profile:', error);
-        cancelResetStages();
-      } finally {
-        switchInProgress.current = false;
+          void switchToImportedProfile({ accountIndex: action.accountIndex });
+          break;
+        }
       }
     },
-    [closeDrawer, resetStages, cancelResetStages]
+    [closeDrawer, activeAccountIndex]
   );
 
   const handleOpenProfileSheet = useCallback(() => {
-    SheetManager.show('profile-switcher', {
-      context: 'global',
-      payload: {
-        onSwitchProfile: handleSwitchProfile,
-        onAddProfile: handleAddProfile,
-        onImportProfile: handleImportProfile,
-      },
+    profileSwitcherPopup({
+      onRequestAction: executeProfileAction,
     });
-  }, [handleSwitchProfile, handleAddProfile, handleImportProfile]);
+  }, [executeProfileAction]);
 
-  // Only show selector if there are profiles (should always be true after first launch)
   if (profiles.length === 0) return null;
 
   return (
@@ -204,7 +143,13 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
           return (
             <TouchableOpacity
               key={profile.accountIndex}
-              onPress={() => handleSwitchProfile(profile.accountIndex)}
+              onPress={() => {
+                if (profile.accountIndex === activeAccountIndex) return;
+                void executeProfileAction({
+                  type: 'switch',
+                  accountIndex: profile.accountIndex,
+                });
+              }}
               style={[
                 styles.profileAvatarButton,
                 isActive && {
@@ -217,7 +162,6 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
                 picture={profile.cachedPicture}
                 name={profile.cachedDisplayName || getUsername(profile.pubkey)}
                 size={30}
-                variant="person"
               />
             </TouchableOpacity>
           );
@@ -267,13 +211,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
         <TouchableOpacity style={styles.profileTouchable} onPress={handlePress}>
           {nostrKeys?.pubkey && (
             <VStack align="center" spacing={16}>
-              <Avatar
-                seed={nostrKeys?.pubkey}
-                picture={picture}
-                name={displayName}
-                size={64}
-                variant="person"
-              />
+              <Avatar seed={nostrKeys?.pubkey} picture={picture} name={displayName} size={64} />
               <VStack align="center" spacing={8}>
                 <Text bold size={20} style={{ textAlign: 'center', color: foreground }}>
                   {displayName}
@@ -330,7 +268,6 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 
   const isRouteActive = useCallback(
     (route: string) => {
-      // Wallet route points to tab index; keep legacy checks for grouped paths.
       if (route === '(drawer)/(tabs)' || route === '(drawer)/(tabs)/index') {
         return (
           pathname === '/' ||
@@ -441,8 +378,6 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     backgroundColor: 'transparent',
-    // padding: 16,
-    // paddingTop: 0,
   },
   profileSelector: {
     marginBottom: 16,

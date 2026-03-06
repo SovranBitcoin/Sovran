@@ -1,10 +1,10 @@
 ---
 description: Security-critical rules for mnemonic handling, key derivation, and secure storage boundaries.
 globs:
-  - "helper/keyDerivation.ts"
-  - "helper/secureStorage.ts"
-  - "providers/NostrKeysProvider.tsx"
-  - "providers/CocoManagerProvider.tsx"
+  - "shared/lib/nostr/keyDerivation.ts"
+  - "shared/lib/nostr/secureStorage.ts"
+  - "shared/providers/NostrKeysProvider.tsx"
+  - "shared/lib/cashu/manager.ts"
   - "__tests__/keyDerivation.test.ts"
   - "scripts/generate-test-vectors.ts"
 alwaysApply: true
@@ -73,6 +73,8 @@ Imported nsec is stored securely at SecureStore key `imported_nsec_<pubkeyHex>`.
 
 Duplicate protection: before import, check all existing profile pubkeys. Reject if the identity already exists in any profile (derived or imported).
 
+**Must use npubNumber for imported profiles**: For any imported profile, the `accountIndex` stored in the profile entry and used for DB naming, SecureStore keys (`cashu_mnemonic_{n}`, `migrations_complete_{n}`), and profile-scoped storage MUST be the npubNumber from `pubkeyToAccountNumber(pubkeyHex)`. Never use a sequential index (0, 1, 2...) for imported profiles — that would collide with derived profiles and corrupt data. When adding an imported profile: `addProfile(pubkeyToAccountNumber(pubkeyHex), pubkeyHex, 'imported')`.
+
 ## 1. Nostr Keys (NIP-06)
 
 ### What they are
@@ -138,7 +140,7 @@ These vectors are verified by `npm test` (see `__tests__/keyDerivation.test.ts`)
 
 ### Where they're consumed
 
-- **`helper/keyDerivation.ts`** — `deriveNostrKeys(M, N)` is the single source of truth; all consumers below use keys derived through this function
+- **`shared/lib/nostr/keyDerivation.ts`** — `deriveNostrKeys(M, N)` is the single source of truth; all consumers below use keys derived through this function
 - **`NostrNDKProvider`** — `new NDKPrivateKeySigner(privateKey)` to authenticate with relays
 - **`CocoManager`** — `new NsecSigner(privateKey)` → wraps in `NPCPlugin` for signing Cashu NPC events
 - **DM screens** — `privateKey` signs/encrypts gift-wrap messages (NIP-44)
@@ -188,7 +190,7 @@ The coco-cashu-core `Manager` requires a deterministic seed to:
 
 ### Where it's consumed
 
-- **`helper/keyDerivation.ts`** — `deriveCashuMnemonic(M, N)` is the single source of truth
+- **`shared/lib/nostr/keyDerivation.ts`** — `deriveCashuMnemonic(M, N)` is the single source of truth
 - **`CocoManager.initialize()`** — The `seedGetter` callback converts the cashu mnemonic to a 64-byte seed via `deriveCashuWalletSeed()`, passed to the `Manager` constructor
 - **`settings-pages/profile.tsx`** — Displayed in settings for user backup
 
@@ -288,7 +290,7 @@ The active account index is stored in `profileStore.activeAccountIndex` (persist
 
 ## Reproduction Steps
 
-All derivation logic lives in `helper/keyDerivation.ts` — every consumer (`NostrKeysProvider`, `CocoManager`) calls through these functions. To reproduce all derived data from a mnemonic `M` and account index `N`:
+All derivation logic lives in `shared/lib/nostr/keyDerivation.ts` — every consumer (`NostrKeysProvider`, `CocoManager`) calls through these functions. To reproduce all derived data from a mnemonic `M` and account index `N`:
 
 ```ts
 import {
@@ -299,7 +301,7 @@ import {
   pubkeyToAccountNumber,
   deriveCashuMnemonicForImported,
   deriveCashuWalletSeedForImported,
-} from 'helper/keyDerivation';
+} from '@/shared/lib/nostr/keyDerivation';
 
 // ── Derived profiles ──
 // 1. Nostr keys (NIP-06: m/44'/1237'/N'/0/0)

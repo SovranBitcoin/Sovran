@@ -1,7 +1,7 @@
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Stack } from 'expo-router';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
-import { buildExpoRouterHeaderOptions } from '@/components/navigation/expoRouter55';
+import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 
 export default function FeedLayout() {
   const iconColor = useThemeColor('foreground');

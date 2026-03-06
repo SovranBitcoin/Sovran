@@ -8,8 +8,7 @@
 
 import React from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
-import { UserMessagesScreen } from 'components/screens/UserMessagesScreen';
+import { UserMessagesScreen } from '@/features/user';
 
 function ModalScreen() {
   const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
@@ -22,4 +21,4 @@ function ModalScreen() {
   return <UserMessagesScreen pubkey={pubkey} onBack={handleBack} />;
 }
 
-export default withSheetProvider(ModalScreen);
+export default ModalScreen;

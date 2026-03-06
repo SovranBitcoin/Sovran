@@ -13,11 +13,10 @@
 import React, { useCallback } from 'react';
 import { Alert } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
-import { MintListScreen } from 'components/screens/MintListScreen';
-import { useMeltWithHistory } from '@/hooks/coco/useMeltWithHistory';
-import { useScanHistoryStore } from 'stores/scanHistoryStore';
-import { captureAndStoreLocation } from '@/hooks/useTransactionLocation';
+import { MintListScreen } from '@/features/mint';
+import { useMeltWithHistory } from '@/features/send';
+import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
+import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import type { Mint } from 'coco-cashu-core';
 
 function MintSelectRoute() {
@@ -132,4 +131,4 @@ function MintSelectRoute() {
   );
 }
 
-export default withSheetProvider(MintSelectRoute);
+export default MintSelectRoute;

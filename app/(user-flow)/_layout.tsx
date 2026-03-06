@@ -12,7 +12,7 @@
  */
 
 import { Stack } from 'expo-router';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
 
 export default function UserFlowLayout() {

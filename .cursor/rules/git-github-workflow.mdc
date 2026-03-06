@@ -87,7 +87,7 @@ Derive from diff paths first, then feature intent. Pick **one** primary scope pe
 
 | Scope | Covers |
 |---|---|
-| `ui` | `components/ui/*`, general visual/layout, pill styling, skeleton, text |
+| `ui` | `shared/ui/*`, general visual/layout, pill styling, skeleton, text |
 | `app` | `app/*` top-level, offline shell, launch, widget target, release automation |
 | `camera` | QR scanning, camera permissions, camera lock |
 | `nfc` | NFC payment flow, NFC rollback, NFC tap |
@@ -98,19 +98,19 @@ Derive from diff paths first, then feature intent. Pick **one** primary scope pe
 | `rebalance` | Rebalance chain cards, step grouping |
 | `transactions` | Transaction screens, source/P2PK details |
 | `keyring` | P2PK key regeneration, keyring settings |
-| `keys` | Key derivation, NIP-06, NUT-13, `helper/keyDerivation*` |
+| `keys` | Key derivation, NIP-06, NUT-13, `shared/lib/nostr/keyDerivation*` |
 | `profile` | Account session isolation, multi-profile, profile switch |
 | `settings` | Settings pages, dev mode, preferences |
 | `home` | Dashboard widgets, native headers |
 | `explore` | Explore tab, wallet health modal |
 | `map` | Map flow, BTC Map, map performance |
 | `lists` | LegendList, virtualized feeds |
-| `popup` | `helper/popup/*`, toast/sheet system |
+| `popup` | `shared/lib/popup/*`, toast/sheet system |
 | `theme` | Theme engine, HeroUI semantics, `themeEngine.ts` |
-| `providers` | `providers/*`, NDK, ThemeProvider |
-| `store` | `stores/*`, Zustand stores |
-| `hooks` | `hooks/*` |
-| `blocks` | `components/blocks/*` |
+| `providers` | `shared/providers/*`, NDK, ThemeProvider |
+| `store` | `shared/stores/*`, Zustand stores |
+| `hooks` | `shared/hooks/*` |
+| `blocks` | `shared/blocks/*` |
 | `tx` | Transaction timeline, history rerenders |
 | `widget` | iOS/Android widget target |
 | `repo` | Repo-level docs, commit guidance |

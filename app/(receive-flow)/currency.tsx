@@ -6,18 +6,16 @@
 
 import React from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
-import { CurrencyScreen } from 'components/screens/CurrencyScreen';
-import WalletHeaderTitle from 'components/blocks/WalletHeaderTitle';
-import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
-import { useMintStore } from 'stores/mintStore';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { CurrencyScreen, useProcessPaymentString } from '@/features/send';
+import { WalletHeaderTitle } from '@/features/wallet';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import {
   getHeaderTitleWidth,
   getHeaderTitleHeight,
   getHeaderContentWidth,
   getHeaderContentHeight,
-} from 'constants/wallet-header';
+} from '@/features/wallet/lib/walletHeader';
 
 function ModalScreen() {
   const params = useLocalSearchParams<{
@@ -108,4 +106,4 @@ function ModalScreen() {
   );
 }
 
-export default withSheetProvider(ModalScreen);
+export default ModalScreen;

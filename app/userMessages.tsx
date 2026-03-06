@@ -7,10 +7,9 @@
 
 import React, { useEffect } from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
-import { UserMessagesScreen } from 'components/screens/UserMessagesScreen';
-import { useRoutstrStore } from 'stores/routstrStore';
-import { ROUTSTR_PUBKEY } from 'helper/constants';
+import { UserMessagesScreen } from '@/features/user';
+import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+import { ROUTSTR_PUBKEY } from '@/shared/lib/constants';
 
 function ModalScreen() {
   const { pubkey, model } = useLocalSearchParams<{ pubkey: string; model?: string }>();
@@ -26,4 +25,4 @@ function ModalScreen() {
   return <UserMessagesScreen pubkey={pubkey} />;
 }
 
-export default withSheetProvider(ModalScreen);
+export default ModalScreen;

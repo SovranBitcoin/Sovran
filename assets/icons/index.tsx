@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
 import Svg, { Circle, Defs, Path, Rect, Stop, LinearGradient } from 'react-native-svg';
 
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Monicon } from '@monicon/native';
 
 import { Animated, StyleProp, ViewStyle } from 'react-native';
 import { Easing } from 'react-native-reanimated';
-import { View } from 'components/ui/View/View';
+import { View } from '@/shared/ui/primitives/View/View';
 
 type IconProps = {
   name: string;

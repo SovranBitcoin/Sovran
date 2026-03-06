@@ -8,44 +8,49 @@ import 'intl';
 import 'intl/locale-data/jsonp/en';
 import 'react-native-reanimated';
 
-import { registerAllSheets } from '@/components/blocks/sheets/registerSheets';
-import { useFonts } from '@/hooks/useFonts';
-import { initLog } from '@/helper/initTiming';
+import { useFonts } from '@/shared/hooks/useFonts';
+import { initLog } from '@/shared/lib/initTiming';
 import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Image, LogBox, TouchableOpacity, Platform, View } from 'react-native';
-import { supportsLiquidGlass } from '@/helper/version';
+import { supportsLiquidGlass } from '@/shared/lib/version';
 
-import AppGate from '@/components/blocks/AppGate';
-import MigrationGate from '@/components/blocks/MigrationGate';
+import AppGate from '@/shared/blocks/AppGate';
+import MigrationGate from '@/shared/blocks/MigrationGate';
 import {
   InitializationProvider,
   INITIALIZATION_DISPLAY_TYPE,
   useInitializationState,
-} from '@/providers/InitializationProvider';
+  useInitializationReset,
+} from '@/shared/providers/InitializationProvider';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
-import PasscodeGate from 'components/blocks/passcode/PasscodeGate';
-import { compose } from 'helper/utils';
-import { NostrKeysProvider, useNostrKeysContext } from 'providers/NostrKeysProvider';
-import { NostrNDKProvider } from 'providers/NostrNDKProvider';
-import { PricelistProvider } from 'providers/PricelistProvider';
-import { ThemeProvider, useTheme } from 'providers/ThemeProvider';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { PasscodeGate } from '@/features/auth';
+import { compose } from '@/shared/lib/utils';
+import { NostrKeysProvider, useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
+import { PricelistProvider } from '@/shared/providers/PricelistProvider';
+import { ThemeProvider, useTheme } from '@/shared/providers/ThemeProvider';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { SheetProvider } from 'react-native-actions-sheet';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
-import { persistor, store } from 'redux/store';
+import { persistor, store } from '@/redux/store/store.deprecated';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
-import { CocoProvider } from '@/helper/coco/CocoProvider';
-import { HeroTransitionProvider } from '@/components/ui/hero-transition/HeroTransitionProvider';
-import { useProfileStore } from '@/stores/profileStore';
-import { useAppBalance } from '@/hooks/useAppBalance';
+import { CocoProvider } from '@/shared/providers/CocoProvider';
+import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { useAppBalance } from '@/features/wallet';
+import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
-import PopupHost from '@/components/blocks/popup/PopupHost';
+import PopupHost from '@/shared/blocks/popup/PopupHost';
+import {
+  clearTransitionGuardOnStartup,
+  registerTransitionControls,
+  registerKeyDerivation,
+} from '@/shared/lib/profile/profileSessionOrchestrator';
 
 export const unstable_settings = {
   initialRouteName: '(drawer)',
@@ -55,8 +60,6 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called');
-
-registerAllSheets({ context: 'global' });
 
 LogBox.ignoreAllLogs();
 
@@ -95,10 +98,9 @@ function AccountScopedProviders({
       compose([
         MigrationGate,
         [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
-        NostrNDKProvider,
+        [NostrNDKProvider, { accountIndex }],
         CocoProvider,
         ActionSheetProvider,
-        [SheetProvider, { context: 'global' }],
         PricelistProvider,
         PasscodeGate,
         AppGate,
@@ -107,6 +109,42 @@ function AccountScopedProviders({
   );
 
   return <InnerProviders>{children}</InnerProviders>;
+}
+
+/** Registers resetStages/cancelResetStages with the orchestrator so profile transitions can show a splash. */
+function TransitionControlRegistrar() {
+  const { resetStages, cancelResetStages } = useInitializationReset();
+
+  useEffect(() => {
+    registerTransitionControls({ resetStages, cancelResetStages });
+  }, [resetStages, cancelResetStages]);
+
+  return null;
+}
+
+/** Registers key derivation function with the orchestrator so createAndSwitchProfile can derive keys. */
+function KeyDerivationRegistrar() {
+  const { getKeysForAccount } = useNostrKeysContext();
+
+  useEffect(() => {
+    registerKeyDerivation(getKeysForAccount);
+  }, [getKeysForAccount]);
+
+  return null;
+}
+
+/** Clears the AsyncStorage transition guard on app startup (if leftover from a previous restart). */
+function TransitionGuardCleanup() {
+  useEffect(() => {
+    void clearTransitionGuardOnStartup();
+  }, []);
+  return null;
+}
+
+/** Subscribes to coco mint-quote events and shows payment status sheet for NPC payments */
+function PaymentStatusListener() {
+  usePaymentStatusListener();
+  return null;
 }
 
 /** Invisible component that syncs the live balance to the profile store for the active profile */
@@ -194,6 +232,7 @@ function RootLayoutContent() {
       return {
         ...baseHeaderOptions,
         ...screen.options,
+        headerShown: true,
         ...headerStyleOverride,
         ...(screen.title !== undefined ? { headerTitle: screen.title } : {}),
         // Add close button for modal presentations (only when header is shown)
@@ -225,6 +264,8 @@ function RootLayoutContent() {
 
   return (
     <NavigationThemeProvider value={DarkTheme}>
+      <KeyDerivationRegistrar />
+      <PaymentStatusListener />
       <ProfileBalanceSync />
       <ProfileMetadataSync />
       <StatusBar
@@ -248,7 +289,6 @@ function RootLayoutContent() {
           <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
         ))}
       </Stack>
-      <PopupHost />
     </NavigationThemeProvider>
   );
 }
@@ -350,6 +390,8 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <OuterProviders>
+        <TransitionControlRegistrar />
+        <TransitionGuardCleanup />
         <NativeSplashLayoutGate>
           <AccountScopedProviders
             key={`account-${activeAccountIndex}`}
@@ -357,6 +399,7 @@ export default function RootLayout() {
             <RootLayoutContent />
           </AccountScopedProviders>
         </NativeSplashLayoutGate>
+        <PopupHost />
       </OuterProviders>
     </GestureHandlerRootView>
   );

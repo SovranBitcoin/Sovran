@@ -1,20 +1,20 @@
 ---
 description: Popup and toast system conventions, ownership, and copy patterns. Use when adding or changing popup behavior.
 globs:
-  - "helper/popup/**"
-  - "components/blocks/popup/**"
-  - "stores/popupStore.ts"
+  - "shared/lib/popup/**"
+  - "shared/blocks/popup/**"
+  - "shared/stores/runtime/popupStore.ts"
 alwaysApply: false
 ---
 
 # Popup System
 
-Sovran uses a centralized popup system for all user-facing notifications. Every popup in the app is a named function in `helper/popup/popups.ts`, called from anywhere without React context.
+Sovran uses a centralized popup system for all user-facing notifications. Every popup in the app is a named function in `shared/lib/popup/popups/`, called from anywhere without React context.
 
 **Always import from the barrel:**
 
 ```tsx
-import { copyPopup, sendSuccessPopup, fmt } from '@/helper/popup';
+import { copyPopup, sendSuccessPopup, fmt, profileSwitcherPopup, emojiPickerPopup, buttonHandlerPopup } from '@/shared/lib/popup';
 ```
 
 ---
@@ -33,31 +33,64 @@ A detached bottom sheet (HeroUI `BottomSheet`). Shows an **icon**, **title**, op
 
 A popup becomes a sheet when it has **buttons** or **`variant: 'sheet'`** is set explicitly.
 
+### Action sheets (custom sheet content)
+
+Action sheets are a popup variant with **custom content** instead of the standard icon/title/buttons layout. Use the named popup functions (same pattern as `copyPopup`, `sendSuccessPopup`, etc.):
+
+| Function | Payload | Use case |
+|----------|---------|----------|
+| `profileSwitcherPopup` | `{ onSwitchProfile, onAddProfile, onImportProfile }` | Profile list + import nsec |
+| `emojiPickerPopup` | `{ token: string }` | Encode token as emoji, copy to clipboard |
+| `buttonHandlerPopup` | `{ buttons: ButtonHandlerButton[] }` | Dynamic button actions |
+
+**Example:**
+
+```tsx
+import { profileSwitcherPopup } from '@/shared/lib/popup';
+
+profileSwitcherPopup({
+  onSwitchProfile: (accountIndex) => { ... },
+  onAddProfile: () => { ... },
+  onImportProfile: (npubNumber) => { ... },
+});
+```
+
+PopupHost renders all sheets (standard + action) in one place. No separate registration or sheet provider.
+
+`PopupHost` sheets must keep HeroUI's default `FullWindowOverlay` behavior enabled so action sheets render above native-stack modals and form sheets. If you need to avoid stale iOS overlay windows during a profile transition, destroy the sheet before restarting rather than disabling the overlay layer globally.
+
 ---
 
 ## File structure
 
 ```
-helper/popup/
-  index.ts       Barrel — the only import path external code should use
-  engine.tsx     popup() function, runtime error matching, toast/sheet routing
-  bridge.ts      showToast/showSheet, type definitions, toast manager registration
-  format.ts      fmt tagged template, PopupTextSegment, flattenSegments
-  icons.tsx      PopupIcon type, resolvePopupIcon, CUSTOM_ICONS registry
-  popups.ts      All named popup functions (the source of truth for copy)
+shared/lib/popup/
+  index.ts              Barrel — the only import path external code should use
+  engine.tsx            popup() function, runtime error matching, toast/sheet routing
+  bridge.ts             showToast/showSheet/showActionSheet, type definitions
+  actionSheetTypes.ts   ActionSheetPayloads type for custom sheets
+  format.ts             fmt tagged template, PopupTextSegment, flattenSegments
+  icons.tsx             PopupIcon type, resolvePopupIcon, CUSTOM_ICONS registry
+  liveSheetTypes.ts     LiveSheetConfig, LiveSheetStatus (live-updating sheet state)
+  parsePaymentError.ts  Parses coco/cashu errors for payment status toast
+  CompactToast.tsx      Standard toast component (internal, used by bridge)
+  PaymentStatusToast.tsx  Payment status custom toast (internal)
+  PaymentStatusIcon.tsx  Animated icon for payment status (internal)
+  popups/               Named popup functions by domain (copy, payment, token, etc.)
 
-stores/popupStore.ts                Zustand store for sheet open/close state
-components/blocks/popup/PopupHost.tsx   Renders toasts + sheets (mounted in app layout)
+shared/stores/runtime/popupStore.ts   Zustand store for sheet open/close state
+shared/blocks/popup/PopupHost.tsx     Renders toasts + standard sheets + action sheets
+shared/lib/popup/sheets/              Action sheet content (profile-switcher, emoji-picker, button-handler)
 ```
 
 ### Roles
 
 | File | Owns | Consumers |
 |------|------|-----------|
-| `popups.ts` | Every popup's copy, type, and icon | All app code |
-| `engine.tsx` | Routing logic (toast vs sheet) + runtime error matching | `popups.ts` only |
-| `bridge.ts` | Toast manager ref + Zustand store connection | `engine.tsx`, `PopupHost` |
-| `format.ts` | Amount formatting for popup text | `popups.ts`, `engine.tsx`, `PopupHost` |
+| `popups/` | Every popup's copy, type, and icon (by domain) | All app code |
+| `engine.tsx` | Routing logic (toast vs sheet) + runtime error matching | `popups/` only |
+| `bridge.ts` | Toast manager ref + showActionSheet (internal) + Zustand store connection | `popups/`, `PopupHost` |
+| `format.ts` | Amount formatting for popup text | `popups/`, `engine.tsx`, `PopupHost` |
 | `icons.tsx` | Icon resolution (emoji/monicon/custom) | `PopupHost` |
 | `popupStore.ts` | Sheet open/close state | `bridge.ts`, `PopupHost` |
 | `PopupHost.tsx` | Rendering (toasts via HeroUI, sheets via BottomSheet) | Mounted once in `app/_layout.tsx` |
@@ -66,9 +99,9 @@ components/blocks/popup/PopupHost.tsx   Renders toasts + sheets (mounted in app 
 
 ## Adding a new popup
 
-### 1. Add a named function in `popups.ts`
+### 1. Add a named function in `popups/`
 
-Every popup is a named export. No free-form strings at callsites.
+Every popup is a named export in the appropriate domain file. No free-form strings at callsites.
 
 ```ts
 export function myNewPopup(overrides?: TextOverrides): void {
@@ -100,7 +133,7 @@ Three formats, in order of preference:
 | Format | Syntax | When to use |
 |--------|--------|-------------|
 | **Monicon** | `'icon:mdi:check-circle'` | Default choice. Themed, consistent, sharp. Browse at [icones.js.org](https://icones.js.org). |
-| **Custom** | `'custom:nfc-success'` | Animated or complex SVG. Must be registered in `icons.tsx` `CUSTOM_ICONS`. |
+| **Custom** | `'custom:X'` | Animated or complex SVG. Must be registered in `icons.tsx` `CUSTOM_ICONS`. |
 | **Emoji** | `'emoji:🎉'` | Only when the emoji is genuinely more expressive than any icon. Rare. |
 
 Icon naming conventions already used in the codebase:
@@ -111,7 +144,7 @@ Icon naming conventions already used in the codebase:
 | Keys | `solar:key-bold`, `mdi:key-alert`, `mdi:key-remove` |
 | Mints | `mdi:bank-check`, `mdi:bank-off`, `mdi:bank-remove` |
 | Wallet | `mdi:wallet-outline`, `mdi:wallet-check`, `mdi:wallet-plus` |
-| NFC | `mdi:nfc`, `mdi:nfc-off`, `custom:nfc-success` |
+| NFC | `mdi:nfc`, `mdi:nfc-off`, `mdi:send-check` |
 | Camera | `mdi:camera-check`, `mdi:camera-off`, `mdi:camera-lock` |
 | Errors | `mdi:alert-circle`, `mdi:alert-circle-outline` |
 | Info | `mdi:information-outline`, `mdi:help-circle-outline` |
@@ -120,9 +153,9 @@ Icon naming conventions already used in the codebase:
 | QR | `mdi:qrcode-remove` |
 | Links | `mdi:link-off` |
 
-### 4. Add to DevPopupPanel
+### 4. Verify in dev mode
 
-Add an entry to the `SECTIONS` array in `components/blocks/DevPopupPanel.tsx` so it can be visually verified. Put it in the matching category section.
+Use the `__DEV__` test buttons on the Wallet screen to visually verify copy, icons, and timing after any change to `popups/`.
 
 ---
 
@@ -150,7 +183,7 @@ Overrides spread **after** the defaults, so they win. This means callers can ove
 Use the `fmt` tagged template to embed formatted amounts inline. Objects with `{ amount, unit }` are rendered as `<AmountFormatter>` in sheets and stringified via `formatAmount()` in toasts.
 
 ```ts
-import { fmt } from '@/helper/popup';
+import { fmt } from '@/shared/lib/popup';
 
 nfcPaymentSentPopup({
   text: fmt`${{ amount: 500, unit: 'sat' }} sent`,
@@ -163,7 +196,7 @@ For plain interpolations, `fmt` stringifies normally:
 
 ```ts
 modelSwitchedPopup({ modelName: 'GPT-4o' });
-// inside popups.ts:
+// inside popups/:
 popup({ message: `Switched to ${params.modelName}`, ... });
 ```
 
@@ -201,7 +234,7 @@ Pass `duration` (ms) to auto-close a sheet. A progress bar renders at the bottom
 ```ts
 nfcPaymentSentPopup({
   text: fmt`${{ amount: 100, unit: 'sat' }} sent`,
-  icon: 'custom:nfc-success',
+  icon: 'icon:mdi:send-check',
   duration: 2600,
 });
 ```
@@ -231,10 +264,10 @@ nfcPaymentSentPopup({
 
 ### Avoid duplication
 
-Before adding a new popup, search `popups.ts` for similar ones. The file is organized by section (Copy, Funds, NFC, Token Status, etc.). If a popup already exists for that scenario, reuse it with overrides rather than creating a near-duplicate.
+Before adding a new popup, search `popups/` for similar ones. Popups are organized by domain (copy, payment, token, mint, etc.). If a popup already exists for that scenario, reuse it with overrides rather than creating a near-duplicate.
 
 ---
 
 ## Testing
 
-The `DevPopupPanel` (`components/blocks/DevPopupPanel.tsx`) shows every popup in the system organized by category. Use it to visually verify copy, icons, and timing after any change to `popups.ts`.
+The Wallet screen has `__DEV__` test buttons for standard sheets and action sheets. Use them to visually verify copy, icons, and timing after any change to `popups.ts`.

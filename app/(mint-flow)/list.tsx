@@ -10,9 +10,8 @@
 import React from 'react';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { withSheetProvider } from 'hocs/withSheetProvider';
-import { MintListScreen } from 'components/screens/MintListScreen';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { MintListScreen } from '@/features/mint';
 import Icon from 'assets/icons';
 
 function MintListRoute() {
@@ -94,4 +93,4 @@ function MintListRoute() {
   );
 }
 
-export default withSheetProvider(MintListRoute);
+export default MintListRoute;

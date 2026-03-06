@@ -222,7 +222,7 @@ struct PayWidgetEntryView: View {
 
     private var mediumLayout: some View {
         Link(destination: payURL) {
-            HStack(spacing: 16) {
+            HStack(spacing: 0) {
                 LogoView(brand: brand, color: .white, size: 52)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Bitcoin Pay")
@@ -273,7 +273,7 @@ struct PayWidgetEntryView: View {
         ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(.white)
-            HStack(spacing: 6) {
+            HStack(spacing: 0) {
                 LogoView(brand: brand, color: .black, size: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Bitcoin Pay")

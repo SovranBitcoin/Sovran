@@ -8,12 +8,19 @@ module.exports = function (api) {
     {
       root: ['./'],
       alias: {
+        '@/shared': './shared',
+        '@/features': './features',
+        '@/sheets': './shared/lib/popup/sheets',
+        '@/navigation': './navigation',
+        '@/config': './config',
+        '@/redux': './redux',
+        '@/themes': './themes',
         '@': './',
+        assets: './assets',
       },
     },
   ]);
 
-  // Reanimated plugin MUST be last - it includes worklets internally
   plugins.push('react-native-reanimated/plugin');
 
   return {

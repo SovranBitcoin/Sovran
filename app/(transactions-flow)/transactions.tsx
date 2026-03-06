@@ -10,14 +10,12 @@
 import React, { useCallback } from 'react';
 import { TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
-import { TransactionsScreen } from 'components/screens/TransactionsScreen';
+import { TransactionsScreen, useTransactionsFilter } from '@/features/transactions';
 import { HistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
-import { View } from 'components/ui/View/View';
-import { Text } from 'components/ui/Text';
+import { View } from '@/shared/ui/primitives/View/View';
+import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import { useTransactionsFilter } from 'components/screens/TransactionsFilterContext';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 
 function FilterButton() {
@@ -171,4 +169,4 @@ function TransactionsRoute() {
   );
 }
 
-export default withSheetProvider(TransactionsRoute);
+export default TransactionsRoute;

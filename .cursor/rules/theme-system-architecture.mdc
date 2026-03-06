@@ -2,9 +2,9 @@
 description: Theme architecture, semantic color mapping, and runtime token usage guidance.
 globs:
   - "themes.ts"
-  - "helper/themeEngine.ts"
-  - "providers/ThemeProvider.tsx"
-  - "hooks/useThemeColor.ts"
+  - "shared/lib/themeEngine.ts"
+  - "shared/providers/ThemeProvider.tsx"
+  - "shared/hooks/useThemeColor.ts"
   - "global.css"
   - "tailwind.config.js"
   - "app/settings-pages/theme.tsx"
@@ -24,10 +24,10 @@ Sovran uses a single-source-of-truth theme system built on **HeroUI Native** sem
 themes.ts                       40+ palettes (typed 0-950 shade records)
     │
     ▼
-helper/themeEngine.ts           Maps each palette → HeroUI semantic CSS vars
+shared/lib/themeEngine.ts       Maps each palette → HeroUI semantic CSS vars
     │                           Also registers static color scales + wallpaper vars
     ▼
-providers/ThemeProvider.tsx      React context. Calls Uniwind.updateCSSVariables()
+shared/providers/ThemeProvider.tsx  React context. Calls Uniwind.updateCSSVariables()
     │                           when the selected theme changes.
     ▼
 heroui-native/styles            Imported in global.css. Reads the semantic vars
@@ -46,13 +46,13 @@ Components                      Use Tailwind classes: bg-background, text-foregr
 | File | Role |
 |------|------|
 | `themes.ts` | Defines every theme as a `ThemePalette` (shade 0-950 → hex). Exports typed `THEMES`, `THEME_NAMES`, `ThemeName`. |
-| `helper/themeEngine.ts` | The **single theme engine**. `getThemeVariables(name)` returns all CSS variables: semantic tokens, static color scales, and wallpaper vars. Pre-computes all themes at import time via `themeVariables`. Also contains `STATIC_COLOR_VALUES` — the single source of truth for all static hex values. |
-| `providers/ThemeProvider.tsx` | Thin React context. Reads theme from `settingsStore`, calls `Uniwind.updateCSSVariables()`. Exposes `currentTheme`, `setTheme()`, `availableThemes`. |
+| `shared/lib/themeEngine.ts` | The **single theme engine**. `getThemeVariables(name)` returns all CSS variables: semantic tokens, static color scales, and wallpaper vars. Pre-computes all themes at import time via `themeVariables`. Also contains `STATIC_COLOR_VALUES` — the single source of truth for all static hex values. |
+| `shared/providers/ThemeProvider.tsx` | Thin React context. Reads theme from `settingsStore`, calls `Uniwind.updateCSSVariables()`. Exposes `currentTheme`, `setTheme()`, `availableThemes`. |
 | `global.css` | Imports `tailwindcss`, `uniwind`, and `heroui-native/styles`. Maps static color scales via `var()` references so Tailwind can generate utility classes. |
 | `tailwind.config.js` | Extends Tailwind with wallpaper-only colors (`dominant`, `gradient`). All other colors come from HeroUI's auto-generated tokens or `global.css @theme`. |
-| `hooks/useThemeColor.ts` | **The single hook for all runtime color access.** Resolves any color token — semantic or static scale — from Uniwind's CSS variable store. Supports single and array (batch) forms. |
+| `shared/hooks/useThemeColor.ts` | **The single hook for all runtime color access.** Resolves any color token — semantic or static scale — from Uniwind's CSS variable store. Supports single and array (batch) forms. |
 | `config/backgroundImageThemes.ts` | Auto-generated (via `npm run build:themes`). Maps wallpaper theme names to image assets, dominant colors, and gradient colors. |
-| `stores/settingsStore.ts` | Zustand store persisted to AsyncStorage. Holds the `theme` string (global, not profile-scoped). |
+| `shared/stores/global/settingsStore.ts` | Zustand store persisted to AsyncStorage. Holds the `theme` string (global, not profile-scoped). |
 | `metro.config.js` | Applies `withUniwindConfig` wrapping with `cssEntryFile: './global.css'`. |
 
 ---
@@ -74,7 +74,7 @@ Both the `'light'` and `'dark'` adaptive roots are updated simultaneously so var
 
 ---
 
-## The Theme Engine (`helper/themeEngine.ts`)
+## The Theme Engine (`shared/lib/themeEngine.ts`)
 
 This is the **only place** where palette shades are mapped to semantic meaning and where static color hex values are declared. Everything flows from here into Uniwind's runtime store.
 
@@ -200,7 +200,7 @@ Raw scale tokens are not wrong — they're useful when you need a specific light
 ### 3. Theme name or switching
 
 ```tsx
-import { useTheme } from 'providers/ThemeProvider';
+import { useTheme } from '@/shared/providers/ThemeProvider';
 
 const { currentTheme, setTheme, availableThemes } = useTheme();
 setTheme('navy');
@@ -228,7 +228,7 @@ setTheme('navy');
 
 ### How static colors work
 
-Static color hex values are declared once in `themeEngine.ts` (`STATIC_COLOR_VALUES`). The engine registers them with Uniwind under both `--shade-300` and `--color-shade-300` forms. `global.css @theme` maps `--color-shade-300: var(--shade-300)` so Tailwind can generate utility classes like `text-shade-300` and `bg-shade-300`.
+Static color hex values are declared once in `shared/lib/themeEngine.ts` (`STATIC_COLOR_VALUES`). The engine registers them with Uniwind under both `--shade-300` and `--color-shade-300` forms. `global.css @theme` maps `--color-shade-300: var(--shade-300)` so Tailwind can generate utility classes like `text-shade-300` and `bg-shade-300`.
 
 This dual registration is necessary because:
 - `className` (`bg-shade-300`) needs the `@theme` token → resolves `var(--shade-300)` at runtime
@@ -314,13 +314,13 @@ On app launch, `ThemeProvider` reads the persisted theme from the store and appl
 
 ---
 
-If you need a color value in a style prop, use `useThemeColor` from `hooks/useThemeColor`. If you need it in a className, use the Tailwind class (`text-danger`, `bg-shade-300`, etc.). Both resolve from the same CSS variables registered by `themeEngine.ts`.
+If you need a color value in a style prop, use `useThemeColor` from `shared/hooks/useThemeColor`. If you need it in a className, use the Tailwind class (`text-danger`, `bg-shade-300`, etc.). Both resolve from the same CSS variables registered by `shared/lib/themeEngine.ts`.
 
 ---
 
 ## Image Color Extraction
 
-For deriving gradients or accent tints from user-provided images (profile pictures, banners, mint icons), use the hooks in `helper/colorExtraction.ts`. Distribution components re-export them from `components/blocks/distribution/colorUtils.ts` for convenience.
+For deriving gradients or accent tints from user-provided images (profile pictures, banners, mint icons), use the hooks in `shared/lib/colorExtraction.ts`. Distribution components re-export them from `features/mint/components/distribution/colorUtils.ts` for convenience.
 
 ### Hooks
 
@@ -337,7 +337,7 @@ When composing a gradient from image colors with a deterministic fallback:
 
 1. **PFP colors** (`useDominantColor(pictureUrl, ...)`) — preferred source; most users have a PFP.
 2. **Banner colors** (`useDominantColor(bannerUrl, ...)`) — only extracted when no PFP is available.
-3. **Seeded gradient** (`generateSeededGradient(pubkey, 'person')` from `helper/avatarGradient.ts`) — deterministic fallback when no image colors are available.
+3. **Seeded gradient** (`generateSeededGradient(pubkey)` from `shared/lib/avatarGradient.ts`) — deterministic fallback when no image colors are available.
 
 Check `hasExtractedColors` (not just `hasLoaded`) before choosing a source — `hasLoaded` is `true` even when extraction failed or only corner colors were found.
 
@@ -351,7 +351,7 @@ Check `hasExtractedColors` (not just `hasLoaded`) before choosing a source — `
 
 ### Rules
 
-1. **Import from `helper/colorExtraction.ts`** for screens and hooks. Distribution components may import from the local re-export barrel (`./colorUtils`).
+1. **Import from `shared/lib/colorExtraction.ts`** for screens and hooks. Distribution components may import from the local re-export barrel (`./colorUtils`).
 2. **Don't call both hooks for the same image** — pick the one that fits your use case.
 3. **Always check `hasExtractedColors`** before using extracted colors as a gradient source — fall through to the next source or a deterministic fallback if extraction failed.
 4. **Don't reimplement color extraction** — extend the shared hooks if you need different behavior.

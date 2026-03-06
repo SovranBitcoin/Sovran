@@ -6,11 +6,9 @@
 
 import React from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
-import { withSheetProvider } from 'hocs/withSheetProvider';
-import { CurrencyScreen } from 'components/screens/CurrencyScreen';
-import { useProcessPaymentString } from '@/hooks/coco/useProcessPaymentString';
-import { useMintStore } from 'stores/mintStore';
-import { useNostrKeysContext } from 'providers/NostrKeysProvider';
+import { CurrencyScreen, useProcessPaymentString } from '@/features/send';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
 function ModalScreen() {
   const params = useLocalSearchParams<{
@@ -81,4 +79,4 @@ function ModalScreen() {
   );
 }
 
-export default withSheetProvider(ModalScreen);
+export default ModalScreen;

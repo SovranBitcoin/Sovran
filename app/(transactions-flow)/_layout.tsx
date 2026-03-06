@@ -15,9 +15,9 @@
  */
 
 import { Stack } from 'expo-router';
-import { useThemeColor } from '@/hooks/useThemeColor';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { createFlowLayoutScreenOptions } from '../../config/flowLayoutOptions';
-import { TransactionsFilterProvider } from 'components/screens/TransactionsFilterContext';
+import { TransactionsFilterProvider } from '@/features/transactions';
 
 function TransactionsFlowContent() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
