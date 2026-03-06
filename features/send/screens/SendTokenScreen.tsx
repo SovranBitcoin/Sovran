@@ -35,10 +35,6 @@ import {
   nfcSendFailedPopup,
   copyPopup,
   tokenCannotCancelPopup,
-  tokenAlreadyRedeemedPopup,
-  tokenCannotReclaimPopup,
-  fundsReclaimedPopup,
-  reclaimFailedPopup,
   transactionCancelledPopup,
   tokenCannotCheckStatusPopup,
   tokenRedeemedPopup,
@@ -345,71 +341,11 @@ export function SendTokenScreen({
 
   const handleCancelSend = useCallback(
     async (onClose: (event: any) => void) => {
-      // --- Legacy fallback: no operationId but we have a token ---
       if (!currentTransaction?.operationId) {
-        if (!token) {
-          tokenCannotCancelPopup({ onClose: () => onClose({}) });
-          return;
-        }
-        try {
-          const mintUrl = currentTransaction?.mintUrl;
-          if (!mintUrl) throw new Error('Missing mint URL');
-
-          // Check proof states with the mint (NUT-07)
-          const wallet = await manager.walletService.getWallet(mintUrl);
-          const proofStates = await wallet.checkProofsStates(
-            token.proofs.map((p) => ({ secret: p.secret }))
-          );
-
-          const allSpent = proofStates.every((s) => s.state === 'SPENT');
-          if (allSpent) {
-            await updateLegacyHistoryState(
-              currentTransaction,
-              'finalized',
-              mintUrl,
-              manager,
-              accountIndex
-            );
-            tokenAlreadyRedeemedPopup({ onClose: () => onClose({}) });
-            return;
-          }
-
-          // Filter to only unspent proofs — mint rejects swaps containing spent proofs
-          const unspentProofs = token.proofs.filter((_, i) => proofStates[i]?.state === 'UNSPENT');
-
-          if (unspentProofs.length === 0) {
-            // All proofs are PENDING at the mint
-            tokenCannotReclaimPopup({ onClose: () => onClose({}) });
-            return;
-          }
-
-          // Reclaim unspent proofs
-          const reclaimToken: Token = { mint: token.mint, proofs: unspentProofs, unit: token.unit };
-          await manager.wallet.receive(reclaimToken);
-          await updateLegacyHistoryState(
-            currentTransaction,
-            'rolledBack',
-            mintUrl,
-            manager,
-            accountIndex
-          );
-
-          const amt = unspentProofs.reduce((s, p) => s + p.amount, 0);
-          fundsReclaimedPopup(
-            { amount: amt, unit: currentTransaction?.unit || 'sat' },
-            { onClose: () => onClose({}) }
-          );
-        } catch (error) {
-          console.error('[SendTokenScreen] Legacy cancel failed:', error);
-          reclaimFailedPopup({
-            text: error instanceof Error ? error.message : String(error),
-            onClose: () => onClose({}),
-          });
-        }
+        tokenCannotCancelPopup({ onClose: () => onClose({}) });
         return;
       }
 
-      // --- Normal path: operationId exists ---
       try {
         await manager.send.rollback(currentTransaction.operationId);
         transactionCancelledPopup({ onClose: () => onClose({}) });
@@ -420,7 +356,7 @@ export function SendTokenScreen({
         });
       }
     },
-    [currentTransaction, manager, token, accountIndex]
+    [currentTransaction, manager]
   );
 
   const handleCheckStatus = useCallback(
@@ -708,7 +644,8 @@ export function SendTokenScreen({
               icon: 'mdi:cancel',
               variant: 'dangerous',
               onPress: handleCancelSend,
-              condition: !isPaymentRequestMode && !isPaid && !!token,
+              condition:
+                !isPaymentRequestMode && !isPaid && !!token && !!currentTransaction?.operationId,
             },
           ]}
         />
