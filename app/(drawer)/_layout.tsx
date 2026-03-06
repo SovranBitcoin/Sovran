@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import {
   GestureHandlerRootView,
@@ -13,7 +13,6 @@ import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useInitializationReset } from '@/shared/providers/InitializationProvider';
 import { Text } from '@/shared/ui/primitives/Text';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -25,16 +24,22 @@ import { getUsername } from '@/shared/lib/username';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfileStore, ProfileEntry } from '@/shared/stores/global/profileStore';
-import {
-  createAndSwitchProfile,
-  isProfileTransitionInProgress,
-  switchToExistingProfile,
-  switchToImportedProfile,
-} from '@/shared/lib/profile/profileSessionOrchestrator';
-import { profileSwitcherPopup } from '@/shared/lib/popup';
+import { isProfileTransitionInProgress } from '@/shared/lib/profile/profileSessionOrchestrator';
+import { keyImportFailedPopup, profileSwitcherPopup } from '@/shared/lib/popup';
+import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
+import { PROFILE_SWITCHER_CLOSE_SETTLE_MS } from '@/shared/lib/popup/sheets/profile-switcher/constants';
+import type { ProfileSwitcherAction } from '@/shared/lib/popup/actionSheetTypes';
+import { useProfileActionStore } from '@/shared/stores/runtime/profileActionStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 320);
+const CANONICAL_WALLET_ROUTE = '/' as any;
+
+function waitForProfileSwitcherDismiss(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, PROFILE_SWITCHER_CLOSE_SETTLE_MS);
+  });
+}
 
 type MenuItem = {
   icon: string;
@@ -82,61 +87,101 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
     'default',
     'shade-400',
   ] as const);
-  const { getKeysForAccount } = useNostrKeysContext();
-  const { resetStages, cancelResetStages } = useInitializationReset();
   const profiles = useProfileStore((s) => s.profiles);
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
+  const [pendingAction, setPendingAction] = useState<ProfileSwitcherAction | null>(null);
 
-  const handleSwitchProfile = useCallback(
-    async (accountIndex: number) => {
-      if (accountIndex === activeAccountIndex) return;
-      if (isProfileTransitionInProgress()) return;
-
-      // Close drawer immediately so loading UI is visible.
+  const queueWalletActionAfterDrawerDismiss = useCallback(
+    async (
+      action:
+        | { type: 'create' }
+        | { type: 'switch'; accountIndex: number }
+        | { type: 'import'; nsec: string; pubkeyHex: string; accountIndex: number },
+      cancelledRef: { current: boolean }
+    ) => {
       closeDrawer();
-      await switchToExistingProfile({
-        accountIndex,
-        resetStages,
-        cancelResetStages,
-      });
+      await waitForProfileSwitcherDismiss();
+      if (cancelledRef.current) return;
+
+      switch (action.type) {
+        case 'create':
+          useProfileActionStore.getState().requestCreateDerivedProfile();
+          break;
+        case 'switch':
+          useProfileActionStore.getState().requestSwitchProfile(action.accountIndex);
+          break;
+        case 'import': {
+          if (useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
+            keyImportFailedPopup({ text: 'This identity already exists as a profile.' });
+            return;
+          }
+
+          const stored = await storeImportedNsec(action.pubkeyHex, action.nsec);
+          if (!stored) {
+            keyImportFailedPopup({ text: 'Failed to store nsec securely.' });
+            return;
+          }
+
+          useProfileActionStore
+            .getState()
+            .requestActivateImportedProfile(action.accountIndex, action.pubkeyHex);
+          break;
+        }
+      }
+
+      router.replace(CANONICAL_WALLET_ROUTE);
     },
-    [activeAccountIndex, closeDrawer, resetStages, cancelResetStages]
+    [closeDrawer]
   );
 
-  const handleAddProfile = useCallback(async () => {
-    if (isProfileTransitionInProgress()) return;
+  const handleRequestProfileAction = useCallback((action: ProfileSwitcherAction) => {
+    setPendingAction(action);
+  }, []);
 
-    // Close drawer immediately so loading UI is visible.
-    closeDrawer();
-    await createAndSwitchProfile({
-      getKeysForAccount,
-      resetStages,
-      cancelResetStages,
-    });
-  }, [getKeysForAccount, closeDrawer, resetStages, cancelResetStages]);
+  useEffect(() => {
+    if (!pendingAction) return;
 
-  const handleImportProfile = useCallback(
-    async (npubNumber: number) => {
-      if (isProfileTransitionInProgress()) return;
+    let cancelled = false;
+    const cancellation = { current: false };
 
-      // Profile entry is created by ImportNsec before this callback runs.
-      closeDrawer();
-      await switchToImportedProfile({
-        accountIndex: npubNumber,
-        resetStages,
-        cancelResetStages,
-      });
-    },
-    [closeDrawer, resetStages, cancelResetStages]
-  );
+    const runAction = async () => {
+      await waitForProfileSwitcherDismiss();
+      if (cancelled) return;
+
+      switch (pendingAction.type) {
+        case 'switch':
+          if (pendingAction.accountIndex === activeAccountIndex) return;
+          if (isProfileTransitionInProgress()) return;
+          await queueWalletActionAfterDrawerDismiss(pendingAction, cancellation);
+          break;
+        case 'create':
+          if (isProfileTransitionInProgress()) return;
+          await queueWalletActionAfterDrawerDismiss(pendingAction, cancellation);
+          break;
+        case 'import':
+          if (isProfileTransitionInProgress()) return;
+          await queueWalletActionAfterDrawerDismiss(pendingAction, cancellation);
+          break;
+      }
+
+      if (!cancelled) {
+        setPendingAction(null);
+      }
+    };
+
+    void runAction();
+
+    return () => {
+      cancelled = true;
+      cancellation.current = true;
+    };
+  }, [pendingAction, activeAccountIndex, queueWalletActionAfterDrawerDismiss]);
 
   const handleOpenProfileSheet = useCallback(() => {
     profileSwitcherPopup({
-      onSwitchProfile: handleSwitchProfile,
-      onAddProfile: handleAddProfile,
-      onImportProfile: handleImportProfile,
+      onRequestAction: handleRequestProfileAction,
     });
-  }, [handleSwitchProfile, handleAddProfile, handleImportProfile]);
+  }, [handleRequestProfileAction]);
 
   // Only show selector if there are profiles (should always be true after first launch)
   if (profiles.length === 0) return null;
@@ -152,7 +197,14 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
           return (
             <TouchableOpacity
               key={profile.accountIndex}
-              onPress={() => handleSwitchProfile(profile.accountIndex)}
+              onPress={() => {
+                if (profile.accountIndex === activeAccountIndex) return;
+                if (isProfileTransitionInProgress()) return;
+                void queueWalletActionAfterDrawerDismiss(
+                  { type: 'switch', accountIndex: profile.accountIndex },
+                  { current: false }
+                );
+              }}
               style={[
                 styles.profileAvatarButton,
                 isActive && {

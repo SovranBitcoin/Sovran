@@ -29,10 +29,8 @@ export function ProfileList({ payload, close }: ProfileListProps) {
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
 
   const handleSwitch = (accountIndex: number) => {
+    payload.onRequestAction({ type: 'switch', accountIndex });
     close();
-    setTimeout(() => {
-      payload.onSwitchProfile(accountIndex);
-    }, 100);
   };
 
   const imported = profiles.filter((p) => p.source === 'imported');

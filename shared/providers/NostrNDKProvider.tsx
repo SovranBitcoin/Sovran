@@ -1,7 +1,6 @@
 import React, { createContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { relays } from '@/shared/ndk';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useInitializationStage } from './InitializationProvider';
 import { useNostrKeysContext } from './NostrKeysProvider';
 import { initLog } from '@/shared/lib/initTiming';
@@ -16,12 +15,16 @@ const NostrNDKContext = createContext<NostrNDKContextValue>({
 
 interface NostrNDKProviderProps {
   children: ReactNode;
+  accountIndex?: number;
 }
 
-export function NostrNDKProvider({ children }: NostrNDKProviderProps) {
+export function NostrNDKProvider({
+  children,
+  accountIndex: accountIndexProp,
+}: NostrNDKProviderProps) {
   const { init: initializeNDK } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
-  const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
+  const activeAccountIndex = accountIndexProp ?? 0;
   const hasInitialized = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const cacheAdapter = useMemo(

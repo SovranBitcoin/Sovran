@@ -5,15 +5,28 @@ import type {
 
 type EmojiPickerPayload = { token: string };
 
+export type ProfileSwitcherAction =
+  | {
+      type: 'switch';
+      accountIndex: number;
+    }
+  | {
+      type: 'create';
+    }
+  | {
+      type: 'import';
+      nsec: string;
+      pubkeyHex: string;
+      accountIndex: number;
+    };
+
 /**
  * Addressable custom sheet IDs. Nested pages that only exist inside a sheet flow
  * (for example profile-switcher's import route) should stay internal to that sheet.
  */
 type BaseActionSheetPayloads = {
   'profile-switcher': {
-    onSwitchProfile: (accountIndex: number) => void;
-    onAddProfile: () => void;
-    onImportProfile: (npubNumber: number) => void;
+    onRequestAction: (action: ProfileSwitcherAction) => void;
   };
   'emoji-picker': EmojiPickerPayload;
 };

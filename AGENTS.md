@@ -14,6 +14,7 @@ Read `.cursor/rules/` docs before touching their domains. The index is `.cursor/
 | Text component, fonts, skeletons | `.cursor/rules/text-typography-skeleton-guidelines.mdc` |
 | Theme, colors, tokens | `.cursor/rules/theme-system-architecture.mdc` |
 | Zustand stores, profile scope | `.cursor/rules/zustand-store-scoping.mdc` |
+| Profile safety, security, audit | `.cursor/rules/profile-safety-security-audit.mdc` |
 | Git, commits, PRs, issues | `.cursor/rules/git-github-workflow.mdc` |
 
 If the domain you need isn't documented, check if an existing rule doc covers it partially before creating a new one. See the rule documentation improvement protocol below.

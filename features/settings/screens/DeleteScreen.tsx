@@ -1,10 +1,6 @@
 import React, { useCallback } from 'react';
 import { Dimensions, ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { useDispatch } from 'react-redux';
-import type { AppThunk } from 'redux/store/reducer';
-import { resetApp } from '@/redux/store';
-import * as Updates from 'expo-updates';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   interpolate,
@@ -16,12 +12,13 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import Container from '@/shared/blocks/Container';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useProfileActionStore } from '@/shared/stores/runtime/profileActionStore';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import Icon from 'assets/icons';
 import { Button, Card } from 'heroui-native';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 
 const SLIDER_WIDTH = Dimensions.get('window').width - 48;
@@ -134,12 +131,11 @@ const styles = StyleSheet.create({
 export function DeleteScreen() {
   const foreground = useThemeColor('foreground');
   const [danger, red400] = useThemeColor(['danger', 'red-400'] as const);
-  const dispatch = useDispatch();
 
   const handleDeleteProfile = useCallback(async () => {
-    await (dispatch as (thunk: AppThunk) => Promise<void>)(resetApp());
-    await Updates.reloadAsync();
-  }, [dispatch]);
+    useProfileActionStore.getState().requestDeleteAccount();
+    router.replace('/');
+  }, []);
 
   return (
     <Container>
@@ -159,16 +155,30 @@ export function DeleteScreen() {
               size={16}
               className="text-center leading-6"
               style={{ color: opacity(foreground, 0.5) }}>
-              Are you sure you want to delete your profile? This action cannot be reversed.
+              Deleting this account removes your local wallet data on this device. This action
+              cannot be reversed.
             </Text>
           </VStack>
 
           <Card variant="secondary" className="w-full">
             <Card.Body className="gap-2">
-              <Card.Title>Important</Card.Title>
+              <Card.Title>Save your NIP06</Card.Title>
               <Card.Description>
-                There is no guarantee that your mnemonic phrase will recover your funds. If you were
-                a TestFlight user, recovery may not restore all funds.
+                Your NIP06 is the recovery phrase for your full Sovran account. Every Cashu profile
+                in this app is derived from it, so restoring with a different NIP06 will create
+                different Cashu wallets and will not recover the same ecash. If you were a
+                TestFlight user, recovery may still not restore all historical funds.
+              </Card.Description>
+            </Card.Body>
+          </Card>
+
+          <Card variant="secondary" className="w-full">
+            <Card.Body className="gap-2">
+              <Card.Title>Imported Nostr accounts</Card.Title>
+              <Card.Description>
+                Even imported Nostr accounts depend on your current NIP06 for their Cashu profile.
+                Re-importing the same Nostr key under a different NIP06 will produce a different
+                Cashu profile, so that ecash will not be recoverable.
               </Card.Description>
             </Card.Body>
           </Card>
@@ -177,8 +187,8 @@ export function DeleteScreen() {
             <Card.Body className="gap-2">
               <Card.Title>Before deleting, make sure you have:</Card.Title>
               <Card.Description>
-                - Backed up your mnemonic phrase{'\n'}- Transferred any remaining funds{'\n'}-
-                Exported any important data
+                - Backed up your NIP06{'\n'}- Transferred any ecash you do not want to risk
+                {'\n'}- Exported any important data
               </Card.Description>
             </Card.Body>
           </Card>

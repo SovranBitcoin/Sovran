@@ -28,6 +28,17 @@ import { useProfileStore } from '@/shared/stores/global/profileStore';
  */
 let _skipPersistWrite = false;
 
+/** Wait for profileStore hydration to complete before reading profiles. */
+async function ensureProfileStoreHydrated(): Promise<void> {
+  if (useProfileStore.persist.hasHydrated()) return;
+  await new Promise<void>((resolve) => {
+    const unsub = useProfileStore.persist.onFinishHydration(() => {
+      unsub();
+      resolve();
+    });
+  });
+}
+
 function getActiveProfilePubkey(): string | undefined {
   const state = useProfileStore.getState();
   return state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey;
@@ -40,17 +51,20 @@ function getActiveProfilePubkey(): string | undefined {
 export function createProfileScopedStorage(): StateStorage {
   return {
     getItem: async (name: string) => {
+      await ensureProfileStoreHydrated();
       const pubkey = getActiveProfilePubkey();
       const key = pubkey ? `${name}:profile:${pubkey}` : name;
       return AsyncStorage.getItem(key);
     },
     setItem: async (name: string, value: string) => {
       if (_skipPersistWrite) return;
+      await ensureProfileStoreHydrated();
       const pubkey = getActiveProfilePubkey();
       const key = pubkey ? `${name}:profile:${pubkey}` : name;
       await AsyncStorage.setItem(key, value);
     },
     removeItem: async (name: string) => {
+      await ensureProfileStoreHydrated();
       const pubkey = getActiveProfilePubkey();
       const key = pubkey ? `${name}:profile:${pubkey}` : name;
       await AsyncStorage.removeItem(key);
@@ -165,7 +179,11 @@ export async function migrateProfileScopedKeys(): Promise<void> {
  * Reset all profile-scoped stores to their initial state and rehydrate
  * from the new profile's AsyncStorage keys.
  *
- * Call this during profile switch, AFTER setting the new activeAccountIndex
+ * **Currently unused** — profile switches go through a full app reload
+ * (see profileSessionOrchestrator.ts), which rehydrates everything from
+ * scratch. Retained for a potential future non-reload switch path.
+ *
+ * If called, must run AFTER setting the new activeAccountIndex
  * in the profile store and BEFORE inner providers remount.
  */
 export async function rehydrateProfileStores(): Promise<void> {

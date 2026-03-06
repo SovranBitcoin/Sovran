@@ -43,6 +43,10 @@ Zustand state scoping policy (global vs profile vs runtime), persistence boundar
 
 Folder structure, layer boundaries (app, features, shared), and where to place new code. Read this before adding files outside existing patterns.
 
+### `.cursor/rules/profile-safety-security-audit.mdc`
+
+Periodic safety, security, and reliability audit for profile-scoped state, secrets, database isolation, and cleanup. Contains a reusable audit prompt and a registry of previously addressed concerns. Read this before touching profile switching, Nostr import, profile generation, secure storage, or any code crossing profile boundaries.
+
 ---
 
 ## How to Write a Rule Doc

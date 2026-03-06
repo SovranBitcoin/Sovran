@@ -398,6 +398,7 @@ function SheetPopup() {
   const insets = useSafeAreaInsets();
   const current = usePopupStore((s) => s.current);
   const isOpen = usePopupStore((s) => s.isOpen);
+  const destroyed = usePopupStore((s) => s.destroyed);
   const close = usePopupStore((s) => s.close);
   const update = usePopupStore((s) => s.update);
 
@@ -607,8 +608,8 @@ function SheetPopup() {
                 <>
                   <Button
                     onPress={() => {
+                      switcherPayload.onRequestAction({ type: 'create' });
                       close();
-                      setTimeout(() => switcherPayload.onAddProfile(), 100);
                     }}>
                     <Button.Label>Generate new account</Button.Label>
                   </Button>
@@ -647,6 +648,8 @@ function SheetPopup() {
       importFooterState,
     ]
   );
+
+  if (destroyed) return null;
 
   return (
     <BottomSheet isOpen={isOpen} onOpenChange={handleOpenChange}>

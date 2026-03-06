@@ -93,16 +93,16 @@ Stores are organized by scope in `shared/stores/{global,profile,runtime}/`.
 Profile switch must produce a clean profile-local session.
 
 Current flow:
-- Triggered from `app/(drawer)/_layout.tsx`
-- Account-scoped providers remount via key in `app/_layout.tsx`
-- Profile-scoped Zustand stores are reset + rehydrated in `shared/lib/cashu/profileScopedStorage.ts` (`rehydrateProfileStores()`)
+- Triggered via `profileSessionOrchestrator.ts` (switch / create / import flows)
+- Orchestrator runs `CocoManager.cleanup()` (closes SQLite), updates `profileStore`, flushes to AsyncStorage, then triggers a **full app reload** (`Updates.reloadAsync()` / `DevSettings.reload()`)
+- On next launch, `AccountScopedProviders` in `app/_layout.tsx` mounts with the new `accountIndex` key, causing a full remount of all inner providers
+- Profile-scoped Zustand stores rehydrate from their `{name}:profile:{pubkey}` AsyncStorage keys via `createProfileScopedStorage()`
+
+Note: `rehydrateProfileStores()` in `profileScopedStorage.ts` is **not currently called** — the full reload makes it unnecessary. It is retained for a potential future non-reload switch path.
 
 Rules:
-- Every store using `createProfileScopedStorage()` must be included in:
-  - `PROFILE_SCOPED_STORE_KEYS`
-  - reset state in `rehydrateProfileStores()`
-  - `persist.rehydrate()` call set
-- If a profile-scoped store is missing from any of the above, stale in-memory state can leak between profiles.
+- Every store using `createProfileScopedStorage()` must be included in `PROFILE_SCOPED_STORE_KEYS` and (if `rehydrateProfileStores()` is ever activated) in its reset + rehydrate list.
+- If a profile-scoped store is missing from `PROFILE_SCOPED_STORE_KEYS`, `clearAllProfileScopedData()` will not remove its data on account deletion.
 - For profile-scoped domain actions, derive identity from active session context where possible (avoid manual pubkey threading from UI callsites).
 
 ---
@@ -162,10 +162,10 @@ For a new profile-scoped Zustand store:
 
 1. Use `persist(..., { storage: createJSONStorage(() => createProfileScopedStorage()) })`.
 2. Add store key to `PROFILE_SCOPED_STORE_KEYS` in `shared/lib/cashu/profileScopedStorage.ts`.
-3. Add reset state + `persist.rehydrate()` handling in `rehydrateProfileStores()`.
+3. If `rehydrateProfileStores()` is ever activated, add reset state + `persist.rehydrate()` handling there.
 4. Ensure full reset clears all profile variants via `clearAllProfileScopedData(pubkeys)`.
 
-If any of these steps are skipped, profile isolation is incomplete.
+If steps 1, 2, or 4 are skipped, profile isolation is incomplete.
 
 ---
 

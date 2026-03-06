@@ -92,7 +92,7 @@ function AccountScopedProviders({
       compose([
         MigrationGate,
         [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
-        NostrNDKProvider,
+        [NostrNDKProvider, { accountIndex }],
         CocoProvider,
         ActionSheetProvider,
         PricelistProvider,

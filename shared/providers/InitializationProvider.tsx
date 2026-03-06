@@ -125,7 +125,7 @@ interface InitializationContextValue {
   canStageStart: (id: string) => boolean;
   startTestAnimation: () => void;
   /** Clear all stages and log history, forcing the initialization screen to show immediately. */
-  resetStages: () => void;
+  resetStages: (options?: { holdUntilCancel?: boolean }) => void;
   /** Cancel force re-initialization when a profile switch/add flow aborts before stages re-register. */
   cancelResetStages: () => void;
 }
@@ -170,6 +170,8 @@ export function InitializationProvider({
   const [isTestMode, setIsTestMode] = useState(testMode);
   // When true, forces isInitializing=true until real stages register
   const [forceReinitialize, setForceReinitialize] = useState(false);
+  // When true, keeps the splash pinned even after stages re-register until explicitly released.
+  const [holdSplashVisible, setHoldSplashVisible] = useState(false);
   // Synchronous map of stage id → blocking flag. Updated immediately in
   // registerStage so updateStage can check it before the next React render.
   const blockingFlagsRef = useRef<Map<string, boolean>>(new Map());
@@ -349,6 +351,7 @@ export function InitializationProvider({
     forceVisible ||
     isTestMode ||
     forceReinitialize ||
+    holdSplashVisible ||
     Array.from(stages.values()).some(
       (stage) => stage.blocking && (stage.status === 'loading' || stage.status === 'pending')
     );
@@ -374,10 +377,11 @@ export function InitializationProvider({
     }
   }, [forceReinitialize, stages.size]);
 
-  const resetStages = useCallback(() => {
+  const resetStages = useCallback((options?: { holdUntilCancel?: boolean }) => {
     console.log('[InitializationProvider] resetStages called — forcing loading screen');
     // Force the loading screen to show immediately
     setForceReinitialize(true);
+    setHoldSplashVisible(options?.holdUntilCancel === true);
     // Clear all stages so inner providers can re-register fresh
     setStages(new Map());
     blockingFlagsRef.current.clear();
@@ -390,6 +394,7 @@ export function InitializationProvider({
 
   const cancelResetStages = useCallback(() => {
     setForceReinitialize(false);
+    setHoldSplashVisible(false);
   }, []);
 
   const startTestAnimation = useCallback(() => {

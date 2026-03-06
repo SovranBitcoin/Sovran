@@ -1,19 +1,23 @@
 /**
  * @fileoverview Profile session orchestration for switch/create/import flows.
  *
- * Coordinates CocoManager cleanup, profileStore updates, and profile-scoped store
- * rehydration. Uses a single transition guard to prevent concurrent profile switches.
- * Callers must provide resetStages/cancelResetStages from InitializationProvider
- * to reset the app shell during the transition.
+ * Coordinates CocoManager cleanup, profileStore updates, and a hard app reload for
+ * switch/create/import flows. Uses a single transition guard to prevent concurrent
+ * profile switches. Callers must provide resetStages/cancelResetStages from
+ * InitializationProvider to keep the app covered until reload or failure fallback.
  */
-import { InteractionManager } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DevSettings } from 'react-native';
+
+import * as Updates from 'expo-updates';
 
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { rehydrateProfileStores } from '@/shared/lib/cashu/profileScopedStorage';
+import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import { usePopupStore } from '@/shared/stores/runtime/popupStore';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
 type TransitionControls = {
-  resetStages: () => void;
+  resetStages: (options?: { holdUntilCancel?: boolean }) => void;
   cancelResetStages: () => void;
 };
 
@@ -26,10 +30,21 @@ type CreateProfileTransition = TransitionControls & {
 };
 
 let transitionInProgress = false;
+let transitionStartedAt = 0;
+const TRANSITION_EXPIRY_MS = 10_000;
+const UI_OVERLAY_SETTLE_MS = 350;
 
 function beginTransition(): boolean {
-  if (transitionInProgress) return false;
+  if (transitionInProgress) {
+    if (Date.now() - transitionStartedAt > TRANSITION_EXPIRY_MS) {
+      console.warn('[ProfileSessionOrchestrator] Stale transition guard expired');
+      transitionInProgress = false;
+    } else {
+      return false;
+    }
+  }
   transitionInProgress = true;
+  transitionStartedAt = Date.now();
   return true;
 }
 
@@ -37,14 +52,58 @@ function endTransition(): void {
   transitionInProgress = false;
 }
 
+async function waitForUiOverlaySettle(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, UI_OVERLAY_SETTLE_MS);
+  });
+}
+
+async function flushProfileStoreToDisk(): Promise<void> {
+  const { activeAccountIndex, profiles, cocoMigrationComplete } = useProfileStore.getState();
+
+  await AsyncStorage.setItem(
+    'profile-store',
+    JSON.stringify({
+      state: {
+        activeAccountIndex,
+        profiles,
+        cocoMigrationComplete,
+      },
+      version: 0,
+    })
+  );
+}
+
+async function reloadAtTransitionEnd(): Promise<boolean> {
+  usePopupStore.getState().destroySheet();
+  usePaymentStatusStore.getState().setActive(null);
+  await waitForUiOverlaySettle();
+
+  if (__DEV__) {
+    DevSettings.reload();
+    return true;
+  }
+
+  if (!Updates.isEnabled) {
+    console.warn(
+      '[ProfileSessionOrchestrator] expo-updates is disabled; skipping final app reload'
+    );
+    return false;
+  }
+
+  await Updates.reloadAsync();
+  return true;
+}
+
 async function runProfileTransition(
   accountIndex: number,
-  resetStages: () => void,
+  resetStages: (options?: { holdUntilCancel?: boolean }) => void,
   cancelResetStages: () => void,
   flowName: string
 ): Promise<boolean> {
   try {
-    resetStages();
+    resetStages({ holdUntilCancel: true });
+    usePopupStore.getState().close();
     await CocoManager.cleanup();
 
     const switched = useProfileStore.getState().switchProfile(accountIndex);
@@ -52,11 +111,11 @@ async function runProfileTransition(
       throw new Error(`Target profile does not exist: ${accountIndex}`);
     }
 
-    // Yield to let React flush, then wait for animations (e.g. drawer close) before rehydrating
-    await new Promise<void>((resolve) => {
-      InteractionManager.runAfterInteractions(() => resolve());
-    });
-    await rehydrateProfileStores();
+    await flushProfileStoreToDisk();
+    const reloaded = await reloadAtTransitionEnd();
+    if (!reloaded) {
+      cancelResetStages();
+    }
     return true;
   } catch (error) {
     console.error(`[ProfileSessionOrchestrator] ${flowName} failed:`, error);
@@ -89,7 +148,8 @@ export async function createAndSwitchProfile({
 }: CreateProfileTransition): Promise<boolean> {
   if (!beginTransition()) return false;
   try {
-    resetStages();
+    resetStages({ holdUntilCancel: true });
+    usePopupStore.getState().close();
 
     const profileStore = useProfileStore.getState();
     const nextIndex = profileStore.getNextAccountIndex();
@@ -108,11 +168,11 @@ export async function createAndSwitchProfile({
       throw new Error(`Failed to activate newly-created profile: ${nextIndex}`);
     }
 
-    // Yield to let React flush, then wait for animations (e.g. drawer close) before rehydrating
-    await new Promise<void>((resolve) => {
-      InteractionManager.runAfterInteractions(() => resolve());
-    });
-    await rehydrateProfileStores();
+    await flushProfileStoreToDisk();
+    const reloaded = await reloadAtTransitionEnd();
+    if (!reloaded) {
+      cancelResetStages();
+    }
     return true;
   } catch (error) {
     console.error('[ProfileSessionOrchestrator] create failed:', error);

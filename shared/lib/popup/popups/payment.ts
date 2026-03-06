@@ -94,6 +94,7 @@ export function paymentStatusPopup(payload: {
 
   const onPressViewTransaction = async () => {
     try {
+      if (!CocoManager.isInitialized()) return;
       const manager = CocoManager.getInstance();
       const history = await manager.history.getPaginatedHistory(0, 100);
       const { type, idField } = config.history;

@@ -109,12 +109,12 @@ async function updateLegacyHistoryState(
   entry: SendHistoryEntry,
   state: string,
   mintUrl: string,
-  manager: ReturnType<typeof useManager>
+  manager: ReturnType<typeof useManager>,
+  accountIndex: number
 ) {
   if (!entry.id) return;
   try {
-    const activeAccountIndex = useProfileStore.getState().activeAccountIndex;
-    const dbName = activeAccountIndex === 0 ? 'coco.db' : `coco-${activeAccountIndex}.db`;
+    const dbName = accountIndex === 0 ? 'coco.db' : `coco-${accountIndex}.db`;
     const db = await SQLite.openDatabaseAsync(dbName);
     await db.runAsync(
       `UPDATE coco_cashu_history SET state = ? WHERE id = ? AND type = 'send'`,
@@ -156,6 +156,7 @@ export function SendTokenScreen({
   const manager = useManager();
   const { send, isSending } = useSendWithHistory();
   const { sendDirectMessage, isSending: isSendingDM } = useNostrDirectMessage();
+  const accountIndex = useProfileStore((s) => s.activeAccountIndex);
 
   // State
   const [, setUri] = useState('');
@@ -361,7 +362,13 @@ export function SendTokenScreen({
 
           const allSpent = proofStates.every((s) => s.state === 'SPENT');
           if (allSpent) {
-            await updateLegacyHistoryState(currentTransaction, 'finalized', mintUrl, manager);
+            await updateLegacyHistoryState(
+              currentTransaction,
+              'finalized',
+              mintUrl,
+              manager,
+              accountIndex
+            );
             tokenAlreadyRedeemedPopup({ onClose: () => onClose({}) });
             return;
           }
@@ -378,7 +385,13 @@ export function SendTokenScreen({
           // Reclaim unspent proofs
           const reclaimToken: Token = { mint: token.mint, proofs: unspentProofs, unit: token.unit };
           await manager.wallet.receive(reclaimToken);
-          await updateLegacyHistoryState(currentTransaction, 'rolledBack', mintUrl, manager);
+          await updateLegacyHistoryState(
+            currentTransaction,
+            'rolledBack',
+            mintUrl,
+            manager,
+            accountIndex
+          );
 
           const amt = unspentProofs.reduce((s, p) => s + p.amount, 0);
           fundsReclaimedPopup(
@@ -406,7 +419,7 @@ export function SendTokenScreen({
         });
       }
     },
-    [currentTransaction, manager, token]
+    [currentTransaction, manager, token, accountIndex]
   );
 
   const handleCheckStatus = useCallback(
@@ -433,7 +446,13 @@ export function SendTokenScreen({
           const total = proofStates.length;
 
           if (spentCount === total) {
-            await updateLegacyHistoryState(currentTransaction, 'finalized', mintUrl, manager);
+            await updateLegacyHistoryState(
+              currentTransaction,
+              'finalized',
+              mintUrl,
+              manager,
+              accountIndex
+            );
             tokenRedeemedPopup({ onClose: () => onClose({}) });
           } else if (unspentCount === total) {
             tokenStillPendingPopup({ onClose: () => onClose({}) });
@@ -496,7 +515,7 @@ export function SendTokenScreen({
         setIsCheckingStatus(false);
       }
     },
-    [currentTransaction, manager, token]
+    [currentTransaction, manager, token, accountIndex]
   );
 
   // Handle send payment (payment request mode)

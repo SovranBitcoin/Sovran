@@ -38,6 +38,7 @@ export class NsecSigner implements Signer {
  */
 export class CocoManager {
   private static instance: Manager | null = null;
+  private static db: SQLite.SQLiteDatabase | null = null;
   private static isInitializing = false;
   /** Tracks an in-flight cleanup() call so initialize() can await it before proceeding. */
   private static pendingCleanup: Promise<void> | null = null;
@@ -128,6 +129,7 @@ export class CocoManager {
       const dbName = this.getDbName();
       initLog('CocoManager', `opening DB: ${dbName}`);
       const db = await SQLite.openDatabaseAsync(dbName);
+      this.db = db;
       const repositories = new ExpoSqliteRepositories({ database: db });
       await repositories.init();
       initLog('CocoManager', 'DB + repos initialized');
@@ -303,12 +305,31 @@ export class CocoManager {
           console.warn('Failed to disable mint quote watcher:', error);
         }
 
+        // Close the SQLite connection to prevent "database is locked" on revisit
+        if (this.db) {
+          try {
+            await this.db.closeAsync();
+            console.log('SQLite connection closed');
+          } catch (dbError) {
+            console.warn('Failed to close SQLite connection:', dbError);
+          }
+          this.db = null;
+        }
+
         // Clear the instance
         this.instance = null;
         this.clearSensitiveRuntimeState();
         console.log('Coco Manager cleanup completed');
       } catch (error) {
         console.error('Failed to cleanup Coco Manager:', error);
+        if (this.db) {
+          try {
+            await this.db.closeAsync();
+          } catch {
+            // best-effort
+          }
+          this.db = null;
+        }
         this.clearSensitiveRuntimeState();
       }
     };

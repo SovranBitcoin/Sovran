@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Input, Label, TextField, Description } from 'heroui-native';
 import { getPublicKey, nip19 } from 'nostr-tools';
+
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
-import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import type { ActionSheetPayloads } from '../../actionSheetTypes';
 import { SheetContent } from '../SheetContent';
@@ -64,20 +64,14 @@ export function ImportNsec({ payload, close, onFooterStateChange }: ImportNsecPr
 
     setIsImporting(true);
     try {
-      const stored = await storeImportedNsec(pubkeyHex, trimmed);
-      if (!stored) {
-        setError('Failed to store nsec securely.');
-        return;
-      }
-
-      const npubNumber = pubkeyToAccountNumber(pubkeyHex);
-      useProfileStore.getState().addProfile(npubNumber, pubkeyHex, 'imported');
-
+      payload.onRequestAction({
+        type: 'import',
+        nsec: trimmed,
+        pubkeyHex,
+        accountIndex: pubkeyToAccountNumber(pubkeyHex),
+      });
       setNsecInput('');
       close();
-      setTimeout(() => {
-        payload.onImportProfile(npubNumber);
-      }, 100);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Import failed';
       setError(message);

@@ -39,16 +39,21 @@ export function isCustomSheetPayload(p: SheetPayload | null): p is CustomSheetPa
 type PopupStore = {
   current: SheetPayload | null;
   isOpen: boolean;
+  /** When true, PopupHost must fully unmount the BottomSheet tree to tear down native overlays. */
+  destroyed: boolean;
   open: (payload: SheetPayload) => void;
   close: () => void;
+  /** Like close(), but also sets `destroyed` so PopupHost unmounts the BottomSheet (and its FullWindowOverlay). */
+  destroySheet: () => void;
   update: (partial: Partial<StandardSheetPayload>) => void;
 };
 
 export const usePopupStore = create<PopupStore>((set, get) => ({
   current: null,
   isOpen: false,
+  destroyed: false,
   open: (payload) => {
-    set({ current: payload, isOpen: true });
+    set({ current: payload, isOpen: true, destroyed: false });
   },
   update: (partial) => {
     const { current } = get();
@@ -65,5 +70,16 @@ export const usePopupStore = create<PopupStore>((set, get) => ({
       }
     }
     set({ current: null, isOpen: false });
+  },
+  destroySheet: () => {
+    const { current } = get();
+    if (current && !isCustomSheetPayload(current) && current.onClose) {
+      try {
+        current.onClose({ reason: 'dismiss' });
+      } catch (error) {
+        console.error('popup onClose callback failed', error);
+      }
+    }
+    set({ current: null, isOpen: false, destroyed: true });
   },
 }));
