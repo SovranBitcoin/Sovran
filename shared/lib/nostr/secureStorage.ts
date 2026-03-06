@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import * as bip39 from '@scure/bip39';
@@ -28,6 +29,28 @@ const IOS_SECURE_OPTIONS = {
   authenticatePrompt: 'Authenticate to access your Sovran wallet',
   // For production, you might want to set requireAuthentication: true
 } as const;
+
+function getDebugMnemonicOverride(): string | null {
+  if (!__DEV__) {
+    return null;
+  }
+
+  const configuredMnemonic =
+    Constants.expoConfig?.extra?.debugMnemonicOverride ??
+    process.env.EXPO_PUBLIC_DEBUG_MNEMONIC ??
+    null;
+  if (!configuredMnemonic) {
+    return null;
+  }
+
+  const mnemonic = configuredMnemonic.trim();
+  const words = mnemonic.split(/\s+/);
+  if (words.length !== 12) {
+    throw new Error('debug mnemonic override must be exactly 12 words');
+  }
+
+  return words.join(' ');
+}
 
 /**
  * Securely stores the user's mnemonic phrase
@@ -80,6 +103,12 @@ export async function retrieveMnemonic(): Promise<string | null> {
  */
 async function generateMnemonic(): Promise<string> {
   try {
+    const debugMnemonic = getDebugMnemonicOverride();
+    if (debugMnemonic) {
+      console.log('Using debug mnemonic from EXPO_PUBLIC_DEBUG_MNEMONIC');
+      return debugMnemonic;
+    }
+
     // Generate 128 bits of entropy (16 bytes) for a 12-word mnemonic
     const entropy = new Uint8Array(16);
     crypto.getRandomValues(entropy);

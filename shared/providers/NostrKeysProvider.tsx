@@ -11,6 +11,7 @@ import { InteractionManager } from 'react-native';
 import { useMnemonic } from '@/shared/hooks/useSecureStore';
 import {
   ensureMnemonicExists,
+  retrieveMnemonic,
   retrieveDerivedKeys,
   storeDerivedKeys,
   retrieveCashuMnemonic,
@@ -123,7 +124,12 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     message: 'Initializing keys...',
     dependsOn: ['migrations'],
   });
-  const { value: mnemonic, loading: mnemonicLoading, error: mnemonicError } = useMnemonic();
+  const {
+    value: mnemonic,
+    loading: mnemonicLoading,
+    error: mnemonicError,
+    refresh: refreshMnemonic,
+  } = useMnemonic();
   const [keys, setKeys] = useState<NostrKeys | null>(null);
   const [cashuMnemonic, setCashuMnemonic] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -133,9 +139,26 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
   const [cachedCashuMnemonics, setCachedCashuMnemonics] = useState<Map<number, string>>(new Map());
   const hasStarted = useRef(false);
 
+  const getMnemonicForDerivation = useCallback(async (): Promise<string | null> => {
+    if (mnemonic) {
+      return mnemonic;
+    }
+
+    // On a brand-new session, ensureMnemonicExists() may have stored the mnemonic
+    // before useMnemonic() refreshes. Read SecureStore directly so profile creation
+    // works immediately on first launch after a wipe.
+    const storedMnemonic = await retrieveMnemonic();
+    if (storedMnemonic) {
+      return storedMnemonic;
+    }
+
+    return null;
+  }, [mnemonic]);
+
   const deriveKeys = useCallback(
     async (accountIndex: number): Promise<NostrKeys | null> => {
-      if (!mnemonic) {
+      const rootMnemonic = await getMnemonicForDerivation();
+      if (!rootMnemonic) {
         return null;
       }
 
@@ -145,7 +168,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           return cachedKeys.get(accountIndex)!;
         }
 
-        const derivedKeys: NostrKeys = deriveNostrKeys(mnemonic, accountIndex);
+        const derivedKeys: NostrKeys = deriveNostrKeys(rootMnemonic, accountIndex);
 
         // Cache the keys
         setCachedKeys((prev) => new Map(prev).set(accountIndex, derivedKeys));
@@ -157,12 +180,13 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         throw new Error(errorMessage);
       }
     },
-    [mnemonic, cachedKeys]
+    [getMnemonicForDerivation, cachedKeys]
   );
 
   const deriveCashuMnemonic = useCallback(
     async (accountIndex: number): Promise<string | null> => {
-      if (!mnemonic) {
+      const rootMnemonic = await getMnemonicForDerivation();
+      if (!rootMnemonic) {
         return null;
       }
 
@@ -172,7 +196,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           return cachedCashuMnemonics.get(accountIndex)!;
         }
 
-        const derivedCashuMnemonic = deriveCashuMnemonicPure(mnemonic, accountIndex);
+        const derivedCashuMnemonic = deriveCashuMnemonicPure(rootMnemonic, accountIndex);
 
         // Cache the mnemonic
         setCachedCashuMnemonics((prev) => new Map(prev).set(accountIndex, derivedCashuMnemonic));
@@ -184,7 +208,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         throw new Error(errorMessage);
       }
     },
-    [mnemonic, cachedCashuMnemonics]
+    [getMnemonicForDerivation, cachedCashuMnemonics]
   );
 
   const getKeysForAccount = useCallback(
@@ -275,6 +299,9 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
               const { storeMnemonic } = await import('@/shared/lib/nostr/secureStorage');
               const stored = await storeMnemonic(mnemonicToUse);
               initLog('NostrKeys', `storeMnemonic result: ${stored}`);
+              if (stored) {
+                await refreshMnemonic();
+              }
             } catch (error) {
               initLog('NostrKeys', `storeMnemonic error: ${error}`);
             }
@@ -290,6 +317,9 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
           initLog('NostrKeys', 'generating new mnemonic...');
           mnemonicToUse = await ensureMnemonicExists();
           initLog('NostrKeys', `ensureMnemonicExists done: ${!!mnemonicToUse}`);
+          if (mnemonicToUse) {
+            await refreshMnemonic();
+          }
 
           if (!mnemonicToUse) {
             throw new Error('Failed to generate or retrieve mnemonic');
@@ -435,7 +465,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
 
     initializeKeys();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mnemonic, mnemonicLoading, stage.canStart]);
+  }, [mnemonic, mnemonicLoading, stage.canStart, refreshMnemonic]);
 
   // Update error state based on mnemonic error
   useEffect(() => {

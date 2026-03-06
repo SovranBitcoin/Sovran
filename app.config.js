@@ -24,11 +24,17 @@ module.exports = ({ config }) => {
     : './assets/images/production.png';
   const androidGoogleMapsApiKey =
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+  const debugMnemonicOverride =
+    process.env.DEBUG_MNEMONIC || process.env.EXPO_PUBLIC_DEBUG_MNEMONIC || undefined;
 
   // Spread the static config from app.json and override only what's needed
   return {
     ...config,
     icon: appIcon,
+    extra: {
+      ...config.extra,
+      debugMnemonicOverride,
+    },
     plugins: [
       ...(config.plugins || []),
       'expo-maps',
