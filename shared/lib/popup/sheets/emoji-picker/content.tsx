@@ -73,7 +73,7 @@ export function EmojiPickerContent({
   const handleEmojiSelect = async (emoji: string) => {
     const encodedEmoji = encode(emoji, payload.token);
     await Clipboard.setStringAsync(encodedEmoji);
-    copyPopup('ecashToken', { onClose: () => close() });
+    copyPopup('ecashToken', { onOpen: close });
   };
 
   return (
@@ -93,7 +93,7 @@ export function EmojiPickerContent({
               <TouchableOpacity
                 testID={emoji.id}
                 key={colIndex}
-                className={`bg-surface-secondary flex-1 rounded-lg p-3 ${colIndex > 0 ? 'ml-2' : ''}`}
+                className={`bg-surface-tertiary flex-1 rounded-lg p-3 ${colIndex > 0 ? 'ml-2' : ''}`}
                 onPress={() => handleEmojiSelect(emoji.emoji)}>
                 <View className="items-center justify-center">
                   <Text className="text-2xl">{emoji.emoji}</Text>

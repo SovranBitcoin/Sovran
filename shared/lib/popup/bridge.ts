@@ -27,6 +27,7 @@ export type ToastConfig = {
   label: string;
   description?: string;
   duration?: number | 'persistent';
+  onShow?: () => void;
   onHide?: () => void;
 };
 
@@ -35,6 +36,7 @@ export type CustomToastConfig = {
     props: Record<string, unknown> & { hide: (ids?: string | string[] | 'all') => void }
   ) => React.ReactElement;
   duration?: number | 'persistent';
+  onShow?: () => void;
   onHide?: () => void;
 };
 
@@ -64,6 +66,7 @@ export function showToast(config: ToastConfig) {
         description: config.description,
       }),
     duration: config.duration,
+    onShow: config.onShow,
     onHide: config.onHide,
   });
 }
@@ -80,6 +83,7 @@ export function showCustomToast(config: CustomToastConfig) {
         props as Record<string, unknown> & { hide: (ids?: string | string[] | 'all') => void }
       ),
     duration: config.duration,
+    onShow: config.onShow,
     onHide: config.onHide,
   });
 }

@@ -52,6 +52,7 @@
 import {
   noMintSelectedPopup,
   noClipboardAddressPopup,
+  offlineSendSuggestionsPopup,
   routstrTopUpSuccessPopup,
   routstrWalletCreatedPopup,
   routstrInitializedPopup,
@@ -84,8 +85,9 @@ import { View } from '@/shared/ui/primitives/View/View';
 import * as Clipboard from 'expo-clipboard';
 import { checkBalance, createWalletFromToken, topUpBalance } from '@/shared/lib/routstr/api';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { InteractionManager, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
@@ -94,6 +96,10 @@ import { useSettingsStore, DisplayCurrency } from '@/shared/stores/global/settin
 import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
 import opacity from 'hex-color-opacity';
 import { useLightningOperations } from '@/features/receive';
+import {
+  buildExactOfflineAmountIndex,
+  getOfflineSendSuggestions,
+} from '@/features/send/lib/offlineSendSuggestions';
 import { useSendWithHistory } from '@/features/send';
 import { useNostrDirectMessage } from '@/features/user';
 import { useBalanceContext, useManager, useMints } from 'coco-cashu-react';
@@ -110,6 +116,11 @@ const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }
 
 type InputMode = 'sats' | 'fiat';
 type SendMode = 'offline' | 'online';
+
+type OfflineSendabilityState = {
+  reachableAmounts: Set<number>;
+  totalReadyBalance: number;
+};
 
 /**
  * Displays fiat amount with styled decimal placeholders
@@ -261,8 +272,10 @@ export function CurrencyScreen({
   // Track raw input string for fiat mode to preserve decimal state
   const [rawFiatInput, setRawFiatInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sendMode, setSendMode] = useState<SendMode | null>(null);
-  const sendModeRequestIdRef = useRef(0);
+  const [offlineSendability, setOfflineSendability] = useState<OfflineSendabilityState | null>(
+    null
+  );
+  const offlineSendabilityRequestIdRef = useRef(0);
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
   const setSelectedMint = useMintStore((state) => state.setSelectedMint);
@@ -382,44 +395,66 @@ export function CurrencyScreen({
   }, [satsAmount]);
 
   const manager = useManager();
+  const { isOffline } = useOfflineStatus();
 
   useEffect(() => {
     const isSendTokenFlow = params.to === 'sendToken';
+    if (!isSendTokenFlow || !selectedMint || mintBalance <= 0) {
+      setOfflineSendability(null);
+      return;
+    }
+
+    const requestId = ++offlineSendabilityRequestIdRef.current;
+    let cancelled = false;
+    setOfflineSendability(null);
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      void (async () => {
+        try {
+          const readyProofs = await manager.proofService.getReadyProofs(selectedMint);
+          const index = buildExactOfflineAmountIndex(readyProofs.map((proof) => proof.amount));
+
+          if (cancelled || offlineSendabilityRequestIdRef.current !== requestId) {
+            return;
+          }
+
+          setOfflineSendability({
+            reachableAmounts: new Set(index.reachableSums),
+            totalReadyBalance: index.totalReadyBalance,
+          });
+        } catch {
+          if (!cancelled && offlineSendabilityRequestIdRef.current === requestId) {
+            setOfflineSendability(null);
+          }
+        }
+      })();
+    });
+
+    return () => {
+      cancelled = true;
+      interaction.cancel();
+    };
+  }, [manager, mintBalance, params.to, selectedMint]);
+
+  const sendMode = useMemo<SendMode | null>(() => {
+    const isSendTokenFlow = params.to === 'sendToken';
     if (!isSendTokenFlow || !selectedMint || !Number.isFinite(amount) || amount <= 0) {
-      setSendMode(null);
-      return;
+      return null;
     }
 
-    // If we already know the mint cannot cover this amount, skip route estimation.
     if (amount > mintBalance) {
-      setSendMode(null);
-      return;
+      return null;
     }
 
-    const requestId = ++sendModeRequestIdRef.current;
-    void (async () => {
-      try {
-        // Mirror coco SendOperationService.prepare(): if exact proof set exists with includeFees=false,
-        // it's an offline send; otherwise it needs swap and is online.
-        const selectedProofs = await manager.proofService.selectProofsToSend(
-          selectedMint,
-          amount,
-          false
-        );
-        const selectedAmount = selectedProofs.reduce((sum, proof) => sum + proof.amount, 0);
-        const mode: SendMode =
-          selectedProofs.length > 0 && selectedAmount === amount ? 'offline' : 'online';
+    if (!offlineSendability) {
+      return null;
+    }
 
-        if (sendModeRequestIdRef.current === requestId) {
-          setSendMode(mode);
-        }
-      } catch {
-        if (sendModeRequestIdRef.current === requestId) {
-          setSendMode(null);
-        }
-      }
-    })();
-  }, [amount, manager, mintBalance, params.to, selectedMint]);
+    if (offlineSendability.totalReadyBalance < amount) {
+      return null;
+    }
+
+    return offlineSendability.reachableAmounts.has(amount) ? 'offline' : 'online';
+  }, [amount, mintBalance, offlineSendability, params.to, selectedMint]);
 
   useEffect(() => {
     onSendModeChange?.(params.to === 'sendToken' ? sendMode : null);
@@ -444,92 +479,143 @@ export function CurrencyScreen({
     }
   };
 
-  const handleEcashSend = async () => {
-    if (!selectedMint) {
-      noMintSelectedPopup();
-      return;
-    }
+  const handleEcashSend = useCallback(
+    async (sendAmount: number) => {
+      if (!selectedMint) {
+        noMintSelectedPopup();
+        return;
+      }
 
-    // useSendWithHistory returns both the token and the history entry
-    const { token, historyEntry } = await send(selectedMint, amount, {});
+      // useSendWithHistory returns both the token and the history entry
+      const { token, historyEntry } = await send(selectedMint, sendAmount, {});
 
-    // Capture and store location (respects settings toggle and permissions)
-    await captureAndStoreLocation(historyEntry.id);
+      // Capture and store location (respects settings toggle and permissions)
+      await captureAndStoreLocation(historyEntry.id);
 
-    // Handle Routstr top-up flow
-    if (params.routstrTopUp === 'true') {
-      try {
-        const encodedToken = getEncodedTokenV4(token);
+      // Handle Routstr top-up flow
+      if (params.routstrTopUp === 'true') {
+        try {
+          const encodedToken = getEncodedTokenV4(token);
 
-        // Get the latest apiKey directly from the store to avoid stale closure
-        const currentApiKey = useRoutstrStore.getState().apiKey;
-        console.log('Routstr top-up: Current API key exists:', !!currentApiKey);
+          // Get the latest apiKey directly from the store to avoid stale closure
+          const currentApiKey = useRoutstrStore.getState().apiKey;
+          console.log('Routstr top-up: Current API key exists:', !!currentApiKey);
 
-        if (currentApiKey) {
-          // We have an existing API key - use top-up endpoint
-          console.log('Routstr top-up: Using existing wallet, calling topUpBalance');
-          const topUpResult = await topUpBalance(currentApiKey, encodedToken);
-          setBalance(balance ? balance + topUpResult.added_amount : topUpResult.added_amount);
-          routstrTopUpSuccessPopup({
-            balance: `${(balance ? balance + topUpResult.added_amount : topUpResult.added_amount / 1000).toFixed(0)} sats`,
-          });
-          onRoutstrSuccess?.();
-          return;
-        } else {
-          // No API key - create a new wallet
-          console.log('Routstr top-up: No existing wallet, creating new one');
-
-          // Try the /wallet/create endpoint first (may not exist yet per docs)
-          const walletResponse = await createWalletFromToken(encodedToken);
-
-          if (walletResponse && walletResponse.api_key) {
-            // Wallet created successfully via /wallet/create
-            console.log('Routstr top-up: Wallet created via /wallet/create');
-            setApiKey(walletResponse.api_key);
-            setBalance(walletResponse.balance);
-            routstrWalletCreatedPopup({
-              balance: `${(walletResponse.balance / 1000).toFixed(0)} sats`,
+          if (currentApiKey) {
+            // We have an existing API key - use top-up endpoint
+            console.log('Routstr top-up: Using existing wallet, calling topUpBalance');
+            const topUpResult = await topUpBalance(currentApiKey, encodedToken);
+            setBalance(balance ? balance + topUpResult.added_amount : topUpResult.added_amount);
+            routstrTopUpSuccessPopup({
+              balance: `${(balance ? balance + topUpResult.added_amount : topUpResult.added_amount / 1000).toFixed(0)} sats`,
             });
             onRoutstrSuccess?.();
             return;
+          } else {
+            // No API key - create a new wallet
+            console.log('Routstr top-up: No existing wallet, creating new one');
+
+            // Try the /wallet/create endpoint first (may not exist yet per docs)
+            const walletResponse = await createWalletFromToken(encodedToken);
+
+            if (walletResponse && walletResponse.api_key) {
+              // Wallet created successfully via /wallet/create
+              console.log('Routstr top-up: Wallet created via /wallet/create');
+              setApiKey(walletResponse.api_key);
+              setBalance(walletResponse.balance);
+              routstrWalletCreatedPopup({
+                balance: `${(walletResponse.balance / 1000).toFixed(0)} sats`,
+              });
+              onRoutstrSuccess?.();
+              return;
+            }
+
+            // Fallback: Use the Cashu token directly as API key (per Routstr docs)
+            // "Currently, you can use Cashu tokens directly as API keys"
+            console.log('Routstr top-up: Falling back to using token directly');
+            try {
+              const balanceData = await checkBalance(encodedToken);
+
+              // If server returns a persistent API key, use that for future requests
+              const persistentKey = balanceData.api_key || encodedToken;
+              setApiKey(persistentKey);
+              setBalance(balanceData.balance);
+
+              console.log(
+                'Routstr top-up: Stored API key:',
+                persistentKey !== encodedToken ? 'persistent key from server' : 'token as key'
+              );
+
+              routstrInitializedPopup({
+                balance: `${(balanceData.balance / 1000).toFixed(0)} sats`,
+              });
+            } catch (balanceError) {
+              console.error('Failed to check balance:', balanceError);
+              // Still store the token as API key - it may work for subsequent requests
+              setApiKey(encodedToken);
+              routstrInitializedPopup();
+            }
+            onRoutstrSuccess?.();
+            return;
           }
-
-          // Fallback: Use the Cashu token directly as API key (per Routstr docs)
-          // "Currently, you can use Cashu tokens directly as API keys"
-          console.log('Routstr top-up: Falling back to using token directly');
-          try {
-            const balanceData = await checkBalance(encodedToken);
-
-            // If server returns a persistent API key, use that for future requests
-            const persistentKey = balanceData.api_key || encodedToken;
-            setApiKey(persistentKey);
-            setBalance(balanceData.balance);
-
-            console.log(
-              'Routstr top-up: Stored API key:',
-              persistentKey !== encodedToken ? 'persistent key from server' : 'token as key'
-            );
-
-            routstrInitializedPopup({
-              balance: `${(balanceData.balance / 1000).toFixed(0)} sats`,
-            });
-          } catch (balanceError) {
-            console.error('Failed to check balance:', balanceError);
-            // Still store the token as API key - it may work for subsequent requests
-            setApiKey(encodedToken);
-            routstrInitializedPopup();
-          }
-          onRoutstrSuccess?.();
-          return;
+        } catch (error: any) {
+          console.error('Failed to handle Routstr top-up:', error);
+          routstrTransactionFailedPopup({ text: error.error?.message });
         }
-      } catch (error: any) {
-        console.error('Failed to handle Routstr top-up:', error);
-        routstrTransactionFailedPopup({ text: error.error?.message });
       }
+
+      onSendTokenCreated({ ...historyEntry, token });
+    },
+    [
+      balance,
+      onRoutstrSuccess,
+      onSendTokenCreated,
+      params.routstrTopUp,
+      selectedMint,
+      send,
+      setApiKey,
+      setBalance,
+    ]
+  );
+
+  const handleRoundedOfflineSend = useCallback(
+    async (sendAmount: number) => {
+      setLoading(true);
+      try {
+        await handleEcashSend(sendAmount);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [handleEcashSend]
+  );
+
+  const maybeShowOfflineSendSuggestions = useCallback(async () => {
+    if (
+      !isOffline ||
+      params.to !== 'sendToken' ||
+      !selectedMint ||
+      !Number.isFinite(amount) ||
+      amount <= 0
+    ) {
+      return false;
     }
 
-    onSendTokenCreated({ ...historyEntry, token });
-  };
+    const suggestions = await getOfflineSendSuggestions(manager.proofService, selectedMint, amount);
+    if (suggestions.isRequestedAmountSendableOffline) {
+      return false;
+    }
+
+    offlineSendSuggestionsPopup({
+      requestedAmount: amount,
+      roundDownAmount: suggestions.roundDownAmount,
+      roundUpAmount: suggestions.roundUpAmount,
+      unit: 'sat',
+      onSelectAmount: handleRoundedOfflineSend,
+    });
+
+    return true;
+  }, [amount, handleRoundedOfflineSend, isOffline, manager.proofService, params.to, selectedMint]);
 
   const handleNext = async () => {
     if (!isValidAmount) return;
@@ -545,6 +631,18 @@ export function CurrencyScreen({
       }
     }
 
+    if (params.to === 'sendToken' && isOffline) {
+      setLoading(true);
+      try {
+        const didShowOfflineSuggestions = await maybeShowOfflineSendSuggestions();
+        if (didShowOfflineSuggestions) {
+          return;
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
     setLoading(true);
 
     switch (params.to) {
@@ -557,7 +655,7 @@ export function CurrencyScreen({
         break;
       case 'sendToken':
         try {
-          await handleEcashSend();
+          await handleEcashSend(amount);
         } finally {
           setLoading(false);
         }

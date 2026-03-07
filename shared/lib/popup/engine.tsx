@@ -105,6 +105,7 @@ interface popupConfig {
   dismissable?: boolean;
   duration?: number;
   buttons?: MessageButton[];
+  onOpen?: () => void;
   onClose?: (data: unknown) => void;
   type?: MessageType;
   live?: LiveSheetConfig;
@@ -165,6 +166,7 @@ export const popup = (config: popupConfig | string) => {
     label: messageConfig.title,
     description,
     duration: options.duration,
+    onShow: options.onOpen,
     onHide: options.onClose ? () => options.onClose!({ reason: 'dismiss' }) : undefined,
   };
   showToast(toastConfig);

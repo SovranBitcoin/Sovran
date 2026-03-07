@@ -46,6 +46,7 @@ import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListene
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
+import { OfflineProvider } from '@/shared/providers/OfflineProvider';
 import {
   clearTransitionGuardOnStartup,
   registerTransitionControls,
@@ -272,23 +273,25 @@ function RootLayoutContent() {
         backgroundColor={background}
         style={currentTheme.includes('light') ? 'dark' : 'light'}
       />
-      <Stack
-        key={currentTheme}
-        screenOptions={{
-          headerShown: false,
-          gestureEnabled: true,
-          contentStyle: {
-            backgroundColor: contentBackgroundColor,
-          },
-        }}>
-        {/* Main drawer with tabs inside */}
-        <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
+      <OfflineProvider>
+        <Stack
+          key={currentTheme}
+          screenOptions={{
+            headerShown: false,
+            gestureEnabled: true,
+            contentStyle: {
+              backgroundColor: contentBackgroundColor,
+            },
+          }}>
+          {/* Main drawer with tabs inside */}
+          <Stack.Screen name="(drawer)" options={{ headerShown: false }} />
 
-        {/* All modal screens configured from MODAL_SCREENS */}
-        {MODAL_SCREENS.map((screen) => (
-          <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
-        ))}
-      </Stack>
+          {/* All modal screens configured from MODAL_SCREENS */}
+          {MODAL_SCREENS.map((screen) => (
+            <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
+          ))}
+        </Stack>
+      </OfflineProvider>
     </NavigationThemeProvider>
   );
 }
