@@ -1,6 +1,11 @@
 export type { CopyTarget } from './copy';
 export { copyPopup } from './copy';
-export { profileSwitcherPopup, emojiPickerPopup, buttonHandlerPopup } from './actionSheets';
+export {
+  profileSwitcherPopup,
+  emojiPickerPopup,
+  offlineSendSuggestionsPopup,
+  buttonHandlerPopup,
+} from './actionSheets';
 export {
   paymentStatusPopup,
   sendSuccessPopup,

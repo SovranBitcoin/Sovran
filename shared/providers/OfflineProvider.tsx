@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform, StyleSheet, View } from 'react-native';
 import * as Network from 'expo-network';
 import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -192,6 +192,10 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
       </View>
     </OfflineContext.Provider>
   );
+}
+
+export function useOfflineStatus(): OfflineContextValue {
+  return useContext(OfflineContext);
 }
 
 const styles = StyleSheet.create({

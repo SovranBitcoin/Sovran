@@ -13,6 +13,7 @@ import { WalletHeaderTitle } from '@/features/wallet';
 import Icon from 'assets/icons';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   getHeaderTitleWidth,
@@ -40,6 +41,7 @@ function ModalScreen() {
   }>();
 
   const { keys } = useNostrKeysContext();
+  const { isOffline } = useOfflineStatus();
   const foreground = useThemeColor('foreground');
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
@@ -63,23 +65,29 @@ function ModalScreen() {
   const handlePressSendModeInfo = useCallback(() => {
     if (!sendMode) {
       Alert.alert(
-        'Checking route',
-        'Determining whether this send can go offline (no swap) or needs an online swap.'
+        isOffline ? 'Checking offline route' : 'Checking route',
+        isOffline
+          ? 'Determining whether this send can be completed offline or if it would need a swap once you reconnect.'
+          : 'Determining whether this send can go offline (no swap) or needs an online swap.'
       );
       return;
     }
     if (sendMode === 'offline') {
       Alert.alert(
         'Offline send',
-        'This amount can be sent directly with existing proofs, so no swap is required.'
+        isOffline
+          ? 'This amount can be sent right now while offline because your existing proofs already match it exactly.'
+          : 'This amount can be sent directly with existing proofs, so no swap is required.'
       );
       return;
     }
     Alert.alert(
-      'Online send',
-      'This amount requires a mint swap to construct the exact send proofs before sending.'
+      isOffline ? 'Offline round required' : 'Online send',
+      isOffline
+        ? 'This amount needs a mint swap, so while offline you will be asked to round up or down to a nearby exact sendable amount.'
+        : 'This amount requires a mint swap to construct the exact send proofs before sending.'
     );
-  }, [sendMode]);
+  }, [isOffline, sendMode]);
 
   return (
     <>

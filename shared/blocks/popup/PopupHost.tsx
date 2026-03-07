@@ -37,9 +37,11 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   ButtonHandlerContent,
   EmojiPickerContent,
+  OfflineSendSuggestionsContent,
   ProfileSwitcherContent,
 } from '@/shared/lib/popup/sheets';
 import { IMPORT_NSEC_LABEL } from '@/shared/lib/popup/sheets/profile-switcher/constants';
+import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
 import type {
   CustomSheetFooterConfig,
   CustomSheetPage,
@@ -54,8 +56,11 @@ type ImportFooterState = {
   isImporting: boolean;
 };
 
-const PROFILE_STYLE_SNAP_POINTS = ['80%'] as const;
-const STICKY_FOOTER_CONTAINER_CLASS = 'bg-background pb-safe-offset-4 px-4 pt-2';
+function getStickyFooterClass(mode?: 'contentHeight' | 'snapPoints'): string {
+  const px = mode === 'contentHeight' ? 'px-0' : 'px-4';
+  const pb = mode === 'contentHeight' ? 'pb-4' : 'pb-safe-offset-4';
+  return `bg-surface pt-4 ${pb} ${px}`;
+}
 
 function ToastRegistrar() {
   const { toast } = useToast();
@@ -241,6 +246,17 @@ const CUSTOM_SHEET_CONTENT: Record<
     canPop: boolean;
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
+  'offline-send-suggestions': OfflineSendSuggestionsContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
   'button-handler': ButtonHandlerContent as React.ComponentType<{
     payload: unknown;
     close: () => void;
@@ -263,6 +279,7 @@ function SheetContent({
   profileRoute,
   profileNavDirection,
   customNavDirection,
+  isContentHeight,
   onProfileBack,
   onImportFooterStateChange,
   pushCustomPage,
@@ -278,6 +295,7 @@ function SheetContent({
   profileRoute: ProfileRoute;
   profileNavDirection: ProfileNavDirection;
   customNavDirection: CustomSheetNavDirection;
+  isContentHeight: boolean;
   onProfileBack: () => void;
   onImportFooterStateChange: (state: ImportFooterState) => void;
   pushCustomPage: <K extends keyof ActionSheetPayloads>(
@@ -335,7 +353,7 @@ function SheetContent({
     return (
       <Animated.View
         key={`${activeCustomPage.sheetId}-${canPopCustomPage ? 'stacked' : 'root'}`}
-        style={{ flex: 1 }}
+        style={isContentHeight ? undefined : { flex: 1 }}
         entering={entering}
         exiting={exiting}>
         <ContentComponent
@@ -467,8 +485,8 @@ function SheetPopup() {
 
   const customRootSheetId =
     customStack[0]?.sheetId ?? (isCustom && payload ? payload.sheetId : undefined);
-  const isProfileStyleCustomShell =
-    customRootSheetId === 'profile-switcher' || customRootSheetId === 'button-handler';
+  const layoutConfig =
+    isCustom && customRootSheetId ? SHEET_LAYOUT_CONFIG[customRootSheetId] : undefined;
   const isProfileSwitcher = activeCustomPage?.sheetId === 'profile-switcher';
   const standardPayload = !isCustom ? (payload as StandardSheetPayload | null) : null;
   const hasLiveStatus = standardPayload?.status != null;
@@ -509,7 +527,10 @@ function SheetPopup() {
     [hasLiveStatus, overlayColor, successMutedColor]
   );
 
-  const profileSnapPoints = useMemo(() => [...PROFILE_STYLE_SNAP_POINTS], []);
+  const customSnapPoints = useMemo(
+    () => (layoutConfig?.mode === 'snapPoints' ? [...layoutConfig.snapPoints] : undefined),
+    [layoutConfig]
+  );
 
   const [profileStack, setProfileStack] = useState<ProfileRoute[]>(['profile-list']);
   const [profileNavDirection, setProfileNavDirection] = useState<ProfileNavDirection>('forward');
@@ -582,13 +603,16 @@ function SheetPopup() {
         if (!customFooterConfig || customFooterConfig.buttons.length === 0) return null;
         return (
           <BottomSheetFooter {...props}>
-            <View className={STICKY_FOOTER_CONTAINER_CLASS}>
-              <View style={{ gap: 10 }}>
+            <View className={getStickyFooterClass(layoutConfig?.mode)}>
+              <View
+                className={customFooterConfig.layout === 'row' ? 'flex-row' : undefined}
+                style={{ gap: 10 }}>
                 {customFooterConfig.buttons.map((button, index) => (
                   <Button
                     key={`${button.label}-${index}`}
                     variant={button.variant ?? (index === 0 ? 'primary' : 'tertiary')}
                     onPress={button.onPress}
+                    className={customFooterConfig.layout === 'row' ? 'flex-1' : undefined}
                     isDisabled={button.isDisabled}>
                     <Button.Label>{button.label}</Button.Label>
                   </Button>
@@ -602,7 +626,7 @@ function SheetPopup() {
       if (!switcherPayload) return null;
       return (
         <BottomSheetFooter {...props}>
-          <View className={STICKY_FOOTER_CONTAINER_CLASS}>
+          <View className={getStickyFooterClass(layoutConfig?.mode)}>
             <View style={{ gap: 10 }}>
               {profileRoute === 'profile-list' ? (
                 <>
@@ -640,6 +664,7 @@ function SheetPopup() {
       isCustom,
       isProfileSwitcher,
       customFooterConfig,
+      layoutConfig?.mode,
       profileRoute,
       switcherPayload,
       close,
@@ -656,21 +681,23 @@ function SheetPopup() {
       <BottomSheet.Portal>
         <BottomSheet.Overlay isCloseOnPress={standardPayload?.dismissable ?? true} />
         <BottomSheet.Content
-          detached={!isProfileStyleCustomShell}
-          bottomInset={isProfileStyleCustomShell ? undefined : insets.bottom}
-          snapPoints={isProfileStyleCustomShell ? profileSnapPoints : undefined}
-          enableDynamicSizing={isProfileStyleCustomShell ? false : undefined}
-          enableOverDrag={isProfileStyleCustomShell ? false : undefined}
-          footerComponent={isCustom ? renderCustomFooter : undefined}
+          detached={!isCustom}
+          bottomInset={isCustom ? undefined : insets.bottom}
+          snapPoints={isCustom ? customSnapPoints : undefined}
+          enableDynamicSizing={isCustom ? layoutConfig?.mode === 'contentHeight' : undefined}
+          enableOverDrag={isCustom ? false : undefined}
+          footerComponent={
+            isCustom && layoutConfig?.mode !== 'contentHeight' ? renderCustomFooter : undefined
+          }
           handleComponent={
-            isProfileStyleCustomShell
+            isCustom
               ? () => null
               : hasLiveStatus
                 ? (props: any) => <LiveSheetHandle {...props} animatedStyle={liveBackgroundStyle} />
                 : undefined
           }
-          className={isProfileStyleCustomShell ? undefined : 'mx-4'}
-          backgroundClassName={isProfileStyleCustomShell ? 'bg-background' : 'rounded-[32px]'}
+          className={isCustom ? undefined : 'mx-4'}
+          backgroundClassName={isCustom ? 'bg-surface' : 'bg-surface rounded-[32px]'}
           backgroundComponent={
             hasLiveStatus
               ? (props: any) => (
@@ -678,7 +705,9 @@ function SheetPopup() {
                 )
               : undefined
           }
-          contentContainerClassName={isProfileStyleCustomShell ? 'h-full pt-2' : undefined}>
+          contentContainerClassName={
+            isCustom && layoutConfig?.mode === 'snapPoints' ? 'h-full pt-2' : undefined
+          }>
           <SheetContent
             payload={payload}
             activeCustomPage={activeCustomPage}
@@ -688,6 +717,7 @@ function SheetPopup() {
             profileRoute={profileRoute}
             profileNavDirection={profileNavDirection}
             customNavDirection={customNavDirection}
+            isContentHeight={layoutConfig?.mode === 'contentHeight'}
             onProfileBack={popProfileRoute}
             onImportFooterStateChange={setImportFooterState}
             pushCustomPage={pushCustomPage}
@@ -695,6 +725,24 @@ function SheetPopup() {
             canPopCustomPage={canPopCustomPage}
             onCustomFooterConfigChange={setCustomFooterConfig}
           />
+          {isCustom &&
+            layoutConfig?.mode === 'contentHeight' &&
+            customFooterConfig &&
+            customFooterConfig.buttons.length > 0 && (
+              <View className={getStickyFooterClass(layoutConfig?.mode)}>
+                <View style={{ gap: 10 }}>
+                  {customFooterConfig.buttons.map((button, index) => (
+                    <Button
+                      key={`${button.label}-${index}`}
+                      variant={button.variant ?? (index === 0 ? 'primary' : 'tertiary')}
+                      onPress={button.onPress}
+                      isDisabled={button.isDisabled}>
+                      <Button.Label>{button.label}</Button.Label>
+                    </Button>
+                  ))}
+                </View>
+              </View>
+            )}
         </BottomSheet.Content>
       </BottomSheet.Portal>
     </BottomSheet>
