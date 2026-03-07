@@ -62,6 +62,14 @@ function getStickyFooterClass(mode?: 'contentHeight' | 'snapPoints'): string {
   return `bg-surface pt-4 ${pb} ${px}`;
 }
 
+function getSheetButtonClassName(variant: 'primary' | 'tertiary'): string | undefined {
+  return variant === 'primary' ? 'bg-foreground' : undefined;
+}
+
+function getSheetButtonLabelClassName(variant: 'primary' | 'tertiary'): string | undefined {
+  return variant === 'primary' ? 'text-background' : undefined;
+}
+
 function ToastRegistrar() {
   const { toast } = useToast();
 
@@ -385,25 +393,29 @@ function SheetContent({
 
       {(standardPayload?.buttons?.length ?? 0) > 0 ? (
         <View className="mt-4 gap-2">
-          {standardPayload?.buttons?.map((button, index) => (
-            <Button
-              key={`${button.text}-${index}`}
-              variant={index === 0 ? 'primary' : 'tertiary'}
-              className={hasLiveStatus ? 'bg-foreground' : undefined}
-              feedbackVariant={hasLiveStatus ? 'scale' : undefined}
-              onPress={async () => {
-                if (button.onPress) {
-                  await button.onPress();
-                } else if (button.page) {
-                  router.navigate(`/${button.page}` as any);
-                }
-                close();
-              }}>
-              <Button.Label className={hasLiveStatus ? 'text-overlay' : undefined}>
-                {button.text}
-              </Button.Label>
-            </Button>
-          ))}
+          {standardPayload?.buttons?.map((button, index) => {
+            const variant = index === 0 ? 'primary' : 'tertiary';
+            const className = getSheetButtonClassName(variant);
+            const labelClassName = getSheetButtonLabelClassName(variant);
+
+            return (
+              <Button
+                key={`${button.text}-${index}`}
+                variant={variant}
+                className={className}
+                feedbackVariant={hasLiveStatus ? 'scale' : undefined}
+                onPress={async () => {
+                  if (button.onPress) {
+                    await button.onPress();
+                  } else if (button.page) {
+                    router.navigate(`/${button.page}` as any);
+                  }
+                  close();
+                }}>
+                <Button.Label className={labelClassName}>{button.text}</Button.Label>
+              </Button>
+            );
+          })}
         </View>
       ) : null}
 
@@ -607,16 +619,27 @@ function SheetPopup() {
               <View
                 className={customFooterConfig.layout === 'row' ? 'flex-row' : undefined}
                 style={{ gap: 10 }}>
-                {customFooterConfig.buttons.map((button, index) => (
-                  <Button
-                    key={`${button.label}-${index}`}
-                    variant={button.variant ?? (index === 0 ? 'primary' : 'tertiary')}
-                    onPress={button.onPress}
-                    className={customFooterConfig.layout === 'row' ? 'flex-1' : undefined}
-                    isDisabled={button.isDisabled}>
-                    <Button.Label>{button.label}</Button.Label>
-                  </Button>
-                ))}
+                {customFooterConfig.buttons.map((button, index) => {
+                  const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
+                  const buttonClassName = getSheetButtonClassName(variant);
+                  const className =
+                    customFooterConfig.layout === 'row'
+                      ? [buttonClassName, 'flex-1'].filter(Boolean).join(' ')
+                      : buttonClassName;
+
+                  return (
+                    <Button
+                      key={`${button.label}-${index}`}
+                      variant={variant}
+                      onPress={button.onPress}
+                      className={className}
+                      isDisabled={button.isDisabled}>
+                      <Button.Label className={getSheetButtonLabelClassName(variant)}>
+                        {button.label}
+                      </Button.Label>
+                    </Button>
+                  );
+                })}
               </View>
             </View>
           </BottomSheetFooter>
@@ -631,11 +654,15 @@ function SheetPopup() {
               {profileRoute === 'profile-list' ? (
                 <>
                   <Button
+                    variant="primary"
+                    className={getSheetButtonClassName('primary')}
                     onPress={() => {
                       switcherPayload.onRequestAction({ type: 'create' });
                       close();
                     }}>
-                    <Button.Label>Generate new account</Button.Label>
+                    <Button.Label className={getSheetButtonLabelClassName('primary')}>
+                      Generate new account
+                    </Button.Label>
                   </Button>
                   <Button variant="tertiary" onPress={() => pushProfileRoute('import-nsec')}>
                     <Button.Label>{IMPORT_NSEC_LABEL}</Button.Label>
@@ -644,9 +671,11 @@ function SheetPopup() {
               ) : (
                 <>
                   <Button
+                    variant="primary"
+                    className={getSheetButtonClassName('primary')}
                     onPress={importFooterState.onImport}
                     isDisabled={importFooterState.isDisabled}>
-                    <Button.Label>
+                    <Button.Label className={getSheetButtonLabelClassName('primary')}>
                       {importFooterState.isImporting ? 'Importing...' : 'Import'}
                     </Button.Label>
                   </Button>
@@ -731,15 +760,22 @@ function SheetPopup() {
             customFooterConfig.buttons.length > 0 && (
               <View className={getStickyFooterClass(layoutConfig?.mode)}>
                 <View style={{ gap: 10 }}>
-                  {customFooterConfig.buttons.map((button, index) => (
-                    <Button
-                      key={`${button.label}-${index}`}
-                      variant={button.variant ?? (index === 0 ? 'primary' : 'tertiary')}
-                      onPress={button.onPress}
-                      isDisabled={button.isDisabled}>
-                      <Button.Label>{button.label}</Button.Label>
-                    </Button>
-                  ))}
+                  {customFooterConfig.buttons.map((button, index) => {
+                    const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
+
+                    return (
+                      <Button
+                        key={`${button.label}-${index}`}
+                        variant={variant}
+                        className={getSheetButtonClassName(variant)}
+                        onPress={button.onPress}
+                        isDisabled={button.isDisabled}>
+                        <Button.Label className={getSheetButtonLabelClassName(variant)}>
+                          {button.label}
+                        </Button.Label>
+                      </Button>
+                    );
+                  })}
                 </View>
               </View>
             )}
