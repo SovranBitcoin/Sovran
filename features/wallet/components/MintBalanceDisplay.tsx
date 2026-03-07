@@ -22,6 +22,7 @@ interface MintBalanceDisplayProps {
   contentHeight?: number;
   linkHref: Href;
   style?: StyleProp<ViewStyle>;
+  variant?: 'default' | 'plain';
 }
 
 const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
@@ -34,6 +35,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   contentHeight,
   linkHref,
   style,
+  variant = 'default',
 }) => {
   const [foreground, defaultColor, surfaceSecondary] = useThemeColor([
     'foreground',
@@ -89,6 +91,27 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
       </View>
     </HStack>
   );
+
+  if (variant === 'plain') {
+    return (
+      <HStack
+        align="center"
+        justify="space-between"
+        className="rounded-2xl"
+        style={[
+          {
+            flexGrow: 0,
+            flexShrink: 0,
+            width: '100%',
+            padding: 8,
+            alignSelf: 'center',
+          },
+          style,
+        ]}>
+        {mintInfoContent}
+      </HStack>
+    );
+  }
 
   if (supportsLiquidGlass()) {
     return (

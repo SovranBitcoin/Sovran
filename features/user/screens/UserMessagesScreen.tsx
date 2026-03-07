@@ -93,6 +93,7 @@ import {
   glassEffect,
 } from '@expo/ui/swift-ui/modifiers';
 import opacity from 'hex-color-opacity';
+import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { getUsername } from '@/shared/lib/username';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
@@ -1750,56 +1751,13 @@ export function UserMessagesScreen({
             ),
           headerTitle: () =>
             isSessionsPanelOpen && isRoutstrMode ? (
-              Platform.OS === 'ios' ? (
-                <Host matchContents={false} style={{ width: headerTitleWidth, height: 44 }}>
-                  <SwiftUIVStack
-                    modifiers={[
-                      padding({ horizontal: 12, vertical: 8 }),
-                      frame({ width: headerTitleWidth, height: 44, alignment: 'center' }),
-                      glassEffect(),
-                    ]}>
-                    <TextField
-                      key={sessionClearKey}
-                      defaultValue=""
-                      placeholder="Search sessions..."
-                      onChangeText={handleSessionSearchChange}
-                      keyboardType="web-search"
-                      autocorrection={false}
-                      modifiers={[
-                        foregroundStyle(foreground),
-                        frame({ maxWidth: Infinity, height: 28, alignment: 'leading' }),
-                      ]}
-                    />
-                  </SwiftUIVStack>
-                </Host>
-              ) : (
-                <View
-                  style={{
-                    width: headerTitleWidth,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: surfaceTertiary,
-                    borderRadius: 12,
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                  }}>
-                  <RNTextInput
-                    key={sessionClearKey}
-                    defaultValue=""
-                    onChangeText={handleSessionSearchChange}
-                    placeholder="Search sessions..."
-                    placeholderTextColor={opacity(foreground, 0.33)}
-                    style={{
-                      flex: 1,
-                      color: foreground,
-                      fontSize: 16,
-                      fontFamily: 'OxygenRegular',
-                    }}
-                    keyboardType="web-search"
-                    autoCorrect={false}
-                  />
-                </View>
-              )
+              <GlassSearchBar
+                width={headerTitleWidth}
+                clearKey={sessionClearKey}
+                onChangeText={handleSessionSearchChange}
+                placeholder="Search sessions..."
+                keyboardType="web-search"
+              />
             ) : Platform.OS === 'ios' && isRoutstrMode ? (
               <Host matchContents={false} style={{ width: headerTitleWidth, height: 48 }}>
                 <ContextMenu>

@@ -48,6 +48,105 @@ features/<domain>/
 - If 70%+ of importers are in one folder, move the file there.
 - Domain-specific logic belongs in the feature that owns it. Do not centralize "just in case."
 
+## Platform variant components
+
+When a component uses liquid glass features or has materially different iOS / Android UI, use a folder-per-component pattern. Do this only for components that truly need it; do not split simple components just because they are on iOS.
+
+```
+ComponentName/
+  index.ts                     # Barrel: re-exports from ./ComponentName
+  ComponentName.ios.tsx        # iOS fallback entry
+  ComponentName.android.tsx    # Android entry
+  ComponentName.liquid.tsx     # Liquid glass UI
+  useComponentName.ts          # Shared logic hook / view-model
+  ComponentNameLayout.tsx      # Optional shared presentational shell
+```
+
+Metro resolves `.ios.tsx` vs `.android.tsx` at bundle time. Use that to keep call sites simple: consumers should import `ComponentName` and let the component resolve the correct implementation internally.
+
+### Intent
+
+The goal is:
+- one public component import
+- one place for shared logic
+- very thin platform files
+- no repeated `if (supportsLiquidGlass())` trees in parent screens
+
+Prefer this mental model:
+
+```ts
+const shared = useComponentName(props);
+return <ComponentNameLayout shared={shared} renderLeading={...} renderTrailing={...} />;
+```
+
+If iOS needs a liquid branch, keep the branch at the iOS entry boundary:
+
+```tsx
+export function ComponentName(props: ComponentNameProps) {
+  const shared = useComponentName(props);
+
+  if (supportsLiquidGlass()) {
+    return <ComponentNameLiquid {...shared} />;
+  }
+
+  return <ComponentNameFallback {...shared} />;
+}
+```
+
+For shared primitives used in many places, the primitive itself should own this resolution so callers can just write:
+
+```tsx
+<CapsuleButton onPress={...} />
+<QRButton onPress={...} />
+```
+
+### File responsibilities
+
+- `index.ts`: pure barrel only. No logic.
+- `useComponentName.ts`: source of truth for props, callbacks, derived values, navigation handlers, store access, permissions, sizing, and state.
+- `ComponentName.ios.tsx`: fallback-only renderer or iOS entry boundary that delegates once to `.liquid.tsx`.
+- `ComponentName.android.tsx`: Android renderer only. If Android has its own liquid-native component, keep that detail here.
+- `ComponentName.liquid.tsx`: liquid UI only. No hooks, no store reads, no business logic.
+- `ComponentNameLayout.tsx`: optional shared shell when `.ios`, `.android`, and `.liquid` all reuse the same outer structure and only swap subparts.
+
+### Rules
+
+- Must keep business logic out of `index.ts`.
+- Must keep platform files mostly declarative. They should wire shared callbacks into UI, not recreate feature logic.
+- Must prefer one shared `useComponentName.ts` over duplicating handlers across `.ios`, `.android`, and `.liquid`.
+- Must extract a shared layout component when multiple variants repeat the same outer structure.
+- Must let shared primitives self-resolve their platform variant instead of asking every parent to branch manually.
+- Must keep liquid-only imports like `@expo/ui/swift-ui` inside `.liquid.tsx` when practical.
+- Must not create `.liquid.tsx` for components that do not actually use liquid glass behavior.
+- Must not split components whose differences are trivial styling or a tiny inline conditional.
+- Must not branch inside a fallback renderer when that branch can live at the file boundary or inside a self-resolving primitive.
+
+### When to use
+
+- 2+ distinct UI branches where each branch is substantial
+- liquid glass UI that would otherwise create noisy inline branching
+- components reused in multiple places where callers should not know about platform details
+- cases where the same callbacks / state feed different renderers
+
+### When NOT to use
+
+- small inline conditionals
+- trivial style differences
+- components under roughly 100 LOC total
+- one-off UI where the split adds more ceremony than clarity
+
+### Preferred shapes
+
+Use a shared hook plus thin wrappers for feature components:
+- `features/wallet/components/AccountPagerView/`
+- `features/wallet/components/FiatCurrencyPill/`
+- `features/camera/screens/CameraScreen/`
+
+Use self-resolving primitives for reused platform-aware building blocks:
+- `shared/ui/composed/CapsuleButton/`
+- `shared/ui/composed/QRButton/`
+- `shared/ui/composed/GlassSearchBar/`
+
 ## Must / Must not
 
 - **Must** use barrel exports (`index.ts`) for feature public API. Internals stay internal.

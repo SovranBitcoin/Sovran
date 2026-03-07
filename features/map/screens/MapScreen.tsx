@@ -36,6 +36,7 @@ import {
   glassEffect,
   padding,
 } from '@expo/ui/swift-ui/modifiers';
+import { liquidGlassModifiers } from '@/shared/lib/version';
 import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -151,10 +152,12 @@ const StatsCard = memo(function StatsCard({
                 modifiers={[
                   // buttonStyle('glass'),
                   frame({ width: STATS_CARD_WIDTH, height: 60, alignment: 'center' }),
-                  glassEffect({
-                    shape: 'capsule',
-                    glass: { variant: 'regular', interactive: true },
-                  }),
+                  ...liquidGlassModifiers(
+                    glassEffect({
+                      shape: 'capsule',
+                      glass: { variant: 'regular', interactive: true },
+                    })
+                  ),
                 ]}>
                 <SwiftUIHStack
                   alignment="center"
@@ -206,12 +209,14 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
         <Host style={{ height: 48, width: 48 }} matchContents={false}>
           <SwiftUIButton
             modifiers={[
-              buttonStyle('glass'),
+              ...liquidGlassModifiers(buttonStyle('glass')),
               frame({ height: 48, width: 48 }),
-              glassEffect({
-                shape: 'circle',
-                glass: { variant: 'regular', interactive: true },
-              }),
+              ...liquidGlassModifiers(
+                glassEffect({
+                  shape: 'circle',
+                  glass: { variant: 'regular', interactive: true },
+                })
+              ),
             ]}
             onPress={onMyLocation}>
             <SwiftUIHStack
@@ -226,12 +231,14 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
         <Host style={{ height: 48, width: 48 }} matchContents={false}>
           <SwiftUIButton
             modifiers={[
-              buttonStyle('glass'),
+              ...liquidGlassModifiers(buttonStyle('glass')),
               frame({ height: 48, width: 48 }),
-              glassEffect({
-                shape: 'circle',
-                glass: { variant: 'regular', interactive: true },
-              }),
+              ...liquidGlassModifiers(
+                glassEffect({
+                  shape: 'circle',
+                  glass: { variant: 'regular', interactive: true },
+                })
+              ),
             ]}
             onPress={onZoomIn}>
             <SwiftUIHStack
@@ -246,12 +253,14 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
         <Host style={{ height: 48, width: 48 }} matchContents={false}>
           <SwiftUIButton
             modifiers={[
-              buttonStyle('glass'),
+              ...liquidGlassModifiers(buttonStyle('glass')),
               frame({ height: 48, width: 48 }),
-              glassEffect({
-                shape: 'circle',
-                glass: { variant: 'regular', interactive: true },
-              }),
+              ...liquidGlassModifiers(
+                glassEffect({
+                  shape: 'circle',
+                  glass: { variant: 'regular', interactive: true },
+                })
+              ),
             ]}
             onPress={onZoomOut}>
             <SwiftUIHStack

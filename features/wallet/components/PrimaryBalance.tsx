@@ -21,7 +21,7 @@ import {
   Text as SwiftUIText,
 } from '@expo/ui/swift-ui';
 import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
-import { supportsLiquidGlass } from '@/shared/lib/version';
+import { liquidGlassModifiers, supportsLiquidGlass } from '@/shared/lib/version';
 import { useRouter } from 'expo-router';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { reservedProofsFreedPopup, reservedProofsFailedPopup } from '@/shared/lib/popup';
@@ -87,10 +87,12 @@ function EcashStatusPill({
           onPress={onPress}
           modifiers={[
             frame({ height: PILL_IOS_HEIGHT, width: iosWidth, alignment: 'center' }),
-            glassEffect({
-              shape: 'capsule',
-              glass: { tint: opacity(tint, 0.15), variant: 'regular', interactive: false },
-            }),
+            ...liquidGlassModifiers(
+              glassEffect({
+                shape: 'capsule',
+                glass: { tint: opacity(tint, 0.15), variant: 'regular', interactive: false },
+              })
+            ),
           ]}>
           <SwiftUIHStack
             alignment="center"
