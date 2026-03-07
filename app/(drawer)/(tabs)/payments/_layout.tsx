@@ -1,14 +1,11 @@
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Stack } from 'expo-router';
-import { Pressable, Platform, useWindowDimensions, TextInput } from 'react-native';
+import { Pressable, useWindowDimensions } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
-import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
-import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
-import { createContext, useContext, useState, useCallback, useRef } from 'react';
-import opacity from 'hex-color-opacity';
-import { View } from '@/shared/ui/primitives/View/View';
+import { createContext, useContext, useState, useCallback } from 'react';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
+import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 
 // Search context for sharing state between layout and index
 interface PaymentsSearchContextValue {
@@ -28,85 +25,10 @@ export const usePaymentsSearch = () => {
   return context;
 };
 
-// Native search header component for iOS
-function NativeSearchHeader({ width, clearKey }: { width: number; clearKey: number }) {
-  const foreground = useThemeColor('foreground');
-  const { onSearchChange } = usePaymentsSearch();
-
-  return (
-    <View style={{ alignItems: 'center' }}>
-      <Host style={{ zIndex: 10, height: 44, width }} matchContents={false}>
-        <SwiftUIVStack
-          modifiers={[
-            padding({ horizontal: 12, vertical: 8 }),
-            frame({ width, height: 44, alignment: 'center' }),
-            glassEffect(),
-          ]}>
-          <TextField
-            key={clearKey}
-            defaultValue=""
-            placeholder="Search contacts..."
-            onChangeText={onSearchChange}
-            keyboardType="web-search"
-            autocorrection={false}
-            modifiers={[
-              foregroundStyle(foreground),
-              frame({ maxWidth: Infinity, height: 28, alignment: 'leading' }),
-            ]}
-          />
-        </SwiftUIVStack>
-      </Host>
-    </View>
-  );
-}
-
-// Fallback search header for Android - uses uncontrolled pattern for better responsiveness
-function FallbackSearchHeader({ clearKey }: { clearKey: number }) {
-  const [foreground, surfaceSecondary] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-  ] as const);
-  const { onSearchChange } = usePaymentsSearch();
-  const inputRef = useRef<TextInput>(null);
-
-  return (
-    <View
-      style={{
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: surfaceSecondary,
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        marginRight: 8,
-      }}>
-      <TextInput
-        key={clearKey}
-        ref={inputRef}
-        defaultValue=""
-        onChangeText={onSearchChange}
-        placeholder="Search contacts..."
-        placeholderTextColor={opacity(foreground, 0.33)}
-        style={{
-          flex: 1,
-          color: foreground,
-          fontSize: 16,
-          fontFamily: 'OxygenRegular',
-        }}
-        keyboardType="web-search"
-        autoCorrect={false}
-      />
-    </View>
-  );
-}
-
 export default function PaymentsLayout() {
   const iconColor = useThemeColor('foreground');
   const navigation = useNavigation();
-  // Search state
   const [searchQuery, setSearchQuery] = useState('');
-  // Key to force TextField re-render only when clearing (not on each keystroke)
   const [clearKey, setClearKey] = useState(0);
 
   const openDrawer = () => {
@@ -119,17 +41,12 @@ export default function PaymentsLayout() {
 
   const handleClearSearch = useCallback(() => {
     setSearchQuery('');
-    // Increment key to force TextField to re-render with empty value
     setClearKey((prev) => prev + 1);
   }, []);
 
   const isSearching = searchQuery.trim().length > 0;
 
-  // Use responsive window dimensions for proper layout across device sizes
   const { width: windowWidth } = useWindowDimensions();
-
-  // Calculate width for header - match WalletHeaderTitle calculation
-  // 124px for left/right button areas + 24px padding
   const headerWidth = windowWidth - 124 - 24;
 
   const contextValue: PaymentsSearchContextValue = {
@@ -160,12 +77,15 @@ export default function PaymentsLayout() {
             ),
             options: {
               headerTransparent: true,
-              headerTitle: () =>
-                Platform.OS === 'ios' ? (
-                  <NativeSearchHeader width={headerWidth} clearKey={clearKey} />
-                ) : (
-                  <FallbackSearchHeader clearKey={clearKey} />
-                ),
+              headerTitle: () => (
+                <GlassSearchBar
+                  width={headerWidth}
+                  clearKey={clearKey}
+                  onChangeText={handleSearchChange}
+                  placeholder="Search contacts..."
+                  keyboardType="web-search"
+                />
+              ),
             },
           })}
         />

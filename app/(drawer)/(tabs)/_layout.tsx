@@ -64,7 +64,7 @@ export default function TabLayout() {
                     selected: 'arrow.up.arrow.down',
                   }}
                 />
-                <Expo55NativeTabs.Trigger.Label>Contacts</Expo55NativeTabs.Trigger.Label>
+                <Expo55NativeTabs.Trigger.Label>Payments</Expo55NativeTabs.Trigger.Label>
               </Expo55NativeTabs.Trigger>
 
               <Expo55NativeTabs.Trigger name="index">
@@ -139,7 +139,8 @@ export default function TabLayout() {
             <Tabs.Screen
               name="explore"
               options={{
-                ...(hasAndroidLiquidGlass ? {} : { href: null }),
+                title: 'Explore',
+                tabBarIcon: ({ color }) => <IconSymbol name="paperplane" color={color} size={24} />,
               }}
             />
           </Tabs>

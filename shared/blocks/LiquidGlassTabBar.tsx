@@ -3,9 +3,11 @@ import { Image, StyleSheet, UIManager, View } from 'react-native';
 import { usePathname, useRouter, useRootNavigationState } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomTabsContentView } from 'expo-liquid-glass-native';
+import { LIQUID_GLASS_ENABLED } from '@/shared/lib/version';
 
 const BottomTabsView = BottomTabsContentView;
 export const isLiquidGlassTabBarAvailable = () => {
+  if (!LIQUID_GLASS_ENABLED) return false;
   const config = UIManager?.getViewManagerConfig?.('BottomTabsContentView');
   const hasConfig = (UIManager as any)?.hasViewManagerConfig?.('BottomTabsContentView');
   return Boolean(config || hasConfig);

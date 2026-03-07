@@ -1,11 +1,10 @@
-import React, { useState, useMemo, useCallback, memo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
   TextInput,
   useWindowDimensions,
-  InteractionManager,
 } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
@@ -42,8 +41,7 @@ import { Checkbox } from '@/shared/ui/primitives/Checkbox';
 import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
-import { Host, TextField, VStack as SwiftUIVStack } from '@expo/ui/swift-ui';
-import { foregroundStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
+import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useAuditedMints, type AuditedMintData } from '@/features/mint/hooks/useAuditedMints';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
@@ -74,77 +72,7 @@ const adaptDiscoveredMint = (mint: any): SearchableDiscoveredMint => ({
   name: mint.mintInfo?.name || extractDomain(mint.url),
 });
 
-// Native search header for iOS with liquid glass effect
-// Uses internal state with debouncing to prevent parent re-renders during typing
-// which would cause the SwiftUI TextField to lose focus
-const NativeSearchHeader = memo(function NativeSearchHeader({
-  width,
-  onSearchChange,
-  clearKey,
-}: {
-  width: number;
-  onSearchChange: (text: string) => void;
-  clearKey: number;
-}) {
-  const foreground = useThemeColor('foreground');
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onSearchChangeRef = useRef(onSearchChange);
-  const latestTextRef = useRef('');
-
-  useEffect(() => {
-    onSearchChangeRef.current = onSearchChange;
-  }, [onSearchChange]);
-
-  const handleTextChange = useCallback((text: string) => {
-    latestTextRef.current = text;
-
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
-    debounceRef.current = setTimeout(() => {
-      InteractionManager.runAfterInteractions(() => {
-        onSearchChangeRef.current(latestTextRef.current);
-      });
-    }, 500);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-    };
-  }, []);
-
-  return (
-    <View className="items-center">
-      <Host style={{ zIndex: 10, height: 44, width }} matchContents={false}>
-        <SwiftUIVStack
-          modifiers={[
-            padding({ horizontal: 12, vertical: 8 }),
-            frame({ width, height: 44, alignment: 'center' }),
-            glassEffect(),
-          ]}>
-          <TextField
-            key={clearKey}
-            defaultValue=""
-            placeholder="Search mints or enter URL..."
-            onChangeText={handleTextChange}
-            keyboardType="url"
-            autocorrection={false}
-            modifiers={[
-              foregroundStyle(foreground),
-              frame({ maxWidth: Infinity, height: 28, alignment: 'leading' }),
-            ]}
-          />
-        </SwiftUIVStack>
-      </Host>
-    </View>
-  );
-});
-
-// Fallback search header for Android
+// Fallback search header for Android with validation state
 const FallbackSearchHeader = memo(function FallbackSearchHeader({
   searchQuery,
   onSearchChange,
@@ -721,10 +649,13 @@ export function MintAddScreen() {
 
   const iosHeaderTitle = useMemo(
     () => (
-      <NativeSearchHeader
+      <GlassSearchBar
         width={headerWidth}
-        onSearchChange={handleSearchChange}
+        onChangeText={handleSearchChange}
         clearKey={clearKey}
+        placeholder="Search mints or enter URL..."
+        keyboardType="url"
+        debounceMs={500}
       />
     ),
     [headerWidth, handleSearchChange, clearKey]

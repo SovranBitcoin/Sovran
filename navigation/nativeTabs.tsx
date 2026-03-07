@@ -21,7 +21,7 @@ import type { NativeStackNavigationOptions } from '@react-navigation/native-stac
 
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import Icon from 'assets/icons';
-import { supportsLiquidGlass } from '@/shared/lib/version';
+import { LIQUID_GLASS_ENABLED, supportsLiquidGlass } from '@/shared/lib/version';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 
 type HeaderIconName = string;
@@ -34,6 +34,7 @@ const ANDROID_HEADER_ICON_MAP: Partial<Record<HeaderIconName, string>> = {
 };
 
 export const hasAndroidLiquidButtonView = () => {
+  if (!LIQUID_GLASS_ENABLED) return false;
   const config = UIManager?.getViewManagerConfig?.('LiquidButtonView');
   const hasConfig = (UIManager as any)?.hasViewManagerConfig?.('LiquidButtonView');
   return Boolean(config || hasConfig);

@@ -4,6 +4,7 @@
     "strict": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
+    "moduleSuffixes": [".ios", ".android", ""],
     "paths": {
       "@/*": ["./*"],
       "@/shared/*": ["./shared/*"],

@@ -1,20 +1,15 @@
-import React, { useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useWindowDimensions, ViewStyle } from 'react-native';
 import { router } from 'expo-router';
-import MintBalanceDisplay from '@/features/wallet/components/MintBalanceDisplay';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { Host, Button as SwiftUIButton, ContextMenu, HStack } from '@expo/ui/swift-ui';
-import { buttonStyle, frame, padding, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { getMintDisplayName } from '@/shared/lib/url';
-import { View } from '@/shared/ui/primitives/View/View';
-import { supportsLiquidGlass } from '@/shared/lib/version';
 import { useBalanceContext } from 'coco-cashu-react';
 import { useMintManagement } from '@/features/mint';
 import { useWalletHeaderState } from '@/features/wallet/hooks/useWalletHeaderState';
 import { getContentWidthFromButtonWidth } from '@/features/wallet/lib/walletHeader';
 
-interface WalletHeaderTitleProps {
+export interface WalletHeaderTitleProps {
   width?: number;
   unit?: string;
   requireBalance?: boolean;
@@ -25,15 +20,49 @@ interface WalletHeaderTitleProps {
   liquidGlass?: boolean;
   contentWidth?: number;
   contentHeight?: number;
+  style?: ViewStyle;
 }
 
-function formatBalance(amount: number): string {
+export interface TopMint {
+  mintUrl: string;
+  displayName: string;
+  balance: number;
+}
+
+export interface WalletHeaderTitleShared {
+  topMints: TopMint[];
+  handleQuickSelectMint: (mintUrl: string) => void;
+  handleShowAllMints: () => void;
+  handleAddMint: () => void;
+  dimensions: {
+    buttonWidth: number | undefined;
+    fallbackWidth: number;
+    styleHeight: string | number | undefined;
+    contentWidth: number;
+    contentHeight: number;
+  };
+  mintDisplayProps: {
+    unit: string;
+    mintName: string | undefined;
+    mintIconUrl: string | undefined;
+    balance: number;
+    isLoadingMint: boolean;
+    contentWidth: number;
+    contentHeight: number;
+    linkHref: { pathname: '/list'; params: Record<string, string> };
+  };
+  showAddMintsButton: boolean;
+  liquidGlass: boolean;
+  style?: ViewStyle;
+}
+
+export function formatBalance(amount: number): string {
   if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M sats`;
   if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)}k sats`;
   return `${amount} sats`;
 }
 
-export default function WalletHeaderTitle({
+export function useWalletHeaderTitle({
   width: explicitWidth,
   unit = 'sat',
   requireBalance = false,
@@ -45,7 +74,7 @@ export default function WalletHeaderTitle({
   contentWidth,
   contentHeight,
   style,
-}: WalletHeaderTitleProps & { style?: ViewStyle }) {
+}: WalletHeaderTitleProps): WalletHeaderTitleShared {
   const { keys } = useNostrKeysContext();
   const pubkey = keys?.pubkey;
   const setSelectedMint = useMintStore((state) => state.setSelectedMint);
@@ -112,23 +141,32 @@ export default function WalletHeaderTitle({
   const dimensions = useMemo(() => {
     const styleWidth =
       style && typeof style === 'object' && 'width' in style ? style.width : undefined;
-    const styleHeight =
+    const styleHeightValue =
       style && typeof style === 'object' && 'height' in style ? style.height : undefined;
+    const styleHeight =
+      typeof styleHeightValue === 'number' || typeof styleHeightValue === 'string'
+        ? styleHeightValue
+        : undefined;
     const buttonWidth =
       typeof styleWidth === 'number'
         ? styleWidth
         : typeof explicitWidth === 'number'
           ? explicitWidth
           : undefined;
-    const resolvedContentWidth = contentWidth ?? getContentWidthFromButtonWidth(buttonWidth);
+    const fallbackWidth = buttonWidth ?? windowWidth - 124 - 16;
+    const resolvedContentWidth =
+      contentWidth ??
+      getContentWidthFromButtonWidth(buttonWidth) ??
+      getContentWidthFromButtonWidth(fallbackWidth)!;
     const resolvedContentHeight = contentHeight ?? 36;
     return {
       buttonWidth,
+      fallbackWidth,
       styleHeight,
       contentWidth: resolvedContentWidth,
       contentHeight: resolvedContentHeight,
     };
-  }, [style, explicitWidth, contentWidth, contentHeight]);
+  }, [style, explicitWidth, contentWidth, contentHeight, windowWidth]);
 
   const linkHref = useMemo(
     () => ({
@@ -155,75 +193,15 @@ export default function WalletHeaderTitle({
     linkHref,
   };
 
-  if (!supportsLiquidGlass()) {
-    const headerWidth = windowWidth - 124 - 16;
-    const fallbackWidth =
-      typeof dimensions.buttonWidth === 'number' ? dimensions.buttonWidth : headerWidth;
-
-    return (
-      <View
-        style={{
-          width: fallbackWidth,
-          alignSelf: 'center',
-          alignItems: 'center',
-          justifyContent: 'center',
-          ...(style || {}),
-        }}>
-        <MintBalanceDisplay {...mintDisplayProps} style={{ width: '100%' }} />
-      </View>
-    );
-  }
-
-  const buttonModifiers = [
-    buttonStyle('glass'),
-    frame({ height: 50, width: dimensions.buttonWidth, alignment: 'center' }),
-    ...(liquidGlass ? [] : [glassEffect({ shape: 'capsule' })]),
-  ];
-
-  return (
-    <View
-      style={{
-        alignSelf: 'center',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: dimensions.buttonWidth,
-        height: typeof dimensions.styleHeight === 'number' ? dimensions.styleHeight : undefined,
-        ...style,
-      }}>
-      <Host style={{ zIndex: 10, height: 50, width: dimensions.buttonWidth }} matchContents>
-        <ContextMenu>
-          <ContextMenu.Items>
-            {topMints.map((mint) => (
-              <SwiftUIButton
-                key={mint.mintUrl}
-                systemImage="building.columns"
-                label={`${mint.displayName} (${formatBalance(mint.balance)})`}
-                onPress={() => handleQuickSelectMint(mint.mintUrl)}
-              />
-            ))}
-            <SwiftUIButton
-              systemImage="list.bullet.rectangle"
-              label="Show all mints"
-              onPress={handleShowAllMints}
-            />
-            {showAddMintsButton && (
-              <SwiftUIButton systemImage="plus.circle" label="Add Mint" onPress={handleAddMint} />
-            )}
-          </ContextMenu.Items>
-          <ContextMenu.Trigger>
-            <HStack
-              modifiers={
-                liquidGlass || typeof dimensions.buttonWidth === 'number'
-                  ? []
-                  : [padding({ horizontal: 64 })]
-              }>
-              <SwiftUIButton modifiers={buttonModifiers}>
-                <MintBalanceDisplay {...mintDisplayProps} />
-              </SwiftUIButton>
-            </HStack>
-          </ContextMenu.Trigger>
-        </ContextMenu>
-      </Host>
-    </View>
-  );
+  return {
+    topMints,
+    handleQuickSelectMint,
+    handleShowAllMints,
+    handleAddMint,
+    dimensions,
+    mintDisplayProps,
+    showAddMintsButton,
+    liquidGlass,
+    style,
+  };
 }
