@@ -28,14 +28,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   const { onPress, accentColor = shadeColor100, color = foreground, size = DEFAULT_SIZE } = props;
 
   if (supportsLiquidGlass()) {
-    return (
-      <QRButtonLiquid
-        onPress={onPress}
-        accentColor={accentColor}
-        color={shadeColor300}
-        size={size}
-      />
-    );
+    return <QRButtonLiquid onPress={onPress} accentColor={accentColor} color={color} size={size} />;
   }
 
   return (
