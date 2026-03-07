@@ -4,6 +4,7 @@ import type { PopupTextSegment } from '../format';
 
 export type BaseOverrides = {
   duration?: number;
+  onOpen?: () => void;
   onClose?: (data: unknown) => void;
 };
 

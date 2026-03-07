@@ -18,6 +18,7 @@ export type CustomSheetFooterButton = {
 
 export type CustomSheetFooterConfig = {
   buttons: CustomSheetFooterButton[];
+  layout?: 'column' | 'row';
 };
 
 export type CustomSheetSharedProps = {
@@ -27,3 +28,7 @@ export type CustomSheetSharedProps = {
   canPop: boolean;
   setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
 };
+
+export type SheetLayoutConfig =
+  | { mode: 'snapPoints'; snapPoints: readonly string[] }
+  | { mode: 'contentHeight' };

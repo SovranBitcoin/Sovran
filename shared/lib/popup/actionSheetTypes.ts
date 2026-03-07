@@ -4,6 +4,13 @@ import type {
 } from '@/shared/ui/composed/ButtonHandler';
 
 type EmojiPickerPayload = { token: string };
+type OfflineSendSuggestionsPayload = {
+  requestedAmount: number;
+  roundDownAmount: number | null;
+  roundUpAmount: number | null;
+  unit: string;
+  onSelectAmount: (amount: number) => void | Promise<void>;
+};
 
 export type ProfileSwitcherAction =
   | {
@@ -29,6 +36,7 @@ type BaseActionSheetPayloads = {
     onRequestAction: (action: ProfileSwitcherAction) => void;
   };
   'emoji-picker': EmojiPickerPayload;
+  'offline-send-suggestions': OfflineSendSuggestionsPayload;
 };
 
 type ButtonHandlerPushTarget = {
