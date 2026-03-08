@@ -51,13 +51,14 @@ import Animated, {
  *
  * Current stage map:
  *
- *  | Stage ID         | Blocking | Depends On | Provider            |
- *  |------------------|----------|------------|---------------------|
- *  | migrations       | yes      | —          | MigrationGate       |
- *  | nostr            | yes      | migrations | NostrKeysProvider   |
- *  | coco             | yes      | nostr      | CocoProvider        |
- *  | nostr-ndk        | no       | coco       | NostrNDKProvider    |
- *  | coco-background  | no       | coco       | CocoProvider        |
+ *  | Stage ID           | Blocking | Depends On        | Provider              |
+ *  |--------------------|----------|-------------------|-----------------------|
+ *  | global-migrations  | yes      | —                 | GlobalMigrationGate   |
+ *  | migrations         | yes      | global-migrations | MigrationGate         |
+ *  | nostr              | yes      | migrations        | NostrKeysProvider     |
+ *  | coco               | yes      | nostr             | CocoProvider          |
+ *  | nostr-ndk          | no       | coco              | NostrNDKProvider      |
+ *  | coco-background    | no       | coco              | CocoProvider          |
  */
 
 // ── Initialization display type ──────────────────────────────

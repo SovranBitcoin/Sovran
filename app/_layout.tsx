@@ -16,6 +16,7 @@ import { Image, LogBox, TouchableOpacity, Platform, View } from 'react-native';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 
 import AppGate from '@/shared/blocks/AppGate';
+import GlobalMigrationGate from '@/shared/blocks/GlobalMigrationGate';
 import MigrationGate from '@/shared/blocks/MigrationGate';
 import {
   InitializationProvider,
@@ -396,11 +397,13 @@ export default function RootLayout() {
         <TransitionControlRegistrar />
         <TransitionGuardCleanup />
         <NativeSplashLayoutGate>
-          <AccountScopedProviders
-            key={`account-${activeAccountIndex}`}
-            accountIndex={activeAccountIndex}>
-            <RootLayoutContent />
-          </AccountScopedProviders>
+          <GlobalMigrationGate>
+            <AccountScopedProviders
+              key={`account-${activeAccountIndex}`}
+              accountIndex={activeAccountIndex}>
+              <RootLayoutContent />
+            </AccountScopedProviders>
+          </GlobalMigrationGate>
         </NativeSplashLayoutGate>
         <PopupHost />
       </OuterProviders>

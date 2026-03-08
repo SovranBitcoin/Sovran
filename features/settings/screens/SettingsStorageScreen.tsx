@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView } from 'react-native';
+import { RefreshControl, ScrollView, Share } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 
 import Container from '@/shared/ui/composed/Container';
 import {
+  getFullAsyncStorageDump,
   getStorageInventorySnapshot,
   type ZustandInventory,
 } from '@/shared/lib/debug/storageInventory';
@@ -160,6 +161,7 @@ export const SettingsStorageScreen = () => {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [zustandGroups, setZustandGroups] = useState<ZustandInventory>(EMPTY_ZUSTAND_GROUPS);
   const [secureStoreKeys, setSecureStoreKeys] = useState<string[]>([]);
@@ -203,6 +205,19 @@ export const SettingsStorageScreen = () => {
   useEffect(() => {
     void loadSnapshot();
   }, [loadSnapshot]);
+
+  const handleShareDump = useCallback(async () => {
+    setIsSharing(true);
+    try {
+      const dump = await getFullAsyncStorageDump();
+      const jsonString = JSON.stringify(dump, null, 2);
+      await Share.share({ message: jsonString, title: 'AsyncStorage Full Dump' });
+    } catch (shareError) {
+      setError(shareError instanceof Error ? shareError.message : 'Share failed');
+    } finally {
+      setIsSharing(false);
+    }
+  }, []);
 
   const subtitle = useMemo(() => {
     if (isLoading) {
@@ -265,9 +280,18 @@ export const SettingsStorageScreen = () => {
               SecureStore cannot enumerate all keys. This probes deterministic keys from known
               profile/account data and reports which currently exist.
             </Text>
-            <Button variant="secondary" size="sm" onPress={() => loadSnapshot(true)}>
-              <Button.Label>Refresh</Button.Label>
-            </Button>
+            <View className="flex-row gap-2">
+              <Button variant="secondary" size="sm" onPress={() => loadSnapshot(true)}>
+                <Button.Label>Refresh</Button.Label>
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                isDisabled={isSharing}
+                onPress={handleShareDump}>
+                <Button.Label>{isSharing ? 'Exporting...' : 'Share Full Dump'}</Button.Label>
+              </Button>
+            </View>
             {error ? (
               <Text size={12} className="text-danger">
                 Failed to refresh inventory: {error}
