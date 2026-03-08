@@ -37,45 +37,45 @@ type Profile = {
 
 type NostrState = {
   currentProfile: { id: number };
+  search?: any[];
   profiles: Profile[];
   messages: {
     loaded_messages: any[];
     [key: string]: Message[];
   };
   follows: Record<string, any>;
+  contacts?: any[];
 };
 
+const p = nostrState.profiles[0];
 const initialState: NostrState = {
   currentProfile: {
     id: nostrState.currentProfile.id,
   },
+  ...(nostrState.search ? { search: nostrState.search as any[] } : {}),
   profiles: [
     {
-      id: nostrState.profiles[0].id,
-      mnemonic: nostrState.profiles[0].mnemonic || '',
-      pubkey: '',
-      profile: {
+      id: p.id,
+      mnemonic: p.mnemonic || '',
+      pubkey: p.pubkey || '',
+      profile: p.profile || {
         created_at: 0,
         profileEvent: '',
         name: '',
         picture: '',
         image: '',
       },
-      npub: '',
-      nsec: '',
-      mints: [],
-      picture: '',
-      root: {
-        xpub: '',
-        xpriv: '',
-      },
-      nut13: '',
+      npub: p.npub || '',
+      nsec: p.nsec || '',
+      mints: p.mints || [],
+      picture: p.picture || '',
+      root: p.root || { xpub: '', xpriv: '' },
+      nut13: p.nut13 || '',
     },
   ],
-  messages: {
-    loaded_messages: [],
-  },
-  follows: {},
+  messages: nostrState.messages || { loaded_messages: [] },
+  follows: nostrState.follows || {},
+  ...(nostrState.contacts ? { contacts: nostrState.contacts as any[] } : {}),
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

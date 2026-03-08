@@ -2,7 +2,6 @@ import React, { useState, useEffect, ReactNode, useRef } from 'react';
 import { store } from '@/redux/store/store.deprecated';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { isMigrationsComplete, setMigrationsComplete } from '@/shared/lib/nostr/secureStorage';
-import { migrateProfileScopedKeys } from '@/shared/lib/cashu/profileScopedStorage';
 import { initLog } from '@/shared/lib/initTiming';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
@@ -11,17 +10,21 @@ interface MigrationGateProps {
 }
 
 /**
- * MigrationGate ensures all Redux migrations complete before rendering children.
+ * MigrationGate ensures legacy Redux migrations complete before rendering children.
  *
  * On the first launch (or after a cache clear) it waits for Redux rehydration
  * and async migration polling, then persists a completion flag to SecureStore.
  * On subsequent launches the flag is found immediately and children render
  * with zero delay.
+ *
+ * Global profile-scoped key migrations are handled separately by
+ * GlobalMigrationGate (runs before AccountScopedProviders mount).
  */
 export default function MigrationGate({ children }: MigrationGateProps) {
   const stage = useInitializationStage('migrations', {
     message: 'Running migrations...',
     blocking: true,
+    dependsOn: ['global-migrations'],
   });
   const [migrationsComplete, setMigrationsCompleteDone] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -41,7 +44,6 @@ export default function MigrationGate({ children }: MigrationGateProps) {
         const alreadyDone = await isMigrationsComplete(accountIndex);
         initLog('MigrationGate', `SecureStore flag = ${alreadyDone}`);
         if (alreadyDone) {
-          await migrateProfileScopedKeys();
           setMigrationsCompleteDone(true);
           stage.log('Migrations already complete');
           stage.complete();
@@ -102,8 +104,6 @@ export default function MigrationGate({ children }: MigrationGateProps) {
         if (attempts >= maxAttempts) {
           initLog('MigrationGate', 'TIMEOUT — proceeding anyway');
         }
-
-        await migrateProfileScopedKeys();
 
         initLog('MigrationGate', `persisting completion flag for account ${accountIndex}...`);
         await setMigrationsComplete(accountIndex);

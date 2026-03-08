@@ -150,3 +150,24 @@ export async function getStorageInventorySnapshot(
 
   return { zustand, secureStore, cocoDatabases };
 }
+
+/**
+ * Read every key in AsyncStorage and return a parsed dump.
+ * Values that are valid JSON are parsed; others are kept as raw strings.
+ * Useful for debugging migrations — the output matches the old
+ * "Share Full Dump" format from the v0.0.60 Storage Inspector.
+ */
+export async function getFullAsyncStorageDump(): Promise<Record<string, unknown>> {
+  const allKeys = await AsyncStorage.getAllKeys();
+  const pairs = await AsyncStorage.multiGet(allKeys);
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of pairs) {
+    if (value == null) continue;
+    try {
+      result[key] = JSON.parse(value);
+    } catch {
+      result[key] = value;
+    }
+  }
+  return result;
+}
