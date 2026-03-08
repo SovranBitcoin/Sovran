@@ -2,11 +2,9 @@ import React, { createContext, useEffect, useState, ReactNode, useRef } from 're
 import { CocoCashuProvider } from 'coco-cashu-react';
 import { Manager } from 'coco-cashu-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
-import { DataMigration } from '@/shared/lib/cashu/migration';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { initLog } from '@/shared/lib/initTiming';
 
 interface CocoContextValue {
@@ -77,11 +75,11 @@ async function initializeDefaultMints(
 }
 
 /**
- * CocoProvider initializes the Coco Manager and runs data migration.
+ * CocoProvider initializes the Coco Manager for normal runtime use.
  *
  * Startup is split into two phases:
- *  - **Blocking** (`coco` stage): Manager init + data migration. The app stays
- *    on the splash screen until this completes.
+ *  - **Blocking** (`coco` stage): Manager init. The app stays on the splash
+ *    screen until this completes.
  *  - **Non-blocking** (`coco-background` stage): Default mints + recovery.
  *    These run after the app is visible and don't hold up rendering.
  */
@@ -99,7 +97,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
   const { keys } = useNostrKeysContext();
   const [manager, setManager] = useState<Manager | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const [isMigrating, setIsMigrating] = useState(false);
+  const isMigrating = false;
   const [migrationError, setMigrationError] = useState<Error | null>(null);
   const hasStarted = useRef(false);
   const bgStarted = useRef(false);
@@ -124,48 +122,6 @@ export function CocoProvider({ children }: CocoProviderProps) {
         const mgr = await CocoManager.initialize();
         initLog('Coco', 'CocoManager.initialize() done');
         setManager(mgr);
-
-        const activeAccountIndex = useProfileStore.getState().activeAccountIndex;
-        const migrationAlreadyDone = useProfileStore
-          .getState()
-          .isCocoMigrationComplete(activeAccountIndex);
-        initLog(
-          'Coco',
-          `account=${activeAccountIndex} migrationAlreadyDone=${migrationAlreadyDone}`
-        );
-
-        if (migrationAlreadyDone) {
-          initLog('Coco', 'skipping migration check (already done)');
-        } else {
-          stage.log('Checking for data migration...');
-          initLog('Coco', 'creating DataMigration instance...');
-          const migration = new DataMigration(mgr, activeAccountIndex);
-          initLog('Coco', 'calling isMigrationNeeded()...');
-          const needsMigration = await migration.isMigrationNeeded();
-          initLog('Coco', `isMigrationNeeded = ${needsMigration}`);
-
-          if (needsMigration) {
-            stage.log('Migrating data...');
-            initLog('Coco', 'starting migrateFromRedux()...');
-            setIsMigrating(true);
-
-            try {
-              const result = await migration.migrateFromRedux();
-              initLog('Coco', `migrateFromRedux done — errors=${result.errors.length}`);
-              if (result.errors.length > 0) {
-                console.warn('Migration completed with errors:', result.errors);
-              }
-            } catch (error) {
-              initLog('Coco', `migrateFromRedux ERROR: ${error}`);
-              setMigrationError(error instanceof Error ? error : new Error('Migration failed'));
-            } finally {
-              setIsMigrating(false);
-            }
-          }
-
-          initLog('Coco', 'marking migration complete in profileStore');
-          useProfileStore.getState().markCocoMigrationComplete(activeAccountIndex);
-        }
 
         initLog('Coco', 'setting isReady=true, calling stage.complete()');
         setIsReady(true);

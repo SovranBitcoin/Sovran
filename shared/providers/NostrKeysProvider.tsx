@@ -33,46 +33,6 @@ import { useInitializationStage } from './InitializationProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { initLog } from '@/shared/lib/initTiming';
 
-/**
- * Check if mnemonic exists in Redux store (profile 0) as fallback
- */
-function getMnemonicFromRedux(): string | null {
-  try {
-    // Import store dynamically to avoid circular dependencies
-    // eslint-disable-next-line
-    const { store } = require('../../redux/store/store.deprecated');
-    const state = store.getState();
-    const nostrState = state.nostr;
-
-    // Check if profile 0 exists and has a mnemonic
-    if (nostrState.profiles && nostrState.profiles.length > 0) {
-      const profile0 = nostrState.profiles[0];
-      if (profile0 && profile0.mnemonic) {
-        console.log('Found main mnemonic in Redux store (profile 0)');
-
-        // Validate the mnemonic format
-        const words = profile0.mnemonic.split(' ');
-        if (words.length === 12 || words.length === 24) {
-          console.log('Redux mnemonic appears valid, using it');
-          return profile0.mnemonic;
-        } else {
-          console.warn('Redux mnemonic has invalid format:', words.length, 'words');
-        }
-      } else {
-        console.log('Profile 0 exists but no mnemonic found');
-      }
-    } else {
-      console.log('No profiles found in Redux store');
-    }
-
-    console.log('No mnemonic found in Redux store (profile 0)');
-    return null;
-  } catch (error) {
-    console.error('Failed to get mnemonic from Redux store:', error);
-    return null;
-  }
-}
-
 interface NostrKeys {
   npub: string;
   nsec: string;
@@ -284,33 +244,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
 
         let mnemonicToUse = mnemonic;
         initLog('NostrKeys', `mnemonic from SecureStore: ${mnemonic ? 'exists' : 'null'}`);
-
-        // If no mnemonic from secure storage, try Redux fallback first
-        if (!mnemonicToUse) {
-          stage.log('Checking for existing wallet...');
-          initLog('NostrKeys', 'checking Redux for mnemonic...');
-          mnemonicToUse = getMnemonicFromRedux();
-
-          if (mnemonicToUse) {
-            initLog('NostrKeys', 'found mnemonic in Redux — migrating to SecureStore');
-            stage.log('Migrating wallet to secure storage...');
-
-            try {
-              const { storeMnemonic } = await import('@/shared/lib/nostr/secureStorage');
-              const stored = await storeMnemonic(mnemonicToUse);
-              initLog('NostrKeys', `storeMnemonic result: ${stored}`);
-              if (stored) {
-                await refreshMnemonic();
-              }
-            } catch (error) {
-              initLog('NostrKeys', `storeMnemonic error: ${error}`);
-            }
-          } else {
-            initLog('NostrKeys', 'no mnemonic in Redux either');
-          }
-        } else {
-          stage.log('Initializing keys...');
-        }
+        stage.log('Initializing keys...');
 
         if (!mnemonicToUse) {
           stage.log('Generating new wallet...');

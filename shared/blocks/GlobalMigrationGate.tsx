@@ -18,6 +18,7 @@ export default function GlobalMigrationGate({ children }: GlobalMigrationGatePro
   const stage = useInitializationStage('global-migrations', {
     message: 'Running global migrations...',
     blocking: true,
+    dependsOn: ['legacy-redux-bootstrap'],
   });
   const [isComplete, setIsComplete] = useState(false);
   const hasStarted = useRef(false);

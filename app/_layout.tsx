@@ -17,6 +17,7 @@ import { supportsLiquidGlass } from '@/shared/lib/version';
 
 import AppGate from '@/shared/blocks/AppGate';
 import GlobalMigrationGate from '@/shared/blocks/GlobalMigrationGate';
+import LegacyMigrationGate from '@/shared/blocks/LegacyMigrationGate';
 import MigrationGate from '@/shared/blocks/MigrationGate';
 import {
   InitializationProvider,
@@ -397,13 +398,15 @@ export default function RootLayout() {
         <TransitionControlRegistrar />
         <TransitionGuardCleanup />
         <NativeSplashLayoutGate>
-          <GlobalMigrationGate>
-            <AccountScopedProviders
-              key={`account-${activeAccountIndex}`}
-              accountIndex={activeAccountIndex}>
-              <RootLayoutContent />
-            </AccountScopedProviders>
-          </GlobalMigrationGate>
+          <LegacyMigrationGate>
+            <GlobalMigrationGate>
+              <AccountScopedProviders
+                key={`account-${activeAccountIndex}`}
+                accountIndex={activeAccountIndex}>
+                <RootLayoutContent />
+              </AccountScopedProviders>
+            </GlobalMigrationGate>
+          </LegacyMigrationGate>
         </NativeSplashLayoutGate>
         <PopupHost />
       </OuterProviders>
