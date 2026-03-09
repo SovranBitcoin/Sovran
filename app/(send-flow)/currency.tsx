@@ -46,6 +46,10 @@ function ModalScreen() {
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
   const [sendMode, setSendMode] = useState<SendMode | null>(null);
+  const [sendModeDebugInfo, setSendModeDebugInfo] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const allowedMints = useMemo(() => {
     if (!params.allowedMints) return undefined;
     try {
@@ -63,6 +67,11 @@ function ModalScreen() {
   const showSendModeIcon = params.to === 'sendToken';
 
   const handlePressSendModeInfo = useCallback(() => {
+    if (sendModeDebugInfo) {
+      Alert.alert(sendModeDebugInfo.title, sendModeDebugInfo.message);
+      return;
+    }
+
     if (!sendMode) {
       Alert.alert(
         isOffline ? 'Checking offline route' : 'Checking route',
@@ -87,7 +96,7 @@ function ModalScreen() {
         ? 'This amount needs a mint swap, so while offline you will be asked to round up or down to a nearby exact sendable amount.'
         : 'This amount requires a mint swap to construct the exact send proofs before sending.'
     );
-  }, [isOffline, sendMode]);
+  }, [isOffline, sendMode, sendModeDebugInfo]);
 
   return (
     <>
@@ -187,6 +196,7 @@ function ModalScreen() {
         }}
         processPaymentStringFn={processPaymentString}
         onSendModeChange={setSendMode}
+        onSendModeDebugChange={setSendModeDebugInfo}
       />
     </>
   );

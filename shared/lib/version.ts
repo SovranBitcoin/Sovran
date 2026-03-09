@@ -57,7 +57,7 @@ export const supportsBlur = (): boolean => {
 };
 
 /** Flip to `false` to disable all liquid glass effects app-wide. */
-export const LIQUID_GLASS_ENABLED = false;
+export const LIQUID_GLASS_ENABLED = true;
 
 /**
  * Apple Liquid Glass: iOS 26+ / iPadOS 26+ / macOS 26+ (WWDC 2025).

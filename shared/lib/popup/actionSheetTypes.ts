@@ -7,7 +7,9 @@ type EmojiPickerPayload = { token: string };
 type OfflineSendSuggestionsPayload = {
   requestedAmount: number;
   roundDownAmount: number | null;
+  roundDownLabel?: string;
   roundUpAmount: number | null;
+  roundUpLabel?: string;
   unit: string;
   onSelectAmount: (amount: number) => void | Promise<void>;
 };

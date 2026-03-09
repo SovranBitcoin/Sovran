@@ -98,7 +98,9 @@ import opacity from 'hex-color-opacity';
 import { useLightningOperations } from '@/features/receive';
 import {
   buildExactOfflineAmountIndex,
+  getOfflineFiatSendSuggestions,
   getOfflineSendSuggestions,
+  getSatRangeForDisplayedFiatMinorUnit,
 } from '@/features/send/lib/offlineSendSuggestions';
 import { useSendWithHistory } from '@/features/send';
 import { useNostrDirectMessage } from '@/features/user';
@@ -114,10 +116,75 @@ const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }
   gbp: { symbol: '£', label: 'GBP' },
 };
 
+function parseFiatInputToMinorUnit(rawInput: string, fallbackAmount: number): number | null {
+  const trimmedInput = rawInput.trim();
+  if (!trimmedInput) {
+    return Number.isFinite(fallbackAmount) ? Math.round(fallbackAmount * 100) : null;
+  }
+
+  const [wholePartRaw = '0', decimalPartRaw = ''] = trimmedInput.split('.');
+  if (!/^\d*$/.test(wholePartRaw) || !/^\d*$/.test(decimalPartRaw)) {
+    return null;
+  }
+
+  const wholePart = wholePartRaw === '' ? 0 : Number.parseInt(wholePartRaw, 10);
+  const decimalPart = Number.parseInt(`${decimalPartRaw}00`.slice(0, 2), 10);
+
+  if (!Number.isFinite(wholePart) || !Number.isFinite(decimalPart)) {
+    return null;
+  }
+
+  return wholePart * 100 + decimalPart;
+}
+
+function formatFiatMinorUnit(amountMinorUnit: number, symbol: string): string {
+  return `${symbol}${(amountMinorUnit / 100).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatSatsAmount(amount: number): string {
+  return `${amount.toLocaleString('en-US')} sats`;
+}
+
+function formatAmountList(
+  amounts: number[],
+  formatter: (amount: number) => string,
+  limit: number = 8
+): string {
+  if (amounts.length === 0) {
+    return 'none';
+  }
+
+  const visibleAmounts = amounts.slice(0, limit).map(formatter);
+  if (amounts.length <= limit) {
+    return visibleAmounts.join(', ');
+  }
+
+  return `${visibleAmounts.join(', ')}, ...`;
+}
+
+function orderCandidatesByCloseness(candidates: number[], requestedAmount: number): number[] {
+  return [...candidates].sort((left, right) => {
+    const distanceDifference = Math.abs(left - requestedAmount) - Math.abs(right - requestedAmount);
+    if (distanceDifference !== 0) {
+      return distanceDifference;
+    }
+
+    return left - right;
+  });
+}
+
 type InputMode = 'sats' | 'fiat';
 type SendMode = 'offline' | 'online';
+type SendModeDebugInfo = {
+  title: string;
+  message: string;
+};
 
 type OfflineSendabilityState = {
+  reachableSums: number[];
   reachableAmounts: Set<number>;
   totalReadyBalance: number;
 };
@@ -227,6 +294,8 @@ interface CurrencyScreenProps {
   onInsufficientBalance?: (amount: number, unit: string) => void;
   /** Emits exact send route mode based on current mint proofs + amount */
   onSendModeChange?: (mode: SendMode | null) => void;
+  /** Emits a human-readable debug explanation for the current send route */
+  onSendModeDebugChange?: (info: SendModeDebugInfo | null) => void;
 }
 
 export function CurrencyScreen({
@@ -240,6 +309,7 @@ export function CurrencyScreen({
   processPaymentStringFn,
   onInsufficientBalance,
   onSendModeChange,
+  onSendModeDebugChange,
 }: CurrencyScreenProps) {
   const [foreground, background, danger] = useThemeColor([
     'foreground',
@@ -262,6 +332,7 @@ export function CurrencyScreen({
 
   // Get user's preferred fiat currency and BTC price
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
+  const mockOffline = useSettingsStore((state) => state.mockOffline);
   const btcPrice = useBtcPrice(displayCurrency);
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
 
@@ -276,6 +347,9 @@ export function CurrencyScreen({
     null
   );
   const offlineSendabilityRequestIdRef = useRef(0);
+  const sendRouteAnalysisRequestIdRef = useRef(0);
+  const [sendMode, setSendMode] = useState<SendMode | null>(null);
+  const [sendModeDebugInfo, setSendModeDebugInfo] = useState<SendModeDebugInfo | null>(null);
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
   const setSelectedMint = useMintStore((state) => state.setSelectedMint);
@@ -357,6 +431,10 @@ export function CurrencyScreen({
 
   // The amount to use for API calls (always in sats)
   const amount = satsAmount;
+  const fiatMinorUnitAmount = useMemo(
+    () => parseFiatInputToMinorUnit(rawFiatInput, inputAmount),
+    [inputAmount, rawFiatInput]
+  );
 
   // Toggle between sats and fiat input modes
   const handleToggleInputMode = useCallback(async () => {
@@ -418,6 +496,7 @@ export function CurrencyScreen({
           }
 
           setOfflineSendability({
+            reachableSums: index.reachableSums,
             reachableAmounts: new Set(index.reachableSums),
             totalReadyBalance: index.totalReadyBalance,
           });
@@ -435,30 +514,276 @@ export function CurrencyScreen({
     };
   }, [manager, mintBalance, params.to, selectedMint]);
 
-  const sendMode = useMemo<SendMode | null>(() => {
+  useEffect(() => {
     const isSendTokenFlow = params.to === 'sendToken';
-    if (!isSendTokenFlow || !selectedMint || !Number.isFinite(amount) || amount <= 0) {
-      return null;
+
+    if (!isSendTokenFlow) {
+      setSendMode(null);
+      setSendModeDebugInfo(null);
+      return;
+    }
+
+    if (!selectedMint || !Number.isFinite(amount) || amount <= 0) {
+      setSendMode(null);
+      setSendModeDebugInfo({
+        title: 'Checking route',
+        message: 'Enter an amount to analyze whether this send can be completed offline.',
+      });
+      return;
     }
 
     if (amount > mintBalance) {
-      return null;
+      setSendMode(null);
+      setSendModeDebugInfo({
+        title: 'Insufficient balance',
+        message: `This send needs ${formatSatsAmount(amount)} but the selected mint only has ${formatSatsAmount(mintBalance)} available.`,
+      });
+      return;
     }
 
     if (!offlineSendability) {
-      return null;
+      setSendMode(null);
+      setSendModeDebugInfo({
+        title: 'Checking route',
+        message:
+          'The wallet is building the offline exact-amount index from your ready proofs for the selected mint.',
+      });
+      return;
     }
 
     if (offlineSendability.totalReadyBalance < amount) {
-      return null;
+      setSendMode(null);
+      setSendModeDebugInfo({
+        title: 'Not enough ready proofs',
+        message: `Your ready proofs sum to ${formatSatsAmount(offlineSendability.totalReadyBalance)}, which is below the requested ${formatSatsAmount(amount)}.`,
+      });
+      return;
     }
 
-    return offlineSendability.reachableAmounts.has(amount) ? 'offline' : 'online';
-  }, [amount, mintBalance, offlineSendability, params.to, selectedMint]);
+    const requestId = ++sendRouteAnalysisRequestIdRef.current;
+    let cancelled = false;
+    setSendMode(null);
+
+    void (async () => {
+      if (inputMode === 'fiat' && fiatMinorUnitAmount != null && btcPrice) {
+        const requestedFiatLabel = formatFiatMinorUnit(fiatMinorUnitAmount, currencyConfig.symbol);
+        const sameDisplayRange = getSatRangeForDisplayedFiatMinorUnit(fiatMinorUnitAmount, btcPrice);
+        const sameDisplayCandidates = sameDisplayRange
+          ? offlineSendability.reachableSums.filter(
+              (candidate) =>
+                candidate >= sameDisplayRange.minSat && candidate <= sameDisplayRange.maxSat
+            )
+          : [];
+        const sameDisplaySearchOrder = orderCandidatesByCloseness(sameDisplayCandidates, amount);
+        const fiatSuggestions = await getOfflineFiatSendSuggestions(
+          manager.proofService,
+          selectedMint,
+          amount,
+          fiatMinorUnitAmount,
+          btcPrice
+        );
+
+        if (cancelled || sendRouteAnalysisRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        const lines: string[] = [
+          `${requestedFiatLabel} currently converts to about ${formatSatsAmount(amount)}.`,
+        ];
+
+        if (sameDisplayRange) {
+          lines.push(
+            `${requestedFiatLabel} stays the same for any amount from ${formatSatsAmount(sameDisplayRange.minSat)} to ${formatSatsAmount(sameDisplayRange.maxSat)} because those sats all round to the same fiat display.`
+          );
+        }
+
+        if (sameDisplayCandidates.length > 0) {
+          lines.push(
+            `Exact offline amounts already constructible from your ready proofs in that same-price window: ${formatAmountList(
+              sameDisplayCandidates,
+              formatSatsAmount
+            )}.`
+          );
+          lines.push(
+            `Nearest-first search inside that window: ${formatAmountList(
+              sameDisplaySearchOrder,
+              formatSatsAmount
+            )}.`
+          );
+        } else {
+          lines.push(
+            'There are no exact offline amounts from your current proofs inside that same-price window.'
+          );
+        }
+
+        if (offlineSendability.reachableAmounts.has(amount)) {
+          lines.push(`${formatSatsAmount(amount)} is already exact, so it can be sent offline as entered.`);
+        } else {
+          lines.push(
+            `${formatSatsAmount(amount)} can't be sent offline exactly, so the wallet looks for the nearest exact amount that still displays as ${requestedFiatLabel}.`
+          );
+        }
+
+        if (fiatSuggestions.autoSelectAmount != null) {
+          lines.push(
+            `First match found: ${formatSatsAmount(fiatSuggestions.autoSelectAmount)}. It still displays as ${requestedFiatLabel}, so the header shows offline-spendable.`
+          );
+          setSendMode('offline');
+          setSendModeDebugInfo({
+            title: 'Offline sendable',
+            message: lines.join('\n\n'),
+          });
+          return;
+        }
+
+        lines.push(`No exact offline amount was found that still displays as ${requestedFiatLabel}.`);
+
+        for (let step = 1; step <= 5; step += 1) {
+          const lowerMinorUnit = fiatMinorUnitAmount - step;
+          const upperMinorUnit = fiatMinorUnitAmount + step;
+
+          if (lowerMinorUnit >= 0) {
+            const lowerRange = getSatRangeForDisplayedFiatMinorUnit(lowerMinorUnit, btcPrice);
+            if (lowerRange) {
+              const lowerCandidates = offlineSendability.reachableSums.filter(
+                (candidate) =>
+                  candidate >= lowerRange.minSat && candidate <= lowerRange.maxSat
+              );
+              lines.push(
+                `${formatFiatMinorUnit(lowerMinorUnit, currencyConfig.symbol)} would search ${formatSatsAmount(lowerRange.minSat)} to ${formatSatsAmount(lowerRange.maxSat)}. Exact offline amounts there: ${formatAmountList(
+                  lowerCandidates,
+                  formatSatsAmount
+                )}.`
+              );
+            }
+          }
+
+          const upperRange = getSatRangeForDisplayedFiatMinorUnit(upperMinorUnit, btcPrice);
+          if (upperRange) {
+            const upperCandidates = offlineSendability.reachableSums.filter(
+              (candidate) => candidate >= upperRange.minSat && candidate <= upperRange.maxSat
+            );
+            lines.push(
+              `${formatFiatMinorUnit(upperMinorUnit, currencyConfig.symbol)} would search ${formatSatsAmount(upperRange.minSat)} to ${formatSatsAmount(upperRange.maxSat)}. Exact offline amounts there: ${formatAmountList(
+                upperCandidates,
+                formatSatsAmount
+              )}.`
+            );
+          }
+
+          if (
+            (fiatSuggestions.roundDownOption &&
+              fiatSuggestions.roundDownOption.displayMinorUnit === lowerMinorUnit) ||
+            (fiatSuggestions.roundUpOption &&
+              fiatSuggestions.roundUpOption.displayMinorUnit === upperMinorUnit)
+          ) {
+            break;
+          }
+        }
+
+        if (fiatSuggestions.roundDownOption || fiatSuggestions.roundUpOption) {
+          const fallbackOptions = [
+            fiatSuggestions.roundDownOption
+              ? `${formatFiatMinorUnit(
+                  fiatSuggestions.roundDownOption.displayMinorUnit,
+                  currencyConfig.symbol
+                )} -> ${formatSatsAmount(fiatSuggestions.roundDownOption.amount)}`
+              : null,
+            fiatSuggestions.roundUpOption
+              ? `${formatFiatMinorUnit(
+                  fiatSuggestions.roundUpOption.displayMinorUnit,
+                  currencyConfig.symbol
+                )} -> ${formatSatsAmount(fiatSuggestions.roundUpOption.amount)}`
+              : null,
+          ].filter(Boolean);
+
+          lines.push(
+            `That is why the header shows rounding required. The first wider-range exact options are ${fallbackOptions.join(' or ')}.`
+          );
+        } else {
+          lines.push(
+            'No exact offline fallback was found in the current debug search range, so this send would need an online swap.'
+          );
+        }
+
+        setSendMode('online');
+        setSendModeDebugInfo({
+          title: 'Offline round required',
+          message: lines.join('\n\n'),
+        });
+        return;
+      }
+
+      const suggestions = await getOfflineSendSuggestions(manager.proofService, selectedMint, amount);
+
+      if (cancelled || sendRouteAnalysisRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      const nearbyReachableAmounts = orderCandidatesByCloseness(
+        offlineSendability.reachableSums.filter(
+          (candidate) => Math.abs(candidate - amount) <= Math.max(25, Math.ceil(amount * 0.1))
+        ),
+        amount
+      );
+
+      const lines: string[] = [
+        `Requested amount: ${formatSatsAmount(amount)}.`,
+        `Exact offline amounts already constructible near this value: ${formatAmountList(
+          nearbyReachableAmounts,
+          formatSatsAmount
+        )}.`,
+      ];
+
+      if (suggestions.isRequestedAmountSendableOffline) {
+        lines.push(`${formatSatsAmount(amount)} is exact, so it can be sent offline as entered.`);
+        setSendMode('offline');
+        setSendModeDebugInfo({
+          title: 'Offline sendable',
+          message: lines.join('\n\n'),
+        });
+        return;
+      }
+
+      lines.push(
+        `${formatSatsAmount(amount)} can't be sent offline exactly. The closest validated exact amounts are ${
+          suggestions.roundDownAmount ? formatSatsAmount(suggestions.roundDownAmount) : 'no lower match'
+        } and ${
+          suggestions.roundUpAmount ? formatSatsAmount(suggestions.roundUpAmount) : 'no higher match'
+        }.`
+      );
+
+      setSendMode('online');
+      setSendModeDebugInfo({
+        title: 'Offline round required',
+        message: lines.join('\n\n'),
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    amount,
+    btcPrice,
+    currencyConfig.symbol,
+    fiatMinorUnitAmount,
+    inputMode,
+    manager.proofService,
+    mintBalance,
+    mockOffline,
+    offlineSendability,
+    params.to,
+    selectedMint,
+  ]);
 
   useEffect(() => {
     onSendModeChange?.(params.to === 'sendToken' ? sendMode : null);
   }, [onSendModeChange, params.to, sendMode]);
+
+  useEffect(() => {
+    onSendModeDebugChange?.(params.to === 'sendToken' ? sendModeDebugInfo : null);
+  }, [onSendModeDebugChange, params.to, sendModeDebugInfo]);
 
   const handleLightningReceive = async () => {
     if (!selectedMint) {
@@ -601,6 +926,47 @@ export function CurrencyScreen({
       return false;
     }
 
+    if (inputMode === 'fiat' && fiatMinorUnitAmount != null && btcPrice) {
+      const fiatSuggestions = await getOfflineFiatSendSuggestions(
+        manager.proofService,
+        selectedMint,
+        amount,
+        fiatMinorUnitAmount,
+        btcPrice
+      );
+
+      if (fiatSuggestions.autoSelectAmount != null) {
+        await handleRoundedOfflineSend(fiatSuggestions.autoSelectAmount);
+        return true;
+      }
+
+      if (fiatSuggestions.roundDownOption || fiatSuggestions.roundUpOption) {
+        offlineSendSuggestionsPopup({
+          requestedAmount: amount,
+          roundDownAmount: fiatSuggestions.roundDownOption?.amount ?? null,
+          roundDownLabel: fiatSuggestions.roundDownOption
+            ? formatFiatMinorUnit(
+                fiatSuggestions.roundDownOption.displayMinorUnit,
+                currencyConfig.symbol
+              )
+            : undefined,
+          roundUpAmount: fiatSuggestions.roundUpOption?.amount ?? null,
+          roundUpLabel: fiatSuggestions.roundUpOption
+            ? formatFiatMinorUnit(
+                fiatSuggestions.roundUpOption.displayMinorUnit,
+                currencyConfig.symbol
+              )
+            : undefined,
+          unit: 'sat',
+          onSelectAmount: handleRoundedOfflineSend,
+        });
+
+        return true;
+      }
+
+      return false;
+    }
+
     const suggestions = await getOfflineSendSuggestions(manager.proofService, selectedMint, amount);
     if (suggestions.isRequestedAmountSendableOffline) {
       return false;
@@ -615,7 +981,18 @@ export function CurrencyScreen({
     });
 
     return true;
-  }, [amount, handleRoundedOfflineSend, isOffline, manager.proofService, params.to, selectedMint]);
+  }, [
+    amount,
+    btcPrice,
+    currencyConfig.symbol,
+    fiatMinorUnitAmount,
+    handleRoundedOfflineSend,
+    inputMode,
+    isOffline,
+    manager.proofService,
+    params.to,
+    selectedMint,
+  ]);
 
   const handleNext = async () => {
     if (!isValidAmount) return;
@@ -631,7 +1008,19 @@ export function CurrencyScreen({
       }
     }
 
-    if (params.to === 'sendToken' && isOffline) {
+    if (params.to === 'sendToken' && mockOffline) {
+      setLoading(true);
+      try {
+        const didShowOfflineSuggestions = await maybeShowOfflineSendSuggestions();
+        if (didShowOfflineSuggestions) {
+          return;
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (params.to === 'sendToken' && isOffline && !mockOffline) {
       setLoading(true);
       try {
         const didShowOfflineSuggestions = await maybeShowOfflineSendSuggestions();

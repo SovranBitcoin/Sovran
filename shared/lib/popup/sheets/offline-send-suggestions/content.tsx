@@ -63,8 +63,8 @@ export function OfflineSendSuggestionsContent({
                   ? 'Rounding down...'
                   : 'Rounding up...'
                 : button.direction === 'down'
-                  ? `Round down to ${formatFooterAmount(button.amount, payload.unit)}`
-                  : `Round up to ${formatFooterAmount(button.amount, payload.unit)}`,
+                  ? payload.roundDownLabel || `Round down to ${formatFooterAmount(button.amount, payload.unit)}`
+                  : payload.roundUpLabel || `Round up to ${formatFooterAmount(button.amount, payload.unit)}`,
             variant: button.direction === 'down' ? 'primary' : 'tertiary',
             isDisabled: selectionInFlight !== null,
             onPress: () => void handleSelectAmount(button.direction, button.amount),

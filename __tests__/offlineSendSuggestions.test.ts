@@ -1,6 +1,9 @@
 import {
   buildExactOfflineAmountIndex,
+  getOfflineFiatSendSuggestions,
+  getRoundedFiatMinorUnitForSats,
   getOfflineSendSuggestions,
+  getSatRangeForDisplayedFiatMinorUnit,
 } from '@/features/send/lib/offlineSendSuggestions';
 
 function createProofService(exactAmounts: number[], readyProofAmounts: number[]) {
@@ -86,6 +89,61 @@ describe('offline send suggestions', () => {
       roundDownAmount: null,
       roundUpAmount: null,
       totalReadyBalance: 14,
+    });
+  });
+
+  it('derives a stable sat window for a displayed fiat amount', () => {
+    expect(getSatRangeForDisplayedFiatMinorUnit(1001, 100_000)).toEqual({
+      minSat: 10005,
+      maxSat: 10014,
+    });
+    expect(getRoundedFiatMinorUnitForSats(10014, 100_000)).toBe(1001);
+    expect(getRoundedFiatMinorUnitForSats(10015, 100_000)).toBe(1002);
+  });
+
+  it('auto-selects the nearest offline-sendable amount that preserves the entered fiat display', async () => {
+    const proofService = createProofService([10009], [10009, 3000]);
+
+    const result = await getOfflineFiatSendSuggestions(
+      proofService,
+      'mint-a',
+      10012,
+      1001,
+      100_000
+    );
+
+    expect(result).toEqual({
+      autoSelectAmount: 10009,
+      requestedDisplayMinorUnit: 1001,
+      roundDownOption: null,
+      roundUpOption: null,
+      totalReadyBalance: 13009,
+    });
+  });
+
+  it('returns adjacent fiat suggestions when no exact amount exists in the same displayed fiat window', async () => {
+    const proofService = createProofService([10000, 10020], [10000, 10020]);
+
+    const result = await getOfflineFiatSendSuggestions(
+      proofService,
+      'mint-a',
+      10012,
+      1001,
+      100_000
+    );
+
+    expect(result).toEqual({
+      autoSelectAmount: null,
+      requestedDisplayMinorUnit: 1001,
+      roundDownOption: {
+        amount: 10000,
+        displayMinorUnit: 1000,
+      },
+      roundUpOption: {
+        amount: 10020,
+        displayMinorUnit: 1002,
+      },
+      totalReadyBalance: 20020,
     });
   });
 });
