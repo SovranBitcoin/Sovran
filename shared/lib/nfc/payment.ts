@@ -12,6 +12,7 @@ import { selectBestMint } from './mint-selection';
 import { isNfcSupported, isNfcEnabled } from './status';
 import { log, logDebug, logError, logWarn } from './logger';
 import { isLightningInvoice, lnTrim, getLightningAmount } from '@/shared/lib/cashu/utils';
+import { debugLog } from '@/shared/lib/debugSession';
 
 export interface PaymentOptions {
   createToken: (mintUrl: string, amount: number) => Promise<string>;
@@ -223,6 +224,22 @@ export async function performNfcPayment(options: PaymentOptions): Promise<Paymen
     log(`Payment request: ${amount} ${unit}`);
     logDebug(`Allowed mints: ${allowedMints.join(', ') || 'any'}`);
 
+    // #region agent log
+    debugLog({
+      location: 'payment.ts:decoded',
+      message: 'NFC payment request decoded (terminal state)',
+      data: {
+        terminalAmount: amount,
+        terminalUnit: unit,
+        terminalAllowedMints: allowedMints,
+        terminalAllowedMintsCount: allowedMints.length,
+        preferredMint,
+        maxAmountSats: maxAmountSats ?? 'No limits',
+      },
+      hypothesisId: 'nfc',
+    });
+    // #endregion
+
     if (amount <= 0) {
       throw new NfcError('Invalid payment amount', 'INVALID_AMOUNT');
     }
@@ -245,6 +262,21 @@ export async function performNfcPayment(options: PaymentOptions): Promise<Paymen
     const mintSelection = selectBestMint(allowedMints, liveAvailableMints, amount, preferredMint);
     selectedMint = mintSelection.mintUrl;
     log(`Selected mint: ${selectedMint} (balance: ${mintSelection.balance} sats)`);
+
+    // #region agent log
+    debugLog({
+      location: 'payment.ts:selectBestMint',
+      message: 'NFC mint selection result',
+      data: {
+        selectedMint,
+        selectedBalance: mintSelection.balance,
+        amount,
+        preferredMint,
+        terminalAllowedMints: allowedMints,
+      },
+      hypothesisId: 'nfc',
+    });
+    // #endregion
 
     // ---------- Phase 3: Create token ----------
     log('Phase 3: Creating token...');

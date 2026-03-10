@@ -130,6 +130,4 @@ class EnhancedHaptics {
   }
 }
 
-// Export both the original Haptics and the enhanced version
-export default Haptics;
 export { EnhancedHaptics };

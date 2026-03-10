@@ -15,6 +15,7 @@ import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStor
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { PaymentStatusIcon } from './PaymentStatusIcon';
 import { fmt, isAmountSegment, type PopupTextSegment } from './format';
+import { debugLog } from '@/shared/lib/debugSession';
 import { Text } from '@/shared/ui/primitives/Text';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 
@@ -47,9 +48,10 @@ const CASES = {
     route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
   },
   melt: {
-    message: 'Payment sent',
+    messagePending: 'Sending payment',
+    messageConfirmed: 'Payment sent',
     submessagePending: 'Processing...',
-    submessageConfirmed: (amount: number, unit: string) => fmt`Sent ${{ amount, unit }}`,
+    submessageConfirmed: 'Processed',
     submessageFailed: 'Payment failed',
     history: { type: 'melt' as const, idField: 'quoteId' as const },
     route: { pathname: '/meltQuote' as const, paramKey: 'meltHistoryEntry' },
@@ -99,6 +101,17 @@ export function PaymentStatusToast({
     : isFailed
       ? 'failed'
       : 'pending';
+
+  // #region agent log
+  useEffect(() => {
+    debugLog({
+      location: 'PaymentStatusToast.tsx',
+      message: 'PaymentStatusToast render',
+      data: { variant, paymentId, status, amount, unit },
+      hypothesisId: 'popup',
+    });
+  }, [variant, paymentId, status, amount, unit]);
+  // #endregion
   // For melt: operationId may be set by melt-op:finalized after toast mounts
   const effectiveOperationId =
     variant === 'melt' ? (active?.operationId ?? operationId) : operationId;
@@ -117,6 +130,12 @@ export function PaymentStatusToast({
       : 'submessagePending' in config
         ? config.submessagePending
         : confirmedSubmessage;
+  const message =
+    status === 'pending'
+      ? ('messagePending' in config ? config.messagePending : config.message)
+      : status === 'confirmed'
+        ? ('messageConfirmed' in config ? config.messageConfirmed : config.message)
+        : ('message' in config ? config.message : '');
 
   // --- Animated colors ---
   const [foreground, overlay, success, danger] = useThemeColor([
@@ -227,7 +246,7 @@ export function PaymentStatusToast({
           <Animated.Text
             style={[{ fontSize: 15, fontWeight: '600' }, textColorStyle]}
             numberOfLines={1}>
-            {config.message}
+            {message}
           </Animated.Text>
           {typeof submessage === 'string' ? (
             <Animated.Text style={[{ fontSize: 13 }, textColorStyle]} numberOfLines={1}>

@@ -3,7 +3,7 @@ import * as Linking from 'expo-linking';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { deeplinkFailedPopup } from '@/shared/lib/popup';
-import { useProcessPaymentString } from '@/features/send/hooks/useProcessPaymentString';
+import { usePaymentMachine } from '@/shared/hooks/usePaymentMachine';
 
 export const useDeeplink = () => {
   const { keys } = useNostrKeysContext();
@@ -11,14 +11,13 @@ export const useDeeplink = () => {
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
   const url = Linking.useURL();
 
-  const { processPaymentString } = useProcessPaymentString({
+  const machine = usePaymentMachine({
+    mintUrl: selectedMint,
     unit: 'sat',
-    selectedMint,
-    isFocused: true,
   });
 
   useEffect(() => {
-    // bail out early if we don’t have a URL or the user isn’t fully loaded
+    // bail out early if we don't have a URL or the user isn't fully loaded
     if (!url || !keys?.pubkey) {
       return;
     }
@@ -36,11 +35,11 @@ export const useDeeplink = () => {
       const isValidHost = hostname !== null && hostname !== 'expo-development-client';
       if (isValidHost) {
         try {
-          await processPaymentString({ data: hostname, type: 'deeplink' });
+          await machine.scan(hostname, 'deeplink');
         } catch (error) {
           deeplinkFailedPopup({ text: error instanceof Error ? error.message : undefined });
         }
       }
     })();
-  }, [url, keys?.pubkey, selectedMint, processPaymentString]);
+  }, [url, keys?.pubkey, selectedMint, machine.scan]);
 };

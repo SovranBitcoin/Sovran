@@ -44,12 +44,14 @@ import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
+import { debugLog } from '@/shared/lib/debugSession';
 
 interface ReceiveScreenProps {
   unit: string;
   onReceiveToken: (receiveHistoryEntry: ReceiveHistoryEntry) => void;
   onCamera: (unit: string) => void;
   onFixedAmount: (unit: string) => void;
+  processPaymentStringFn?: (scanning: { data: string; type?: string }) => Promise<unknown>;
 }
 
 export function ReceiveScreen({
@@ -57,6 +59,7 @@ export function ReceiveScreen({
   onReceiveToken,
   onCamera,
   onFixedAmount,
+  processPaymentStringFn,
 }: ReceiveScreenProps) {
   const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
@@ -131,21 +134,29 @@ export function ReceiveScreen({
   }, []);
 
   const handleEcashToken = ({ token }: { token: string }): void => {
+    // #region agent log
+    debugLog({
+      location: 'ReceiveScreen.tsx:handleEcashToken',
+      message: 'handleEcashToken',
+      data: { tokenLen: token?.length },
+      hypothesisId: 'screen',
+    });
+    // #endregion
     onReceiveToken(buildReceiveHistoryEntry(token, unit));
   };
 
-  const handleEcashPaste = async (): Promise<void> => {
+  const handlePaste = async (): Promise<void> => {
     const text = await Clipboard.getStringAsync();
 
-    let decodedText;
-    if (isEncoded(text)) {
-      decodedText = decode(text);
-    } else {
-      decodedText = text;
-    }
+    const decodedText = isEncoded(text) ? decode(text) : text;
 
     if (!decodedText) {
       noClipboardAddressPopup();
+      return;
+    }
+
+    if (processPaymentStringFn) {
+      await processPaymentStringFn({ data: decodedText, type: 'paste' });
       return;
     }
 
@@ -154,9 +165,7 @@ export function ReceiveScreen({
       return;
     }
 
-    // Log paste to scan history
     useScanHistoryStore.getState().addScan(text, decodedText, 'ecash', 'paste');
-
     handleEcashToken({ token: decodedText });
   };
 
@@ -170,6 +179,14 @@ export function ReceiveScreen({
   };
 
   const handleFixedAmount = async (): Promise<void> => {
+    // #region agent log
+    debugLog({
+      location: 'ReceiveScreen.tsx:handleFixedAmount',
+      message: 'handleFixedAmount',
+      data: { unit },
+      hypothesisId: 'screen',
+    });
+    // #endregion
     onFixedAmount(unit);
   };
 
@@ -341,7 +358,7 @@ export function ReceiveScreen({
               text: 'Paste',
               icon: 'lets-icons:copy',
               variant: 'primary',
-              onPress: handleEcashPaste,
+              onPress: handlePaste,
             },
             {
               text: 'Fixed Amount',

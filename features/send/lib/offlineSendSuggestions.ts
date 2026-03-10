@@ -668,6 +668,17 @@ export async function getOfflineSendSuggestions(
     };
   }
 
+  // Fast path: when amount is already sendable, skip expensive index building.
+  // Round up/down clicks bypass this entirely (they call handleEcashSend directly).
+  if (await isExactOfflineAmount(proofService, mintUrl, requestedAmount)) {
+    return {
+      isRequestedAmountSendableOffline: true,
+      roundDownAmount: null,
+      roundUpAmount: null,
+      totalReadyBalance: 0,
+    };
+  }
+
   const readyProofs = await proofService.getReadyProofs(mintUrl);
   const proofAmounts = readyProofs.map((proof) => proof.amount);
   const { totalReadyBalance } = buildExactOfflineAmountIndex(proofAmounts);
@@ -732,6 +743,17 @@ export async function getOfflineFiatSendSuggestions(
   ) {
     return {
       autoSelectAmount: null,
+      requestedDisplayMinorUnit,
+      roundDownOption: null,
+      roundUpOption: null,
+      totalReadyBalance: 0,
+    };
+  }
+
+  // Fast path: when requested amount (in sats) is already sendable, skip expensive work.
+  if (await isExactOfflineAmount(proofService, mintUrl, requestedAmount)) {
+    return {
+      autoSelectAmount: requestedAmount,
       requestedDisplayMinorUnit,
       roundDownOption: null,
       roundUpOption: null,

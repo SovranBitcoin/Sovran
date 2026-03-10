@@ -2,33 +2,22 @@
  * @fileoverview Send flow camera route wrapper
  *
  * Part of the (send-flow) modal group - displays with back button.
- * Uses useProcessPaymentString hook for payment processing.
  */
 
 import React, { useCallback } from 'react';
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useProcessPaymentString } from '@/features/send';
+import { Stack } from 'expo-router';
 import { CameraScreen, ScanningData } from '@/features/camera';
+import { usePaymentMachine } from '@/shared/hooks/usePaymentMachine';
 
 const Camera: React.FC = () => {
-  const { unit } = useLocalSearchParams<{ unit: string }>();
-  const { keys } = useNostrKeysContext();
-  const selectedMints = useMintStore((state) => state.selectedMints);
-  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
-
-  const { processPaymentString, reset } = useProcessPaymentString({
-    unit: unit || 'sat',
-    selectedMint,
-    isFocused: true,
-  });
+  const { scan, resetUrDecoder } = usePaymentMachine();
 
   const handleScan = useCallback(
     async (data: ScanningData) => {
-      return processPaymentString(data);
+      const source = data.type === 'paste' || data.type === 'deeplink' ? data.type : 'qr';
+      return scan(data.data, source);
     },
-    [processPaymentString]
+    [scan]
   );
 
   return (
@@ -40,7 +29,7 @@ const Camera: React.FC = () => {
           headerStyle: { backgroundColor: 'transparent' },
         }}
       />
-      <CameraScreen onScan={handleScan} onReset={reset} />
+      <CameraScreen onScan={handleScan} onReset={resetUrDecoder} />
     </>
   );
 };

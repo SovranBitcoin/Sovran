@@ -27,17 +27,16 @@ describe('offline send suggestions', () => {
     expect(result.reachableSums).toEqual([2, 4, 6, 8, 10, 12, 14]);
   });
 
-  it('recognizes when the requested amount is already sendable offline', async () => {
+  it('recognizes when the requested amount is already sendable offline (fast path)', async () => {
     const proofService = createProofService([6, 8, 10, 12, 14], [2, 4, 8]);
 
     const result = await getOfflineSendSuggestions(proofService, 'mint-a', 6);
 
-    expect(result).toEqual({
-      isRequestedAmountSendableOffline: true,
-      roundDownAmount: null,
-      roundUpAmount: null,
-      totalReadyBalance: 14,
-    });
+    expect(result.isRequestedAmountSendableOffline).toBe(true);
+    expect(result.roundDownAmount).toBeNull();
+    expect(result.roundUpAmount).toBeNull();
+    // Fast path skips index build; totalReadyBalance is 0
+    expect(result.totalReadyBalance).toBe(0);
   });
 
   it('finds both round-down and round-up options around a swap-required amount', async () => {

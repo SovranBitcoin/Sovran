@@ -18,3 +18,11 @@ export function offlineSendSuggestionsPopup(
 export function buttonHandlerPopup(payload: ActionSheetPayloads['button-handler']): void {
   showActionSheet('button-handler', payload);
 }
+
+export function offlineSendPopup(payload: ActionSheetPayloads['offline-send']): void {
+  showActionSheet('offline-send', payload);
+}
+
+export function mintSelectPopup(payload: ActionSheetPayloads['mint-select']): void {
+  showActionSheet('mint-select', payload);
+}

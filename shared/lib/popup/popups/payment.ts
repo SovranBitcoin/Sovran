@@ -10,11 +10,14 @@ import type { PopupTextSegment } from '../format';
 import { PaymentStatusIcon } from '../PaymentStatusIcon';
 import { PaymentStatusToast } from '../PaymentStatusToast';
 import type { BaseOverrides, PopupOverrides, TextOverrides } from './types';
+import { debugLog } from '@/shared/lib/debugSession';
 
 type PaymentStatusVariant = 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
 
 type PaymentStatusCase = {
   message: string;
+  messagePending?: string;
+  messageConfirmed?: string;
   submessagePending?: string;
   submessageConfirmed: string | ((amount: number, unit: string) => string | PopupTextSegment[]);
   submessageFailed: string;
@@ -51,8 +54,10 @@ const PAYMENT_STATUS_CASES: Record<PaymentStatusVariant, PaymentStatusCase> = {
   },
   melt: {
     message: 'Payment sent',
+    messagePending: 'Sending payment',
+    messageConfirmed: 'Payment sent',
     submessagePending: 'Processing...',
-    submessageConfirmed: (amount, unit) => fmt`Sent ${{ amount, unit }}`,
+    submessageConfirmed: 'Processed',
     submessageFailed: 'Payment failed',
     history: { type: 'melt', idField: 'quoteId' },
     route: { pathname: '/meltQuote', paramKey: 'meltHistoryEntry' },
@@ -80,6 +85,15 @@ export function paymentStatusPopup(payload: {
 }): void {
   const { variant, id, amount, unit, mintUrl, operationId, receiveEntryId } = payload;
   const config = PAYMENT_STATUS_CASES[variant];
+
+  // #region agent log
+  debugLog({
+    location: 'payment.ts:paymentStatusPopup',
+    message: 'paymentStatusPopup called',
+    data: { variant, id, amount, unit },
+    hypothesisId: 'popup',
+  });
+  // #endregion
 
   if (PAYMENT_STATUS_DISPLAY === 'toast') {
     showCustomToast({
@@ -153,9 +167,14 @@ export function paymentStatusPopup(payload: {
           : isFailed
             ? (active?.errorMessage ?? config.submessageFailed)
             : (config.submessagePending ?? confirmedSubmessage);
+        const message = isConfirmed
+          ? (config.messageConfirmed ?? config.message)
+          : status === 'pending'
+            ? (config.messagePending ?? config.message)
+            : config.message;
 
         return {
-          message: config.message,
+          message,
           status,
           submessage,
           icon: React.createElement(PaymentStatusIcon, {

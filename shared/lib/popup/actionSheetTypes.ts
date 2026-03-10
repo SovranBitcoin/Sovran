@@ -33,12 +33,46 @@ export type ProfileSwitcherAction =
  * Addressable custom sheet IDs. Nested pages that only exist inside a sheet flow
  * (for example profile-switcher's import route) should stay internal to that sheet.
  */
+type OfflineSendPayload = {
+  requestedAmount: number;
+  roundDownAmount: number | null;
+  roundUpAmount: number | null;
+  unit: string;
+  /** When set, the sheet displays amounts in fiat instead of sats */
+  fiat?: {
+    symbol: string;
+    requestedMinorUnit: number;
+    roundDownMinorUnit: number | null;
+    roundUpMinorUnit: number | null;
+  };
+  onRoundDown: (amount: number) => void | Promise<void>;
+  onRoundUp: (amount: number) => void | Promise<void>;
+  onCancel: () => void;
+};
+
+type MintSelectMint = {
+  mintUrl: string;
+  name: string;
+  iconUrl?: string | null;
+  balance: number;
+};
+
+type MintSelectPayload = {
+  requiredAmount: number;
+  unit: string;
+  mints: MintSelectMint[];
+  onSelectMint: (mintUrl: string) => void;
+  onCancel: () => void;
+};
+
 type BaseActionSheetPayloads = {
   'profile-switcher': {
     onRequestAction: (action: ProfileSwitcherAction) => void;
   };
   'emoji-picker': EmojiPickerPayload;
   'offline-send-suggestions': OfflineSendSuggestionsPayload;
+  'offline-send': OfflineSendPayload;
+  'mint-select': MintSelectPayload;
 };
 
 type ButtonHandlerPushTarget = {

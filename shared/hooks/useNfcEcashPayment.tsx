@@ -11,16 +11,12 @@ import { Alert } from 'react-native';
 
 import { router } from 'expo-router';
 
-// TODO: re-export getEncodedTokenV4 from coco-cashu-core
-import { getEncodedTokenV4 } from '@cashu/cashu-ts';
-
 import type { SendHistoryEntry } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
 
 import { NfcPayment, NfcError } from '@/shared/lib/nfc';
 import { getNfcErrorMessage } from '@/shared/lib/nfc/messages';
 import type { NfcErrorMessage } from '@/shared/lib/nfc/messages';
-import { useSendWithHistory } from '@/features/send';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { nfcPaymentSentPopup, walletNotReadyPopup, nfcErrorPopup, fmt } from '@/shared/lib/popup';
 import { PAYMENT_TIERS } from '@/features/wallet/lib/walletHeader';
@@ -28,8 +24,14 @@ import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 
 export type NfcPaymentStatus = 'idle' | 'paying' | 'error';
 
+/** (mintUrl, amount) => Promise<{ token, historyEntry }> — used by NFC createToken callback */
+export type NfcSendFunction = (
+  mintUrl: string,
+  amount: number
+) => Promise<{ token: string; historyEntry: SendHistoryEntry }>;
+
 interface UseNfcEcashPaymentArgs {
-  send: ReturnType<typeof useSendWithHistory>['send'];
+  send: NfcSendFunction | null;
   manager: ReturnType<typeof useManager>;
   availableMints: Record<string, number>;
   preferredMint: string | undefined;
@@ -130,7 +132,7 @@ export function useNfcEcashPayment({
               linkTransaction(lastScannedRaw, historyEntry.id);
               lastScannedRaw = null;
             }
-            return getEncodedTokenV4(token);
+            return token;
           },
           recoverToken: rollbackPendingSend,
           getAvailableMints: () => availableMintsRef.current,

@@ -8,6 +8,7 @@ Read `.cursor/rules/` docs before touching their domains. The index is `.cursor/
 
 | Domain | Read first |
 |---|---|
+| Payment flows, routing, state machines | `PAYMENT_FLOWS.md` |
 | Folder structure, where to add files | `.cursor/rules/folder-structure.mdc` |
 | Popups, toasts, sheets | `.cursor/rules/popup-toast-sheet-guidelines.mdc` |
 | Mnemonic, keys, secure storage | `.cursor/rules/secure-storage-key-derivation.mdc` |

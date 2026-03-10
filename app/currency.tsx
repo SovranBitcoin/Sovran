@@ -4,11 +4,10 @@
  * This is the standalone version used for direct navigation and deep linking.
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
-import { CurrencyScreen, useProcessPaymentString } from '@/features/send';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { CurrencyScreen } from '@/features/send';
+import { usePaymentMachine } from '@/shared/hooks/usePaymentMachine';
 
 function ModalScreen() {
   const params = useLocalSearchParams<{
@@ -23,16 +22,17 @@ function ModalScreen() {
     lnUrlOrAddress?: string;
     routstrTopUp?: string;
   }>();
-  const { keys } = useNostrKeysContext();
-  const selectedMints = useMintStore((state) => state.selectedMints);
-  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 
-  const { processPaymentString } = useProcessPaymentString({
-    unit: params?.unit?.toLowerCase() || 'sat',
-    selectedMint,
-    isFocused: true,
-    onLoading: () => {},
-  });
+  const { scan } = usePaymentMachine();
+
+  const processPaymentString = useCallback(
+    async (scanning: { data: string; type?: string }) => {
+      const source =
+        scanning.type === 'paste' || scanning.type === 'deeplink' ? scanning.type : 'qr';
+      return scan(scanning.data, source);
+    },
+    [scan]
+  );
 
   return (
     <>

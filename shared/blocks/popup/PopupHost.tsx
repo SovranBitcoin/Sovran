@@ -37,6 +37,8 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   ButtonHandlerContent,
   EmojiPickerContent,
+  MintSelectContent,
+  OfflineSendContent,
   OfflineSendSuggestionsContent,
   ProfileSwitcherContent,
 } from '@/shared/lib/popup/sheets';
@@ -266,6 +268,28 @@ const CUSTOM_SHEET_CONTENT: Record<
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
   'button-handler': ButtonHandlerContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'offline-send': OfflineSendContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'mint-select': MintSelectContent as React.ComponentType<{
     payload: unknown;
     close: () => void;
     pushCustomPage: <K extends keyof ActionSheetPayloads>(
