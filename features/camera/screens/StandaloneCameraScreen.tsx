@@ -12,38 +12,48 @@ import Icon from 'assets/icons';
 import { CameraScreen, ScanningData } from '@/features/camera';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useProcessPaymentString, useSendWithHistory } from '@/features/send';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { usePaymentMachine } from '@/shared/hooks/usePaymentMachine';
+import { useNfcEcashPayment } from '@/shared/hooks/useNfcEcashPayment';
 
 export function StandaloneCameraScreen() {
-  const { action } = useLocalSearchParams<{ unit: string; action: string }>();
+  const { unit, action } = useLocalSearchParams<{ unit: string; action: string }>();
   const { keys } = useNostrKeysContext();
   const foreground = useThemeColor('foreground');
-  const getSelectedMint = useMintStore((state) => state.getSelectedMint);
   const selectedMints = useMintStore((state) => state.selectedMints);
+  const getSelectedMint = useMintStore((state) => state.getSelectedMint);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 
+  const { processPaymentString, reset } = useProcessPaymentString({
+    unit,
+    selectedMint,
+    isFocused: true,
+    onProgress: () => {},
+    onLoading: () => {},
+    onScanned: () => {},
+  });
+
+  const handleScan = useCallback(
+    async (data: ScanningData) => {
+      return processPaymentString(data);
+    },
+    [processPaymentString]
+  );
+
+  const { send } = useSendWithHistory();
   const manager = useManager();
   const { balance: balancesWithTotal } = useBalanceContext();
   const { total: _total, ...availableMints } = balancesWithTotal;
 
-  const machine = usePaymentMachine({
+  const nfc = useNfcEcashPayment({
+    send,
+    manager: manager ?? undefined,
     availableMints,
     preferredMint: selectedMint,
     getSelectedMint,
     pubkey: keys?.pubkey,
     usdToSats: () => undefined,
   });
-
-  const { scan, resetUrDecoder, isNfcIdle, startNfcPayment } = machine;
-
-  const handleScan = useCallback(
-    async (data: ScanningData) => {
-      const source = data.type === 'paste' || data.type === 'deeplink' ? data.type : 'qr';
-      return scan(data.data, source);
-    },
-    [scan],
-  );
 
   const nfcFiredRef = useRef(false);
   const shouldAutoStartNfc = Array.isArray(action)
@@ -56,11 +66,11 @@ export function StandaloneCameraScreen() {
       return;
     }
 
-    if (isNfcIdle && manager && !nfcFiredRef.current) {
+    if (nfc.isIdle && manager && !nfcFiredRef.current) {
       nfcFiredRef.current = true;
-      startNfcPayment();
+      nfc.startPayment();
     }
-  }, [shouldAutoStartNfc, isNfcIdle, manager, startNfcPayment]);
+  }, [shouldAutoStartNfc, nfc, manager]);
 
   return (
     <>
@@ -86,7 +96,7 @@ export function StandaloneCameraScreen() {
           ),
         }}
       />
-      <CameraScreen onScan={handleScan} onReset={resetUrDecoder} scanLocked={machine.isNfcPaying} />
+      <CameraScreen onScan={handleScan} onReset={reset} scanLocked={nfc.isPaying} />
     </>
   );
 }

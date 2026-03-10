@@ -13,14 +13,14 @@
 import React, { useCallback } from 'react';
 import { Alert } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useManager } from 'coco-cashu-react';
 import { MintListScreen } from '@/features/mint';
+import { useMeltWithHistory } from '@/features/send';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import type { Mint } from 'coco-cashu-core';
 
 function MintSelectRoute() {
-  const manager = useManager();
+  const { prepareMeltQuote } = useMeltWithHistory();
   const params = useLocalSearchParams<{
     unit?: string;
     to?: string;
@@ -43,29 +43,8 @@ function MintSelectRoute() {
       // Check if coming from NFC Lightning scan with invoice
       if (params.to === 'meltQuote' && params.invoice) {
         try {
-          if (!manager) throw new Error('Wallet not ready');
-          const operation = await manager.quotes.prepareMeltBolt11(mint.mintUrl, params.invoice);
-          const quote = {
-            quote: operation.quoteId,
-            amount: operation.amount,
-            fee_reserve: operation.fee_reserve,
-            state: 'UNPAID' as const,
-            expiry: 0,
-            payment_preimage: null as null,
-            change: undefined,
-            request: params.invoice,
-            unit: 'sat',
-          };
-          const historyEntry = {
-            id: operation.id,
-            type: 'melt' as const,
-            createdAt: Date.now(),
-            mintUrl: operation.mintUrl,
-            unit: 'sat',
-            quoteId: operation.quoteId,
-            state: 'UNPAID' as const,
-            amount: operation.amount,
-          };
+          // Create melt quote to get actual fees and history entry
+          const { quote, historyEntry } = await prepareMeltQuote(mint.mintUrl, params.invoice);
           const totalRequired = quote.amount + quote.fee_reserve;
 
           if (mint.amount >= totalRequired) {
@@ -131,7 +110,7 @@ function MintSelectRoute() {
         });
       }
     },
-    [params, manager]
+    [params, prepareMeltQuote]
   );
 
   return (

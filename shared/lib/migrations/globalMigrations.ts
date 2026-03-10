@@ -17,7 +17,7 @@ import { PROFILE_SCOPED_STORE_KEYS } from '@/shared/lib/cashu/profileScopedStora
 
 const GLOBAL_MIGRATIONS_COMPLETED_KEY = 'global-migrations-completed';
 
-interface Migration {
+export interface Migration {
   id: string;
   run: () => Promise<void>;
 }
@@ -72,7 +72,7 @@ async function migrateIndexKeysToPubkeyKeys(): Promise<void> {
  * is already in the completed set. Each function must be safe to call
  * after a partial prior run (idempotent at the key level).
  */
-const MIGRATIONS: Migration[] = [
+export const MIGRATIONS: Migration[] = [
   { id: 'index-to-pubkey-v2', run: migrateIndexKeysToPubkeyKeys },
 ];
 

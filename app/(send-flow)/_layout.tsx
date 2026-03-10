@@ -24,7 +24,6 @@ export default function SendFlowLayout() {
     <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
       <Stack.Screen name="mintSelect" options={{ title: 'Select Mint' }} />
       <Stack.Screen name="currency" options={{ title: 'Select Amount' }} />
-      <Stack.Screen name="sendCurrency" options={{ title: 'Send Ecash' }} />
       <Stack.Screen name="sendToken" options={{ title: 'Send Ecash' }} />
       <Stack.Screen name="meltQuote" options={{ title: 'Send Lightning' }} />
       <Stack.Screen

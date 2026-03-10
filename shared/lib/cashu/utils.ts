@@ -201,7 +201,7 @@ interface LightningAddress {
 /**
  * Validates if a string is a lightning address (user@domain.com format)
  */
-const isLightningAddress = (address: string): boolean => {
+export const isLightningAddress = (address: string): boolean => {
   if (!address) return false;
   return LN_ADDRESS_REGEX.test(address);
 };
@@ -209,7 +209,7 @@ const isLightningAddress = (address: string): boolean => {
 /**
  * Validates if a string is an lnurlp URL
  */
-const isLnurlp = (url: string): boolean => {
+export const isLnurlp = (url: string): boolean => {
   if (!url) return false;
   return LNURLP_REGEX.test(url);
 };

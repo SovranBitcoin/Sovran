@@ -7,7 +7,8 @@ import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { useBalanceContext } from 'coco-cashu-react';
+import { useBalanceContext, useManager } from 'coco-cashu-react';
+import { useSendWithHistory } from '@/features/send';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WalletHeaderTitle, useWalletHeaderState } from '@/features/wallet';
 import { useMintManagement } from '@/features/mint';
@@ -23,7 +24,7 @@ import {
   getHeaderContentWidthFromWidth,
   getHeaderContentHeight,
 } from '@/features/wallet/lib/walletHeader';
-import { usePaymentMachine } from '@/shared/hooks/usePaymentMachine';
+import { useNfcEcashPayment } from '@/shared/hooks/useNfcEcashPayment';
 
 export { HEADER_LAYOUT, MOCK_NFC_SUCCESS_SATS } from '@/features/wallet/lib/walletHeader';
 
@@ -33,6 +34,8 @@ export default function HomeLayout() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const useAndroidLiquidHeader = isAndroidLiquidHeaderSupported();
+  const { send } = useSendWithHistory();
+  const manager = useManager();
   const { mints, isLoading: isMintsLoading } = useMintManagement();
   const { keys } = useNostrKeysContext();
   const getSelectedMint = useMintStore((state) => state.getSelectedMint);
@@ -64,7 +67,9 @@ export default function HomeLayout() {
     [btcPrice]
   );
 
-  const nfc = usePaymentMachine({
+  const nfc = useNfcEcashPayment({
+    send,
+    manager: manager ?? undefined,
     availableMints,
     preferredMint: selectedMint,
     getSelectedMint,

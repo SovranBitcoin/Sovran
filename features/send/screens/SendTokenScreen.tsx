@@ -14,16 +14,18 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Share } from 'react-native';
 
 import * as Clipboard from 'expo-clipboard';
+import * as SQLite from 'expo-sqlite';
 
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import {
   getEncodedTokenV4,
   decodePaymentRequest,
   PaymentRequestTransportType,
-  type Token,
+  PaymentRequestPayload,
+  Token,
 } from '@cashu/cashu-ts';
 import type { SendHistoryEntry } from 'coco-cashu-core';
-import { useManager } from 'coco-cashu-react';
+import { useReceive, useManager } from 'coco-cashu-react';
 import { nip19 } from 'nostr-tools';
 import { Metadata } from 'nostr-tools/kinds';
 import type { ProfilePointer } from 'nostr-tools/nip19';
@@ -35,6 +37,9 @@ import {
   tokenCannotCancelPopup,
   transactionCancelledPopup,
   tokenCannotCheckStatusPopup,
+  tokenRedeemedPopup,
+  tokenStillPendingPopup,
+  tokenMixedStatesPopup,
   tokenCheckFailedPopup,
   tokenRedeemedByRecipientPopup,
   transactionAlreadyCancelledPopup,
@@ -43,6 +48,8 @@ import {
   operationNotFoundPopup,
   operationInvalidStatePopup,
   invalidPaymentRequestPopup,
+  paymentStatusPopup,
+  sendPaymentFailedPopup,
 } from '@/shared/lib/popup';
 
 import {
@@ -54,7 +61,9 @@ import {
   TransactionLocationSection,
 } from '@/features/transactions';
 import { useMintManagement } from '@/features/mint';
-import { usePaymentMachine } from '@/shared/hooks/usePaymentMachine';
+import { useSendWithHistory } from '@/features/send';
+import { useNostrDirectMessage } from '@/features/user';
+import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -69,7 +78,10 @@ import { writeTokenToNFC } from '@/shared/lib/nfc';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { convertTime } from '@/shared/lib/time';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 
+// Default relay for payment requests
 const DEFAULT_PAYMENT_RELAY = 'wss://relay.vertexlab.io';
 
 const FALLBACK_PAYMENT_RELAYS = [
@@ -78,6 +90,40 @@ const FALLBACK_PAYMENT_RELAYS = [
   'wss://nos.lol',
   'wss://relay.primal.net',
 ];
+
+/**
+ * Update state for a legacy send history entry (no operationId).
+ *
+ * Legacy entries (pre-Dec 2025) have operationId = NULL in the DB. Coco's
+ * update methods all key on (mintUrl, operationId), and NULL = NULL is false
+ * in SQL, so they can never match these rows.
+ *
+ * We open the account-specific coco DB and UPDATE by the row's primary key `id`,
+ * then emit `history:updated` so usePaginatedHistory re-fetches from the
+ * now-updated DB. Uses openDatabaseAsync to avoid blocking the JS thread.
+ */
+async function updateLegacyHistoryState(
+  entry: SendHistoryEntry,
+  state: string,
+  mintUrl: string,
+  manager: ReturnType<typeof useManager>,
+  accountIndex: number
+) {
+  if (!entry.id) return;
+  try {
+    const dbName = accountIndex === 0 ? 'coco.db' : `coco-${accountIndex}.db`;
+    const db = await SQLite.openDatabaseAsync(dbName);
+    await db.runAsync(
+      `UPDATE coco_cashu_history SET state = ? WHERE id = ? AND type = 'send'`,
+      state,
+      Number(entry.id)
+    );
+    // Emit so the UI refreshes from the updated DB
+    await manager.historyService.handleHistoryUpdated(mintUrl, { ...entry, state } as any);
+  } catch (err) {
+    console.warn('[SendTokenScreen] Failed to update legacy history state:', err);
+  }
+}
 
 /** Payment request data for confirmation mode (no token yet) */
 interface PaymentRequestData {
@@ -102,37 +148,25 @@ export function SendTokenScreen({
   initialNostrSent = false,
   onNavigateBack,
 }: SendTokenScreenProps) {
+  const { receive: _receive } = useReceive();
   const { isKnownMint } = useMintManagement();
   const manager = useManager();
+  const { send, isSending } = useSendWithHistory();
+  const { sendDirectMessage, isSending: isSendingDM } = useNostrDirectMessage();
+  const accountIndex = useProfileStore((s) => s.activeAccountIndex);
 
   // State
   const [, setUri] = useState('');
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [isSendingPayment, setIsSendingPayment] = useState(false);
   const [isMintTrusted, setIsMintTrusted] = useState<boolean | null>(null);
 
   // Track the created transaction + token when transitioning from payment request mode
   const [createdEntry, setCreatedEntry] = useState<SendHistoryEntry | null>(null);
   const [createdToken, setCreatedToken] = useState<Token | null>(null);
-
-  // Payment machine — handles the NUT-18 ecash + Nostr DM send.
-  // Always initialised (Rules of Hooks); only triggered in payment request mode.
-  // Unit is decoded lazily inside the actor from the encodedPaymentRequest; we
-  // pass 'sat' as fallback so the machine context always has a valid value.
-  // manager and sendDirectMessage are sourced internally by the hook.
-  const paymentRequestMachine = usePaymentMachine({
-    sendBranch: 'paymentRequest',
-    mintUrl: paymentRequest?.mintUrl,
-    amount: paymentRequest?.amount,
-    encodedPaymentRequest: paymentRequest?.encodedRequest,
-    unit: 'sat',
-  });
-
-  // Navigate away when the machine confirms the payment request was sent
-  useEffect(() => {
-    if (paymentRequestMachine.isPaymentRequestSent) {
-      onNavigateBack();
-    }
-  }, [paymentRequestMachine.isPaymentRequestSent, onNavigateBack]);
+  // Track payment request timeline progress
+  const [tokenCreated, setTokenCreated] = useState(initialNostrSent); // If nostr already sent, token was created
+  const [nostrSent, setNostrSent] = useState(initialNostrSent);
 
   // Determine which entry to use - created entry takes precedence over prop
   const entryToUse = createdEntry || sendHistoryEntryProp;
@@ -327,11 +361,57 @@ export function SendTokenScreen({
 
   const handleCheckStatus = useCallback(
     async (onClose: (event: any) => void) => {
+      // --- Legacy fallback: no operationId but we have a token ---
       if (!currentTransaction?.operationId) {
-        tokenCannotCheckStatusPopup({ onClose: () => onClose({}) });
+        if (!token) {
+          tokenCannotCheckStatusPopup({ onClose: () => onClose({}) });
+          return;
+        }
+        setIsCheckingStatus(true);
+        try {
+          const mintUrl = currentTransaction?.mintUrl;
+          if (!mintUrl) throw new Error('Missing mint URL');
+
+          const wallet = await manager.walletService.getWallet(mintUrl);
+          const proofStates = await wallet.checkProofsStates(
+            token.proofs.map((p) => ({ secret: p.secret }))
+          );
+
+          const spentCount = proofStates.filter((s) => s.state === 'SPENT').length;
+          const unspentCount = proofStates.filter((s) => s.state === 'UNSPENT').length;
+          const pendingCount = proofStates.filter((s) => s.state === 'PENDING').length;
+          const total = proofStates.length;
+
+          if (spentCount === total) {
+            await updateLegacyHistoryState(
+              currentTransaction,
+              'finalized',
+              mintUrl,
+              manager,
+              accountIndex
+            );
+            tokenRedeemedPopup({ onClose: () => onClose({}) });
+          } else if (unspentCount === total) {
+            tokenStillPendingPopup({ onClose: () => onClose({}) });
+          } else {
+            tokenMixedStatesPopup(
+              { spent: spentCount, unspent: unspentCount, pending: pendingCount, total },
+              { onClose: () => onClose({}) }
+            );
+          }
+        } catch (error) {
+          console.error('[SendTokenScreen] Legacy check status failed:', error);
+          tokenCheckFailedPopup({
+            text: error instanceof Error ? error.message : String(error),
+            onClose: () => onClose({}),
+          });
+        } finally {
+          setIsCheckingStatus(false);
+        }
         return;
       }
 
+      // --- Normal path: operationId exists ---
       setIsCheckingStatus(true);
       try {
         const operation = await manager.send.getOperation(currentTransaction.operationId);
@@ -372,17 +452,72 @@ export function SendTokenScreen({
         setIsCheckingStatus(false);
       }
     },
-    [currentTransaction, manager]
+    [currentTransaction, manager, token, accountIndex]
   );
 
-  // Trigger the payment machine for payment request mode sends.
-  const handleSendPayment = useCallback(() => {
-    if (!paymentRequest || !nostrTransport || !recipientInfo) {
+  // Handle send payment (payment request mode)
+  const handleSendPayment = useCallback(async () => {
+    if (!paymentRequest || !decodedRequest || !nostrTransport || !recipientInfo) {
       invalidPaymentRequestPopup();
       return;
     }
-    paymentRequestMachine.next();
-  }, [paymentRequest, nostrTransport, recipientInfo, paymentRequestMachine]);
+
+    setIsSendingPayment(true);
+
+    try {
+      // 1. Create ecash token using coco
+      const { token: newToken, historyEntry } = await send(
+        paymentRequest.mintUrl,
+        paymentRequest.amount
+      );
+
+      // Mark token as created for timeline (Prepared step complete)
+      setTokenCreated(true);
+      setCreatedEntry(historyEntry);
+      setCreatedToken(newToken);
+
+      // 2. Build PaymentRequestPayload
+      const payload: PaymentRequestPayload = {
+        id: decodedRequest.id,
+        mint: paymentRequest.mintUrl,
+        unit: decodedRequest.unit || 'sat',
+        proofs: newToken.proofs,
+      };
+
+      // 3. Send via NIP-17 direct message
+      await sendDirectMessage(nostrTransport.target, JSON.stringify(payload), {
+        additionalRelays: recipientInfo.relays,
+      });
+
+      // Mark Nostr as sent for timeline (Nostr Send step complete)
+      setNostrSent(true);
+
+      // 4. Capture location for the transaction
+      await captureAndStoreLocation(historyEntry.id);
+
+      // 5. Show payment-request status
+      usePaymentStatusStore.getState().setActive({
+        variant: 'payment-request',
+        id: historyEntry.operationId,
+        mintUrl: paymentRequest.mintUrl,
+        amount: paymentRequest.amount,
+        unit: decodedRequest.unit || 'sat',
+        state: 'processing',
+      });
+      paymentStatusPopup({
+        variant: 'payment-request',
+        id: historyEntry.operationId,
+        mintUrl: paymentRequest.mintUrl,
+        amount: paymentRequest.amount,
+        unit: decodedRequest.unit || 'sat',
+      });
+    } catch (err) {
+      console.error('[SendTokenScreen] Failed to send payment:', err);
+      sendPaymentFailedPopup({ text: err instanceof Error ? err.message : undefined });
+    } finally {
+      setIsSendingPayment(false);
+    }
+  }, [paymentRequest, decodedRequest, nostrTransport, recipientInfo, send, sendDirectMessage]);
 
   // Error states for payment request mode
   if (isPaymentRequestMode) {
@@ -437,7 +572,7 @@ export function SendTokenScreen({
   const isPaid =
     currentTransaction?.state === 'finalized' || currentTransaction?.state === 'rolledBack';
 
-  const isLoading = paymentRequestMachine.isPaymentRequestSending;
+  const isLoading = isSending || isSendingDM || isSendingPayment;
 
   // Build buttons based on mode
   const bottomButtons = (
@@ -450,7 +585,7 @@ export function SendTokenScreen({
               text: isLoading ? 'Sending...' : 'Send Payment',
               variant: 'primary',
               icon: 'mdi:send',
-              onPress: async () => handleSendPayment(),
+              onPress: handleSendPayment,
               loading: isLoading,
               condition: isPaymentRequestMode,
             },
@@ -602,13 +737,8 @@ export function SendTokenScreen({
                 operationId: '',
               }
             }
-            tokenCreated={
-              paymentRequest
-                ? paymentRequestMachine.isPaymentRequestSent ||
-                  paymentRequestMachine.isPaymentRequestSending
-                : undefined
-            }
-            nostrSent={paymentRequestMachine.isPaymentRequestSent || initialNostrSent}
+            tokenCreated={paymentRequest ? tokenCreated : undefined}
+            nostrSent={nostrSent}
           />
         )}
 

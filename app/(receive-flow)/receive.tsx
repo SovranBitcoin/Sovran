@@ -4,25 +4,13 @@
  * Part of the (receive-flow) modal group - displays with back button.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { ReceiveScreen, getFormattedReceiveTitle } from '@/features/receive';
-import { usePaymentMachine } from '@/shared/hooks/usePaymentMachine';
 
 const EcashLightningReceiver = () => {
   const { unit } = useLocalSearchParams<{ unit: string }>();
   const formattedTitle = getFormattedReceiveTitle(unit || 'sat');
-
-  const { scan } = usePaymentMachine();
-
-  const processPaymentString = useCallback(
-    async (scanning: { data: string; type?: string }) => {
-      const source =
-        scanning.type === 'paste' || scanning.type === 'deeplink' ? scanning.type : 'qr';
-      return scan(scanning.data, source);
-    },
-    [scan]
-  );
 
   return (
     <>
@@ -52,7 +40,6 @@ const EcashLightningReceiver = () => {
             },
           });
         }}
-        processPaymentStringFn={processPaymentString}
       />
     </>
   );

@@ -8,12 +8,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Alert, TouchableOpacity } from 'react-native';
-import { CurrencyScreen } from '@/features/send';
+import { CurrencyScreen, useProcessPaymentString } from '@/features/send';
 import { WalletHeaderTitle } from '@/features/wallet';
 import Icon from 'assets/icons';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { usePaymentMachine } from '@/shared/hooks/usePaymentMachine';
 import {
   getHeaderTitleWidth,
   getHeaderTitleHeight,
@@ -39,8 +40,11 @@ function ModalScreen() {
     allowedMints?: string; // JSON array of allowed mint URLs (for payment requests)
   }>();
 
+  const { keys } = useNostrKeysContext();
   const { isOffline } = useOfflineStatus();
   const foreground = useThemeColor('foreground');
+  const selectedMints = useMintStore((state) => state.selectedMints);
+  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
   const [sendMode, setSendMode] = useState<SendMode | null>(null);
   const [sendModeDebugInfo, setSendModeDebugInfo] = useState<{
     title: string;
@@ -55,15 +59,11 @@ function ModalScreen() {
     }
   }, [params.allowedMints]);
 
-  const { scan } = usePaymentMachine();
-  const processPaymentString = useCallback(
-    async (scanning: { data: string; type?: string }) => {
-      const source =
-        scanning.type === 'paste' || scanning.type === 'deeplink' ? scanning.type : 'qr';
-      return scan(scanning.data, source);
-    },
-    [scan]
-  );
+  const { processPaymentString } = useProcessPaymentString({
+    unit: params?.unit?.toLowerCase() || 'sat',
+    selectedMint,
+    isFocused: true,
+  });
   const showSendModeIcon = params.to === 'sendToken';
 
   const handlePressSendModeInfo = useCallback(() => {

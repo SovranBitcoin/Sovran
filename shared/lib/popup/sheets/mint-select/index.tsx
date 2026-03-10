@@ -1,1 +1,0 @@
-export { MintSelectContent } from './content';

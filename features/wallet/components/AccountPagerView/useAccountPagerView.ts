@@ -105,7 +105,7 @@ export function useAccountPagerView({
     }
 
     router.navigate({
-      pathname: '/(send-flow)/sendCurrency',
+      pathname: '/(send-flow)/currency',
       params: { to: 'sendToken', unit: account.unit },
     });
   }, [getBalances, selectedMintUrl, account.unit]);

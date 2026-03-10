@@ -4,17 +4,18 @@
  * Part of the (receive-flow) modal group - displays with back button.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
-import { CurrencyScreen } from '@/features/send';
+import { CurrencyScreen, useProcessPaymentString } from '@/features/send';
 import { WalletHeaderTitle } from '@/features/wallet';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import {
   getHeaderTitleWidth,
   getHeaderTitleHeight,
   getHeaderContentWidth,
   getHeaderContentHeight,
 } from '@/features/wallet/lib/walletHeader';
-import { usePaymentMachine } from '@/shared/hooks/usePaymentMachine';
 
 function ModalScreen() {
   const params = useLocalSearchParams<{
@@ -29,17 +30,16 @@ function ModalScreen() {
     lnUrlOrAddress?: string;
     routstrTopUp?: string;
   }>();
+  const { keys } = useNostrKeysContext();
+  const selectedMints = useMintStore((state) => state.selectedMints);
+  const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 
-  const { scan } = usePaymentMachine();
-
-  const processPaymentString = useCallback(
-    async (scanning: { data: string; type?: string }) => {
-      const source =
-        scanning.type === 'paste' || scanning.type === 'deeplink' ? scanning.type : 'qr';
-      return scan(scanning.data, source);
-    },
-    [scan]
-  );
+  const { processPaymentString } = useProcessPaymentString({
+    unit: params?.unit?.toLowerCase() || 'sat',
+    selectedMint,
+    isFocused: true,
+    onLoading: () => {},
+  });
 
   return (
     <>
