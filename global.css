@@ -7,6 +7,8 @@
 @theme {
   /* Static scales — var() references resolved at runtime via Uniwind.
      Hex values live in shared/lib/themeEngine.ts STATIC_COLORS (single source of truth). */
+  --color-shade-0: var(--shade-0);
+  --color-shade-50: var(--shade-50);
   --color-shade-100: var(--shade-100);
   --color-shade-200: var(--shade-200);
   --color-shade-300: var(--shade-300);

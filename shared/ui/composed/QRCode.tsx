@@ -14,10 +14,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 const MAX_QR_DATA_LENGTH = 2000;
 
 /**
- * Circle background for the QR code center logo
+ * Circle background for the QR code center logo — matches the gradient background.
  */
 const Circle = memo(() => {
-  const foreground = useThemeColor('foreground');
+  const surfaceTertiary = useThemeColor('surface-tertiary');
   return (
     <View
       className="absolute z-10"
@@ -28,7 +28,7 @@ const Circle = memo(() => {
         transform: [{ translateX: -50 }, { translateY: -50 }, { scale: 0.63 }],
         left: '50%' as any,
         top: '50%' as any,
-        backgroundColor: foreground,
+        backgroundColor: surfaceTertiary,
       }}
     />
   );
@@ -57,11 +57,10 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   animate: animateProp = false,
   variant: _variant = 'primary',
 }: AnimatedQRCodeProps) {
-  const [foreground, surfaceTertiary, shade200, shade300] = useThemeColor([
+  const [foreground, surfaceSecondary, surfaceTertiary] = useThemeColor([
     'foreground',
+    'surface-secondary',
     'surface-tertiary',
-    'shade-200',
-    'shade-300',
   ] as const);
   const { width: screenWidth } = useWindowDimensions();
 
@@ -128,9 +127,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
 
   const width = Math.min(screenWidth, 600);
   const isLocationUnit = unit.startsWith('circle-flags');
-  const gradientColors = needsAnimation
-    ? ([surfaceTertiary, surfaceTertiary] as const)
-    : ([shade200, shade300] as const);
+  const gradientColors = [surfaceSecondary, surfaceTertiary] as const;
   const qrSize = width - 2 * padding;
 
   return (
@@ -190,7 +187,12 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
         {isLocationUnit ? (
           <Icon name={unit} size={72} />
         ) : (
-          <CurrencyIcon width={72} currency={unit} />
+          <CurrencyIcon
+            width={72}
+            currency={unit}
+            colors={[surfaceSecondary, surfaceTertiary, surfaceTertiary]}
+            iconColor={foreground}
+          />
         )}
       </View>
     </View>

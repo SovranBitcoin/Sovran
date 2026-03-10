@@ -191,6 +191,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     const recoverPending = async () => {
       try {
         const manager = CocoManager.getInstance();
+
         await manager.recoverPendingSendOperations();
         await manager.recoverPendingMeltOperations();
         reservedProofsFreedPopup({
@@ -206,32 +207,9 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
       }
     };
 
-    const forceFreeAll = async () => {
-      try {
-        const result = await CocoManager.freeAllReservedProofs();
-        reservedProofsFreedPopup({
-          text:
-            `Reserved proofs found: ${result.totalReservedProofs}\n` +
-            `Rolled back send ops: ${result.rolledBackSendOperations}\n` +
-            `Rolled back melt ops: ${result.rolledBackMeltOperations}\n` +
-            `Orphaned reservations released: ${result.releasedOrphanedReservations}\n` +
-            `Errors: ${result.errors.length}`,
-        });
-      } catch (error) {
-        reservedProofsFailedPopup({
-          text: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    };
-
     Alert.alert('Reserved Proofs', 'Choose a recovery action.', [
       { text: 'Close', style: 'cancel' },
       { text: 'Recover Pending Operations', onPress: recoverPending },
-      {
-        text: 'Force Free All Reserved Proofs',
-        style: 'destructive',
-        onPress: forceFreeAll,
-      },
     ]);
   }, []);
 

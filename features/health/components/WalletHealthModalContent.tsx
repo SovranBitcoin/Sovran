@@ -62,17 +62,17 @@ export function WalletHealthModalContent({
   scrollY?: SharedValue<number>;
   children?: (layout: WalletHealthLayout) => React.ReactNode;
 }) {
-  const [foreground, background, shade300] = useThemeColor([
+  const [foreground, background, red300] = useThemeColor([
     'foreground',
     'background',
-    'shade-300',
+    'red-300',
   ] as const);
   const heroTransition = useHeroTransition();
   const primary50 = useMemo(() => opacity(foreground, 0.9), [foreground]);
   const primary300 = useMemo(() => opacity(foreground, 0.5), [foreground]);
   const primary400 = useMemo(() => opacity(foreground, 0.4), [foreground]);
   const primary950 = background;
-  const red = shade300;
+  const red = red300;
 
   // Keep the background gradient consistently "red-warm" (like the Needs rebalance state),
   // even when the wallet is Balanced (where hero.accent is intentionally white for text/icon tones).

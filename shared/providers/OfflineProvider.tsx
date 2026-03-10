@@ -57,7 +57,7 @@ function isOfflineFromState(state: Network.NetworkState): boolean {
 
 export function OfflineProvider({ children }: OfflineProviderProps) {
   const [networkOffline, setNetworkOffline] = useState(false);
-  const [foreground, info] = useThemeColor(['foreground', 'blue-300'] as const);
+  const [foreground, info] = useThemeColor(['foreground', 'red-300'] as const);
   const insets = useSafeAreaInsets();
   const frame = useSafeAreaFrame();
   const isCheckingRef = useRef(false);
