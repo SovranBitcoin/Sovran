@@ -72,6 +72,7 @@
     "coco-cashu-expo-sqlite": "1.1.2-rc.47",
     "coco-cashu-plugin-npc": "2.3.1",
     "coco-cashu-react": "1.1.2-rc.47",
+    "@expo/vector-icons": "^15.0.2",
     "expo": "^55.0.4",
     "expo-application": "~55.0.8",
     "expo-blur": "~55.0.8",

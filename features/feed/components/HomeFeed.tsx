@@ -75,7 +75,7 @@ interface HomeFeedProps {
   activeFilter?: string;
 }
 
-export interface FeedSpec {
+interface FeedSpec {
   name: string;
   spec: string;
   description?: string;
