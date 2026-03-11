@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, FlatList, Text, StyleSheet } from 'react-native';
+import { View, FlatList, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/useContactSearch';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -11,6 +11,9 @@ import { FeedFilters } from '../components/FeedFilters';
 import { NoResultsFound } from '@/features/payments/components/NoResultsFound';
 import { SEARCH_FILTERS_HEIGHT } from '@/features/contacts/lib/constants/styles';
 import { HomeFeed } from '@/features/feed/components/HomeFeed';
+import { Text } from '@/shared/ui/primitives/Text';
+import { VStack } from '@/shared/ui/primitives/View/VStack';
+import Icon from '@/assets/icons';
 
 export function FeedScreen() {
   const { isSearching, searchQuery } = useFeedSearch();
@@ -58,8 +61,32 @@ export function FeedScreen() {
     );
   }, [foreground]);
 
-  // Show people search results when searching with a query
-  const showSearchResults = isSearching && searchQuery.trim().length > 0;
+  // When search is active with empty query, show prompt instead of feed
+  const renderSearchPrompt = useCallback(() => {
+    return (
+      <VStack spacing={24} align="center" className="mt-3 px-4">
+        <VStack
+          justify="center"
+          align="center"
+          className="bg-surface-secondary h-20 w-20 rounded-full">
+          <Icon name="mingcute:search-3-line" size={40} color={opacity(foreground, 0.4)} />
+        </VStack>
+
+        <VStack spacing={12}>
+          <Text className="text-center" color={opacity(foreground, 0.5)} bold size={20}>
+            Search for someone by name
+          </Text>
+
+          <Text className="text-center" color={opacity(foreground, 0.4)} size={16}>
+            Enter a name, NIP-05, or npub to find people
+          </Text>
+        </VStack>
+      </VStack>
+    );
+  }, [foreground]);
+
+  const hasSearchQuery = searchQuery.trim().length > 0;
+  const showSearchUI = isSearching;
 
   return (
     <View style={styles.root}>
@@ -78,16 +105,20 @@ export function FeedScreen() {
       </View>
 
       <ScreenContainer>
-        {showSearchResults ? (
-          <FlatList
-            data={showNoResults ? [] : displayResults}
-            keyExtractor={(item) => item.pubkey}
-            renderItem={renderSearchResult}
-            keyboardDismissMode="on-drag"
-            keyboardShouldPersistTaps="handled"
-            ListEmptyComponent={renderSearchEmpty}
-            contentContainerStyle={showNoResults ? styles.emptyList : undefined}
-          />
+        {showSearchUI ? (
+          hasSearchQuery ? (
+            <FlatList
+              data={showNoResults ? [] : displayResults}
+              keyExtractor={(item) => item.pubkey}
+              renderItem={renderSearchResult}
+              keyboardDismissMode="on-drag"
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={renderSearchEmpty}
+              contentContainerStyle={showNoResults ? styles.emptyList : undefined}
+            />
+          ) : (
+            renderSearchPrompt()
+          )
         ) : (
           <HomeFeed activeFilter={activeFilter} />
         )}

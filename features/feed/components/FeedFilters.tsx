@@ -16,7 +16,7 @@ export const FeedFilters = ({ isSearching, onFilterChange }: FeedFiltersProps) =
   const feedFilters = useMemo(() => {
     const primalNames = PRIMAL_FEED_SPECS.map((s) => s.name);
     const categoryNames = Object.keys(CATEGORY_NPUBS).map(categoryToLabel);
-    return [...primalNames, ...categoryNames];
+    return [...primalNames];
   }, []);
 
   const filters = isSearching ? (SEARCH_FILTERS as unknown as string[]) : feedFilters;
