@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, Image, Pressable, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { DisplayResult } from '@/features/payments/hooks/useContactSearch';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
+import { Text } from '@/shared/ui/primitives/Text';
+import { Avatar } from '@/shared/ui/primitives/Avatar';
 
 type Props = {
   result: DisplayResult;
@@ -18,43 +20,24 @@ export const ContactSearchResultItem = ({ result, loading, onPress }: Props) => 
     'surface-tertiary',
   ] as const);
 
-  // Skeleton placeholder while loading
-  if (loading || !result.profile) {
-    return (
-      <View style={styles.container}>
-        <View
-          style={[styles.skeletonAvatar, { backgroundColor: surfaceTertiary }]}
-        />
-        <View style={styles.info}>
-          <View
-            style={[
-              styles.skeletonLine,
-              { width: '60%', backgroundColor: surfaceTertiary },
-            ]}
-          />
-          <View
-            style={[
-              styles.skeletonLine,
-              { width: '40%', backgroundColor: surfaceTertiary },
-            ]}
-          />
-        </View>
-      </View>
-    );
-  }
-
-  const { profile, pubkey } = result;
-  const displayName =
-    profile.displayName || profile.name || pubkey.slice(0, 12) + '...';
+  const isLoading = loading || !result.profile;
+  const profile = result.profile;
+  const pubkey = result.pubkey;
+  const displayName = profile
+    ? profile.displayName || profile.name || pubkey.slice(0, 12) + '...'
+    : '';
+  const hasNip05 = Boolean(profile?.nip05);
 
   return (
     <Pressable
-      onPress={() => onPress(result)}
+      onPress={() => !isLoading && onPress(result)}
       style={({ pressed }) => [
         styles.container,
-        pressed && { backgroundColor: surfaceSecondary },
+        pressed && !isLoading && { backgroundColor: surfaceSecondary },
       ]}>
-      {profile.picture ? (
+      {isLoading ? (
+        <Avatar seed={pubkey} size={44} loading />
+      ) : profile?.picture ? (
         <Image source={{ uri: profile.picture }} style={styles.avatar} />
       ) : (
         <View style={[styles.avatar, { backgroundColor: surfaceTertiary }]}>
@@ -62,26 +45,30 @@ export const ContactSearchResultItem = ({ result, loading, onPress }: Props) => 
         </View>
       )}
       <View style={styles.info}>
-        <Text style={[styles.name, { color: foreground }]} numberOfLines={1}>
+        <Text
+          loading={isLoading}
+          placeholder="Display Name"
+          style={[styles.name, { color: foreground }]}
+          numberOfLines={1}>
           {displayName}
         </Text>
-        {profile.nip05 ? (
+        {hasNip05 ? (
           <View style={styles.nip05Row}>
-            {profile.nip05Valid && (
-              <Feather
-                name="check-circle"
-                size={12}
-                color={opacity(foreground, 0.4)}
-              />
+            {profile!.nip05Valid && (
+              <Feather name="check-circle" size={12} color={opacity(foreground, 0.4)} />
             )}
             <Text
+              loading={isLoading}
+              placeholder="user@relay.example"
               style={[styles.handle, { color: opacity(foreground, 0.5) }]}
               numberOfLines={1}>
-              {profile.nip05}
+              {profile!.nip05}
             </Text>
           </View>
         ) : (
           <Text
+            loading={isLoading}
+            placeholder="npub1..."
             style={[styles.handle, { color: opacity(foreground, 0.5) }]}
             numberOfLines={1}>
             {pubkey.slice(0, 16)}...
@@ -108,18 +95,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  skeletonAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
   info: {
     flex: 1,
     gap: 4,
-  },
-  skeletonLine: {
-    height: 14,
-    borderRadius: 4,
   },
   name: {
     fontSize: 16,

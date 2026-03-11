@@ -85,12 +85,13 @@ export const ContactsScreen = () => {
       case 'Mints':
         return displayMints;
       default:
-        // "All" — merge recent + mints, deduplicated by pubkey
+        // "All" — merge recent + mints, deduplicated by pubkey (or mintUrl for mints without pubkey)
         const seen = new Set<string>();
         const merged: any[] = [];
         for (const item of [...displayContacts, ...displayMints]) {
-          if (item.pubkey && !seen.has(item.pubkey)) {
-            seen.add(item.pubkey);
+          const key = item.pubkey || item.mint?.mintUrl;
+          if (key && !seen.has(key)) {
+            seen.add(key);
             merged.push(item);
           }
         }
@@ -107,6 +108,7 @@ export const ContactsScreen = () => {
     ({ item }: { item: any }) => {
       const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
       const lastMessage = item.dmEvent?.content;
+      const isLoadingProfile = item.pubkey !== undefined && profile === undefined;
 
       return (
         <ContactListItem
@@ -115,6 +117,7 @@ export const ContactsScreen = () => {
           subtitle={lastMessage}
           type={item.type}
           mintInfo={item.mintInfo}
+          isLoadingProfile={isLoadingProfile}
         />
       );
     },

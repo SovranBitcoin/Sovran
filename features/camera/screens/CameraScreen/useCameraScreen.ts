@@ -21,9 +21,11 @@ export interface ScanningData {
 }
 
 export interface CameraScreenProps {
-  onScan: (data: ScanningData) => Promise<void | { urInProgress: boolean; progress?: number }>;
+  onScan: (data: ScanningData) => Promise<void | { urInProgress: boolean; progress?: number; lockedPending?: boolean }>;
   onReset?: () => void;
   scanLocked?: boolean;
+  /** Called once on mount with an `unlock` function that resets the processing lock. */
+  onRegisterUnlock?: (unlock: () => void) => void;
 }
 
 export interface CameraScreenShared {
@@ -45,6 +47,7 @@ export function useCameraScreen({
   onScan,
   onReset,
   scanLocked = false,
+  onRegisterUnlock,
 }: CameraScreenProps): CameraScreenShared {
   const foreground = useThemeColor('foreground');
   const insets = useSafeAreaInsets();
@@ -80,6 +83,15 @@ export function useCameraScreen({
 
   const isProcessingRef = useRef<boolean>(false);
 
+  const unlock = useCallback(() => {
+    isProcessingRef.current = false;
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    onRegisterUnlock?.(unlock);
+  }, [onRegisterUnlock, unlock]);
+
   const handleScan = useCallback(
     async (data: ScanningData) => {
       if (scanLocked) return;
@@ -108,7 +120,12 @@ export function useCameraScreen({
           setProgress(result.progress);
         }
 
-        if (!urInProgress) {
+        const lockedPending =
+          result && typeof result === 'object' && 'lockedPending' in result
+            ? result.lockedPending
+            : false;
+
+        if (!urInProgress && !lockedPending) {
           setLoading(false);
           setProgress(0);
           isProcessingRef.current = false;

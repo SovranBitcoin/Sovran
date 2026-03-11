@@ -16,27 +16,30 @@ export interface QRButtonProps {
 
 const DEFAULT_SIZE = 64;
 
+const WHITE = '#FFFFFF';
+
 export function QRButton(props: QRButtonProps): React.ReactElement {
-  const [surfaceForeground, accent] = useThemeColor(['surface-foreground', 'accent'] as const);
+  const [surfaceForeground] = useThemeColor(['surface-foreground'] as const);
 
   const { onPress, size = DEFAULT_SIZE } = props;
 
   const borderRadius = size * 0.18;
-  const accentGlow = { color: accent, opacity: 0.6, radius: 10, offset: { width: 0, height: 0 } };
+  const glow = { color: WHITE, opacity: 0.6, radius: 10, offset: { width: 0, height: 0 } };
 
   const containerStyle = {
     width: size,
     height: size,
     borderRadius,
+    borderCurve: 'continuous',
     overflow: 'hidden' as const,
   };
 
   const pressableStyle = {
     ...containerStyle,
-    shadowColor: accentGlow.color,
-    shadowOffset: accentGlow.offset,
-    shadowOpacity: accentGlow.opacity,
-    shadowRadius: accentGlow.radius,
+    shadowColor: glow.color,
+    shadowOffset: glow.offset,
+    shadowOpacity: glow.opacity,
+    shadowRadius: glow.radius,
     elevation: 5,
   };
 
@@ -48,10 +51,16 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
       <PressableFeedback.Ripple />
       <View style={[styles.container, containerStyle]} pointerEvents="none">
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0f0f12' }]} />
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(accent, 0.35) }]} />
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(WHITE, 0.35) }]} />
         <LinearGradient
-          colors={[accent, opacity(accent, 0.25), 'transparent']}
-          locations={[0, 0.2, 0.6]}
+          colors={[
+            WHITE,
+            opacity(WHITE, 0.6),
+            opacity(WHITE, 0.25),
+            opacity(WHITE, 0.08),
+            'transparent',
+          ]}
+          locations={[0, 0.12, 0.35, 0.6, 1]}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFillObject}
@@ -59,7 +68,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
         <View
           style={[
             StyleSheet.absoluteFillObject,
-            { borderWidth: 1, borderColor: opacity(accent, 0.4) },
+            { borderWidth: 1, borderColor: opacity(WHITE, 0.4) },
           ]}
         />
       </View>

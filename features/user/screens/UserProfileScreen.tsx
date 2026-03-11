@@ -544,31 +544,35 @@ function BannerWithAvatarComponent({
 
       {/* Name and NIP-05 */}
       <VStack align="center" style={{ marginTop: 8 }}>
-        <Text
-          loading={isLoading}
-          placeholder="Display Name"
-          bold
-          size={22}
-          style={{
-            color: foreground,
-            includeFontPadding: false,
-            lineHeight: Math.round(22 * 1.25),
-          }}>
-          {displayName}
-        </Text>
+        <View style={{ alignSelf: 'center' }}>
+          <Text
+            loading={isLoading}
+            placeholder="Display Name"
+            bold
+            size={22}
+            style={{
+              color: foreground,
+              includeFontPadding: false,
+              lineHeight: Math.round(22 * 1.25),
+            }}>
+            {displayName}
+          </Text>
+        </View>
         {(isLoading || nip05) && (
-          <HStack align="center" gap={4}>
-            {!isLoading && (
-              <Icon name="mdi:check-decagram" size={16} color={opacity(foreground, 0.4)} />
-            )}
-            <Text
-              loading={isLoading}
-              placeholder="username@relay.example"
-              size={14}
-              style={{ color: opacity(foreground, 0.4) }}>
-              {nip05 || '\u00A0'}
-            </Text>
-          </HStack>
+          <View style={{ alignSelf: 'center' }}>
+            <HStack align="center" gap={4}>
+              {!isLoading && (
+                <Icon name="mdi:check-decagram" size={16} color={opacity(foreground, 0.4)} />
+              )}
+              <Text
+                loading={isLoading}
+                placeholder="username@relay.example"
+                size={14}
+                style={{ color: opacity(foreground, 0.4) }}>
+                {nip05 || '\u00A0'}
+              </Text>
+            </HStack>
+          </View>
         )}
         {showFollowButton &&
           (isLoading ? (

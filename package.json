@@ -43,7 +43,7 @@
   "dependencies": {
     "@babel/runtime": "^7.28.0",
     "@bacons/apple-targets": "^4.0.6",
-    "@cashu/cashu-ts": "^3.3.0",
+    "@cashu/cashu-ts": "^3.5.0",
     "@expo/metro-runtime": "~55.0.6",
     "@expo/react-native-action-sheet": "^4.1.0",
     "@expo/ui": "^55.0.0-beta.3",

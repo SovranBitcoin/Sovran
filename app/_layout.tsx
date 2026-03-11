@@ -67,7 +67,7 @@ initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called')
 LogBox.ignoreAllLogs();
 
 const IOS_SPLASH_IMAGE_WIDTH = 390;
-const REINIT_SPLASH_IMAGE = require('../assets/images/logo.png');
+const REINIT_SPLASH_IMAGE = require('../assets/images/dark.png');
 const REINIT_SPLASH_IMAGE_SIZE = Image.resolveAssetSource(REINIT_SPLASH_IMAGE);
 const PROFILE_SWITCH_SPLASH_BOX_SIZE =
   REINIT_SPLASH_IMAGE_SIZE?.width && REINIT_SPLASH_IMAGE_SIZE?.height

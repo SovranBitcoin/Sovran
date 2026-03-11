@@ -323,6 +323,18 @@ function sumProofAmounts(proofs: ReadonlyArray<{ amount: number }>): number {
 }
 
 /**
+ * Extracts the amount in sats from an ecash token.
+ */
+export function getEcashTokenAmount(token: string): number | undefined {
+  try {
+    const decoded = getDecodedToken(token);
+    return sumProofAmounts(decoded.proofs);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Builds a `ReceiveHistoryEntry` from a decoded token.
  *
  * Centralises the pattern that was duplicated in ReceiveScreen, useProcessPaymentString,

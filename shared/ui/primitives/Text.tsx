@@ -232,7 +232,11 @@ export function Text({ loading, size = 14, italic = false, ...props }: CustomTex
   );
 }
 
-const skeletonWrapperStyle = { position: 'relative' as const, overflow: 'hidden' as const };
+const skeletonWrapperStyle = {
+  position: 'relative' as const,
+  overflow: 'hidden' as const,
+  alignSelf: 'flex-start' as const,
+};
 const hiddenTextStyle = { opacity: 0 };
 
 /** Inset the skeleton to ~90% height, vertically centered, to account for glyph padding. */

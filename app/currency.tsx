@@ -54,12 +54,13 @@ function ModalScreen() {
             },
           });
         }}
-        onMeltQuoteReady={(lnUrlOrAddress, amount) => {
+        onMeltQuoteReady={(lnUrlOrAddress, amount, selectedMintUrl) => {
           router.navigate({
             pathname: `/${params.to}` as any,
             params: {
               lnUrlOrAddress,
               amount: String(amount),
+              ...(selectedMintUrl && { selectedMintUrl }),
             },
           });
         }}

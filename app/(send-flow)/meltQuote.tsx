@@ -12,12 +12,14 @@ import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { MeltQuoteScreen } from '@/features/send';
 
 function ModalScreen() {
-  const { meltHistoryEntry, invoice, lnUrlOrAddress, amount } = useLocalSearchParams<{
-    meltHistoryEntry?: string;
-    invoice?: string;
-    lnUrlOrAddress?: string;
-    amount?: string;
-  }>();
+  const { meltHistoryEntry, invoice, lnUrlOrAddress, amount, selectedMintUrl } =
+    useLocalSearchParams<{
+      meltHistoryEntry?: string;
+      invoice?: string;
+      lnUrlOrAddress?: string;
+      amount?: string;
+      selectedMintUrl?: string;
+    }>();
 
   return (
     <>
@@ -33,6 +35,7 @@ function ModalScreen() {
         invoice={invoice}
         lnUrlOrAddress={lnUrlOrAddress}
         amount={amount ? parseInt(amount, 10) : undefined}
+        selectedMintUrl={selectedMintUrl}
         onCancel={() => {
           router.dismissTo('/');
         }}

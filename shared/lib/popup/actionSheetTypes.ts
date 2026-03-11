@@ -2,8 +2,17 @@ import type {
   ButtonHandlerActionButton,
   ButtonHandlerButton,
 } from '@/shared/ui/composed/ButtonHandler';
+import type { AnnotatedOption } from '@/shared/lib/cashu/paymentIntent';
+import type { ParsedPaymentInput, SupportedPaymentOption } from '@/shared/lib/cashu/paymentInputParser';
 
 type EmojiPickerPayload = { token: string };
+type PaymentOptionsPayload = {
+  parsed: ParsedPaymentInput;
+  options: AnnotatedOption[];
+  unit?: string;
+  onSelectOption: (option: SupportedPaymentOption) => void;
+  onDismiss?: () => void;
+};
 type OfflineSendSuggestionsPayload = {
   requestedAmount: number;
   roundDownAmount: number | null;
@@ -39,6 +48,7 @@ type BaseActionSheetPayloads = {
   };
   'emoji-picker': EmojiPickerPayload;
   'offline-send-suggestions': OfflineSendSuggestionsPayload;
+  'payment-options': PaymentOptionsPayload;
 };
 
 type ButtonHandlerPushTarget = {

@@ -38,6 +38,7 @@ import {
   ButtonHandlerContent,
   EmojiPickerContent,
   OfflineSendSuggestionsContent,
+  PaymentOptionsContent,
   ProfileSwitcherContent,
 } from '@/shared/lib/popup/sheets';
 import { IMPORT_NSEC_LABEL } from '@/shared/lib/popup/sheets/profile-switcher/constants';
@@ -266,6 +267,17 @@ const CUSTOM_SHEET_CONTENT: Record<
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
   'button-handler': ButtonHandlerContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'payment-options': PaymentOptionsContent as React.ComponentType<{
     payload: unknown;
     close: () => void;
     pushCustomPage: <K extends keyof ActionSheetPayloads>(

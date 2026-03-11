@@ -5,7 +5,7 @@
  * Uses useProcessPaymentString hook for payment processing.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -18,10 +18,13 @@ const Camera: React.FC = () => {
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 
+  const unlockCameraRef = useRef<(() => void) | null>(null);
+
   const { processPaymentString, reset } = useProcessPaymentString({
     unit: unit || 'sat',
     selectedMint,
     isFocused: true,
+    onUnlockCamera: () => unlockCameraRef.current?.(),
   });
 
   const handleScan = useCallback(
@@ -40,7 +43,13 @@ const Camera: React.FC = () => {
           headerStyle: { backgroundColor: 'transparent' },
         }}
       />
-      <CameraScreen onScan={handleScan} onReset={reset} />
+      <CameraScreen
+        onScan={handleScan}
+        onReset={reset}
+        onRegisterUnlock={(fn) => {
+          unlockCameraRef.current = fn;
+        }}
+      />
     </>
   );
 };

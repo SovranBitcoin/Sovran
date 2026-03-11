@@ -18,7 +18,7 @@ module.exports = ({ config }) => {
     );
   }
 
-  const appIcon = './assets/images/logo.png';
+  const appIcon = './assets/images/light.png';
   const androidGoogleMapsApiKey =
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 

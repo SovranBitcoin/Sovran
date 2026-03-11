@@ -61,6 +61,8 @@ interface MeltQuoteScreenProps {
   lnUrlOrAddress?: string;
   /** Amount in sats (required when using lnUrlOrAddress) */
   amount?: number;
+  /** Mint to use for quote creation; overrides store selection when provided */
+  selectedMintUrl?: string;
   onCancel: () => void;
   /** Callback when send is successful (after popup closes) */
   onSendSuccess?: () => void;
@@ -71,13 +73,23 @@ export function MeltQuoteScreen({
   invoice: invoiceProp,
   lnUrlOrAddress: lnUrlOrAddressProp,
   amount: amountProp,
+  selectedMintUrl: selectedMintUrlProp,
   onCancel,
   onSendSuccess,
 }: MeltQuoteScreenProps) {
   const manager = useManager();
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
+  const setSelectedMint = useMintStore((state) => state.setSelectedMint);
   const selectedMintFromStore = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
+  const effectiveMint = selectedMintUrlProp ?? selectedMintFromStore;
+
+  // When routing passes a mint (e.g. from payment options), ensure store matches so WalletHeaderTitle shows it
+  useEffect(() => {
+    if (keys?.pubkey && selectedMintUrlProp && selectedMintFromStore !== selectedMintUrlProp) {
+      setSelectedMint(keys.pubkey, selectedMintUrlProp);
+    }
+  }, [keys?.pubkey, selectedMintUrlProp, selectedMintFromStore, setSelectedMint]);
 
   // For viewing existing transaction
   const { entry: trackedHistoryEntry, error: parseError } =
@@ -195,16 +207,16 @@ export function MeltQuoteScreen({
       const invoice = invoiceProp || resolvedInvoice;
       if (
         invoice &&
-        selectedMintFromStore &&
+        effectiveMint &&
         !currentTransaction &&
         !isCreating &&
         !hasStartedCreation.current
       ) {
         hasStartedCreation.current = true;
         hasStoredLocationRef.current = false; // Reset location flag for new quote
-        lastQuoteMintRef.current = selectedMintFromStore;
+        lastQuoteMintRef.current = effectiveMint;
         try {
-          const result = await prepareMeltQuote(selectedMintFromStore, invoice);
+          const result = await prepareMeltQuote(effectiveMint, invoice);
 
           // Capture and store location right after quote creation
           if (result?.historyEntry?.id) {
@@ -223,7 +235,7 @@ export function MeltQuoteScreen({
   }, [
     invoiceProp,
     resolvedInvoice,
-    selectedMintFromStore,
+    effectiveMint,
     currentTransaction,
     isCreating,
     prepareMeltQuote,
@@ -236,28 +248,28 @@ export function MeltQuoteScreen({
 
     // Only re-create quote if:
     // 1. We have an invoice
-    // 2. Store mint changed from what we used for the current quote
+    // 2. Effective mint changed from what we used for the current quote
     // 3. We're not currently creating a quote
     // 4. Current transaction is UNPAID (don't re-create for already paid quotes)
     // Note: We allow re-creation even if we started with a history entry
     // (e.g., NFC flow passes pre-created quote but user changes mint)
     if (
       invoice &&
-      selectedMintFromStore &&
+      effectiveMint &&
       lastQuoteMintRef.current &&
-      selectedMintFromStore !== lastQuoteMintRef.current &&
+      effectiveMint !== lastQuoteMintRef.current &&
       !isCreating &&
       currentTransaction?.state === 'UNPAID'
     ) {
       console.log(
-        `Mint changed from ${lastQuoteMintRef.current} to ${selectedMintFromStore}, re-creating quote`
+        `Mint changed from ${lastQuoteMintRef.current} to ${effectiveMint}, re-creating quote`
       );
-      lastQuoteMintRef.current = selectedMintFromStore;
+      lastQuoteMintRef.current = effectiveMint;
       resetMeltState();
       hasStartedCreation.current = false;
 
       // Create new quote with the newly selected mint
-      prepareMeltQuote(selectedMintFromStore, invoice)
+      prepareMeltQuote(effectiveMint, invoice)
         .then(async (result) => {
           if (result?.historyEntry?.id) {
             // Re-capture location for the new transaction
@@ -271,7 +283,7 @@ export function MeltQuoteScreen({
         });
     }
   }, [
-    selectedMintFromStore,
+    effectiveMint,
     invoiceProp,
     resolvedInvoice,
     isCreating,
@@ -408,10 +420,7 @@ export function MeltQuoteScreen({
     return <ScreenLoadingState message="Resolving lightning address..." />;
   }
 
-  if (
-    isCreating ||
-    (!currentTransaction && (invoiceProp || lnUrlOrAddressProp) && selectedMintFromStore)
-  ) {
+  if (isCreating || (!currentTransaction && (invoiceProp || lnUrlOrAddressProp) && effectiveMint)) {
     return <ScreenLoadingState message="Creating payment quote..." />;
   }
 

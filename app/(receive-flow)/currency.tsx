@@ -80,13 +80,14 @@ function ModalScreen() {
             },
           });
         }}
-        onMeltQuoteReady={(lnUrlOrAddress, amount) => {
+        onMeltQuoteReady={(lnUrlOrAddress, amount, selectedMintUrl) => {
           // meltQuote is a separate flow, navigate to root-level screen
           router.navigate({
             pathname: `/${params.to}` as any,
             params: {
               lnUrlOrAddress,
               amount: String(amount),
+              ...(selectedMintUrl && { selectedMintUrl }),
             },
           });
         }}

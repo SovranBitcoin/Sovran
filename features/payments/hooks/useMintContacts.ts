@@ -65,8 +65,6 @@ export function useMintContacts(
 
   // Build mints with most recent DM metadata
   const mintsWithMetadata = useMemo(() => {
-    if (!dmEvents) return [];
-
     const dmMap = new Map();
     dmEvents?.forEach((event) => {
       const otherPubkey =

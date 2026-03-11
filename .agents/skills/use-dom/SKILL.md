@@ -357,7 +357,7 @@ Prefer requiring assets instead of using the public directory:
 "use dom";
 
 // Good - bundled with the component
-const logo = require("../assets/logo.png");
+const logo = require("../assets/dark.png");
 
 export default function Component({
   dom,

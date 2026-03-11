@@ -18,3 +18,7 @@ export function offlineSendSuggestionsPopup(
 export function buttonHandlerPopup(payload: ActionSheetPayloads['button-handler']): void {
   showActionSheet('button-handler', payload);
 }
+
+export function paymentOptionsPopup(payload: ActionSheetPayloads['payment-options']): void {
+  showActionSheet('payment-options', payload);
+}

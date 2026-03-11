@@ -24,6 +24,8 @@ export function StandaloneCameraScreen() {
   const getSelectedMint = useMintStore((state) => state.getSelectedMint);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
 
+  const unlockCameraRef = useRef<(() => void) | null>(null);
+
   const { processPaymentString, reset } = useProcessPaymentString({
     unit,
     selectedMint,
@@ -31,6 +33,7 @@ export function StandaloneCameraScreen() {
     onProgress: () => {},
     onLoading: () => {},
     onScanned: () => {},
+    onUnlockCamera: () => unlockCameraRef.current?.(),
   });
 
   const handleScan = useCallback(
@@ -96,7 +99,14 @@ export function StandaloneCameraScreen() {
           ),
         }}
       />
-      <CameraScreen onScan={handleScan} onReset={reset} scanLocked={nfc.isPaying} />
+      <CameraScreen
+        onScan={handleScan}
+        onReset={reset}
+        scanLocked={nfc.isPaying}
+        onRegisterUnlock={(fn) => {
+          unlockCameraRef.current = fn;
+        }}
+      />
     </>
   );
 }

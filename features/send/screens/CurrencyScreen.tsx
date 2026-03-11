@@ -283,7 +283,7 @@ interface CurrencyScreenProps {
     options?: { nostrSent?: boolean }
   ) => void;
   /** Navigate to MeltQuoteScreen with lnUrlOrAddress and amount - screen handles quote creation */
-  onMeltQuoteReady: (lnUrlOrAddress: string, amount: number) => void;
+  onMeltQuoteReady: (lnUrlOrAddress: string, amount: number, selectedMintUrl?: string) => void;
   onCameraPress: (unit: string) => void;
   onReceiveTokenScanned?: (receiveHistoryEntry: ReceiveHistoryEntry) => void;
   onRoutstrSuccess?: () => void;
@@ -1072,7 +1072,7 @@ export function CurrencyScreen({
           return;
         }
 
-        onMeltQuoteReady(params.lnUrlOrAddress, amount);
+        onMeltQuoteReady(params.lnUrlOrAddress, amount, selectedMint);
         setLoading(false);
         break;
       case 'paymentRequest':
