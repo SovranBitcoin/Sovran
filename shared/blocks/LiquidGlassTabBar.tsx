@@ -13,12 +13,11 @@ export const isLiquidGlassTabBarAvailable = () => {
   return Boolean(config || hasConfig);
 };
 
-const TAB_PATHS = ['/payments', '/', '/explore'];
+const TAB_PATHS = ['/', '/explore'];
 
 function getTabIndexFromPathname(pathname: string): number | null {
-  if (pathname === '/payments' || pathname.startsWith('/payments/')) return 0;
-  if (pathname === '/' || pathname === '/index' || pathname.startsWith('/index/')) return 1;
-  if (pathname === '/explore' || pathname.startsWith('/explore/')) return 2;
+  if (pathname === '/' || pathname === '/index' || pathname.startsWith('/index/')) return 0;
+  if (pathname === '/explore' || pathname.startsWith('/explore/')) return 1;
   return null;
 }
 
@@ -111,7 +110,7 @@ export function GlobalLiquidGlassTabsOverlay() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
-  const [selectedTabIndex, setSelectedTabIndex] = useState(1);
+  const [selectedTabIndex, setSelectedTabIndex] = useState(0);
   const isOnTabScreen = useIsOnTabScreen();
 
   const resolvedTabIndex = useMemo(() => {
@@ -127,8 +126,8 @@ export function GlobalLiquidGlassTabsOverlay() {
         <BottomTabs
           style={styles.nativeTabs}
           selectedTabIndex={resolvedTabIndex}
-          tabsCount={3}
-          tabLabels={['Payments', 'Wallet', 'Explore']}
+          tabsCount={2}
+          tabLabels={['Wallet', 'Explore']}
           iconTintEnabled
           onTabSelected={(index) => {
             setSelectedTabIndex(index);

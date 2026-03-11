@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo } from 'react';
-import { Pressable } from 'react-native';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -10,7 +9,8 @@ import { PUBLIC_KEYS } from '@/shared/lib/constants';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { prefetchImage } from '@/shared/lib/imageCache';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-
+import { PressableFeedback } from 'heroui-native';
+import { View } from '@/shared/ui/primitives/View/View';
 interface ContactItemProps {
   item: {
     type: 'contact' | 'mint';
@@ -54,6 +54,8 @@ export const ContactItem = React.memo(function ContactItem({
   item,
   profile,
   isLoadingProfile = false,
+  index,
+  length,
 }: ContactItemProps) {
   const router = useRouter();
   const foreground = useThemeColor('foreground');
@@ -125,9 +127,8 @@ export const ContactItem = React.memo(function ContactItem({
   );
 
   return (
-    <Pressable
-      style={styles.contactItem}
-      disabled={!canNavigateToProfile}
+    <PressableFeedback
+      animation={false}
       onPress={() => {
         if (!item.pubkey) return;
         router.navigate({
@@ -135,7 +136,17 @@ export const ContactItem = React.memo(function ContactItem({
           params: { pubkey: item.pubkey },
         });
       }}>
-      {content}
-    </Pressable>
+      <PressableFeedback.Ripple />
+      <View
+        pointerEvents="none"
+        style={{
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+          paddingTop: index === 0 ? 16 : 8,
+          paddingBottom: index === length - 1 ? 16 : 8,
+        }}>
+        {content}
+      </View>
+    </PressableFeedback>
   );
 });

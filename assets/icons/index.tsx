@@ -49,15 +49,23 @@ function Icon({ name, color, size = 24, spin, style = {}, className }: IconProps
       })
     : '0deg';
 
+  if (spin?.outputRange) {
+    return (
+      <Animated.View
+        style={{
+          transform: [{ rotate: spinAnimation }],
+          ...style,
+        }}
+        className={className}>
+        <Monicon name={name} size={size} color={color || foreground} />
+      </Animated.View>
+    );
+  }
+
   return (
-    <Animated.View
-      style={{
-        transform: [{ rotate: spinAnimation }],
-        ...style,
-      }}
-      className={className}>
+    <View style={style} className={className}>
       <Monicon name={name} size={size} color={color || foreground} />
-    </Animated.View>
+    </View>
   );
 }
 

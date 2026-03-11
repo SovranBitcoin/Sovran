@@ -11,6 +11,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   onChangeText,
   placeholder,
   keyboardType = 'web-search',
+  autoFocus,
   debounceMs,
 }: GlassSearchBarProps) {
   const [foreground, surfaceSecondary] = useThemeColor([
@@ -76,6 +77,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
         }}
         keyboardType={keyboardType}
         autoCorrect={false}
+        autoFocus={autoFocus}
       />
     </View>
   );

@@ -21,7 +21,7 @@ export interface CapsuleButtonProps {
   height?: number;
 }
 
-const DEFAULT_HEIGHT = 48;
+const DEFAULT_HEIGHT = 46;
 
 export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
@@ -32,7 +32,16 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
   }
 
   return (
-    <View style={[styles.card, { borderColor: opacity(muted, 0.3), minHeight: height }]}>
+    <View
+      style={[
+        styles.card,
+        {
+          borderColor: opacity(muted, 0.3),
+          minHeight: height,
+          maxWidth: 140,
+          alignSelf: 'center',
+        },
+      ]}>
       <BlurCardFrame accentColor={muted}>
         <PressableFeedback
           animation={false}
@@ -58,7 +67,7 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    borderRadius: 20,
+    borderRadius: 24,
     borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,

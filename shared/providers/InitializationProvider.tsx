@@ -775,7 +775,7 @@ function LogoInitializationScreen() {
         right: 0,
         bottom: 0,
         zIndex: 9999,
-        backgroundColor: '#000',
+        backgroundColor: '#030303',
       }}>
       <Animated.View
         style={[
@@ -786,7 +786,7 @@ function LogoInitializationScreen() {
             right: 0,
             bottom: 0,
             zIndex: 9999,
-            backgroundColor: '#000',
+            backgroundColor: '#030303',
             justifyContent: 'center',
             alignItems: 'center',
           },
@@ -967,7 +967,7 @@ function InitializationScreenInternal() {
         right: 0,
         bottom: 0,
         zIndex: 9999,
-        backgroundColor: '#000',
+        backgroundColor: '#030303',
       }}>
       <Animated.View
         style={[
@@ -978,7 +978,7 @@ function InitializationScreenInternal() {
             right: 0,
             bottom: 0,
             zIndex: 9999,
-            backgroundColor: '#000',
+            backgroundColor: '#030303',
             justifyContent: 'center',
             alignItems: 'center',
           },
@@ -992,7 +992,7 @@ function InitializationScreenInternal() {
             justifyContent: 'center',
             alignItems: 'center',
             overflow: 'hidden',
-            backgroundColor: '#000',
+            backgroundColor: '#030303',
           }}>
           <Animated.View style={[{ width: '100%', backgroundColor: 'transparent' }, listAnimStyle]}>
             {logHistory.map((entry, index) => {

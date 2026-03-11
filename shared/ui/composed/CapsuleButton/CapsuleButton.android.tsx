@@ -17,7 +17,7 @@ export interface CapsuleButtonProps {
   height?: number;
 }
 
-const DEFAULT_HEIGHT = 48;
+const DEFAULT_HEIGHT = 46;
 const INVISIBLE_TITLE = '\u2007'.repeat(12);
 
 export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
@@ -56,7 +56,15 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
       variant="secondary"
       blur={{ intensity: 70, tint: 'dark' }}
       haptics
-      style={{ margin: 0, marginBottom: 0, width: '100%', minHeight: height }}
+      style={{
+        margin: 0,
+        marginBottom: 0,
+        width: '100%',
+        minHeight: height,
+        maxWidth: 140,
+        alignSelf: 'center',
+        borderRadius: 24,
+      }}
     />
   );
 }

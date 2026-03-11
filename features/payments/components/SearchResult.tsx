@@ -1,4 +1,3 @@
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -6,6 +5,7 @@ import opacity from 'hex-color-opacity';
 import { UserProfile } from '@/shared/lib/apiClient';
 import { ProfileImage } from './ProfileImage';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { PressableFeedback } from 'heroui-native';
 
 interface SearchResultProps {
   result: {
@@ -24,10 +24,13 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
     (result.profile?.npub
       ? `${result.profile.npub.slice(0, 12)}…`
       : `${result.pubkey.slice(0, 12)}…`);
-
+  if (loading) {
+    return <HStack spacing={8} align="center"></HStack>;
+  }
   return (
-    <TouchableOpacity onPress={onPress} disabled={loading || !result.profile}>
-      <HStack spacing={8} align="center">
+    <PressableFeedback animation={false} onPress={onPress}>
+      <PressableFeedback.Ripple />
+      <HStack spacing={8} align="center" style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
         <ProfileImage loading={loading} profile={result.profile} />
         <VStack spacing={4} className="flex-1">
           <Text
@@ -50,6 +53,6 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
           )}
         </VStack>
       </HStack>
-    </TouchableOpacity>
+    </PressableFeedback>
   );
 }

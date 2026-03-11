@@ -24,6 +24,7 @@ import { getUsername } from '@/shared/lib/username';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfileStore, ProfileEntry } from '@/shared/stores/global/profileStore';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import {
   switchToExistingProfile,
   createAndSwitchProfile,
@@ -59,14 +60,14 @@ const MENU_ITEMS: MenuItem[] = [
   {
     icon: 'fluent:wallet-20-filled',
     label: 'Wallet',
-    route: '(drawer)/(tabs)/index',
+    route: '(drawer)/(tabs)',
     drawerLabel: 'wallet',
   },
   {
-    icon: 'fluent:arrow-swap-16-filled',
-    label: 'Payments',
-    route: '(drawer)/(tabs)/payments',
-    drawerLabel: 'payments',
+    icon: 'ph:user-bold',
+    label: 'Contacts',
+    route: '(drawer)/(tabs)/contacts',
+    drawerLabel: 'contacts',
   },
   {
     icon: 'material-symbols:settings-rounded',
@@ -187,6 +188,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const insets = useSafeAreaInsets();
   const { displayName, picture } = useProfileDisplay(nostrKeys?.pubkey || '');
+  const { isOffline } = useOfflineStatus();
 
   const handlePress = useCallback(() => {
     if (nostrKeys?.pubkey) {
@@ -203,7 +205,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
   return (
     <LinearGradient
       colors={[surface, surface, surface, surface, surface, surface, opacity(surface, 0)]}
-      style={[styles.gradientContainer, { paddingTop: insets.top + 16 }]}
+      style={[styles.gradientContainer, { paddingTop: isOffline ? 0 : insets.top }]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}>
       <View style={styles.headerContent}>
@@ -276,15 +278,15 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
           pathname === '/(drawer)/(tabs)/' ||
           pathname.includes('(tabs)/index') ||
           (pathname.includes('(tabs)') &&
-            !pathname.includes('payments') &&
             !pathname.includes('explore') &&
-            !pathname.includes('feed'))
+            !pathname.includes('feed') &&
+            !pathname.includes('contacts'))
         );
       }
       if (route.includes('(tabs)/feed') && pathname.includes('feed')) {
         return true;
       }
-      if (route.includes('(tabs)/payments') && pathname.includes('payments')) {
+      if (route.includes('(tabs)/contacts') && pathname.includes('contacts')) {
         return true;
       }
       if (route.includes('(tabs)/explore') && pathname.includes('explore')) {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, useEffect, memo } from 'react';
 import { View } from '@/shared/ui/primitives/View/View';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import Icon from 'assets/icons';
@@ -10,6 +10,8 @@ interface CustomKeyboardProps {
   unit: 'sat' | string;
   loading?: boolean;
   compact?: boolean;
+  /** External value to sync internal state (e.g. after fiat/sats toggle) */
+  value?: string;
 }
 
 type KeyboardValue = string | number;
@@ -19,8 +21,15 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   unit,
   loading = false,
   compact = false,
+  value,
 }) => {
-  const [, setInputValue] = useState('');
+  const [, setInputValue] = useState(value ?? '');
+
+  useEffect(() => {
+    if (value !== undefined) {
+      setInputValue(value);
+    }
+  }, [value]);
 
   const handlePress = useCallback(
     (value: KeyboardValue) => {

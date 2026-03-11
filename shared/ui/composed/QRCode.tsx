@@ -17,7 +17,7 @@ const MAX_QR_DATA_LENGTH = 2000;
  * Circle background for the QR code center logo — matches the gradient background.
  */
 const Circle = memo(() => {
-  const surfaceTertiary = useThemeColor('surface-tertiary');
+  const foreground = useThemeColor('foreground');
   return (
     <View
       className="absolute z-10"
@@ -28,7 +28,7 @@ const Circle = memo(() => {
         transform: [{ translateX: -50 }, { translateY: -50 }, { scale: 0.63 }],
         left: '50%' as any,
         top: '50%' as any,
-        backgroundColor: surfaceTertiary,
+        backgroundColor: foreground,
       }}
     />
   );
@@ -57,11 +57,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   animate: animateProp = false,
   variant: _variant = 'primary',
 }: AnimatedQRCodeProps) {
-  const [foreground, surfaceSecondary, surfaceTertiary] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-    'surface-tertiary',
-  ] as const);
+  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const { width: screenWidth } = useWindowDimensions();
 
   const [index, setIndex] = useState(0);
@@ -127,7 +123,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
 
   const width = Math.min(screenWidth, 600);
   const isLocationUnit = unit.startsWith('circle-flags');
-  const gradientColors = [surfaceSecondary, surfaceTertiary] as const;
+  const gradientColors = [foreground, foreground] as const;
   const qrSize = width - 2 * padding;
 
   return (
@@ -143,7 +139,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
               justifyContent: 'center',
               alignItems: 'center',
             }}>
-            <ActivityIndicator size="large" color={foreground} />
+            <ActivityIndicator size="large" color={surfaceTertiary} />
           </View>
         ) : showError ? (
           // Error state if encoding failed
@@ -159,7 +155,12 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
           </View>
         ) : canRenderQR ? (
           // Normal QR code render
-          <EQRCode color={foreground} backgroundColor="transparent" value={qrData} size={qrSize} />
+          <EQRCode
+            color={surfaceTertiary}
+            backgroundColor="transparent"
+            value={qrData}
+            size={qrSize}
+          />
         ) : (
           // Fallback: data too large and couldn't be encoded
           <View
@@ -170,7 +171,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
               alignItems: 'center',
               padding: 20,
             }}>
-            <ActivityIndicator size="large" color={foreground} />
+            <ActivityIndicator size="large" color={surfaceTertiary} />
           </View>
         )}
       </LinearGradient>
@@ -190,8 +191,8 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
           <CurrencyIcon
             width={72}
             currency={unit}
-            colors={[surfaceSecondary, surfaceTertiary, surfaceTertiary]}
-            iconColor={foreground}
+            colors={[foreground, foreground, foreground]}
+            iconColor={surfaceTertiary}
           />
         )}
       </View>

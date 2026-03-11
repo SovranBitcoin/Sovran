@@ -55,16 +55,6 @@ export default function TabLayout() {
               <Expo55NativeTabs.Trigger.Label>Feed</Expo55NativeTabs.Trigger.Label>
             </Expo55NativeTabs.Trigger>
 
-            <Expo55NativeTabs.Trigger name="payments">
-              <Expo55NativeTabs.Trigger.Icon
-                sf={{
-                  default: 'arrow.up.arrow.down',
-                  selected: 'arrow.up.arrow.down',
-                }}
-              />
-              <Expo55NativeTabs.Trigger.Label>Payments</Expo55NativeTabs.Trigger.Label>
-            </Expo55NativeTabs.Trigger>
-
             <Expo55NativeTabs.Trigger name="index">
               <Expo55NativeTabs.Trigger.Icon
                 sf={{
@@ -73,6 +63,13 @@ export default function TabLayout() {
                 }}
               />
               <Expo55NativeTabs.Trigger.Label>Wallet</Expo55NativeTabs.Trigger.Label>
+            </Expo55NativeTabs.Trigger>
+
+            <Expo55NativeTabs.Trigger name="contacts">
+              <Expo55NativeTabs.Trigger.Icon
+                sf={{ default: 'person.2', selected: 'person.2.fill' }}
+              />
+              <Expo55NativeTabs.Trigger.Label>Contacts</Expo55NativeTabs.Trigger.Label>
             </Expo55NativeTabs.Trigger>
 
             <Expo55NativeTabs.Trigger name="explore">
@@ -115,21 +112,19 @@ export default function TabLayout() {
             }}
           />
           <Tabs.Screen
-            name="payments"
-            options={{
-              title: 'Payments',
-              tabBarIcon: ({ color }) => (
-                <IconSymbol name="arrow.up.arrow.down" color={color} size={24} />
-              ),
-            }}
-          />
-          <Tabs.Screen
             name="index"
             options={{
               title: 'Wallet',
               tabBarIcon: ({ color }) => (
                 <IconSymbol name="wallet.bifold" color={color} size={24} />
               ),
+            }}
+          />
+          <Tabs.Screen
+            name="contacts"
+            options={{
+              title: 'Contacts',
+              tabBarIcon: ({ color }) => <IconSymbol name="person.2" color={color} size={24} />,
             }}
           />
           <Tabs.Screen

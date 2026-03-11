@@ -355,7 +355,6 @@ export function CurrencyScreen({
   const setSelectedMint = useMintStore((state) => state.setSelectedMint);
   const storeSelectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
   const unit = params?.unit?.toLowerCase() || 'sat';
-  const [isValidAmount, setIsValidAmount] = useState(false);
 
   // Get live balance for the selected mint
   const { balance: liveBalances } = useBalanceContext();
@@ -468,9 +467,7 @@ export function CurrencyScreen({
     }
   }, [inputMode, inputAmount, btcPrice]);
 
-  useEffect(() => {
-    setIsValidAmount(satsAmount > 0);
-  }, [satsAmount]);
+  const isValidAmount = satsAmount > 0 || !!(params?.paymentRequest && params?.amount);
 
   const manager = useManager();
   const { isOffline } = useOfflineStatus();
@@ -564,10 +561,14 @@ export function CurrencyScreen({
     let cancelled = false;
     setSendMode(null);
 
+    const debounceTimer = setTimeout(() => {
     void (async () => {
       if (inputMode === 'fiat' && fiatMinorUnitAmount != null && btcPrice) {
         const requestedFiatLabel = formatFiatMinorUnit(fiatMinorUnitAmount, currencyConfig.symbol);
-        const sameDisplayRange = getSatRangeForDisplayedFiatMinorUnit(fiatMinorUnitAmount, btcPrice);
+        const sameDisplayRange = getSatRangeForDisplayedFiatMinorUnit(
+          fiatMinorUnitAmount,
+          btcPrice
+        );
         const sameDisplayCandidates = sameDisplayRange
           ? offlineSendability.reachableSums.filter(
               (candidate) =>
@@ -617,7 +618,9 @@ export function CurrencyScreen({
         }
 
         if (offlineSendability.reachableAmounts.has(amount)) {
-          lines.push(`${formatSatsAmount(amount)} is already exact, so it can be sent offline as entered.`);
+          lines.push(
+            `${formatSatsAmount(amount)} is already exact, so it can be sent offline as entered.`
+          );
         } else {
           lines.push(
             `${formatSatsAmount(amount)} can't be sent offline exactly, so the wallet looks for the nearest exact amount that still displays as ${requestedFiatLabel}.`
@@ -636,7 +639,9 @@ export function CurrencyScreen({
           return;
         }
 
-        lines.push(`No exact offline amount was found that still displays as ${requestedFiatLabel}.`);
+        lines.push(
+          `No exact offline amount was found that still displays as ${requestedFiatLabel}.`
+        );
 
         for (let step = 1; step <= 5; step += 1) {
           const lowerMinorUnit = fiatMinorUnitAmount - step;
@@ -646,8 +651,7 @@ export function CurrencyScreen({
             const lowerRange = getSatRangeForDisplayedFiatMinorUnit(lowerMinorUnit, btcPrice);
             if (lowerRange) {
               const lowerCandidates = offlineSendability.reachableSums.filter(
-                (candidate) =>
-                  candidate >= lowerRange.minSat && candidate <= lowerRange.maxSat
+                (candidate) => candidate >= lowerRange.minSat && candidate <= lowerRange.maxSat
               );
               lines.push(
                 `${formatFiatMinorUnit(lowerMinorUnit, currencyConfig.symbol)} would search ${formatSatsAmount(lowerRange.minSat)} to ${formatSatsAmount(lowerRange.maxSat)}. Exact offline amounts there: ${formatAmountList(
@@ -714,7 +718,11 @@ export function CurrencyScreen({
         return;
       }
 
-      const suggestions = await getOfflineSendSuggestions(manager.proofService, selectedMint, amount);
+      const suggestions = await getOfflineSendSuggestions(
+        manager.proofService,
+        selectedMint,
+        amount
+      );
 
       if (cancelled || sendRouteAnalysisRequestIdRef.current !== requestId) {
         return;
@@ -747,9 +755,13 @@ export function CurrencyScreen({
 
       lines.push(
         `${formatSatsAmount(amount)} can't be sent offline exactly. The closest validated exact amounts are ${
-          suggestions.roundDownAmount ? formatSatsAmount(suggestions.roundDownAmount) : 'no lower match'
+          suggestions.roundDownAmount
+            ? formatSatsAmount(suggestions.roundDownAmount)
+            : 'no lower match'
         } and ${
-          suggestions.roundUpAmount ? formatSatsAmount(suggestions.roundUpAmount) : 'no higher match'
+          suggestions.roundUpAmount
+            ? formatSatsAmount(suggestions.roundUpAmount)
+            : 'no higher match'
         }.`
       );
 
@@ -759,9 +771,11 @@ export function CurrencyScreen({
         message: lines.join('\n\n'),
       });
     })();
+    }, 300);
 
     return () => {
       cancelled = true;
+      clearTimeout(debounceTimer);
     };
   }, [
     amount,
@@ -1151,12 +1165,6 @@ export function CurrencyScreen({
     }
   };
 
-  useEffect(() => {
-    if (params?.paymentRequest && params?.amount) {
-      setIsValidAmount(true);
-    }
-  }, [selectedMint, params?.paymentRequest, params?.amount]);
-
   const handlePastePress = async () => {
     const text = await Clipboard.getStringAsync();
     if (!text) {
@@ -1232,6 +1240,12 @@ export function CurrencyScreen({
   // Get the unit to pass to keyboard based on input mode
   const keyboardUnit = inputMode === 'sats' ? 'sat' : displayCurrency;
 
+  // Keyboard value synced externally (critical for fiat/sats toggle)
+  const keyboardValue = useMemo(() => {
+    if (inputMode === 'fiat') return rawFiatInput;
+    return inputAmount > 0 ? String(inputAmount) : '';
+  }, [inputMode, inputAmount, rawFiatInput]);
+
   // Format the secondary display value
   const secondaryDisplay = useMemo(() => {
     if (inputMode === 'sats') {
@@ -1306,6 +1320,7 @@ export function CurrencyScreen({
             loading={loading}
             unit={keyboardUnit}
             compact={isCompactPhone}
+            value={keyboardValue}
             onKeyPress={(value: string) => {
               setInputAmount(parseFloat(value) || 0);
               if (inputMode === 'fiat') {

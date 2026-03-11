@@ -22,8 +22,26 @@ interface DraggableContactsListProps {
 }
 
 const RenderItem = React.memo(
-  ({ item, profile, isLoadingProfile }: { item: any; profile: any; isLoadingProfile: boolean }) => (
-    <ContactItem item={item} profile={profile} isLoadingProfile={isLoadingProfile} />
+  ({
+    item,
+    profile,
+    isLoadingProfile,
+    index,
+    length,
+  }: {
+    item: any;
+    profile: any;
+    isLoadingProfile: boolean;
+    index: number;
+    length: number;
+  }) => (
+    <ContactItem
+      item={item}
+      profile={profile}
+      isLoadingProfile={isLoadingProfile}
+      index={index}
+      length={length}
+    />
   )
 );
 
@@ -67,12 +85,14 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
       contentContainerStyle={styles.scrollContent}>
       <RNView style={[styles.card, { borderColor }]}>
         <BlurCardFrame accentColor={muted}>
-          <View style={styles.content} className="gap-4">
+          <View style={styles.content}>
             {displayData.map((item, index) => {
               const key = item.pubkey || item.mint?.mintUrl || `item-${index}`;
               const { profile, isLoadingProfile } = getItemProps(item);
               return (
                 <RenderItem
+                  index={index}
+                  length={displayData.length}
                   key={key}
                   item={item}
                   profile={profile}
@@ -112,7 +132,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   content: {
-    padding: 16,
     zIndex: 1,
   },
 });

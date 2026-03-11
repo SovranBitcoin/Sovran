@@ -224,11 +224,7 @@ function generateSubsetSums(values: number[]): number[] {
   return sums;
 }
 
-function exhaustiveSearch(
-  coins: number[],
-  target: number,
-  startedAt: number
-): CompositionResult {
+function exhaustiveSearch(coins: number[], target: number, startedAt: number): CompositionResult {
   const totalSubsets = 1 << coins.length;
   let bestLower: number | null = null;
   let bestUpper: number | null = null;
@@ -391,7 +387,10 @@ async function findNearestValidatedReachableAmountInRange(
 
   for (const candidateIndex of candidateIndices) {
     const candidateAmount = reachableSums[candidateIndex];
-    if (candidateAmount != null && (await isExactOfflineAmount(proofService, mintUrl, candidateAmount))) {
+    if (
+      candidateAmount != null &&
+      (await isExactOfflineAmount(proofService, mintUrl, candidateAmount))
+    ) {
       return candidateAmount;
     }
   }
@@ -462,7 +461,9 @@ export function buildExactOfflineAmountIndex(proofAmounts: number[]): ExactOffli
   }
 
   return {
-    reachableSums: buildReachableSums(validProofAmounts, totalReadyBalance).filter((sum) => sum > 0),
+    reachableSums: buildReachableSums(validProofAmounts, totalReadyBalance).filter(
+      (sum) => sum > 0
+    ),
     totalReadyBalance,
   };
 }
@@ -845,7 +846,9 @@ export async function getOfflineFiatSendSuggestions(
 
   if (!roundDownOption && fiatComposition.nearestLowerFiat) {
     const fallbackMinorUnit = Math.round(fiatComposition.nearestLowerFiat.fiat * minorUnitsPerUnit);
-    if (await isExactOfflineAmount(proofService, mintUrl, fiatComposition.nearestLowerFiat.satoshis)) {
+    if (
+      await isExactOfflineAmount(proofService, mintUrl, fiatComposition.nearestLowerFiat.satoshis)
+    ) {
       roundDownOption = {
         amount: fiatComposition.nearestLowerFiat.satoshis,
         displayMinorUnit: fallbackMinorUnit,
@@ -855,7 +858,9 @@ export async function getOfflineFiatSendSuggestions(
 
   if (!roundUpOption && fiatComposition.nearestUpperFiat) {
     const fallbackMinorUnit = Math.round(fiatComposition.nearestUpperFiat.fiat * minorUnitsPerUnit);
-    if (await isExactOfflineAmount(proofService, mintUrl, fiatComposition.nearestUpperFiat.satoshis)) {
+    if (
+      await isExactOfflineAmount(proofService, mintUrl, fiatComposition.nearestUpperFiat.satoshis)
+    ) {
       roundUpOption = {
         amount: fiatComposition.nearestUpperFiat.satoshis,
         displayMinorUnit: fallbackMinorUnit,

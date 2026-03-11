@@ -11,6 +11,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   onChangeText,
   placeholder,
   keyboardType = 'web-search',
+  autoFocus,
   debounceMs,
 }: GlassSearchBarProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -20,6 +21,12 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   useEffect(() => {
     onChangeTextRef.current = onChangeText;
   }, [onChangeText]);
+
+  // Cancel pending debounce when clearKey changes (user pressed X)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    latestTextRef.current = '';
+  }, [clearKey]);
 
   useEffect(() => {
     return () => {
@@ -45,7 +52,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   );
 
   return (
-    <View style={{ alignItems: 'center', width }}>
+    <View style={{ alignItems: 'center', ...(width != null ? { width } : { flex: 1 }) }}>
       <TextField key={clearKey} className="w-full">
         <Input
           defaultValue=""
@@ -53,6 +60,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
           onChangeText={handleTextChange}
           keyboardType={keyboardType}
           autoCorrect={false}
+          autoFocus={autoFocus}
           className="bg-surface-secondary text-foreground h-11 w-full rounded-xl border-0 px-3"
         />
       </TextField>
