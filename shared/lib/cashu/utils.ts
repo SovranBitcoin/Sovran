@@ -246,14 +246,14 @@ const parseLnurlp = (url: string): string | null => {
 /**
  * Decodes a lightning address or lnurlp URL to a callback URL
  */
-const decodeUrlOrAddress = (lnUrlOrAddress: string): string | null => {
-  const address = parseLightningAddress(lnUrlOrAddress);
+const decodeUrlOrAddress = (meltTarget: string): string | null => {
+  const address = parseLightningAddress(meltTarget);
   if (address) {
     const { username, domain } = address;
     const protocol = domain.match(/\.onion$/) ? 'http' : 'https';
     return `${protocol}://${domain}/.well-known/lnurlp/${username}`;
   }
-  return parseLnurlp(lnUrlOrAddress);
+  return parseLnurlp(meltTarget);
 };
 
 interface LnUrlPayParams {
@@ -266,8 +266,8 @@ interface LnUrlPayParams {
 /**
  * Fetches LNURL pay parameters from a lightning address or lnurlp URL
  */
-const getLnurlPayParams = async (lnUrlOrAddress: string): Promise<LnUrlPayParams | null> => {
-  const url = decodeUrlOrAddress(lnUrlOrAddress);
+const getLnurlPayParams = async (meltTarget: string): Promise<LnUrlPayParams | null> => {
+  const url = decodeUrlOrAddress(meltTarget);
   if (!url) return null;
 
   const response = await fetch(url);
@@ -277,15 +277,15 @@ const getLnurlPayParams = async (lnUrlOrAddress: string): Promise<LnUrlPayParams
 
 /**
  * Requests an invoice from a lightning address or lnurlp URL
- * @param lnUrlOrAddress - Lightning address (user@domain.com) or lnurlp URL
+ * @param meltTarget - Lightning address (user@domain.com) or lnurlp URL
  * @param amountSats - Amount in satoshis
  * @returns The lightning invoice (payment request)
  */
 export const requestInvoiceFromLnurl = async (
-  lnUrlOrAddress: string,
+  meltTarget: string,
   amountSats: number
 ): Promise<string> => {
-  const params = await getLnurlPayParams(lnUrlOrAddress);
+  const params = await getLnurlPayParams(meltTarget);
   if (!params || !params.callback) {
     throw new Error('Invalid LNURL or lightning address');
   }

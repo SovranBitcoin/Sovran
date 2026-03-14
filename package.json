@@ -41,6 +41,7 @@
     "release:freedomstore:pr": "bash scripts/create-freedomstore-pr.sh"
   },
   "dependencies": {
+    "coco-payment-ux": "file:./coco-payment-ux",
     "@babel/runtime": "^7.28.0",
     "@bacons/apple-targets": "^4.0.6",
     "@cashu/cashu-ts": "^3.5.0",

@@ -1,20 +1,15 @@
 import {
   buildExactOfflineAmountIndex,
   getOfflineFiatSendSuggestions,
-  getRoundedFiatMinorUnitForSats,
   getOfflineSendSuggestions,
   getSatRangeForDisplayedFiatMinorUnit,
-} from '@/features/send/lib/offlineSendSuggestions';
+} from '@/features/send/lib/offlineSendHelpers';
+import { getRoundedFiatMinorUnitForSats } from 'coco-payment-ux';
 
-function createProofService(exactAmounts: number[], readyProofAmounts: number[]) {
-  const exactAmountSet = new Set(exactAmounts);
-
+function createProofService(readyProofAmounts: number[]) {
   return {
     async getReadyProofs() {
       return readyProofAmounts.map((amount) => ({ amount }));
-    },
-    async selectProofsToSend(_mintUrl: string, amount: number) {
-      return exactAmountSet.has(amount) ? [{ amount }] : [{ amount: amount + 1 }];
     },
   };
 }
@@ -28,7 +23,7 @@ describe('offline send suggestions', () => {
   });
 
   it('recognizes when the requested amount is already sendable offline', async () => {
-    const proofService = createProofService([6, 8, 10, 12, 14], [2, 4, 8]);
+    const proofService = createProofService([2, 4, 8]);
 
     const result = await getOfflineSendSuggestions(proofService, 'mint-a', 6);
 
@@ -41,7 +36,7 @@ describe('offline send suggestions', () => {
   });
 
   it('finds both round-down and round-up options around a swap-required amount', async () => {
-    const proofService = createProofService([6, 8, 10, 12, 14], [2, 4, 8]);
+    const proofService = createProofService([2, 4, 8]);
 
     const result = await getOfflineSendSuggestions(proofService, 'mint-a', 7);
 
@@ -54,7 +49,7 @@ describe('offline send suggestions', () => {
   });
 
   it('returns only a lower option when the requested amount is above every exact sendable amount', async () => {
-    const proofService = createProofService([6, 8, 10, 12, 14], [2, 4, 8]);
+    const proofService = createProofService([2, 4, 8]);
 
     const result = await getOfflineSendSuggestions(proofService, 'mint-a', 15);
 
@@ -67,7 +62,7 @@ describe('offline send suggestions', () => {
   });
 
   it('returns only a higher option when the requested amount is below every exact sendable amount', async () => {
-    const proofService = createProofService([4, 8, 12], [4, 8]);
+    const proofService = createProofService([4, 8]);
 
     const result = await getOfflineSendSuggestions(proofService, 'mint-a', 1);
 
@@ -79,8 +74,8 @@ describe('offline send suggestions', () => {
     });
   });
 
-  it('returns no suggestions when no exact offline amount can be validated', async () => {
-    const proofService = createProofService([], [2, 4, 8]);
+  it('returns no suggestions when no proofs available', async () => {
+    const proofService = createProofService([]);
 
     const result = await getOfflineSendSuggestions(proofService, 'mint-a', 7);
 
@@ -88,7 +83,7 @@ describe('offline send suggestions', () => {
       isRequestedAmountSendableOffline: false,
       roundDownAmount: null,
       roundUpAmount: null,
-      totalReadyBalance: 14,
+      totalReadyBalance: 0,
     });
   });
 
@@ -102,7 +97,7 @@ describe('offline send suggestions', () => {
   });
 
   it('auto-selects the nearest offline-sendable amount that preserves the entered fiat display', async () => {
-    const proofService = createProofService([10009], [10009, 3000]);
+    const proofService = createProofService([10009, 3000]);
 
     const result = await getOfflineFiatSendSuggestions(
       proofService,
@@ -122,7 +117,7 @@ describe('offline send suggestions', () => {
   });
 
   it('returns adjacent fiat suggestions when no exact amount exists in the same displayed fiat window', async () => {
-    const proofService = createProofService([10000, 10020], [10000, 10020]);
+    const proofService = createProofService([10000, 10020]);
 
     const result = await getOfflineFiatSendSuggestions(
       proofService,

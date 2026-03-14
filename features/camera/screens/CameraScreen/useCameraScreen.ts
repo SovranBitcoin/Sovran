@@ -2,10 +2,11 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Dimensions, AppState } from 'react-native';
 import { useCameraPermissions, scanFromURLAsync } from 'expo-camera';
 import { useFocusEffect } from 'expo-router';
+import { debugLog } from '@/shared/lib/debugLog';
 import { noQrCodeFoundPopup, qrScanFailedPopup } from '@/shared/lib/popup';
-import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePaste } from '@/shared/hooks/usePaste';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -21,7 +22,9 @@ export interface ScanningData {
 }
 
 export interface CameraScreenProps {
-  onScan: (data: ScanningData) => Promise<void | { urInProgress: boolean; progress?: number; lockedPending?: boolean }>;
+  onScan: (
+    data: ScanningData
+  ) => Promise<void | { urInProgress: boolean; progress?: number; lockedPending?: boolean }>;
   onReset?: () => void;
   scanLocked?: boolean;
   /** Called once on mount with an `unlock` function that resets the processing lock. */
@@ -94,6 +97,14 @@ export function useCameraScreen({
 
   const handleScan = useCallback(
     async (data: ScanningData) => {
+      // #region agent log
+      debugLog({
+        location: 'useCameraScreen.ts:handleScan',
+        message: 'camera handleScan before',
+        phase: 'before',
+        data: { dataLen: data?.data?.length, type: data?.type },
+      });
+      // #endregion
       if (scanLocked) return;
 
       const isUrCode = data.data.toLowerCase().startsWith('ur:');
@@ -106,6 +117,14 @@ export function useCameraScreen({
       setLoading(true);
       try {
         const result = await onScan(data);
+        // #region agent log
+        debugLog({
+          location: 'useCameraScreen.ts:handleScan',
+          message: 'camera handleScan after onScan',
+          phase: 'after',
+          data: { urInProgress: result && typeof result === 'object' && 'urInProgress' in result ? (result as any).urInProgress : undefined },
+        });
+        // #endregion
         const urInProgress =
           result && typeof result === 'object' && 'urInProgress' in result
             ? result.urInProgress
@@ -177,13 +196,12 @@ export function useCameraScreen({
     }
   }, [handleScan]);
 
-  const handleClipboardPress = useCallback(async (): Promise<void> => {
-    const text = await Clipboard.getStringAsync();
-    if (!text) return;
-
-    const scanning: ScanningData = { data: text, type: 'paste' };
-    await handleScan(scanning);
-  }, [handleScan]);
+  const { handlePaste: handleClipboardPress } = usePaste({
+    onPaste: async (text) => {
+      const scanning: ScanningData = { data: text, type: 'paste' };
+      await handleScan(scanning);
+    },
+  });
 
   return {
     foreground,

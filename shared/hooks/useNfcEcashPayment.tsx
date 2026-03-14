@@ -140,17 +140,22 @@ export function useNfcEcashPayment({
             addScan(raw, raw, 'ecash', 'nfc');
             lastScannedRaw = raw;
           },
-          onLightningInvoice: (invoice, amount) => {
-            addScan(invoice, invoice, 'lightning', 'nfc');
+          onLightningInvoice: (meltTarget, amount) => {
+            addScan(meltTarget, meltTarget, 'lightning', 'nfc');
             if (amount) {
               router.navigate({
                 pathname: '/(send-flow)/mintSelect' as any,
-                params: { to: 'meltQuote', unit: 'sat', minAmount: String(amount), invoice },
+                params: {
+                  destination: 'meltQuote',
+                  unit: 'sat',
+                  minAmount: String(amount),
+                  meltTarget,
+                },
               });
             } else {
               router.navigate({
-                pathname: '/(send-flow)/currency' as any,
-                params: { to: 'meltQuote', lnUrlOrAddress: invoice, unit: 'sat' },
+                pathname: '/(send-flow)/amount' as any,
+                params: { destination: 'meltQuote', meltTarget, unit: 'sat' },
               });
             }
           },

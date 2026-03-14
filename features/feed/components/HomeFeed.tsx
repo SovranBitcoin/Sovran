@@ -7,12 +7,7 @@
  */
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
-import {
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
-  useWindowDimensions,
-} from 'react-native';
+import { StyleSheet, ActivityIndicator, RefreshControl, useWindowDimensions } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -935,18 +930,11 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
           renderItem={renderItem}
           extraData={`${dataVersion}:${engagementRevision}`}
           recycleItems
-
           ListEmptyComponent={
-            isLoading ? (
-              <ActivityIndicator style={styles.loader} />
-            ) : (
-              <EmptyFeed />
-            )
+            isLoading ? <ActivityIndicator style={styles.loader} /> : <EmptyFeed />
           }
           ListFooterComponent={
-            isLoadingMore ? (
-              <ActivityIndicator style={styles.loadMoreSpinner} />
-            ) : null
+            isLoadingMore ? <ActivityIndicator style={styles.loadMoreSpinner} /> : null
           }
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.4}

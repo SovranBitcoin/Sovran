@@ -4,6 +4,7 @@ export {
   profileSwitcherPopup,
   emojiPickerPopup,
   offlineSendSuggestionsPopup,
+  paymentOptionsPopup,
   buttonHandlerPopup,
 } from './actionSheets';
 export {

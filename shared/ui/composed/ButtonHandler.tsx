@@ -110,7 +110,7 @@ export type ButtonHandlerActionButton = ButtonHandlerButton;
  * Configuration object for the ButtonHandler component supporting
  * multiple buttons, context-aware styling, and overflow handling.
  */
-interface ButtonHandlerProps {
+export interface ButtonHandlerProps {
   /** Context for styling adjustments ('tab' or 'sheet') */
   context?: 'tab' | 'sheet';
   /** Array of button configurations */

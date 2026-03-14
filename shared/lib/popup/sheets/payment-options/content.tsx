@@ -1,18 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { decodePaymentRequest } from '@cashu/cashu-ts';
 import opacity from 'hex-color-opacity';
 import { Alert, ListGroup, PressableFeedback } from 'heroui-native';
 
 import Icon from 'assets/icons';
+import { defaultDetectors, type AnnotatedOption, type PaymentOptionKind } from 'coco-payment-ux';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import type { AnnotatedOption } from '@/shared/lib/cashu/paymentIntent';
-import type {
-  SupportedPaymentKind,
-  SupportedPaymentOption,
-} from '@/shared/lib/cashu/paymentInputParser';
 import { getEcashTokenAmount } from '@/shared/lib/cashu/utils';
 import type { ActionSheetPayloads } from '../../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../types';
@@ -22,29 +17,29 @@ interface PaymentOptionsContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['payment-options'];
 }
 
-const CASHU_KINDS: SupportedPaymentKind[] = ['cashuPaymentRequest', 'ecashToken'];
-const LIGHTNING_KINDS: SupportedPaymentKind[] = ['lightningInvoice', 'lightningAddress', 'lnurlp'];
+const CASHU_KINDS: PaymentOptionKind[] = ['paymentRequest', 'ecashToken'];
+const LIGHTNING_KINDS: PaymentOptionKind[] = ['lightningInvoice', 'lightningAddress', 'lnurlp'];
 
-function getMethodLabel(kind: SupportedPaymentKind): string {
+function getMethodLabel(kind: PaymentOptionKind): string {
   if (CASHU_KINDS.includes(kind)) return 'Cashu';
   if (LIGHTNING_KINDS.includes(kind)) return 'Lightning';
   return kind;
 }
 
-function getMethodIcon(kind: SupportedPaymentKind): string {
+function getMethodIcon(kind: PaymentOptionKind): string {
   if (CASHU_KINDS.includes(kind)) return 'majesticons:coins';
   if (LIGHTNING_KINDS.includes(kind)) return 'mdi:lightning-bolt';
   return 'mdi:gesture-tap-button';
 }
 
-function getOptionAmount(option: SupportedPaymentOption): number | undefined {
+function getOptionAmount(option: {
+  kind: PaymentOptionKind;
+  value: string;
+  amount?: number | null;
+}): number | undefined {
   if (option.amount != null && option.amount > 0) return option.amount;
-  if (option.kind === 'cashuPaymentRequest') {
-    try {
-      return decodePaymentRequest(option.value.trim()).amount;
-    } catch {
-      return undefined;
-    }
+  if (option.kind === 'paymentRequest') {
+    return defaultDetectors.getPaymentRequestInfo(option.value)?.amount ?? undefined;
   }
   if (option.kind === 'ecashToken') return getEcashTokenAmount(option.value);
   return undefined;
@@ -75,7 +70,7 @@ export function PaymentOptionsContent({ payload, close }: PaymentOptionsContentP
     [close, payload]
   );
 
-  const hasMultipleKinds = new Set(payload.options.map((o) => o.option.kind)).size > 1;
+  const hasMultipleKinds = new Set(payload.annotatedOptions.map((o) => o.option.kind)).size > 1;
   const isProcessing = inflightIndex !== null;
   const unit = payload.unit ?? 'sat';
 
@@ -94,7 +89,7 @@ export function PaymentOptionsContent({ payload, close }: PaymentOptionsContentP
           </Alert>
         )}
         <ListGroup variant="secondary">
-          {payload.options.map((annotated, index) => {
+          {payload.annotatedOptions.map((annotated, index) => {
             const isDisabled = annotated.status === 'disabled' || isProcessing;
             const label = getMethodLabel(annotated.option.kind);
             const subtitle = annotated.status === 'recommended' ? 'Recommended' : undefined;

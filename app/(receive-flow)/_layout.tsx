@@ -5,7 +5,7 @@
  * The parent root Stack presents this group as a modal (slides up from bottom).
  * Screens within this group push horizontally:
  * - receive: Entry point, shows receive options
- * - currency: Amount selector (pushes horizontally)
+ * - amount: Amount selector (pushes horizontally)
  * - mintQuote: Lightning invoice display (pushes horizontally)
  *
  * The first screen shows a close button, subsequent screens show a back button.
@@ -21,7 +21,8 @@ export default function ReceiveFlowLayout() {
   return (
     <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
       <Stack.Screen name="receive" options={{ title: 'Receive' }} />
-      <Stack.Screen name="currency" options={{ title: 'Select Amount' }} />
+      <Stack.Screen name="amount" options={{ title: 'Select Amount' }} />
+      <Stack.Screen name="mintSelect" options={{ title: 'Select Mint' }} />
       <Stack.Screen name="mintQuote" options={{ title: 'Receive Lightning' }} />
       <Stack.Screen name="receiveToken" options={{ title: 'Receive Ecash' }} />
       <Stack.Screen

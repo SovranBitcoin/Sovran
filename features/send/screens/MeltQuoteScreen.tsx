@@ -6,7 +6,7 @@
  *
  * The Screen supports two flows:
  * 1. Viewing existing transaction: meltHistoryEntry prop provided
- * 2. Creating new quote: invoice or lnUrlOrAddress + amount provided
+ * 2. Creating new quote: meltTarget + amount provided
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -23,20 +23,18 @@ import {
   HistoryEntryTimeline,
   TransactionLocationSection,
 } from '@/features/transactions';
-import { getLightningTimestamp, requestInvoiceFromLnurl } from '@/shared/lib/cashu/utils';
 import {
-  paymentCancelledPopup,
-  couldNotCancelPopup,
-  paymentStatusPopup,
-  quoteCreationFailedPopup,
-} from '@/shared/lib/popup';
+  getLightningTimestamp,
+  isLightningInvoice,
+  requestInvoiceFromLnurl,
+} from '@/shared/lib/cashu/utils';
+import { paymentCancelledPopup, couldNotCancelPopup, paymentStatusPopup } from '@/shared/lib/popup';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useMeltWithHistory } from '@/features/send';
 import { useBeforeRemoveCleanup } from '@/shared/hooks/useBeforeRemoveCleanup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
-import { WalletHeaderTitle } from '@/features/wallet';
+import { MintSelector } from '@/features/wallet';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
@@ -49,47 +47,38 @@ import { truncateMiddle } from '@/shared/lib/strings';
 import { convertTime } from '@/shared/lib/time';
 import { meltQuoteExpired } from '@/shared/lib/utils';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 
 interface MeltQuoteScreenProps {
   /** For viewing existing transaction - either parsed entry or JSON string */
   meltHistoryEntry?: MeltHistoryEntry | string;
-  /** Direct Lightning invoice for creating new quote */
-  invoice?: string;
-  /** Lightning address or LNURL for creating new quote (requires amount) */
-  lnUrlOrAddress?: string;
-  /** Amount in sats (required when using lnUrlOrAddress) */
+  /** BOLT11 invoice, Lightning address, or LNURL-p URL (requires amount when not BOLT11) */
+  meltTarget?: string;
+  /** Amount in sats (required when meltTarget is Lightning address or LNURL-p) */
   amount?: number;
-  /** Mint to use for quote creation; overrides store selection when provided */
+  /** Mint to use for quote creation. When changed, the route wrapper remounts the screen via key. */
   selectedMintUrl?: string;
   onCancel: () => void;
   /** Callback when send is successful (after popup closes) */
   onSendSuccess?: () => void;
+  /** Called when user picks a mint from the MintSelector. */
+  onMintSelected?: (mintUrl: string) => void;
+  /** Called when user requests to see the full mint list. */
+  onRequestMintList?: () => void;
 }
 
 export function MeltQuoteScreen({
   meltHistoryEntry: meltHistoryEntryProp,
-  invoice: invoiceProp,
-  lnUrlOrAddress: lnUrlOrAddressProp,
+  meltTarget: meltTargetProp,
   amount: amountProp,
   selectedMintUrl: selectedMintUrlProp,
   onCancel,
   onSendSuccess,
+  onMintSelected,
+  onRequestMintList,
 }: MeltQuoteScreenProps) {
   const manager = useManager();
-  const { keys } = useNostrKeysContext();
-  const selectedMints = useMintStore((state) => state.selectedMints);
-  const setSelectedMint = useMintStore((state) => state.setSelectedMint);
-  const selectedMintFromStore = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
-  const effectiveMint = selectedMintUrlProp ?? selectedMintFromStore;
-
-  // When routing passes a mint (e.g. from payment options), ensure store matches so WalletHeaderTitle shows it
-  useEffect(() => {
-    if (keys?.pubkey && selectedMintUrlProp && selectedMintFromStore !== selectedMintUrlProp) {
-      setSelectedMint(keys.pubkey, selectedMintUrlProp);
-    }
-  }, [keys?.pubkey, selectedMintUrlProp, selectedMintFromStore, setSelectedMint]);
+  const effectiveMint = selectedMintUrlProp;
 
   // For viewing existing transaction
   const { entry: trackedHistoryEntry, error: parseError } =
@@ -104,7 +93,6 @@ export function MeltQuoteScreen({
     isCreating,
     isPaying,
     error: meltError,
-    reset: resetMeltState,
     executeMeltQuote,
     cancelMeltQuote,
   } = useMeltWithHistory();
@@ -116,17 +104,6 @@ export function MeltQuoteScreen({
   const [isResolvingLnurl, setIsResolvingLnurl] = useState(false);
   const [resolutionError, setResolutionError] = useState<string | null>(null);
   const hasStartedCreation = useRef(false);
-  // Track the mint URL used for the current quote
-  // This ensures we always pay with the mint that created the quote
-  const lastQuoteMintRef = useRef<string | null>(null);
-
-  // Initialize lastQuoteMintRef from history entry if provided
-  // This is needed for NFC flow where we pass a pre-created quote
-  useEffect(() => {
-    if (trackedHistoryEntry?.mintUrl && !lastQuoteMintRef.current) {
-      lastQuoteMintRef.current = trackedHistoryEntry.mintUrl;
-    }
-  }, [trackedHistoryEntry?.mintUrl]);
 
   // Clear payment status when leaving so retries start fresh
   const quoteIdForCleanup = createdHistoryEntry?.quoteId ?? trackedHistoryEntry?.quoteId;
@@ -142,7 +119,7 @@ export function MeltQuoteScreen({
   // The history entry to display - prefer newly created (e.g., after mint change) over initial prop
   const currentTransaction = createdHistoryEntry || trackedHistoryEntry;
   const sourceLabel = useTransactionSource(currentTransaction?.id);
-  const mintInfo = useMintInfo(currentTransaction?.mintUrl || selectedMintFromStore);
+  const mintInfo = useMintInfo(currentTransaction?.mintUrl ?? effectiveMint);
 
   // The quote to display - either derived from history entry or created
   const displayQuote: MeltQuoteBolt11Response | null =
@@ -161,7 +138,7 @@ export function MeltQuoteScreen({
         }
       : null);
 
-  const [unit, setUnit] = useState(currentTransaction?.unit || 'sat');
+  const unit = currentTransaction?.unit || 'sat';
 
   // On back/swipe/hardware back: roll back the melt so reserved proofs are freed.
   // active: prevent leave when we have an operation (usePreventRemove works with native-stack).
@@ -177,15 +154,21 @@ export function MeltQuoteScreen({
       }),
   });
 
-  // Resolve LNURL to invoice if needed
+  // Resolve Lightning address / LNURL-p to BOLT11 if needed (skip when meltTarget is already BOLT11)
   useEffect(() => {
     const resolveLnurl = async () => {
-      if (lnUrlOrAddressProp && amountProp && !resolvedInvoice && !hasStartedCreation.current) {
+      if (
+        meltTargetProp &&
+        amountProp &&
+        !isLightningInvoice(meltTargetProp) &&
+        !resolvedInvoice &&
+        !hasStartedCreation.current
+      ) {
         setIsResolvingLnurl(true);
         setResolutionError(null);
         try {
-          const invoice = await requestInvoiceFromLnurl(lnUrlOrAddressProp, amountProp);
-          setResolvedInvoice(invoice);
+          const bolt11 = await requestInvoiceFromLnurl(meltTargetProp, amountProp);
+          setResolvedInvoice(bolt11);
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : 'Failed to resolve LNURL';
           setResolutionError(errorMessage);
@@ -196,35 +179,35 @@ export function MeltQuoteScreen({
       }
     };
     resolveLnurl();
-  }, [lnUrlOrAddressProp, amountProp, resolvedInvoice]);
+  }, [meltTargetProp, amountProp, resolvedInvoice]);
 
   // Track whether we've already stored location for the current quote
   const hasStoredLocationRef = useRef(false);
 
-  // Create melt quote when we have an invoice (initial creation)
+  // BOLT11 to pass to coco: meltTarget if it's BOLT11, else resolved from LNURL
+  const bolt11ForCoco =
+    meltTargetProp && isLightningInvoice(meltTargetProp) ? meltTargetProp : resolvedInvoice;
+
+  // Create melt quote on mount. Mint changes are handled by the route wrapper
+  // via key={flowMint}, which remounts this component with the new mint prop.
   useEffect(() => {
     const createQuote = async () => {
-      const invoice = invoiceProp || resolvedInvoice;
       if (
-        invoice &&
+        bolt11ForCoco &&
         effectiveMint &&
         !currentTransaction &&
         !isCreating &&
         !hasStartedCreation.current
       ) {
         hasStartedCreation.current = true;
-        hasStoredLocationRef.current = false; // Reset location flag for new quote
-        lastQuoteMintRef.current = effectiveMint;
+        hasStoredLocationRef.current = false;
         try {
-          const result = await prepareMeltQuote(effectiveMint, invoice);
+          const result = await prepareMeltQuote(effectiveMint, bolt11ForCoco);
 
-          // Capture and store location right after quote creation
           if (result?.historyEntry?.id) {
             await captureAndStoreLocation(result.historyEntry.id);
             hasStoredLocationRef.current = true;
-
-            // Link the scanned invoice to the transaction
-            useScanHistoryStore.getState().linkTransaction(invoice, result.historyEntry.id);
+            useScanHistoryStore.getState().linkTransaction(bolt11ForCoco, result.historyEntry.id);
           }
         } catch (err) {
           console.error('Failed to create melt quote:', err);
@@ -232,89 +215,7 @@ export function MeltQuoteScreen({
       }
     };
     createQuote();
-  }, [
-    invoiceProp,
-    resolvedInvoice,
-    effectiveMint,
-    currentTransaction,
-    isCreating,
-    prepareMeltQuote,
-  ]);
-
-  // Watch for mint changes from the store (e.g., user navigated to mint list and selected a different mint)
-  // This handles the case where onMintSelected callback is bypassed by navigation
-  useEffect(() => {
-    const invoice = invoiceProp || resolvedInvoice;
-
-    // Only re-create quote if:
-    // 1. We have an invoice
-    // 2. Effective mint changed from what we used for the current quote
-    // 3. We're not currently creating a quote
-    // 4. Current transaction is UNPAID (don't re-create for already paid quotes)
-    // Note: We allow re-creation even if we started with a history entry
-    // (e.g., NFC flow passes pre-created quote but user changes mint)
-    if (
-      invoice &&
-      effectiveMint &&
-      lastQuoteMintRef.current &&
-      effectiveMint !== lastQuoteMintRef.current &&
-      !isCreating &&
-      currentTransaction?.state === 'UNPAID'
-    ) {
-      console.log(
-        `Mint changed from ${lastQuoteMintRef.current} to ${effectiveMint}, re-creating quote`
-      );
-      lastQuoteMintRef.current = effectiveMint;
-      resetMeltState();
-      hasStartedCreation.current = false;
-
-      // Create new quote with the newly selected mint
-      prepareMeltQuote(effectiveMint, invoice)
-        .then(async (result) => {
-          if (result?.historyEntry?.id) {
-            // Re-capture location for the new transaction
-            await captureAndStoreLocation(result.historyEntry.id);
-            // Link the new transaction back to the original scan
-            useScanHistoryStore.getState().linkTransaction(invoice, result.historyEntry.id);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to re-create melt quote after mint change:', err);
-        });
-    }
-  }, [
-    effectiveMint,
-    invoiceProp,
-    resolvedInvoice,
-    isCreating,
-    currentTransaction?.state,
-    prepareMeltQuote,
-    resetMeltState,
-  ]);
-
-  // Handle mint selection change (called when user selects via callback, not navigation)
-  const handleMintSelected = async (mint: { id: string; unit: string }) => {
-    setUnit(mint.unit.toLowerCase());
-    // Re-create quote with new mint if we have an invoice
-    const invoice = invoiceProp || resolvedInvoice;
-    if (invoice && mint.id !== lastQuoteMintRef.current) {
-      lastQuoteMintRef.current = mint.id;
-      resetMeltState();
-      hasStartedCreation.current = false;
-      try {
-        const result = await prepareMeltQuote(mint.id, invoice);
-        if (result?.historyEntry?.id) {
-          // Re-capture location for the new transaction
-          await captureAndStoreLocation(result.historyEntry.id);
-          // Link the new transaction back to the original scan
-          useScanHistoryStore.getState().linkTransaction(invoice, result.historyEntry.id);
-        }
-      } catch (err) {
-        console.error('Failed to create quote with new mint:', err);
-        quoteCreationFailedPopup({ text: err instanceof Error ? err.message : undefined });
-      }
-    }
-  };
+  }, [bolt11ForCoco, effectiveMint, currentTransaction, isCreating, prepareMeltQuote]);
 
   /**
    * Cancel the melt operation, freeing reserved proofs, then close the screen.
@@ -420,7 +321,7 @@ export function MeltQuoteScreen({
     return <ScreenLoadingState message="Resolving lightning address..." />;
   }
 
-  if (isCreating || (!currentTransaction && (invoiceProp || lnUrlOrAddressProp) && effectiveMint)) {
+  if (isCreating || (!currentTransaction && meltTargetProp && effectiveMint)) {
     return <ScreenLoadingState message="Creating payment quote..." />;
   }
 
@@ -488,7 +389,13 @@ export function MeltQuoteScreen({
         <HistoryEntryHeader historyEntry={currentTransaction} />
 
         {currentTransaction.state === 'UNPAID' && !isExpired ? (
-          <WalletHeaderTitle width={280} unit={unit} onMintSelected={handleMintSelected} />
+          <MintSelector
+            width={280}
+            unit={unit}
+            selectedMintUrl={effectiveMint}
+            onMintSelected={onMintSelected ?? (() => {})}
+            onRequestMintList={onRequestMintList ?? (() => {})}
+          />
         ) : mintInfo ? (
           <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={currentTransaction} />
         ) : null}

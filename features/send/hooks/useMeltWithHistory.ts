@@ -38,7 +38,7 @@ interface MeltOptions {
  * This shim builds one from the prepared operation so downstream screens
  * (MeltQuoteScreen) can render quote details.
  */
-function operationToQuote(operation: PreparedMeltOp, invoice: string): MeltQuoteBolt11Response {
+function operationToQuote(operation: PreparedMeltOp, meltTarget: string): MeltQuoteBolt11Response {
   return {
     quote: operation.quoteId,
     amount: operation.amount,
@@ -47,7 +47,7 @@ function operationToQuote(operation: PreparedMeltOp, invoice: string): MeltQuote
     expiry: 0,
     payment_preimage: null,
     change: undefined,
-    request: invoice,
+    request: meltTarget,
     unit: 'sat',
   };
 }
@@ -85,7 +85,11 @@ export function useMeltWithHistory() {
   const isProcessingRef = useRef(false);
 
   const prepareMeltQuote = useCallback(
-    async (mintUrl: string, invoice: string, opts: MeltOptions = {}): Promise<MeltQuoteResult> => {
+    async (
+      mintUrl: string,
+      meltTarget: string,
+      opts: MeltOptions = {}
+    ): Promise<MeltQuoteResult> => {
       if (isProcessingRef.current) {
         const err = new Error('Melt operation already in progress');
         opts.onError?.(err);
@@ -98,8 +102,8 @@ export function useMeltWithHistory() {
         throw err;
       }
 
-      if (!invoice?.trim()) {
-        const err = new Error('invoice is required');
+      if (!meltTarget?.trim()) {
+        const err = new Error('meltTarget is required');
         opts.onError?.(err);
         throw err;
       }
@@ -109,9 +113,9 @@ export function useMeltWithHistory() {
       setError(null);
 
       try {
-        const operation = await manager.quotes.prepareMeltBolt11(mintUrl, invoice);
+        const operation = await manager.quotes.prepareMeltBolt11(mintUrl, meltTarget);
 
-        const quote = operationToQuote(operation, invoice);
+        const quote = operationToQuote(operation, meltTarget);
         const historyEntry = operationToHistoryEntry(operation);
         const result: MeltQuoteResult = {
           quote,
@@ -175,8 +179,12 @@ export function useMeltWithHistory() {
   );
 
   const melt = useCallback(
-    async (mintUrl: string, invoice: string, opts: MeltOptions = {}): Promise<MeltQuoteResult> => {
-      const result = await prepareMeltQuote(mintUrl, invoice, opts);
+    async (
+      mintUrl: string,
+      meltTarget: string,
+      opts: MeltOptions = {}
+    ): Promise<MeltQuoteResult> => {
+      const result = await prepareMeltQuote(mintUrl, meltTarget, opts);
       await executeMeltQuote(result.operationId, result.quote.quote, opts);
       return result;
     },

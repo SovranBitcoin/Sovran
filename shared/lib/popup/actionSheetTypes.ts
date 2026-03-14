@@ -1,24 +1,25 @@
+import type { AnnotatedOption, ParsedPaymentInput, PaymentOption } from 'coco-payment-ux';
 import type {
   ButtonHandlerActionButton,
   ButtonHandlerButton,
 } from '@/shared/ui/composed/ButtonHandler';
-import type { AnnotatedOption } from '@/shared/lib/cashu/paymentIntent';
-import type { ParsedPaymentInput, SupportedPaymentOption } from '@/shared/lib/cashu/paymentInputParser';
 
 type EmojiPickerPayload = { token: string };
+
+/** coco-payment-ux aligned: parsed input + annotated options for choose-option sheet */
 type PaymentOptionsPayload = {
   parsed: ParsedPaymentInput;
-  options: AnnotatedOption[];
+  annotatedOptions: AnnotatedOption[];
   unit?: string;
-  onSelectOption: (option: SupportedPaymentOption) => void;
+  onSelectOption: (option: PaymentOption) => void;
   onDismiss?: () => void;
 };
+
+/** Matches coco-payment-ux OfflineSuggestion shape */
+export type OfflineSendSuggestion = { amount: number; label?: string };
 type OfflineSendSuggestionsPayload = {
-  requestedAmount: number;
-  roundDownAmount: number | null;
-  roundDownLabel?: string;
-  roundUpAmount: number | null;
-  roundUpLabel?: string;
+  roundDown: OfflineSendSuggestion | null;
+  roundUp: OfflineSendSuggestion | null;
   unit: string;
   onSelectAmount: (amount: number) => void | Promise<void>;
 };

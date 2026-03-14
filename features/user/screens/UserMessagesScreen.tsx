@@ -1197,10 +1197,9 @@ export function UserMessagesScreen({
     }
 
     router.navigate({
-      pathname: '/(send-flow)/currency',
+      pathname: '/(send-flow)/amount',
       params: {
-        to: 'sendToken',
-        routstrTopUp: 'true',
+        destination: 'sendEcash',
       },
     });
   };
@@ -1607,9 +1606,9 @@ export function UserMessagesScreen({
           variant: 'primary' as const,
           onPress: async (close: any) => {
             router.navigate({
-              pathname: '/(send-flow)/currency',
+              pathname: '/(send-flow)/amount',
               params: {
-                to: 'sendToken',
+                destination: 'sendEcash',
               },
             });
             close({} as any);
@@ -1620,16 +1619,11 @@ export function UserMessagesScreen({
           icon: 'mingcute:lightning-fill',
           variant: 'primary' as const,
           onPress: async (close: any) => {
-            console.log('[LIGHTNING-FLOW] Send Lightning button pressed', {
-              lnUrlOrAddress: lud16,
-              to: 'meltQuote',
-            });
             router.navigate({
-              pathname: '/(send-flow)/currency',
+              pathname: '/(send-flow)/amount',
               params: {
-                to: 'meltQuote',
-                lnUrlOrAddress: lud16,
-                profile: JSON.stringify(userInfo),
+                destination: 'meltQuote',
+                meltTarget: lud16,
               },
             });
             close({} as any);

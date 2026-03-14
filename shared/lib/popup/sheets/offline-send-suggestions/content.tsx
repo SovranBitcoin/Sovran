@@ -1,51 +1,55 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert } from 'heroui-native';
+import React, { useCallback } from 'react';
+import opacity from 'hex-color-opacity';
+import { Alert, ListGroup, PressableFeedback } from 'heroui-native';
+
+import Icon from 'assets/icons';
+import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { View } from '@/shared/ui/primitives/View/View';
-import { SheetHeader } from '../SheetHeader';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ActionSheetPayloads } from '../../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../types';
-
-type SelectionDirection = 'down' | 'up';
+import { SheetHeader } from '../SheetHeader';
+import { useExecutionState } from '@/coco-payment-ux/src/react';
+import { usePaymentFlowMachine } from '@/features/send/providers/PaymentFlowProvider';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 interface OfflineSendSuggestionsContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['offline-send-suggestions'];
 }
 
-function formatFooterAmount(amount: number, unit: string): string {
-  const normalizedUnit = unit.toLowerCase();
-  const suffix = normalizedUnit === 'sat' ? 'sats' : normalizedUnit;
-  return `${amount.toLocaleString('en-US')} ${suffix}`;
-}
+type Option = { direction: 'down' | 'up'; amount: number; label: string };
 
 export function OfflineSendSuggestionsContent({
   payload,
   close,
-  setFooterConfig,
 }: OfflineSendSuggestionsContentProps) {
-  const [selectionInFlight, setSelectionInFlight] = useState<SelectionDirection | null>(null);
-  const footerButtons = useMemo(() => {
-    const buttons: {
-      direction: SelectionDirection;
-      amount: number;
-    }[] = [];
+  const machine = usePaymentFlowMachine({
+    walletContext: useWalletContext(),
+    unit: payload.unit,
+  });
+  const { isExecuting } = useExecutionState(machine);
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
 
-    if (payload.roundUpAmount != null) {
-      buttons.push({ direction: 'up', amount: payload.roundUpAmount });
-    }
-    if (payload.roundDownAmount != null) {
-      buttons.push({ direction: 'down', amount: payload.roundDownAmount });
-    }
+  const options: Option[] = [];
+  if (payload.roundUp != null) {
+    options.push({
+      direction: 'up',
+      amount: payload.roundUp.amount,
+      label: payload.roundUp.label ?? `Round up`,
+    });
+  }
+  if (payload.roundDown != null) {
+    options.push({
+      direction: 'down',
+      amount: payload.roundDown.amount,
+      label: payload.roundDown.label ?? `Round down`,
+    });
+  }
 
-    return buttons.slice(0, 2);
-  }, [payload.roundDownAmount, payload.roundUpAmount]);
-
-  const handleSelectAmount = useCallback(
-    async (direction: SelectionDirection, amount: number | null) => {
-      if (amount == null) return;
-
-      setSelectionInFlight(direction);
+  const handleSelect = useCallback(
+    async (opt: Option) => {
       try {
-        await payload.onSelectAmount(amount);
+        await payload.onSelectAmount(opt.amount);
       } finally {
         close();
       }
@@ -53,50 +57,61 @@ export function OfflineSendSuggestionsContent({
     [close, payload]
   );
 
-  useEffect(() => {
-    setFooterConfig({
-      buttons: footerButtons.length
-        ? footerButtons.map((button) => ({
-            label:
-              selectionInFlight === button.direction
-                ? button.direction === 'down'
-                  ? 'Rounding down...'
-                  : 'Rounding up...'
-                : button.direction === 'down'
-                  ? payload.roundDownLabel ||
-                    `Round down to ${formatFooterAmount(button.amount, payload.unit)}`
-                  : payload.roundUpLabel ||
-                    `Round up to ${formatFooterAmount(button.amount, payload.unit)}`,
-            variant: button.direction === 'down' ? 'primary' : 'tertiary',
-            isDisabled: selectionInFlight !== null,
-            onPress: () => void handleSelectAmount(button.direction, button.amount),
-          }))
-        : [
-            {
-              label: 'Close',
-              variant: 'tertiary',
-              isDisabled: selectionInFlight !== null,
-              onPress: close,
-            },
-          ],
-    });
-
-    return () => setFooterConfig(null);
-  }, [close, footerButtons, handleSelectAmount, payload.unit, selectionInFlight, setFooterConfig]);
-
   return (
     <View>
-      <SheetHeader title="Offline send" centered />
+      <SheetHeader title="Choose amount" centered />
       <View className="px-0 pt-4">
-        <Alert status="warning" className="bg-surface-secondary">
+        <Alert status="warning" className="bg-surface-secondary mb-4">
           <Alert.Content>
-            <Alert.Title>You&apos;re offline</Alert.Title>
+            <Alert.Title>Rounding required</Alert.Title>
             <Alert.Description>
-              You can&apos;t send exact amounts while offline but you can send a nearby exact
-              sendable amount to continue right now.
+              This amount can&apos;t be sent exactly. Choose a nearby amount.
             </Alert.Description>
           </Alert.Content>
         </Alert>
+        <ListGroup variant="secondary">
+          {options.map((opt) => {
+            return (
+              <PressableFeedback
+                key={opt.direction}
+                animation={false}
+                onPress={() => void handleSelect(opt)}
+                isDisabled={isExecuting}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled={isExecuting}>
+                    <ListGroup.ItemPrefix>
+                      <View
+                        className="rounded-full p-2"
+                        style={{ backgroundColor: opacity(muted, 0.25) }}>
+                        <Icon
+                          color={isExecuting ? muted : foreground}
+                          name={
+                            opt.direction === 'down'
+                              ? 'fluent:arrow-download-16-filled'
+                              : 'fluent:arrow-upload-16-filled'
+                          }
+                          size={24}
+                        />
+                      </View>
+                    </ListGroup.ItemPrefix>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>{opt.label}</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <AmountFormatter
+                        amount={opt.amount}
+                        unit={payload.unit}
+                        size={16}
+                        weight="medium"
+                      />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+            );
+          })}
+        </ListGroup>
       </View>
     </View>
   );

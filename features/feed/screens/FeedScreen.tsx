@@ -54,9 +54,7 @@ export function FeedScreen() {
     return (
       <View style={styles.emptyContainer}>
         <Feather name="rss" size={30} color={opacity(foreground, 0.3)} />
-        <Text style={[styles.emptyText, { color: opacity(foreground, 0.4) }]}>
-          No posts yet
-        </Text>
+        <Text style={[styles.emptyText, { color: opacity(foreground, 0.4) }]}>No posts yet</Text>
       </View>
     );
   }, [foreground]);

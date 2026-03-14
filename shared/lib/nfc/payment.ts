@@ -1,17 +1,20 @@
 /**
  * NFC Cashu payment flow: read request from POS, create token, write token back.
  * Single session (IsoDep held until done or error). Handles Lightning invoice redirect.
+ *
+ * Uses coco-payment-ux for: parsePaymentInput, getPaymentRequestInfo, selectMint.
  */
 
 import NfcManager, { NfcTech } from 'react-native-nfc-manager';
+
+import { defaultDetectors, parsePaymentInput, selectMint } from 'coco-payment-ux';
+
 import { NfcError } from './errors';
 import { SELECT_AID, SELECT_NDEF, readBinary, updateBinary, MAX_CHUNK_SIZE } from './constants';
 import { sendApdu, getStatusMessage } from './apdu';
 import { buildTextNdef, decodeTextRecord } from './ndef';
-import { selectBestMint } from './mint-selection';
 import { isNfcSupported, isNfcEnabled } from './status';
 import { log, logDebug, logError, logWarn } from './logger';
-import { isLightningInvoice, lnTrim, getLightningAmount } from '@/shared/lib/cashu/utils';
 
 export interface PaymentOptions {
   createToken: (mintUrl: string, amount: number) => Promise<string>;
@@ -22,7 +25,7 @@ export interface PaymentOptions {
   preferredMint?: string;
   maxAmountSats?: number;
   onScanRead?: (raw: string) => void;
-  onLightningInvoice?: (invoice: string, amount: number) => void;
+  onLightningInvoice?: (meltTarget: string, amount: number) => void;
 }
 
 export interface PaymentResult {
@@ -195,14 +198,17 @@ export async function performNfcPayment(options: PaymentOptions): Promise<Paymen
     onScanRead?.(paymentRequest);
     logDebug(`Preview: ${paymentRequest.substring(0, 60)}...`);
 
-    // ---------- Lightning invoice redirect ----------
-    const trimmedForLightning = lnTrim(paymentRequest);
-    if (isLightningInvoice(trimmedForLightning)) {
+    // ---------- Classify via coco-payment-ux ----------
+    const parsed = parsePaymentInput(paymentRequest, defaultDetectors);
+
+    const lightningOption = parsed.options.find((o) => o.kind === 'lightningInvoice');
+    if (lightningOption) {
       log('Lightning invoice detected via NFC');
-      const lnAmount = getLightningAmount(trimmedForLightning);
+      const lnAmount =
+        lightningOption.amount ?? defaultDetectors.getLightningAmount(lightningOption.value) ?? 0;
       if (onLightningInvoice) {
         await releaseNfc();
-        onLightningInvoice(trimmedForLightning, lnAmount);
+        onLightningInvoice(lightningOption.value, lnAmount);
         return { paymentRequest, mintUrl: '', amount: lnAmount };
       }
       throw new NfcError(
@@ -211,16 +217,23 @@ export async function performNfcPayment(options: PaymentOptions): Promise<Paymen
       );
     }
 
-    // ---------- Phase 2: Decode and validate ----------
-    log('Phase 2: Decoding payment request...');
-    const { decodePaymentRequest } = await import('@cashu/cashu-ts');
-    const decoded = decodePaymentRequest(paymentRequest);
+    const paymentRequestOption = parsed.options.find((o) => o.kind === 'paymentRequest');
+    if (!paymentRequestOption) {
+      throw new NfcError(
+        'Could not decode payment request. The terminal may have sent an unsupported format.',
+        'INVALID_PAYMENT_REQUEST'
+      );
+    }
 
-    amount = decoded.amount ?? 0;
-    const unit = decoded.unit ?? 'sat';
-    const allowedMints = decoded.mints ?? [];
+    const info = defaultDetectors.getPaymentRequestInfo(paymentRequestOption.value);
+    if (!info) {
+      throw new NfcError('Invalid payment request', 'INVALID_PAYMENT_REQUEST');
+    }
 
-    log(`Payment request: ${amount} ${unit}`);
+    amount = info.amount ?? 0;
+    const allowedMints = info.mints ?? [];
+
+    log(`Payment request: ${amount} ${info.unit}`);
     logDebug(`Allowed mints: ${allowedMints.join(', ') || 'any'}`);
 
     if (amount <= 0) {
@@ -235,16 +248,49 @@ export async function performNfcPayment(options: PaymentOptions): Promise<Paymen
     }
 
     const liveAvailableMints = await waitForAvailableMints(resolveAvailableMints);
-    if (Object.keys(liveAvailableMints).length === 0) {
+    const appMintUrls = Object.keys(liveAvailableMints);
+    if (appMintUrls.length === 0) {
       throw new NfcError(
         'No mints available. Please add a mint to your wallet first.',
         'NO_AVAILABLE_MINTS'
       );
     }
 
-    const mintSelection = selectBestMint(allowedMints, liveAvailableMints, amount, preferredMint);
-    selectedMint = mintSelection.mintUrl;
-    log(`Selected mint: ${selectedMint} (balance: ${mintSelection.balance} sats)`);
+    const normalizeUrl = (u: string) => u.toLowerCase().replace(/\/+$/, '');
+    const allowedForSelect =
+      allowedMints.length > 0
+        ? appMintUrls.filter((app) => {
+            const n = normalizeUrl(app);
+            return allowedMints.some((pos) => normalizeUrl(pos) === n);
+          })
+        : undefined;
+
+    const walletContext = {
+      trustedMintUrls: appMintUrls,
+      mintBalances: liveAvailableMints,
+      preferredMintUrl: preferredMint,
+      proofAmounts: {},
+    };
+    const selection = selectMint(walletContext, {
+      allowedMints: allowedForSelect,
+      minAmount: amount,
+    });
+
+    if (selection.type === 'noValidMint') {
+      throw new NfcError(selection.reason, 'NO_COMPATIBLE_MINT');
+    }
+    if (selection.type === 'selectionNeeded') {
+      const best = selection.validMints[0];
+      selectedMint = best?.mintUrl ?? null;
+      log(`Multiple mints available, using highest balance: ${selectedMint}`);
+    } else {
+      selectedMint = selection.mintUrl;
+      log(`Selected mint: ${selectedMint} (balance: ${selection.balance} sats)`);
+    }
+
+    if (!selectedMint) {
+      throw new NfcError('No suitable mint found', 'NO_COMPATIBLE_MINT');
+    }
 
     // ---------- Phase 3: Create token ----------
     log('Phase 3: Creating token...');

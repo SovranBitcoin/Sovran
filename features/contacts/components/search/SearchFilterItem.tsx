@@ -24,10 +24,7 @@ const FilterItem = ({
 }: FilterItemProps) => {
   const isActive = activeFilterItem === item;
   const isPressed = useSharedValue(false);
-  const [foreground, surfaceTertiary] = useThemeColor([
-    'foreground',
-    'surface-tertiary',
-  ] as const);
+  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
 
   // Pre-compute colors on JS thread so they can be used safely in worklets
   const pressedBg = useMemo(() => opacity(surfaceTertiary, 0.6), [surfaceTertiary]);
@@ -51,14 +48,9 @@ const FilterItem = ({
           viewPosition: 0.5,
         });
       }}
-      style={[
-        styles.pressable,
-        isActive && { backgroundColor: activeBg },
-      ]}>
+      style={[styles.pressable, isActive && { backgroundColor: activeBg }]}>
       <Animated.View style={[styles.inner, rStyle]}>
-        {item === 'All filters' ? (
-          <Feather name="sliders" size={18} color={foreground} />
-        ) : null}
+        {item === 'All filters' ? <Feather name="sliders" size={18} color={foreground} /> : null}
         <Text style={[styles.label, { color: foreground }]}>{item}</Text>
       </Animated.View>
     </Pressable>

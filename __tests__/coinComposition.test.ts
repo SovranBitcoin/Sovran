@@ -3,7 +3,7 @@ import {
   composeSatoshis,
   type CompositionResult,
   type FiatCompositionResult,
-} from '@/features/send/lib/offlineSendSuggestions';
+} from 'coco-payment-ux';
 
 describe('coin composition engine', () => {
   describe('basic exact match tests', () => {

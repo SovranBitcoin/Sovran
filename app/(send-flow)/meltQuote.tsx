@@ -3,23 +3,56 @@
  *
  * Part of the (send-flow) modal group - displays with back button.
  * Supports two flows:
- * 1. Creating new quote: invoice or lnUrlOrAddress + amount params
+ * 1. Creating new quote: meltTarget + amount params
  * 2. Viewing existing: meltHistoryEntry param
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
+
+import { debugLog } from '@/shared/lib/debugLog';
 import { MeltQuoteScreen } from '@/features/send';
+import {
+  usePaymentFlowMint,
+  usePaymentFlowMachine,
+} from '@/features/send/providers/PaymentFlowProvider';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 function ModalScreen() {
-  const { meltHistoryEntry, invoice, lnUrlOrAddress, amount, selectedMintUrl } =
-    useLocalSearchParams<{
-      meltHistoryEntry?: string;
-      invoice?: string;
-      lnUrlOrAddress?: string;
-      amount?: string;
-      selectedMintUrl?: string;
-    }>();
+  const { meltHistoryEntry, meltTarget, amount, selectedMintUrl } = useLocalSearchParams<{
+    meltHistoryEntry?: string;
+    meltTarget?: string;
+    amount?: string;
+    selectedMintUrl?: string;
+  }>();
+
+  const walletContext = useWalletContext();
+  const machine = usePaymentFlowMachine({ walletContext });
+  const flowMint = usePaymentFlowMint();
+  const effectiveMint = flowMint ?? selectedMintUrl;
+
+  const handleMintSelected = useCallback(
+    (mintUrl: string) => {
+      debugLog({
+        location: 'MeltQuoteRoute.handleMintSelected',
+        message: 'MintSelector: mint selected from melt quote screen',
+        phase: 'before',
+        data: { mintUrl, persist: false, source: 'meltQuoteScreen' },
+      });
+      void machine.changeMint(mintUrl);
+    },
+    [machine]
+  );
+
+  const handleRequestMintList = useCallback(() => {
+    debugLog({
+      location: 'MeltQuoteRoute.handleRequestMintList',
+      message: 'MintSelector: request mint list from melt quote screen',
+      phase: 'before',
+      data: { source: 'meltQuoteScreen' },
+    });
+    void machine.requestMintSelector();
+  }, [machine]);
 
   return (
     <>
@@ -31,17 +64,19 @@ function ModalScreen() {
         }}
       />
       <MeltQuoteScreen
+        key={effectiveMint}
         meltHistoryEntry={meltHistoryEntry}
-        invoice={invoice}
-        lnUrlOrAddress={lnUrlOrAddress}
+        meltTarget={meltTarget}
         amount={amount ? parseInt(amount, 10) : undefined}
-        selectedMintUrl={selectedMintUrl}
+        selectedMintUrl={effectiveMint}
         onCancel={() => {
           router.dismissTo('/');
         }}
         onSendSuccess={() => {
           router.dismissTo('/');
         }}
+        onMintSelected={handleMintSelected}
+        onRequestMintList={handleRequestMintList}
       />
     </>
   );

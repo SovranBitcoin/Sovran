@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 
-import { router } from 'expo-router';
 import { PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
@@ -10,22 +9,15 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { View } from '@/shared/ui/primitives/View/View';
 import { supportsLiquidGlass } from '@/shared/lib/version';
-import { WalletHeaderTitleLiquid } from './WalletHeaderTitle.liquid';
-import { useWalletHeaderTitle, type WalletHeaderTitleProps } from './useWalletHeaderTitle';
+import { MintSelectorLiquid } from './MintSelector.liquid';
+import { useMintSelector, type MintSelectorProps } from './useMintSelector';
 
-export default function WalletHeaderTitle(props: WalletHeaderTitleProps): React.ReactElement {
-  const { dimensions, mintDisplayProps, style, ...liquidProps } = useWalletHeaderTitle(props);
+export default function MintSelector(props: MintSelectorProps): React.ReactElement {
+  const shared = useMintSelector(props);
   const muted = useThemeColor('muted');
 
   if (supportsLiquidGlass()) {
-    return (
-      <WalletHeaderTitleLiquid
-        {...liquidProps}
-        dimensions={dimensions}
-        mintDisplayProps={mintDisplayProps}
-        style={style}
-      />
-    );
+    return <MintSelectorLiquid {...shared} />;
   }
 
   const borderColor = opacity(muted, 0.3);
@@ -35,15 +27,18 @@ export default function WalletHeaderTitle(props: WalletHeaderTitleProps): React.
       <BlurCardFrame accentColor={muted}>
         <PressableFeedback
           animation={false}
-          onPress={() => router.navigate(mintDisplayProps.linkHref)}
-          style={[
-            styles.pressable,
-            {
-              width: dimensions.fallbackWidth,
-            },
-            style,
-          ]}>
-          <MintBalanceDisplay {...mintDisplayProps} variant="plain" style={styles.fullWidth} />
+          onPress={shared.onRequestMintList}
+          style={[styles.pressable, { width: shared.dimensions.buttonWidth }]}>
+          <MintBalanceDisplay
+            mintName={shared.mintName}
+            mintIconUrl={shared.mintIconUrl}
+            balance={shared.balance}
+            isLoading={shared.isLoading}
+            unit={shared.unit}
+            contentWidth={shared.dimensions.contentWidth}
+            contentHeight={shared.dimensions.contentHeight}
+            style={styles.fullWidth}
+          />
           <PressableFeedback.Ripple />
         </PressableFeedback>
       </BlurCardFrame>

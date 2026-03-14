@@ -65,7 +65,7 @@ export type ContentSegment =
   | { kind: 'image'; url: string }
   | { kind: 'video'; url: string }
   | { kind: 'hashtag'; tag: string }
-  | { kind: 'lightning'; invoice: string }
+  | { kind: 'lightning'; meltTarget: string }
   | { kind: 'npub'; pubkey: string; bech32: string }
   | { kind: 'nprofile'; pubkey: string; bech32: string }
   | { kind: 'nevent'; eventId: string }
@@ -210,7 +210,7 @@ function _parseContentInner(raw: string): ContentSegment[] {
     spans.push({
       start: m.index!,
       end: m.index! + m[0].length,
-      seg: { kind: 'lightning', invoice: m[0] },
+      seg: { kind: 'lightning', meltTarget: m[0] },
     });
   }
 
@@ -698,7 +698,11 @@ const VideoBlockInner = React.memo(function VideoBlockInner({
 
 export const VideoBlock = VideoBlockInner;
 
-export const LightningBlock = React.memo(function LightningBlock({ invoice }: { invoice: string }) {
+export const LightningBlock = React.memo(function LightningBlock({
+  meltTarget,
+}: {
+  meltTarget: string;
+}) {
   const [foreground, surface, surfaceTertiary] = useThemeColor([
     'foreground',
     'surface',
@@ -708,7 +712,7 @@ export const LightningBlock = React.memo(function LightningBlock({ invoice }: { 
   return (
     <Pressable
       onPress={() => {
-        router.navigate({ pathname: '/(send-flow)/meltQuote' as any, params: { invoice } });
+        router.navigate({ pathname: '/(send-flow)/meltQuote' as any, params: { meltTarget } });
       }}
       style={[sharedStyles.mediaCard, { backgroundColor: surface, borderColor: surfaceTertiary }]}>
       <HStack align="center" gap={8}>
@@ -718,7 +722,7 @@ export const LightningBlock = React.memo(function LightningBlock({ invoice }: { 
             Lightning Invoice
           </Text>
           <Text size={11} numberOfLines={1} style={{ color: opacity(foreground, 0.33) }}>
-            {invoice.slice(0, 30)}…
+            {meltTarget.slice(0, 30)}…
           </Text>
         </VStack>
         <Icon name="mdi:chevron-right" size={18} color={opacity(foreground, 0.33)} />
@@ -1327,7 +1331,7 @@ export const NoteContent = React.memo(function NoteContent({
                 );
               }
               case 'lightning':
-                return <LightningBlock key={`b${i}`} invoice={seg.invoice} />;
+                return <LightningBlock key={`b${i}`} meltTarget={seg.meltTarget} />;
               case 'nevent':
               case 'note':
                 return (

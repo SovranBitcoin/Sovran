@@ -41,7 +41,9 @@ import { persistor, store } from '@/redux/store/store.deprecated';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
+import { WalletContextProvider } from '@/shared/providers/WalletContextProvider';
 import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
+import { PaymentFlowProvider } from '@/features/send/providers/PaymentFlowProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useAppBalance } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
@@ -103,6 +105,8 @@ function AccountScopedProviders({
         [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
         [NostrNDKProvider, { accountIndex }],
         CocoProvider,
+        WalletContextProvider,
+        PaymentFlowProvider,
         ActionSheetProvider,
         PricelistProvider,
         PasscodeGate,

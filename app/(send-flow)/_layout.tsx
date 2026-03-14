@@ -5,7 +5,7 @@
  * The parent root Stack presents this group as a modal (slides up from bottom).
  * Screens within this group push horizontally:
  * - mintSelect: Entry point when no balance (shows mint list)
- * - currency: Amount selection (entry point when has balance)
+ * - amount: Amount selection (entry point when has balance)
  * - sendToken: Ecash token display after creation (also handles NUT-18 payment request mode)
  * - meltQuote: Lightning invoice payment
  * - camera: QR code scanning
@@ -23,7 +23,7 @@ export default function SendFlowLayout() {
   return (
     <Stack screenOptions={createFlowLayoutScreenOptions({ foreground, background })}>
       <Stack.Screen name="mintSelect" options={{ title: 'Select Mint' }} />
-      <Stack.Screen name="currency" options={{ title: 'Select Amount' }} />
+      <Stack.Screen name="amount" options={{ title: 'Select Amount' }} />
       <Stack.Screen name="sendToken" options={{ title: 'Send Ecash' }} />
       <Stack.Screen name="meltQuote" options={{ title: 'Send Lightning' }} />
       <Stack.Screen

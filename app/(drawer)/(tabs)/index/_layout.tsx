@@ -1,42 +1,30 @@
-import { useCallback, useMemo } from 'react';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Stack, router } from 'expo-router';
-import { useWindowDimensions, View } from 'react-native';
+import { useCallback } from 'react';
+import { View } from 'react-native';
+import { Stack } from 'expo-router';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
+
+import { useBalanceContext, useManager } from 'coco-cashu-react';
+
+import { useSendWithHistory } from '@/features/send';
+import { usePaymentFlowMachine } from '@/features/send/providers/PaymentFlowProvider';
+import { MintSelector } from '@/features/wallet';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useNfcEcashPayment } from '@/shared/hooks/useNfcEcashPayment';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { debugLog } from '@/shared/lib/debugLog';
 import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { useBalanceContext, useManager } from 'coco-cashu-react';
-import { useSendWithHistory } from '@/features/send';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { WalletHeaderTitle, useWalletHeaderState } from '@/features/wallet';
-import { useMintManagement } from '@/features/mint';
-import {
-  AndroidLiquidHeaderOverlay,
-  AndroidLiquidHeaderTitleButton,
-  buildExpoRouterHeaderOptions,
-  isAndroidLiquidHeaderSupported,
-} from '@/navigation/nativeTabs';
-import {
-  getHeaderTitleWidthFromWidth,
-  getHeaderTitleHeight,
-  getHeaderContentWidthFromWidth,
-  getHeaderContentHeight,
-} from '@/features/wallet/lib/walletHeader';
-import { useNfcEcashPayment } from '@/shared/hooks/useNfcEcashPayment';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
+import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 
 export { HEADER_LAYOUT, MOCK_NFC_SUCCESS_SATS } from '@/features/wallet/lib/walletHeader';
 
 export default function HomeLayout() {
   const iconColor = useThemeColor('foreground');
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
-  const useAndroidLiquidHeader = isAndroidLiquidHeaderSupported();
   const { send } = useSendWithHistory();
   const manager = useManager();
-  const { mints, isLoading: isMintsLoading } = useMintManagement();
   const { keys } = useNostrKeysContext();
   const getSelectedMint = useMintStore((state) => state.getSelectedMint);
   const selectedMint = keys?.pubkey ? getSelectedMint(keys.pubkey) : undefined;
@@ -45,19 +33,8 @@ export default function HomeLayout() {
   const displayCurrency = useSettingsStore((state) => state.displayCurrency);
   const btcPrice = useBtcPrice(displayCurrency);
 
-  const headerTitleWidth = useMemo(() => getHeaderTitleWidthFromWidth(windowWidth), [windowWidth]);
-  const headerContentWidth = useMemo(
-    () => getHeaderContentWidthFromWidth(windowWidth),
-    [windowWidth]
-  );
-
-  const headerBalance = selectedMint ? balancesWithTotal[selectedMint] || 0 : 0;
-  const header = useWalletHeaderState({
-    selectedMint,
-    balanceForMint: headerBalance,
-    mints,
-    isMintsLoading,
-  });
+  const walletContext = useWalletContext();
+  const machine = usePaymentFlowMachine({ walletContext });
 
   const usdToSats = useCallback(
     (usd: number): number | undefined => {
@@ -81,6 +58,29 @@ export default function HomeLayout() {
     navigation.dispatch(DrawerActions.openDrawer());
   }, [navigation]);
 
+  const handleMintSelected = useCallback(
+    (mintUrl: string) => {
+      debugLog({
+        location: 'HomeLayout.handleMintSelected',
+        message: 'MintSelector: mint selected from home screen',
+        phase: 'before',
+        data: { mintUrl, source: 'home' },
+      });
+      void machine.changeMint(mintUrl);
+    },
+    [machine]
+  );
+
+  const handleRequestMintList = useCallback(() => {
+    debugLog({
+      location: 'HomeLayout.handleRequestMintList',
+      message: 'MintSelector: request mint list from home screen',
+      phase: 'before',
+      data: { source: 'home', currentStep: machine.getStep() },
+    });
+    void machine.requestMintSelector({ reset: true });
+  }, [machine]);
+
   return (
     <View style={{ flex: 1 }}>
       <Stack
@@ -96,44 +96,18 @@ export default function HomeLayout() {
             headerRightIcon: 'wave.3.right',
             onHeaderRightPress: nfc.handleNfcPaymentAlert,
             options: {
-              headerShown: !useAndroidLiquidHeader,
               headerTransparent: true,
               headerTitleAlign: 'center',
               headerTitle: () => (
-                <WalletHeaderTitle
-                  liquidGlass
-                  style={{ width: headerTitleWidth, height: getHeaderTitleHeight() }}
-                  contentWidth={headerContentWidth}
-                  contentHeight={getHeaderContentHeight()}
+                <MintSelector
+                  onMintSelected={handleMintSelected}
+                  onRequestMintList={handleRequestMintList}
                 />
               ),
             },
           })}
         />
       </Stack>
-      {useAndroidLiquidHeader ? (
-        <AndroidLiquidHeaderOverlay
-          topInset={insets.top}
-          iconColor={iconColor}
-          leftIcon="line.3.horizontal"
-          onLeftPress={openDrawer}
-          rightIcon="wave.3.right"
-          onRightPress={nfc.handleNfcPaymentAlert}
-          centerWidth={headerTitleWidth}
-          center={
-            <AndroidLiquidHeaderTitleButton
-              width={headerTitleWidth}
-              lineOneText={header.headerMintName}
-              lineTwoText={header.headerAmountLabel}
-              avatarName={header.headerMintName}
-              avatarPicture={header.headerMintInfo?.icon_url}
-              onPress={() => {
-                router.navigate('/(mint-flow)/list' as any);
-              }}
-            />
-          }
-        />
-      ) : null}
     </View>
   );
 }

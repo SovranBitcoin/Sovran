@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import * as Linking from 'expo-linking';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { debugLog } from '@/shared/lib/debugLog';
 import { deeplinkFailedPopup } from '@/shared/lib/popup';
 import { useProcessPaymentString } from '@/features/send/hooks/useProcessPaymentString';
 
@@ -35,6 +36,14 @@ export const useDeeplink = () => {
 
       const isValidHost = hostname !== null && hostname !== 'expo-development-client';
       if (isValidHost) {
+        // #region agent log
+        debugLog({
+          location: 'useDeeplink.ts',
+          message: 'deeplink processPaymentString before',
+          phase: 'before',
+          data: { hostnameLen: hostname?.length },
+        });
+        // #endregion
         try {
           await processPaymentString({ data: hostname, type: 'deeplink' });
         } catch (error) {

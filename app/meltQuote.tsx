@@ -3,7 +3,7 @@
  *
  * This is the standalone version used for direct navigation and deep linking.
  * Supports two flows:
- * 1. Creating new quote: invoice or lnUrlOrAddress + amount params
+ * 1. Creating new quote: meltTarget + amount params
  * 2. Viewing existing: meltHistoryEntry param
  */
 
@@ -12,18 +12,16 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { MeltQuoteScreen } from '@/features/send';
 
 function ModalScreen() {
-  const { meltHistoryEntry, invoice, lnUrlOrAddress, amount } = useLocalSearchParams<{
+  const { meltHistoryEntry, meltTarget, amount } = useLocalSearchParams<{
     meltHistoryEntry?: string;
-    invoice?: string;
-    lnUrlOrAddress?: string;
+    meltTarget?: string;
     amount?: string;
   }>();
 
   return (
     <MeltQuoteScreen
       meltHistoryEntry={meltHistoryEntry}
-      invoice={invoice}
-      lnUrlOrAddress={lnUrlOrAddress}
+      meltTarget={meltTarget}
       amount={amount ? parseInt(amount, 10) : undefined}
       onCancel={() => {
         router.dismissTo('/');

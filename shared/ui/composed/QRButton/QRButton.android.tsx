@@ -43,7 +43,9 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
       onPress={onPress}>
       <View style={[styles.container, containerStyle]} pointerEvents="none">
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: background }]} />
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(BUTTON_COLOR, 0.3) }]} />
+        <View
+          style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(BUTTON_COLOR, 0.3) }]}
+        />
         <LinearGradient
           colors={[
             opacity(BUTTON_COLOR, 0.7),

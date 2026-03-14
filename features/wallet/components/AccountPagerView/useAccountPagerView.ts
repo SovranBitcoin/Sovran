@@ -2,9 +2,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useHandleCameraPermission } from '@/features/camera';
-import { useMintManagement } from '@/features/mint';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { usePaymentFlowMachine } from '@/features/send/providers/PaymentFlowProvider';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -50,11 +49,8 @@ export function useAccountPagerView({
   const pagerHeight = Math.max(windowHeight * 0.3, 250);
 
   const { handlePermission } = useHandleCameraPermission();
-  const { getBalances } = useMintManagement();
-
-  const { keys } = useNostrKeysContext();
-  const selectedMints = useMintStore((state) => state.selectedMints);
-  const selectedMintUrl = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
+  const walletContext = useWalletContext();
+  const machine = usePaymentFlowMachine({ walletContext, unit: account.unit });
 
   const swiperRef = useRef<any>(null);
 
@@ -88,27 +84,8 @@ export function useAccountPagerView({
   }, [handlePermission, account.unit]);
 
   const handleSend = useCallback(async () => {
-    let balance = 0;
-    try {
-      const balances = await getBalances();
-      balance = balances[selectedMintUrl || ''] || 0;
-    } catch (error) {
-      if (__DEV__) console.error('Failed to get balance:', error);
-    }
-
-    if (balance <= 0) {
-      router.navigate({
-        pathname: '/(send-flow)/mintSelect',
-        params: { to: 'sendToken', unit: account.unit },
-      });
-      return;
-    }
-
-    router.navigate({
-      pathname: '/(send-flow)/currency',
-      params: { to: 'sendToken', unit: account.unit },
-    });
-  }, [getBalances, selectedMintUrl, account.unit]);
+    await machine.startSendEcash();
+  }, [machine]);
 
   return {
     accounts,

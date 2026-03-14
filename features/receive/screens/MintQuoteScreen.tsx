@@ -1,11 +1,12 @@
 /**
  * @fileoverview Shared MintQuote screen component
  *
- * This module provides the core UI and logic for Lightning mint quotes (receiving).
- * It is used by both standalone and flow-based route wrappers.
+ * Pure display component for Lightning mint quotes (receiving).
+ * The mint quote is created before navigation — this screen only renders
+ * and subscribes to live updates on the provided MintHistoryEntry.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Share } from 'react-native';
 
 import * as Clipboard from 'expo-clipboard';
@@ -13,6 +14,7 @@ import { router } from 'expo-router';
 
 import type { MintHistoryEntry } from 'coco-cashu-core';
 
+import { MintSelector } from '@/features/wallet';
 import { copyPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
 import {
@@ -39,14 +41,21 @@ interface MintQuoteScreenProps {
   /** Either the parsed entry or a JSON string to be parsed internally */
   mintHistoryEntry: MintHistoryEntry | string;
   extraButtons?: ButtonHandlerButton[];
+  /** Mint URL to display in MintSelector. Reflects any mid-flow changeMint(). */
+  selectedMintUrl?: string;
+  /** Called when user picks a mint from the MintSelector. */
+  onMintSelected?: (mintUrl: string) => void;
+  /** Called when user requests to see the full mint list. */
+  onRequestMintList?: () => void;
 }
 
 export function MintQuoteScreen({
   mintHistoryEntry: mintHistoryEntryProp,
   extraButtons = [],
+  selectedMintUrl,
+  onMintSelected,
+  onRequestMintList,
 }: MintQuoteScreenProps) {
-  const [, setUri] = useState<string | null>(null);
-
   const { entry: currentTransaction, error: parseError } =
     useHistoryEntry<MintHistoryEntry>(mintHistoryEntryProp);
   const sourceLabel = useTransactionSource(currentTransaction?.id);
@@ -106,7 +115,6 @@ export function MintQuoteScreen({
         <HistoryEntryHeader historyEntry={currentTransaction} />
         {!isPaid && (
           <PaymentInfo
-            setUri={setUri}
             data={[{ name: 'Lightning', value: currentTransaction.paymentRequest }]}
             unit={currentTransaction.unit}
             copyTarget="lightningAddress"
@@ -115,11 +123,21 @@ export function MintQuoteScreen({
 
         {isPaid && <TransactionLocationSection transactionId={currentTransaction.id} />}
 
+        {!isPaid ? (
+          <MintSelector
+            width={280}
+            unit={currentTransaction.unit}
+            selectedMintUrl={selectedMintUrl}
+            onMintSelected={onMintSelected ?? (() => {})}
+            onRequestMintList={onRequestMintList ?? (() => {})}
+          />
+        ) : mintInfo ? (
+          <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={currentTransaction} />
+        ) : null}
+
         {currentTransaction.metadata?.memo && (
           <Card message={currentTransaction.metadata.memo} variant="info" />
         )}
-
-        {mintInfo && <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={currentTransaction} />}
 
         <HistoryEntryTimeline historyEntry={currentTransaction} />
 
