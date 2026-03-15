@@ -10,8 +10,6 @@ import React, {
 import {
   createPaymentMachine,
   selectMintContext,
-  serializeFlowContext,
-  serializeWalletContext,
   type FlowContext,
   type MintResolutionContext,
   type PaymentMachine,
@@ -23,7 +21,6 @@ import { useManager } from 'coco-cashu-react';
 import { createSovranHandlers } from '@/features/send/lib/paymentHandlers';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { debugLog } from '@/shared/lib/debugLog';
 
 interface PaymentFlowContextValue {
   machine: PaymentMachine;
@@ -62,35 +59,9 @@ export function PaymentFlowProvider({ children }: { children: React.ReactNode })
       },
       getUnit: () => unitRef.current,
       onPersistMint: (mintUrl) => {
-        const walletCtx = walletContextRef.current;
-        const cacheBefore = useMintStore.getState().getAllSelectedMints();
-        debugLog({
-          location: 'PaymentFlowProvider.onPersistMint',
-          message: 'onPersistMint invoked',
-          phase: 'before',
-          data: {
-            mintUrl,
-            walletContext: walletCtx ? serializeWalletContext(walletCtx) : null,
-            cacheBefore: { ...cacheBefore },
-          },
-        });
         const pubkey = pubkeyRef.current;
         if (pubkey) {
           useMintStore.getState().setSelectedMint(pubkey, mintUrl);
-          const cacheAfter = useMintStore.getState().getAllSelectedMints();
-          debugLog({
-            location: 'PaymentFlowProvider.onPersistMint',
-            message: 'setSelectedMint completed',
-            phase: 'after',
-            data: { mintUrl, cacheAfter: { ...cacheAfter } },
-          });
-        } else {
-          debugLog({
-            location: 'PaymentFlowProvider.onPersistMint',
-            message: 'no pubkey — skip setSelectedMint',
-            phase: 'after',
-            data: { mintUrl },
-          });
         }
       },
     });
@@ -139,22 +110,6 @@ export function usePaymentFlowMachine({
   ctx.unitRef.current = unit;
 
   useEffect(() => {
-    const selectedMints = useMintStore.getState().getAllSelectedMints();
-    debugLog({
-      location: 'usePaymentFlowMachine',
-      message: 'walletContext/unit bound to machine',
-      phase: 'entry',
-      data: {
-        unit,
-        walletContext: serializeWalletContext(walletContext),
-        cache: { ...selectedMints },
-      },
-    });
-    // Intentionally stable deps to avoid log spam; log fires when binding-relevant fields change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unit, walletContext.preferredMintUrl, walletContext.trustedMintUrls.length]);
-
-  useEffect(() => {
     ctx.optionDismissRef.current = onOptionDismiss;
     return () => {
       if (ctx.optionDismissRef.current === onOptionDismiss) {
@@ -179,23 +134,7 @@ export function usePaymentFlowMint(): string | undefined {
     ctx?.machine.getContext ?? (() => ({ unit: 'sat' })),
     ctx?.machine.getContext ?? (() => ({ unit: 'sat' }))
   ) as FlowContext;
-  const mintUrl = flowCtx.mintUrl;
-  const destination = flowCtx.destination;
-  useEffect(() => {
-    const cache = useMintStore.getState().getAllSelectedMints();
-    debugLog({
-      location: 'usePaymentFlowMint',
-      message: 'flow mintUrl updated',
-      phase: 'entry',
-      data: {
-        flowContext: serializeFlowContext(flowCtx),
-        cache: { ...cache },
-      },
-    });
-    // Log when mintUrl/destination change; flowCtx excluded to avoid log spam.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mintUrl, destination]);
-  return mintUrl;
+  return flowCtx.mintUrl;
 }
 
 export function usePaymentFlowMintContext({

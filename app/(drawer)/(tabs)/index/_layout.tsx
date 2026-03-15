@@ -12,7 +12,6 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNfcEcashPayment } from '@/shared/hooks/useNfcEcashPayment';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
-import { debugLog } from '@/shared/lib/debugLog';
 import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -60,24 +59,12 @@ export default function HomeLayout() {
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {
-      debugLog({
-        location: 'HomeLayout.handleMintSelected',
-        message: 'MintSelector: mint selected from home screen',
-        phase: 'before',
-        data: { mintUrl, source: 'home' },
-      });
       void machine.changeMint(mintUrl);
     },
     [machine]
   );
 
   const handleRequestMintList = useCallback(() => {
-    debugLog({
-      location: 'HomeLayout.handleRequestMintList',
-      message: 'MintSelector: request mint list from home screen',
-      phase: 'before',
-      data: { source: 'home', currentStep: machine.getStep() },
-    });
     void machine.requestMintSelector({ reset: true });
   }, [machine]);
 

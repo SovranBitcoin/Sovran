@@ -146,14 +146,19 @@ export function annotateOptions(
     .sort((a, b) => STATUS_SORT[a.status] - STATUS_SORT[b.status]);
 
   const hasRecommended = annotated.some((a) => a.status === 'recommended');
+  let result: AnnotatedOption[];
   if (!hasRecommended) {
     const firstAvailable = annotated.find((a) => a.status === 'available');
     if (firstAvailable) {
-      return annotated.map((a) =>
+      result = annotated.map((a) =>
         a === firstAvailable ? { ...a, status: 'recommended' as OptionStatus } : a
       );
+    } else {
+      result = annotated;
     }
+  } else {
+    result = annotated;
   }
 
-  return annotated;
+  return result;
 }

@@ -13,7 +13,6 @@ import {
   stripLightningPrefixes,
   inputVariants,
 } from './normalize';
-import { debugLog } from './debugLog';
 import type {
   Detectors,
   PaymentOption,
@@ -194,14 +193,6 @@ function parseBip321Container(input: string): Bip321Container | null {
 // ---------------------------------------------------------------------------
 
 export function parsePaymentInput(rawInput: string, detectors: Detectors): ParsedPaymentInput {
-  // #region agent log
-  debugLog({
-    location: 'coco-payment-ux/parse.ts:parsePaymentInput',
-    message: 'parsePaymentInput entry',
-    phase: 'entry',
-    data: { inputLen: rawInput?.length },
-  });
-  // #endregion
   const normalized = sanitizeInput(rawInput);
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -257,7 +248,7 @@ export function parsePaymentInput(rawInput: string, detectors: Detectors): Parse
       );
     }
 
-    return {
+    const result: ParsedPaymentInput = {
       raw: rawInput,
       normalized,
       type: options.length > 0 ? 'payment' : 'bip321',
@@ -267,12 +258,13 @@ export function parsePaymentInput(rawInput: string, detectors: Detectors): Parse
       warnings,
       errors,
     };
+    return result;
   }
 
   // Standalone supported payment types
   const standaloneOptions = extractOptions(normalized, 'standalone', detectors);
   if (standaloneOptions.length > 0) {
-    return {
+    const result: ParsedPaymentInput = {
       raw: rawInput,
       normalized,
       type: 'payment',
@@ -281,6 +273,7 @@ export function parsePaymentInput(rawInput: string, detectors: Detectors): Parse
       warnings,
       errors,
     };
+    return result;
   }
 
   // Mint URL
@@ -312,7 +305,7 @@ export function parsePaymentInput(rawInput: string, detectors: Detectors): Parse
     };
   }
 
-  return {
+  const result: ParsedPaymentInput = {
     raw: rawInput,
     normalized,
     type: 'unknown',
@@ -321,4 +314,5 @@ export function parsePaymentInput(rawInput: string, detectors: Detectors): Parse
     warnings,
     errors,
   };
+  return result;
 }

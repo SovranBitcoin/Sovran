@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import opacity from 'hex-color-opacity';
 import { Alert, ListGroup, PressableFeedback } from 'heroui-native';
 
@@ -9,9 +9,6 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { ActionSheetPayloads } from '../../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../types';
 import { SheetHeader } from '../SheetHeader';
-import { useExecutionState } from '@/coco-payment-ux/src/react';
-import { usePaymentFlowMachine } from '@/features/send/providers/PaymentFlowProvider';
-import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 interface OfflineSendSuggestionsContentProps extends CustomSheetSharedProps {
   payload: ActionSheetPayloads['offline-send-suggestions'];
@@ -23,11 +20,7 @@ export function OfflineSendSuggestionsContent({
   payload,
   close,
 }: OfflineSendSuggestionsContentProps) {
-  const machine = usePaymentFlowMachine({
-    walletContext: useWalletContext(),
-    unit: payload.unit,
-  });
-  const { isExecuting } = useExecutionState(machine);
+  const [isLoading, setIsLoading] = useState(false);
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
 
   const options: Option[] = [];
@@ -48,6 +41,7 @@ export function OfflineSendSuggestionsContent({
 
   const handleSelect = useCallback(
     async (opt: Option) => {
+      setIsLoading(true);
       try {
         await payload.onSelectAmount(opt.amount);
       } finally {
@@ -76,15 +70,15 @@ export function OfflineSendSuggestionsContent({
                 key={opt.direction}
                 animation={false}
                 onPress={() => void handleSelect(opt)}
-                isDisabled={isExecuting}>
+                isDisabled={isLoading}>
                 <PressableFeedback.Scale>
-                  <ListGroup.Item disabled={isExecuting}>
+                  <ListGroup.Item disabled={isLoading}>
                     <ListGroup.ItemPrefix>
                       <View
                         className="rounded-full p-2"
                         style={{ backgroundColor: opacity(muted, 0.25) }}>
                         <Icon
-                          color={isExecuting ? muted : foreground}
+                          color={isLoading ? muted : foreground}
                           name={
                             opt.direction === 'down'
                               ? 'fluent:arrow-download-16-filled'

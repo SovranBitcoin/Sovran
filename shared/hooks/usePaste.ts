@@ -2,8 +2,6 @@ import { useCallback, useState } from 'react';
 
 import * as Clipboard from 'expo-clipboard';
 
-import { debugLog } from '@/shared/lib/debugLog';
-
 interface UsePasteConfig<TValue = string> {
   normalize?: (text: string) => TValue | Promise<TValue>;
   isEmpty?: (value: TValue) => boolean;
@@ -26,13 +24,6 @@ export function usePaste<TValue = string>({
   const [isPasting, setIsPasting] = useState(false);
 
   const handlePaste = useCallback(async (): Promise<void> => {
-    // #region agent log
-    debugLog({
-      location: 'usePaste.ts:handlePaste',
-      message: 'usePaste handlePaste before',
-      phase: 'before',
-    });
-    // #endregion
     setIsPasting(true);
 
     try {
@@ -46,13 +37,6 @@ export function usePaste<TValue = string>({
       }
 
       await onPaste(normalized, rawText);
-      // #region agent log
-      debugLog({
-        location: 'usePaste.ts:handlePaste',
-        message: 'usePaste handlePaste after',
-        phase: 'after',
-      });
-      // #endregion
     } catch (error) {
       onError?.(error);
     } finally {

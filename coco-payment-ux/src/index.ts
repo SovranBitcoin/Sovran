@@ -2,9 +2,6 @@
 // coco-payment-ux — public API
 // ---------------------------------------------------------------------------
 
-// Debug (for agent tracing)
-export { debugLog, serializeFlowContext, serializeWalletContext } from './debugLog';
-
 // Machine (state machine core)
 export { createPaymentMachine } from './machine/createMachine';
 export { resolveNext } from './machine/resolveNext';

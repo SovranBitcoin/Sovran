@@ -15,31 +15,37 @@ parse → intent → resolveNext → step → [handler]
 3. **resolveNext** — Intent + accumulated context + balances → next `FlowStep` with typed step data.
 4. **handler** — Wallet implements `StepHandlerMap`; the machine invokes the matching handler for each step.
 
+**Two routing paths:** Scan/paste flows use `resolveNext` (parse → intent → resolveNext). Button flows (`START_SEND_ECASH`, `START_RECEIVE_LIGHTNING`) have no prior intent, so `AMOUNT_ENTERED` and similar events use `resolveFromContext` instead. Both paths check proof composition for `chooseProofs`; the wallet must supply `proofAmounts` in `WalletContext` for offline send rounding to work.
+
 ---
 
 ## Flow steps
 
 Input steps (user must interact before advancing):
 
-| Step | Triggered when |
-|---|---|
-| `chooseOption` | Multiple payment options detected |
-| `enterAmount` | Amount required but not yet known |
-| `selectMint` | Mint selection required |
+
+| Step           | Triggered when                               |
+| -------------- | -------------------------------------------- |
+| `chooseOption` | Multiple payment options detected            |
+| `enterAmount`  | Amount required but not yet known            |
+| `selectMint`   | Mint selection required                      |
 | `chooseProofs` | Exact proof match not possible (swap needed) |
+
 
 Terminal steps (machine invokes handler and stops):
 
-| Step | Description |
-|---|---|
-| `receiveToken` | Ecash token received — pass to wallet |
-| `confirmSend` | Ecash send — call `manager.wallet.send()` |
+
+| Step                    | Description                                                  |
+| ----------------------- | ------------------------------------------------------------ |
+| `receiveToken`          | Ecash token received — pass to wallet                        |
+| `confirmSend`           | Ecash send — call `manager.wallet.send()`                    |
 | `navigateToMeltPreview` | Lightning pay — navigate to melt screen with synthetic entry |
-| `createMintQuote` | Lightning receive — call `manager.quotes.createMintQuote()` |
-| `openMint` | Mint URL scanned |
-| `openProfile` | Nostr npub scanned |
-| `dismiss` | No-op navigation (e.g. mint persisted from home screen) |
-| `error` | Unresolvable state — show error |
+| `createMintQuote`       | Lightning receive — call `manager.quotes.createMintQuote()`  |
+| `openMint`              | Mint URL scanned                                             |
+| `openProfile`           | Nostr npub scanned                                           |
+| `dismiss`               | No-op navigation (e.g. mint persisted from home screen)      |
+| `error`                 | Unresolvable state — show error                              |
+
 
 ---
 
@@ -54,32 +60,36 @@ const machine = createPaymentMachine({
 });
 ```
 
-| Method | Description |
-|---|---|
-| `send(event)` | Advance the machine with a `FlowEvent` |
+
+| Method                       | Description                                                                              |
+| ---------------------------- | ---------------------------------------------------------------------------------------- |
+| `send(event)`                | Advance the machine with a `FlowEvent`                                                   |
 | `changeMint(mintUrl, opts?)` | Select a mint for the current flow. Pass `{ persist: true }` to save via `onPersistMint` |
-| `requestMintSelector(opts?)` | Open mint selector. Pass `{ reset: true }` to clear stale context first |
-| `startSendEcash()` | Start an ecash send flow |
-| `startReceiveLightning()` | Start a lightning receive flow |
-| `reset()` | Clear flow state back to idle |
-| `inspect()` | Current `ExecutionState` (stable cached object — safe for `useSyncExternalStore`) |
-| `subscribe(listener)` | Subscribe to step/isExecuting changes |
-| `getContext()` | Current accumulated `FlowContext` |
-| `getStep()` | Current `FlowStep` |
+| `requestMintSelector(opts?)` | Open mint selector. Pass `{ reset: true }` to clear stale context first                  |
+| `startSendEcash()`           | Start an ecash send flow                                                                 |
+| `startReceiveLightning()`    | Start a lightning receive flow                                                           |
+| `reset()`                    | Clear flow state back to idle                                                            |
+| `inspect()`                  | Current `ExecutionState` (stable cached object — safe for `useSyncExternalStore`)        |
+| `subscribe(listener)`        | Subscribe to step/isExecuting changes                                                    |
+| `getContext()`               | Current accumulated `FlowContext`                                                        |
+| `getStep()`                  | Current `FlowStep`                                                                       |
+
 
 ### Events
 
-| Event | Key fields |
-|---|---|
-| `EXECUTE` | `input` — raw scan/paste string |
-| `OPTION_CHOSEN` | `option` |
-| `AMOUNT_ENTERED` | `amount`, `mintUrl`, `destination?` |
-| `MINT_SELECTED` | `mintUrl`, `amount?`, `destination?`, `persist?` |
-| `PROOFS_CHOSEN` | `amount` |
-| `REQUEST_MINT_SELECTOR` | — |
-| `START_SEND_ECASH` | — |
-| `START_RECEIVE_LIGHTNING` | — |
-| `RESET` | — |
+
+| Event                     | Key fields                                       |
+| ------------------------- | ------------------------------------------------ |
+| `EXECUTE`                 | `input` — raw scan/paste string                  |
+| `OPTION_CHOSEN`           | `option`                                         |
+| `AMOUNT_ENTERED`          | `amount`, `mintUrl`, `destination?`              |
+| `MINT_SELECTED`           | `mintUrl`, `amount?`, `destination?`, `persist?` |
+| `PROOFS_CHOSEN`           | `amount`                                         |
+| `REQUEST_MINT_SELECTOR`   | —                                                |
+| `START_SEND_ECASH`        | —                                                |
+| `START_RECEIVE_LIGHTNING` | —                                                |
+| `RESET`                   | —                                                |
+
 
 ### `isExecuting`
 
@@ -95,35 +105,73 @@ const { isExecuting } = useExecutionState(machine);
 
 ```ts
 const handlers: StepHandlerMap = {
-  receiveToken: ({ token }) => router.push('/receive', { token }),
+  receiveToken: ({ token }) => {
+    const entry = buildReceiveHistoryEntry(token);
+    router.navigate({
+      pathname: '/(receive-flow)/receiveToken',
+      params: { receiveHistoryEntry: JSON.stringify(entry) },
+    });
+  },
 
-  confirmSend: ({ mintUrl, amount }) => router.push('/send', { mintUrl, amount }),
+  confirmSend: async ({ mintUrl, amount }) => {
+    await manager.wallet.send(mintUrl, amount);
+    const entry = /* fetch from manager.history */;
+    router.navigate({
+      pathname: '/(send-flow)/sendToken',
+      params: { sendHistoryEntry: JSON.stringify(entry) },
+    });
+  },
 
   navigateToMeltPreview: ({ mintUrl, meltTarget, unit, amount }) => {
-    // Navigate instantly with a synthetic MeltHistoryEntry (quoteId: '').
-    // The melt screen handles LNURL resolution + prepareMeltBolt11 on "Pay".
-    router.replace('/melt-quote', { meltHistoryEntry: JSON.stringify(syntheticEntry) });
+    const entry: MeltHistoryEntry = {
+      id: `melt-preview-${Date.now()}`,
+      type: 'melt',
+      createdAt: Date.now(),
+      mintUrl,
+      unit: unit ?? 'sat',
+      quoteId: '',
+      state: 'UNPAID',
+      amount,
+      metadata: { phase: 'preview', meltTarget },
+    };
+    router.replace({
+      pathname: '/(send-flow)/meltQuote',
+      params: { meltHistoryEntry: JSON.stringify(entry) },
+    });
   },
 
   createMintQuote: async ({ mintUrl, amount, unit }) => {
-    const quote = await manager.quotes.createMintQuote(mintUrl, amount);
-    router.replace('/mint-quote', { mintHistoryEntry: JSON.stringify(entry) });
+    await manager.quotes.createMintQuote(mintUrl, amount);
+    const entry = /* fetch from manager.history */;
+    router.replace({
+      pathname: '/(receive-flow)/mintQuote',
+      params: { mintHistoryEntry: JSON.stringify(entry), unit: unit ?? 'sat' },
+    });
   },
 
   enterAmount: ({ unit, preselectedMintUrl, constraints }) => {
-    router.navigate('/amount', { unit, destination: constraints.destination });
+    const params = { unit };
+    if (constraints.destination) params.destination = constraints.destination;
+    if (preselectedMintUrl) params.selectedMintUrl = preselectedMintUrl;
+    const pathname =
+      constraints.destination === 'mintQuote' ? '/(receive-flow)/amount' : '/(send-flow)/amount';
+    router.navigate({ pathname, params });
   },
 
-  selectMint: ({ candidates, amount, unit, destination }) => {
-    router.navigate('/mint-select', { /* ... */ });
+  selectMint: ({ candidates, supportedMintUrls, amount, unit, destination }) => {
+    // Fetch mints, compute availability, items = buildMintListItems(allTrustedMints, availability)
+    router.navigate({
+      pathname: destination === 'mintQuote' ? '/(receive-flow)/mintSelect' : '/(send-flow)/mintSelect',
+      params: { unit, mintItems: JSON.stringify(items), ...(destination && { destination }) },
+    });
   },
 
   chooseOption: ({ parsed, options }) => showOptionPicker(options),
 
   chooseProofs: ({ suggestions, unit }) => showProofSelector(suggestions),
 
-  openMint: ({ url }) => router.navigate('/mint', { mintUrl: url }),
-  openProfile: ({ npub }) => router.navigate('/profile', { npub }),
+  openMint: ({ url }) => router.navigate({ pathname: '/(mint-flow)/info', params: { mintUrl: url } }),
+  openProfile: ({ npub }) => router.navigate({ pathname: '/(user-flow)/profile', params: { npub } }),
 
   error: ({ code, message }) => showError(code, message),
   dismiss: () => router.back(),
@@ -185,12 +233,26 @@ await manager.execute('pay');
 
 ### Action availability
 
-| Screen | Actions | Available when |
-|---|---|---|
-| `sendToken` | `copy`, `share`, `nfc`, `copyAsEmoji`, `checkStatus`, `cancel` | Token present and not finalized |
-| `receiveToken` | `redeem` | Token present, not yet redeemed |
-| `mintQuote` | `copy`, `share` | Quote not yet issued/paid |
-| `meltQuote` | `pay`, `cancel` | `pay`: state UNPAID. `cancel`: state UNPAID or PENDING |
+
+| Screen         | Actions                                                        | Available when                                         |
+| -------------- | -------------------------------------------------------------- | ------------------------------------------------------ |
+| `sendToken`    | `copy`, `share`, `nfc`, `copyAsEmoji`, `checkStatus`, `cancel` | Token present and not finalized                        |
+| `receiveToken` | `redeem`                                                       | Token present, not yet redeemed                        |
+| `mintQuote`    | `copy`, `share`                                                | Quote not yet issued/paid                              |
+| `meltQuote`    | `pay`, `cancel`                                                | `pay`: state UNPAID. `cancel`: state UNPAID or PENDING |
+
+
+---
+
+## Runtime behavior (from logs)
+
+Observations from actual execution:
+
+- **Persist-only mint select** — When `REQUEST_MINT_SELECTOR` is fired from the home screen (`hadDestination: false`, `fromStep: idle`), the flow resolves to `selectMint` with `destination: null`. On `MINT_SELECTED`, the machine takes the persist-only path: `onPersistMint` → `dismiss` → `router.back()`; no send/receive flow. When `hadDestination: true` (e.g. from send/receive flow), context is preserved and `mintUrl` stays in flowContext.
+- **chooseProofs step data** — `stepData` includes `proofAmounts` (e.g. `[1,2,4,16,32]`), `suggestions.roundDown.amount`, `suggestions.roundUp.amount`, `mintUrl`, `amount`, `unit`. Triggered when amount cannot be composed exactly from available denominations. Handler shows popup; user selects → `PROOFS_CHOSEN` with chosen `amount` → machine updates `flowContext.amount` → `confirmSend`.
+- **selectMint candidates** — Only mints with `balance > 0` appear in `candidates`. When the preferred mint is in the valid set, it is auto-selected; otherwise `selectionNeeded` is true.
+- **FlowContext accumulation** — `destination` is set by `START_SEND_ECASH` (sendEcash), `START_RECEIVE_LIGHTNING` (mintQuote), or EXECUTE intent. For send flows, `mintUrl` is cleared when transitioning to `selectMint` so the user can pick.
+- **proofAmounts requirement** — `WalletContext.proofAmounts` is required for `chooseProofs`. Without it, the machine skips to `confirmSend` when composition cannot be exact. The wallet must fetch proof denominations per mint.
 
 ---
 
@@ -221,21 +283,24 @@ const ctx = selectMintContext(machine.getContext(), walletContext);
 
 ## Module structure
 
-| Path | Role |
-|---|---|
-| `parse.ts` | Raw string → `ParsedPaymentInput` |
-| `intent.ts` | Parsed input + context → `ResolvedIntent` |
-| `annotate.ts` | Multi-option annotation (recommended / available / disabled) |
-| `guards.ts` | Intent validation, capability checks |
-| `mint-selection.ts` | `selectMint`, `selectMintForMelt`, `getValidMintCandidates` |
-| `normalize.ts` | Input sanitization, prefix stripping, input variants |
-| `offline.ts` | Proof composition: `composeSatoshis`, `composeFiat` |
-| `nfc-fallback.ts` | Fallback options when a transport fails |
-| `machine/types.ts` | `FlowStep`, `FlowContext`, `FlowEvent`, `StepHandlerMap`, `ExecutionState` |
-| `machine/resolveNext.ts` | Routing function: intent + context → next step |
-| `machine/transitions.ts` | Event handlers: update context, call `resolveNext` |
-| `machine/createMachine.ts` | Stateful runtime: send / subscribe / inspect / reset |
-| `machine/selectMintContext.ts` | Flow context → mint availability |
-| `screen-actions/` | Post-terminal action system: `createScreenActionManager`, availability rules |
-| `react/usePaymentMachine.ts` | Hook: creates machine with live context refs |
-| `react/useExecutionState.ts` | `useSyncExternalStore` wrapper for `machine.inspect()` |
+
+| Path                           | Role                                                                         |
+| ------------------------------ | ---------------------------------------------------------------------------- |
+| `parse.ts`                     | Raw string → `ParsedPaymentInput`                                            |
+| `intent.ts`                    | Parsed input + context → `ResolvedIntent`                                    |
+| `annotate.ts`                  | Multi-option annotation (recommended / available / disabled)                 |
+| `guards.ts`                    | Intent validation, capability checks                                         |
+| `mint-selection.ts`            | `selectMint`, `selectMintForMelt`, `getValidMintCandidates`                  |
+| `normalize.ts`                 | Input sanitization, prefix stripping, input variants                         |
+| `offline.ts`                   | Proof composition: `composeSatoshis`, `composeFiat`                          |
+| `nfc-fallback.ts`              | Fallback options when a transport fails                                      |
+| `machine/types.ts`             | `FlowStep`, `FlowContext`, `FlowEvent`, `StepHandlerMap`, `ExecutionState`   |
+| `machine/resolveNext.ts`       | Routing function: intent + context → next step                               |
+| `machine/transitions.ts`       | Event handlers: update context, call `resolveNext`                           |
+| `machine/createMachine.ts`     | Stateful runtime: send / subscribe / inspect / reset                         |
+| `machine/selectMintContext.ts` | Flow context → mint availability                                             |
+| `screen-actions/`              | Post-terminal action system: `createScreenActionManager`, availability rules |
+| `react/usePaymentMachine.ts`   | Hook: creates machine with live context refs                                 |
+| `react/useExecutionState.ts`   | `useSyncExternalStore` wrapper for `machine.inspect()`                       |
+
+

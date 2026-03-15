@@ -13,7 +13,6 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useExecutionState } from 'coco-payment-ux/react';
 import type { MintListItem } from 'coco-payment-ux';
 
-import { debugLog } from '@/shared/lib/debugLog';
 import { MintListScreen } from '@/features/mint';
 import { usePaymentFlowMachine } from '@/features/send/providers/PaymentFlowProvider';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
@@ -36,20 +35,9 @@ function MintSelectRoute() {
 
   const handleMintNavigation = useCallback(
     (item: MintListItem) => {
-      debugLog({
-        location: 'SendMintSelect.handleMintSelect',
-        message: 'user selected mint from list (send flow)',
-        phase: 'before',
-        data: {
-          mintUrl: item.mintUrl,
-          destination: params.destination ?? null,
-          isExecutingAtTap: isExecuting,
-          machineStep: machine.getStep(),
-        },
-      });
       void machine.changeMint(item.mintUrl);
     },
-    [machine, params.destination, isExecuting]
+    [machine]
   );
 
   return (

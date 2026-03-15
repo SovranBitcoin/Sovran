@@ -8,7 +8,6 @@
 // ---------------------------------------------------------------------------
 
 import { annotateOptions } from './annotate';
-import { debugLog } from './debugLog';
 import type {
   ParsedPaymentInput,
   PaymentOption,
@@ -56,14 +55,6 @@ export function resolveIntent(
   detectors: Detectors,
   ctx?: WalletContext
 ): ResolvedIntent {
-  // #region agent log
-  debugLog({
-    location: 'coco-payment-ux/intent.ts:resolveIntent',
-    message: 'resolveIntent entry',
-    phase: 'entry',
-    data: { parsedType: parsed?.type, optionsLen: parsed?.options?.length },
-  });
-  // #endregion
   // Multiple options → chooseOption (annotated when wallet context is available)
   if (parsed.options.length > 1) {
     const annotated: AnnotatedOption[] = ctx
@@ -79,7 +70,8 @@ export function resolveIntent(
 
   // Single option → direct intent
   if (parsed.options.length === 1) {
-    return resolveForSingleOption(parsed.options[0], detectors);
+    const intent = resolveForSingleOption(parsed.options[0], detectors);
+    return intent;
   }
 
   // Non-payment intents

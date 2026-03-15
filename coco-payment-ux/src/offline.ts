@@ -256,11 +256,16 @@ export function composeSatoshis(coins: number[], target: number): CompositionRes
     return compositionResult(true, target, target, target, 'exhaustive', t0);
   }
 
-  if (valid.length <= EXHAUSTIVE_LIMIT) return exhaustiveSearch(valid, target, t0);
-  if (totalSum <= BITSET_LIMIT) return bitsetDP(valid, target, t0);
-
-  const selected = valid.length <= MITM_LIMIT ? valid : prefilterCoins(valid, target, MITM_LIMIT);
-  return meetInTheMiddle(selected, target, t0);
+  let result: CompositionResult;
+  if (valid.length <= EXHAUSTIVE_LIMIT) {
+    result = exhaustiveSearch(valid, target, t0);
+  } else if (totalSum <= BITSET_LIMIT) {
+    result = bitsetDP(valid, target, t0);
+  } else {
+    const selected = valid.length <= MITM_LIMIT ? valid : prefilterCoins(valid, target, MITM_LIMIT);
+    result = meetInTheMiddle(selected, target, t0);
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------

@@ -174,7 +174,8 @@ export function useAmountEntry(config: UseAmountEntryConfig): AmountEntryResult 
         composition.nearestLower != null ? { amount: composition.nearestLower } : null;
       const roundUp =
         composition.nearestUpper != null ? { amount: composition.nearestUpper } : null;
-      setSuggestions({ autoSelectAmount: null, roundDown, roundUp });
+      const suggestions = { autoSelectAmount: null, roundDown, roundUp };
+      setSuggestions(suggestions);
     } catch {
       if (requestId === requestIdRef.current) {
         setSendMode(null);
@@ -188,9 +189,11 @@ export function useAmountEntry(config: UseAmountEntryConfig): AmountEntryResult 
     return () => clearTimeout(t);
   }, [run]);
 
+  const needsProofSelection = sendMode === 'online' && suggestions !== null;
+
   return {
     sendMode,
     suggestions,
-    needsProofSelection: sendMode === 'online' && suggestions !== null,
+    needsProofSelection,
   };
 }

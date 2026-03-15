@@ -1,8 +1,8 @@
 import { resolveIntent } from '../intent';
+import { composeSatoshis } from '../offline';
 import { parsePaymentInput } from '../parse';
 import { selectMint, getValidMintCandidates } from '../mint-selection';
 import type { Detectors, WalletContext } from '../types';
-import { debugLog, serializeFlowContext, serializeWalletContext } from '../debugLog';
 import { resolveNext, type StepResult } from './resolveNext';
 import type { FlowContext, FlowEvent, FlowStep } from './types';
 
@@ -31,20 +31,8 @@ function handleExecute(
   walletCtx: WalletContext,
   unit: string
 ): TransitionResult {
-  debugLog({
-    location: 'coco-payment-ux.transitions.handleExecute',
-    message: 'EXECUTE event — parsing input',
-    phase: 'before',
-    data: { inputLen: input?.length, preferredMintUrl: walletCtx.preferredMintUrl ?? null },
-  });
   const parsed = parsePaymentInput(input, detectors);
   const intent = resolveIntent(parsed, detectors, walletCtx);
-  debugLog({
-    location: 'coco-payment-ux.transitions.handleExecute',
-    message: 'intent resolved',
-    phase: 'after',
-    data: { intentType: intent?.type },
-  });
 
   const ctx: FlowContext = { parsed, intent, unit };
 
@@ -123,16 +111,6 @@ function handleAmountEntered(
   currentCtx: FlowContext,
   walletCtx: WalletContext
 ): TransitionResult {
-  debugLog({
-    location: 'coco-payment-ux.transitions.handleAmountEntered',
-    message: 'AMOUNT_ENTERED event',
-    phase: 'before',
-    data: {
-      amount: event.amount,
-      mintUrl: event.mintUrl ?? null,
-      destination: event.destination ?? currentCtx.destination ?? null,
-    },
-  });
   // When destination is explicitly provided, start fresh to avoid stale context
   const ctx: FlowContext = event.destination
     ? {
@@ -161,17 +139,6 @@ function handleMintSelected(
   currentCtx: FlowContext,
   walletCtx: WalletContext
 ): TransitionResult {
-  debugLog({
-    location: 'coco-payment-ux.transitions.handleMintSelected',
-    message: 'MINT_SELECTED event',
-    phase: 'before',
-    data: {
-      mintUrl: event.mintUrl,
-      persist: event.persist ?? false,
-      hasIntent: !!currentCtx.intent,
-      destination: currentCtx.destination ?? null,
-    },
-  });
   // When destination is explicitly provided, start fresh to avoid stale context
   const ctx: FlowContext = event.destination
     ? {
@@ -187,18 +154,6 @@ function handleMintSelected(
       };
 
   if (!ctx.intent && !ctx.destination) {
-    debugLog({
-      location: 'coco-payment-ux.transitions.handleMintSelected',
-      message: 'persist-only path — transitioning to dismiss',
-      phase: 'after',
-      data: {
-        mintUrl: event.mintUrl,
-        persist: event.persist,
-        flowContextBefore: serializeFlowContext(currentCtx),
-        flowContextAfter: serializeFlowContext(ctx),
-        contextCleared: true,
-      },
-    });
     // Persist-only (e.g. home screen): dismiss the current screen
     return { step: 'dismiss', context: ctx, data: {} as any };
   }
@@ -227,12 +182,6 @@ function handleProofsChosen(
   const mintUrl = ctx.mintUrl!;
 
   if (destination === 'meltQuote' && ctx.meltTarget) {
-    debugLog({
-      location: 'coco-payment-ux.transitions.handleProofsSelected',
-      message: 'navigateToMeltPreview step (proofs selected)',
-      phase: 'before',
-      data: { mintUrl, meltTarget: ctx.meltTarget, amount: event.amount },
-    });
     return {
       step: 'navigateToMeltPreview',
       context: ctx,
@@ -254,18 +203,6 @@ function handleMintSelectorRequested(
   const hadDestination = !!currentCtx.destination;
   // When no destination (e.g. home screen), clear stale context
   const ctx = currentCtx.destination ? currentCtx : ({ unit: currentCtx.unit } as FlowContext);
-  debugLog({
-    location: 'coco-payment-ux.transitions.handleMintSelectorRequested',
-    message: 'REQUEST_MINT_SELECTOR event',
-    phase: 'before',
-    data: {
-      hadDestination,
-      contextCleared: !hadDestination,
-      flowContextBefore: serializeFlowContext(currentCtx),
-      flowContextAfter: serializeFlowContext(ctx),
-      walletContext: serializeWalletContext(walletCtx),
-    },
-  });
 
   const amount = ctx.amount;
   const candidates = getValidMintCandidates(walletCtx, { minAmount: amount });
@@ -299,12 +236,6 @@ function handleMintSelectorRequested(
 // ---------------------------------------------------------------------------
 
 function handleStartSendEcash(walletCtx: WalletContext, unit: string): TransitionResult {
-  debugLog({
-    location: 'coco-payment-ux.transitions.handleStartSendEcash',
-    message: 'START_SEND_ECASH event',
-    phase: 'before',
-    data: { preferredMintUrl: walletCtx.preferredMintUrl ?? null },
-  });
   const ctx: FlowContext = { unit, destination: 'sendEcash' };
   const selection = selectMint(walletCtx);
 
@@ -340,15 +271,6 @@ function handleStartSendEcash(walletCtx: WalletContext, unit: string): Transitio
 }
 
 function handleStartReceiveLightning(walletCtx: WalletContext, unit: string): TransitionResult {
-  debugLog({
-    location: 'coco-payment-ux.transitions.handleStartReceiveLightning',
-    message: 'START_RECEIVE_LIGHTNING event',
-    phase: 'before',
-    data: {
-      preferredMintUrl: walletCtx.preferredMintUrl ?? null,
-      fallbackMint: walletCtx.trustedMintUrls[0] ?? null,
-    },
-  });
   const mintUrl = walletCtx.preferredMintUrl ?? walletCtx.trustedMintUrls[0] ?? '';
   const ctx: FlowContext = { unit, destination: 'mintQuote', mintUrl };
 
@@ -422,12 +344,30 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
       };
     }
     if (mintUrl) {
-      debugLog({
-        location: 'coco-payment-ux.transitions.resolveFromContext',
-        message: 'navigateToMeltPreview step (resolveFromContext)',
-        phase: 'before',
-        data: { mintUrl, meltTarget: ctx.meltTarget, amount },
-      });
+      const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
+      if (proofAmounts.length > 0) {
+        const composition = composeSatoshis(proofAmounts, amount);
+        if (!composition.exactMatch) {
+          return {
+            step: 'chooseProofs',
+            context: { ...ctx, destination },
+            data: {
+              mintUrl,
+              amount,
+              unit,
+              paymentRequest: ctx.paymentRequest,
+              meltTarget: ctx.meltTarget,
+              proofAmounts,
+              suggestions: {
+                roundDown:
+                  composition.nearestLower != null ? { amount: composition.nearestLower } : null,
+                roundUp:
+                  composition.nearestUpper != null ? { amount: composition.nearestUpper } : null,
+              },
+            },
+          };
+        }
+      }
       return {
         step: 'navigateToMeltPreview',
         context: { ...ctx, destination },
@@ -454,6 +394,30 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
   }
 
   if (mintUrl) {
+    const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
+      if (proofAmounts.length > 0) {
+        const composition = composeSatoshis(proofAmounts, amount);
+        if (!composition.exactMatch) {
+          return {
+          step: 'chooseProofs',
+          context: { ...ctx, destination },
+          data: {
+            mintUrl,
+            amount,
+            unit,
+            paymentRequest: ctx.paymentRequest,
+            meltTarget: ctx.meltTarget,
+            proofAmounts,
+            suggestions: {
+              roundDown:
+                composition.nearestLower != null ? { amount: composition.nearestLower } : null,
+              roundUp:
+                composition.nearestUpper != null ? { amount: composition.nearestUpper } : null,
+            },
+          },
+        };
+      }
+    }
     return {
       step: 'confirmSend',
       context: { ...ctx, destination },
@@ -483,32 +447,11 @@ export function transition(
   walletCtx: WalletContext,
   unit: string
 ): TransitionResult {
-  debugLog({
-    location: 'coco-payment-ux.transitions.transition',
-    message: 'transition event',
-    phase: 'entry',
-    data: {
-      eventType: event.type,
-      fromStep: currentStep,
-      flowContext: serializeFlowContext(currentCtx),
-      walletContext: serializeWalletContext(walletCtx),
-    },
-  });
   // Global events: work from any state
   switch (event.type) {
     case 'EXECUTE':
       return handleExecute(event.input, detectors, walletCtx, unit);
     case 'RESET':
-      debugLog({
-        location: 'coco-payment-ux.transitions.transition',
-        message: 'RESET — clearing flow context to idle',
-        phase: 'before',
-        data: {
-          previousStep: currentStep,
-          flowContextBefore: serializeFlowContext(currentCtx),
-          flowContextAfter: serializeFlowContext({ unit }),
-        },
-      });
       return { step: 'idle', context: { unit }, data: {} as any };
     case 'REQUEST_MINT_SELECTOR':
       return handleMintSelectorRequested(currentCtx, walletCtx);

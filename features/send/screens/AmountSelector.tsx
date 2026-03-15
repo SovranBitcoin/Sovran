@@ -16,7 +16,6 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { debugLog } from '@/shared/lib/debugLog';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
@@ -63,23 +62,8 @@ export function AmountSelector({
   );
 
   const handleNext = useCallback(async () => {
-    // #region agent log
-    debugLog({
-      location: 'AmountSelector.tsx:handleNext',
-      message: 'AmountSelector Next button before',
-      phase: 'before',
-      data: { amount, transactionType },
-    });
-    // #endregion
     if (amount > 0) onAmountSubmit(amount);
-    // #region agent log
-    debugLog({
-      location: 'AmountSelector.tsx:handleNext',
-      message: 'AmountSelector Next button after',
-      phase: 'after',
-    });
-    // #endregion
-  }, [amount, onAmountSubmit, transactionType]);
+  }, [amount, onAmountSubmit]);
 
   return (
     <View style={{ flex: 1, backgroundColor: background }}>

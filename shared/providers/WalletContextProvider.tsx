@@ -11,10 +11,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { useBalanceContext, useManager, useMints } from 'coco-cashu-react';
-import { serializeWalletContext, type WalletContext } from 'coco-payment-ux';
+import type { WalletContext } from 'coco-payment-ux';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { debugLog } from '@/shared/lib/debugLog';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
@@ -91,21 +90,6 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     }),
     [trustedMintUrls, mintBalancesOnly, preferredMintUrl, proofAmounts]
   );
-
-  useEffect(() => {
-    const cache = useMintStore.getState().getAllSelectedMints();
-    debugLog({
-      location: 'WalletContextProvider',
-      message: 'WalletContext built',
-      phase: 'entry',
-      data: {
-        walletContext: serializeWalletContext(value),
-        cache: { ...cache },
-      },
-    });
-    // Log when preferredMintUrl or trusted mints change; value excluded to avoid balance/proof spam.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preferredMintUrl, trustedMintUrls.length]);
 
   return <WalletContextCtx.Provider value={value}>{children}</WalletContextCtx.Provider>;
 }

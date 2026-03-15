@@ -10,7 +10,6 @@
 import React, { useCallback } from 'react';
 import { useLocalSearchParams, Stack } from 'expo-router';
 
-import { debugLog } from '@/shared/lib/debugLog';
 import { MintQuoteScreen, getFormattedMintQuoteTitle } from '@/features/receive';
 import {
   usePaymentFlowMint,
@@ -33,24 +32,12 @@ function ModalScreen() {
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {
-      debugLog({
-        location: 'MintQuoteRoute.handleMintSelected',
-        message: 'MintSelector: mint selected from mint quote screen',
-        phase: 'before',
-        data: { mintUrl, persist: false, source: 'mintQuoteScreen' },
-      });
       void machine.changeMint(mintUrl);
     },
     [machine]
   );
 
   const handleRequestMintList = useCallback(() => {
-    debugLog({
-      location: 'MintQuoteRoute.handleRequestMintList',
-      message: 'MintSelector: request mint list from mint quote screen',
-      phase: 'before',
-      data: { source: 'mintQuoteScreen' },
-    });
     void machine.requestMintSelector();
   }, [machine]);
 

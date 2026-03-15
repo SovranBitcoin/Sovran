@@ -21,7 +21,6 @@ import {
   usePaymentFlowMachine,
 } from '@/features/send/providers/PaymentFlowProvider';
 import { MintSelector } from '@/features/wallet';
-import { debugLog } from '@/shared/lib/debugLog';
 import { noMintSelectedPopup, noClipboardAddressPopup } from '@/shared/lib/popup';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -65,12 +64,6 @@ function AmountRoute() {
 
   const handleAmountSubmit = useCallback(
     (amount: number) => {
-      debugLog({
-        location: 'SendAmount.handleAmountSubmit',
-        message: 'AMOUNT_ENTERED sending',
-        phase: 'before',
-        data: { amount, selectedMint, destination },
-      });
       const mintUrl = selectedMint;
       if (!mintUrl) {
         noMintSelectedPopup();
@@ -106,26 +99,14 @@ function AmountRoute() {
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {
-      debugLog({
-        location: 'SendAmount.handleMintSelected',
-        message: 'MintSelector: mint selected from send flow',
-        phase: 'before',
-        data: { mintUrl, persist: false, source: 'sendFlow', destination },
-      });
       void machine.changeMint(mintUrl);
     },
     [machine, destination]
   );
 
   const handleRequestMintList = useCallback(() => {
-    debugLog({
-      location: 'SendAmount.handleRequestMintList',
-      message: 'MintSelector: request mint list from send flow',
-      phase: 'before',
-      data: { source: 'sendFlow', destination, note: 'flow context preserved' },
-    });
     void machine.requestMintSelector();
-  }, [machine, destination]);
+  }, [machine]);
 
   const extraButtons: ButtonHandlerProps['buttons'] = isEcashSend
     ? [

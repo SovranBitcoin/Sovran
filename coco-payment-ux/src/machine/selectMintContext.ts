@@ -1,5 +1,4 @@
 import type { WalletContext } from '../types';
-import { debugLog } from '../debugLog';
 import type { FlowContext, Destination } from './types';
 
 // ---------------------------------------------------------------------------
@@ -105,28 +104,11 @@ export function selectMintContext(
   walletCtx: WalletContext
 ): MintResolutionContext | null {
   if (!flowCtx?.destination) {
-    debugLog({
-      location: 'coco-payment-ux.selectMintContext',
-      message: 'selectMintContext — no destination, returning null',
-      phase: 'entry',
-      data: { hasFlowCtx: !!flowCtx },
-    });
     return null;
   }
 
   const { destination, amount, supportedMintUrls, mintUrl } = flowCtx;
   const selectedMintUrl = mintUrl ?? walletCtx.preferredMintUrl;
-  debugLog({
-    location: 'coco-payment-ux.selectMintContext',
-    message: 'selectMintContext computed',
-    phase: 'entry',
-    data: {
-      destination,
-      selectedMintUrl: selectedMintUrl ?? null,
-      flowMintUrl: mintUrl ?? null,
-      preferredMintUrl: walletCtx.preferredMintUrl ?? null,
-    },
-  });
 
   const trustedMints = walletCtx.trustedMintUrls
     .map((url) =>

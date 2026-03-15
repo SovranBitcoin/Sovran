@@ -13,7 +13,6 @@ import { router } from 'expo-router';
 import { URDecoder } from '@gandlaf21/bc-ur';
 
 import { usePaymentFlowMachine } from '@/features/send/providers/PaymentFlowProvider';
-import { debugLog } from '@/shared/lib/debugLog';
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import Haptics from '@/shared/ui/primitives/Haptics';
@@ -68,14 +67,6 @@ export const useProcessPaymentString = ({
     async (
       scanning: ScanningData
     ): Promise<{ urInProgress: boolean; progress?: number; lockedPending?: boolean }> => {
-      // #region agent log
-      debugLog({
-        location: 'useProcessPaymentString.ts:processPaymentString',
-        message: 'processPaymentString before',
-        phase: 'before',
-        data: { dataLen: scanning?.data?.length, type: scanning?.type, isFocused },
-      });
-      // #endregion
       if (!isFocused) {
         return { urInProgress: false };
       }
@@ -122,22 +113,8 @@ export const useProcessPaymentString = ({
       }
 
       processedRef.current = true;
-      debugLog({
-        location: 'useProcessPaymentString',
-        message: 'sending EXECUTE to machine',
-        phase: 'before',
-        data: { inputLen: scanning.data?.length, selectedMint },
-      });
       await machine.send({ type: 'EXECUTE', input: scanning.data });
       const state = machine.inspect();
-      // #region agent log
-      debugLog({
-        location: 'useProcessPaymentString.ts:processPaymentString',
-        message: 'processPaymentString after resolver.execute',
-        phase: 'after',
-        data: { status: state?.status, code: state?.code },
-      });
-      // #endregion
 
       if (state.status !== 'needsInput' || state.code !== 'OPTION_SELECTION_REQUIRED') {
         onLoading?.(false);
@@ -154,12 +131,6 @@ export const useProcessPaymentString = ({
   );
 
   const reset = useCallback(() => {
-    debugLog({
-      location: 'useProcessPaymentString.reset',
-      message: 'machine.reset() — clearing flow context/cache',
-      phase: 'before',
-      data: { note: 'flow context reset to idle' },
-    });
     machine.reset();
     processedRef.current = false;
     setUrDecoder(new URDecoder());

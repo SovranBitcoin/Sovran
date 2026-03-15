@@ -1,7 +1,6 @@
 import { selectMint } from '../mint-selection';
 import { composeSatoshis } from '../offline';
 import type { ResolvedIntent, WalletContext } from '../types';
-import { debugLog } from '../debugLog';
 import type { Destination, ErrorCode, FlowContext, FlowStep, StepDataMap } from './types';
 
 // ---------------------------------------------------------------------------
@@ -116,18 +115,6 @@ function checkProofComposition(
 function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
   const { mintUrl, amount, unit, meltTarget } = ctx;
 
-  debugLog({
-    location: 'coco-payment-ux.resolveNext.terminalStep',
-    message: 'resolving to terminal step',
-    phase: 'before',
-    data: {
-      destination,
-      mintUrl: mintUrl ?? null,
-      amount: amount ?? null,
-      ...(destination === 'meltQuote' && { meltTarget: meltTarget ?? null }),
-    },
-  });
-
   switch (destination) {
     case 'mintQuote':
       return {
@@ -200,12 +187,6 @@ export function resolveNext(
   // 1. Need amount?
   if (needsAmount(destination, ctx)) {
     const preselectedMintUrl = ctx.mintUrl ?? walletCtx.preferredMintUrl;
-    debugLog({
-      location: 'coco-payment-ux.resolveNext',
-      message: 'resolving to enterAmount',
-      phase: 'before',
-      data: { destination, preselectedMintUrl: preselectedMintUrl ?? null },
-    });
     return {
       step: 'enterAmount',
       data: {
@@ -250,12 +231,6 @@ export function resolveNext(
       mintUrl,
       balance: walletCtx.mintBalances[mintUrl] ?? 0,
     }));
-    debugLog({
-      location: 'coco-payment-ux.resolveNext',
-      message: 'resolving to selectMint (mintQuote)',
-      phase: 'before',
-      data: { destination, candidateCount: candidates.length },
-    });
     return {
       step: 'selectMint',
       data: { candidates, amount, unit, destination },
@@ -275,12 +250,6 @@ export function resolveNext(
       case 'selected':
         return resolveWithMint(selection.mintUrl, destination, amount, unit, ctx, walletCtx);
       case 'selectionNeeded':
-        debugLog({
-          location: 'coco-payment-ux.resolveNext',
-          message: 'resolving to selectMint (send/melt)',
-          phase: 'before',
-          data: { destination, candidateCount: selection.validMints.length },
-        });
         return {
           step: 'selectMint',
           data: {

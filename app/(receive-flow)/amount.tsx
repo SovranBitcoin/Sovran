@@ -16,7 +16,6 @@ import {
   usePaymentFlowMachine,
 } from '@/features/send/providers/PaymentFlowProvider';
 import { MintSelector } from '@/features/wallet';
-import { debugLog } from '@/shared/lib/debugLog';
 import { noMintSelectedPopup } from '@/shared/lib/popup';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -27,6 +26,7 @@ function ReceiveAmountRoute() {
   const params = useLocalSearchParams<{
     selectedMintUrl?: string;
     unit?: string;
+    destination?: string;
   }>();
 
   const unit = params.unit || 'sat';
@@ -44,12 +44,6 @@ function ReceiveAmountRoute() {
 
   const handleAmountSubmit = useCallback(
     (amount: number) => {
-      debugLog({
-        location: 'ReceiveAmount.handleAmountSubmit',
-        message: 'AMOUNT_ENTERED sending',
-        phase: 'before',
-        data: { amount, selectedMint, destination: 'mintQuote' },
-      });
       const mintUrl = selectedMint;
       if (!mintUrl) {
         noMintSelectedPopup();
@@ -62,29 +56,17 @@ function ReceiveAmountRoute() {
         destination: 'mintQuote',
       });
     },
-    [selectedMint, unit, machine]
+    [selectedMint, machine]
   );
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {
-      debugLog({
-        location: 'ReceiveAmount.handleMintSelected',
-        message: 'MintSelector: mint selected from receive flow',
-        phase: 'before',
-        data: { mintUrl, persist: false, source: 'receiveFlow', destination: 'mintQuote' },
-      });
       void machine.changeMint(mintUrl);
     },
     [machine]
   );
 
   const handleRequestMintList = useCallback(() => {
-    debugLog({
-      location: 'ReceiveAmount.handleRequestMintList',
-      message: 'MintSelector: request mint list from receive flow',
-      phase: 'before',
-      data: { source: 'receiveFlow', destination: 'mintQuote', note: 'flow context preserved' },
-    });
     void machine.requestMintSelector();
   }, [machine]);
 

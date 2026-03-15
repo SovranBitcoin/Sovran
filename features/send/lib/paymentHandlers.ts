@@ -11,7 +11,6 @@ import type { FlowEvent, MintAvailability, StepHandlerMap } from 'coco-payment-u
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
-import { debugLog } from '@/shared/lib/debugLog';
 import {
   allOptionsDisabledPopup,
   balanceTooLowPopup,
@@ -114,11 +113,6 @@ export function createSovranHandlers({
 }: CreateSovranHandlersConfig): StepHandlerMap {
   return {
     receiveToken: ({ token }) => {
-      debugLog({
-        location: 'paymentHandlers.receiveToken',
-        message: 'receiveToken handler — navigating to receive',
-        phase: 'before',
-      });
       router.navigate({
         pathname: '/(receive-flow)/receiveToken',
         params: { receiveHistoryEntry: JSON.stringify(buildReceiveHistoryEntry(token)) },
@@ -126,12 +120,6 @@ export function createSovranHandlers({
     },
 
     confirmSend: async ({ mintUrl, amount }) => {
-      debugLog({
-        location: 'paymentHandlers.confirmSend',
-        message: 'confirmSend handler',
-        phase: 'before',
-        data: { mintUrl, amount },
-      });
       try {
         await manager.wallet.send(mintUrl, amount);
         const history = await manager.history.getPaginatedHistory();
@@ -139,9 +127,10 @@ export function createSovranHandlers({
           (h) => h.type === 'send' && (h as SendHistoryEntry).mintUrl === mintUrl
         ) as SendHistoryEntry | undefined;
         if (!entry) throw new Error('Send history entry not found after creation');
+        const params = { sendHistoryEntry: JSON.stringify(entry) };
         router.navigate({
           pathname: '/(send-flow)/sendToken',
-          params: { sendHistoryEntry: JSON.stringify(entry) },
+          params,
         });
       } catch (err) {
         generalErrorPopup({
@@ -162,25 +151,14 @@ export function createSovranHandlers({
         amount,
         metadata: { phase: 'preview', meltTarget },
       };
-      debugLog({
-        location: 'paymentHandlers.navigateToMeltPreview',
-        message: 'instant navigation with synthetic entry',
-        phase: 'before',
-        data: { mintUrl, meltTarget, amount, unit, entryId: entry.id },
-      });
+      const params = { meltHistoryEntry: JSON.stringify(entry) };
       router.replace({
         pathname: '/(send-flow)/meltQuote',
-        params: { meltHistoryEntry: JSON.stringify(entry) },
+        params,
       });
     },
 
     createMintQuote: async ({ mintUrl, amount, unit }) => {
-      debugLog({
-        location: 'paymentHandlers.createMintQuote',
-        message: 'createMintQuote handler',
-        phase: 'before',
-        data: { mintUrl, amount, unit },
-      });
       try {
         const mintQuote = await manager.quotes.createMintQuote(mintUrl, amount);
         const history = await manager.history.getPaginatedHistory();
@@ -188,9 +166,10 @@ export function createSovranHandlers({
           (h) => h.type === 'mint' && (h as MintHistoryEntry).quoteId === mintQuote.quote
         ) as MintHistoryEntry | undefined;
         if (!entry) throw new Error('Mint quote history entry not found after creation');
+        const params = { mintHistoryEntry: JSON.stringify(entry), unit: unit ?? 'sat' };
         router.replace({
           pathname: '/(receive-flow)/mintQuote',
-          params: { mintHistoryEntry: JSON.stringify(entry), unit },
+          params,
         });
       } catch (err) {
         generalErrorPopup({
@@ -214,18 +193,6 @@ export function createSovranHandlers({
     },
 
     enterAmount: ({ unit, preselectedMintUrl, constraints }) => {
-      const cache = useMintStore.getState().getAllSelectedMints();
-      debugLog({
-        location: 'paymentHandlers.enterAmount',
-        message: 'enterAmount handler — navigating to amount screen',
-        phase: 'before',
-        data: {
-          unit,
-          preselectedMintUrl: preselectedMintUrl ?? null,
-          destination: constraints.destination ?? null,
-          cache: { ...cache },
-        },
-      });
       const params: Record<string, string> = { unit };
       if (constraints.destination) params.destination = constraints.destination;
       if (preselectedMintUrl) params.selectedMintUrl = preselectedMintUrl;
@@ -244,22 +211,6 @@ export function createSovranHandlers({
       unit,
       destination,
     }) => {
-      const cache = useMintStore.getState().getAllSelectedMints();
-      debugLog({
-        location: 'paymentHandlers.selectMint',
-        message: 'selectMint handler — navigating to mint list',
-        phase: 'before',
-        data: {
-          destination: destination ?? null,
-          hasDestination: !!destination,
-          unit,
-          amount: amount ?? null,
-          note: destination
-            ? 'flow context preserved'
-            : 'no destination — context was cleared to { unit }',
-          cache: { ...cache },
-        },
-      });
       try {
         const [allTrustedMints, balances] = await Promise.all([
           manager.mint.getAllTrustedMints(),
@@ -320,23 +271,10 @@ export function createSovranHandlers({
     },
 
     dismiss: () => {
-      const cache = useMintStore.getState().getAllSelectedMints();
-      debugLog({
-        location: 'paymentHandlers.dismiss',
-        message: 'dismiss handler — going back (e.g. after persist-only mint select on home)',
-        phase: 'before',
-        data: { note: 'flow context cleared, screen dismissed', cache: { ...cache } },
-      });
       router.back();
     },
 
     error: ({ code, message }) => {
-      debugLog({
-        location: 'paymentHandlers.error',
-        message: 'error handler',
-        phase: 'before',
-        data: { code, message },
-      });
       switch (code) {
         case 'NO_AMOUNT':
           noAmountPopup();

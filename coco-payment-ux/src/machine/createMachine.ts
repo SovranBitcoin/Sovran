@@ -1,5 +1,4 @@
 import { defaultDetectors } from '../detectors';
-import { debugLog, serializeFlowContext, serializeWalletContext } from '../debugLog';
 import { transition } from './transitions';
 import type {
   CreateMachineConfig,
@@ -155,12 +154,6 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
   const send = async (event: import('./types').FlowEvent): Promise<void> => {
     if (sendLocked) {
-      debugLog({
-        location: 'coco-payment-ux.createMachine.send',
-        message: 'send REJECTED — machine is locked (concurrent event)',
-        phase: 'before',
-        data: { eventType: event.type, currentStep: step },
-      });
       return;
     }
     sendLocked = true;
@@ -168,36 +161,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     const walletCtx = getContext();
     const unit = getUnit?.() ?? configUnit;
 
-    debugLog({
-      location: 'coco-payment-ux.createMachine.send',
-      message: 'send event — BEFORE transition',
-      phase: 'before',
-      data: {
-        eventType: event.type,
-        fromStep: step,
-        flowContext: serializeFlowContext(flowCtx),
-        walletContext: serializeWalletContext(walletCtx),
-        stepDataKeys: Object.keys(stepData as object),
-      },
-    });
-
     const result = transition(step, flowCtx, event, detectors, walletCtx, unit);
 
     step = result.step;
     flowCtx = result.context;
     stepData = result.data;
-
-    debugLog({
-      location: 'coco-payment-ux.createMachine.send',
-      message: 'send event — AFTER transition',
-      phase: 'after',
-      data: {
-        eventType: event.type,
-        toStep: step,
-        flowContext: serializeFlowContext(flowCtx),
-        stepData: stepData as Record<string, unknown>,
-      },
-    });
 
     // Auto-persist on persist-only path (no destination = home screen selection).
     // Explicit event.persist overrides: true forces persist, false suppresses it.
@@ -205,12 +173,6 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       const isPersistOnlyPath = step === 'dismiss' && !flowCtx.destination;
       const shouldPersist = event.persist ?? isPersistOnlyPath;
       if (shouldPersist) {
-        debugLog({
-          location: 'coco-payment-ux.createMachine.send',
-          message: 'invoking onPersistMint (auto-persist)',
-          phase: 'before',
-          data: { mintUrl: event.mintUrl, isPersistOnlyPath, explicitPersist: event.persist },
-        });
         onPersistMint(event.mintUrl);
       }
     }
@@ -219,18 +181,6 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     if (trackExecuting) {
       handlerExecuting = true;
     }
-    debugLog({
-      location: 'coco-payment-ux.createMachine.send',
-      message: 'pre-handler notify',
-      phase: 'before',
-      data: {
-        eventType: event.type,
-        step,
-        handlerExecuting,
-        sendLocked,
-        trackExecuting,
-      },
-    });
     notify();
 
     try {
@@ -240,38 +190,15 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         handlerExecuting = false;
       }
       sendLocked = false;
-      debugLog({
-        location: 'coco-payment-ux.createMachine.send',
-        message: 'post-handler notify',
-        phase: 'after',
-        data: {
-          eventType: event.type,
-          step,
-          handlerExecuting,
-          sendLocked,
-        },
-      });
       notify();
     }
   };
 
   const changeMint = (mintUrl: string, opts?: { persist?: boolean }) => {
-    debugLog({
-      location: 'coco-payment-ux.createMachine.changeMint',
-      message: 'changeMint called',
-      phase: 'before',
-      data: { mintUrl, persist: opts?.persist ?? false },
-    });
     return send({ type: 'MINT_SELECTED', mintUrl, persist: opts?.persist });
   };
 
   const requestMintSelector = (opts?: { reset?: boolean }) => {
-    debugLog({
-      location: 'coco-payment-ux.createMachine.requestMintSelector',
-      message: 'requestMintSelector called',
-      phase: 'before',
-      data: { reset: opts?.reset ?? false, previousStep: step },
-    });
     if (opts?.reset) {
       step = 'idle';
       flowCtx = { unit: getUnit?.() ?? configUnit };
@@ -286,28 +213,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   const startReceiveLightning = () => send({ type: 'START_RECEIVE_LIGHTNING' });
 
   const reset = () => {
-    const walletCtx = getContext();
-    debugLog({
-      location: 'coco-payment-ux.createMachine.reset',
-      message: 'reset called — clearing flow context to idle',
-      phase: 'before',
-      data: {
-        previousStep: step,
-        flowContextBefore: serializeFlowContext(flowCtx),
-        walletContext: serializeWalletContext(walletCtx),
-      },
-    });
     step = 'idle';
     flowCtx = { unit: getUnit?.() ?? configUnit };
     stepData = {} as any;
     handlerExecuting = false;
     notify();
-    debugLog({
-      location: 'coco-payment-ux.createMachine.reset',
-      message: 'reset complete — context cleared',
-      phase: 'after',
-      data: { flowContextAfter: serializeFlowContext(flowCtx) },
-    });
   };
 
   return {

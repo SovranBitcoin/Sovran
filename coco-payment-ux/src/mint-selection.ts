@@ -67,14 +67,14 @@ export function selectMint(
   const candidates = getValidMintCandidates(ctx, config);
 
   if (candidates.length === 0) {
+    let reason: string;
     if (allowedMints && allowedMints.length > 0) {
       const anyTrusted = allowedMints.some((m) => ctx.trustedMintUrls.includes(m));
-      if (!anyTrusted) {
-        return { type: 'noValidMint', reason: 'No allowed mint is trusted' };
-      }
-      return { type: 'noValidMint', reason: 'Insufficient balance on allowed mints' };
+      reason = !anyTrusted ? 'No allowed mint is trusted' : 'Insufficient balance on allowed mints';
+    } else {
+      reason = 'No mint with sufficient balance';
     }
-    return { type: 'noValidMint', reason: 'No mint with sufficient balance' };
+    return { type: 'noValidMint', reason };
   }
 
   // Sort by strategy

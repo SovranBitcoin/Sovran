@@ -52,6 +52,7 @@ export function MintQuoteScreen({
     'mintQuote',
     mintHistoryEntry
   );
+
   const sourceLabel = useTransactionSource(entry?.id);
   const mintInfo = useMintInfo(entry?.mintUrl);
 

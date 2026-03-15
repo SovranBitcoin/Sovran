@@ -32,7 +32,6 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { convertTime } from '@/shared/lib/time';
-import { debugLog } from '@/shared/lib/debugLog';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useScreenActions } from '@/shared/hooks/useScreenActions';
 import { useBeforeRemoveCleanup } from '@/shared/hooks/useBeforeRemoveCleanup';
@@ -56,24 +55,13 @@ export function MeltQuoteScreen({
   onMintSelected,
   onRequestMintList,
 }: MeltQuoteScreenProps) {
-  useEffect(() => {
-    debugLog({
-      location: 'MeltQuoteScreen',
-      message: 'MeltQuoteScreen mounted',
-      phase: 'entry',
-      data: {
-        hasMeltHistoryEntry: !!meltHistoryEntry,
-        operationId: operationId ?? null,
-      },
-    });
-  }, [meltHistoryEntry, operationId]);
-
   const extraContext = useMemo(() => (operationId ? { operationId } : undefined), [operationId]);
   const { entry, error, actions } = useScreenActions<'meltQuote', MeltHistoryEntry>(
     'meltQuote',
     meltHistoryEntry,
     extraContext
   );
+
   const sourceLabel = useTransactionSource(entry?.id);
   const mintInfo = useMintInfo(entry?.mintUrl ?? selectedMintUrl);
   const successRef = useRef(false);
@@ -82,12 +70,6 @@ export function MeltQuoteScreen({
     active: !!operationId,
     shouldCleanup: () => !successRef.current && !!operationId,
     cleanup: async () => {
-      debugLog({
-        location: 'MeltQuoteScreen.useBeforeRemoveCleanup',
-        message: 'cleanup triggered — executing cancel',
-        phase: 'before',
-        data: { operationId },
-      });
       await actions.cancel.execute();
     },
   });
@@ -122,20 +104,8 @@ export function MeltQuoteScreen({
               icon: actions.pay.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
               variant: 'primary',
               onPress: async (close: any) => {
-                debugLog({
-                  location: 'MeltQuoteScreen.pay',
-                  message: 'Pay button pressed — executing actions.pay',
-                  phase: 'before',
-                  data: { isPreview, quoteId: entry?.quoteId },
-                });
                 await actions.pay.execute();
                 successRef.current = true;
-                debugLog({
-                  location: 'MeltQuoteScreen.pay',
-                  message: 'Pay completed — success',
-                  phase: 'after',
-                  data: { quoteId: entry?.quoteId },
-                });
                 onSendSuccess?.();
                 close({});
               },
@@ -147,12 +117,6 @@ export function MeltQuoteScreen({
               icon: actions.cancel.loading ? 'ri:loader-line' : 'ri:close-circle-line',
               variant: 'secondary',
               onPress: async (close: any) => {
-                debugLog({
-                  location: 'MeltQuoteScreen.cancel',
-                  message: 'Cancel button pressed — executing actions.cancel',
-                  phase: 'before',
-                  data: { quoteId: entry?.quoteId },
-                });
                 await actions.cancel.execute();
                 onCancel();
                 close({});

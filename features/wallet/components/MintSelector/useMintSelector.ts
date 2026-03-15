@@ -1,9 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 
 import type { MintAvailability } from 'coco-payment-ux';
 
-import { debugLog } from '@/shared/lib/debugLog';
 import { useBalanceContext } from 'coco-cashu-react';
 
 import { useMintManagement } from '@/features/mint';
@@ -61,26 +60,6 @@ export function useMintSelector({
   const selectedMints = useMintStore((state) => state.selectedMints);
   const mintUrl = selectedMintUrl ?? (pubkey ? selectedMints[pubkey] : undefined);
   const balance = mintUrl ? liveBalances[mintUrl] || 0 : 0;
-  const source = selectedMintUrl != null ? 'prop' : pubkey ? 'store' : 'none';
-
-  useEffect(() => {
-    debugLog({
-      location: 'useMintSelector',
-      message: 'MintSelector resolved mintUrl',
-      phase: 'entry',
-      data: {
-        mintUrl: mintUrl ?? null,
-        source,
-        hasPubkey: !!pubkey,
-        storeMintForPubkey: pubkey ? (selectedMints[pubkey] ?? null) : null,
-        balance,
-        cache: { ...selectedMints },
-      },
-    });
-    // Only log when resolved mint or source changes; balance/selectedMints would cause log spam.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mintUrl, source]);
-
   const mintData = useMemo(
     () => (mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined),
     [mints, mintUrl]

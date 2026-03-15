@@ -41,7 +41,6 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { Section } from '@/features/settings';
 import Icon from 'assets/icons';
-import { debugLog } from '@/shared/lib/debugLog';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -158,44 +157,16 @@ export function ReceiveScreen({
   });
 
   const handleScanQR = async (): Promise<void> => {
-    // #region agent log
-    debugLog({
-      location: 'ReceiveScreen.tsx:handleScanQR',
-      message: 'ReceiveScreen Scan QR button before',
-      phase: 'before',
-    });
-    // #endregion
     if (!hasPermission?.granted) {
       await requestPermission();
       return;
     }
 
     onCamera(unit);
-    // #region agent log
-    debugLog({
-      location: 'ReceiveScreen.tsx:handleScanQR',
-      message: 'ReceiveScreen Scan QR button after',
-      phase: 'after',
-    });
-    // #endregion
   };
 
   const handleFixedAmount = async (): Promise<void> => {
-    // #region agent log
-    debugLog({
-      location: 'ReceiveScreen.tsx:handleFixedAmount',
-      message: 'ReceiveScreen Fixed Amount button before',
-      phase: 'before',
-    });
-    // #endregion
     onFixedAmount(unit);
-    // #region agent log
-    debugLog({
-      location: 'ReceiveScreen.tsx:handleFixedAmount',
-      message: 'ReceiveScreen Fixed Amount button after',
-      phase: 'after',
-    });
-    // #endregion
   };
 
   const handleCopyLightningAddress = useCallback(async () => {

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 
 import type { HistoryEntry } from 'coco-cashu-core';
 
-import { debugLog } from '@/shared/lib/debugLog';
 import { useManager } from 'coco-cashu-react';
 
 import {
@@ -78,17 +77,6 @@ export function useScreenActions<S extends ScreenType, E extends HistoryEntry = 
   const extraContextRef = useRef(extraContext);
   extraContextRef.current = extraContext;
 
-  useEffect(() => {
-    if (extraContext && Object.keys(extraContext).length > 0) {
-      debugLog({
-        location: 'useScreenActions',
-        message: 'extraContext provided (e.g. operationId for meltQuote)',
-        phase: 'entry',
-        data: { screenType, keys: Object.keys(extraContext) },
-      });
-    }
-  }, [screenType, extraContext]);
-
   const { parsed, error } = useMemo(() => parseEntryParam(entryParam), [entryParam]);
 
   const managerRef = useRef<ScreenActionManager<S> | null>(null);
@@ -158,9 +146,7 @@ export function useScreenActions<S extends ScreenType, E extends HistoryEntry = 
     return bound;
   }, [rawState, actionManager]);
 
-  return {
-    entry: actionManager.getEntry() as E | null,
-    error,
-    actions,
-  };
+  const entry = actionManager.getEntry() as E | null;
+
+  return { entry, error, actions };
 }

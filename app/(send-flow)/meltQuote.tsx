@@ -7,10 +7,9 @@
  * prepareMeltBolt11 and re-navigates with the real entry + operationId.
  */
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 
-import { debugLog } from '@/shared/lib/debugLog';
 import { MeltQuoteScreen } from '@/features/send';
 import {
   usePaymentFlowMint,
@@ -24,42 +23,18 @@ function ModalScreen() {
     operationId?: string;
   }>();
 
-  useEffect(() => {
-    debugLog({
-      location: 'MeltQuoteRoute',
-      message: 'meltQuote route mounted with params',
-      phase: 'entry',
-      data: {
-        hasMeltHistoryEntry: !!meltHistoryEntry,
-        operationId: operationId ?? null,
-      },
-    });
-  }, [meltHistoryEntry, operationId]);
-
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
   const flowMint = usePaymentFlowMint();
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {
-      debugLog({
-        location: 'MeltQuoteRoute.handleMintSelected',
-        message: 'MintSelector: mint selected from melt quote screen',
-        phase: 'before',
-        data: { mintUrl, persist: false, source: 'meltQuoteScreen' },
-      });
       void machine.changeMint(mintUrl);
     },
     [machine]
   );
 
   const handleRequestMintList = useCallback(() => {
-    debugLog({
-      location: 'MeltQuoteRoute.handleRequestMintList',
-      message: 'MintSelector: request mint list from melt quote screen',
-      phase: 'before',
-      data: { source: 'meltQuoteScreen' },
-    });
     void machine.requestMintSelector();
   }, [machine]);
 

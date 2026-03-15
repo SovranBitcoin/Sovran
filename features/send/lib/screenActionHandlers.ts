@@ -13,7 +13,6 @@ import type {
 import type { ScreenActionContext, ScreenActionHandlerMap } from 'coco-payment-ux';
 
 import { isLightningInvoice, requestInvoiceFromLnurl } from '@/shared/lib/cashu/utils';
-import { debugLog } from '@/shared/lib/debugLog';
 import {
   copyPopup,
   nfcEcashSharedPopup,
@@ -190,46 +189,18 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         let operationId = (rawCtx as Record<string, unknown>).operationId as string | undefined;
         const isPreview = !entry.quoteId;
 
-        debugLog({
-          location: 'screenActionHandlers.meltQuote.pay',
-          message: 'pay handler — entry',
-          phase: 'entry',
-          data: { isPreview, quoteId: entry.quoteId, operationId },
-        });
-
         // Phase 1: Prepare (only when preview — no quote yet)
         // TODO: On prepare failure, navigate to mint selector to let user change mints
         if (isPreview) {
           const meltTarget = entry.metadata?.meltTarget;
           if (!meltTarget) throw new Error('Missing meltTarget in metadata');
 
-          debugLog({
-            location: 'screenActionHandlers.meltQuote.pay',
-            message: 'preview phase — resolving bolt11',
-            phase: 'before',
-            data: { meltTarget, mintUrl: entry.mintUrl, amount: entry.amount },
-          });
-
           const bolt11 = isLightningInvoice(meltTarget)
             ? meltTarget
             : await requestInvoiceFromLnurl(meltTarget, entry.amount);
 
-          debugLog({
-            location: 'screenActionHandlers.meltQuote.pay',
-            message: 'bolt11 ready — calling prepareMeltBolt11',
-            phase: 'before',
-            data: { bolt11Len: bolt11?.length },
-          });
-
           const operation = await manager.quotes.prepareMeltBolt11(entry.mintUrl, bolt11);
           operationId = operation.id;
-
-          debugLog({
-            location: 'screenActionHandlers.meltQuote.pay',
-            message: 'prepareMeltBolt11 completed — pushing real entry for live updates',
-            phase: 'after',
-            data: { operationId: operation.id, quoteId: operation.quoteId },
-          });
 
           const setEntry = (rawCtx as Record<string, unknown>).setEntry as
             | ((e: Record<string, unknown>) => void)
@@ -266,12 +237,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           state: 'processing',
         });
 
-        debugLog({
-          location: 'screenActionHandlers.meltQuote.pay',
-          message: 'payment status store set — showing popup',
-          phase: 'before',
-          data: { quoteId, operationId },
-        });
         paymentStatusPopup({
           variant: 'melt',
           id: quoteId ?? operationId ?? entry.id,
@@ -281,24 +246,11 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           operationId,
         });
 
-        debugLog({
-          location: 'screenActionHandlers.meltQuote.pay',
-          message: operationId ? 'executeMelt by operationId' : 'executeMeltByQuote fallback',
-          phase: 'before',
-          data: { operationId, quoteId },
-        });
         if (operationId) {
           await manager.quotes.executeMelt(operationId);
         } else if (quoteId) {
           await manager.quotes.executeMeltByQuote(entry.mintUrl, quoteId);
         }
-
-        debugLog({
-          location: 'screenActionHandlers.meltQuote.pay',
-          message: 'executeMelt completed',
-          phase: 'after',
-          data: { quoteId, operationId },
-        });
       },
 
       cancel: async (rawCtx) => {
@@ -306,48 +258,17 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         const operationId = (rawCtx as Record<string, unknown>).operationId as string | undefined;
         const entry = meltQuoteCtx(rawCtx).entry;
 
-        debugLog({
-          location: 'screenActionHandlers.meltQuote.cancel',
-          message: 'cancel handler — entry',
-          phase: 'entry',
-          data: { quoteId: entry.quoteId, operationId, hasOperationId: !!operationId },
-        });
-
         if (!operationId && !entry.quoteId) {
-          debugLog({
-            location: 'screenActionHandlers.meltQuote.cancel',
-            message: 'cancel — no operationId or quoteId, skipping',
-            phase: 'after',
-            data: {},
-          });
           return;
         }
 
         try {
-          debugLog({
-            location: 'screenActionHandlers.meltQuote.cancel',
-            message: 'rollbackMelt',
-            phase: 'before',
-            data: { operationId },
-          });
           if (operationId) {
             await manager.quotes.rollbackMelt(operationId, 'User cancelled');
           }
-          debugLog({
-            location: 'screenActionHandlers.meltQuote.cancel',
-            message: 'rollback completed — showing paymentCancelledPopup',
-            phase: 'after',
-            data: {},
-          });
           paymentCancelledPopup();
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
-          debugLog({
-            location: 'screenActionHandlers.meltQuote.cancel',
-            message: 'rollback failed',
-            phase: 'after',
-            data: { error: msg },
-          });
           if (
             msg.includes('Cannot rollback') ||
             msg.includes('not found') ||
