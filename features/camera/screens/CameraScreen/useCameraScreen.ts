@@ -122,7 +122,12 @@ export function useCameraScreen({
           location: 'useCameraScreen.ts:handleScan',
           message: 'camera handleScan after onScan',
           phase: 'after',
-          data: { urInProgress: result && typeof result === 'object' && 'urInProgress' in result ? (result as any).urInProgress : undefined },
+          data: {
+            urInProgress:
+              result && typeof result === 'object' && 'urInProgress' in result
+                ? (result as any).urInProgress
+                : undefined,
+          },
         });
         // #endregion
         const urInProgress =

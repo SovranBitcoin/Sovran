@@ -145,7 +145,12 @@ export interface MintListItem {
   /** Whether this mint can be selected in the current flow. */
   status: 'available' | 'disabled';
   /** Reason the mint is disabled, null when status is 'available'. */
-  reason: 'NOT_IN_PAYMENT_REQUEST' | 'INSUFFICIENT_BALANCE' | 'NO_BALANCE' | 'UNSUPPORTED_FOR_FLOW' | null;
+  reason:
+    | 'NOT_IN_PAYMENT_REQUEST'
+    | 'INSUFFICIENT_BALANCE'
+    | 'NO_BALANCE'
+    | 'UNSUPPORTED_FOR_FLOW'
+    | null;
   isPreferred: boolean;
   /** KYM (Know Your Mint) community score, cached from Nostr events. */
   kymScore?: number;
