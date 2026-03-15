@@ -62,30 +62,6 @@ function AmountRoute() {
     isFocused: true,
   });
 
-  const handleAmountSubmit = useCallback(
-    (amount: number) => {
-      const mintUrl = selectedMint;
-      if (!mintUrl) {
-        noMintSelectedPopup();
-        return;
-      }
-      void machine.send({
-        type: 'AMOUNT_ENTERED',
-        amount,
-        mintUrl,
-        destination,
-      });
-    },
-    [selectedMint, destination, machine]
-  );
-
-  const { handlePaste: handlePastePress } = usePaste({
-    onEmpty: noClipboardAddressPopup,
-    onPaste: async (text) => {
-      await processPaymentString({ data: text, type: 'paste' });
-    },
-  });
-
   const isEcashSend = destination === 'sendEcash';
 
   const [amount, setAmount] = useState(0);
@@ -96,6 +72,25 @@ function AmountRoute() {
     if (proofAmounts.length === 0) return null;
     return composeSatoshis(proofAmounts, amount).exactMatch;
   }, [isEcashSend, selectedMint, amount, walletContext.proofAmounts]);
+
+  const handleAmountSubmit = useCallback(
+    (amount: number) => {
+      const mintUrl = selectedMint;
+      if (!mintUrl) {
+        noMintSelectedPopup();
+        return;
+      }
+      void machine.enterAmount(amount, mintUrl, { destination, offline: canSendOffline === true });
+    },
+    [selectedMint, destination, machine, canSendOffline]
+  );
+
+  const { handlePaste: handlePastePress } = usePaste({
+    onEmpty: noClipboardAddressPopup,
+    onPaste: async (text) => {
+      await processPaymentString({ data: text, type: 'paste' });
+    },
+  });
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {

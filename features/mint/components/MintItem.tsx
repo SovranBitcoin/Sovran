@@ -81,7 +81,7 @@ const MintItem: React.FC<MintItemProps> = ({
 
   const activityBadgeVariant = item.auditState === 'ERROR' ? 'error' : 'success';
 
-  const hasBadges = displayScore !== undefined || successRate !== undefined;
+  const hasBadges = displayScore !== undefined || successRate !== undefined || item.worksOffline === true;
 
   return (
     <TouchableOpacity
@@ -173,6 +173,12 @@ const MintItem: React.FC<MintItemProps> = ({
                   className="h-[24px] w-[60px] rounded-full"
                   style={{ backgroundColor: opacity(success, 0.2) }}
                 />
+              )}
+
+              {item.worksOffline === true && (
+                <Badge className="h-[24px]" variant="success" icon="mdi:airplane" size={14}>
+                  Offline
+                </Badge>
               )}
             </HStack>
           </>

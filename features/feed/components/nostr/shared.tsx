@@ -716,7 +716,7 @@ export const LightningBlock = React.memo(function LightningBlock({
   return (
     <Pressable
       onPress={() => {
-        void machine.send({ type: 'EXECUTE', input: meltTarget });
+        void machine.execute(meltTarget);
       }}
       style={[sharedStyles.mediaCard, { backgroundColor: surface, borderColor: surfaceTertiary }]}>
       <HStack align="center" gap={8}>

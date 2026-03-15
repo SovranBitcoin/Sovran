@@ -158,6 +158,8 @@ export interface MintListItem {
   auditScore?: number;
   /** Auditor state string, e.g. 'OK' or 'ERROR'. */
   auditState?: string;
+  /** Whether this mint can send the requested amount offline (exact proof composition). */
+  worksOffline?: boolean;
 }
 
 export type MintSelectionResult =

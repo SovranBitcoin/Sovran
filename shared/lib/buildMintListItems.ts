@@ -1,6 +1,6 @@
 import type { Mint } from 'coco-cashu-core';
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
-import type { MintAvailability, MintListItem } from 'coco-payment-ux';
+import { composeSatoshis, type MintAvailability, type MintListItem } from 'coco-payment-ux';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { getMintDisplayName, normalizeMintUrlKey } from '@/shared/lib/url';
@@ -23,7 +23,8 @@ export function computeAuditScore(auditData: AuditMintResponse): number | undefi
  */
 export function buildMintListItems(
   trustedMints: Mint[],
-  availability: MintAvailability[]
+  availability: MintAvailability[],
+  offlineCheck?: { amount: number; proofAmounts: Record<string, number[]> }
 ): MintListItem[] {
   const kymState = useKYMMintStore.getState();
   const auditState = useAuditMintStore.getState();
@@ -42,6 +43,11 @@ export function buildMintListItems(
       const kymCached = kymState.getCached(normalizedUrl);
       const auditCached = auditState.getCached(mintUrl);
 
+      const proofs = offlineCheck?.proofAmounts[mintUrl];
+      const worksOffline = offlineCheck && proofs && proofs.length > 0
+        ? composeSatoshis(proofs, offlineCheck.amount).exactMatch
+        : undefined;
+
       return {
         mintUrl,
         displayName: getMintDisplayName(mintUrl, mint?.mintInfo),
@@ -54,6 +60,7 @@ export function buildMintListItems(
         kymScore: kymCached?.score,
         auditScore: auditCached ? computeAuditScore(auditCached.auditData) : undefined,
         auditState: auditCached?.auditData?.state,
+        worksOffline,
       };
     })
     .sort((a, b) => {

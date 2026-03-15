@@ -5,7 +5,7 @@
 // Machine (state machine core)
 export { createPaymentMachine } from './machine/createMachine';
 export { resolveNext } from './machine/resolveNext';
-export { selectMintContext } from './machine/selectMintContext';
+export { selectMintContext, buildMintAvailability } from './machine/selectMintContext';
 
 // Pipeline utilities (usable standalone)
 export { parsePaymentInput } from './parse';
@@ -45,6 +45,7 @@ export type {
   StepDataMap,
   StepHandlerMap,
   CreateMachineConfig,
+  MachineOperations,
   PaymentMachine,
   ExecutionState,
   ErrorCode,

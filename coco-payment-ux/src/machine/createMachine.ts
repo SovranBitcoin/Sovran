@@ -1,7 +1,10 @@
 import { defaultDetectors } from '../detectors';
+import { composeSatoshis } from '../offline';
 import { transition } from './transitions';
+import type { PaymentOption } from '../types';
 import type {
   CreateMachineConfig,
+  Destination,
   ExecutionState,
   FlowContext,
   FlowStep,
@@ -77,7 +80,9 @@ function deriveExecutionState(step: FlowStep, data: StepDataMap[FlowStep]): Exec
         code === 'INSUFFICIENT_BALANCE' ||
         code === 'NO_BALANCE' ||
         code === 'ALL_OPTIONS_DISABLED' ||
-        code === 'UNSUPPORTED_INPUT'
+        code === 'UNSUPPORTED_INPUT' ||
+        code === 'SEND_FAILED' ||
+        code === 'MINT_QUOTE_FAILED'
           ? code
           : ('UNSUPPORTED_INPUT' as const);
       return {
@@ -127,6 +132,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     getUnit,
     unit: configUnit = 'sat',
     onPersistMint,
+    operations,
   } = config;
 
   let step: FlowStep = 'idle';
@@ -177,6 +183,97 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       }
     }
 
+    // Intercept action steps when operations are provided.
+    // The machine runs the operation internally, then re-targets to
+    // a result step (sendComplete, mintQuoteCreated) or fallback (chooseProofs, error).
+    if (operations) {
+      if (step === 'confirmSend') {
+        const data = stepData as StepDataMap['confirmSend'];
+        handlerExecuting = true;
+        notify();
+        try {
+          const result = await operations.executeSend(data.mintUrl, data.amount);
+          step = 'sendComplete';
+          stepData = result as any;
+        } catch (err) {
+          const walletCtx = getContext();
+          const proofAmounts = walletCtx.proofAmounts[data.mintUrl] ?? [];
+          let handled = false;
+          if (proofAmounts.length > 0) {
+            const composition = composeSatoshis(proofAmounts, data.amount);
+            const hasOptions =
+              composition.exactMatch ||
+              composition.nearestLower != null ||
+              composition.nearestUpper != null;
+            if (hasOptions) {
+              step = 'chooseProofs';
+              stepData = {
+                mintUrl: data.mintUrl,
+                amount: data.amount,
+                unit: flowCtx.unit,
+                proofAmounts,
+                suggestions: {
+                  roundDown: composition.exactMatch
+                    ? { amount: data.amount }
+                    : composition.nearestLower != null
+                      ? { amount: composition.nearestLower }
+                      : null,
+                  roundUp: composition.exactMatch
+                    ? null
+                    : composition.nearestUpper != null
+                      ? { amount: composition.nearestUpper }
+                      : null,
+                },
+              } as any;
+              handled = true;
+            }
+          }
+          if (!handled) {
+            step = 'error';
+            stepData = {
+              code: 'SEND_FAILED',
+              message: err instanceof Error ? err.message : 'Failed to create token',
+            } as any;
+          }
+        }
+        handlerExecuting = false;
+        notify();
+      } else if (step === 'createMintQuote') {
+        const data = stepData as StepDataMap['createMintQuote'];
+        handlerExecuting = true;
+        notify();
+        try {
+          const result = await operations.executeMintQuote(data.mintUrl, data.amount, data.unit);
+          step = 'mintQuoteCreated';
+          stepData = { historyEntry: result.historyEntry, unit: data.unit } as any;
+        } catch (err) {
+          step = 'error';
+          stepData = {
+            code: 'MINT_QUOTE_FAILED',
+            message: err instanceof Error ? err.message : 'Failed to create mint quote',
+          } as any;
+        }
+        handlerExecuting = false;
+        notify();
+      } else if (step === 'selectMint') {
+        const data = stepData as StepDataMap['selectMint'];
+        handlerExecuting = true;
+        notify();
+        try {
+          const items = await operations.buildMintListItems(data);
+          (stepData as any).mintListItems = items;
+        } catch (err) {
+          step = 'error';
+          stepData = {
+            code: 'UNSUPPORTED_INPUT',
+            message: err instanceof Error ? err.message : 'Failed to load mints',
+          } as any;
+        }
+        handlerExecuting = false;
+        notify();
+      }
+    }
+
     const trackExecuting = !INPUT_STEPS.has(step);
     if (trackExecuting) {
       handlerExecuting = true;
@@ -208,6 +305,25 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     return send({ type: 'REQUEST_MINT_SELECTOR' });
   };
 
+  const execute = (input: string) => send({ type: 'EXECUTE', input });
+
+  const enterAmount = (
+    amount: number,
+    mintUrl: string,
+    opts?: { destination?: Destination; offline?: boolean }
+  ) =>
+    send({
+      type: 'AMOUNT_ENTERED',
+      amount,
+      mintUrl,
+      destination: opts?.destination,
+      offline: opts?.offline,
+    });
+
+  const chooseOption = (option: PaymentOption) => send({ type: 'OPTION_CHOSEN', option });
+
+  const chooseProofs = (amount: number) => send({ type: 'PROOFS_CHOSEN', amount });
+
   const startSendEcash = () => send({ type: 'START_SEND_ECASH' });
 
   const startReceiveLightning = () => send({ type: 'START_RECEIVE_LIGHTNING' });
@@ -222,6 +338,10 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
   return {
     send,
+    execute,
+    enterAmount,
+    chooseOption,
+    chooseProofs,
     changeMint,
     requestMintSelector,
     startSendEcash,

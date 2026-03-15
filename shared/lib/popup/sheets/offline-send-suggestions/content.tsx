@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import opacity from 'hex-color-opacity';
 import { Alert, ListGroup, PressableFeedback } from 'heroui-native';
 
@@ -19,6 +19,7 @@ type Option = { direction: 'down' | 'up'; amount: number; label: string };
 export function OfflineSendSuggestionsContent({
   payload,
   close,
+  setFooterConfig,
 }: OfflineSendSuggestionsContentProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
@@ -50,6 +51,26 @@ export function OfflineSendSuggestionsContent({
     },
     [close, payload]
   );
+
+  useEffect(() => {
+    if (!payload.onChangeMint) {
+      setFooterConfig(null);
+      return;
+    }
+    setFooterConfig({
+      buttons: [
+        {
+          label: 'Change Mint',
+          variant: 'tertiary',
+          onPress: () => {
+            close();
+            payload.onChangeMint?.();
+          },
+        },
+      ],
+    });
+    return () => setFooterConfig(null);
+  }, [payload.onChangeMint, close, setFooterConfig]);
 
   return (
     <View>

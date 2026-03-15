@@ -884,7 +884,7 @@ From route params (enterAmount handler navigates with):
 
 | Action                | Triggers                | Response                                                    |
 | --------------------- | ----------------------- | ----------------------------------------------------------- |
-| handleAmountSubmit    | User taps Next          | `machine.send({ type: 'AMOUNT_ENTERED', amount, mintUrl })` |
+| handleAmountSubmit    | User taps Next          | `machine.enterAmount(amount, mintUrl, { destination })`    |
 | handleRequestMintList | User taps mint selector | REQUEST_MINT_SELECTOR (reset: false, context preserved)     |
 
 

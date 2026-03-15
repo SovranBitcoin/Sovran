@@ -118,11 +118,13 @@ function handleAmountEntered(
         amount: event.amount,
         mintUrl: event.mintUrl,
         destination: event.destination,
+        offline: event.offline,
       }
     : {
         ...currentCtx,
         amount: event.amount,
         mintUrl: event.mintUrl || currentCtx.mintUrl,
+        offline: event.offline ?? currentCtx.offline,
       };
 
   if (!ctx.intent) {
@@ -395,10 +397,11 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
 
   if (mintUrl) {
     const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
-      if (proofAmounts.length > 0) {
-        const composition = composeSatoshis(proofAmounts, amount);
-        if (!composition.exactMatch) {
-          return {
+    if (proofAmounts.length > 0) {
+      const composition = composeSatoshis(proofAmounts, amount);
+      const forceOffline = ctx.offline && (destination === 'sendEcash' || destination === 'paymentRequest');
+      if (!composition.exactMatch || forceOffline) {
+        return {
           step: 'chooseProofs',
           context: { ...ctx, destination },
           data: {
@@ -409,10 +412,12 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
             meltTarget: ctx.meltTarget,
             proofAmounts,
             suggestions: {
-              roundDown:
-                composition.nearestLower != null ? { amount: composition.nearestLower } : null,
-              roundUp:
-                composition.nearestUpper != null ? { amount: composition.nearestUpper } : null,
+              roundDown: composition.exactMatch
+                ? { amount }
+                : composition.nearestLower != null ? { amount: composition.nearestLower } : null,
+              roundUp: composition.exactMatch
+                ? null
+                : composition.nearestUpper != null ? { amount: composition.nearestUpper } : null,
             },
           },
         };

@@ -113,7 +113,7 @@ export const useProcessPaymentString = ({
       }
 
       processedRef.current = true;
-      await machine.send({ type: 'EXECUTE', input: scanning.data });
+      await machine.execute(scanning.data);
       const state = machine.inspect();
 
       if (state.status !== 'needsInput' || state.code !== 'OPTION_SELECTION_REQUIRED') {

@@ -7,7 +7,10 @@ import React, {
   useSyncExternalStore,
 } from 'react';
 
+import type { MintHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
+
 import {
+  buildMintAvailability,
   createPaymentMachine,
   selectMintContext,
   type FlowContext,
@@ -17,6 +20,8 @@ import {
   type WalletContext,
 } from 'coco-payment-ux';
 import { useManager } from 'coco-cashu-react';
+
+import { buildMintListItems } from '@/shared/lib/buildMintListItems';
 
 import { createSovranHandlers } from '@/features/send/lib/paymentHandlers';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -42,6 +47,8 @@ export function PaymentFlowProvider({ children }: { children: React.ReactNode })
   const optionDismissRef = useRef<(() => void) | undefined>(undefined);
   const handlersRef = useRef<StepHandlerMap>({});
   const machineRef = useRef<PaymentMachine | null>(null);
+  const managerRef = useRef(manager);
+  managerRef.current = manager;
 
   if (!machineRef.current) {
     machineRef.current = createPaymentMachine({
@@ -64,14 +71,60 @@ export function PaymentFlowProvider({ children }: { children: React.ReactNode })
           useMintStore.getState().setSelectedMint(pubkey, mintUrl);
         }
       },
+      operations: {
+        executeSend: async (mintUrl, amount) => {
+          const mgr = managerRef.current;
+          await mgr.wallet.send(mintUrl, amount);
+          const history = await mgr.history.getPaginatedHistory();
+          const entry = history.find(
+            (h) => h.type === 'send' && (h as SendHistoryEntry).mintUrl === mintUrl
+          ) as SendHistoryEntry | undefined;
+          if (!entry) throw new Error('Send history entry not found after creation');
+          return { historyEntry: JSON.stringify(entry) };
+        },
+
+        executeMintQuote: async (mintUrl, amount, _unit) => {
+          const mgr = managerRef.current;
+          const mintQuote = await mgr.quotes.createMintQuote(mintUrl, amount);
+          const history = await mgr.history.getPaginatedHistory();
+          const entry = history.find(
+            (h) => h.type === 'mint' && (h as MintHistoryEntry).quoteId === mintQuote.quote
+          ) as MintHistoryEntry | undefined;
+          if (!entry) throw new Error('Mint quote history entry not found after creation');
+          return { historyEntry: JSON.stringify(entry) };
+        },
+
+        buildMintListItems: async (stepData) => {
+          const mgr = managerRef.current;
+          const [allTrustedMints, balances] = await Promise.all([
+            mgr.mint.getAllTrustedMints(),
+            mgr.wallet.getBalances(),
+          ]);
+          const availability = allTrustedMints.map((mint) =>
+            buildMintAvailability({
+              mintUrl: mint.mintUrl,
+              balance: balances[mint.mintUrl] ?? 0,
+              supportedMintUrls: stepData.supportedMintUrls,
+              amount: stepData.amount,
+              destination: stepData.destination,
+            })
+          );
+          const offlineCheck =
+            (stepData.destination === 'sendEcash' || stepData.destination === 'paymentRequest') &&
+            stepData.amount
+              ? {
+                  amount: stepData.amount,
+                  proofAmounts: walletContextRef.current?.proofAmounts ?? {},
+                }
+              : undefined;
+          return buildMintListItems(allTrustedMints, availability, offlineCheck);
+        },
+      },
     });
   }
 
   handlersRef.current = createSovranHandlers({
-    manager,
-    onSend: (event) => {
-      void machineRef.current?.send(event);
-    },
+    machine: machineRef.current!,
     onOptionDismiss: () => {
       optionDismissRef.current?.();
     },

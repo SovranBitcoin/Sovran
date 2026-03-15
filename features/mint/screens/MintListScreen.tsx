@@ -3,7 +3,7 @@
  *
  * Pure display component — receives a pre-built MintListItem[] and renders it.
  * All data fetching (balances, KYM scores, audit data, availability) is done
- * before navigation via buildMintListItems() in paymentHandlers.ts.
+ * before navigation via machine operations in PaymentFlowProvider.tsx.
  *
  * The only local state is the selected currency tab.
  */

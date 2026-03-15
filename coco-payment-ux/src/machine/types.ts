@@ -1,6 +1,7 @@
 import type {
   AnnotatedOption,
   MintCandidate,
+  MintListItem,
   ParsedPaymentInput,
   PaymentOption,
   ResolvedIntent,
@@ -21,8 +22,10 @@ export type FlowStep =
   | 'chooseProofs'
   | 'receiveToken'
   | 'confirmSend'
+  | 'sendComplete'
   | 'navigateToMeltPreview'
   | 'createMintQuote'
+  | 'mintQuoteCreated'
   | 'openMint'
   | 'openProfile'
   | 'dismiss'
@@ -59,6 +62,8 @@ export interface StepDataMap {
     paymentRequest?: string;
     meltTarget?: string;
     destination?: Destination;
+    /** Pre-computed mint list items (populated when machine operations are provided). */
+    mintListItems?: MintListItem[];
   };
   chooseProofs: {
     mintUrl: string;
@@ -74,8 +79,10 @@ export interface StepDataMap {
   };
   receiveToken: { token: string };
   confirmSend: { mintUrl: string; amount: number };
+  sendComplete: { historyEntry: string };
   navigateToMeltPreview: { mintUrl: string; meltTarget: string; unit: string; amount: number };
   createMintQuote: { mintUrl: string; amount: number; unit: string };
+  mintQuoteCreated: { historyEntry: string; unit: string };
   openMint: { url: string };
   openProfile: { npub: string };
   dismiss: Record<string, never>;
@@ -93,7 +100,9 @@ export type ErrorCode =
   | 'NO_BALANCE'
   | 'UNSUPPORTED_INPUT'
   | 'ALL_OPTIONS_DISABLED'
-  | 'MISSING_MELT_TARGET';
+  | 'MISSING_MELT_TARGET'
+  | 'SEND_FAILED'
+  | 'MINT_QUOTE_FAILED';
 
 // ---------------------------------------------------------------------------
 // Flow Context — accumulated data through the flow
@@ -109,6 +118,8 @@ export interface FlowContext {
   paymentRequest?: string;
   meltTarget?: string;
   supportedMintUrls?: string[];
+  /** When true, force offline send (proof selector) instead of online confirmSend. */
+  offline?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +166,9 @@ export type ExecutionState =
         | 'NO_VALID_MINT'
         | 'INSUFFICIENT_BALANCE'
         | 'NO_BALANCE'
-        | 'ALL_OPTIONS_DISABLED';
+        | 'ALL_OPTIONS_DISABLED'
+        | 'SEND_FAILED'
+        | 'MINT_QUOTE_FAILED';
       message: string;
       isExecutable: false;
       isExecuting: boolean;
@@ -170,7 +183,7 @@ export type ExecutionState =
 export type FlowEvent =
   | { type: 'EXECUTE'; input: string }
   | { type: 'OPTION_CHOSEN'; option: PaymentOption }
-  | { type: 'AMOUNT_ENTERED'; amount: number; mintUrl: string; destination?: Destination }
+  | { type: 'AMOUNT_ENTERED'; amount: number; mintUrl: string; destination?: Destination; offline?: boolean }
   | {
       type: 'MINT_SELECTED';
       mintUrl: string;
@@ -196,6 +209,29 @@ export type StepHandlerMap = {
 };
 
 // ---------------------------------------------------------------------------
+// Machine operations — async side effects the machine runs internally
+// ---------------------------------------------------------------------------
+
+/**
+ * Async callbacks the machine executes for action steps (confirmSend,
+ * createMintQuote, selectMint). When provided, the machine handles
+ * success/failure routing and only dispatches external handlers for the
+ * resulting navigation/UI step.
+ *
+ * Backward compatible: when omitted, external handlers receive the raw
+ * action step data (old behavior).
+ */
+export interface MachineOperations {
+  executeSend: (mintUrl: string, amount: number) => Promise<{ historyEntry: string }>;
+  executeMintQuote: (
+    mintUrl: string,
+    amount: number,
+    unit: string
+  ) => Promise<{ historyEntry: string }>;
+  buildMintListItems: (data: StepDataMap['selectMint']) => Promise<MintListItem[]>;
+}
+
+// ---------------------------------------------------------------------------
 // Machine configuration
 // ---------------------------------------------------------------------------
 
@@ -211,6 +247,12 @@ export interface CreateMachineConfig {
    * Can be forced via `changeMint(url, { persist: true })` or suppressed with `false`.
    */
   onPersistMint?: (mintUrl: string) => void;
+  /**
+   * Async operations the machine executes for action steps.
+   * When provided, confirmSend/createMintQuote/selectMint are handled
+   * internally and external handlers only receive result steps.
+   */
+  operations?: MachineOperations;
 }
 
 // ---------------------------------------------------------------------------
@@ -220,6 +262,18 @@ export interface CreateMachineConfig {
 export interface PaymentMachine {
   /** Send any event to advance the machine. */
   send: (event: FlowEvent) => Promise<void>;
+  /** Process scan/paste/lightning input. Parses and routes to the appropriate flow. */
+  execute: (input: string) => Promise<void>;
+  /** Submit amount and mint for the current flow. Pass `offline: true` to force proof selection. */
+  enterAmount: (
+    amount: number,
+    mintUrl: string,
+    opts?: { destination?: Destination; offline?: boolean }
+  ) => Promise<void>;
+  /** User selected one of multiple payment options (e.g. from chooseOption step). */
+  chooseOption: (option: PaymentOption) => Promise<void>;
+  /** User selected round-down or round-up amount from offline proof suggestions. */
+  chooseProofs: (amount: number) => Promise<void>;
   /** Select a mint. Without `destination`, continues the current flow with the new mint. */
   changeMint: (mintUrl: string, opts?: { persist?: boolean }) => Promise<void>;
   /**

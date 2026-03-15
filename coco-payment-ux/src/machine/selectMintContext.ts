@@ -34,7 +34,7 @@ export interface MintResolutionContext {
 // Build availability for a single mint
 // ---------------------------------------------------------------------------
 
-function buildMintAvailability(args: {
+export function buildMintAvailability(args: {
   mintUrl: string;
   balance: number;
   selectedMintUrl?: string;
@@ -43,6 +43,16 @@ function buildMintAvailability(args: {
   destination?: Destination;
 }): MintAvailability {
   const { mintUrl, balance, selectedMintUrl, supportedMintUrls, amount, destination } = args;
+
+  if (destination === 'mintQuote') {
+    return {
+      mintUrl,
+      balance,
+      status: 'available',
+      reason: null,
+      isPreferred: selectedMintUrl === mintUrl,
+    };
+  }
 
   if (supportedMintUrls?.length && !supportedMintUrls.includes(mintUrl)) {
     return {

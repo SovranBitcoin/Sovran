@@ -1,15 +1,9 @@
 import { router } from 'expo-router';
 
-import type {
-  Manager,
-  MeltHistoryEntry,
-  MintHistoryEntry,
-  SendHistoryEntry,
-} from 'coco-cashu-core';
+import type { MeltHistoryEntry } from 'coco-cashu-core';
 
-import type { FlowEvent, MintAvailability, StepHandlerMap } from 'coco-payment-ux';
+import type { PaymentMachine, StepHandlerMap } from 'coco-payment-ux';
 
-import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import {
   allOptionsDisabledPopup,
@@ -22,93 +16,14 @@ import {
   paymentOptionsPopup,
   unsupportedInputPopup,
 } from '@/shared/lib/popup';
-import { buildMintListItems } from '@/shared/lib/buildMintListItems';
-
-/**
- * Computes MintAvailability status for a single mint given flow constraints.
- */
-function computeAvailability(args: {
-  mintUrl: string;
-  balance: number;
-  supportedMintUrls?: string[];
-  amount?: number;
-  destination?: string;
-  preferredMintUrl?: string;
-}): MintAvailability {
-  const { mintUrl, balance, supportedMintUrls, amount, destination, preferredMintUrl } = args;
-
-  if (destination === 'mintQuote') {
-    return {
-      mintUrl,
-      balance,
-      status: 'available',
-      reason: null,
-      isPreferred: mintUrl === preferredMintUrl,
-    };
-  }
-
-  if (supportedMintUrls?.length && !supportedMintUrls.includes(mintUrl)) {
-    return {
-      mintUrl,
-      balance,
-      status: 'disabled',
-      reason: 'NOT_IN_PAYMENT_REQUEST',
-      isPreferred: mintUrl === preferredMintUrl,
-    };
-  }
-
-  const needsBalance =
-    destination === 'paymentRequest' || destination === 'meltQuote' || destination === 'sendEcash';
-
-  if (needsBalance && amount != null && amount > 0) {
-    if (balance <= 0) {
-      return {
-        mintUrl,
-        balance,
-        status: 'disabled',
-        reason: 'NO_BALANCE',
-        isPreferred: mintUrl === preferredMintUrl,
-      };
-    }
-    if (balance < amount) {
-      return {
-        mintUrl,
-        balance,
-        status: 'disabled',
-        reason: 'INSUFFICIENT_BALANCE',
-        isPreferred: mintUrl === preferredMintUrl,
-      };
-    }
-  } else if (needsBalance && balance <= 0) {
-    return {
-      mintUrl,
-      balance,
-      status: 'disabled',
-      reason: 'NO_BALANCE',
-      isPreferred: mintUrl === preferredMintUrl,
-    };
-  }
-
-  return {
-    mintUrl,
-    balance,
-    status: 'available',
-    reason: null,
-    isPreferred: mintUrl === preferredMintUrl,
-  };
-}
-
-export { buildMintListItems };
 
 interface CreateSovranHandlersConfig {
-  manager: Manager;
-  onSend: (event: FlowEvent) => void | Promise<void>;
+  machine: PaymentMachine;
   onOptionDismiss?: () => void;
 }
 
 export function createSovranHandlers({
-  manager,
-  onSend,
+  machine,
   onOptionDismiss,
 }: CreateSovranHandlersConfig): StepHandlerMap {
   return {
@@ -119,24 +34,11 @@ export function createSovranHandlers({
       });
     },
 
-    confirmSend: async ({ mintUrl, amount }) => {
-      try {
-        await manager.wallet.send(mintUrl, amount);
-        const history = await manager.history.getPaginatedHistory();
-        const entry = history.find(
-          (h) => h.type === 'send' && (h as SendHistoryEntry).mintUrl === mintUrl
-        ) as SendHistoryEntry | undefined;
-        if (!entry) throw new Error('Send history entry not found after creation');
-        const params = { sendHistoryEntry: JSON.stringify(entry) };
-        router.navigate({
-          pathname: '/(send-flow)/sendToken',
-          params,
-        });
-      } catch (err) {
-        generalErrorPopup({
-          text: err instanceof Error ? err.message : 'Failed to create token',
-        });
-      }
+    sendComplete: ({ historyEntry }) => {
+      router.navigate({
+        pathname: '/(send-flow)/sendToken',
+        params: { sendHistoryEntry: historyEntry },
+      });
     },
 
     navigateToMeltPreview: ({ mintUrl, meltTarget, amount, unit }) => {
@@ -151,31 +53,17 @@ export function createSovranHandlers({
         amount,
         metadata: { phase: 'preview', meltTarget },
       };
-      const params = { meltHistoryEntry: JSON.stringify(entry) };
       router.replace({
         pathname: '/(send-flow)/meltQuote',
-        params,
+        params: { meltHistoryEntry: JSON.stringify(entry) },
       });
     },
 
-    createMintQuote: async ({ mintUrl, amount, unit }) => {
-      try {
-        const mintQuote = await manager.quotes.createMintQuote(mintUrl, amount);
-        const history = await manager.history.getPaginatedHistory();
-        const entry = history.find(
-          (h) => h.type === 'mint' && (h as MintHistoryEntry).quoteId === mintQuote.quote
-        ) as MintHistoryEntry | undefined;
-        if (!entry) throw new Error('Mint quote history entry not found after creation');
-        const params = { mintHistoryEntry: JSON.stringify(entry), unit: unit ?? 'sat' };
-        router.replace({
-          pathname: '/(receive-flow)/mintQuote',
-          params,
-        });
-      } catch (err) {
-        generalErrorPopup({
-          text: err instanceof Error ? err.message : 'Failed to create mint quote',
-        });
-      }
+    mintQuoteCreated: ({ historyEntry, unit }) => {
+      router.replace({
+        pathname: '/(receive-flow)/mintQuote',
+        params: { mintHistoryEntry: historyEntry, unit },
+      });
     },
 
     openMint: ({ url }) => {
@@ -204,45 +92,16 @@ export function createSovranHandlers({
       router.navigate({ pathname: pathname as any, params });
     },
 
-    selectMint: async ({
-      candidates: _candidates,
-      supportedMintUrls,
-      amount,
-      unit,
-      destination,
-    }) => {
-      try {
-        const [allTrustedMints, balances] = await Promise.all([
-          manager.mint.getAllTrustedMints(),
-          manager.wallet.getBalances(),
-        ]);
+    selectMint: ({ mintListItems, unit, destination }) => {
+      const params: Record<string, string> = {
+        unit,
+        mintItems: JSON.stringify(mintListItems ?? []),
+      };
+      if (destination) params.destination = destination;
 
-        const availability = allTrustedMints.map((mint) =>
-          computeAvailability({
-            mintUrl: mint.mintUrl,
-            balance: balances[mint.mintUrl] ?? 0,
-            supportedMintUrls,
-            amount,
-            destination,
-          })
-        );
-
-        const items = buildMintListItems(allTrustedMints, availability);
-
-        const params: Record<string, string> = {
-          unit,
-          mintItems: JSON.stringify(items),
-        };
-        if (destination) params.destination = destination;
-
-        const pathname =
-          destination === 'mintQuote' ? '/(receive-flow)/mintSelect' : '/(send-flow)/mintSelect';
-        router.navigate({ pathname: pathname as any, params });
-      } catch (err) {
-        generalErrorPopup({
-          text: err instanceof Error ? err.message : 'Failed to load mints',
-        });
-      }
+      const pathname =
+        destination === 'mintQuote' ? '/(receive-flow)/mintSelect' : '/(send-flow)/mintSelect';
+      router.navigate({ pathname: pathname as any, params });
     },
 
     chooseOption: ({ parsed, options, unit }) => {
@@ -251,7 +110,7 @@ export function createSovranHandlers({
         annotatedOptions: options,
         unit,
         onSelectOption: (option) => {
-          void onSend({ type: 'OPTION_CHOSEN', option });
+          void machine.chooseOption(option);
         },
         onDismiss: onOptionDismiss,
       });
@@ -265,7 +124,10 @@ export function createSovranHandlers({
         roundUp,
         unit,
         onSelectAmount: (amount) => {
-          void onSend({ type: 'PROOFS_CHOSEN', amount });
+          void machine.chooseProofs(amount);
+        },
+        onChangeMint: () => {
+          void machine.requestMintSelector();
         },
       });
     },
@@ -294,6 +156,10 @@ export function createSovranHandlers({
           break;
         case 'MISSING_MELT_TARGET':
           missingMeltTargetPopup();
+          break;
+        case 'SEND_FAILED':
+        case 'MINT_QUOTE_FAILED':
+          generalErrorPopup({ text: message });
           break;
         default:
           generalErrorPopup({ text: message });

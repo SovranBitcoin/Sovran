@@ -75,20 +75,19 @@ const machine = createPaymentMachine({
 | `getStep()`                  | Current `FlowStep`                                                                       |
 
 
-### Events
+### Events and helpers
 
-
-| Event                     | Key fields                                       |
-| ------------------------- | ------------------------------------------------ |
-| `EXECUTE`                 | `input` — raw scan/paste string                  |
-| `OPTION_CHOSEN`           | `option`                                         |
-| `AMOUNT_ENTERED`          | `amount`, `mintUrl`, `destination?`              |
-| `MINT_SELECTED`           | `mintUrl`, `amount?`, `destination?`, `persist?` |
-| `PROOFS_CHOSEN`           | `amount`                                         |
-| `REQUEST_MINT_SELECTOR`   | —                                                |
-| `START_SEND_ECASH`        | —                                                |
-| `START_RECEIVE_LIGHTNING` | —                                                |
-| `RESET`                   | —                                                |
+| Event                     | Helper method                       | Key fields                                       |
+| ------------------------- | ----------------------------------- | ------------------------------------------------ |
+| `EXECUTE`                 | `execute(input)`                    | `input` — raw scan/paste string                  |
+| `OPTION_CHOSEN`           | `chooseOption(option)`              | `option`                                         |
+| `AMOUNT_ENTERED`          | `enterAmount(amount, mintUrl, opts?)` | `amount`, `mintUrl`, `destination?`              |
+| `MINT_SELECTED`           | `changeMint(mintUrl, opts?)`        | `mintUrl`, `amount?`, `destination?`, `persist?` |
+| `PROOFS_CHOSEN`           | `chooseProofs(amount)`              | `amount`                                         |
+| `REQUEST_MINT_SELECTOR`   | `requestMintSelector(opts?)`        | —                                                |
+| `START_SEND_ECASH`        | `startSendEcash()`                 | —                                                |
+| `START_RECEIVE_LIGHTNING` | `startReceiveLightning()`          | —                                                |
+| `RESET`                   | `reset()`                          | —                                                |
 
 
 ### `isExecuting`
@@ -193,10 +192,10 @@ const machine = usePaymentFlowMachine({ walletContext, unit });
 const { isExecuting } = useExecutionState(machine);
 
 // On scan or paste:
-await machine.send({ type: 'EXECUTE', input: rawString });
+await machine.execute(rawString);
 
 // On amount submitted:
-await machine.send({ type: 'AMOUNT_ENTERED', amount: 1000, mintUrl });
+await machine.enterAmount(1000, mintUrl, { destination: 'sendEcash' });
 
 // On mint changed:
 await machine.changeMint(newMintUrl);

@@ -22,6 +22,7 @@ type OfflineSendSuggestionsPayload = {
   roundUp: OfflineSendSuggestion | null;
   unit: string;
   onSelectAmount: (amount: number) => void | Promise<void>;
+  onChangeMint?: () => void;
 };
 
 export type ProfileSwitcherAction =

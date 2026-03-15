@@ -49,12 +49,7 @@ function ReceiveAmountRoute() {
         noMintSelectedPopup();
         return;
       }
-      void machine.send({
-        type: 'AMOUNT_ENTERED',
-        amount,
-        mintUrl,
-        destination: 'mintQuote',
-      });
+      void machine.enterAmount(amount, mintUrl, { destination: 'mintQuote' });
     },
     [selectedMint, machine]
   );
