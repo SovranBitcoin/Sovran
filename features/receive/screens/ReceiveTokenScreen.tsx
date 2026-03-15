@@ -1,8 +1,9 @@
 /**
  * @fileoverview Shared ReceiveToken screen component
  *
- * This module provides the core UI and logic for receiving ecash tokens.
- * It is used by both standalone and flow-based route wrappers.
+ * Uses the screen-action system for entry tracking and availability.
+ * The redeem action is complex (payment status toast, P2PK key rotation,
+ * scan history linking) so it stays local to this screen.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -42,7 +43,6 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useReceiveHistoryEntry } from '../hooks/useReceiveHistoryEntry';
 
 interface ReceiveTokenScreenProps {
-  /** Either the parsed entry or a JSON string to be parsed internally */
   receiveHistoryEntry: ReceiveHistoryEntry | string | undefined;
   onNavigateBack: () => void;
   onRedeemSuccess: () => void;
@@ -72,7 +72,6 @@ export function ReceiveTokenScreen({
     ? manager.wallet.encodeToken(receiveHistoryEntry.token)
     : undefined;
 
-  // Extract P2PK locking pubkey from token proofs (if any)
   const p2pkPubkey = useMemo(() => {
     const proofs = receiveHistoryEntry?.token?.proofs;
     if (!proofs?.length) return null;
@@ -89,23 +88,17 @@ export function ReceiveTokenScreen({
     return null;
   }, [receiveHistoryEntry?.token?.proofs]);
 
-  // Detect if this is a scan placeholder (created by useProcessPaymentString before redeem).
-  // When we have a real entry (from history:updated or resolve), we're redeemed.
   const isScanPlaceholder = receiveHistoryEntry?.id?.startsWith('receive-') ?? false;
   const effectiveIsRedeemed = !isScanPlaceholder;
   const effectiveIsAlreadySpent = !effectiveIsRedeemed && isAlreadySpent;
   const isFinalizedReceive = effectiveIsRedeemed;
 
-  // Determine local UI state for timeline.
   const receiveState = effectiveIsRedeemed
     ? 'redeemed'
     : effectiveIsAlreadySpent
       ? 'alreadySpent'
       : 'pending';
 
-  // Clear payment status when leaving so retries start fresh. Uses a ref instead of
-  // receiveHistoryEntry?.id to avoid the cleanup firing when useReceiveHistoryEntry resolves
-  // the scan placeholder to the real entry (which changes the id and re-runs the effect).
   useEffect(() => {
     const ref = paymentIdRef;
     return () => {
@@ -123,7 +116,6 @@ export function ReceiveTokenScreen({
     };
   }, []);
 
-  // Show error state if parsing failed
   if (parseError || !receiveHistoryEntry) {
     return (
       <ScreenErrorState
@@ -153,16 +145,13 @@ export function ReceiveTokenScreen({
       const mintUrl = receiveHistoryEntry.mintUrl;
       const id = receiveHistoryEntry.id;
 
-      // Track the payment ID for cleanup — must be set before showing the toast
       paymentIdRef.current = id;
 
-      // Clear any stale failed state so retry shows fresh pending (avoids "goes straight to error")
       const store = usePaymentStatusStore.getState();
       if (store.active?.id === id && store.active?.state === 'failed') {
         store.setActive(null);
       }
 
-      // Show pending toast immediately on redeem button
       store.setActive({
         variant: 'receive-ecash',
         id,
@@ -171,18 +160,10 @@ export function ReceiveTokenScreen({
         unit,
         state: 'processing',
       });
-      paymentStatusPopup({
-        variant: 'receive-ecash',
-        id,
-        mintUrl,
-        amount,
-        unit,
-      });
+      paymentStatusPopup({ variant: 'receive-ecash', id, mintUrl, amount, unit });
 
       await receive(tokenString);
 
-      // If the token contained P2PK-locked proofs and the setting is enabled,
-      // generate a fresh key so the used pubkey is retired.
       const regenerateP2PK = useSettingsStore.getState().regenerateP2PKOnReceive;
       if (regenerateP2PK) {
         try {
@@ -199,12 +180,10 @@ export function ReceiveTokenScreen({
             await manager.keyring.generateKeyPair();
           }
         } catch (e) {
-          // Non-critical — don't block the receive flow
           console.warn('Failed to regenerate P2PK key:', e);
         }
       }
 
-      // Find the real history entry created by coco and store location against it
       const history = await manager.history.getPaginatedHistory(0, 5);
       const realEntry = history.find(
         (h) =>
@@ -213,24 +192,15 @@ export function ReceiveTokenScreen({
           h.mintUrl === receiveHistoryEntry.mintUrl
       );
 
-      // Capture and store location at redeem time (respects settings)
       if (realEntry?.id) {
         await captureAndStoreLocation(realEntry.id);
 
-        // Link the scan history entry to the transaction.
-        // Prefer the original raw token string (stored in metadata) because
-        // re-encoding via encodeToken() can produce a different string than
-        // what was stored as `processed` in the scan history.
         const rawToken = (receiveHistoryEntry.metadata as any)?.rawToken;
         if (rawToken || tokenString) {
           useScanHistoryStore.getState().linkTransaction(rawToken || tokenString, realEntry.id);
         }
       }
 
-      // useReceiveHistoryEntry will update entry/finalizedTransactionId when history:updated fires.
-      // usePaymentStatusListener's receive:created handler confirms the toast automatically.
-
-      // Defer navigation so the timeline and toast can render the final state before dismissal.
       setTimeout(() => onRedeemSuccess?.(), 0);
     } catch (error) {
       console.error(error);
@@ -239,7 +209,6 @@ export function ReceiveTokenScreen({
         store.active?.id === receiveHistoryEntry.id && store.active?.state === 'processing';
       if (hadPaymentToast) {
         store.setFailed(receiveHistoryEntry.id, error);
-        // Payment status toast shows failed state — do not show unrelated popup
       } else {
         receiveFailedPopup({ text: error instanceof Error ? error.message : undefined });
       }
@@ -317,7 +286,6 @@ export function ReceiveTokenScreen({
           historyEntry={{ ...receiveHistoryEntry, state: receiveState } as ReceiveHistoryEntry}
         />
 
-        {/* Technical details - collapsed by default */}
         <DetailsSection
           items={[
             ...(sourceLabel ? [{ title: 'Source', value: sourceLabel }] : []),

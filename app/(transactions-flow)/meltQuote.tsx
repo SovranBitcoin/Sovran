@@ -10,10 +10,8 @@ import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { MeltQuoteScreen } from '@/features/send';
 
 function ModalScreen() {
-  const { meltHistoryEntry, meltTarget, amount } = useLocalSearchParams<{
+  const { meltHistoryEntry } = useLocalSearchParams<{
     meltHistoryEntry?: string;
-    meltTarget?: string;
-    amount?: string;
   }>();
 
   return (
@@ -26,8 +24,6 @@ function ModalScreen() {
       />
       <MeltQuoteScreen
         meltHistoryEntry={meltHistoryEntry}
-        meltTarget={meltTarget}
-        amount={amount ? parseInt(amount, 10) : undefined}
         onCancel={() => {
           router.dismissTo('/');
         }}

@@ -21,7 +21,7 @@ export type FlowStep =
   | 'chooseProofs'
   | 'receiveToken'
   | 'confirmSend'
-  | 'fetchMeltQuote'
+  | 'navigateToMeltPreview'
   | 'createMintQuote'
   | 'openMint'
   | 'openProfile'
@@ -74,7 +74,7 @@ export interface StepDataMap {
   };
   receiveToken: { token: string };
   confirmSend: { mintUrl: string; amount: number };
-  fetchMeltQuote: { mintUrl: string; meltTarget: string; unit: string; amount: number };
+  navigateToMeltPreview: { mintUrl: string; meltTarget: string; unit: string; amount: number };
   createMintQuote: { mintUrl: string; amount: number; unit: string };
   openMint: { url: string };
   openProfile: { npub: string };

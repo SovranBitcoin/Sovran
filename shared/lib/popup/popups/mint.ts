@@ -1,5 +1,5 @@
 import { popup } from '../engine';
-import type { BaseOverrides } from './types';
+import type { BaseOverrides, TextOverrides } from './types';
 
 export function mintsAddedPopup(
   params: { added: number; failed?: number },
@@ -24,6 +24,17 @@ export function mintsAddedPopup(
 
 export function noMintSelectedPopup(overrides?: BaseOverrides): void {
   popup({ message: 'No mint selected', icon: 'icon:mdi:bank-off', type: 'error', ...overrides });
+}
+
+/** For coco-payment-ux NO_VALID_MINT — no mint supports this payment. */
+export function noValidMintPopup(overrides?: TextOverrides): void {
+  popup({
+    message: 'No Valid Mint',
+    text: 'No mint is available for this payment.',
+    icon: 'icon:mdi:bank-off',
+    type: 'error',
+    ...overrides,
+  });
 }
 
 export function noMintsSelectedPopup(): void {

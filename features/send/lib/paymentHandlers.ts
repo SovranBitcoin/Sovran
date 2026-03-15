@@ -1,16 +1,27 @@
 import { router } from 'expo-router';
 
-import type { Manager, MintHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
+import type {
+  Manager,
+  MeltHistoryEntry,
+  MintHistoryEntry,
+  SendHistoryEntry,
+} from 'coco-cashu-core';
 
-import type { StepHandlerMap, MintAvailability, FlowEvent } from 'coco-payment-ux';
+import type { FlowEvent, MintAvailability, StepHandlerMap } from 'coco-payment-ux';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { debugLog } from '@/shared/lib/debugLog';
 import {
+  allOptionsDisabledPopup,
+  balanceTooLowPopup,
   generalErrorPopup,
+  missingMeltTargetPopup,
+  noAmountPopup,
+  noValidMintPopup,
   offlineSendSuggestionsPopup,
   paymentOptionsPopup,
+  unsupportedInputPopup,
 } from '@/shared/lib/popup';
 import { buildMintListItems } from '@/shared/lib/buildMintListItems';
 
@@ -139,16 +150,27 @@ export function createSovranHandlers({
       }
     },
 
-    fetchMeltQuote: ({ mintUrl, meltTarget, amount }) => {
+    navigateToMeltPreview: ({ mintUrl, meltTarget, amount, unit }) => {
+      const entry: MeltHistoryEntry = {
+        id: `melt-preview-${Date.now()}`,
+        type: 'melt',
+        createdAt: Date.now(),
+        mintUrl,
+        unit: unit ?? 'sat',
+        quoteId: '',
+        state: 'UNPAID',
+        amount,
+        metadata: { phase: 'preview', meltTarget },
+      };
       debugLog({
-        location: 'paymentHandlers.fetchMeltQuote',
-        message: 'fetchMeltQuote handler — navigating to melt quote',
+        location: 'paymentHandlers.navigateToMeltPreview',
+        message: 'instant navigation with synthetic entry',
         phase: 'before',
-        data: { mintUrl, amount },
+        data: { mintUrl, meltTarget, amount, unit, entryId: entry.id },
       });
       router.replace({
         pathname: '/(send-flow)/meltQuote',
-        params: { meltTarget, amount: String(amount), selectedMintUrl: mintUrl },
+        params: { meltHistoryEntry: JSON.stringify(entry) },
       });
     },
 
@@ -308,14 +330,36 @@ export function createSovranHandlers({
       router.back();
     },
 
-    error: ({ message }) => {
+    error: ({ code, message }) => {
       debugLog({
         location: 'paymentHandlers.error',
         message: 'error handler',
         phase: 'before',
-        data: { message },
+        data: { code, message },
       });
-      generalErrorPopup({ text: message });
+      switch (code) {
+        case 'NO_AMOUNT':
+          noAmountPopup();
+          break;
+        case 'NO_VALID_MINT':
+          noValidMintPopup({ text: message });
+          break;
+        case 'INSUFFICIENT_BALANCE':
+        case 'NO_BALANCE':
+          balanceTooLowPopup({ text: message });
+          break;
+        case 'UNSUPPORTED_INPUT':
+          unsupportedInputPopup({ text: message });
+          break;
+        case 'ALL_OPTIONS_DISABLED':
+          allOptionsDisabledPopup();
+          break;
+        case 'MISSING_MELT_TARGET':
+          missingMeltTargetPopup();
+          break;
+        default:
+          generalErrorPopup({ text: message });
+      }
     },
   };
 }

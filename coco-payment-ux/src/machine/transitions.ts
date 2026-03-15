@@ -227,8 +227,14 @@ function handleProofsChosen(
   const mintUrl = ctx.mintUrl!;
 
   if (destination === 'meltQuote' && ctx.meltTarget) {
+    debugLog({
+      location: 'coco-payment-ux.transitions.handleProofsSelected',
+      message: 'navigateToMeltPreview step (proofs selected)',
+      phase: 'before',
+      data: { mintUrl, meltTarget: ctx.meltTarget, amount: event.amount },
+    });
     return {
-      step: 'fetchMeltQuote',
+      step: 'navigateToMeltPreview',
       context: ctx,
       data: { mintUrl, meltTarget: ctx.meltTarget, unit: ctx.unit, amount: event.amount },
     };
@@ -416,8 +422,14 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
       };
     }
     if (mintUrl) {
+      debugLog({
+        location: 'coco-payment-ux.transitions.resolveFromContext',
+        message: 'navigateToMeltPreview step (resolveFromContext)',
+        phase: 'before',
+        data: { mintUrl, meltTarget: ctx.meltTarget, amount },
+      });
       return {
-        step: 'fetchMeltQuote',
+        step: 'navigateToMeltPreview',
         context: { ...ctx, destination },
         data: { mintUrl, meltTarget: ctx.meltTarget, unit, amount },
       };

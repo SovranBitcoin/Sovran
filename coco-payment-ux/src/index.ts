@@ -61,6 +61,19 @@ export type {
   MintResolutionContext,
 } from './machine/selectMintContext';
 
+// Screen actions (post-terminal screen action system)
+export { createScreenActionManager, getAvailableActions } from './screen-actions';
+export type {
+  ActionAvailability,
+  ActionHandler,
+  ActionState,
+  ScreenActionContext,
+  ScreenActionHandlerMap,
+  ScreenActionManager,
+  ScreenActionName,
+  ScreenType,
+} from './screen-actions';
+
 // Domain types
 export type {
   Detectors,

@@ -120,7 +120,12 @@ function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
     location: 'coco-payment-ux.resolveNext.terminalStep',
     message: 'resolving to terminal step',
     phase: 'before',
-    data: { destination, mintUrl: mintUrl ?? null, amount: amount ?? null },
+    data: {
+      destination,
+      mintUrl: mintUrl ?? null,
+      amount: amount ?? null,
+      ...(destination === 'meltQuote' && { meltTarget: meltTarget ?? null }),
+    },
   });
 
   switch (destination) {
@@ -131,7 +136,7 @@ function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
       };
     case 'meltQuote':
       return {
-        step: 'fetchMeltQuote',
+        step: 'navigateToMeltPreview',
         data: { mintUrl: mintUrl!, meltTarget: meltTarget!, unit, amount: amount! },
       };
     case 'paymentRequest':

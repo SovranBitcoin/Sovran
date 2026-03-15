@@ -408,11 +408,11 @@ export default function RootLayout() {
                 key={`account-${activeAccountIndex}`}
                 accountIndex={activeAccountIndex}>
                 <RootLayoutContent />
+                <PopupHost />
               </AccountScopedProviders>
             </GlobalMigrationGate>
           </LegacyMigrationGate>
         </NativeSplashLayoutGate>
-        <PopupHost />
       </OuterProviders>
     </GestureHandlerRootView>
   );

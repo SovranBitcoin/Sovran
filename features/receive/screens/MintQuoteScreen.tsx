@@ -1,28 +1,23 @@
 /**
  * @fileoverview Shared MintQuote screen component
  *
- * Pure display component for Lightning mint quotes (receiving).
- * The mint quote is created before navigation — this screen only renders
- * and subscribes to live updates on the provided MintHistoryEntry.
+ * Display component for Lightning mint quotes (receiving). Actions (copy, share)
+ * are handled by the screen-action system.
  */
 
 import React from 'react';
-import { Share } from 'react-native';
 
-import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 
 import type { MintHistoryEntry } from 'coco-cashu-core';
 
 import { MintSelector } from '@/features/wallet';
-import { copyPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
   HistoryEntryTimeline,
   TransactionLocationSection,
-  useHistoryEntry,
   useTransactionSource,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
@@ -36,52 +31,39 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import { useScreenActions } from '@/shared/hooks/useScreenActions';
 
 interface MintQuoteScreenProps {
-  /** Either the parsed entry or a JSON string to be parsed internally */
   mintHistoryEntry: MintHistoryEntry | string;
   extraButtons?: ButtonHandlerButton[];
-  /** Mint URL to display in MintSelector. Reflects any mid-flow changeMint(). */
   selectedMintUrl?: string;
-  /** Called when user picks a mint from the MintSelector. */
   onMintSelected?: (mintUrl: string) => void;
-  /** Called when user requests to see the full mint list. */
   onRequestMintList?: () => void;
 }
 
 export function MintQuoteScreen({
-  mintHistoryEntry: mintHistoryEntryProp,
+  mintHistoryEntry,
   extraButtons = [],
   selectedMintUrl,
   onMintSelected,
   onRequestMintList,
 }: MintQuoteScreenProps) {
-  const { entry: currentTransaction, error: parseError } =
-    useHistoryEntry<MintHistoryEntry>(mintHistoryEntryProp);
-  const sourceLabel = useTransactionSource(currentTransaction?.id);
-  const mintInfo = useMintInfo(currentTransaction?.mintUrl);
+  const { entry, error, actions } = useScreenActions<'mintQuote', MintHistoryEntry>(
+    'mintQuote',
+    mintHistoryEntry
+  );
+  const sourceLabel = useTransactionSource(entry?.id);
+  const mintInfo = useMintInfo(entry?.mintUrl);
 
-  if (parseError) {
-    return <ScreenErrorState message={parseError} onGoBack={() => router.back()} />;
+  if (error) {
+    return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
   }
 
-  if (!currentTransaction) {
+  if (!entry) {
     return <ScreenLoadingState message="Loading transaction..." />;
   }
 
-  const handleCopy = async (close: (event: any) => void) => {
-    await Clipboard.setStringAsync(currentTransaction.paymentRequest);
-    copyPopup('lightningAddress', { onClose: () => close({}) });
-  };
-
-  const handleShare = async (close: (event: any) => void) => {
-    await Share.share({ message: currentTransaction.paymentRequest });
-    close({});
-  };
-
-  const isPaid =
-    (currentTransaction as any)?.state === 'ISSUED' ||
-    (currentTransaction as any)?.state === 'PAID';
+  const isPaid = entry.state === 'ISSUED' || entry.state === 'PAID';
 
   const bottomButtons = (
     <BottomButtons>
@@ -92,15 +74,21 @@ export function MintQuoteScreen({
               text: 'Copy',
               icon: 'lets-icons:copy',
               variant: 'primary',
-              onPress: handleCopy,
-              condition: !isPaid,
+              onPress: async (close: any) => {
+                await actions.copy.execute();
+                close({});
+              },
+              condition: actions.copy.available,
             },
             {
               text: 'Share',
               icon: 'ri:share-fill',
               variant: 'secondary',
-              onPress: handleShare,
-              condition: !isPaid,
+              onPress: async (close: any) => {
+                await actions.share.execute();
+                close({});
+              },
+              condition: actions.share.available,
             },
             ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
           ]}
@@ -112,43 +100,41 @@ export function MintQuoteScreen({
   return (
     <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
       <VStack gap={12}>
-        <HistoryEntryHeader historyEntry={currentTransaction} />
+        <HistoryEntryHeader historyEntry={entry} />
         {!isPaid && (
           <PaymentInfo
-            data={[{ name: 'Lightning', value: currentTransaction.paymentRequest }]}
-            unit={currentTransaction.unit}
+            data={[{ name: 'Lightning', value: entry.paymentRequest }]}
+            unit={entry.unit}
             copyTarget="lightningAddress"
           />
         )}
 
-        {isPaid && <TransactionLocationSection transactionId={currentTransaction.id} />}
+        {isPaid && <TransactionLocationSection transactionId={entry.id} />}
 
         {!isPaid ? (
           <MintSelector
             width={280}
-            unit={currentTransaction.unit}
+            unit={entry.unit}
             selectedMintUrl={selectedMintUrl}
             onMintSelected={onMintSelected ?? (() => {})}
             onRequestMintList={onRequestMintList ?? (() => {})}
           />
         ) : mintInfo ? (
-          <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={currentTransaction} />
+          <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
         ) : null}
 
-        {currentTransaction.metadata?.memo && (
-          <Card message={currentTransaction.metadata.memo} variant="info" />
-        )}
+        {entry.metadata?.memo && <Card message={entry.metadata.memo} variant="info" />}
 
-        <HistoryEntryTimeline historyEntry={currentTransaction} />
+        <HistoryEntryTimeline historyEntry={entry} />
 
         <DetailsSection
           items={[
-            ...(sourceLabel ? [{ title: 'Source', value: sourceLabel }] : []),
+            sourceLabel && { title: 'Source', value: sourceLabel },
             {
               title: 'Invoice',
-              value: truncateMiddle(currentTransaction.paymentRequest, 10),
+              value: truncateMiddle(entry.paymentRequest, 10),
             },
-          ]}
+          ].flatMap((item) => (item ? [item] : []))}
         />
       </VStack>
     </ModalLayoutWrapper>

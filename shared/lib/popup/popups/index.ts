@@ -36,6 +36,7 @@ export {
 } from './token';
 export { cameraPermissionPopup, noQrCodeFoundPopup, qrScanFailedPopup } from './camera';
 export {
+  balanceTooLowPopup,
   insufficientBalancePopup,
   invalidAddressPopup,
   noClipboardAddressPopup,
@@ -55,6 +56,7 @@ export {
   mintsAddedPopup,
   noMintSelectedPopup,
   noMintsSelectedPopup,
+  noValidMintPopup,
   mintsAddFailedPopup,
   managerNotInitializedPopup,
 } from './mint';
@@ -68,7 +70,11 @@ export {
   engagementUpdateFailedPopup,
 } from './general';
 export {
+  allOptionsDisabledPopup,
   invalidPaymentRequestPopup,
+  missingMeltTargetPopup,
+  noAmountPopup,
+  noPaymentRequestPopup,
   sendPaymentFailedPopup,
   cancelTransactionFailedPopup,
   quoteCreationFailedPopup,
@@ -78,7 +84,7 @@ export {
   invalidNostrTransportPopup,
   invalidRecipientPopup,
   noLightningAddressPopup,
-  noPaymentRequestPopup,
+  unsupportedInputPopup,
 } from './send';
 export {
   receiveFailedPopup,

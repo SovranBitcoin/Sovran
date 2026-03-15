@@ -22,6 +22,8 @@ import { nip19 } from 'nostr-tools';
 import { Metadata } from 'nostr-tools/kinds';
 import { ImageBlock, useImageOverlay } from './image-overlay';
 import type { ImageOverlayLayout, ImageOverlayPost } from './image-overlay';
+import { usePaymentFlowMachine } from '@/features/send/providers/PaymentFlowProvider';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 // ============================================================================
@@ -708,11 +710,13 @@ export const LightningBlock = React.memo(function LightningBlock({
     'surface',
     'surface-tertiary',
   ] as const);
+  const walletContext = useWalletContext();
+  const machine = usePaymentFlowMachine({ walletContext });
 
   return (
     <Pressable
       onPress={() => {
-        router.navigate({ pathname: '/(send-flow)/meltQuote' as any, params: { meltTarget } });
+        void machine.send({ type: 'EXECUTE', input: meltTarget });
       }}
       style={[sharedStyles.mediaCard, { backgroundColor: surface, borderColor: surfaceTertiary }]}>
       <HStack align="center" gap={8}>

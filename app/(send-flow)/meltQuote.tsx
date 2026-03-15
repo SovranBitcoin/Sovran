@@ -2,12 +2,12 @@
  * @fileoverview Send flow meltQuote route wrapper
  *
  * Part of the (send-flow) modal group - displays with back button.
- * Supports two flows:
- * 1. Creating new quote: meltTarget + amount params
- * 2. Viewing existing: meltHistoryEntry param
+ * The navigateToMeltPreview handler navigates here instantly with a
+ * synthetic meltHistoryEntry. The prepare action (on-screen) runs
+ * prepareMeltBolt11 and re-navigates with the real entry + operationId.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 
 import { debugLog } from '@/shared/lib/debugLog';
@@ -19,17 +19,26 @@ import {
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 function ModalScreen() {
-  const { meltHistoryEntry, meltTarget, amount, selectedMintUrl } = useLocalSearchParams<{
+  const { meltHistoryEntry, operationId } = useLocalSearchParams<{
     meltHistoryEntry?: string;
-    meltTarget?: string;
-    amount?: string;
-    selectedMintUrl?: string;
+    operationId?: string;
   }>();
+
+  useEffect(() => {
+    debugLog({
+      location: 'MeltQuoteRoute',
+      message: 'meltQuote route mounted with params',
+      phase: 'entry',
+      data: {
+        hasMeltHistoryEntry: !!meltHistoryEntry,
+        operationId: operationId ?? null,
+      },
+    });
+  }, [meltHistoryEntry, operationId]);
 
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
   const flowMint = usePaymentFlowMint();
-  const effectiveMint = flowMint ?? selectedMintUrl;
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {
@@ -59,16 +68,14 @@ function ModalScreen() {
       <Stack.Screen
         options={{
           title: 'Send Lightning',
-          // So native-stack back goes through JS and usePreventRemove can run cleanup (free reserved proofs).
           headerBackButtonMenuEnabled: false,
         }}
       />
       <MeltQuoteScreen
-        key={effectiveMint}
+        key={flowMint}
         meltHistoryEntry={meltHistoryEntry}
-        meltTarget={meltTarget}
-        amount={amount ? parseInt(amount, 10) : undefined}
-        selectedMintUrl={effectiveMint}
+        operationId={operationId}
+        selectedMintUrl={flowMint}
         onCancel={() => {
           router.dismissTo('/');
         }}
