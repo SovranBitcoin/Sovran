@@ -230,9 +230,7 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
  * Returns null when the endpoint is unavailable (404),
  * signaling the caller to use the token directly as an API key.
  */
-export async function createWalletFromToken(
-  cashuToken: string
-): Promise<CreateWalletResponse | null> {
+async function createWalletFromToken(cashuToken: string): Promise<CreateWalletResponse | null> {
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/create`, {
       method: 'POST',
@@ -257,7 +255,7 @@ export async function createWalletFromToken(
   }
 }
 
-export async function topUpBalance(apiKey: string, cashuToken: string): Promise<TopUpResponse> {
+async function topUpBalance(apiKey: string, cashuToken: string): Promise<TopUpResponse> {
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/topup`, {
       method: 'POST',

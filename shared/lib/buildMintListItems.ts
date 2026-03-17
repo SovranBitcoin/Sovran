@@ -8,7 +8,7 @@ import { getMintDisplayName, normalizeMintUrlKey } from '@/shared/lib/url';
 /**
  * Derives a 0-5 audit score from raw swap data.
  */
-export function computeAuditScore(auditData: AuditMintResponse): number | undefined {
+function computeAuditScore(auditData: AuditMintResponse): number | undefined {
   const swaps = auditData.swaps || [];
   if (swaps.length === 0) return undefined;
   const successCount = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
@@ -44,9 +44,10 @@ export function buildMintListItems(
       const auditCached = auditState.getCached(mintUrl);
 
       const proofs = offlineCheck?.proofAmounts[mintUrl];
-      const worksOffline = offlineCheck && proofs && proofs.length > 0
-        ? composeSatoshis(proofs, offlineCheck.amount).exactMatch
-        : undefined;
+      const worksOffline =
+        offlineCheck && proofs && proofs.length > 0
+          ? composeSatoshis(proofs, offlineCheck.amount).exactMatch
+          : undefined;
 
       return {
         mintUrl,

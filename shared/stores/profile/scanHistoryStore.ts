@@ -17,7 +17,7 @@ import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStor
 const profileStorage = createProfileScopedStorage();
 
 /** What type of data was scanned */
-export type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'paymentRequest' | 'unknown';
+type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'paymentRequest' | 'unknown';
 
 /** How the data was scanned/entered */
 export type ScanSource = 'qr' | 'nfc' | 'paste' | 'deeplink';

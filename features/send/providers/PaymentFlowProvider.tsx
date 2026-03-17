@@ -61,6 +61,3 @@ export function PaymentFlowProvider({ children }: { children: React.ReactNode })
 
   return <CocoPaymentFlowProvider config={configRef.current}>{children}</CocoPaymentFlowProvider>;
 }
-
-/** Legacy alias during migration */
-export { usePaymentFlowMachine as usePaymentFlowResolver } from 'coco-payment-ux/react';

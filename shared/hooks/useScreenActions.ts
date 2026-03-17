@@ -172,23 +172,16 @@ export function useScreenActions<S extends ScreenType, E extends HistoryEntry = 
 
     // P2PK pubkey — prefer pre-computed metadata, fall back to extraction
     let p2pkPubkey: FormattedStringValue | null = null;
-    const meta = (raw as Record<string, unknown>).metadata as
-      | Record<string, string>
-      | undefined;
+    const meta = (raw as Record<string, unknown>).metadata as Record<string, string> | undefined;
     if (meta?.p2pkPubkey) {
       p2pkPubkey = new FormattedString(
         meta.p2pkPubkey,
         'middle'
       ) as unknown as FormattedStringValue;
     } else if (token && (token as { proofs?: unknown[] }).proofs) {
-      const extracted = extractP2PKPubkey(
-        (token as { proofs: Array<{ secret: string }> }).proofs
-      );
+      const extracted = extractP2PKPubkey((token as { proofs: Array<{ secret: string }> }).proofs);
       if (extracted) {
-        p2pkPubkey = new FormattedString(
-          extracted,
-          'middle'
-        ) as unknown as FormattedStringValue;
+        p2pkPubkey = new FormattedString(extracted, 'middle') as unknown as FormattedStringValue;
       }
     }
 
@@ -237,4 +230,3 @@ export function useScreenActions<S extends ScreenType, E extends HistoryEntry = 
 }
 
 // Re-export types
-export type { BoundAction } from 'coco-payment-ux/react';

@@ -21,7 +21,8 @@
     "@monicon/metro",
     "@monicon/core",
     "number-flow-react-native",
-    "@expo/config-plugins"
+    "@expo/config-plugins",
+    "coco-payment-ux"
   ],
   "ignoreBinaries": ["eas", "maestro"],
   "ignoreIssues": {
@@ -48,6 +49,7 @@
     "shared/stores/runtime/**": ["exports", "types"],
     "shared/lib/nostr/secureStorage.ts": ["exports"],
     "navigation/**": ["exports"],
-    "features/mint/components/rebalance/demoRunner.ts": ["files"]
+    "features/mint/components/rebalance/demoRunner.ts": ["files"],
+    "coco-payment-ux/**": ["files", "exports", "types"]
   }
 }

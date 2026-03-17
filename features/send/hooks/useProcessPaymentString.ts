@@ -10,7 +10,7 @@
 import { router } from 'expo-router';
 import { URDecoder } from '@gandlaf21/bc-ur';
 
-import { usePaymentStringProcessor, type ScanData } from 'coco-payment-ux/react';
+import { usePaymentStringProcessor } from 'coco-payment-ux/react';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
@@ -76,6 +76,3 @@ export const useProcessPaymentString = ({
     onUnlockCamera,
   });
 };
-
-// Re-export for convenience
-export type { ScanData };

@@ -32,7 +32,6 @@
 import { getDecodedToken, type ReceiveHistoryEntry } from 'coco-cashu-core';
 
 import { decode } from '@gandlaf21/bolt11-decode';
-import _ from 'lodash';
 
 /**
  * Validates if a string is a valid ecash token by attempting to decode it
@@ -58,59 +57,6 @@ export function isValidEcashToken(token: string): boolean {
     return true;
   } catch {
     return false;
-  }
-}
-
-/**
- * Extracts the amount in satoshis from a Lightning Network invoice
- *
- * @description Decodes a BOLT11 invoice and extracts the payment amount, converting from millisatoshis to satoshis
- *
- * **Process:** decode invoice → find amount section → convert millisats to sats
- * **Effects:** None (pure parsing function)
- *
- * @param {string} invoice - The Lightning Network invoice string
- * @returns {number} Amount in satoshis, or 0 if parsing fails or no amount specified
- *
- * @example
- * const invoice = 'lnbc100n1p...';
- * const amount = getLightningAmount(invoice);
- * console.log(`Amount: ${amount} sats`); // Amount: 100 sats
- */
-export function getLightningAmount(invoice: string): number {
-  try {
-    const decoded = decode(invoice);
-    const amount = decoded?.sections?.find((route) => route?.name === 'amount')?.value;
-    return amount ? amount / 1000 : 0; // Convert to sats
-  } catch {
-    return 0;
-  }
-}
-
-/**
- * Extracts the timestamp from a Lightning Network invoice
- *
- * @description Decodes a BOLT11 invoice and extracts the creation timestamp
- *
- * **Process:** decode invoice → find timestamp section → return timestamp
- * **Effects:** None (pure parsing function)
- *
- * @param {string} invoice - The Lightning Network invoice string
- * @returns {number} Unix timestamp in seconds, or 0 if parsing fails or no timestamp
- *
- * @example
- * const invoice = 'lnbc100n1p...';
- * const timestamp = getLightningTimestamp(invoice);
- * const date = new Date(timestamp * 1000);
- * console.log(`Created: ${date.toISOString()}`);
- */
-export function getLightningTimestamp(invoice: string): number {
-  try {
-    const decoded = decode(invoice);
-    const timestamp = decoded?.sections?.find((route) => route?.name === 'timestamp')?.value;
-    return timestamp || 0;
-  } catch {
-    return 0;
   }
 }
 
@@ -141,49 +87,6 @@ export const isLightningInvoice = (invoice: string): boolean => {
   }
 };
 
-/**
- * Trims and normalizes Lightning Network addresses and URLs by removing common prefixes
- *
- * @description Removes various Lightning Network URI prefixes and normalizes the string for consistent processing
- *
- * **Process:** validate input → trim and lowercase → remove URI prefixes → return cleaned string
- * **Effects:** None (pure string processing function)
- *
- * @param {string} str - The string to trim and normalize
- * @returns {string} The cleaned string with prefixes removed, or empty string if input is invalid
- *
- * @example
- * // Various input formats
- * lnTrim('lightning:user@domain.com') // 'user@domain.com'
- * lnTrim('lnurlp://domain.com/pay') // 'domain.com/pay'
- * lnTrim('lnurl:user@domain.com') // 'user@domain.com'
- * lnTrim('  LNBC100N1P...  ') // 'lnbc100n1p...'
- */
-export function lnTrim(str: string) {
-  if (!str || !_.isString(str)) {
-    return '';
-  }
-  str = str.trim().toLowerCase();
-  const uriPrefixes = [
-    'lightning:',
-    'lightning=',
-    'lightning://',
-    'lnurlp://',
-    'lnurlp=',
-    'lnurlp:',
-    'lnurl:',
-    'lnurl=',
-    'lnurl://',
-  ];
-  uriPrefixes.forEach((prefix) => {
-    if (!str.startsWith(prefix)) {
-      return;
-    }
-    str = str.slice(prefix.length).trim();
-  });
-  return str.trim();
-}
-
 // ============================================================================
 // LNURL Utilities (replaces lnurl-pay library which has React Native issues)
 // ============================================================================
@@ -197,22 +100,6 @@ interface LightningAddress {
   username: string;
   domain: string;
 }
-
-/**
- * Validates if a string is a lightning address (user@domain.com format)
- */
-export const isLightningAddress = (address: string): boolean => {
-  if (!address) return false;
-  return LN_ADDRESS_REGEX.test(address);
-};
-
-/**
- * Validates if a string is an lnurlp URL
- */
-export const isLnurlp = (url: string): boolean => {
-  if (!url) return false;
-  return LNURLP_REGEX.test(url);
-};
 
 /**
  * Parses a lightning address into username and domain
@@ -338,9 +225,7 @@ export function getEcashTokenAmount(token: string): number | undefined {
  * Extracts the P2PK public key from proofs, if any proof uses P2PK locking.
  * Returns the first P2PK data field found, or null.
  */
-export function extractP2PKPubkey(
-  proofs: ReadonlyArray<{ secret: string }>
-): string | null {
+export function extractP2PKPubkey(proofs: ReadonlyArray<{ secret: string }>): string | null {
   for (const proof of proofs) {
     try {
       const parsed = JSON.parse(proof.secret);
