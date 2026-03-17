@@ -18,7 +18,6 @@ import {
   HistoryEntryRefresh,
   HistoryEntryTimeline,
   TransactionLocationSection,
-  useTransactionSource,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -48,12 +47,10 @@ export function MintQuoteScreen({
   onMintSelected,
   onRequestMintList,
 }: MintQuoteScreenProps) {
-  const { entry, error, actions } = useScreenActions<'mintQuote', MintHistoryEntry>(
+  const { entry, error, actions, source } = useScreenActions<'mintQuote', MintHistoryEntry>(
     'mintQuote',
     mintHistoryEntry
   );
-
-  const sourceLabel = useTransactionSource(entry?.id);
   const mintInfo = useMintInfo(entry?.mintUrl);
 
   if (error) {
@@ -130,7 +127,7 @@ export function MintQuoteScreen({
 
         <DetailsSection
           items={[
-            sourceLabel && { title: 'Source', value: sourceLabel },
+            source && { title: 'Source', value: source },
             {
               title: 'Invoice',
               value: truncateMiddle(entry.paymentRequest, 10),

@@ -8,12 +8,10 @@
 
 import React from 'react';
 
-import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import type { SendHistoryEntry } from 'coco-cashu-core';
 
 import {
   HistoryEntryHeader,
-  useTransactionSource,
   HistoryEntryRefresh,
   HistoryEntryTimeline,
 } from '@/features/transactions';
@@ -25,8 +23,6 @@ import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { truncateMiddle } from '@/shared/lib/strings';
-import { convertTime } from '@/shared/lib/time';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useScreenActions } from '@/shared/hooks/useScreenActions';
 
@@ -36,12 +32,10 @@ interface SendTokenScreenProps {
 }
 
 export function SendTokenScreen({ sendHistoryEntry, onNavigateBack }: SendTokenScreenProps) {
-  const { entry, error, actions } = useScreenActions<'sendToken', SendHistoryEntry>(
+  const { entry, error, actions, source } = useScreenActions<'sendToken', SendHistoryEntry>(
     'sendToken',
     sendHistoryEntry
   );
-
-  const sourceLabel = useTransactionSource(entry?.id);
   const mintInfo = useMintInfo(entry?.mintUrl);
 
   if (error) {
@@ -51,8 +45,6 @@ export function SendTokenScreen({ sendHistoryEntry, onNavigateBack }: SendTokenS
   if (!entry) {
     return <ScreenLoadingState message="Loading transaction..." />;
   }
-
-  const encodedToken = entry.token ? getEncodedTokenV4(entry.token) : '';
 
   const bottomButtons = (
     <BottomButtons>
@@ -93,9 +85,9 @@ export function SendTokenScreen({ sendHistoryEntry, onNavigateBack }: SendTokenS
               text: 'Copy as Emoji',
               icon: 'fluent:emoji-24-filled',
               variant: 'primary',
-              pushSheet: {
-                sheetId: 'emoji-picker',
-                payload: { token: encodedToken },
+              onPress: async (close: any) => {
+                await actions.copyAsEmoji.execute();
+                close({});
               },
               condition: actions.copyAsEmoji.available,
             },
@@ -134,8 +126,8 @@ export function SendTokenScreen({ sendHistoryEntry, onNavigateBack }: SendTokenS
           <PaymentInfo
             copyTarget="ecashToken"
             unit={entry.unit}
-            data={encodedToken}
-            animated={encodedToken.length >= 500}
+            data={entry.tokenString?.toString() ?? ''}
+            animated={(entry.tokenString?.length ?? 0) >= 500}
           />
         )}
 
@@ -145,11 +137,11 @@ export function SendTokenScreen({ sendHistoryEntry, onNavigateBack }: SendTokenS
 
         <DetailsSection
           items={[
-            sourceLabel && { title: 'Source', value: sourceLabel },
-            { title: 'Date', value: convertTime(new Date(entry.createdAt)) },
-            entry.token && {
+            source && { title: 'Source', value: source },
+            { title: 'Date', value: entry.createdAt.datetime },
+            entry.tokenString && {
               title: 'Token',
-              value: truncateMiddle(getEncodedTokenV4(entry.token), 6),
+              value: entry.tokenString.truncate(6),
             },
           ].flatMap((item) => (item ? [item] : []))}
         />

@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import opacity from 'hex-color-opacity';
 import { Alert, ListGroup, PressableFeedback } from 'heroui-native';
 
 import Icon from 'assets/icons';
 import { defaultDetectors, type AnnotatedOption, type PaymentOptionKind } from 'coco-payment-ux';
+import { useExecutionState } from 'coco-payment-ux/react';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -46,33 +47,33 @@ function getOptionAmount(option: {
 }
 
 export function PaymentOptionsContent({ payload, close }: PaymentOptionsContentProps) {
-  const [inflightIndex, setInflightIndex] = useState<number | null>(null);
-  const selectedRef = useRef(false);
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
+
+  const { options, machine, unit: payloadUnit, onDismiss } = payload;
+  const { isExecuting } = useExecutionState(machine);
+  const selectedRef = useRef(false);
 
   // If the sheet is closed without selecting, reset the scanner.
   useEffect(() => {
     return () => {
       if (!selectedRef.current) {
-        payload.onDismiss?.();
+        onDismiss?.();
       }
     };
-  }, [payload]);
+  }, [onDismiss]);
 
   const handleSelect = useCallback(
-    (annotated: AnnotatedOption, index: number) => {
+    (annotated: AnnotatedOption) => {
       if (annotated.status === 'disabled') return;
       selectedRef.current = true;
-      setInflightIndex(index);
-      payload.onSelectOption(annotated.option);
+      void machine.chooseOption(annotated.option);
       close();
     },
-    [close, payload]
+    [close, machine]
   );
 
-  const hasMultipleKinds = new Set(payload.annotatedOptions.map((o) => o.option.kind)).size > 1;
-  const isProcessing = inflightIndex !== null;
-  const unit = payload.unit ?? 'sat';
+  const hasMultipleKinds = new Set(options.map((o) => o.option.kind)).size > 1;
+  const unit = payloadUnit ?? 'sat';
 
   return (
     <View>
@@ -89,8 +90,8 @@ export function PaymentOptionsContent({ payload, close }: PaymentOptionsContentP
           </Alert>
         )}
         <ListGroup variant="secondary">
-          {payload.annotatedOptions.map((annotated, index) => {
-            const isDisabled = annotated.status === 'disabled' || isProcessing;
+          {options.map((annotated, index) => {
+            const isDisabled = annotated.status === 'disabled' || isExecuting;
             const label = getMethodLabel(annotated.option.kind);
             const subtitle = annotated.status === 'recommended' ? 'Recommended' : undefined;
             const amount = getOptionAmount(annotated.option);
@@ -100,7 +101,7 @@ export function PaymentOptionsContent({ payload, close }: PaymentOptionsContentP
               <PressableFeedback
                 key={index}
                 animation={false}
-                onPress={() => handleSelect(annotated, index)}
+                onPress={() => handleSelect(annotated)}
                 isDisabled={isDisabled}>
                 <PressableFeedback.Scale>
                   <ListGroup.Item

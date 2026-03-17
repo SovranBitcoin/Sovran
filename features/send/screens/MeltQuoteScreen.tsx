@@ -11,7 +11,7 @@
  * entry; the pay action handles LNURL resolution + prepareMeltBolt11 + executeMelt.
  */
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 
 import type { MeltHistoryEntry } from 'coco-cashu-core';
 
@@ -20,7 +20,6 @@ import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
   HistoryEntryTimeline,
-  useTransactionSource,
 } from '@/features/transactions';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -31,7 +30,6 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
-import { convertTime } from '@/shared/lib/time';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useScreenActions } from '@/shared/hooks/useScreenActions';
 import { useBeforeRemoveCleanup } from '@/shared/hooks/useBeforeRemoveCleanup';
@@ -55,20 +53,26 @@ export function MeltQuoteScreen({
   onMintSelected,
   onRequestMintList,
 }: MeltQuoteScreenProps) {
-  const extraContext = useMemo(() => (operationId ? { operationId } : undefined), [operationId]);
-  const { entry, error, actions } = useScreenActions<'meltQuote', MeltHistoryEntry>(
-    'meltQuote',
-    meltHistoryEntry,
-    extraContext
-  );
+  const enrichedEntry = useMemo(() => {
+    if (!meltHistoryEntry || !operationId) return meltHistoryEntry;
+    const parsed =
+      typeof meltHistoryEntry === 'string'
+        ? (JSON.parse(meltHistoryEntry) as MeltHistoryEntry)
+        : meltHistoryEntry;
+    return { ...parsed, metadata: { ...parsed.metadata, operationId } };
+  }, [meltHistoryEntry, operationId]);
 
-  const sourceLabel = useTransactionSource(entry?.id);
-  const mintInfo = useMintInfo(entry?.mintUrl ?? selectedMintUrl);
+  const { entry, error, actions, source } = useScreenActions<'meltQuote', MeltHistoryEntry>(
+    'meltQuote',
+    enrichedEntry
+  );
+  const mintInfo = useMintInfo(entry?.mintUrl);
   const successRef = useRef(false);
 
+  const hasOperation = !!entry?.metadata?.operationId;
   useBeforeRemoveCleanup({
-    active: !!operationId,
-    shouldCleanup: () => !successRef.current && !!operationId,
+    active: hasOperation,
+    shouldCleanup: () => !successRef.current && hasOperation,
     cleanup: async () => {
       await actions.cancel.execute();
     },
@@ -82,8 +86,6 @@ export function MeltQuoteScreen({
     return <ScreenLoadingState message="Loading transaction..." />;
   }
 
-  const isPaid = entry.state === 'PAID';
-  const isUnpaid = entry.state === 'UNPAID';
   const isPreview = !entry.quoteId;
   const anyLoading = actions.pay.loading || actions.cancel.loading;
 
@@ -97,7 +99,7 @@ export function MeltQuoteScreen({
               icon: 'ri:close-circle-line',
               variant: 'secondary',
               onPress: async () => onCancel(),
-              condition: isPaid,
+              condition: entry.state === 'PAID',
             },
             {
               text: actions.pay.loading ? 'Sending...' : 'Pay',
@@ -135,7 +137,7 @@ export function MeltQuoteScreen({
       <VStack gap={12}>
         <HistoryEntryHeader historyEntry={entry} />
 
-        {isUnpaid ? (
+        {entry.state === 'UNPAID' ? (
           <MintSelector
             width={280}
             unit={entry.unit}
@@ -151,8 +153,8 @@ export function MeltQuoteScreen({
 
         <DetailsSection
           items={[
-            sourceLabel && { title: 'Source', value: sourceLabel },
-            { title: 'Date', value: convertTime(new Date(entry.createdAt)) },
+            source && { title: 'Source', value: source },
+            { title: 'Date', value: entry.createdAt.datetime },
             !isPreview && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
             isPreview &&
               entry.metadata?.meltTarget && {

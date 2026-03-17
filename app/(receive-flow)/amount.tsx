@@ -2,13 +2,13 @@
  * @fileoverview Receive flow amount route wrapper
  *
  * Renders AmountSelector for the mintQuote destination.
- * On submit, resumes payment resolver with amountEntered and mintQuote destination.
+ * No fiat toggle or offline optimization — just sat input.
  */
 
 import React, { useCallback } from 'react';
 import { Stack, useLocalSearchParams } from 'expo-router';
 
-import { useExecutionState } from 'coco-payment-ux/react';
+import { useExecutionState, useAmountActions } from 'coco-payment-ux/react';
 
 import { AmountSelector } from '@/features/send';
 import {
@@ -26,7 +26,6 @@ function ReceiveAmountRoute() {
   const params = useLocalSearchParams<{
     selectedMintUrl?: string;
     unit?: string;
-    destination?: string;
   }>();
 
   const unit = params.unit || 'sat';
@@ -42,17 +41,21 @@ function ReceiveAmountRoute() {
   const machine = usePaymentFlowMachine({ walletContext, unit });
   const { isExecuting } = useExecutionState(machine);
 
-  const handleAmountSubmit = useCallback(
-    (amount: number) => {
-      const mintUrl = selectedMint;
-      if (!mintUrl) {
-        noMintSelectedPopup();
-        return;
-      }
-      void machine.enterAmount(amount, mintUrl, { destination: 'mintQuote' });
-    },
-    [selectedMint, machine]
-  );
+  const amount = useAmountActions({
+    mintUrl: selectedMint,
+    proofAmounts: [],
+    btcPrice: 0,
+    offlineOptimization: false,
+    unit,
+  });
+
+  const handleSubmit = useCallback(() => {
+    if (!selectedMint) {
+      noMintSelectedPopup();
+      return;
+    }
+    void machine.enterAmount(amount.effectiveSatAmount, selectedMint, { destination: 'mintQuote' });
+  }, [selectedMint, machine, amount.effectiveSatAmount]);
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {
@@ -83,9 +86,9 @@ function ReceiveAmountRoute() {
         }}
       />
       <AmountSelector
-        unit={unit}
+        amount={amount}
         transactionType="receive"
-        onAmountSubmit={handleAmountSubmit}
+        onSubmit={handleSubmit}
         loading={isExecuting}
       />
     </>

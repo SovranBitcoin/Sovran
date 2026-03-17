@@ -133,6 +133,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     unit: configUnit = 'sat',
     onPersistMint,
     operations,
+    notifications,
   } = config;
 
   let step: FlowStep = 'idle';
@@ -271,6 +272,15 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         }
         handlerExecuting = false;
         notify();
+      }
+    }
+
+    // Dispatch notification for error steps (fire-and-forget).
+    if (step === 'error' && notifications) {
+      const errorData = stepData as StepDataMap['error'];
+      const notificationHandler = notifications[errorData.code];
+      if (notificationHandler) {
+        notificationHandler(errorData);
       }
     }
 

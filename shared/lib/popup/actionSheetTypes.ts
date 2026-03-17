@@ -1,4 +1,4 @@
-import type { AnnotatedOption, ParsedPaymentInput, PaymentOption } from 'coco-payment-ux';
+import type { PaymentMachine, StepDataMap } from 'coco-payment-ux';
 import type {
   ButtonHandlerActionButton,
   ButtonHandlerButton,
@@ -6,23 +6,15 @@ import type {
 
 type EmojiPickerPayload = { token: string };
 
-/** coco-payment-ux aligned: parsed input + annotated options for choose-option sheet */
-type PaymentOptionsPayload = {
-  parsed: ParsedPaymentInput;
-  annotatedOptions: AnnotatedOption[];
-  unit?: string;
-  onSelectOption: (option: PaymentOption) => void;
+/** Directly uses StepDataMap['chooseOption'] + machine reference. */
+type PaymentOptionsPayload = StepDataMap['chooseOption'] & {
+  machine: PaymentMachine;
   onDismiss?: () => void;
 };
 
-/** Matches coco-payment-ux OfflineSuggestion shape */
-export type OfflineSendSuggestion = { amount: number; label?: string };
-type OfflineSendSuggestionsPayload = {
-  roundDown: OfflineSendSuggestion | null;
-  roundUp: OfflineSendSuggestion | null;
-  unit: string;
-  onSelectAmount: (amount: number) => void | Promise<void>;
-  onChangeMint?: () => void;
+/** Directly uses StepDataMap['chooseProofs'] + machine reference. */
+type ProofSelectorPayload = StepDataMap['chooseProofs'] & {
+  machine: PaymentMachine;
 };
 
 export type ProfileSwitcherAction =
@@ -49,7 +41,7 @@ type BaseActionSheetPayloads = {
     onRequestAction: (action: ProfileSwitcherAction) => void;
   };
   'emoji-picker': EmojiPickerPayload;
-  'offline-send-suggestions': OfflineSendSuggestionsPayload;
+  'proof-selector': ProofSelectorPayload;
   'payment-options': PaymentOptionsPayload;
 };
 

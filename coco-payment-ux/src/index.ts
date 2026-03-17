@@ -50,6 +50,7 @@ export type {
   ExecutionState,
   ErrorCode,
   MachineSnapshot,
+  NotificationHandlerMap,
 } from './machine/types';
 
 export type {
@@ -58,6 +59,16 @@ export type {
   MintAvailabilityReason,
   MintResolutionContext,
 } from './machine/selectMintContext';
+
+// Amount actions (amount screen action system)
+export { createAmountActionManager, resolveAmount, resolutionEqual } from './amount-actions';
+export type {
+  AmountInputMode,
+  CoreAmountResolution,
+  AmountResolution,
+  CreateAmountActionManagerConfig,
+  AmountActionManager,
+} from './amount-actions';
 
 // Screen actions (post-terminal screen action system)
 export { createScreenActionManager, getAvailableActions } from './screen-actions';
@@ -71,6 +82,10 @@ export type {
   ScreenActionName,
   ScreenType,
 } from './screen-actions';
+
+// Formatting utilities
+export { FormattedTimestamp } from './formatting';
+export { FormattedString, type TruncateMode } from './formatting';
 
 // Domain types
 export type {

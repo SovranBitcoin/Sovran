@@ -3,7 +3,7 @@ export { copyPopup } from './copy';
 export {
   profileSwitcherPopup,
   emojiPickerPopup,
-  offlineSendSuggestionsPopup,
+  proofSelectorPopup,
   paymentOptionsPopup,
   buttonHandlerPopup,
 } from './actionSheets';

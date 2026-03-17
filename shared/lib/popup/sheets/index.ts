@@ -5,6 +5,6 @@
 
 export { ProfileSwitcherContent } from './profile-switcher';
 export { EmojiPickerContent } from './emoji-picker';
-export { OfflineSendSuggestionsContent } from './offline-send-suggestions/content';
+export { ProofSelectorContent } from './proof-selector/content';
 export { ButtonHandlerContent } from './button-handler';
 export { PaymentOptionsContent } from './payment-options/content';

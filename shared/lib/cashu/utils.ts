@@ -335,6 +335,26 @@ export function getEcashTokenAmount(token: string): number | undefined {
 }
 
 /**
+ * Extracts the P2PK public key from proofs, if any proof uses P2PK locking.
+ * Returns the first P2PK data field found, or null.
+ */
+export function extractP2PKPubkey(
+  proofs: ReadonlyArray<{ secret: string }>
+): string | null {
+  for (const proof of proofs) {
+    try {
+      const parsed = JSON.parse(proof.secret);
+      if (Array.isArray(parsed) && parsed[0] === 'P2PK' && parsed[1]?.data) {
+        return parsed[1].data as string;
+      }
+    } catch {
+      // not a structured secret
+    }
+  }
+  return null;
+}
+
+/**
  * Builds a `ReceiveHistoryEntry` from a decoded token.
  *
  * Centralises the pattern that was duplicated in ReceiveScreen, useProcessPaymentString,
@@ -348,6 +368,7 @@ export function buildReceiveHistoryEntry(
   unitOverride?: string
 ): ReceiveHistoryEntry {
   const decodedToken = getDecodedToken(rawToken);
+  const p2pkPubkey = extractP2PKPubkey(decodedToken.proofs);
   return {
     id: `receive-${Date.now()}`,
     type: 'receive',
@@ -355,7 +376,10 @@ export function buildReceiveHistoryEntry(
     unit: unitOverride ?? decodedToken.unit ?? 'sat',
     mintUrl: decodedToken.mint,
     createdAt: Date.now(),
-    metadata: { rawToken },
+    metadata: {
+      rawToken,
+      ...(p2pkPubkey ? { p2pkPubkey } : {}),
+    },
     token: decodedToken,
   };
 }

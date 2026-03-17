@@ -9,10 +9,8 @@ export function emojiPickerPopup(payload: ActionSheetPayloads['emoji-picker']): 
   showActionSheet('emoji-picker', payload);
 }
 
-export function offlineSendSuggestionsPopup(
-  payload: ActionSheetPayloads['offline-send-suggestions']
-): void {
-  showActionSheet('offline-send-suggestions', payload);
+export function proofSelectorPopup(payload: ActionSheetPayloads['proof-selector']): void {
+  showActionSheet('proof-selector', payload);
 }
 
 export function buttonHandlerPopup(payload: ActionSheetPayloads['button-handler']): void {

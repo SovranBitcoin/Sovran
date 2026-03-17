@@ -37,7 +37,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   ButtonHandlerContent,
   EmojiPickerContent,
-  OfflineSendSuggestionsContent,
+  ProofSelectorContent,
   PaymentOptionsContent,
   ProfileSwitcherContent,
 } from '@/shared/lib/popup/sheets';
@@ -255,7 +255,7 @@ const CUSTOM_SHEET_CONTENT: Record<
     canPop: boolean;
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
-  'offline-send-suggestions': OfflineSendSuggestionsContent as React.ComponentType<{
+  'proof-selector': ProofSelectorContent as React.ComponentType<{
     payload: unknown;
     close: () => void;
     pushCustomPage: <K extends keyof ActionSheetPayloads>(
