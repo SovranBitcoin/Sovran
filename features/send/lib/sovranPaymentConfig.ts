@@ -1,7 +1,19 @@
+/**
+ * @fileoverview Sovran payment flow config — single source for coco-payment-ux glue
+ *
+ * All four factory functions that inject Sovran-specific behavior into coco-payment-ux:
+ * - createSovranNotifications: error/notification popups
+ * - createSovranOperations: executeSend, executeMintQuote, buildMintListItems
+ * - createSovranHandlers: step handlers (navigation, popups, dismiss)
+ * - createSovranScreenActionHandlers: post-terminal actions (copy, share, NFC, redeem, pay)
+ *
+ * Consumed by PaymentFlowProvider (notifications, operations, handlers) and
+ * useScreenActions (screenActionHandlers).
+ */
+
+import type { MutableRefObject } from 'react';
 import { Share } from 'react-native';
-
 import * as Clipboard from 'expo-clipboard';
-
 import { router } from 'expo-router';
 
 import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
@@ -12,39 +24,292 @@ import type {
   MintHistoryEntry,
   ReceiveHistoryEntry,
 } from 'coco-cashu-core';
-
-import { defaultDetectors } from 'coco-payment-ux';
-import type { ScreenActionContext, ScreenActionHandlerMap } from 'coco-payment-ux';
-
-import { isLightningInvoice, requestInvoiceFromLnurl } from '@/shared/lib/cashu/utils';
 import {
-  copyPopup,
-  emojiPickerPopup,
-  nfcEcashSharedPopup,
-  nfcConnectionLostPopup,
-  nfcSendFailedPopup,
-  transactionCancelledPopup,
+  defaultDetectors,
+  buildMintAvailability,
+  type MachineOperations,
+  type NotificationHandlerMap,
+  type PaymentMachine,
+  type ScreenActionContext,
+  type ScreenActionHandlerMap,
+  type StepHandlerMap,
+  type WalletContext,
+} from 'coco-payment-ux';
+
+import { buildMintListItems } from '@/shared/lib/buildMintListItems';
+import {
+  buildReceiveHistoryEntry,
+  isLightningInvoice,
+  requestInvoiceFromLnurl,
+} from '@/shared/lib/cashu/utils';
+import { writeTokenToNFC } from '@/shared/lib/nfc';
+import {
+  allOptionsDisabledPopup,
+  balanceTooLowPopup,
   cancelTransactionFailedPopup,
-  tokenRedeemedByRecipientPopup,
-  tokenPendingNotRedeemedPopup,
-  operationNotFoundPopup,
-  operationInvalidStatePopup,
-  transactionAlreadyCancelledPopup,
-  paymentCancelledPopup,
+  copyPopup,
   couldNotCancelPopup,
+  emojiPickerPopup,
+  generalErrorPopup,
+  missingMeltTargetPopup,
+  nfcConnectionLostPopup,
+  nfcEcashSharedPopup,
+  nfcSendFailedPopup,
+  noAmountPopup,
+  noValidMintPopup,
+  operationInvalidStatePopup,
+  operationNotFoundPopup,
+  paymentCancelledPopup,
+  paymentOptionsPopup,
   paymentStatusPopup,
-  unsupportedTokenUnitPopup,
+  proofSelectorPopup,
   receiveFailedPopup,
+  tokenPendingNotRedeemedPopup,
+  tokenRedeemedByRecipientPopup,
+  transactionAlreadyCancelledPopup,
+  transactionCancelledPopup,
+  unsupportedInputPopup,
+  unsupportedTokenUnitPopup,
 } from '@/shared/lib/popup';
+import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
-import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
-import { writeTokenToNFC } from '@/shared/lib/nfc';
 
-// ---------------------------------------------------------------------------
-// Typed context helpers — cast generic ScreenActionContext to concrete types
-// ---------------------------------------------------------------------------
+// =============================================================================
+// createSovranNotifications
+// =============================================================================
+
+export function createSovranNotifications(): NotificationHandlerMap {
+  return {
+    NO_AMOUNT: ({ code: _code, message: _message, data: _data }) => {
+      noAmountPopup();
+    },
+    NO_VALID_MINT: ({ code: _code, message, data: _data }) => {
+      noValidMintPopup({ text: message });
+    },
+    INSUFFICIENT_BALANCE: ({ code: _code, message, data: _data }) => {
+      balanceTooLowPopup({ text: message });
+    },
+    NO_BALANCE: ({ code: _code, message, data: _data }) => {
+      balanceTooLowPopup({ text: message });
+    },
+    UNSUPPORTED_INPUT: ({ code: _code, message, data: _data }) => {
+      unsupportedInputPopup({ text: message });
+    },
+    ALL_OPTIONS_DISABLED: ({ code: _code, message: _message, data: _data }) => {
+      allOptionsDisabledPopup();
+    },
+    MISSING_MELT_TARGET: ({ code: _code, message: _message, data: _data }) => {
+      missingMeltTargetPopup();
+    },
+    SEND_FAILED: ({ code: _code, message, data: _data }) => {
+      generalErrorPopup({ text: message });
+    },
+    MINT_QUOTE_FAILED: ({ code: _code, message, data: _data }) => {
+      generalErrorPopup({ text: message });
+    },
+  };
+}
+
+// =============================================================================
+// createSovranOperations
+// =============================================================================
+
+interface CreateSovranOperationsConfig {
+  managerRef: MutableRefObject<Manager>;
+  walletContextRef: MutableRefObject<WalletContext | null>;
+}
+
+export function createSovranOperations({
+  managerRef,
+  walletContextRef,
+}: CreateSovranOperationsConfig): MachineOperations {
+  return {
+    executeSend: async (mintUrl, amount) => {
+      const mgr = managerRef.current;
+      await mgr.wallet.send(mintUrl, amount);
+      const history = await mgr.history.getPaginatedHistory();
+      const entry = history.find(
+        (h) => h.type === 'send' && (h as SendHistoryEntry).mintUrl === mintUrl
+      ) as SendHistoryEntry | undefined;
+      if (!entry) throw new Error('Send history entry not found after creation');
+      return { historyEntry: JSON.stringify(entry) };
+    },
+
+    executeMintQuote: async (mintUrl, amount, _unit) => {
+      const mgr = managerRef.current;
+      const mintQuote = await mgr.quotes.createMintQuote(mintUrl, amount);
+      const history = await mgr.history.getPaginatedHistory();
+      const entry = history.find(
+        (h) => h.type === 'mint' && (h as MintHistoryEntry).quoteId === mintQuote.quote
+      ) as MintHistoryEntry | undefined;
+      if (!entry) throw new Error('Mint quote history entry not found after creation');
+      return { historyEntry: JSON.stringify(entry) };
+    },
+
+    buildMintListItems: async (stepData) => {
+      const mgr = managerRef.current;
+      const [allTrustedMints, balances] = await Promise.all([
+        mgr.mint.getAllTrustedMints(),
+        mgr.wallet.getBalances(),
+      ]);
+      const availability = allTrustedMints.map((mint) =>
+        buildMintAvailability({
+          mintUrl: mint.mintUrl,
+          balance: balances[mint.mintUrl] ?? 0,
+          supportedMintUrls: stepData.supportedMintUrls,
+          amount: stepData.amount,
+          destination: stepData.destination,
+        })
+      );
+      const offlineCheck =
+        (stepData.destination === 'sendEcash' || stepData.destination === 'paymentRequest') &&
+        stepData.amount
+          ? {
+              amount: stepData.amount,
+              proofAmounts: walletContextRef.current?.proofAmounts ?? {},
+            }
+          : undefined;
+      return buildMintListItems(allTrustedMints, availability, offlineCheck);
+    },
+  };
+}
+
+// =============================================================================
+// createSovranHandlers
+// =============================================================================
+
+interface CreateSovranHandlersConfig {
+  machine: PaymentMachine;
+  onOptionDismiss?: () => void;
+}
+
+export function createSovranHandlers({
+  machine,
+  onOptionDismiss,
+}: CreateSovranHandlersConfig): StepHandlerMap {
+  return {
+    receiveToken: ({ token }) => {
+      router.navigate({
+        pathname: '/(receive-flow)/receiveToken',
+        params: { receiveHistoryEntry: JSON.stringify(buildReceiveHistoryEntry(token)) },
+      });
+    },
+
+    sendComplete: ({ historyEntry }) => {
+      router.navigate({
+        pathname: '/(send-flow)/sendToken',
+        params: { sendHistoryEntry: historyEntry },
+      });
+    },
+
+    navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit }) => {
+      const entry = {
+        id: `pr-preview-${Date.now()}`,
+        type: 'send',
+        createdAt: Date.now(),
+        mintUrl,
+        amount,
+        unit,
+        state: 'prepared',
+        metadata: { paymentRequest, phase: 'preview' },
+      };
+      router.navigate({
+        pathname: '/(send-flow)/paymentRequest' as any,
+        params: { paymentRequestEntry: JSON.stringify(entry) },
+      });
+    },
+
+    navigateToMeltPreview: ({ mintUrl, meltTarget, amount, unit }) => {
+      const entry: MeltHistoryEntry = {
+        id: `melt-preview-${Date.now()}`,
+        type: 'melt',
+        createdAt: Date.now(),
+        mintUrl,
+        unit: unit ?? 'sat',
+        quoteId: '',
+        state: 'UNPAID',
+        amount,
+        metadata: { phase: 'preview', meltTarget },
+      };
+      router.replace({
+        pathname: '/(send-flow)/meltQuote',
+        params: { meltHistoryEntry: JSON.stringify(entry) },
+      });
+    },
+
+    mintQuoteCreated: ({ historyEntry, unit }) => {
+      router.replace({
+        pathname: '/(receive-flow)/mintQuote',
+        params: { mintHistoryEntry: historyEntry, unit },
+      });
+    },
+
+    openMint: ({ url }) => {
+      router.navigate({
+        pathname: '/(mint-flow)/info',
+        params: { mintUrl: url, fromScan: '1' },
+      });
+    },
+
+    openProfile: ({ npub }) => {
+      router.navigate({
+        pathname: '/(user-flow)/profile',
+        params: { npub },
+      });
+    },
+
+    enterAmount: ({ unit, preselectedMintUrl, constraints }) => {
+      const params: Record<string, string> = { unit };
+      if (constraints.destination) params.destination = constraints.destination;
+      if (preselectedMintUrl) params.selectedMintUrl = preselectedMintUrl;
+      if (constraints.paymentRequest) params.paymentRequest = constraints.paymentRequest;
+      if (constraints.meltTarget) params.meltTarget = constraints.meltTarget;
+
+      const pathname =
+        constraints.destination === 'mintQuote' ? '/(receive-flow)/amount' : '/(send-flow)/amount';
+      router.navigate({ pathname: pathname as any, params });
+    },
+
+    selectMint: ({
+      candidates: _candidates,
+      supportedMintUrls: _supportedMintUrls,
+      amount: _amount,
+      unit,
+      paymentRequest: _paymentRequest,
+      meltTarget: _meltTarget,
+      destination,
+      mintListItems,
+    }) => {
+      const params: Record<string, string> = {
+        unit,
+        mintItems: JSON.stringify(mintListItems ?? []),
+      };
+      if (destination) params.destination = destination;
+
+      const pathname =
+        destination === 'mintQuote' ? '/(receive-flow)/mintSelect' : '/(send-flow)/mintSelect';
+      router.navigate({ pathname: pathname as any, params });
+    },
+
+    chooseOption: (stepData) => {
+      paymentOptionsPopup({ ...stepData, machine, onDismiss: onOptionDismiss });
+    },
+
+    chooseProofs: (stepData) => {
+      proofSelectorPopup({ ...stepData, machine });
+    },
+
+    dismiss: () => {
+      router.back();
+    },
+  };
+}
+
+// =============================================================================
+// createSovranScreenActionHandlers
+// =============================================================================
 
 type Ctx<E> = ScreenActionContext<E> & { manager: Manager };
 
@@ -90,13 +355,8 @@ function paymentRequestCtx(ctx: ScreenActionContext): PaymentRequestCtx {
   return ctx as unknown as PaymentRequestCtx;
 }
 
-// ---------------------------------------------------------------------------
-// Handler factory
-// ---------------------------------------------------------------------------
-
 export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
   return {
-    // ── Send Token ────────────────────────────────────────────────────────
     sendToken: {
       copy: async (rawCtx) => {
         const { entry } = sendCtx(rawCtx);
@@ -199,7 +459,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
       },
     },
 
-    // ── Receive Token ─────────────────────────────────────────────────────
     receiveToken: {
       redeem: async (rawCtx) => {
         const { entry, manager } = receiveTokenCtx(rawCtx);
@@ -207,14 +466,12 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
         const tokenString = manager.wallet.encodeToken(entry.token);
 
-        // Validate unit
         const decoded = getDecodedToken(tokenString);
         if (decoded.unit !== 'sat') {
           unsupportedTokenUnitPopup({ unit: decoded.unit ?? 'unknown' });
           return;
         }
 
-        // Check mint trust — navigate to mint info if untrusted
         const isTrusted = await manager.mint.isTrustedMint(entry.mintUrl);
         if (!isTrusted) {
           router.navigate({
@@ -228,7 +485,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           return;
         }
 
-        // Show multi-stage payment toast
         const store = usePaymentStatusStore.getState();
         if (store.active?.id === entry.id && store.active?.state === 'failed') {
           store.setActive(null);
@@ -252,7 +508,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         try {
           await manager.wallet.receive(tokenString);
 
-          // P2PK key rotation
           if (useSettingsStore.getState().regenerateP2PKOnReceive) {
             try {
               const hasP2PK = decoded.proofs.some((proof) => {
@@ -271,13 +526,11 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
             }
           }
 
-          // Link scan history + capture location
           const history = await manager.history.getPaginatedHistory(0, 5);
           const realEntry = history.find(
             (h) => h.type === 'receive' && h.amount === entry.amount && h.mintUrl === entry.mintUrl
           );
           if (realEntry?.id) {
-            // Update screen entry to the real persisted entry
             const setEntry = (rawCtx as Record<string, unknown>).setEntry as
               | ((e: Record<string, unknown>) => void)
               | undefined;
@@ -303,7 +556,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
       },
     },
 
-    // ── Mint Quote ────────────────────────────────────────────────────────
     mintQuote: {
       copy: async (rawCtx) => {
         const { entry } = mintQuoteCtx(rawCtx);
@@ -317,15 +569,12 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
       },
     },
 
-    // ── Melt Quote ────────────────────────────────────────────────────────
     meltQuote: {
       pay: async (rawCtx) => {
         const { entry, manager } = meltQuoteCtx(rawCtx);
         let operationId = entry.metadata?.operationId as string | undefined;
         const isPreview = !entry.quoteId;
 
-        // Phase 1: Prepare (only when preview — no quote yet)
-        // TODO: On prepare failure, navigate to mint selector to let user change mints
         if (isPreview) {
           const meltTarget = entry.metadata?.meltTarget;
           if (!meltTarget) throw new Error('Missing meltTarget in metadata');
@@ -356,7 +605,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           }
         }
 
-        // Phase 2: Execute
         const quoteId = isPreview ? undefined : entry.quoteId;
 
         const store = usePaymentStatusStore.getState();
@@ -400,6 +648,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           if (operationId) {
             await manager.quotes.rollbackMelt(operationId, 'User cancelled');
           }
+          // todo: I think here we should be calling some internal function of the machine/coco-payment-ux like ctx.statusUpdate({... type: 'CANCELLED', ... }) or something along these lines and then we have in our createSovranNotifications we handle it. Look at how createSovranNoticiations are currently called.
           paymentCancelledPopup();
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -415,7 +664,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
       },
     },
 
-    // ── Payment Request ───────────────────────────────────────────────────
     paymentRequest: {
       confirm: async (rawCtx) => {
         const ctx = paymentRequestCtx(rawCtx);
@@ -428,12 +676,10 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
         const { mintUrl, amount } = entry;
 
-        // Determine transport: nostr (type 'nostr'), http (type 'post'), or inband (no transport)
         const nostrTransport = info.transports?.find((t) => t.type === 'nostr');
         const httpTransport = info.transports?.find((t) => t.type === 'post');
 
         if (httpTransport) {
-          // HTTP POST transport: use coco payment request API
           const parsed = await manager.wallet.processPaymentRequest(encodedRequest);
           const transaction = await manager.wallet.preparePaymentRequestTransaction(
             mintUrl,
@@ -442,12 +688,12 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           );
           await manager.wallet.handleHttpPaymentRequest(transaction);
 
-          // Update entry state to reflect delivery
           ctx.setEntry?.({
             ...entry,
             metadata: { ...entry.metadata, phase: 'delivered', tokenCreated: 'true' },
           });
 
+          // todo: I think here we should be calling some internal function of the machine/coco-payment-ux like ctx.statusUpdate({... type: 'DELIVERED', ... }) or something along these lines and then we have in our createSovranNotifications we handle it. Look at how createSovranNoticiations are currently called.
           paymentStatusPopup({
             variant: 'payment-request',
             id: entry.id,
@@ -456,8 +702,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
             unit: entry.unit,
           });
         } else if (nostrTransport) {
-          // Nostr transport: create token + send via NIP-17 DM
-          // Mark token creation in progress
           ctx.setEntry?.({
             ...entry,
             metadata: { ...entry.metadata, tokenCreated: 'true' },
@@ -465,7 +709,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
           const token = await manager.wallet.send(mintUrl, amount);
 
-          // Build the PaymentRequestPayload: { id, mint, unit, proofs }
           const payload = {
             id: encodedRequest,
             mint: mintUrl,
@@ -475,7 +718,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
           await ctx.sendDirectMessage(nostrTransport.target, JSON.stringify(payload));
 
-          // Update entry state to reflect full delivery
           ctx.setEntry?.({
             ...entry,
             metadata: {
@@ -486,6 +728,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
             },
           });
 
+          // todo: I think here we should be calling some internal function of the machine/coco-payment-ux like ctx.statusUpdate({... type: 'DELIVERED', ... }) or something along these lines and then we have in our createSovranNotifications we handle it. Look at how createSovranNoticiations are currently called.
           paymentStatusPopup({
             variant: 'payment-request',
             id: entry.id,
@@ -494,7 +737,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
             unit: entry.unit,
           });
         } else {
-          // Inband / no transport: create token and navigate to SendTokenScreen
           const token = await manager.wallet.send(mintUrl, amount);
           const history = await manager.history.getPaginatedHistory();
           const sendEntry = history.find(
@@ -507,7 +749,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
               params: { sendHistoryEntry: JSON.stringify(sendEntry) },
             });
           } else {
-            // Fallback: update entry with token created state
             ctx.setEntry?.({
               ...entry,
               metadata: { ...entry.metadata, phase: 'delivered', tokenCreated: 'true' },

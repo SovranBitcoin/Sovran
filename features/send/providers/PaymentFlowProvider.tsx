@@ -15,9 +15,11 @@ import {
 } from 'coco-payment-ux/react';
 import { useManager } from 'coco-cashu-react';
 
-import { createSovranHandlers } from '@/features/send/lib/paymentHandlers';
-import { createSovranNotifications } from '@/features/send/lib/notifications';
-import { createSovranOperations } from '@/features/send/lib/operations';
+import {
+  createSovranHandlers,
+  createSovranNotifications,
+  createSovranOperations,
+} from '@/features/send/lib/sovranPaymentConfig';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 

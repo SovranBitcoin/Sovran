@@ -30,7 +30,7 @@ import {
 
 import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 
-import { createSovranScreenActionHandlers } from '@/features/send/lib/screenActionHandlers';
+import { createSovranScreenActionHandlers } from '@/features/send/lib/sovranPaymentConfig';
 import { extractP2PKPubkey } from '@/shared/lib/cashu/utils';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
