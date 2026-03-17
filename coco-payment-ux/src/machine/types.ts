@@ -24,6 +24,7 @@ export type FlowStep =
   | 'confirmSend'
   | 'sendComplete'
   | 'navigateToMeltPreview'
+  | 'navigateToPaymentRequest'
   | 'createMintQuote'
   | 'mintQuoteCreated'
   | 'openMint'
@@ -81,6 +82,7 @@ export interface StepDataMap {
   confirmSend: { mintUrl: string; amount: number };
   sendComplete: { historyEntry: string };
   navigateToMeltPreview: { mintUrl: string; meltTarget: string; unit: string; amount: number };
+  navigateToPaymentRequest: { mintUrl: string; paymentRequest: string; amount: number; unit: string };
   createMintQuote: { mintUrl: string; amount: number; unit: string };
   mintQuoteCreated: { historyEntry: string; unit: string };
   openMint: { url: string };
@@ -209,6 +211,24 @@ export type StepHandlerMap = {
 };
 
 // ---------------------------------------------------------------------------
+// Notification Handler Map — wallet provides handlers for informational popups
+// ---------------------------------------------------------------------------
+
+/**
+ * Notification handlers for informational UI feedback (errors, warnings,
+ * success messages). Unlike step handlers which drive navigation/flow,
+ * notifications are fire-and-forget — the machine dispatches them but
+ * does not wait for or depend on the result.
+ *
+ * The wallet decides how to present each notification (native alert,
+ * custom toast, etc.). If no handler is registered for a key, the
+ * notification is silently ignored.
+ */
+export type NotificationHandlerMap = {
+  [K in ErrorCode]?: (data: StepDataMap['error']) => MaybeAsync;
+};
+
+// ---------------------------------------------------------------------------
 // Machine operations — async side effects the machine runs internally
 // ---------------------------------------------------------------------------
 
@@ -253,6 +273,13 @@ export interface CreateMachineConfig {
    * internally and external handlers only receive result steps.
    */
   operations?: MachineOperations;
+  /**
+   * Notification handlers for informational UI feedback.
+   * The machine dispatches notifications for error steps (and future
+   * warning/success events). The wallet decides how to present them.
+   * When omitted or when no handler matches, notifications are no-ops.
+   */
+  notifications?: NotificationHandlerMap;
 }
 
 // ---------------------------------------------------------------------------

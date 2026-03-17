@@ -127,6 +127,10 @@ function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
         data: { mintUrl: mintUrl!, meltTarget: meltTarget!, unit, amount: amount! },
       };
     case 'paymentRequest':
+      return {
+        step: 'navigateToPaymentRequest',
+        data: { mintUrl: mintUrl!, paymentRequest: ctx.paymentRequest!, amount: amount!, unit },
+      };
     case 'sendEcash':
       return {
         step: 'confirmSend',

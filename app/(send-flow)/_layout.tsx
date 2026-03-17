@@ -6,8 +6,9 @@
  * Screens within this group push horizontally:
  * - mintSelect: Entry point when no balance (shows mint list)
  * - amount: Amount selection (entry point when has balance)
- * - sendToken: Ecash token display after creation (also handles NUT-18 payment request mode)
+ * - sendToken: Ecash token display after creation
  * - meltQuote: Lightning invoice payment
+ * - paymentRequest: NUT-18 payment request confirmation and delivery
  * - camera: QR code scanning
  *
  * The first screen shows a close button, subsequent screens show a back button.
@@ -26,6 +27,7 @@ export default function SendFlowLayout() {
       <Stack.Screen name="amount" options={{ title: 'Select Amount' }} />
       <Stack.Screen name="sendToken" options={{ title: 'Send Ecash' }} />
       <Stack.Screen name="meltQuote" options={{ title: 'Send Lightning' }} />
+      <Stack.Screen name="paymentRequest" options={{ title: 'Payment Request' }} />
       <Stack.Screen
         name="camera"
         options={{

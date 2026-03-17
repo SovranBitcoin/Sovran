@@ -118,6 +118,7 @@ const ACTION_NAMES: Record<ScreenType, string[]> = {
   receiveToken: ['redeem'],
   mintQuote: ['copy', 'share'],
   meltQuote: ['pay', 'cancel'],
+  paymentRequest: ['confirm', 'cancel'],
 };
 
 function getActionNames(screenType: ScreenType): string[] {

@@ -5,17 +5,7 @@ import type { MeltHistoryEntry } from 'coco-cashu-core';
 import type { PaymentMachine, StepHandlerMap } from 'coco-payment-ux';
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
-import {
-  allOptionsDisabledPopup,
-  balanceTooLowPopup,
-  generalErrorPopup,
-  missingMeltTargetPopup,
-  noAmountPopup,
-  noValidMintPopup,
-  offlineSendSuggestionsPopup,
-  paymentOptionsPopup,
-  unsupportedInputPopup,
-} from '@/shared/lib/popup';
+import { proofSelectorPopup, paymentOptionsPopup } from '@/shared/lib/popup';
 
 interface CreateSovranHandlersConfig {
   machine: PaymentMachine;
@@ -27,6 +17,7 @@ export function createSovranHandlers({
   onOptionDismiss,
 }: CreateSovranHandlersConfig): StepHandlerMap {
   return {
+    // { token }
     receiveToken: ({ token }) => {
       router.navigate({
         pathname: '/(receive-flow)/receiveToken',
@@ -34,6 +25,7 @@ export function createSovranHandlers({
       });
     },
 
+    // { historyEntry }
     sendComplete: ({ historyEntry }) => {
       router.navigate({
         pathname: '/(send-flow)/sendToken',
@@ -41,6 +33,28 @@ export function createSovranHandlers({
       });
     },
 
+    // { mintUrl, paymentRequest, amount, unit }
+    navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit }) => {
+      const entry = {
+        id: `pr-preview-${Date.now()}`,
+        type: 'send',
+        createdAt: Date.now(),
+        mintUrl,
+        amount,
+        unit,
+        state: 'prepared',
+        metadata: {
+          paymentRequest,
+          phase: 'preview',
+        },
+      };
+      router.navigate({
+        pathname: '/(send-flow)/paymentRequest' as any, // new route not yet in generated types
+        params: { paymentRequestEntry: JSON.stringify(entry) },
+      });
+    },
+
+    // { mintUrl, meltTarget, unit, amount }
     navigateToMeltPreview: ({ mintUrl, meltTarget, amount, unit }) => {
       const entry: MeltHistoryEntry = {
         id: `melt-preview-${Date.now()}`,
@@ -59,6 +73,7 @@ export function createSovranHandlers({
       });
     },
 
+    // { historyEntry, unit }
     mintQuoteCreated: ({ historyEntry, unit }) => {
       router.replace({
         pathname: '/(receive-flow)/mintQuote',
@@ -66,6 +81,7 @@ export function createSovranHandlers({
       });
     },
 
+    // { url }
     openMint: ({ url }) => {
       router.navigate({
         pathname: '/(mint-flow)/info',
@@ -73,6 +89,7 @@ export function createSovranHandlers({
       });
     },
 
+    // { npub }
     openProfile: ({ npub }) => {
       router.navigate({
         pathname: '/(user-flow)/profile',
@@ -80,6 +97,7 @@ export function createSovranHandlers({
       });
     },
 
+    // { unit, preselectedMintUrl?, constraints: { destination, supportedMintUrls?, paymentRequest?, meltTarget? } }
     enterAmount: ({ unit, preselectedMintUrl, constraints }) => {
       const params: Record<string, string> = { unit };
       if (constraints.destination) params.destination = constraints.destination;
@@ -92,7 +110,17 @@ export function createSovranHandlers({
       router.navigate({ pathname: pathname as any, params });
     },
 
-    selectMint: ({ mintListItems, unit, destination }) => {
+    // { candidates, supportedMintUrls?, amount?, unit, paymentRequest?, meltTarget?, destination?, mintListItems? }
+    selectMint: ({
+      candidates: _candidates,
+      supportedMintUrls: _supportedMintUrls,
+      amount: _amount,
+      unit,
+      paymentRequest: _paymentRequest,
+      meltTarget: _meltTarget,
+      destination,
+      mintListItems,
+    }) => {
       const params: Record<string, string> = {
         unit,
         mintItems: JSON.stringify(mintListItems ?? []),
@@ -104,66 +132,18 @@ export function createSovranHandlers({
       router.navigate({ pathname: pathname as any, params });
     },
 
-    chooseOption: ({ parsed, options, unit }) => {
-      paymentOptionsPopup({
-        parsed,
-        annotatedOptions: options,
-        unit,
-        onSelectOption: (option) => {
-          void machine.chooseOption(option);
-        },
-        onDismiss: onOptionDismiss,
-      });
+    // { parsed, options, unit }
+    chooseOption: (stepData) => {
+      paymentOptionsPopup({ ...stepData, machine, onDismiss: onOptionDismiss });
     },
 
-    chooseProofs: ({ suggestions, unit }) => {
-      const roundDown = suggestions?.roundDown ?? null;
-      const roundUp = suggestions?.roundUp ?? null;
-      offlineSendSuggestionsPopup({
-        roundDown,
-        roundUp,
-        unit,
-        onSelectAmount: (amount) => {
-          void machine.chooseProofs(amount);
-        },
-        onChangeMint: () => {
-          void machine.requestMintSelector();
-        },
-      });
+    // { mintUrl, amount, paymentRequest?, meltTarget?, unit, proofAmounts, suggestions? }
+    chooseProofs: (stepData) => {
+      proofSelectorPopup({ ...stepData, machine });
     },
 
     dismiss: () => {
       router.back();
-    },
-
-    error: ({ code, message }) => {
-      switch (code) {
-        case 'NO_AMOUNT':
-          noAmountPopup();
-          break;
-        case 'NO_VALID_MINT':
-          noValidMintPopup({ text: message });
-          break;
-        case 'INSUFFICIENT_BALANCE':
-        case 'NO_BALANCE':
-          balanceTooLowPopup({ text: message });
-          break;
-        case 'UNSUPPORTED_INPUT':
-          unsupportedInputPopup({ text: message });
-          break;
-        case 'ALL_OPTIONS_DISABLED':
-          allOptionsDisabledPopup();
-          break;
-        case 'MISSING_MELT_TARGET':
-          missingMeltTargetPopup();
-          break;
-        case 'SEND_FAILED':
-        case 'MINT_QUOTE_FAILED':
-          generalErrorPopup({ text: message });
-          break;
-        default:
-          generalErrorPopup({ text: message });
-      }
     },
   };
 }

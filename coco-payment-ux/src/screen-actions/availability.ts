@@ -68,6 +68,20 @@ function meltQuoteAvailability(entry: Record<string, unknown>): AvailabilityMap<
   };
 }
 
+function paymentRequestAvailability(
+  entry: Record<string, unknown>
+): AvailabilityMap<'paymentRequest'> {
+  const metadata = entry.metadata as Record<string, unknown> | undefined;
+  const phase = metadata?.phase as string | undefined;
+  const isPreview = phase === 'preview' || !phase;
+  const isDelivered = phase === 'delivered';
+
+  return {
+    confirm: { available: isPreview },
+    cancel: { available: !isDelivered },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -79,6 +93,7 @@ const AVAILABILITY_FNS: {
   receiveToken: receiveTokenAvailability,
   mintQuote: mintQuoteAvailability,
   meltQuote: meltQuoteAvailability,
+  paymentRequest: paymentRequestAvailability,
 };
 
 /**
