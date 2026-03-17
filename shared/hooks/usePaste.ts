@@ -7,10 +7,15 @@
 
 import * as Clipboard from 'expo-clipboard';
 
-import { usePaste as useCocoPaste, type UsePasteConfig as CocoUsePasteConfig } from 'coco-payment-ux/react';
+import {
+  usePaste as useCocoPaste,
+  type UsePasteConfig as CocoUsePasteConfig,
+} from 'coco-payment-ux/react';
 
-export interface UsePasteConfig<TValue = string>
-  extends Omit<CocoUsePasteConfig<TValue>, 'readClipboard'> {}
+export interface UsePasteConfig<TValue = string> extends Omit<
+  CocoUsePasteConfig<TValue>,
+  'readClipboard'
+> {}
 
 /**
  * Shared clipboard paste handler for flows that accept pasted payment input.

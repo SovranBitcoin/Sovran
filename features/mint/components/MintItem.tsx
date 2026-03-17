@@ -81,7 +81,8 @@ const MintItem: React.FC<MintItemProps> = ({
 
   const activityBadgeVariant = item.auditState === 'ERROR' ? 'error' : 'success';
 
-  const hasBadges = displayScore !== undefined || successRate !== undefined || item.worksOffline === true;
+  const hasBadges =
+    displayScore !== undefined || successRate !== undefined || item.worksOffline === true;
 
   return (
     <TouchableOpacity

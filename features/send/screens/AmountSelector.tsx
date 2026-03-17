@@ -127,11 +127,7 @@ export function AmountSelector({
   const isSend = transactionType === 'send';
 
   // Fiat display colors
-  const activeColor = amount.rawInput
-    ? isSend
-      ? danger
-      : foreground
-    : opacity(foreground, 0.4);
+  const activeColor = amount.rawInput ? (isSend ? danger : foreground) : opacity(foreground, 0.4);
   const placeholderColor = opacity(isSend ? danger : foreground, 0.35);
 
   const handleNext = useCallback(async () => {

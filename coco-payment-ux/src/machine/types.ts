@@ -82,7 +82,12 @@ export interface StepDataMap {
   confirmSend: { mintUrl: string; amount: number };
   sendComplete: { historyEntry: string };
   navigateToMeltPreview: { mintUrl: string; meltTarget: string; unit: string; amount: number };
-  navigateToPaymentRequest: { mintUrl: string; paymentRequest: string; amount: number; unit: string };
+  navigateToPaymentRequest: {
+    mintUrl: string;
+    paymentRequest: string;
+    amount: number;
+    unit: string;
+  };
   createMintQuote: { mintUrl: string; amount: number; unit: string };
   mintQuoteCreated: { historyEntry: string; unit: string };
   openMint: { url: string };
@@ -185,7 +190,13 @@ export type ExecutionState =
 export type FlowEvent =
   | { type: 'EXECUTE'; input: string }
   | { type: 'OPTION_CHOSEN'; option: PaymentOption }
-  | { type: 'AMOUNT_ENTERED'; amount: number; mintUrl: string; destination?: Destination; offline?: boolean }
+  | {
+      type: 'AMOUNT_ENTERED';
+      amount: number;
+      mintUrl: string;
+      destination?: Destination;
+      offline?: boolean;
+    }
   | {
       type: 'MINT_SELECTED';
       mintUrl: string;

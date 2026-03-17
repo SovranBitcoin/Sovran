@@ -153,8 +153,7 @@ export function usePaymentStringProcessor({
 
       return {
         urInProgress: false,
-        lockedPending:
-          state.status === 'needsInput' && state.code === 'OPTION_SELECTION_REQUIRED',
+        lockedPending: state.status === 'needsInput' && state.code === 'OPTION_SELECTION_REQUIRED',
       };
     },
     [isFocused, onLoading, onScanned, urDecoder, onProgress, machine, onReceiveUR]

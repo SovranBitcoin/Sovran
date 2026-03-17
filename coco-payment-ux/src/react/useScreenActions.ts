@@ -34,9 +34,10 @@ import type {
 // Entry parsing
 // ---------------------------------------------------------------------------
 
-function parseEntryParam<T>(
-  param: T | string | undefined
-): { parsed: Record<string, unknown> | null; error: string | null } {
+function parseEntryParam<T>(param: T | string | undefined): {
+  parsed: Record<string, unknown> | null;
+  error: string | null;
+} {
   if (!param) {
     return { parsed: null, error: 'Missing transaction data. Please try again.' };
   }

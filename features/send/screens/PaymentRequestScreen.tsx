@@ -41,10 +41,7 @@ export function PaymentRequestScreen({
   onMintSelected,
   onRequestMintList,
 }: PaymentRequestScreenProps) {
-  const { entry, error, actions, source } = useScreenActions(
-    'paymentRequest',
-    paymentRequestEntry
-  );
+  const { entry, error, actions, source } = useScreenActions('paymentRequest', paymentRequestEntry);
 
   if (error) {
     return <ScreenErrorState message={error} onGoBack={onCancel} />;

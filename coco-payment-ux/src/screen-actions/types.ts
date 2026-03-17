@@ -2,7 +2,12 @@
 // Screen Actions — types
 // ---------------------------------------------------------------------------
 
-export type ScreenType = 'sendToken' | 'receiveToken' | 'mintQuote' | 'meltQuote' | 'paymentRequest';
+export type ScreenType =
+  | 'sendToken'
+  | 'receiveToken'
+  | 'mintQuote'
+  | 'meltQuote'
+  | 'paymentRequest';
 
 /**
  * Maps each screen type to the set of action names available on that screen.

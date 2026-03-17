@@ -399,7 +399,8 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
     const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
     if (proofAmounts.length > 0) {
       const composition = composeSatoshis(proofAmounts, amount);
-      const forceOffline = ctx.offline && (destination === 'sendEcash' || destination === 'paymentRequest');
+      const forceOffline =
+        ctx.offline && (destination === 'sendEcash' || destination === 'paymentRequest');
       if (!composition.exactMatch || forceOffline) {
         return {
           step: 'chooseProofs',
@@ -414,10 +415,14 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
             suggestions: {
               roundDown: composition.exactMatch
                 ? { amount }
-                : composition.nearestLower != null ? { amount: composition.nearestLower } : null,
+                : composition.nearestLower != null
+                  ? { amount: composition.nearestLower }
+                  : null,
               roundUp: composition.exactMatch
                 ? null
-                : composition.nearestUpper != null ? { amount: composition.nearestUpper } : null,
+                : composition.nearestUpper != null
+                  ? { amount: composition.nearestUpper }
+                  : null,
             },
           },
         };

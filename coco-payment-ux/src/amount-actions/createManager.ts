@@ -91,7 +91,14 @@ export function createAmountActionManager(
     const mintUrl = getMintUrl();
     const proofAmounts = mintUrl ? getProofAmounts() : [];
     const btcPrice = getBtcPrice();
-    const core = resolveAmount(inputMode, rawInput, numericValue, proofAmounts, btcPrice, offlineOptimization);
+    const core = resolveAmount(
+      inputMode,
+      rawInput,
+      numericValue,
+      proofAmounts,
+      btcPrice,
+      offlineOptimization
+    );
 
     // Keyboard unit: fiat currency code in fiat mode, base unit otherwise
     const keyboardUnit = inputMode === 'fiat' && fiatCurrency ? fiatCurrency : unit;

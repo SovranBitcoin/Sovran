@@ -108,12 +108,7 @@ export function ProofSelectorContent({
                       <ListGroup.ItemTitle>{opt.label}</ListGroup.ItemTitle>
                     </ListGroup.ItemContent>
                     <ListGroup.ItemSuffix>
-                      <AmountFormatter
-                        amount={opt.amount}
-                        unit={unit}
-                        size={16}
-                        weight="medium"
-                      />
+                      <AmountFormatter amount={opt.amount} unit={unit} size={16} weight="medium" />
                     </ListGroup.ItemSuffix>
                   </ListGroup.Item>
                 </PressableFeedback.Scale>

@@ -56,15 +56,8 @@ export type UseAmountActionsResult = AmountResolution & {
  * ensures the component re-renders when the resolved state changes.
  */
 export function useAmountActions(config: UseAmountActionsConfig): UseAmountActionsResult {
-  const {
-    mintUrl,
-    proofAmounts,
-    btcPrice,
-    offlineOptimization,
-    unit,
-    fiatCurrency,
-    fiatSymbol,
-  } = config;
+  const { mintUrl, proofAmounts, btcPrice, offlineOptimization, unit, fiatCurrency, fiatSymbol } =
+    config;
 
   // Refs keep the manager's getters up to date without recreation
   const mintUrlRef = useRef(mintUrl);
