@@ -4,7 +4,7 @@
  * Injects:
  *   - Sovran screen action handlers (copy, share, NFC, redeem, pay, cancel)
  *   - coco-cashu-react wallet manager
- *   - History update subscription via manager.on('history:updated')
+ *   - Live entry updates from history plus melt-operation events when needed
  */
 
 import { useCallback, useMemo } from 'react';
@@ -59,6 +59,173 @@ const SOURCE_LABELS: Record<ScanSource, string> = {
   paste: 'Clipboard',
   deeplink: 'Deep Link',
 };
+
+type EntryRecord = Record<string, unknown>;
+
+type MeltOperationLike = {
+  id: string;
+  mintUrl: string;
+  createdAt: number;
+  state?: string;
+  quoteId?: string;
+  amount?: number;
+};
+
+function isRecord(value: unknown): value is EntryRecord {
+  return typeof value === 'object' && value !== null;
+}
+
+function getStringField(entry: EntryRecord | null | undefined, key: string): string | undefined {
+  const value = entry?.[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function getNumberField(entry: EntryRecord | null | undefined, key: string): number | undefined {
+  const value = entry?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function getMetadata(entry: EntryRecord | null | undefined): EntryRecord | undefined {
+  const metadata = entry?.metadata;
+  return isRecord(metadata) ? metadata : undefined;
+}
+
+function getSendOperationId(entry: EntryRecord | null | undefined): string | undefined {
+  return getStringField(entry, 'operationId') ?? getStringField(getMetadata(entry), 'operationId');
+}
+
+function getMeltQuoteId(entry: EntryRecord | null | undefined): string | undefined {
+  return getStringField(entry, 'quoteId');
+}
+
+function getMeltOperationId(entry: EntryRecord | null | undefined): string | undefined {
+  return (
+    getStringField(getMetadata(entry), 'operationId') ??
+    getStringField(entry, 'operationId') ??
+    getStringField(entry, 'id')
+  );
+}
+
+function getReceiveTokenString(entry: EntryRecord | null | undefined): string | undefined {
+  const token = entry?.token;
+  if (token) {
+    try {
+      return getEncodedTokenV4(token as Parameters<typeof getEncodedTokenV4>[0]);
+    } catch {
+      // Fall back to rawToken metadata when the token cannot be re-encoded.
+    }
+  }
+
+  return getStringField(getMetadata(entry), 'rawToken');
+}
+
+function mergeEntryUpdate(
+  currentEntry: EntryRecord | null,
+  updatedEntry: EntryRecord
+): EntryRecord {
+  const currentMetadata = getMetadata(currentEntry);
+  const updatedMetadata = getMetadata(updatedEntry);
+
+  return {
+    ...(currentEntry ?? {}),
+    ...updatedEntry,
+    ...((currentMetadata || updatedMetadata) && {
+      metadata: {
+        ...(currentMetadata ?? {}),
+        ...(updatedMetadata ?? {}),
+      },
+    }),
+  };
+}
+
+function shouldApplyEntryUpdate(
+  currentEntry: EntryRecord | null,
+  updatedEntry: EntryRecord
+): boolean {
+  if (!currentEntry) return false;
+
+  const currentType = getStringField(currentEntry, 'type');
+  const updatedType = getStringField(updatedEntry, 'type');
+  if (!currentType || currentType !== updatedType) return false;
+
+  const currentId = getStringField(currentEntry, 'id');
+  const updatedId = getStringField(updatedEntry, 'id');
+  if (currentId && updatedId && currentId === updatedId) {
+    return true;
+  }
+
+  if (currentType === 'send') {
+    const currentOperationId = getSendOperationId(currentEntry);
+    const updatedOperationId = getSendOperationId(updatedEntry);
+    return !!currentOperationId && currentOperationId === updatedOperationId;
+  }
+
+  if (currentType === 'melt') {
+    const currentQuoteId = getMeltQuoteId(currentEntry);
+    const updatedQuoteId = getMeltQuoteId(updatedEntry);
+    if (currentQuoteId && updatedQuoteId && currentQuoteId === updatedQuoteId) {
+      return true;
+    }
+
+    const currentOperationId = getMeltOperationId(currentEntry);
+    const updatedOperationId = getMeltOperationId(updatedEntry);
+    return !!currentOperationId && currentOperationId === updatedOperationId;
+  }
+
+  if (currentType === 'receive') {
+    const currentTokenString = getReceiveTokenString(currentEntry);
+    const updatedTokenString = getReceiveTokenString(updatedEntry);
+    if (currentTokenString && updatedTokenString && currentTokenString === updatedTokenString) {
+      return true;
+    }
+
+    const currentId = getStringField(currentEntry, 'id');
+    const isPreviewEntry = currentId?.startsWith('receive-') ?? false;
+    if (!isPreviewEntry) {
+      return false;
+    }
+
+    const currentMintUrl = getStringField(currentEntry, 'mintUrl');
+    const updatedMintUrl = getStringField(updatedEntry, 'mintUrl');
+    const currentAmount = getNumberField(currentEntry, 'amount');
+    const updatedAmount = getNumberField(updatedEntry, 'amount');
+
+    return (
+      !!currentMintUrl &&
+      currentMintUrl === updatedMintUrl &&
+      typeof currentAmount === 'number' &&
+      currentAmount === updatedAmount
+    );
+  }
+
+  return false;
+}
+
+function mapMeltOperationState(state?: string): 'UNPAID' | 'PENDING' | 'PAID' {
+  if (state === 'finalized') return 'PAID';
+  if (state === 'pending' || state === 'executing') return 'PENDING';
+  return 'UNPAID';
+}
+
+function meltOperationToEntry(operation: MeltOperationLike): EntryRecord | null {
+  if (!operation.quoteId || typeof operation.amount !== 'number') {
+    return null;
+  }
+
+  return {
+    id: operation.id,
+    type: 'melt',
+    createdAt: operation.createdAt,
+    mintUrl: operation.mintUrl,
+    unit: 'sat',
+    quoteId: operation.quoteId,
+    amount: operation.amount,
+    state: mapMeltOperationState(operation.state),
+    metadata: {
+      operationId: operation.id,
+    },
+  };
+}
 
 /**
  * Branded number with FormattedTimestamp getters.
@@ -133,14 +300,40 @@ export function useScreenActions<S extends ScreenType, E extends HistoryEntry = 
     handlers: handlers[screenType] as ScreenActionHandlerMap[S],
     entryParam: entryParam as Record<string, unknown> | string | undefined,
     getExtraContext: () => ({ manager, sendDirectMessage }),
+    shouldApplyEntryUpdate,
+    mergeEntryUpdate,
     onEntryUpdate: (callback) => {
-      const unsubscribe = manager.on(
-        'history:updated',
-        ({ entry: updated }: { mintUrl: string; entry: HistoryEntry }) => {
-          callback(updated as unknown as Record<string, unknown>);
-        }
-      );
-      return unsubscribe;
+      const unsubscribes = [
+        manager.on(
+          'history:updated',
+          ({ entry: updated }: { mintUrl: string; entry: HistoryEntry }) => {
+            callback(updated as unknown as Record<string, unknown>);
+          }
+        ),
+      ];
+
+      if (screenType === 'meltQuote') {
+        const subscribeMeltOperation = (
+          eventName: 'melt-op:prepared' | 'melt-op:pending' | 'melt-op:finalized'
+        ) =>
+          manager.on(
+            eventName,
+            ({ operation }: { mintUrl: string; operation: MeltOperationLike }) => {
+              const updatedEntry = meltOperationToEntry(operation);
+              if (updatedEntry) {
+                callback(updatedEntry);
+              }
+            }
+          );
+
+        unsubscribes.push(subscribeMeltOperation('melt-op:prepared'));
+        unsubscribes.push(subscribeMeltOperation('melt-op:pending'));
+        unsubscribes.push(subscribeMeltOperation('melt-op:finalized'));
+      }
+
+      return () => {
+        unsubscribes.forEach((unsubscribe) => unsubscribe());
+      };
     },
   });
 
@@ -179,7 +372,7 @@ export function useScreenActions<S extends ScreenType, E extends HistoryEntry = 
         'middle'
       ) as unknown as FormattedStringValue;
     } else if (token && (token as { proofs?: unknown[] }).proofs) {
-      const extracted = extractP2PKPubkey((token as { proofs: Array<{ secret: string }> }).proofs);
+      const extracted = extractP2PKPubkey((token as { proofs: { secret: string }[] }).proofs);
       if (extracted) {
         p2pkPubkey = new FormattedString(extracted, 'middle') as unknown as FormattedStringValue;
       }

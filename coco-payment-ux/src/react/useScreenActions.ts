@@ -74,6 +74,22 @@ export interface UseScreenActionsConfig<S extends ScreenType> {
    * Return an unsubscribe function.
    */
   onEntryUpdate?: (callback: (entry: Record<string, unknown>) => void) => () => void;
+  /**
+   * Custom matcher for incoming entry updates. Defaults to matching by `id` + `type`.
+   * Useful when a synthetic preview entry later attaches to a real history/operation entry.
+   */
+  shouldApplyEntryUpdate?: (
+    currentEntry: Record<string, unknown> | null,
+    updatedEntry: Record<string, unknown>
+  ) => boolean;
+  /**
+   * Custom merge for incoming entry updates. Defaults to replacing the entry wholesale.
+   * Useful when live updates must preserve preview metadata on the current screen entry.
+   */
+  mergeEntryUpdate?: (
+    currentEntry: Record<string, unknown> | null,
+    updatedEntry: Record<string, unknown>
+  ) => Record<string, unknown>;
 }
 
 export interface UseScreenActionsResult<S extends ScreenType> {
@@ -89,10 +105,22 @@ export interface UseScreenActionsResult<S extends ScreenType> {
 export function useScreenActions<S extends ScreenType>(
   config: UseScreenActionsConfig<S>
 ): UseScreenActionsResult<S> {
-  const { screenType, handlers, entryParam, getExtraContext, onEntryUpdate } = config;
+  const {
+    screenType,
+    handlers,
+    entryParam,
+    getExtraContext,
+    onEntryUpdate,
+    shouldApplyEntryUpdate,
+    mergeEntryUpdate,
+  } = config;
 
   const getExtraContextRef = useRef(getExtraContext);
   getExtraContextRef.current = getExtraContext;
+  const shouldApplyEntryUpdateRef = useRef(shouldApplyEntryUpdate);
+  shouldApplyEntryUpdateRef.current = shouldApplyEntryUpdate;
+  const mergeEntryUpdateRef = useRef(mergeEntryUpdate);
+  mergeEntryUpdateRef.current = mergeEntryUpdate;
 
   const { parsed, error } = useMemo(() => parseEntryParam(entryParam), [entryParam]);
 
@@ -126,13 +154,10 @@ export function useScreenActions<S extends ScreenType>(
 
     return onEntryUpdate((updated) => {
       const currentEntry = actionManager.getEntry();
-      const currentId = (currentEntry as { id?: string } | null)?.id;
-      const currentType = (currentEntry as { type?: string } | null)?.type;
-      const updatedId = (updated as { id?: string }).id;
-      const updatedType = (updated as { type?: string }).type;
-
-      if (currentId && updatedId === currentId && updatedType === currentType) {
-        actionManager.setEntry(updated);
+      const shouldApply = shouldApplyEntryUpdateRef.current ?? defaultShouldApplyEntryUpdate;
+      if (shouldApply(currentEntry, updated)) {
+        const mergeEntry = mergeEntryUpdateRef.current ?? defaultMergeEntryUpdate;
+        actionManager.setEntry(mergeEntry(currentEntry, updated));
       }
     });
   }, [parsed, onEntryUpdate, actionManager]);
@@ -159,4 +184,28 @@ export function useScreenActions<S extends ScreenType>(
   const entry = actionManager.getEntry();
 
   return { entry, error, actions };
+}
+
+function defaultShouldApplyEntryUpdate(
+  currentEntry: Record<string, unknown> | null,
+  updatedEntry: Record<string, unknown>
+): boolean {
+  const currentId = currentEntry?.id;
+  const currentType = currentEntry?.type;
+  const updatedId = updatedEntry.id;
+  const updatedType = updatedEntry.type;
+
+  return (
+    typeof currentId === 'string' &&
+    typeof currentType === 'string' &&
+    currentId === updatedId &&
+    currentType === updatedType
+  );
+}
+
+function defaultMergeEntryUpdate(
+  _currentEntry: Record<string, unknown> | null,
+  updatedEntry: Record<string, unknown>
+): Record<string, unknown> {
+  return updatedEntry;
 }

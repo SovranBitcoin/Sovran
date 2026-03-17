@@ -39,7 +39,6 @@ interface MeltQuoteScreenProps {
   operationId?: string;
   selectedMintUrl?: string;
   onCancel: () => void;
-  onSendSuccess?: () => void;
   onMintSelected?: (mintUrl: string) => void;
   onRequestMintList?: () => void;
 }
@@ -49,7 +48,6 @@ export function MeltQuoteScreen({
   operationId,
   selectedMintUrl,
   onCancel,
-  onSendSuccess,
   onMintSelected,
   onRequestMintList,
 }: MeltQuoteScreenProps) {
@@ -108,7 +106,6 @@ export function MeltQuoteScreen({
               onPress: async (close: any) => {
                 await actions.pay.execute();
                 successRef.current = true;
-                onSendSuccess?.();
                 close({});
               },
               condition: actions.pay.available,

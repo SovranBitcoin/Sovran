@@ -51,9 +51,6 @@ function ModalScreen() {
         onCancel={() => {
           router.dismissTo('/');
         }}
-        onSendSuccess={() => {
-          router.dismissTo('/');
-        }}
         onMintSelected={handleMintSelected}
         onRequestMintList={handleRequestMintList}
       />

@@ -18,9 +18,6 @@ function ModalScreen() {
       <ReceiveTokenScreen
         receiveHistoryEntry={receiveHistoryEntry}
         onNavigateBack={() => router.back()}
-        onRedeemSuccess={() => {
-          router.dismissTo('/');
-        }}
       />
     </>
   );

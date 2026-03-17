@@ -64,6 +64,7 @@ import {
   paymentStatusPopup,
   proofSelectorPopup,
   receiveFailedPopup,
+  sendPaymentFailedPopup,
   tokenPendingNotRedeemedPopup,
   tokenRedeemedByRecipientPopup,
   transactionAlreadyCancelledPopup,
@@ -233,7 +234,7 @@ export function createSovranHandlers({
         amount,
         metadata: { phase: 'preview', meltTarget },
       };
-      router.replace({
+      router.navigate({
         pathname: '/(send-flow)/meltQuote',
         params: { meltHistoryEntry: JSON.stringify(entry) },
       });
@@ -312,6 +313,7 @@ export function createSovranHandlers({
 // =============================================================================
 
 type Ctx<E> = ScreenActionContext<E> & { manager: Manager };
+type EntryRecord = Record<string, unknown>;
 
 function sendCtx(ctx: ScreenActionContext): Ctx<SendHistoryEntry> {
   return ctx as Ctx<SendHistoryEntry>;
@@ -342,6 +344,7 @@ type PaymentRequestEntry = {
     phase: string;
     tokenCreated?: string;
     nostrSent?: string;
+    operationId?: string;
   };
 };
 
@@ -353,6 +356,113 @@ type PaymentRequestCtx = ScreenActionContext<PaymentRequestEntry> & {
 
 function paymentRequestCtx(ctx: ScreenActionContext): PaymentRequestCtx {
   return ctx as unknown as PaymentRequestCtx;
+}
+
+function isRecord(value: unknown): value is EntryRecord {
+  return typeof value === 'object' && value !== null;
+}
+
+function mergeScreenEntry(currentEntry: EntryRecord, patch: EntryRecord): EntryRecord {
+  const currentMetadata = isRecord(currentEntry.metadata) ? currentEntry.metadata : {};
+  const patchMetadata = isRecord(patch.metadata) ? patch.metadata : {};
+
+  return {
+    ...currentEntry,
+    ...patch,
+    ...((Object.keys(currentMetadata).length > 0 || Object.keys(patchMetadata).length > 0) && {
+      metadata: {
+        ...currentMetadata,
+        ...patchMetadata,
+      },
+    }),
+  };
+}
+
+async function findSendHistoryEntryByOperationId(
+  manager: Manager,
+  operationId: string,
+  attempts: number = 3
+): Promise<SendHistoryEntry | null> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const history = await manager.history.getPaginatedHistory(0, 100);
+    const entry = history.find(
+      (item) => item.type === 'send' && (item as SendHistoryEntry).operationId === operationId
+    ) as SendHistoryEntry | undefined;
+
+    if (entry) {
+      return entry;
+    }
+
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+
+  return null;
+}
+
+async function findReceiveHistoryEntryByToken(
+  manager: Manager,
+  tokenString: string,
+  mintUrl: string,
+  amount: number,
+  attempts: number = 3
+): Promise<ReceiveHistoryEntry | null> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const history = await manager.history.getPaginatedHistory(0, 100);
+    const entry = history.find((item) => {
+      if (item.type !== 'receive') {
+        return false;
+      }
+
+      const receiveEntry = item as ReceiveHistoryEntry;
+      if (receiveEntry.token) {
+        try {
+          return getEncodedTokenV4(receiveEntry.token) === tokenString;
+        } catch {
+          // Fall back to mint/amount matching below.
+        }
+      }
+
+      return receiveEntry.mintUrl === mintUrl && receiveEntry.amount === amount;
+    }) as ReceiveHistoryEntry | undefined;
+
+    if (entry) {
+      return entry;
+    }
+
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+
+  return null;
+}
+
+function buildInbandParsedPaymentRequest(
+  encodedRequest: string,
+  info: NonNullable<ReturnType<typeof defaultDetectors.getPaymentRequestInfo>>,
+  mintUrl: string
+): Parameters<Manager['wallet']['preparePaymentRequestTransaction']>[1] {
+  const requiredMints = info.mints ?? [];
+  const matchingMints =
+    requiredMints.length > 0
+      ? requiredMints.filter((candidate) => candidate === mintUrl)
+      : [mintUrl];
+
+  return {
+    paymentRequest: encodedRequest as never,
+    matchingMints,
+    requiredMints,
+    amount: info.amount,
+    transport: { type: 'inband' as const },
+  } as Parameters<Manager['wallet']['preparePaymentRequestTransaction']>[1];
+}
+
+function mapMeltOperationState(state: string): MeltHistoryEntry['state'] {
+  if (state === 'finalized') return 'PAID';
+  if (state === 'pending' || state === 'executing') return 'PENDING';
+  return 'UNPAID';
 }
 
 export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
@@ -526,9 +636,11 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
             }
           }
 
-          const history = await manager.history.getPaginatedHistory(0, 5);
-          const realEntry = history.find(
-            (h) => h.type === 'receive' && h.amount === entry.amount && h.mintUrl === entry.mintUrl
+          const realEntry = await findReceiveHistoryEntryByToken(
+            manager,
+            tokenString,
+            entry.mintUrl,
+            entry.amount
           );
           if (realEntry?.id) {
             const setEntry = (rawCtx as Record<string, unknown>).setEntry as
@@ -574,6 +686,16 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         const { entry, manager } = meltQuoteCtx(rawCtx);
         let operationId = entry.metadata?.operationId as string | undefined;
         const isPreview = !entry.quoteId;
+        let screenEntry: EntryRecord = entry as unknown as EntryRecord;
+        let paymentId = entry.quoteId || operationId || entry.id;
+
+        const setScreenEntry = (patch: EntryRecord) => {
+          screenEntry = mergeScreenEntry(screenEntry, patch);
+          const setEntry = (rawCtx as Record<string, unknown>).setEntry as
+            | ((e: Record<string, unknown>) => void)
+            | undefined;
+          setEntry?.(screenEntry);
+        };
 
         if (isPreview) {
           const meltTarget = entry.metadata?.meltTarget;
@@ -585,35 +707,29 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
           const operation = await manager.quotes.prepareMeltBolt11(entry.mintUrl, bolt11);
           operationId = operation.id;
-
-          const setEntry = (rawCtx as Record<string, unknown>).setEntry as
-            | ((e: Record<string, unknown>) => void)
-            | undefined;
-          if (setEntry) {
-            const realEntry: MeltHistoryEntry = {
-              id: operation.id,
-              type: 'melt',
-              createdAt: Date.now(),
-              mintUrl: operation.mintUrl,
-              unit: entry.unit,
-              quoteId: operation.quoteId,
-              state: 'UNPAID',
-              amount: operation.amount,
-              metadata: { ...entry.metadata, phase: 'ready', operationId: operation.id },
-            };
-            setEntry(realEntry as unknown as Record<string, unknown>);
-          }
+          paymentId = operation.quoteId;
+          setScreenEntry({
+            id: operation.id,
+            type: 'melt',
+            createdAt: operation.createdAt,
+            mintUrl: operation.mintUrl,
+            unit: entry.unit,
+            quoteId: operation.quoteId,
+            state: 'UNPAID',
+            amount: operation.amount,
+            metadata: { phase: 'ready', operationId: operation.id },
+          });
         }
 
-        const quoteId = isPreview ? undefined : entry.quoteId;
+        const quoteId = !isPreview ? entry.quoteId : paymentId;
 
         const store = usePaymentStatusStore.getState();
-        if (quoteId && store.active?.id === quoteId && store.active?.state === 'failed') {
+        if (paymentId && store.active?.id === paymentId && store.active?.state === 'failed') {
           store.setActive(null);
         }
         store.setActive({
           variant: 'melt',
-          id: quoteId ?? operationId ?? entry.id,
+          id: paymentId,
           mintUrl: entry.mintUrl,
           amount: entry.amount,
           unit: entry.unit,
@@ -622,17 +738,31 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
         paymentStatusPopup({
           variant: 'melt',
-          id: quoteId ?? operationId ?? entry.id,
+          id: paymentId,
           mintUrl: entry.mintUrl,
           amount: entry.amount,
           unit: entry.unit,
           operationId,
         });
 
-        if (operationId) {
-          await manager.quotes.executeMelt(operationId);
-        } else if (quoteId) {
-          await manager.quotes.executeMeltByQuote(entry.mintUrl, quoteId);
+        const result = operationId
+          ? await manager.quotes.executeMelt(operationId)
+          : quoteId
+            ? await manager.quotes.executeMeltByQuote(entry.mintUrl, quoteId)
+            : null;
+
+        if (result) {
+          setScreenEntry({
+            id: result.id,
+            type: 'melt',
+            createdAt: result.createdAt,
+            mintUrl: result.mintUrl,
+            unit: entry.unit,
+            quoteId: result.quoteId,
+            state: mapMeltOperationState(result.state),
+            amount: result.amount,
+            metadata: { operationId: result.id },
+          });
         }
       },
 
@@ -675,73 +805,161 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         if (!info) return;
 
         const { mintUrl, amount } = entry;
+        let screenEntry: EntryRecord = entry as unknown as EntryRecord;
+        const setScreenEntry = (patch: EntryRecord) => {
+          screenEntry = mergeScreenEntry(screenEntry, patch);
+          ctx.setEntry?.(screenEntry);
+        };
+        const restorePreviewEntry = () => {
+          screenEntry = entry as unknown as EntryRecord;
+          ctx.setEntry?.(screenEntry);
+        };
 
-        const nostrTransport = info.transports?.find((t) => t.type === 'nostr');
-        const httpTransport = info.transports?.find((t) => t.type === 'post');
+        try {
+          const nostrTransport = info.transports?.find((t) => t.type === 'nostr');
+          const httpTransport = info.transports?.find((t) => t.type === 'post');
+          const parsed =
+            nostrTransport && !httpTransport
+              ? buildInbandParsedPaymentRequest(encodedRequest, info, mintUrl)
+              : await manager.wallet.processPaymentRequest(encodedRequest);
 
-        if (httpTransport) {
-          const parsed = await manager.wallet.processPaymentRequest(encodedRequest);
+          if (httpTransport) {
+            const transaction = await manager.wallet.preparePaymentRequestTransaction(
+              mintUrl,
+              parsed,
+              amount
+            );
+            const operationId = transaction.sendOperation.id;
+            const preparedEntry =
+              (await findSendHistoryEntryByOperationId(manager, operationId)) ??
+              ({
+                id: operationId,
+                type: 'send',
+                createdAt: transaction.sendOperation.createdAt,
+                mintUrl,
+                amount,
+                unit: entry.unit,
+                operationId,
+                state: 'prepared',
+              } as SendHistoryEntry);
+
+            setScreenEntry({
+              ...(preparedEntry as unknown as EntryRecord),
+              metadata: {
+                paymentRequest: encodedRequest,
+                phase: 'created',
+                operationId,
+              },
+            });
+
+            try {
+              await manager.wallet.handleHttpPaymentRequest(transaction);
+            } catch (error) {
+              await manager.send.rollback(operationId);
+              restorePreviewEntry();
+              throw error;
+            }
+
+            setScreenEntry({
+              state: 'pending',
+              metadata: { phase: 'delivered', tokenCreated: 'true' },
+            });
+
+            paymentStatusPopup({
+              variant: 'payment-request',
+              id: operationId,
+              mintUrl,
+              amount,
+              unit: entry.unit,
+            });
+            return;
+          }
+
+          if (nostrTransport) {
+            const transaction = await manager.wallet.preparePaymentRequestTransaction(
+              mintUrl,
+              parsed,
+              amount
+            );
+            const operationId = transaction.sendOperation.id;
+            const preparedEntry =
+              (await findSendHistoryEntryByOperationId(manager, operationId)) ??
+              ({
+                id: operationId,
+                type: 'send',
+                createdAt: transaction.sendOperation.createdAt,
+                mintUrl,
+                amount,
+                unit: entry.unit,
+                operationId,
+                state: 'prepared',
+              } as SendHistoryEntry);
+
+            setScreenEntry({
+              ...(preparedEntry as unknown as EntryRecord),
+              metadata: {
+                paymentRequest: encodedRequest,
+                phase: 'created',
+                operationId,
+              },
+            });
+
+            let tokenCreated = false;
+            try {
+              await manager.wallet.handleInbandPaymentRequest(transaction, async (token) => {
+                tokenCreated = true;
+                setScreenEntry({
+                  state: 'pending',
+                  metadata: {
+                    tokenCreated: 'true',
+                  },
+                });
+
+                const payload = {
+                  id: encodedRequest,
+                  mint: mintUrl,
+                  unit: entry.unit,
+                  proofs: token.proofs,
+                };
+
+                await ctx.sendDirectMessage(nostrTransport.target, JSON.stringify(payload));
+
+                setScreenEntry({
+                  metadata: {
+                    phase: 'delivered',
+                    tokenCreated: 'true',
+                    nostrSent: 'true',
+                  },
+                });
+              });
+            } catch (error) {
+              if (tokenCreated) {
+                await manager.send.rollback(operationId);
+              }
+              restorePreviewEntry();
+              throw error;
+            }
+
+            paymentStatusPopup({
+              variant: 'payment-request',
+              id: operationId,
+              mintUrl,
+              amount,
+              unit: entry.unit,
+            });
+            return;
+          }
+
           const transaction = await manager.wallet.preparePaymentRequestTransaction(
             mintUrl,
             parsed,
             amount
           );
-          await manager.wallet.handleHttpPaymentRequest(transaction);
-
-          ctx.setEntry?.({
-            ...entry,
-            metadata: { ...entry.metadata, phase: 'delivered', tokenCreated: 'true' },
-          });
-
-          // todo: I think here we should be calling some internal function of the machine/coco-payment-ux like ctx.statusUpdate({... type: 'DELIVERED', ... }) or something along these lines and then we have in our createSovranNotifications we handle it. Look at how createSovranNoticiations are currently called.
-          paymentStatusPopup({
-            variant: 'payment-request',
-            id: entry.id,
-            mintUrl,
-            amount,
-            unit: entry.unit,
-          });
-        } else if (nostrTransport) {
-          ctx.setEntry?.({
-            ...entry,
-            metadata: { ...entry.metadata, tokenCreated: 'true' },
-          });
-
-          const token = await manager.wallet.send(mintUrl, amount);
-
-          const payload = {
-            id: encodedRequest,
-            mint: mintUrl,
-            unit: entry.unit,
-            proofs: token.proofs,
-          };
-
-          await ctx.sendDirectMessage(nostrTransport.target, JSON.stringify(payload));
-
-          ctx.setEntry?.({
-            ...entry,
-            metadata: {
-              ...entry.metadata,
-              phase: 'delivered',
-              tokenCreated: 'true',
-              nostrSent: 'true',
-            },
-          });
-
-          // todo: I think here we should be calling some internal function of the machine/coco-payment-ux like ctx.statusUpdate({... type: 'DELIVERED', ... }) or something along these lines and then we have in our createSovranNotifications we handle it. Look at how createSovranNoticiations are currently called.
-          paymentStatusPopup({
-            variant: 'payment-request',
-            id: entry.id,
-            mintUrl,
-            amount,
-            unit: entry.unit,
-          });
-        } else {
-          const token = await manager.wallet.send(mintUrl, amount);
-          const history = await manager.history.getPaginatedHistory();
-          const sendEntry = history.find(
-            (h) => h.type === 'send' && (h as SendHistoryEntry).mintUrl === mintUrl
-          ) as SendHistoryEntry | undefined;
+          await manager.wallet.handleInbandPaymentRequest(transaction, async () => {});
+          const sendEntry = await findSendHistoryEntryByOperationId(
+            manager,
+            transaction.sendOperation.id
+          );
 
           if (sendEntry) {
             router.replace({
@@ -749,12 +967,24 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
               params: { sendHistoryEntry: JSON.stringify(sendEntry) },
             });
           } else {
-            ctx.setEntry?.({
-              ...entry,
-              metadata: { ...entry.metadata, phase: 'delivered', tokenCreated: 'true' },
+            setScreenEntry({
+              id: transaction.sendOperation.id,
+              type: 'send',
+              createdAt: transaction.sendOperation.createdAt,
+              mintUrl,
+              amount,
+              unit: entry.unit,
+              operationId: transaction.sendOperation.id,
+              state: 'pending',
+              metadata: {
+                paymentRequest: encodedRequest,
+                phase: 'delivered',
+                tokenCreated: 'true',
+              },
             });
           }
-          void token;
+        } catch (error) {
+          sendPaymentFailedPopup({ text: error instanceof Error ? error.message : undefined });
         }
       },
 

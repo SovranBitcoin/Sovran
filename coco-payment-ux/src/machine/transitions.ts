@@ -111,8 +111,8 @@ function handleAmountEntered(
   currentCtx: FlowContext,
   walletCtx: WalletContext
 ): TransitionResult {
-  // When destination is explicitly provided, start fresh to avoid stale context
-  const ctx: FlowContext = event.destination
+  const shouldResetContext = !!event.destination && event.destination !== currentCtx.destination;
+  const ctx: FlowContext = shouldResetContext
     ? {
         unit: currentCtx.unit,
         amount: event.amount,
@@ -124,6 +124,7 @@ function handleAmountEntered(
         ...currentCtx,
         amount: event.amount,
         mintUrl: event.mintUrl || currentCtx.mintUrl,
+        destination: event.destination ?? currentCtx.destination,
         offline: event.offline ?? currentCtx.offline,
       };
 
@@ -141,8 +142,8 @@ function handleMintSelected(
   currentCtx: FlowContext,
   walletCtx: WalletContext
 ): TransitionResult {
-  // When destination is explicitly provided, start fresh to avoid stale context
-  const ctx: FlowContext = event.destination
+  const shouldResetContext = !!event.destination && event.destination !== currentCtx.destination;
+  const ctx: FlowContext = shouldResetContext
     ? {
         unit: currentCtx.unit,
         mintUrl: event.mintUrl,
@@ -153,6 +154,7 @@ function handleMintSelected(
         ...currentCtx,
         mintUrl: event.mintUrl,
         amount: event.amount ?? currentCtx.amount,
+        destination: event.destination ?? currentCtx.destination,
       };
 
   if (!ctx.intent && !ctx.destination) {
@@ -174,14 +176,48 @@ function handleProofsChosen(
   walletCtx: WalletContext
 ): TransitionResult {
   const ctx: FlowContext = { ...currentCtx, amount: event.amount };
+  const destination = ctx.destination ?? 'sendEcash';
 
   if (!ctx.intent) {
+    if (destination === 'paymentRequest' && ctx.paymentRequest) {
+      return {
+        step: 'navigateToPaymentRequest',
+        context: ctx,
+        data: {
+          mintUrl: ctx.mintUrl!,
+          paymentRequest: ctx.paymentRequest,
+          unit: ctx.unit,
+          amount: event.amount,
+        },
+      };
+    }
+
+    if (destination === 'meltQuote' && ctx.meltTarget) {
+      return {
+        step: 'navigateToMeltPreview',
+        context: ctx,
+        data: {
+          mintUrl: ctx.mintUrl!,
+          meltTarget: ctx.meltTarget,
+          unit: ctx.unit,
+          amount: event.amount,
+        },
+      };
+    }
+
     return resolveFromContext(ctx, walletCtx);
   }
 
   // After proof selection, go straight to terminal (proofs already validated)
-  const destination = ctx.destination ?? 'sendEcash';
   const mintUrl = ctx.mintUrl!;
+
+  if (destination === 'paymentRequest' && ctx.paymentRequest) {
+    return {
+      step: 'navigateToPaymentRequest',
+      context: ctx,
+      data: { mintUrl, paymentRequest: ctx.paymentRequest, unit: ctx.unit, amount: event.amount },
+    };
+  }
 
   if (destination === 'meltQuote' && ctx.meltTarget) {
     return {
@@ -202,7 +238,6 @@ function handleMintSelectorRequested(
   currentCtx: FlowContext,
   walletCtx: WalletContext
 ): TransitionResult {
-  const hadDestination = !!currentCtx.destination;
   // When no destination (e.g. home screen), clear stale context
   const ctx = currentCtx.destination ? currentCtx : ({ unit: currentCtx.unit } as FlowContext);
 
@@ -399,9 +434,7 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
     const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
     if (proofAmounts.length > 0) {
       const composition = composeSatoshis(proofAmounts, amount);
-      const forceOffline =
-        ctx.offline && (destination === 'sendEcash' || destination === 'paymentRequest');
-      if (!composition.exactMatch || forceOffline) {
+      if (!composition.exactMatch) {
         return {
           step: 'chooseProofs',
           context: { ...ctx, destination },

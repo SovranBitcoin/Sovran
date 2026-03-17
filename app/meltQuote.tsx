@@ -20,9 +20,6 @@ function ModalScreen() {
       onCancel={() => {
         router.dismissTo('/');
       }}
-      onSendSuccess={() => {
-        router.dismissTo('/');
-      }}
     />
   );
 }

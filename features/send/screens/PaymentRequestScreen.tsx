@@ -28,7 +28,6 @@ interface PaymentRequestScreenProps {
   paymentRequestEntry?: string;
   selectedMintUrl?: string;
   onCancel: () => void;
-  onSendSuccess?: () => void;
   onMintSelected?: (mintUrl: string) => void;
   onRequestMintList?: () => void;
 }
@@ -37,7 +36,6 @@ export function PaymentRequestScreen({
   paymentRequestEntry,
   selectedMintUrl,
   onCancel,
-  onSendSuccess,
   onMintSelected,
   onRequestMintList,
 }: PaymentRequestScreenProps) {
@@ -69,7 +67,6 @@ export function PaymentRequestScreen({
               variant: 'primary',
               onPress: async (close: any) => {
                 await actions.confirm.execute();
-                onSendSuccess?.();
                 close({});
               },
               condition: actions.confirm.available,

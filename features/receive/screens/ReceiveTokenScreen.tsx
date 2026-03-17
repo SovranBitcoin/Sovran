@@ -28,13 +28,11 @@ import { useScreenActions } from '@/shared/hooks/useScreenActions';
 interface ReceiveTokenScreenProps {
   receiveHistoryEntry?: ReceiveHistoryEntry | string;
   onNavigateBack: () => void;
-  onRedeemSuccess: () => void;
 }
 
 export function ReceiveTokenScreen({
   receiveHistoryEntry,
   onNavigateBack,
-  onRedeemSuccess,
 }: ReceiveTokenScreenProps) {
   const { entry, error, actions, source } = useScreenActions<'receiveToken', ReceiveHistoryEntry>(
     'receiveToken',
@@ -74,7 +72,6 @@ export function ReceiveTokenScreen({
             variant: 'primary',
             onPress: async () => {
               await actions.redeem.execute();
-              onRedeemSuccess();
             },
             loading: actions.redeem.loading,
             condition: actions.redeem.available,
