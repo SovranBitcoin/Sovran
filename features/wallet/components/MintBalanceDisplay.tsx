@@ -40,60 +40,45 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
     <HStack
       align="center"
       justify="space-between"
-      className="rounded-2xl"
-      style={[
-        {
-          flexGrow: 0,
-          flexShrink: 0,
-          width: '100%',
-          padding: 8,
-          alignSelf: 'center',
-        },
-        style,
-      ]}>
-      <HStack
-        align="center"
-        justify="space-between"
-        style={{ height: innerHeight, width: innerWidth }}>
-        <HStack align="center">
-          <View className="mr-1">
-            <Avatar
-              picture={mintIconUrl}
-              size={32}
-              name={mintName}
-              loading={isLoading}
-              alt={`${mintName || 'Mint'} icon`}
-            />
-          </View>
-          <VStack align="flex-start">
-            <Text
-              loading={isLoading}
-              placeholder="Mint Name"
-              style={{ color: foreground }}
-              size={12}
-              bold>
-              {isLoading ? undefined : mintName || undefined}
-            </Text>
-            {isLoading ? (
-              <Text loading placeholder="1,000 sats" size={12} bold>
-                {undefined}
-              </Text>
-            ) : (
-              <AmountFormatter
-                className="ml-1"
-                size={12}
-                weight="heavy"
-                amount={balance}
-                unit={unit}
-              />
-            )}
-          </VStack>
-        </HStack>
-
-        <View className="mr-2">
-          <Icon name="fluent:chevron-down-12-filled" size={12} color={foreground} />
+      style={[{ height: innerHeight, width: innerWidth }, style]}>
+      <HStack align="center">
+        <View className="mr-1">
+          <Avatar
+            picture={mintIconUrl}
+            size={32}
+            name={mintName}
+            loading={isLoading}
+            alt={`${mintName || 'Mint'} icon`}
+          />
         </View>
+        <VStack align="flex-start">
+          <Text
+            loading={isLoading}
+            placeholder="Mint Name"
+            style={{ color: foreground }}
+            size={12}
+            bold>
+            {isLoading ? undefined : mintName || undefined}
+          </Text>
+          {isLoading ? (
+            <Text loading placeholder="1,000 sats" size={12} bold>
+              {undefined}
+            </Text>
+          ) : (
+            <AmountFormatter
+              className="ml-1"
+              size={12}
+              weight="heavy"
+              amount={balance}
+              unit={unit}
+            />
+          )}
+        </VStack>
       </HStack>
+
+      <View className="mr-2">
+        <Icon name="fluent:chevron-down-12-filled" size={12} color={foreground} />
+      </View>
     </HStack>
   );
 };

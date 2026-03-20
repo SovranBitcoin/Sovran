@@ -4,12 +4,8 @@ import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { buttonStyle, frame } from '@expo/ui/swift-ui/modifiers';
 
 import MintBalanceDisplay from '@/features/wallet/components/MintBalanceDisplay';
+import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
 import type { MintSelectorShared } from './useMintSelector';
-
-/** MintBalanceDisplay uses padding 8 + inner row + padding 8. */
-function liquidButtonHeight(contentHeight: number): number {
-  return 16 + contentHeight;
-}
 
 export function MintSelectorLiquid({
   mintName,
@@ -21,7 +17,7 @@ export function MintSelectorLiquid({
   dimensions,
 }: MintSelectorShared): React.ReactElement {
   const { buttonWidth, contentHeight } = dimensions;
-  const h = liquidButtonHeight(contentHeight);
+  const h = HEADER_LAYOUT.BUTTON_HEIGHT;
 
   const buttonModifiers = [
     buttonStyle('glass'),
@@ -33,15 +29,16 @@ export function MintSelectorLiquid({
   ];
 
   return (
-    <Host style={{ zIndex: 10, height: h, width: buttonWidth }} matchContents={false}>
-      <SwiftUIButton modifiers={buttonModifiers} onPress={onRequestMintList}>
-        <View
-          style={{
-            width: buttonWidth,
-            height: h,
-            justifyContent: 'center',
-            alignItems: 'stretch',
-          }}>
+    <View
+      style={{
+        alignSelf: 'center',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: buttonWidth,
+        height: h,
+      }}>
+      <Host style={{ zIndex: 10, height: h, width: buttonWidth }} matchContents>
+        <SwiftUIButton modifiers={buttonModifiers} onPress={onRequestMintList}>
           <MintBalanceDisplay
             mintName={mintName}
             mintIconUrl={mintIconUrl}
@@ -50,10 +47,9 @@ export function MintSelectorLiquid({
             unit={unit}
             contentWidth={dimensions.contentWidth}
             contentHeight={dimensions.contentHeight}
-            style={{ width: buttonWidth }}
           />
-        </View>
-      </SwiftUIButton>
-    </Host>
+        </SwiftUIButton>
+      </Host>
+    </View>
   );
 }

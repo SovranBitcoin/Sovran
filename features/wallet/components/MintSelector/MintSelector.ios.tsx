@@ -28,7 +28,7 @@ export default function MintSelector(props: MintSelectorProps): React.ReactEleme
         <PressableFeedback
           animation={false}
           onPress={shared.onRequestMintList}
-          style={[styles.pressable, { width: shared.dimensions.buttonWidth }]}>
+          style={[styles.pressable, { width: shared.dimensions.buttonWidth, padding: 8 }]}>
           <MintBalanceDisplay
             mintName={shared.mintName}
             mintIconUrl={shared.mintIconUrl}
