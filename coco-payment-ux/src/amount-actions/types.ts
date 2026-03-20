@@ -47,6 +47,24 @@ export interface AmountResolution extends CoreAmountResolution {
   secondaryDisplay: string | null;
   /** Fiat currency symbol (e.g. '$'). null when fiat toggle unavailable. */
   fiatSymbol: string | null;
+  /** Quick send suggestions — offline-composable amounts for one-tap entry. Empty when N/A. */
+  suggestions: QuickSendSuggestion[];
+}
+
+/**
+ * A single quick send suggestion — an offline-composable amount
+ * ready for one-tap entry. Carries display label and the input values
+ * needed to apply it (mode + raw input string).
+ */
+export interface QuickSendSuggestion {
+  /** Display label: "$5" or "1,000 sats" */
+  label: string;
+  /** Raw input value to set on tap */
+  inputValue: string;
+  /** Input mode to switch to on tap */
+  inputMode: AmountInputMode;
+  /** Exact sat amount this resolves to (offline-composable) */
+  satoshis: number;
 }
 
 /**
@@ -71,6 +89,20 @@ export interface CreateAmountActionManagerConfig {
   fiatCurrency?: string;
   /** Fiat currency symbol (e.g. '$'). Enables fiat toggle when provided with fiatCurrency. */
   fiatSymbol?: string;
+  /** Quick send suggestion config. Omit for defaults, null to disable. */
+  quickSendConfig?: QuickSendConfig | null;
+}
+
+/**
+ * Configuration for quick send suggestion targets and limits.
+ */
+export interface QuickSendConfig {
+  /** Fiat amounts to try (default: broad range from $0.10 to $100) */
+  fiatTargets?: number[];
+  /** Sat amounts to try (default: broad range from 21 to 100,000) */
+  satTargets?: number[];
+  /** Max suggestions to pick per category (default: 3) */
+  limit?: number;
 }
 
 /**
@@ -84,6 +116,8 @@ export interface CreateAmountActionManagerConfig {
 export interface AmountActionManager {
   /** Set the raw input string (forwarded from CustomKeyboard's onKeyPress). */
   setInput: (rawInput: string) => void;
+  /** Set input mode directly (used by suggestion taps). No-op when fiat toggle unavailable. */
+  setMode: (mode: AmountInputMode) => void;
   /** Toggle between sat and fiat input modes. No-op when fiat toggle unavailable. */
   toggle: () => void;
   /** Get current resolved state. Stable reference when result unchanged. */

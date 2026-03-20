@@ -2,10 +2,9 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useHandleCameraPermission } from '@/features/camera';
-import { usePaymentFlowMachine } from '@/features/send/providers/PaymentFlowProvider';
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 export const BUTTON_H = 48;
 export const QR_SIZE = 72;
@@ -29,9 +28,6 @@ export interface AccountPagerViewShared {
   handleReceive: () => void;
   handleScanQR: () => Promise<void>;
   handleSend: () => Promise<void>;
-  foreground: string;
-  shadeColor100: string;
-  shadeColor300: string;
 }
 
 export function useAccountPagerView({
@@ -40,12 +36,6 @@ export function useAccountPagerView({
   account,
 }: AccountPagerViewProps): AccountPagerViewShared {
   const { height: windowHeight } = useWindowDimensions();
-  const [foreground, shadeColor100, shadeColor300] = useThemeColor([
-    'foreground',
-    'shade-100',
-    'shade-300',
-  ] as const);
-
   const pagerHeight = Math.max(windowHeight * 0.3, 250);
 
   const { handlePermission } = useHandleCameraPermission();
@@ -68,11 +58,8 @@ export function useAccountPagerView({
   }, [accounts, account]);
 
   const handleReceive = useCallback(() => {
-    router.navigate({
-      pathname: '/(receive-flow)/receive',
-      params: { to: 'sendToken', unit: account.unit },
-    });
-  }, [account.unit]);
+    void machine.startReceive();
+  }, [machine]);
 
   const handleScanQR = useCallback(async () => {
     const granted = await handlePermission();
@@ -96,8 +83,5 @@ export function useAccountPagerView({
     handleReceive,
     handleScanQR,
     handleSend,
-    foreground,
-    shadeColor100,
-    shadeColor300,
   };
 }

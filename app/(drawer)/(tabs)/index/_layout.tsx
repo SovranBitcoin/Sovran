@@ -6,7 +6,7 @@ import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { useBalanceContext, useManager } from 'coco-cashu-react';
 
 import { useSendWithHistory } from '@/features/send';
-import { usePaymentFlowMachine } from '@/features/send/providers/PaymentFlowProvider';
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { MintSelector } from '@/features/wallet';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNfcEcashPayment } from '@/shared/hooks/useNfcEcashPayment';

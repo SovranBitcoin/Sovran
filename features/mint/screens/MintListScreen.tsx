@@ -3,7 +3,7 @@
  *
  * Pure display component — receives a pre-built MintListItem[] and renders it.
  * All data fetching (balances, KYM scores, audit data, availability) is done
- * before navigation via machine operations in PaymentFlowProvider.tsx.
+ * before navigation via machine operations in CocoPaymentUX.tsx.
  *
  * The only local state is the selected currency tab.
  */

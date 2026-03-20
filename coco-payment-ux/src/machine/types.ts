@@ -29,6 +29,7 @@ export type FlowStep =
   | 'mintQuoteCreated'
   | 'openMint'
   | 'openProfile'
+  | 'navigateToReceive'
   | 'dismiss'
   | 'error';
 
@@ -65,6 +66,8 @@ export interface StepDataMap {
     destination?: Destination;
     /** Pre-computed mint list items (populated when machine operations are provided). */
     mintListItems?: MintListItem[];
+    /** When 'npc', selection updates NPC mint only (not selectedMint). */
+    scope?: 'npc' | 'selected';
   };
   chooseProofs: {
     mintUrl: string;
@@ -92,6 +95,7 @@ export interface StepDataMap {
   mintQuoteCreated: { historyEntry: string; unit: string };
   openMint: { url: string };
   openProfile: { npub: string };
+  navigateToReceive: { unit: string };
   dismiss: Record<string, never>;
   error: { code: ErrorCode; message: string; data?: Record<string, unknown> };
 }
@@ -204,11 +208,14 @@ export type FlowEvent =
       destination?: Destination;
       /** When true, the wallet should persist this mint as the user's preferred mint. */
       persist?: boolean;
+      /** When 'npc', update NPC mint only (not selectedMint). */
+      scope?: 'npc' | 'selected';
     }
   | { type: 'PROOFS_CHOSEN'; amount: number }
-  | { type: 'REQUEST_MINT_SELECTOR' }
+  | { type: 'REQUEST_MINT_SELECTOR'; scope?: 'npc' | 'selected' }
   | { type: 'START_SEND_ECASH' }
   | { type: 'START_RECEIVE_LIGHTNING' }
+  | { type: 'START_RECEIVE' }
   | { type: 'RESET' };
 
 // ---------------------------------------------------------------------------
@@ -237,6 +244,16 @@ export type StepHandlerMap = {
  */
 export type NotificationHandlerMap = {
   [K in ErrorCode]?: (data: StepDataMap['error']) => MaybeAsync;
+} & {
+  /** Called when a scan source returns empty (clipboard empty, no QR in image). */
+  onScanEmpty?: (source: string) => MaybeAsync;
+  /** Called when a scan source throws or returns { error }. */
+  onScanError?: (source: string, err: Error) => MaybeAsync;
+  /**
+   * Called when AMOUNT_ENTERED fires with a positive amount but no mint URL.
+   * Wallet should prompt to select a mint; machine stays on enterAmount.
+   */
+  onMissingMintForAmount?: () => MaybeAsync;
 };
 
 // ---------------------------------------------------------------------------
@@ -263,6 +280,44 @@ export interface MachineOperations {
 }
 
 // ---------------------------------------------------------------------------
+// Scan types (UR assembly + execute)
+// ---------------------------------------------------------------------------
+
+export interface URDecoderLike {
+  receivePart(part: string): void;
+  getProgress(): number;
+  isComplete(): boolean;
+  isSuccess(): boolean;
+  resultUR(): { decodeCBOR(): Uint8Array };
+}
+
+export interface ScanOptions {
+  /** Source hint when data is provided. When no data, selects which source to fetch from. */
+  source?: 'clipboard' | 'gallery' | string;
+}
+
+export interface ProcessResult {
+  urInProgress: boolean;
+  progress?: number;
+  lockedPending?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Scan sources — platform-injected modules for clipboard/gallery
+// ---------------------------------------------------------------------------
+
+export type ScanSourceResult =
+  | { data: string }
+  | { canceled: true }
+  | { empty: true }
+  | { error: Error };
+
+export interface ScanSources {
+  clipboard?: () => Promise<ScanSourceResult>;
+  gallery?: () => Promise<ScanSourceResult>;
+}
+
+// ---------------------------------------------------------------------------
 // Machine configuration
 // ---------------------------------------------------------------------------
 
@@ -279,6 +334,11 @@ export interface CreateMachineConfig {
    */
   onPersistMint?: (mintUrl: string) => void;
   /**
+   * Called when changeMint is invoked with scope: 'npc'.
+   * Updates the NPC (Lightning address) mint only, not selectedMint.
+   */
+  onNpcMintChange?: (mintUrl: string) => void;
+  /**
    * Async operations the machine executes for action steps.
    * When provided, confirmSend/createMintQuote/selectMint are handled
    * internally and external handlers only receive result steps.
@@ -291,6 +351,20 @@ export interface CreateMachineConfig {
    * When omitted or when no handler matches, notifications are no-ops.
    */
   notifications?: NotificationHandlerMap;
+  /**
+   * Factory that creates a URDecoder for animated QR assembly.
+   * When provided, the machine exposes scan() for camera/paste input.
+   */
+  createURDecoder?: () => URDecoderLike;
+  /**
+   * Platform-injected sources for scan() when no data is passed.
+   * clipboard: reads from system clipboard. gallery: picks image and scans QR.
+   */
+  scanSources?: ScanSources;
+  /**
+   * Current device offline / mock-offline flag. Used when AMOUNT_ENTERED omits `offline`.
+   */
+  getOffline?: () => boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -313,18 +387,32 @@ export interface PaymentMachine {
   /** User selected round-down or round-up amount from offline proof suggestions. */
   chooseProofs: (amount: number) => Promise<void>;
   /** Select a mint. Without `destination`, continues the current flow with the new mint. */
-  changeMint: (mintUrl: string, opts?: { persist?: boolean }) => Promise<void>;
+  changeMint: (
+    mintUrl: string,
+    opts?: { persist?: boolean; scope?: 'npc' | 'selected' }
+  ) => Promise<void>;
   /**
    * Open mint selector for current flow.
    * Pass `{ reset: true }` to clear stale flow context first (e.g. from home screen).
+   * Pass `{ scope: 'npc' }` to update NPC mint only (not selectedMint).
    */
-  requestMintSelector: (opts?: { reset?: boolean }) => Promise<void>;
+  requestMintSelector: (opts?: { reset?: boolean; scope?: 'npc' | 'selected' }) => Promise<void>;
   /** Start a send ecash flow. Resets context, auto-selects mint, opens amount screen. */
   startSendEcash: () => Promise<void>;
   /** Start a receive lightning flow. Resets context, opens amount screen for mint quote. */
   startReceiveLightning: () => Promise<void>;
+  /** Open the receive hub screen (Lightning address, P2PK). */
+  startReceive: () => Promise<void>;
   /** Clear all flow state. */
   reset: () => void;
+  /**
+   * Process scan/paste input with optional UR assembly.
+   * Present when createURDecoder or scanSources is provided.
+   * - scan(data, options): process string directly.
+   * - scan() / scan({ source: 'clipboard' }): use clipboard source.
+   * - scan({ source: 'gallery' }): use gallery source.
+   */
+  scan?: (data?: string, options?: ScanOptions) => Promise<ProcessResult>;
   /** Current execution state (stable reference between notifications). */
   inspect: () => ExecutionState;
   /** Current flow context (for mint availability, flow mint, etc.). */

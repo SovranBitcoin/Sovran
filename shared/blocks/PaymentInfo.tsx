@@ -28,8 +28,10 @@ export function PaymentInfo({
   variant = 'primary',
 }: PaymentInfoProps): React.ReactElement {
   const selectedValue = useMemo(() => {
-    if (typeof data === 'string') return data;
     if (Array.isArray(data) && data.length > 0) return data[0].value;
+    if (typeof data === 'string') return data;
+    // FormattedString (coco-payment-ux) extends String — typeof is 'object'
+    if (data instanceof String) return data.valueOf();
     return '';
   }, [data]);
 

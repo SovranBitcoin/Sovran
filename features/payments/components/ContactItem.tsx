@@ -28,6 +28,8 @@ interface ContactItemProps {
     nip05?: string;
   };
   isLoadingProfile?: boolean;
+  index?: number;
+  length?: number;
 }
 
 const styles = {
@@ -54,8 +56,8 @@ export const ContactItem = React.memo(function ContactItem({
   item,
   profile,
   isLoadingProfile = false,
-  index,
-  length,
+  index = 0,
+  length = 1,
 }: ContactItemProps) {
   const router = useRouter();
   const foreground = useThemeColor('foreground');

@@ -3,7 +3,7 @@ import { CameraView } from 'expo-camera';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { scanBoxSize, type CameraScreenShared } from './useCameraScreen';
+import { scanBoxSize, type CameraScreenShared } from './types';
 
 interface CameraLayoutProps extends CameraScreenShared {
   children: React.ReactNode;

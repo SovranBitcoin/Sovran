@@ -3,16 +3,16 @@
  * Keeps route files thin while reusing the shared CameraScreen UI.
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { TouchableOpacity } from 'react-native';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useBalanceContext, useManager } from 'coco-cashu-react';
 
 import Icon from 'assets/icons';
-import { CameraScreen, ScanningData } from '@/features/camera';
+import { CameraScreen } from '@/features/camera';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useProcessPaymentString, useSendWithHistory } from '@/features/send';
+import { useSendWithHistory } from '@/features/send';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNfcEcashPayment } from '@/shared/hooks/useNfcEcashPayment';
 
@@ -23,25 +23,6 @@ export function StandaloneCameraScreen() {
   const selectedMints = useMintStore((state) => state.selectedMints);
   const getSelectedMint = useMintStore((state) => state.getSelectedMint);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
-
-  const unlockCameraRef = useRef<(() => void) | null>(null);
-
-  const { processPaymentString, reset } = useProcessPaymentString({
-    unit,
-    selectedMint,
-    isFocused: true,
-    onProgress: () => {},
-    onLoading: () => {},
-    onScanned: () => {},
-    onUnlockCamera: () => unlockCameraRef.current?.(),
-  });
-
-  const handleScan = useCallback(
-    async (data: ScanningData) => {
-      return processPaymentString(data);
-    },
-    [processPaymentString]
-  );
 
   const { send } = useSendWithHistory();
   const manager = useManager();
@@ -99,14 +80,7 @@ export function StandaloneCameraScreen() {
           ),
         }}
       />
-      <CameraScreen
-        onScan={handleScan}
-        onReset={reset}
-        scanLocked={nfc.isPaying}
-        onRegisterUnlock={(fn) => {
-          unlockCameraRef.current = fn;
-        }}
-      />
+      <CameraScreen scanLocked={nfc.isPaying} />
     </>
   );
 }

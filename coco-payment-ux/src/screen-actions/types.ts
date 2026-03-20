@@ -2,12 +2,33 @@
 // Screen Actions — types
 // ---------------------------------------------------------------------------
 
+import type { FormattedString } from '../formatting/FormattedString';
+import type { FormattedTimestamp } from '../formatting/FormattedTimestamp';
+import type { PaymentRequestInfo } from '../types';
+
+/**
+ * Fields added by the built-in `decorateEntry()`. Screens combine this
+ * with their base entry type for type-safe access:
+ *
+ *   type MyEntry = MeltHistoryEntry & DecoratedEntryFields;
+ */
+export interface DecoratedEntryFields {
+  createdAt: FormattedTimestamp;
+  tokenString: FormattedString | null;
+  p2pkPubkey: FormattedString | null;
+  npcAddress?: FormattedString;
+  paymentRequestInfo: PaymentRequestInfo | null;
+  transportLabel: string | null;
+}
+
 export type ScreenType =
   | 'sendToken'
   | 'receiveToken'
   | 'mintQuote'
   | 'meltQuote'
-  | 'paymentRequest';
+  | 'paymentRequest'
+  | 'receive'
+  | 'amountEntry';
 
 /**
  * Maps each screen type to the set of action names available on that screen.
@@ -19,6 +40,9 @@ export type ScreenActionName = {
   mintQuote: 'copy' | 'share';
   meltQuote: 'pay' | 'cancel';
   paymentRequest: 'confirm' | 'cancel';
+  receive: 'copy' | 'paste' | 'fixedAmount' | 'scanQr' | 'changeNpcMint';
+  /** Flow amount screen — keyboard + submit; `setInput`/`toggle` are handled inside the manager. */
+  amountEntry: 'setInput' | 'toggle' | 'next' | 'paste' | 'scanQr';
 };
 
 export interface ActionAvailability {
@@ -63,7 +87,7 @@ export type ScreenActionHandlerMap = {
 
 export interface ScreenActionManager<S extends ScreenType> {
   /** Execute a named action. Sets loading, calls the handler, clears loading. */
-  execute: (action: ScreenActionName[S]) => Promise<void>;
+  execute: (action: ScreenActionName[S], params?: Record<string, unknown>) => Promise<void>;
   /** Current entry (updated via setEntry). */
   getEntry: () => Record<string, unknown> | null;
   /** Push a new entry (e.g. from history:updated). Recomputes availability. */

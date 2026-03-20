@@ -14,7 +14,7 @@ import { useExecutionState } from 'coco-payment-ux/react';
 import type { MintListItem } from 'coco-payment-ux';
 
 import { MintListScreen } from '@/features/mint';
-import { usePaymentFlowMachine } from '@/features/send/providers/PaymentFlowProvider';
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 function MintSelectRoute() {
@@ -22,6 +22,7 @@ function MintSelectRoute() {
     unit?: string;
     destination?: string;
     mintItems?: string;
+    mintScope?: 'npc' | 'selected';
   }>();
 
   const walletContext = useWalletContext();
@@ -35,9 +36,9 @@ function MintSelectRoute() {
 
   const handleMintNavigation = useCallback(
     (item: MintListItem) => {
-      void machine.changeMint(item.mintUrl);
+      void machine.changeMint(item.mintUrl, { scope: params.mintScope ?? 'selected' });
     },
-    [machine]
+    [machine, params.mintScope]
   );
 
   return (

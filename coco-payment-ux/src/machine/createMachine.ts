@@ -9,6 +9,9 @@ import type {
   FlowContext,
   FlowStep,
   PaymentMachine,
+  ProcessResult,
+  ScanOptions,
+  ScanSourceResult,
   StepDataMap,
 } from './types';
 
@@ -130,11 +133,19 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     detectors = defaultDetectors,
     getContext,
     getUnit,
+    getOffline,
     unit: configUnit = 'sat',
     onPersistMint,
+    onNpcMintChange,
     operations,
     notifications,
+    createURDecoder,
+    scanSources,
   } = config;
+
+  let urDecoder: ReturnType<NonNullable<typeof createURDecoder>> | null =
+    createURDecoder?.() ?? null;
+  let processedRef = false;
 
   let step: FlowStep = 'idle';
   let flowCtx: FlowContext = { unit: configUnit };
@@ -168,19 +179,37 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     const walletCtx = getContext();
     const unit = getUnit?.() ?? configUnit;
 
-    const result = transition(step, flowCtx, event, detectors, walletCtx, unit);
+    const eventForTransition =
+      event.type === 'AMOUNT_ENTERED'
+        ? {
+            ...event,
+            offline: event.offline ?? getOffline?.() ?? false,
+          }
+        : event;
+
+    const result = transition(step, flowCtx, eventForTransition, detectors, walletCtx, unit);
 
     step = result.step;
     flowCtx = result.context;
     stepData = result.data;
 
-    // Auto-persist on persist-only path (no destination = home screen selection).
-    // Explicit event.persist overrides: true forces persist, false suppresses it.
-    if (event.type === 'MINT_SELECTED' && onPersistMint) {
-      const isPersistOnlyPath = step === 'dismiss' && !flowCtx.destination;
-      const shouldPersist = event.persist ?? isPersistOnlyPath;
-      if (shouldPersist) {
-        onPersistMint(event.mintUrl);
+    if (eventForTransition.type === 'AMOUNT_ENTERED') {
+      const e = eventForTransition;
+      if (e.amount > 0 && !String(e.mintUrl ?? '').trim()) {
+        void notifications?.onMissingMintForAmount?.();
+      }
+    }
+
+    // Mint selection callbacks: scope 'npc' → onNpcMintChange; else → onPersistMint when applicable.
+    if (event.type === 'MINT_SELECTED') {
+      if (event.scope === 'npc') {
+        onNpcMintChange?.(event.mintUrl);
+      } else if (onPersistMint) {
+        const isPersistOnlyPath = step === 'dismiss' && !flowCtx.destination;
+        const shouldPersist = event.persist ?? isPersistOnlyPath;
+        if (shouldPersist) {
+          onPersistMint(event.mintUrl);
+        }
       }
     }
 
@@ -301,21 +330,110 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     }
   };
 
-  const changeMint = (mintUrl: string, opts?: { persist?: boolean }) => {
-    return send({ type: 'MINT_SELECTED', mintUrl, persist: opts?.persist });
+  const changeMint = (
+    mintUrl: string,
+    opts?: { persist?: boolean; scope?: 'npc' | 'selected' }
+  ) => {
+    return send({ type: 'MINT_SELECTED', mintUrl, persist: opts?.persist, scope: opts?.scope });
   };
 
-  const requestMintSelector = (opts?: { reset?: boolean }) => {
+  const requestMintSelector = (opts?: { reset?: boolean; scope?: 'npc' | 'selected' }) => {
     if (opts?.reset) {
       step = 'idle';
       flowCtx = { unit: getUnit?.() ?? configUnit };
       stepData = {} as any;
       handlerExecuting = false;
     }
-    return send({ type: 'REQUEST_MINT_SELECTOR' });
+    return send({ type: 'REQUEST_MINT_SELECTOR', scope: opts?.scope });
   };
 
   const execute = (input: string) => send({ type: 'EXECUTE', input });
+
+  async function processScanData(data: string): Promise<ProcessResult> {
+    const isUR = data.startsWith('ur:') || data.startsWith('UR:');
+    if (isUR && createURDecoder && urDecoder) {
+      urDecoder.receivePart(data);
+      const nextProgress = urDecoder.getProgress();
+
+      if (urDecoder.isComplete() && urDecoder.isSuccess()) {
+        const decoded = urDecoder.resultUR().decodeCBOR();
+        const decodedString = new TextDecoder().decode(decoded);
+        await execute(decodedString);
+        urDecoder = createURDecoder();
+        return { urInProgress: false };
+      }
+
+      return { urInProgress: true, progress: nextProgress };
+    }
+
+    if (processedRef) {
+      return { urInProgress: false };
+    }
+
+    processedRef = true;
+    await execute(data);
+    const state = cachedSnapshot;
+
+    if (state.status !== 'needsInput' || state.code !== 'OPTION_SELECTION_REQUIRED') {
+      processedRef = false;
+    }
+
+    return {
+      urInProgress: false,
+      lockedPending: state.status === 'needsInput' && state.code === 'OPTION_SELECTION_REQUIRED',
+    };
+  }
+
+  const scan =
+    createURDecoder || scanSources
+      ? async (data?: string, options?: ScanOptions): Promise<ProcessResult> => {
+          const hasData = data != null && data.length > 0;
+
+          if (hasData) {
+            return processScanData(data);
+          }
+
+          const source = options?.source ?? 'clipboard';
+          const sourceFn =
+            source === 'clipboard'
+              ? scanSources?.clipboard
+              : source === 'gallery'
+                ? scanSources?.gallery
+                : undefined;
+
+          if (!sourceFn) {
+            return { urInProgress: false };
+          }
+
+          let result: ScanSourceResult;
+          try {
+            result = await sourceFn();
+          } catch (err) {
+            notifications?.onScanError?.(
+              source,
+              err instanceof Error ? err : new Error(String(err))
+            );
+            return { urInProgress: false };
+          }
+
+          if ('canceled' in result && result.canceled) {
+            return { urInProgress: false };
+          }
+          if ('empty' in result && result.empty) {
+            notifications?.onScanEmpty?.(source);
+            return { urInProgress: false };
+          }
+          if ('error' in result && result.error) {
+            notifications?.onScanError?.(source, result.error);
+            return { urInProgress: false };
+          }
+          if ('data' in result && result.data) {
+            return processScanData(result.data);
+          }
+
+          return { urInProgress: false };
+        }
+      : undefined;
 
   const enterAmount = (
     amount: number,
@@ -337,18 +455,24 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   const startSendEcash = () => send({ type: 'START_SEND_ECASH' });
 
   const startReceiveLightning = () => send({ type: 'START_RECEIVE_LIGHTNING' });
+  const startReceive = () => send({ type: 'START_RECEIVE' });
 
   const reset = () => {
     step = 'idle';
     flowCtx = { unit: getUnit?.() ?? configUnit };
     stepData = {} as any;
     handlerExecuting = false;
+    processedRef = false;
+    if (createURDecoder) {
+      urDecoder = createURDecoder();
+    }
     notify();
   };
 
   return {
     send,
     execute,
+    scan,
     enterAmount,
     chooseOption,
     chooseProofs,
@@ -356,6 +480,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     requestMintSelector,
     startSendEcash,
     startReceiveLightning,
+    startReceive,
     reset,
     inspect: () => cachedSnapshot,
     getContext: () => flowCtx,

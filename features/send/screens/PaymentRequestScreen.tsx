@@ -12,7 +12,7 @@
 import React from 'react';
 
 import type { SendHistoryEntry } from 'coco-cashu-core';
-
+import { useScreenActions } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
 import { HistoryEntryHeader, HistoryEntryTimeline } from '@/features/transactions';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -22,10 +22,9 @@ import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/Scree
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { useScreenActions } from '@/shared/hooks/useScreenActions';
 
 interface PaymentRequestScreenProps {
-  paymentRequestEntry?: string;
+  paymentRequestEntry?: SendHistoryEntry | string;
   selectedMintUrl?: string;
   onCancel: () => void;
   onMintSelected?: (mintUrl: string) => void;
@@ -49,7 +48,7 @@ export function PaymentRequestScreen({
     return <ScreenLoadingState message="Loading payment request..." />;
   }
 
-  const phase = entry.metadata?.phase;
+  const phase = entry.metadata?.phase as string | undefined;
   const tokenCreated = entry.metadata?.tokenCreated === 'true';
   const nostrSent = entry.metadata?.nostrSent === 'true';
   const isPreview = phase === 'preview' || !phase;
@@ -108,7 +107,7 @@ export function PaymentRequestScreen({
         )}
 
         <HistoryEntryTimeline
-          historyEntry={entry as unknown as SendHistoryEntry}
+          historyEntry={entry}
           tokenCreated={tokenCreated}
           nostrSent={nostrSent}
         />

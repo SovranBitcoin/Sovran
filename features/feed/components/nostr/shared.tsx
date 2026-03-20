@@ -22,7 +22,7 @@ import { nip19 } from 'nostr-tools';
 import { Metadata } from 'nostr-tools/kinds';
 import { ImageBlock, useImageOverlay } from './image-overlay';
 import type { ImageOverlayLayout, ImageOverlayPost } from './image-overlay';
-import { usePaymentFlowMachine } from '@/features/send/providers/PaymentFlowProvider';
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 

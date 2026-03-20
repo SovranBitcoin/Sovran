@@ -1,10 +1,15 @@
 import React from 'react';
+import { View } from 'react-native';
 import { Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { buttonStyle, frame } from '@expo/ui/swift-ui/modifiers';
 
 import MintBalanceDisplay from '@/features/wallet/components/MintBalanceDisplay';
-import { View } from '@/shared/ui/primitives/View/View';
 import type { MintSelectorShared } from './useMintSelector';
+
+/** MintBalanceDisplay uses padding 8 + inner row + padding 8. */
+function liquidButtonHeight(contentHeight: number): number {
+  return 16 + contentHeight;
+}
 
 export function MintSelectorLiquid({
   mintName,
@@ -15,21 +20,28 @@ export function MintSelectorLiquid({
   onRequestMintList,
   dimensions,
 }: MintSelectorShared): React.ReactElement {
+  const { buttonWidth, contentHeight } = dimensions;
+  const h = liquidButtonHeight(contentHeight);
+
   const buttonModifiers = [
     buttonStyle('glass'),
-    frame({ height: 50, width: dimensions.buttonWidth, alignment: 'center' }),
+    frame({
+      height: h,
+      width: buttonWidth,
+      alignment: 'center',
+    }),
   ];
 
   return (
-    <View
-      style={{
-        alignSelf: 'center',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: dimensions.buttonWidth,
-      }}>
-      <Host style={{ zIndex: 10, height: 50, width: dimensions.buttonWidth }} matchContents>
-        <SwiftUIButton modifiers={buttonModifiers} onPress={onRequestMintList}>
+    <Host style={{ zIndex: 10, height: h, width: buttonWidth }} matchContents={false}>
+      <SwiftUIButton modifiers={buttonModifiers} onPress={onRequestMintList}>
+        <View
+          style={{
+            width: buttonWidth,
+            height: h,
+            justifyContent: 'center',
+            alignItems: 'stretch',
+          }}>
           <MintBalanceDisplay
             mintName={mintName}
             mintIconUrl={mintIconUrl}
@@ -38,9 +50,10 @@ export function MintSelectorLiquid({
             unit={unit}
             contentWidth={dimensions.contentWidth}
             contentHeight={dimensions.contentHeight}
+            style={{ width: buttonWidth }}
           />
-        </SwiftUIButton>
-      </Host>
-    </View>
+        </View>
+      </SwiftUIButton>
+    </Host>
   );
 }

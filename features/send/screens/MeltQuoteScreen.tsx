@@ -11,10 +11,10 @@
  * entry; the pay action handles LNURL resolution + prepareMeltBolt11 + executeMelt.
  */
 
-import React, { useMemo, useRef } from 'react';
+import React from 'react';
 
 import type { MeltHistoryEntry } from 'coco-cashu-core';
-
+import { useScreenActions } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
 import {
   HistoryEntryHeader,
@@ -31,12 +31,9 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
-import { useScreenActions } from '@/shared/hooks/useScreenActions';
-import { useBeforeRemoveCleanup } from '@/shared/hooks/useBeforeRemoveCleanup';
 
 interface MeltQuoteScreenProps {
   meltHistoryEntry?: MeltHistoryEntry | string;
-  operationId?: string;
   selectedMintUrl?: string;
   onCancel: () => void;
   onMintSelected?: (mintUrl: string) => void;
@@ -45,36 +42,13 @@ interface MeltQuoteScreenProps {
 
 export function MeltQuoteScreen({
   meltHistoryEntry,
-  operationId,
   selectedMintUrl,
   onCancel,
   onMintSelected,
   onRequestMintList,
 }: MeltQuoteScreenProps) {
-  const enrichedEntry = useMemo(() => {
-    if (!meltHistoryEntry || !operationId) return meltHistoryEntry;
-    const parsed =
-      typeof meltHistoryEntry === 'string'
-        ? (JSON.parse(meltHistoryEntry) as MeltHistoryEntry)
-        : meltHistoryEntry;
-    return { ...parsed, metadata: { ...parsed.metadata, operationId } };
-  }, [meltHistoryEntry, operationId]);
-
-  const { entry, error, actions, source } = useScreenActions<'meltQuote', MeltHistoryEntry>(
-    'meltQuote',
-    enrichedEntry
-  );
+  const { entry, error, actions, source } = useScreenActions('meltQuote', meltHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
-  const successRef = useRef(false);
-
-  const hasOperation = !!entry?.metadata?.operationId;
-  useBeforeRemoveCleanup({
-    active: hasOperation,
-    shouldCleanup: () => !successRef.current && hasOperation,
-    cleanup: async () => {
-      await actions.cancel.execute();
-    },
-  });
 
   if (error) {
     return <ScreenErrorState message={error} onGoBack={onCancel} />;
@@ -105,7 +79,6 @@ export function MeltQuoteScreen({
               variant: 'primary',
               onPress: async (close: any) => {
                 await actions.pay.execute();
-                successRef.current = true;
                 close({});
               },
               condition: actions.pay.available,

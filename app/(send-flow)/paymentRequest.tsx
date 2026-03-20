@@ -10,10 +10,7 @@ import React, { useCallback } from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 
 import { PaymentRequestScreen } from '@/features/send';
-import {
-  usePaymentFlowMint,
-  usePaymentFlowMachine,
-} from '@/features/send/providers/PaymentFlowProvider';
+import { usePaymentFlowMint, usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 function ModalScreen() {

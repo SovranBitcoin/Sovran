@@ -10,11 +10,8 @@
 import React, { useCallback } from 'react';
 import { useLocalSearchParams, Stack } from 'expo-router';
 
-import { MintQuoteScreen, getFormattedMintQuoteTitle } from '@/features/receive';
-import {
-  usePaymentFlowMint,
-  usePaymentFlowMachine,
-} from '@/features/send/providers/PaymentFlowProvider';
+import { MintQuoteScreen } from '@/features/receive';
+import { usePaymentFlowMint, usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 function ModalScreen() {
@@ -24,7 +21,6 @@ function ModalScreen() {
   }>();
 
   const unit = params.unit ?? 'sat';
-  const title = getFormattedMintQuoteTitle(unit);
 
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit });
@@ -43,7 +39,7 @@ function ModalScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerTitle: title }} />
+      <Stack.Screen options={{ headerTitle: 'Receive' }} />
       <MintQuoteScreen
         key={flowMint ?? params.mintHistoryEntry}
         mintHistoryEntry={params.mintHistoryEntry}

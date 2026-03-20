@@ -10,6 +10,7 @@ import React from 'react';
 import { router } from 'expo-router';
 
 import type { MintHistoryEntry } from 'coco-cashu-core';
+import { useScreenActions } from 'coco-payment-ux/react';
 
 import { MintSelector } from '@/features/wallet';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -30,7 +31,6 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
-import { useScreenActions } from '@/shared/hooks/useScreenActions';
 
 interface MintQuoteScreenProps {
   mintHistoryEntry: MintHistoryEntry | string;
@@ -47,10 +47,7 @@ export function MintQuoteScreen({
   onMintSelected,
   onRequestMintList,
 }: MintQuoteScreenProps) {
-  const { entry, error, actions, source } = useScreenActions<'mintQuote', MintHistoryEntry>(
-    'mintQuote',
-    mintHistoryEntry
-  );
+  const { entry, error, actions, source } = useScreenActions('mintQuote', mintHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
 
   if (error) {
@@ -137,9 +134,4 @@ export function MintQuoteScreen({
       </VStack>
     </ModalLayoutWrapper>
   );
-}
-
-export function getFormattedMintQuoteTitle(unit: string): string {
-  const isBitcoin = unit === 'sat';
-  return `Receive ${isBitcoin ? 'Bitcoin' : unit.toUpperCase()}`;
 }

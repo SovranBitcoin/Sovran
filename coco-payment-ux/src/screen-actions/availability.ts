@@ -82,6 +82,42 @@ function paymentRequestAvailability(
   };
 }
 
+function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMap<'amountEntry'> {
+  const numericValue = typeof entry.numericValue === 'number' ? entry.numericValue : 0;
+  const destination = entry.destination as string | undefined;
+  const isSendEcash = destination === 'sendEcash';
+  const hasFiatToggle =
+    typeof entry.fiatCurrency === 'string' &&
+    entry.fiatCurrency.length > 0 &&
+    typeof entry.btcPrice === 'number' &&
+    entry.btcPrice > 0;
+
+  return {
+    setInput: { available: true },
+    toggle: { available: hasFiatToggle },
+    next: { available: numericValue > 0 },
+    paste: { available: isSendEcash },
+    scanQr: { available: isSendEcash },
+  };
+}
+
+function receiveAvailability(entry: Record<string, unknown>): AvailabilityMap<'receive'> {
+  const hasNpc = typeof entry.npcAddress === 'string' && entry.npcAddress.length > 0;
+  const hasP2pk = typeof entry.p2pkKey === 'string' && entry.p2pkKey.length > 0;
+  const isReceiveHub =
+    entry.type === 'receive' && typeof entry.id === 'string' && entry.id === 'receive-hub';
+  const unit = entry.unit as string | undefined;
+  const hubLoaded = isReceiveHub;
+
+  return {
+    copy: { available: hasNpc || hasP2pk },
+    paste: { available: hubLoaded },
+    fixedAmount: { available: hubLoaded },
+    scanQr: { available: hubLoaded },
+    changeNpcMint: { available: hubLoaded && hasNpc && unit === 'sat' },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -94,6 +130,8 @@ const AVAILABILITY_FNS: {
   mintQuote: mintQuoteAvailability,
   meltQuote: meltQuoteAvailability,
   paymentRequest: paymentRequestAvailability,
+  receive: receiveAvailability,
+  amountEntry: amountEntryAvailability,
 };
 
 /**

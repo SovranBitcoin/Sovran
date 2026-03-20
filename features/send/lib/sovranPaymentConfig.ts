@@ -7,13 +7,14 @@
  * - createSovranHandlers: step handlers (navigation, popups, dismiss)
  * - createSovranScreenActionHandlers: post-terminal actions (copy, share, NFC, redeem, pay)
  *
- * Consumed by PaymentFlowProvider (notifications, operations, handlers) and
- * useScreenActions (screenActionHandlers).
+ * Consumed by CocoPaymentUXProvider (notifications, operations, handlers, actions) and
+ * useScreenActions (screen action handlers from context).
  */
 
-import type { MutableRefObject } from 'react';
 import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { scanFromURLAsync } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 
 import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
@@ -27,9 +28,11 @@ import type {
 import {
   defaultDetectors,
   buildMintAvailability,
+  type Destination,
   type MachineOperations,
   type NotificationHandlerMap,
   type PaymentMachine,
+  type ScanSources,
   type ScreenActionContext,
   type ScreenActionHandlerMap,
   type StepHandlerMap,
@@ -42,6 +45,7 @@ import {
   isLightningInvoice,
   requestInvoiceFromLnurl,
 } from '@/shared/lib/cashu/utils';
+import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
 import { writeTokenToNFC } from '@/shared/lib/nfc';
 import {
   allOptionsDisabledPopup,
@@ -56,6 +60,9 @@ import {
   nfcEcashSharedPopup,
   nfcSendFailedPopup,
   noAmountPopup,
+  noMintSelectedPopup,
+  noClipboardAddressPopup,
+  noQrCodeFoundPopup,
   noValidMintPopup,
   operationInvalidStatePopup,
   operationNotFoundPopup,
@@ -63,6 +70,7 @@ import {
   paymentOptionsPopup,
   paymentStatusPopup,
   proofSelectorPopup,
+  qrScanFailedPopup,
   receiveFailedPopup,
   sendPaymentFailedPopup,
   tokenPendingNotRedeemedPopup,
@@ -73,6 +81,7 @@ import {
   unsupportedTokenUnitPopup,
 } from '@/shared/lib/popup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
+import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
@@ -110,6 +119,52 @@ export function createSovranNotifications(): NotificationHandlerMap {
     MINT_QUOTE_FAILED: ({ code: _code, message, data: _data }) => {
       generalErrorPopup({ text: message });
     },
+    onScanEmpty: (source) => {
+      if (source === 'clipboard') noClipboardAddressPopup();
+      else if (source === 'gallery') noQrCodeFoundPopup();
+    },
+    onScanError: (source, err) => {
+      if (source === 'gallery') qrScanFailedPopup();
+      else generalErrorPopup({ text: err.message });
+    },
+    onMissingMintForAmount: () => {
+      noMintSelectedPopup();
+    },
+  };
+}
+
+// =============================================================================
+// createSovranScanSources
+// =============================================================================
+
+export function createSovranScanSources(): ScanSources {
+  return {
+    clipboard: async () => {
+      const rawText = (await Clipboard.getStringAsync()).trim();
+      const decodedText = isEncoded(rawText) ? decode(rawText) : rawText;
+      if (!decodedText) return { empty: true };
+      useScanHistoryStore.getState().addScan(rawText, decodedText, 'unknown', 'paste');
+      return { data: decodedText };
+    },
+    gallery: async () => {
+      try {
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: false,
+          quality: 1,
+        });
+
+        if (result.canceled || !result.assets?.[0]?.uri) return { canceled: true };
+
+        const scannedCodes = await scanFromURLAsync(result.assets[0].uri, ['qr']);
+
+        if (scannedCodes.length === 0) return { empty: true };
+
+        return { data: scannedCodes[0].data };
+      } catch (err) {
+        return { error: err instanceof Error ? err : new Error(String(err)) };
+      }
+    },
   };
 }
 
@@ -118,17 +173,18 @@ export function createSovranNotifications(): NotificationHandlerMap {
 // =============================================================================
 
 interface CreateSovranOperationsConfig {
-  managerRef: MutableRefObject<Manager>;
-  walletContextRef: MutableRefObject<WalletContext | null>;
+  getManager: () => Manager | null;
+  getWalletContext: () => WalletContext | null;
 }
 
 export function createSovranOperations({
-  managerRef,
-  walletContextRef,
+  getManager,
+  getWalletContext,
 }: CreateSovranOperationsConfig): MachineOperations {
   return {
     executeSend: async (mintUrl, amount) => {
-      const mgr = managerRef.current;
+      const mgr = getManager();
+      if (!mgr) throw new Error('Wallet manager is not available');
       await mgr.wallet.send(mintUrl, amount);
       const history = await mgr.history.getPaginatedHistory();
       const entry = history.find(
@@ -139,7 +195,8 @@ export function createSovranOperations({
     },
 
     executeMintQuote: async (mintUrl, amount, _unit) => {
-      const mgr = managerRef.current;
+      const mgr = getManager();
+      if (!mgr) throw new Error('Wallet manager is not available');
       const mintQuote = await mgr.quotes.createMintQuote(mintUrl, amount);
       const history = await mgr.history.getPaginatedHistory();
       const entry = history.find(
@@ -150,7 +207,8 @@ export function createSovranOperations({
     },
 
     buildMintListItems: async (stepData) => {
-      const mgr = managerRef.current;
+      const mgr = getManager();
+      if (!mgr) throw new Error('Wallet manager is not available');
       const [allTrustedMints, balances] = await Promise.all([
         mgr.mint.getAllTrustedMints(),
         mgr.wallet.getBalances(),
@@ -169,7 +227,7 @@ export function createSovranOperations({
         stepData.amount
           ? {
               amount: stepData.amount,
-              proofAmounts: walletContextRef.current?.proofAmounts ?? {},
+              proofAmounts: getWalletContext()?.proofAmounts ?? {},
             }
           : undefined;
       return buildMintListItems(allTrustedMints, availability, offlineCheck);
@@ -184,11 +242,15 @@ export function createSovranOperations({
 interface CreateSovranHandlersConfig {
   machine: PaymentMachine;
   onOptionDismiss?: () => void;
+  getManager: () => Manager | null;
+  getNpub?: () => string | undefined;
 }
 
 export function createSovranHandlers({
   machine,
   onOptionDismiss,
+  getManager,
+  getNpub,
 }: CreateSovranHandlersConfig): StepHandlerMap {
   return {
     receiveToken: ({ token }) => {
@@ -261,16 +323,49 @@ export function createSovranHandlers({
       });
     },
 
-    enterAmount: ({ unit, preselectedMintUrl, constraints }) => {
-      const params: Record<string, string> = { unit };
-      if (constraints.destination) params.destination = constraints.destination;
-      if (preselectedMintUrl) params.selectedMintUrl = preselectedMintUrl;
-      if (constraints.paymentRequest) params.paymentRequest = constraints.paymentRequest;
-      if (constraints.meltTarget) params.meltTarget = constraints.meltTarget;
+    navigateToReceive: async ({ unit }) => {
+      const npub = getNpub?.();
+      const selectedMintUrl = useNpcMintStore.getState().getActiveMintUrl();
+      let p2pkKey: string | undefined;
+      const mgr = getManager();
+      if (mgr) {
+        try {
+          const keypair = await mgr.keyring.getLatestKeyPair();
+          p2pkKey = keypair?.publicKeyHex;
+        } catch {
+          /* ignore */
+        }
+      }
+      const entry = {
+        type: 'receive',
+        id: 'receive-hub',
+        createdAt: Date.now(),
+        mintUrl: selectedMintUrl ?? '',
+        npcAddress: npub ? `${npub}@npubx.cash` : undefined,
+        p2pkKey,
+        selectedMintUrl,
+        unit,
+      };
+      router.navigate({
+        pathname: '/(receive-flow)/receive',
+        params: { receiveEntry: JSON.stringify(entry), unit },
+      });
+    },
 
+    enterAmount: ({ unit, preselectedMintUrl, constraints }) => {
+      const entry = {
+        destination: constraints.destination,
+        unit,
+        selectedMintUrl: preselectedMintUrl ?? '',
+        ...(constraints.paymentRequest ? { paymentRequest: constraints.paymentRequest } : {}),
+        ...(constraints.meltTarget ? { meltTarget: constraints.meltTarget } : {}),
+      };
       const pathname =
         constraints.destination === 'mintQuote' ? '/(receive-flow)/amount' : '/(send-flow)/amount';
-      router.navigate({ pathname: pathname as any, params });
+      router.navigate({
+        pathname: pathname as any,
+        params: { amountEntry: JSON.stringify(entry) },
+      });
     },
 
     selectMint: ({
@@ -282,15 +377,19 @@ export function createSovranHandlers({
       meltTarget: _meltTarget,
       destination,
       mintListItems,
+      scope,
     }) => {
       const params: Record<string, string> = {
         unit,
         mintItems: JSON.stringify(mintListItems ?? []),
       };
       if (destination) params.destination = destination;
+      if (scope) params.mintScope = scope;
 
       const pathname =
-        destination === 'mintQuote' ? '/(receive-flow)/mintSelect' : '/(send-flow)/mintSelect';
+        destination === 'mintQuote' || scope === 'npc'
+          ? '/(receive-flow)/mintSelect'
+          : '/(send-flow)/mintSelect';
       router.navigate({ pathname: pathname as any, params });
     },
 
@@ -990,6 +1089,73 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
       cancel: async (_rawCtx) => {
         router.back();
+      },
+    },
+
+    receive: {
+      copy: async (rawCtx) => {
+        const entry = rawCtx.entry as {
+          npcAddress?: string;
+          p2pkKey?: string;
+        };
+        const source = ((rawCtx as Record<string, unknown>).source ?? 'npc') as 'npc' | 'p2pk';
+        const text = source === 'p2pk' ? entry.p2pkKey : entry.npcAddress;
+        if (!text) return;
+        await Clipboard.setStringAsync(text);
+        copyPopup(source === 'npc' ? 'lightningAddress' : 'p2pk');
+      },
+
+      paste: async (rawCtx) => {
+        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
+        await machine?.scan?.();
+      },
+
+      fixedAmount: async (rawCtx) => {
+        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
+        await machine?.startReceiveLightning?.();
+      },
+
+      scanQr: async (rawCtx) => {
+        const requestCamera = (rawCtx as { requestCameraPermission?: () => Promise<boolean> })
+          .requestCameraPermission;
+        const granted = requestCamera ? await requestCamera() : false;
+        if (!granted) return;
+        const unit = (rawCtx.entry as { unit?: string }).unit ?? 'sat';
+        router.navigate({
+          pathname: '/(receive-flow)/camera',
+          params: { unit },
+        });
+      },
+
+      changeNpcMint: async (rawCtx) => {
+        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
+        await machine?.requestMintSelector?.({ scope: 'npc' });
+      },
+    },
+
+    amountEntry: {
+      next: async (rawCtx) => {
+        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
+        if (!machine) return;
+        const entry = rawCtx.entry as Record<string, unknown>;
+        const effectiveSat = entry.effectiveSatAmount;
+        const mintUrl = typeof entry.selectedMintUrl === 'string' ? entry.selectedMintUrl : '';
+        if (typeof effectiveSat !== 'number' || effectiveSat <= 0) return;
+        const destination = entry.destination as Destination | undefined;
+        if (!destination) return;
+        void machine.enterAmount(effectiveSat, mintUrl, { destination });
+      },
+      paste: async (rawCtx) => {
+        const entry = rawCtx.entry as { destination?: string };
+        if (entry.destination !== 'sendEcash') return;
+        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
+        await machine?.scan?.();
+      },
+      scanQr: async (rawCtx) => {
+        const entry = rawCtx.entry as { destination?: string; unit?: string };
+        if (entry.destination !== 'sendEcash') return;
+        const unit = entry.unit ?? 'sat';
+        router.navigate({ pathname: '/camera', params: { unit } });
       },
     },
   };

@@ -7,7 +7,7 @@
 import React from 'react';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import type { MintHistoryEntry } from 'coco-cashu-core';
-import { MintQuoteScreen, getFormattedMintQuoteTitle } from '@/features/receive';
+import { MintQuoteScreen } from '@/features/receive';
 
 function ModalScreen() {
   const { mintHistoryEntry: mintHistoryEntryString } = useLocalSearchParams<{
@@ -15,11 +15,10 @@ function ModalScreen() {
   }>();
 
   const mintHistoryEntry = JSON.parse(mintHistoryEntryString) as MintHistoryEntry;
-  const title = getFormattedMintQuoteTitle(mintHistoryEntry.unit);
 
   return (
     <>
-      <Stack.Screen options={{ headerTitle: title }} />
+      <Stack.Screen options={{ headerTitle: 'Receive' }} />
       <MintQuoteScreen mintHistoryEntry={mintHistoryEntry} />
     </>
   );

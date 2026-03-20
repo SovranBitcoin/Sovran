@@ -30,7 +30,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
     width: size,
     height: size,
     borderRadius,
-    borderCurve: 'continuous',
+    borderCurve: 'continuous' as const,
     overflow: 'hidden' as const,
   };
 

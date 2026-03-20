@@ -235,6 +235,7 @@ function handleProofsChosen(
 }
 
 function handleMintSelectorRequested(
+  event: FlowEvent & { type: 'REQUEST_MINT_SELECTOR' },
   currentCtx: FlowContext,
   walletCtx: WalletContext
 ): TransitionResult {
@@ -264,6 +265,7 @@ function handleMintSelectorRequested(
       paymentRequest: ctx.paymentRequest,
       meltTarget: ctx.meltTarget,
       destination: ctx.destination,
+      scope: event.scope,
     },
   };
 }
@@ -319,6 +321,14 @@ function handleStartReceiveLightning(walletCtx: WalletContext, unit: string): Tr
       preselectedMintUrl: mintUrl || undefined,
       constraints: { destination: 'mintQuote' },
     },
+  };
+}
+
+function handleStartReceive(unit: string): TransitionResult {
+  return {
+    step: 'navigateToReceive',
+    context: { unit },
+    data: { unit },
   };
 }
 
@@ -497,11 +507,13 @@ export function transition(
     case 'RESET':
       return { step: 'idle', context: { unit }, data: {} as any };
     case 'REQUEST_MINT_SELECTOR':
-      return handleMintSelectorRequested(currentCtx, walletCtx);
+      return handleMintSelectorRequested(event, currentCtx, walletCtx);
     case 'START_SEND_ECASH':
       return handleStartSendEcash(walletCtx, unit);
     case 'START_RECEIVE_LIGHTNING':
       return handleStartReceiveLightning(walletCtx, unit);
+    case 'START_RECEIVE':
+      return handleStartReceive(unit);
   }
 
   // State-specific events

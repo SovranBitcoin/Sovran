@@ -8,7 +8,6 @@ import {
   SpentThisMonth,
   Transactions,
 } from '@/features/transactions';
-import { useDeeplink } from '@/shared/hooks/useDeeplink';
 import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { AccountPagerView } from '@/features/wallet/components/AccountPagerView';
@@ -39,7 +38,6 @@ export function WalletScreen() {
   }, []);
 
   const { history, refresh } = useHistoryWithMelts();
-  useDeeplink();
   useVersionCheck();
 
   return (

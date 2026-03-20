@@ -9,7 +9,7 @@
 import React from 'react';
 
 import type { ReceiveHistoryEntry } from 'coco-cashu-core';
-
+import { useScreenActions } from 'coco-payment-ux/react';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
@@ -23,7 +23,6 @@ import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
-import { useScreenActions } from '@/shared/hooks/useScreenActions';
 
 interface ReceiveTokenScreenProps {
   receiveHistoryEntry?: ReceiveHistoryEntry | string;
@@ -34,10 +33,7 @@ export function ReceiveTokenScreen({
   receiveHistoryEntry,
   onNavigateBack,
 }: ReceiveTokenScreenProps) {
-  const { entry, error, actions, source } = useScreenActions<'receiveToken', ReceiveHistoryEntry>(
-    'receiveToken',
-    receiveHistoryEntry
-  );
+  const { entry, error, actions, source } = useScreenActions('receiveToken', receiveHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
 
   if (error) {

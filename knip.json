@@ -48,6 +48,7 @@
     "shared/stores/profile/nostrSocialStore.ts": ["exports"],
     "shared/stores/runtime/**": ["exports", "types"],
     "shared/lib/nostr/secureStorage.ts": ["exports"],
+    "shared/hooks/useBeforeRemoveCleanup.ts": ["files"],
     "navigation/**": ["exports"],
     "features/mint/components/rebalance/demoRunner.ts": ["files"],
     "coco-payment-ux/**": ["files", "exports", "types"]

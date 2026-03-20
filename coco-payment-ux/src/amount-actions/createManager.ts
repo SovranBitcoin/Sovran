@@ -10,6 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { resolveAmount, resolutionEqual } from './resolve';
+import { computeQuickSendSuggestions, type QuickSendSuggestion } from './suggestions';
 import type {
   AmountActionManager,
   AmountInputMode,
@@ -66,14 +67,42 @@ export function createAmountActionManager(
     unit,
     fiatCurrency,
     fiatSymbol,
+    quickSendConfig,
   } = config;
 
   const hasFiatToggle = !!fiatCurrency && !!fiatSymbol;
+  const suggestionsDisabled = quickSendConfig === null;
 
   let inputMode: AmountInputMode = 'sat';
   let rawInput = '';
   let prevResolution: AmountResolution | null = null;
   const listeners = new Set<() => void>();
+
+  // Suggestion cache — invalidated when proofs or price change
+  const EMPTY_SUGGESTIONS: QuickSendSuggestion[] = [];
+  let sugCache: { len: number; sum: number; price: number; result: QuickSendSuggestion[] } | null =
+    null;
+
+  function getSuggestions(): QuickSendSuggestion[] {
+    if (!offlineOptimization || suggestionsDisabled) return EMPTY_SUGGESTIONS;
+    const proofs = getProofAmounts();
+    const price = getBtcPrice();
+    if (proofs.length === 0 || price <= 0) return EMPTY_SUGGESTIONS;
+
+    const len = proofs.length;
+    const sum = proofs.reduce((a, b) => a + b, 0);
+    if (sugCache && sugCache.len === len && sugCache.sum === sum && sugCache.price === price) {
+      return sugCache.result;
+    }
+
+    const result = computeQuickSendSuggestions(proofs, price, {
+      fiatCurrency,
+      fiatSymbol,
+      config: quickSendConfig ?? undefined,
+    });
+    sugCache = { len, sum, price, result };
+    return result;
+  }
 
   function notify(): void {
     prevResolution = null;
@@ -120,6 +149,7 @@ export function createAmountActionManager(
       keyboardUnit,
       secondaryDisplay,
       fiatSymbol: hasFiatToggle && btcPrice > 0 ? fiatSymbol! : null,
+      suggestions: getSuggestions(),
     };
   }
 
@@ -139,6 +169,12 @@ export function createAmountActionManager(
   const setInput = (input: string): void => {
     rawInput = input;
     notify();
+  };
+
+  const setMode = (mode: AmountInputMode): void => {
+    if (!hasFiatToggle || mode === inputMode) return;
+    inputMode = mode;
+    // Don't notify — caller will follow with setInput.
   };
 
   const toggle = (): void => {
@@ -176,5 +212,5 @@ export function createAmountActionManager(
     };
   };
 
-  return { setInput, toggle, inspect, subscribe };
+  return { setInput, setMode, toggle, inspect, subscribe };
 }

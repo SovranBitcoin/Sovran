@@ -225,7 +225,7 @@ export function getEcashTokenAmount(token: string): number | undefined {
  * Extracts the P2PK public key from proofs, if any proof uses P2PK locking.
  * Returns the first P2PK data field found, or null.
  */
-export function extractP2PKPubkey(proofs: ReadonlyArray<{ secret: string }>): string | null {
+function extractP2PKPubkey(proofs: ReadonlyArray<{ secret: string }>): string | null {
   for (const proof of proofs) {
     try {
       const parsed = JSON.parse(proof.secret);
@@ -242,8 +242,8 @@ export function extractP2PKPubkey(proofs: ReadonlyArray<{ secret: string }>): st
 /**
  * Builds a `ReceiveHistoryEntry` from a decoded token.
  *
- * Centralises the pattern that was duplicated in ReceiveScreen, useProcessPaymentString,
- * and UserMessagesScreen — each constructing the same shape manually.
+ * Centralises the pattern that was duplicated in ReceiveScreen and UserMessagesScreen —
+ * each constructing the same shape manually.
  *
  * @param rawToken  The original encoded token string (stored in metadata for re-encoding)
  * @param unitOverride  Explicit unit; falls back to `decodedToken.unit ?? 'sat'`

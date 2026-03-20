@@ -51,12 +51,13 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
   const { events: giftWrapEvents } = useSubscribe({ filters: giftWrapFilters });
 
   const unwrappedDMs = useMemo(() => {
-    if (!giftWrapEvents?.length || !nostrKeys?.privateKey) return [];
+    const privateKey = nostrKeys?.privateKey;
+    if (!giftWrapEvents?.length || !privateKey) return [];
     return giftWrapEvents
       .map((event) => {
         const unwrapped = unwrapGiftWrap(
           { content: event.content, pubkey: event.pubkey },
-          nostrKeys.privateKey
+          privateKey
         );
         if (!unwrapped) return null;
         return { ...unwrapped, wrapId: event.id };

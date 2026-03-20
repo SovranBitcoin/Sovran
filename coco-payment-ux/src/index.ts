@@ -51,6 +51,8 @@ export type {
   ErrorCode,
   MachineSnapshot,
   NotificationHandlerMap,
+  ScanSourceResult,
+  ScanSources,
 } from './machine/types';
 
 export type {
@@ -61,21 +63,37 @@ export type {
 } from './machine/selectMintContext';
 
 // Amount actions (amount screen action system)
-export { createAmountActionManager, resolveAmount, resolutionEqual } from './amount-actions';
+export {
+  createAmountActionManager,
+  resolveAmount,
+  resolutionEqual,
+  computeQuickSendSuggestions,
+} from './amount-actions';
 export type {
   AmountInputMode,
   CoreAmountResolution,
   AmountResolution,
   CreateAmountActionManagerConfig,
   AmountActionManager,
+  QuickSendSuggestion,
+  QuickSendConfig,
 } from './amount-actions';
 
 // Screen actions (post-terminal screen action system)
-export { createScreenActionManager, getAvailableActions } from './screen-actions';
+export {
+  createScreenActionManager,
+  getAvailableActions,
+  shouldApplyEntryUpdate,
+  mergeEntryUpdate,
+  decorateEntry,
+  meltOperationToScreenActionEntry,
+} from './screen-actions';
 export type {
   ActionAvailability,
   ActionHandler,
   ActionState,
+  DecoratedEntryFields,
+  MeltOperationLike,
   ScreenActionContext,
   ScreenActionHandlerMap,
   ScreenActionManager,

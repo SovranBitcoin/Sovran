@@ -43,7 +43,7 @@ import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
 import { WalletContextProvider } from '@/shared/providers/WalletContextProvider';
 import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
-import { PaymentFlowProvider } from '@/features/send/providers/PaymentFlowProvider';
+import { CocoPaymentUXProvider } from '@/features/send/providers/CocoPaymentUX';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useAppBalance } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
@@ -106,7 +106,7 @@ function AccountScopedProviders({
         [NostrNDKProvider, { accountIndex }],
         CocoProvider,
         WalletContextProvider,
-        PaymentFlowProvider,
+        CocoPaymentUXProvider,
         ActionSheetProvider,
         PricelistProvider,
         PasscodeGate,
