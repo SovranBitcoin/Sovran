@@ -97,7 +97,7 @@ export type OptionStatus = 'recommended' | 'available' | 'disabled';
 export interface AnnotatedOption {
   option: PaymentOption;
   status: OptionStatus;
-  reason: string | null;
+  reason: import('./formatting/locales').LocalizedReason | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ export type ResolvedIntent =
   | { type: 'openMint'; url: string }
   | { type: 'openProfile'; npub: string }
   | { type: 'chooseOption'; options: AnnotatedOption[] }
-  | { type: 'ignore'; reason: string };
+  | { type: 'ignore'; reason: import('./formatting/locales').LocalizedReason };
 
 export interface AmountEntryConstraints {
   paymentRequest?: string;
@@ -145,12 +145,7 @@ export interface MintListItem {
   /** Whether this mint can be selected in the current flow. */
   status: 'available' | 'disabled';
   /** Reason the mint is disabled, null when status is 'available'. */
-  reason:
-    | 'NOT_IN_PAYMENT_REQUEST'
-    | 'INSUFFICIENT_BALANCE'
-    | 'NO_BALANCE'
-    | 'UNSUPPORTED_FOR_FLOW'
-    | null;
+  reason: import('./formatting/locales').LocalizedReason | null;
   isPreferred: boolean;
   /** KYM (Know Your Mint) community score, cached from Nostr events. */
   kymScore?: number;
@@ -165,7 +160,7 @@ export interface MintListItem {
 export type MintSelectionResult =
   | { type: 'selected'; mintUrl: string; balance: number }
   | { type: 'selectionNeeded'; validMints: MintCandidate[] }
-  | { type: 'noValidMint'; reason: string };
+  | { type: 'noValidMint'; reason: import('./formatting/locales').LocalizedReason };
 
 export interface MintCandidate {
   mintUrl: string;
@@ -179,7 +174,7 @@ export interface MintCandidate {
 export interface GuardResult {
   guard: string;
   passed: boolean;
-  reason?: string;
+  reason?: import('./formatting/locales').LocalizedReason;
 }
 
 // ---------------------------------------------------------------------------
@@ -248,6 +243,7 @@ export type RecommendationRule = {
   reason: (
     option: PaymentOption,
     ctx: WalletContext,
-    info?: PaymentRequestInfo | null
-  ) => string | null;
+    info?: PaymentRequestInfo | null,
+    locale?: string
+  ) => import('./formatting/locales').LocalizedReason | null;
 };

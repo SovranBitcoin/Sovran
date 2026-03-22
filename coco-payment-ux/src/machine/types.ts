@@ -365,6 +365,11 @@ export interface CreateMachineConfig {
    * Current device offline / mock-offline flag. Used when AMOUNT_ENTERED omits `offline`.
    */
   getOffline?: () => boolean;
+  /**
+   * Returns the current locale for localized reason messages.
+   * Defaults to 'en'.
+   */
+  getLocale?: () => string;
 }
 
 // ---------------------------------------------------------------------------

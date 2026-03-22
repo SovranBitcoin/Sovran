@@ -6,6 +6,7 @@
 // mints requiring user choice, or a "no valid mint" signal.
 // ---------------------------------------------------------------------------
 
+import { localizeReason } from './formatting/locales';
 import type { WalletContext, MintSelectionResult, MintCandidate } from './types';
 
 export interface MintSelectionConfig {
@@ -61,20 +62,21 @@ export function getValidMintCandidates(
  */
 export function selectMint(
   ctx: WalletContext,
-  config: MintSelectionConfig = {}
+  config: MintSelectionConfig = {},
+  locale: string = 'en'
 ): MintSelectionResult {
   const { allowedMints, strategy = 'highestBalance' } = config;
   const candidates = getValidMintCandidates(ctx, config);
 
   if (candidates.length === 0) {
-    let reason: string;
+    let code: string;
     if (allowedMints && allowedMints.length > 0) {
       const anyTrusted = allowedMints.some((m) => ctx.trustedMintUrls.includes(m));
-      reason = !anyTrusted ? 'No allowed mint is trusted' : 'Insufficient balance on allowed mints';
+      code = !anyTrusted ? 'NO_ALLOWED_MINT_TRUSTED' : 'INSUFFICIENT_BALANCE_ALLOWED';
     } else {
-      reason = 'No mint with sufficient balance';
+      code = 'NO_MINT_SUFFICIENT_BALANCE';
     }
-    return { type: 'noValidMint', reason };
+    return { type: 'noValidMint', reason: localizeReason(code, locale)! };
   }
 
   // Sort by strategy

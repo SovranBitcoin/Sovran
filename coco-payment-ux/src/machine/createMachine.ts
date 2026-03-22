@@ -1,4 +1,5 @@
 import { defaultDetectors } from '../detectors';
+import { t } from '../formatting/locales';
 import { composeSatoshis } from '../offline';
 import { transition } from './transitions';
 import type { PaymentOption } from '../types';
@@ -19,7 +20,11 @@ import type {
 // Derive ExecutionState from step
 // ---------------------------------------------------------------------------
 
-function deriveExecutionState(step: FlowStep, data: StepDataMap[FlowStep]): ExecutionState {
+function deriveExecutionState(
+  step: FlowStep,
+  data: StepDataMap[FlowStep],
+  locale: string = 'en'
+): ExecutionState {
   switch (step) {
     case 'idle':
       return {
@@ -35,7 +40,7 @@ function deriveExecutionState(step: FlowStep, data: StepDataMap[FlowStep]): Exec
       return {
         status: 'needsInput',
         code: 'OPTION_SELECTION_REQUIRED',
-        message: 'Option selection is required to continue',
+        message: t('OPTION_SELECTION_REQUIRED', locale),
         isExecutable: false,
         isExecuting: false,
         step,
@@ -46,7 +51,7 @@ function deriveExecutionState(step: FlowStep, data: StepDataMap[FlowStep]): Exec
       return {
         status: 'needsInput',
         code: 'NO_AMOUNT',
-        message: 'Amount is required to continue',
+        message: t('NO_AMOUNT', locale),
         isExecutable: false,
         isExecuting: false,
         step,
@@ -57,7 +62,7 @@ function deriveExecutionState(step: FlowStep, data: StepDataMap[FlowStep]): Exec
       return {
         status: 'needsInput',
         code: 'MINT_SELECTION_REQUIRED',
-        message: 'Mint selection is required to continue',
+        message: t('MINT_SELECTION_REQUIRED', locale),
         isExecutable: false,
         isExecuting: false,
         step,
@@ -68,7 +73,7 @@ function deriveExecutionState(step: FlowStep, data: StepDataMap[FlowStep]): Exec
       return {
         status: 'needsInput',
         code: 'PROOF_SELECTION_REQUIRED',
-        message: 'Proof selection is required to continue',
+        message: t('PROOF_SELECTION_REQUIRED', locale),
         isExecutable: false,
         isExecuting: false,
         step,
@@ -134,6 +139,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     getContext,
     getUnit,
     getOffline,
+    getLocale,
     unit: configUnit = 'sat',
     onPersistMint,
     onNpcMintChange,
@@ -157,7 +163,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   let cachedSnapshot: ExecutionState = deriveExecutionState('idle', {} as any);
 
   const notify = () => {
-    cachedSnapshot = { ...deriveExecutionState(step, stepData), isExecuting: handlerExecuting };
+    const locale = getLocale?.() ?? 'en';
+    cachedSnapshot = {
+      ...deriveExecutionState(step, stepData, locale),
+      isExecuting: handlerExecuting,
+    };
     listeners.forEach((fn) => fn());
   };
 
@@ -262,7 +272,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             step = 'error';
             stepData = {
               code: 'SEND_FAILED',
-              message: err instanceof Error ? err.message : 'Failed to create token',
+              message: err instanceof Error ? err.message : t('SEND_FAILED', getLocale?.() ?? 'en'),
             } as any;
           }
         }
@@ -280,7 +290,8 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           step = 'error';
           stepData = {
             code: 'MINT_QUOTE_FAILED',
-            message: err instanceof Error ? err.message : 'Failed to create mint quote',
+            message:
+              err instanceof Error ? err.message : t('MINT_QUOTE_FAILED', getLocale?.() ?? 'en'),
           } as any;
         }
         handlerExecuting = false;
@@ -296,7 +307,8 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           step = 'error';
           stepData = {
             code: 'UNSUPPORTED_INPUT',
-            message: err instanceof Error ? err.message : 'Failed to load mints',
+            message:
+              err instanceof Error ? err.message : t('LOAD_MINTS_FAILED', getLocale?.() ?? 'en'),
           } as any;
         }
         handlerExecuting = false;

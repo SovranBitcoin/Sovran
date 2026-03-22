@@ -22,20 +22,20 @@ The package should ship a **single, generic** root component named **`CocoPaymen
 
 ### Flat props (target)
 
-| Prop                          | Role                                                                                                                                                                                                                                                          |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`handlers`**                | Step handlers the machine invokes—navigation entry points for the payment flow (e.g. open amount screen, navigate to token detail, dismiss). Shape TBD: ideally a plain map; implementation may use context to supply `machine` without a factory at the app. |
-| **`operations`**              | Async wallet operations the machine runs for certain steps when provided (e.g. confirm send, create mint quote). When set, some paths are handled internally and handlers only see **result** steps.                                                          |
-| **`notifications`**           | Informational feedback from the machine (errors, validation). Non-blocking; if a key has no handler, it is ignored.                                                                                                                                           |
-| **`actions`**                 | Handler implementations for **predefined** (and optionally **custom**) per-screen actions—see [Predefined actions](#predefined-actions-and-optional-custom-ones). `useScreenActions` resolves them by `screenType`.                                           |
+| Prop                          | Role                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`handlers`**                | Step handlers the machine invokes—navigation entry points for the payment flow (e.g. open amount screen, navigate to token detail, dismiss). Shape TBD: ideally a plain map; implementation may use context to supply `machine` without a factory at the app.                                                                                          |
+| **`operations`**              | Async wallet operations the machine runs for certain steps when provided (e.g. confirm send, create mint quote). When set, some paths are handled internally and handlers only see **result** steps.                                                                                                                                                   |
+| **`notifications`**           | Informational feedback from the machine (errors, validation). Non-blocking; if a key has no handler, it is ignored.                                                                                                                                                                                                                                    |
+| **`actions`**                 | Handler implementations for **predefined** (and optionally **custom**) per-screen actions—see [Predefined actions](#predefined-actions-and-optional-custom-ones). `useScreenActions` resolves them by `screenType`.                                                                                                                                    |
 | **`screenActionsBridge`**     | Optional wallet-only wiring for **`useScreenActions`**: extra action context (`getExtraContext`), history / melt subscriptions (`onEntryUpdate`), entry merge rules, **`decorateEntry`**, **`getLocale`**, scan provenance (**`getSourceLabel`**), and **`subscribeGlobalScreenActions`** for reactive labels. See `src/react/screenActionsBridge.ts`. |
-| **`savePreferredMint`**       | Called when the flow should persist the user’s **selected send/receive mint** (app writes to its store).                                                                                                                                                      |
-| **`saveNpcMint`**             | Called when the flow should persist the **NPC / Lightning-address mint** only (app writes + optional server sync).                                                                                                                                            |
-| **`onNpcMintSync`**           | Optional: run when provider mounts if the app needs to sync NPC mint from server (wallet-specific).                                                                                                                                                           |
-| **`clipboardSource`**         | Returns clipboard text for paste / scan-from-clipboard flows.                                                                                                                                                                                                 |
-| **`shareSource`**             | Platform share primitive (e.g. React Native `Share`). Merged into action context for **`share`** actions.                                                                                                                                                     |
-| **`cameraPermissionsSource`** | Requests or checks camera permission for QR flows.                                                                                                                                                                                                            |
-| **`imagePickerSource`**       | Opens gallery / image picker for QR-from-image flows.                                                                                                                                                                                                         |
+| **`savePreferredMint`**       | Called when the flow should persist the user’s **selected send/receive mint** (app writes to its store).                                                                                                                                                                                                                                               |
+| **`saveNpcMint`**             | Called when the flow should persist the **NPC / Lightning-address mint** only (app writes + optional server sync).                                                                                                                                                                                                                                     |
+| **`onNpcMintSync`**           | Optional: run when provider mounts if the app needs to sync NPC mint from server (wallet-specific).                                                                                                                                                                                                                                                    |
+| **`clipboardSource`**         | Returns clipboard text for paste / scan-from-clipboard flows.                                                                                                                                                                                                                                                                                          |
+| **`shareSource`**             | Platform share primitive (e.g. React Native `Share`). Merged into action context for **`share`** actions.                                                                                                                                                                                                                                              |
+| **`cameraPermissionsSource`** | Requests or checks camera permission for QR flows.                                                                                                                                                                                                                                                                                                     |
+| **`imagePickerSource`**       | Opens gallery / image picker for QR-from-image flows.                                                                                                                                                                                                                                                                                                  |
 
 Optional overrides (names illustrative): **`createURDecoder`**, **`scanSources`** — omitted when defaults suffice.
 
@@ -151,11 +151,11 @@ Same shape **everywhere** (`'receiveToken'`, `'meltQuote'`, `'receive'`, …). T
 
 **Returns (target):**
 
-| Field         | Role                                                                                      |
-| ------------- | ----------------------------------------------------------------------------------------- |
-| **`entry`**   | Current entry (optionally decorated by the wallet — formatted strings, timestamps, etc.). |
-| **`error`**   | Parse/missing-entry error for early exit UI.                                              |
-| **`actions`** | Bound map: each name has `available`, `loading`, `execute(params?)`.                      |
+| Field         | Role                                                                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`entry`**   | Current entry (optionally decorated by the wallet — formatted strings, timestamps, etc.).                                                  |
+| **`error`**   | Parse/missing-entry error for early exit UI.                                                                                               |
+| **`actions`** | Bound map: each name has `available`, `loading`, `execute(params?)`.                                                                       |
 | **`source`**  | Optional scan provenance label when the wallet’s **`screenActionsBridge.getSourceLabel`** is set; always **`null`** for **`amountEntry`**. |
 
 Wallet apps may add more return fields (e.g. **`source`**, labels). The **call site** is **two arguments** for history-driven screens; **`amountEntry`** adds a **third** `{ amountConfig }` (see [Amount entry](#amount-entry-screen-amountentry)).
@@ -186,7 +186,7 @@ Screens stay declarative: gate on `error` / missing `entry`, then wire `ButtonHa
 | `meltQuote`      | `pay`, `cancel`                                                |
 | `paymentRequest` | `confirm`, `cancel`                                            |
 | `receive` (hub)  | `copy`, `paste`, `fixedAmount`, `scanQr`, `changeNpcMint`      |
-| `amountEntry`    | `setInput`, `toggle`, `next`, `paste`, `scanQr`                 |
+| `amountEntry`    | `setInput`, `toggle`, `next`, `paste`, `scanQr`                |
 
 Authoritative source: `src/screen-actions/types.ts` (`ScreenActionName`).
 

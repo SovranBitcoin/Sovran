@@ -1,3 +1,4 @@
+import type { LocalizedReason } from '../formatting/locales';
 import { selectMint } from '../mint-selection';
 import { composeSatoshis } from '../offline';
 import type { ResolvedIntent, WalletContext } from '../types';
@@ -22,15 +23,17 @@ function errorResult(code: ErrorCode, message: string): StepResult<'error'> {
   return { step: 'error', data: { code, message } };
 }
 
-function toMintError(reason: string): StepResult<'error'> {
-  const lower = reason.toLowerCase();
-  if (lower.includes('insufficient')) {
-    return errorResult('INSUFFICIENT_BALANCE', reason);
+function toMintError(reason: LocalizedReason): StepResult<'error'> {
+  switch (reason.code) {
+    case 'INSUFFICIENT_BALANCE':
+    case 'INSUFFICIENT_BALANCE_ALLOWED':
+      return errorResult('INSUFFICIENT_BALANCE', reason.message);
+    case 'NO_BALANCE':
+    case 'NO_MINT_SUFFICIENT_BALANCE':
+      return errorResult('NO_BALANCE', reason.message);
+    default:
+      return errorResult('NO_VALID_MINT', reason.message);
   }
-  if (lower.includes('no balance')) {
-    return errorResult('NO_BALANCE', reason);
-  }
-  return errorResult('NO_VALID_MINT', reason);
 }
 
 function getDestination(intent: ResolvedIntent, ctx: FlowContext): Destination {
@@ -168,7 +171,7 @@ export function resolveNext(
     return { step: 'openProfile', data: { npub: intent.npub } };
   }
   if (intent.type === 'ignore') {
-    return errorResult('UNSUPPORTED_INPUT', intent.reason);
+    return errorResult('UNSUPPORTED_INPUT', intent.reason.message);
   }
 
   // --- Multi-option ---

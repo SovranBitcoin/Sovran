@@ -1,3 +1,5 @@
+import type { LocalizedReason } from '../formatting/locales';
+import { localizeReason } from '../formatting/locales';
 import type { WalletContext } from '../types';
 import type { FlowContext, Destination } from './types';
 
@@ -17,7 +19,7 @@ export interface MintAvailability {
   mintUrl: string;
   balance: number;
   status: MintAvailabilityStatus;
-  reason: MintAvailabilityReason | null;
+  reason: LocalizedReason | null;
   isPreferred: boolean;
 }
 
@@ -41,15 +43,24 @@ export function buildMintAvailability(args: {
   supportedMintUrls?: string[];
   amount?: number;
   destination?: Destination;
+  locale?: string;
 }): MintAvailability {
-  const { mintUrl, balance, selectedMintUrl, supportedMintUrls, amount, destination } = args;
+  const {
+    mintUrl,
+    balance,
+    selectedMintUrl,
+    supportedMintUrls,
+    amount,
+    destination,
+    locale = 'en',
+  } = args;
 
   if (destination === 'mintQuote') {
     return {
       mintUrl,
       balance,
       status: 'available',
-      reason: null,
+      reason: localizeReason(null, locale),
       isPreferred: selectedMintUrl === mintUrl,
     };
   }
@@ -59,7 +70,7 @@ export function buildMintAvailability(args: {
       mintUrl,
       balance,
       status: 'disabled',
-      reason: 'NOT_IN_PAYMENT_REQUEST',
+      reason: localizeReason('NOT_IN_PAYMENT_REQUEST', locale),
       isPreferred: selectedMintUrl === mintUrl,
     };
   }
@@ -73,7 +84,7 @@ export function buildMintAvailability(args: {
         mintUrl,
         balance,
         status: 'disabled',
-        reason: 'NO_BALANCE',
+        reason: localizeReason('NO_BALANCE', locale),
         isPreferred: selectedMintUrl === mintUrl,
       };
     }
@@ -82,7 +93,7 @@ export function buildMintAvailability(args: {
         mintUrl,
         balance,
         status: 'disabled',
-        reason: 'INSUFFICIENT_BALANCE',
+        reason: localizeReason('INSUFFICIENT_BALANCE', locale),
         isPreferred: selectedMintUrl === mintUrl,
       };
     }
@@ -91,7 +102,7 @@ export function buildMintAvailability(args: {
       mintUrl,
       balance,
       status: 'disabled',
-      reason: 'NO_BALANCE',
+      reason: localizeReason('NO_BALANCE', locale),
       isPreferred: selectedMintUrl === mintUrl,
     };
   }

@@ -237,6 +237,7 @@ export function useScreenActions(
     walletContextRef,
     screenActionHandlers,
     screenActionsBridge,
+    getLocaleRef,
     getBtcPriceRef,
     getDisplayCurrencyRef,
   } = useCocoPaymentUXContext();
@@ -316,7 +317,7 @@ export function useScreenActions(
     amountConfig: effectiveAmountConfig,
   });
 
-  const language = screenActionsBridge?.getLocale?.() ?? 'en';
+  const language = screenActionsBridge?.getLocale?.() ?? getLocaleRef.current?.() ?? 'en';
 
   const entry = useMemo(() => {
     if (isAmountEntry) return base.entry;

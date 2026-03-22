@@ -104,6 +104,7 @@ export type {
 // Formatting utilities
 export { FormattedTimestamp } from './formatting';
 export { FormattedString, type TruncateMode } from './formatting';
+export { localizeReason, type LocalizedReason } from './formatting';
 
 // Domain types
 export type {

@@ -304,7 +304,7 @@ function handleStartSendEcash(walletCtx: WalletContext, unit: string): Transitio
       return {
         step: 'error',
         context: ctx,
-        data: { code: 'NO_BALANCE', message: selection.reason },
+        data: { code: 'NO_BALANCE', message: selection.reason.message },
       };
   }
 }

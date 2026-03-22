@@ -358,7 +358,8 @@ export function decorateEntry(raw: EntryRecord | null, language: string): EntryR
     try {
       tokenString = new FormattedString(
         getEncodedTokenV4(token as Parameters<typeof getEncodedTokenV4>[0]),
-        'middle'
+        'middle',
+        language
       );
     } catch {
       /* skip */
@@ -368,18 +369,18 @@ export function decorateEntry(raw: EntryRecord | null, language: string): EntryR
   let p2pkPubkey: FormattedString | null = null;
   const meta = raw.metadata as Record<string, string> | undefined;
   if (meta?.p2pkPubkey) {
-    p2pkPubkey = new FormattedString(meta.p2pkPubkey, 'middle');
+    p2pkPubkey = new FormattedString(meta.p2pkPubkey, 'middle', language);
   } else if (token && (token as { proofs?: unknown[] }).proofs) {
     const extracted = extractP2PKPubkey((token as { proofs: { secret: string }[] }).proofs);
     if (extracted) {
-      p2pkPubkey = new FormattedString(extracted, 'middle');
+      p2pkPubkey = new FormattedString(extracted, 'middle', language);
     }
   }
 
   let npcAddress: FormattedString | undefined;
   const rawNpc = raw.npcAddress;
   if (typeof rawNpc === 'string' && rawNpc.length > 0) {
-    npcAddress = new FormattedString(rawNpc, 'beforeAt');
+    npcAddress = new FormattedString(rawNpc, 'beforeAt', language);
   }
 
   let paymentRequestInfo: PaymentRequestInfo | null = null;

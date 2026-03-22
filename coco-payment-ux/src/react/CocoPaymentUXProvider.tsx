@@ -19,6 +19,7 @@ import React, {
   useSyncExternalStore,
 } from 'react';
 
+import { registerLocale } from '../formatting/locales';
 import { createPaymentMachine } from '../machine/createMachine';
 import { selectMintContext } from '../machine/selectMintContext';
 import type {
@@ -154,6 +155,19 @@ export interface CocoPaymentUXProviderProps {
    */
   actions?: ScreenActionHandlerMap;
   /**
+   * Returns the current locale (e.g. 'en', 'ar', 'de').
+   * Used for localized reason messages, date formatting, and RTL truncation.
+   * Also used by `screenActionsBridge` when `screenActionsBridge.getLocale`
+   * is not set. Defaults to `'en'`.
+   */
+  getLocale?: () => string;
+  /**
+   * Custom locale translations. Keys are language codes, values are
+   * translation dictionaries mapping reason codes to localized strings.
+   * Merged on mount — missing keys fall back to English.
+   */
+  translations?: Record<string, Record<string, string>>;
+  /**
    * Optional wallet wiring for `useScreenActions` (extra context, history
    * subscriptions, decoration, scan provenance).
    */
@@ -177,6 +191,7 @@ export interface CocoPaymentUXContextValue {
   optionDismissRef: React.MutableRefObject<(() => void) | undefined>;
   screenActionHandlers: ScreenActionHandlerMap;
   screenActionsBridge: ScreenActionsBridge | undefined;
+  getLocaleRef: React.MutableRefObject<(() => string) | undefined>;
   getBtcPriceRef: React.MutableRefObject<(() => number) | undefined>;
   getDisplayCurrencyRef: React.MutableRefObject<
     (() => { code: string; symbol: string } | null) | undefined
@@ -203,6 +218,8 @@ export function CocoPaymentUXProvider({
   walletContextRef: externalWalletContextRef,
   createURDecoder,
   scanSources,
+  getLocale,
+  translations,
   getOffline,
   getBtcPrice,
   getDisplayCurrency,
@@ -210,6 +227,15 @@ export function CocoPaymentUXProvider({
   screenActionsBridge,
   deepLinks,
 }: CocoPaymentUXProviderProps) {
+  const getLocaleRef = useRef(getLocale);
+  getLocaleRef.current = getLocale;
+
+  if (translations) {
+    for (const [lang, dict] of Object.entries(translations)) {
+      registerLocale(lang, dict);
+    }
+  }
+
   const getOfflineRef = useRef(getOffline);
   getOfflineRef.current = getOffline;
 
@@ -280,6 +306,7 @@ export function CocoPaymentUXProvider({
       },
       getUnit: () => unitRef.current,
       getOffline: () => getOfflineRef.current?.() ?? false,
+      getLocale: () => getLocaleRef.current?.() ?? 'en',
       onPersistMint: persist,
       onNpcMintChange: npcMint,
       operations: ops,
@@ -330,6 +357,7 @@ export function CocoPaymentUXProvider({
       optionDismissRef,
       screenActionHandlers,
       screenActionsBridge,
+      getLocaleRef,
       getBtcPriceRef,
       getDisplayCurrencyRef,
     }),

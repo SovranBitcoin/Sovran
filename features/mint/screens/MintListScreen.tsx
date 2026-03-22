@@ -44,18 +44,7 @@ export interface MintListScreenProps {
 }
 
 function getMintDisabledReasonLabel(reason: MintListItem['reason']): string | null {
-  switch (reason) {
-    case 'NOT_IN_PAYMENT_REQUEST':
-      return 'Not supported by this payment request';
-    case 'INSUFFICIENT_BALANCE':
-      return 'Insufficient balance';
-    case 'NO_BALANCE':
-      return 'No balance';
-    case 'UNSUPPORTED_FOR_FLOW':
-      return 'Unavailable for this flow';
-    default:
-      return null;
-  }
+  return reason?.message ?? null;
 }
 
 export function MintListScreen({

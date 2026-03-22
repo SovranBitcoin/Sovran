@@ -127,7 +127,7 @@ export function PaymentOptionsContent({ payload, close }: PaymentOptionsContentP
                       )}
                       {annotated.status === 'disabled' && annotated.reason && (
                         <Text size={12} className="text-muted mt-0.5">
-                          {annotated.reason}
+                          {annotated.reason.message}
                         </Text>
                       )}
                     </ListGroup.ItemContent>

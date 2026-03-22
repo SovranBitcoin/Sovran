@@ -277,7 +277,7 @@ export async function performNfcPayment(options: PaymentOptions): Promise<Paymen
     });
 
     if (selection.type === 'noValidMint') {
-      throw new NfcError(selection.reason, 'NO_COMPATIBLE_MINT');
+      throw new NfcError(selection.reason.message, 'NO_COMPATIBLE_MINT');
     }
     if (selection.type === 'selectionNeeded') {
       const best = selection.validMints[0];

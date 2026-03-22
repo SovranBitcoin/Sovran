@@ -87,9 +87,12 @@ export function resolveIntent(
   if (parsed.type === 'bip321') {
     return {
       type: 'ignore',
-      reason: 'Bitcoin URI contained no supported payment option',
+      reason: {
+        code: 'UNSUPPORTED_INPUT',
+        message: 'Bitcoin URI contained no supported payment option',
+      },
     };
   }
 
-  return { type: 'ignore', reason: 'Unsupported input' };
+  return { type: 'ignore', reason: { code: 'UNSUPPORTED_INPUT', message: 'Unsupported input' } };
 }

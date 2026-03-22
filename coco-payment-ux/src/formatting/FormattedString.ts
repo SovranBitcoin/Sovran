@@ -4,12 +4,23 @@
 
 export type TruncateMode = 'start' | 'middle' | 'end' | 'beforeAt';
 
+const RTL_LANGS = new Set(['ar', 'he', 'fa', 'ur', 'ps', 'sd', 'yi']);
+
+function isRTLLocale(locale?: string): boolean {
+  if (!locale) return false;
+  return RTL_LANGS.has(locale.split('-')[0].toLowerCase());
+}
+
 /**
  * A string that also provides smart truncation.
  *
  * All standard string operations work as expected.
  * The default truncation mode is set at construction time based on the
  * kind of data (tokens → middle, addresses → end, pubkeys → middle).
+ *
+ * When a locale is provided, `beforeAt` mode adapts for RTL scripts —
+ * truncating the end of the local part (visual start in RTL) instead of
+ * the middle.
  *
  * @example
  * const s = new FormattedString('cashuABCD...XYZ', 'middle');
@@ -19,10 +30,12 @@ export type TruncateMode = 'start' | 'middle' | 'end' | 'beforeAt';
  */
 export class FormattedString extends String {
   private readonly _defaultMode: TruncateMode;
+  private readonly _locale: string | undefined;
 
-  constructor(value: string, defaultMode: TruncateMode = 'end') {
+  constructor(value: string, defaultMode: TruncateMode = 'end', locale?: string) {
     super(value);
     this._defaultMode = defaultMode;
+    this._locale = locale;
   }
 
   /**
@@ -59,6 +72,11 @@ export class FormattedString extends String {
         if (atIdx < 0) return this.truncate(n, 'middle');
         const local = str.substring(0, atIdx);
         const domain = str.substring(atIdx);
+        if (isRTLLocale(this._locale)) {
+          if (n >= local.length) return str;
+          const truncated = `...${local.substring(local.length - n)}`;
+          return `${truncated}${domain}`;
+        }
         if (n * 2 >= local.length) return str;
         const truncated = `${local.substring(0, n)}...${local.substring(local.length - n)}`;
         return `${truncated}${domain}`;

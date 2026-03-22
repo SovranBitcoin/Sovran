@@ -38,7 +38,10 @@ export function validateIntent(
           passed: anyTrusted,
           reason: anyTrusted
             ? undefined
-            : 'Payment request specifies mints that are not in your trusted set',
+            : {
+                code: 'MINT_NOT_TRUSTED',
+                message: 'Payment request specifies mints that are not in your trusted set',
+              },
         });
       }
 
@@ -57,7 +60,10 @@ export function validateIntent(
           passed: hasSufficient,
           reason: hasSufficient
             ? undefined
-            : `Insufficient balance for ${info.amount} ${info.unit || 'sat'}`,
+            : {
+                code: 'INSUFFICIENT_BALANCE',
+                message: `Insufficient balance for ${info.amount} ${info.unit || 'sat'}`,
+              },
         });
       }
 
@@ -83,7 +89,10 @@ export function validateIntent(
       results.push({
         guard: 'balance',
         passed: total > 0,
-        reason: total > 0 ? undefined : 'No balance available for Lightning payment',
+        reason:
+          total > 0
+            ? undefined
+            : { code: 'NO_BALANCE', message: 'No balance available for Lightning payment' },
       });
 
       if (amount != null && amount > 0) {
@@ -93,7 +102,10 @@ export function validateIntent(
           reason:
             total >= amount
               ? undefined
-              : `Total balance (${total}) is less than invoice amount (${amount})`,
+              : {
+                  code: 'INSUFFICIENT_BALANCE',
+                  message: `Total balance (${total}) is less than invoice amount (${amount})`,
+                },
         });
       }
 
@@ -104,7 +116,10 @@ export function validateIntent(
         reason:
           amount != null && amount > 0
             ? undefined
-            : 'Invoice has no amount — wallet must collect amount from user',
+            : {
+                code: 'NO_AMOUNT',
+                message: 'Invoice has no amount — wallet must collect amount from user',
+              },
       });
 
       break;
@@ -117,14 +132,17 @@ export function validateIntent(
       results.push({
         guard: 'balance',
         passed: total > 0,
-        reason: total > 0 ? undefined : 'No balance available for Lightning payment',
+        reason:
+          total > 0
+            ? undefined
+            : { code: 'NO_BALANCE', message: 'No balance available for Lightning payment' },
       });
 
       // Amount is always required (must be collected from user)
       results.push({
         guard: 'amountRequired',
         passed: false,
-        reason: 'Amount must be entered by user before paying',
+        reason: { code: 'NO_AMOUNT', message: 'Amount must be entered by user before paying' },
       });
 
       break;
@@ -146,7 +164,9 @@ export function validateIntent(
         results.push({
           guard: 'hasViableOption',
           passed: hasNonDisabled,
-          reason: hasNonDisabled ? undefined : 'All payment options are disabled',
+          reason: hasNonDisabled
+            ? undefined
+            : { code: 'ALL_OPTIONS_DISABLED', message: 'All payment options are disabled' },
         });
       }
       break;

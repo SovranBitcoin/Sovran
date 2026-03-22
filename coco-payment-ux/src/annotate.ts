@@ -8,6 +8,7 @@
 // recommended.
 // ---------------------------------------------------------------------------
 
+import { localizeReason } from './formatting/locales';
 import type {
   PaymentOption,
   WalletContext,
@@ -58,17 +59,17 @@ const PAYMENT_REQUEST_RULES: RecommendationRule[] = [
   {
     applies: (option, ctx, info) => hasMatchingMintWithBalance(option, ctx, info),
     status: 'recommended',
-    reason: () => 'Payable with Cashu \u2014 no fees',
+    reason: (_o, _c, _i, locale) => localizeReason('PAYABLE_ECASH', locale ?? 'en'),
   },
   {
     applies: (option, ctx, info) => noTrustedMintInRequest(option, ctx, info),
     status: 'disabled',
-    reason: () => 'No valid mint',
+    reason: (_o, _c, _i, locale) => localizeReason('NO_VALID_MINT', locale ?? 'en'),
   },
   {
     applies: (option, ctx, info) => !hasMatchingMintWithBalance(option, ctx, info),
     status: 'disabled',
-    reason: () => 'Insufficient balance',
+    reason: (_o, _c, _i, locale) => localizeReason('INSUFFICIENT_BALANCE', locale ?? 'en'),
   },
 ];
 
@@ -81,7 +82,7 @@ const LIGHTNING_RULES: RecommendationRule[] = [
   {
     applies: () => true,
     status: 'disabled',
-    reason: () => 'No balance',
+    reason: (_o, _c, _i, locale) => localizeReason('NO_BALANCE', locale ?? 'en'),
   },
 ];
 
@@ -109,7 +110,8 @@ const STATUS_SORT: Record<OptionStatus, number> = {
 function annotateOption(
   option: PaymentOption,
   ctx: WalletContext,
-  detectors: Detectors
+  detectors: Detectors,
+  locale: string = 'en'
 ): AnnotatedOption {
   const rules = RULES_BY_KIND[option.kind];
   if (!rules) {
@@ -124,7 +126,7 @@ function annotateOption(
       return {
         option,
         status: rule.status,
-        reason: rule.reason(option, ctx, info),
+        reason: rule.reason(option, ctx, info, locale),
       };
     }
   }
@@ -139,10 +141,11 @@ function annotateOption(
 export function annotateOptions(
   options: PaymentOption[],
   ctx: WalletContext,
-  detectors: Detectors
+  detectors: Detectors,
+  locale: string = 'en'
 ): AnnotatedOption[] {
   const annotated = options
-    .map((o) => annotateOption(o, ctx, detectors))
+    .map((o) => annotateOption(o, ctx, detectors, locale))
     .sort((a, b) => STATUS_SORT[a.status] - STATUS_SORT[b.status]);
 
   const hasRecommended = annotated.some((a) => a.status === 'recommended');

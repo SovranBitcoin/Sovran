@@ -18,5 +18,13 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],
-  "exclude": ["sovran.money/**", "coco/**", "eNuts/**", "heroui-native/**"]
+  "exclude": [
+    "sovran.money/**",
+    "coco/**",
+    "eNuts/**",
+    "heroui-native/**",
+    "coco-payment-ux/docs/references/**",
+    "coco-payment-ux/docs/node_modules/**",
+    "coco-payment-ux/docs/.vitepress/cache/**"
+  ]
 }
