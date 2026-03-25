@@ -11,7 +11,7 @@ import React, { useCallback } from 'react';
 import { useLocalSearchParams, Stack } from 'expo-router';
 
 import { MintQuoteScreen } from '@/features/receive';
-import { usePaymentFlowMint, usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 function ModalScreen() {
@@ -24,7 +24,6 @@ function ModalScreen() {
 
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit });
-  const flowMint = usePaymentFlowMint();
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {
@@ -41,9 +40,8 @@ function ModalScreen() {
     <>
       <Stack.Screen options={{ headerTitle: 'Receive' }} />
       <MintQuoteScreen
-        key={flowMint ?? params.mintHistoryEntry}
+        key={params.mintHistoryEntry}
         mintHistoryEntry={params.mintHistoryEntry}
-        selectedMintUrl={flowMint}
         onMintSelected={handleMintSelected}
         onRequestMintList={handleRequestMintList}
       />

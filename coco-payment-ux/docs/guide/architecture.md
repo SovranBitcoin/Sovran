@@ -23,7 +23,7 @@ A screen's job is to call one hook and render:
 ```tsx
 // Correct: screen is rendering + action binding
 function MeltQuoteScreen({ meltHistoryEntry }) {
-  const { entry, error, actions, source } = useScreenActions('meltQuote', meltHistoryEntry);
+  const { entry, error, actions, mintUrl, source } = useScreenActions('meltQuote', meltHistoryEntry);
 
   if (error) return <ErrorState message={error} />;
   if (!entry) return <LoadingState />;
@@ -44,6 +44,8 @@ function MeltQuoteScreen({ meltHistoryEntry }) {
 ```
 
 Availability rules live in `src/screen-actions/availability.ts`. Loading state is tracked per-action inside the manager. The screen never computes "can I pay?" — it reads `actions.pay.available`.
+
+The `mintUrl` field is derived from the raw entry (`entry.mintUrl` or `entry.selectedMintUrl`) before decoration converts strings to [`FormattedString`](/methods/formatting#formattedstring). Use this when you need the raw mint URL string — for example, to override wallet context or fetch mint-specific data.
 
 ## Execution State
 

@@ -125,6 +125,7 @@ export type {
   MintListItem,
   MintSelectionResult,
   MintCandidate,
+  MintReviewInfo,
   GuardResult,
   WalletCapability,
   CapabilityCheckResult,

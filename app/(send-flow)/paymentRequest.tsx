@@ -10,7 +10,7 @@ import React, { useCallback } from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 
 import { PaymentRequestScreen } from '@/features/send';
-import { usePaymentFlowMint, usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 function ModalScreen() {
@@ -20,7 +20,6 @@ function ModalScreen() {
 
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
-  const flowMint = usePaymentFlowMint();
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {
@@ -42,9 +41,8 @@ function ModalScreen() {
         }}
       />
       <PaymentRequestScreen
-        key={flowMint}
+        key={paymentRequestEntry}
         paymentRequestEntry={paymentRequestEntry}
-        selectedMintUrl={flowMint}
         onCancel={() => {
           router.dismissTo('/');
         }}

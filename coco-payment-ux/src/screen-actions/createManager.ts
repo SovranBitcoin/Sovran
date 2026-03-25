@@ -142,7 +142,16 @@ export function createScreenActionManager<S extends ScreenType>(
       | Record<string, ((ctx: ScreenActionContext) => void | Promise<void>) | undefined>
       | undefined;
     const handler = handlerMap?.[action as string];
-    if (!handler) return;
+
+    const effectiveHandler =
+      handler ??
+      (action === 'copy' && CONTENT_EXTRACTORS[screenType]
+        ? (ctx: ScreenActionContext) => builtinCopyHandler(screenType, ctx)
+        : action === 'share' && CONTENT_EXTRACTORS[screenType]
+          ? (ctx: ScreenActionContext) => builtinShareHandler(screenType, ctx)
+          : undefined);
+
+    if (!effectiveHandler) return;
 
     loadingActions.add(action as string);
     notify();
@@ -156,7 +165,7 @@ export function createScreenActionManager<S extends ScreenType>(
       if (params) {
         Object.assign(ctx, params);
       }
-      await handler(ctx);
+      await effectiveHandler(ctx);
     } finally {
       loadingActions.delete(action as string);
       notify();
@@ -197,12 +206,119 @@ const ACTION_NAMES: Record<ScreenType, string[]> = {
   mintQuote: ['copy', 'share'],
   meltQuote: ['pay', 'cancel'],
   paymentRequest: ['confirm', 'cancel'],
-  receive: ['copy', 'paste', 'fixedAmount', 'scanQr', 'changeNpcMint'],
+  receive: ['copy', 'share', 'paste', 'fixedAmount', 'scanQr', 'changeNpcMint'],
+  mintInfo: ['trust', 'copy', 'share'],
   amountEntry: ['setInput', 'toggle', 'next', 'paste', 'scanQr'],
+  mintSelector: ['select', 'getInfo', 'addMint'],
 };
 
 function getActionNames(screenType: ScreenType): string[] {
   return ACTION_NAMES[screenType];
+}
+
+// ---------------------------------------------------------------------------
+// Built-in copy + share — extracts shareable text per screen type.
+//
+// Copy writes to clipboard via the injected `writeClipboard` callback.
+// Share opens the platform share sheet via `shareContent`.
+// Both dispatch notifications (`onCopied` / `onShared`) for wallet feedback.
+//
+// Wallet-provided handlers override these entirely.
+// ---------------------------------------------------------------------------
+
+type EntryLike = Record<string, unknown>;
+
+type ContentExtractor = (
+  entry: EntryLike,
+  ctx: EntryLike
+) => { text: string; target: string } | null;
+
+const CONTENT_EXTRACTORS: Partial<Record<ScreenType, ContentExtractor>> = {
+  sendToken: (entry) => {
+    const token = entry.token;
+    if (!token) return null;
+    try {
+      return {
+        text: getEncodedTokenV4(token as Parameters<typeof getEncodedTokenV4>[0]),
+        target: 'token',
+      };
+    } catch {
+      return null;
+    }
+  },
+  mintQuote: (entry) => {
+    const pr = entry.paymentRequest;
+    return typeof pr === 'string' ? { text: pr, target: 'paymentRequest' } : null;
+  },
+  receive: (entry, ctx) => {
+    const source = (ctx.source ?? 'npc') as string;
+    const raw = source === 'p2pk' ? entry.p2pkKey : entry.npcAddress;
+    if (raw == null) return null;
+    const text = typeof raw === 'string' ? raw : String(raw);
+    if (!text) return null;
+    return { text, target: source === 'p2pk' ? 'p2pk' : 'address' };
+  },
+  mintInfo: (entry) => {
+    const url = entry.mintUrl;
+    return typeof url === 'string' ? { text: url, target: 'mintUrl' } : null;
+  },
+};
+
+const SHARE_URL_PREFIXES: Partial<Record<string, string>> = {
+  token: 'cashu://',
+};
+
+function extractContent(
+  screenType: ScreenType,
+  ctx: ScreenActionContext
+): { text: string; target: string } | null {
+  const extractor = CONTENT_EXTRACTORS[screenType];
+  if (!extractor) return null;
+  return extractor(ctx.entry as EntryLike, ctx as EntryLike);
+}
+
+async function builtinCopyHandler(
+  screenType: ScreenType,
+  ctx: ScreenActionContext
+): Promise<void> {
+  const writeClipboard = (ctx as EntryLike).writeClipboard as
+    | ((text: string) => Promise<void>)
+    | undefined;
+  if (!writeClipboard) return;
+
+  const result = extractContent(screenType, ctx);
+  if (!result) return;
+
+  await writeClipboard(result.text);
+
+  const notify = (ctx as EntryLike).notify as
+    | ((event: string, ...args: unknown[]) => void)
+    | undefined;
+  notify?.('onCopied', result.target, result.text);
+}
+
+async function builtinShareHandler(
+  screenType: ScreenType,
+  ctx: ScreenActionContext
+): Promise<void> {
+  const shareContent = (ctx as EntryLike).shareContent as
+    | ((content: { message: string; url?: string }) => Promise<void>)
+    | undefined;
+  if (!shareContent) return;
+
+  const result = extractContent(screenType, ctx);
+  if (!result) return;
+
+  const prefix = SHARE_URL_PREFIXES[result.target];
+  await shareContent({
+    message: result.text,
+    url: prefix ? `${prefix}${result.text}` : undefined,
+  });
+
+  const notify = (ctx as EntryLike).notify as
+    | ((event: string, ...args: unknown[]) => void)
+    | undefined;
+  notify?.('onShared', result.target, result.text);
 }
 
 // ---------------------------------------------------------------------------
@@ -394,6 +510,19 @@ export function decorateEntry(raw: EntryRecord | null, language: string): EntryR
     }
   }
 
+  let mintUrlFormatted: FormattedString | undefined;
+  if (typeof raw.mintUrl === 'string' && raw.mintUrl.length > 0) {
+    mintUrlFormatted = new FormattedString(raw.mintUrl, 'middle', language);
+  }
+
+  let contact: Array<{ method: string; info: FormattedString }> | undefined;
+  if (Array.isArray(raw.contact)) {
+    contact = (raw.contact as Array<{ method: string; info: string }>).map((c) => ({
+      method: c.method,
+      info: new FormattedString(c.info, 'middle', language),
+    }));
+  }
+
   return {
     ...raw,
     createdAt: new FormattedTimestamp(
@@ -403,6 +532,8 @@ export function decorateEntry(raw: EntryRecord | null, language: string): EntryR
     tokenString,
     p2pkPubkey,
     ...(npcAddress != null && { npcAddress }),
+    ...(mintUrlFormatted != null && { mintUrl: mintUrlFormatted }),
+    ...(contact != null && { contact }),
     paymentRequestInfo,
     transportLabel,
   };

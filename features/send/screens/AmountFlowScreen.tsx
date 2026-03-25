@@ -28,7 +28,7 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
   const foreground = useThemeColor('foreground');
   const background = useThemeColor('background');
 
-  const { entry, error, actions, suggestions } = useScreenActions('amountEntry', amountEntry);
+  const { entry, error, actions, suggestions, mintUrl } = useScreenActions('amountEntry', amountEntry);
 
   const walletContext = useWalletContextWithOverride();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
@@ -65,6 +65,7 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
           headerTitleAlign: 'center',
           headerTitle: () => (
             <MintSelector
+              selectedMintUrl={mintUrl}
               onMintSelected={handleMintSelected}
               onRequestMintList={handleRequestMintList}
             />

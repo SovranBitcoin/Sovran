@@ -34,7 +34,7 @@ function handleExecute(
   const parsed = parsePaymentInput(input, detectors);
   const intent = resolveIntent(parsed, detectors, walletCtx);
 
-  const ctx: FlowContext = { parsed, intent, unit };
+  const ctx: FlowContext = { parsed, intent, unit, rawInput: input };
 
   // Extract known data from the intent into context
   switch (intent.type) {
@@ -514,6 +514,23 @@ export function transition(
       return handleStartReceiveLightning(walletCtx, unit);
     case 'START_RECEIVE':
       return handleStartReceive(unit);
+    case 'REVIEW_MINT':
+      return {
+        step: 'reviewMint',
+        context: { ...currentCtx, reviewToken: event.token },
+        data: { mintUrl: event.mintUrl, token: event.token },
+      };
+    case 'MINT_TRUSTED': {
+      const token = currentCtx.reviewToken;
+      if (token) {
+        return {
+          step: 'receiveToken',
+          context: { ...currentCtx, reviewToken: undefined },
+          data: { token },
+        };
+      }
+      return { step: currentStep, context: currentCtx, data: {} as any };
+    }
   }
 
   // State-specific events

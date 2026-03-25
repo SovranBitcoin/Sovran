@@ -66,9 +66,12 @@ const machine = usePaymentFlowMachine({ walletContext, unit });
 const handleReceive = async () => {
   await machine.startReceive();
 };
+
+// From outside a flow (e.g., home screen button) — clear stale state first:
+await machine.startReceive({ reset: true });
 ```
 
-The wallet calls `machine.startReceive()` from any screen (typically a home screen "Receive" button). The machine emits a single step — `handler.navigateToReceive()` — with the current unit.
+The wallet calls `machine.startReceive()` from any screen (typically a home screen "Receive" button). Pass `{ reset: true }` when calling from outside a flow to ensure stale state is cleared. The machine emits a single step — `handler.navigateToReceive()` — with the current unit.
 
 ## NPC and P2PK
 
@@ -171,6 +174,11 @@ function QuickReceiveScreen({ receiveEntry, unit }) {
           <Pressable onPress={() => actions.copy.execute({ source: 'npc' })}>
             <Text>Copy Address</Text>
           </Pressable>
+          {actions.share.available && (
+            <Pressable onPress={() => actions.share.execute({ source: 'npc' })}>
+              <Text>Share</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -180,6 +188,11 @@ function QuickReceiveScreen({ receiveEntry, unit }) {
           <Pressable onPress={() => actions.copy.execute({ source: 'p2pk' })}>
             <Text>Copy Key</Text>
           </Pressable>
+          {actions.share.available && (
+            <Pressable onPress={() => actions.share.execute({ source: 'p2pk' })}>
+              <Text>Share</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -232,24 +245,26 @@ function QuickReceiveScreen({ receiveEntry, unit }) {
 
 | Action          | Available when                             | What it does                                                                                                                   |
 | --------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `copy`          | NPC address or P2PK key exists             | Copy to clipboard — pass `{ source: 'npc' }` or `{ source: 'p2pk' }`                                                           |
+| `copy` *        | NPC address or P2PK key exists             | Copy to clipboard — pass `{ source: 'npc' }` or `{ source: 'p2pk' }`                                                           |
+| `share` *       | NPC address or P2PK key exists             | Platform share sheet with the address or key                                                                                    |
 | `paste`         | Hub loaded                                 | [`machine.scan(undefined, { source: 'clipboard' })`](/flows/scanning) — parse clipboard contents and route to appropriate flow |
 | `fixedAmount`   | Hub loaded                                 | [`machine.startReceiveLightning()`](/flows/lightning-receive) — starts a lightning receive flow for a specific amount          |
 | `scanQr`        | Hub loaded                                 | Navigate to camera for QR scanning                                                                                             |
 | `changeNpcMint` | Hub loaded, has NPC address, unit is `sat` | [`machine.requestMintSelector({ scope: 'npc' })`](/flows/mint-selector) — change the NPC mint                                  |
 
+\* Built-in — works automatically when `writeClipboard` / `shareContent` are provided on the provider. No handler needed.
+
 ### Action handlers
+
+Both `copy` and `share` are **built-in** — when `writeClipboard` and `shareContent` are provided on the provider, they automatically extract the NPC address or P2PK key from the entry (based on the `source` param). The `onCopied` / `onShared` notification fires with `target` set to `'address'` or `'p2pk'`.
 
 ```tsx
 <CocoPaymentUXProvider
+  writeClipboard={(text) => Clipboard.setStringAsync(text)}
+  shareContent={(content) => Share.share({ message: content.message, url: content.url })}
   actions={{
     receive: {
-      copy: async (ctx) => {
-        const source = ctx.source ?? 'npc';
-        const text = source === 'p2pk' ? ctx.entry.p2pkKey : ctx.entry.npcAddress;
-        if (!text) return;
-        await Clipboard.setStringAsync(text);
-      },
+      // copy and share are built-in — no handlers needed
       paste: async (ctx) => {
         await ctx.paymentMachine?.scan?.(undefined, { source: 'clipboard' });
       },

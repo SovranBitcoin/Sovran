@@ -14,7 +14,13 @@ import React from 'react';
 import type { SendHistoryEntry } from 'coco-cashu-core';
 import { useScreenActions } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
-import { HistoryEntryHeader, HistoryEntryTimeline } from '@/features/transactions';
+import { formatAmount } from '@/shared/lib/currency';
+import { truncateMiddle } from '@/shared/lib/strings';
+import {
+  HistoryEntryHeader,
+  HistoryEntryRefresh,
+  HistoryEntryTimeline,
+} from '@/features/transactions';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
@@ -22,10 +28,10 @@ import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/Scree
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
 interface PaymentRequestScreenProps {
   paymentRequestEntry?: SendHistoryEntry | string;
-  selectedMintUrl?: string;
   onCancel: () => void;
   onMintSelected?: (mintUrl: string) => void;
   onRequestMintList?: () => void;
@@ -33,12 +39,12 @@ interface PaymentRequestScreenProps {
 
 export function PaymentRequestScreen({
   paymentRequestEntry,
-  selectedMintUrl,
   onCancel,
   onMintSelected,
   onRequestMintList,
 }: PaymentRequestScreenProps) {
-  const { entry, error, actions, source } = useScreenActions('paymentRequest', paymentRequestEntry);
+  const { entry, error, actions, source, mintUrl } = useScreenActions('paymentRequest', paymentRequestEntry);
+  const mintInfo = useMintInfo(entry?.mintUrl);
 
   if (error) {
     return <ScreenErrorState message={error} onGoBack={onCancel} />;
@@ -96,15 +102,17 @@ export function PaymentRequestScreen({
           pendingData={{ amount: entry.amount, unit: entry.unit, type: 'send' }}
         />
 
-        {isPreview && (
+        {isPreview ? (
           <MintSelector
             width={280}
             unit={entry.unit}
-            selectedMintUrl={selectedMintUrl}
+            selectedMintUrl={mintUrl}
             onMintSelected={onMintSelected ?? (() => {})}
             onRequestMintList={onRequestMintList ?? (() => {})}
           />
-        )}
+        ) : mintInfo ? (
+          <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
+        ) : null}
 
         <HistoryEntryTimeline
           historyEntry={entry}
@@ -116,6 +124,7 @@ export function PaymentRequestScreen({
           items={[
             source ? { title: 'Source', value: source } : null,
             { title: 'Date', value: entry.createdAt.datetime },
+            { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
             entry.transportLabel ? { title: 'Transport', value: entry.transportLabel } : null,
             entry.paymentRequestInfo?.mints?.length
               ? {
@@ -123,7 +132,10 @@ export function PaymentRequestScreen({
                   value: `${entry.paymentRequestInfo.mints.length} mint(s)`,
                 }
               : null,
-            !isPreview && entry.mintUrl ? { title: 'Mint', value: entry.mintUrl } : null,
+            entry.operationId
+              ? { title: 'Operation ID', value: truncateMiddle(entry.operationId, 7) }
+              : null,
+            mintUrl ? { title: 'Mint', value: truncateMiddle(mintUrl, 12) } : null,
           ].flatMap((item) => (item ? [item] : []))}
         />
       </VStack>

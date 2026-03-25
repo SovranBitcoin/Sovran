@@ -16,6 +16,8 @@ import {
   HistoryEntryTimeline,
   TransactionLocationSection,
 } from '@/features/transactions';
+import { formatAmount } from '@/shared/lib/currency';
+import { truncateMiddle } from '@/shared/lib/strings';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -33,7 +35,7 @@ export function ReceiveTokenScreen({
   receiveHistoryEntry,
   onNavigateBack,
 }: ReceiveTokenScreenProps) {
-  const { entry, error, actions, source } = useScreenActions('receiveToken', receiveHistoryEntry);
+  const { entry, error, actions, source, mintUrl } = useScreenActions('receiveToken', receiveHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
 
   if (error) {
@@ -95,6 +97,9 @@ export function ReceiveTokenScreen({
         <DetailsSection
           items={[
             source && { title: 'Source', value: source },
+            { title: 'Date', value: entry.createdAt.datetime },
+            { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+            mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
             entry.p2pkPubkey && { title: 'P2PK', value: entry.p2pkPubkey.truncate(8) },
             entry.tokenString && { title: 'Token', value: entry.tokenString.truncate(6) },
           ].flatMap((item) => (item ? [item] : []))}

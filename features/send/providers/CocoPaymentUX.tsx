@@ -6,7 +6,9 @@
  */
 
 import React, { useCallback, useMemo, useRef } from 'react';
+import { Share } from 'react-native';
 
+import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 
 import { URDecoder } from '@gandlaf21/bc-ur';
@@ -15,7 +17,11 @@ import type { HistoryEntry } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
 
 import type { WalletContext, MeltOperationLike } from 'coco-payment-ux';
-import { meltOperationToScreenActionEntry } from 'coco-payment-ux';
+import {
+  meltOperationToScreenActionEntry,
+  shouldApplyEntryUpdate as defaultShouldApply,
+  mergeEntryUpdate as defaultMerge,
+} from 'coco-payment-ux';
 import {
   CocoPaymentUXProvider as PaymentUXProviderBase,
   type CocoPaymentUXProviderProps,
@@ -42,12 +48,48 @@ import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
+import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
+import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
+import { normalizeMintUrlKey } from '@/shared/lib/url';
 
 export { usePaymentFlowMachine, usePaymentFlowMint } from 'coco-payment-ux/react';
 
 const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
+
+type EntryRecord = Record<string, unknown>;
+
+function getMintEnrichment(mintUrl: string): EntryRecord {
+  const normalized = normalizeMintUrlKey(mintUrl);
+  const audit = useAuditMintStore.getState().getCached(normalized);
+  const kym = useKYMMintStore.getState().getCached(normalized);
+
+  const enrichment: EntryRecord = {};
+  if (kym) enrichment.kymScore = kym.score;
+  if (audit) {
+    const swaps = audit.auditData.swaps ?? [];
+    const swapSuccess = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
+    const swapTotal = swaps.length;
+    const successRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
+    enrichment.auditScore = typeof successRate === 'number' ? successRate * 5 : undefined;
+    enrichment.auditState = audit.auditData.state;
+    enrichment.successRate = successRate;
+    enrichment.swapSuccess = swapSuccess;
+    enrichment.swapTotal = swapTotal;
+    enrichment.totalMints = audit.auditData.n_mints;
+    enrichment.totalMelts = audit.auditData.n_melts;
+
+    const successfulTimes = swaps
+      .filter((s) => s.state === 'OK' && typeof s.time_taken === 'number' && s.time_taken > 0)
+      .map((s) => s.time_taken);
+    enrichment.avgTimeMs =
+      successfulTimes.length > 0
+        ? successfulTimes.reduce((sum, t) => sum + t, 0) / successfulTimes.length
+        : undefined;
+  }
+  return enrichment;
+}
 
 export function CocoPaymentUXProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
@@ -64,6 +106,16 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   npubRef.current = keys?.npub;
   const privateKeyRef = useRef(keys?.privateKey);
   privateKeyRef.current = keys?.privateKey;
+
+  const writeClipboard = useCallback(
+    (text: string) => Clipboard.setStringAsync(text).then(() => {}),
+    []
+  );
+  const shareContent = useCallback(
+    (content: { message: string; url?: string }) =>
+      Share.share({ message: content.message, url: content.url }).then(() => {}),
+    []
+  );
 
   const getManager = useCallback(() => manager, [manager]);
   const walletContextRef = useRef<WalletContext | null>(null);
@@ -111,14 +163,19 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
       }),
       onEntryUpdate: (screenType, callback) => {
         const mgr = getManager();
-        const unsubscribes = [
-          mgr.on(
-            'history:updated',
-            ({ entry: updated }: { mintUrl: string; entry: HistoryEntry }) => {
-              callback(updated as unknown as Record<string, unknown>);
-            }
-          ),
-        ];
+        const unsubscribes: (() => void)[] = [];
+
+        if (screenType !== 'mintSelector' && screenType !== 'mintInfo') {
+          unsubscribes.push(
+            mgr.on(
+              'history:updated',
+              ({ entry: updated }: { mintUrl: string; entry: HistoryEntry }) => {
+                callback(updated as unknown as EntryRecord);
+              }
+            )
+          );
+        }
+
         if (screenType === 'meltQuote') {
           const subscribeMeltOperation = (
             eventName: 'melt-op:prepared' | 'melt-op:pending' | 'melt-op:finalized'
@@ -136,9 +193,58 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           unsubscribes.push(subscribeMeltOperation('melt-op:pending'));
           unsubscribes.push(subscribeMeltOperation('melt-op:finalized'));
         }
+
+        if (screenType === 'receive') {
+          unsubscribes.push(
+            useNpcMintStore.subscribe(() => {
+              callback({ _npcMintUpdate: true } as EntryRecord);
+            })
+          );
+        }
+
+        if (screenType === 'mintInfo' || screenType === 'mintSelector') {
+          const pushEnrichment = () => {
+            if (screenType === 'mintInfo') {
+              callback({ _mintEnrichment: true } as EntryRecord);
+            } else {
+              callback({ _mintItemsEnrichment: true } as EntryRecord);
+            }
+          };
+          unsubscribes.push(useAuditMintStore.subscribe(pushEnrichment));
+          unsubscribes.push(useKYMMintStore.subscribe(pushEnrichment));
+        }
+
         return () => {
           unsubscribes.forEach((unsubscribe) => unsubscribe());
         };
+      },
+      shouldApplyEntryUpdate: (current, updated) => {
+        if (!current) return false;
+        if (updated?._npcMintUpdate && current.type === 'receive') return true;
+        if (updated?._mintEnrichment && typeof current.mintUrl === 'string') return true;
+        if (updated?._mintItemsEnrichment && Array.isArray(current.items)) return true;
+        return defaultShouldApply(current, updated);
+      },
+      mergeEntryUpdate: (current, updated) => {
+        if (!current) return updated;
+        if (updated._npcMintUpdate && current.type === 'receive') {
+          const npcMintUrl = useNpcMintStore.getState().getActiveMintUrl();
+          return { ...current, selectedMintUrl: npcMintUrl, mintUrl: npcMintUrl ?? '' };
+        }
+        if (updated._mintEnrichment && typeof current.mintUrl === 'string') {
+          const enrichment = getMintEnrichment(current.mintUrl as string);
+          return { ...current, ...enrichment };
+        }
+        if (updated._mintItemsEnrichment && Array.isArray(current.items)) {
+          const items = (current.items as EntryRecord[]).map((item) => {
+            const mintUrl = item.mintUrl as string | undefined;
+            if (!mintUrl) return item;
+            const enrichment = getMintEnrichment(mintUrl);
+            return { ...item, ...enrichment };
+          });
+          return { ...current, items };
+        }
+        return defaultMerge(current, updated);
       },
       getLocale: () => useSettingsStore.getState().language || 'en',
       subscribeGlobalScreenActions: (listener) => {
@@ -203,6 +309,8 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
       getOffline,
       getBtcPrice,
       getDisplayCurrency,
+      writeClipboard,
+      shareContent,
       actions,
       screenActionsBridge,
       deepLinks,
@@ -214,6 +322,8 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
       getOffline,
       getBtcPrice,
       getDisplayCurrency,
+      writeClipboard,
+      shareContent,
       actions,
       screenActionsBridge,
       deepLinks,

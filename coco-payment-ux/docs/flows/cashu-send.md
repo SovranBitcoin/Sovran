@@ -99,11 +99,14 @@ const machine = usePaymentFlowMachine({ walletContext, unit });
 const handleCashuSend = async () => {
   await machine.startSendEcash();
 };
+
+// From outside a flow (e.g., home screen button) — clear stale state first:
+await machine.startSendEcash({ reset: true });
 ```
 
 When [`machine.startSendEcash()`](#starting-the-flow) is called, the machine:
 
-- Resets all flow context (clears any previous amount, mint, intent)
+- Resets all flow context (clears any previous amount, mint, intent) — pass `{ reset: true }` when calling from outside a flow to ensure stale state is cleared
 - Checks which trusted mints have balance using the highest-balance strategy
 - **Preferred mint has balance** → auto-selects it, calls [`handler.enterAmount()`](#handler-enteramount)
 - **Only one mint has balance** → auto-selects it, calls [`handler.enterAmount()`](#handler-enteramount)
@@ -431,27 +434,30 @@ function SendCashuScreen({ sendHistoryEntry }) {
 
 | Action        | Available when                            | What it does                           |
 | ------------- | ----------------------------------------- | -------------------------------------- |
-| `copy`        | Token exists and not finalized/rolledBack | Encode token V4, copy to clipboard     |
-| `share`       | Same as copy                              | Platform share sheet with token string |
+| `copy` *      | Token exists and not finalized/rolledBack | Encode token V4, copy to clipboard     |
+| `share` *     | Same as copy                              | Platform share sheet with token string |
 | `nfc`         | Same as copy                              | Write token to NFC tag                 |
 | `copyAsEmoji` | Same as copy                              | Encode token as emoji representation   |
 | `checkStatus` | State is `pending`                        | Check if token has been redeemed       |
 | `cancel`      | Has `operationId` and not finalized       | Rollback operation, destroy proofs     |
 
+\* Built-in — works automatically when `writeClipboard` / `shareContent` are provided on the provider. No handler needed.
+
 ### Action handlers
+
+Both `copy` and `share` are **built-in** — when `writeClipboard` and `shareContent` are provided on the provider, they work automatically for all screen types. The library extracts the correct text per screen type (encoded token V4 for `sendToken`, payment request for `mintQuote`, address for `receive`, mint URL for `mintInfo`). Tokens are shared with a `cashu://` URL for deep link support.
 
 ```tsx
 <CocoPaymentUXProvider
+  writeClipboard={(text) => Clipboard.setStringAsync(text)}
+  shareContent={(content) => Share.share({ message: content.message, url: content.url })}
+  notifications={{
+    onCopied: (target) => toast.success(`Copied ${target}`),
+    onShared: (target) => toast.success(`Shared ${target}`),
+  }}
   actions={{
     sendToken: {
-      copy: async (ctx) => {
-        const encoded = encodeTokenV4(ctx.entry);
-        await Clipboard.setStringAsync(encoded);
-        toast.success('Copied');
-      },
-      share: async (ctx) => {
-        await ctx.shareSource?.({ message: ctx.entry.tokenString, title: 'Ecash' });
-      },
+      // copy and share are built-in — no handlers needed
       nfc: async (ctx) => {
         await writeTokenToNFC(ctx.entry);
       },
@@ -462,4 +468,17 @@ function SendCashuScreen({ sendHistoryEntry }) {
     },
   }}
 />
+```
+
+Custom action handlers receive `notify(event, ...args)` in their context, which dispatches to the wallet's `notifications` handlers. Use this instead of inline popups:
+
+```tsx
+actions={{
+  sendToken: {
+    nfc: async (ctx) => {
+      await writeTokenToNFC(ctx.entry);
+      ctx.notify('onShared', 'token', ctx.entry.tokenString);
+    },
+  },
+}}
 ```

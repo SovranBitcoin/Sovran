@@ -40,6 +40,7 @@ const en: TranslationMap = {
   SEND_FAILED: 'Failed to create token',
   MINT_QUOTE_FAILED: 'Failed to create mint quote',
   LOAD_MINTS_FAILED: 'Failed to load mints',
+  TRUST_MINT_FAILED: 'Failed to trust mint',
 
   // Mint selection errors
   NO_ALLOWED_MINT_TRUSTED: 'No allowed mint is trusted',
@@ -66,6 +67,7 @@ const ar: TranslationMap = {
   SEND_FAILED: 'فشل إنشاء التوكن',
   MINT_QUOTE_FAILED: 'فشل إنشاء عرض السعر',
   LOAD_MINTS_FAILED: 'فشل تحميل المنتات',
+  TRUST_MINT_FAILED: 'فشل الوثوق بالمنت',
 
   NO_ALLOWED_MINT_TRUSTED: 'لا يوجد منت مسموح به موثوق',
   INSUFFICIENT_BALANCE_ALLOWED: 'رصيد غير كافٍ في المنتات المسموحة',
@@ -91,6 +93,7 @@ const de: TranslationMap = {
   SEND_FAILED: 'Token konnte nicht erstellt werden',
   MINT_QUOTE_FAILED: 'Mint-Angebot konnte nicht erstellt werden',
   LOAD_MINTS_FAILED: 'Mints konnten nicht geladen werden',
+  TRUST_MINT_FAILED: 'Mint konnte nicht vertraut werden',
 
   NO_ALLOWED_MINT_TRUSTED: 'Kein erlaubter Mint ist vertraut',
   INSUFFICIENT_BALANCE_ALLOWED: 'Unzureichendes Guthaben bei erlaubten Mints',

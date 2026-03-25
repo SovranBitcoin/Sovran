@@ -101,6 +101,30 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   };
 }
 
+function mintInfoAvailability(entry: Record<string, unknown>): AvailabilityMap<'mintInfo'> {
+  const isTrusted = entry.isTrusted === true;
+  const hasMintUrl = typeof entry.mintUrl === 'string' && entry.mintUrl.length > 0;
+  return {
+    trust: { available: !isTrusted },
+    copy: { available: hasMintUrl },
+    share: { available: hasMintUrl },
+  };
+}
+
+function mintSelectorAvailability(
+  entry: Record<string, unknown>
+): AvailabilityMap<'mintSelector'> {
+  const items = entry.items;
+  const hasItems = Array.isArray(items) && items.length > 0;
+  const isManagement = !entry.destination;
+
+  return {
+    select: { available: hasItems },
+    getInfo: { available: isManagement },
+    addMint: { available: isManagement },
+  };
+}
+
 function receiveAvailability(entry: Record<string, unknown>): AvailabilityMap<'receive'> {
   const hasNpc = typeof entry.npcAddress === 'string' && entry.npcAddress.length > 0;
   const hasP2pk = typeof entry.p2pkKey === 'string' && entry.p2pkKey.length > 0;
@@ -111,6 +135,7 @@ function receiveAvailability(entry: Record<string, unknown>): AvailabilityMap<'r
 
   return {
     copy: { available: hasNpc || hasP2pk },
+    share: { available: hasNpc || hasP2pk },
     paste: { available: hubLoaded },
     fixedAmount: { available: hubLoaded },
     scanQr: { available: hubLoaded },
@@ -131,7 +156,9 @@ const AVAILABILITY_FNS: {
   meltQuote: meltQuoteAvailability,
   paymentRequest: paymentRequestAvailability,
   receive: receiveAvailability,
+  mintInfo: mintInfoAvailability,
   amountEntry: amountEntryAvailability,
+  mintSelector: mintSelectorAvailability,
 };
 
 /**

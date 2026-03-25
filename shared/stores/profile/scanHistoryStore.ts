@@ -33,6 +33,8 @@ interface ScanHistoryEntry {
   type: ScanType;
   /** Source of the scan (how it was scanned) */
   source: ScanSource;
+  /** Structural input type from the parser (e.g., 'bip321', 'payment', 'mintUrl') */
+  inputType?: string;
   /** Timestamp when scanned */
   scannedAt: number;
   /** ID of the transaction history entry this scan resulted in */
@@ -45,7 +47,7 @@ interface ScanHistoryState {
 
 interface ScanHistoryActions {
   /** Add a scan to history */
-  addScan: (raw: string, processed: string, type: ScanType, source: ScanSource) => void;
+  addScan: (raw: string, processed: string, type: ScanType, source: ScanSource, inputType?: string) => void;
   /** Get all scan history entries */
   getEntries: () => ScanHistoryEntry[];
   /** Get entries filtered by type */
@@ -85,7 +87,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       entries: [],
 
       // Add a scan to history
-      addScan: (raw: string, processed: string, type: ScanType, source: ScanSource) => {
+      addScan: (raw: string, processed: string, type: ScanType, source: ScanSource, inputType?: string) => {
         const { entries } = get();
         const now = Date.now();
 
@@ -99,6 +101,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
             ...updated[existingIndex],
             source,
             scannedAt: now,
+            ...(inputType != null && { inputType }),
           };
           set({ entries: updated });
         } else {
@@ -109,6 +112,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
             processed,
             type,
             source,
+            ...(inputType != null && { inputType }),
             scannedAt: now,
           };
           set({ entries: [...entries, newEntry] });

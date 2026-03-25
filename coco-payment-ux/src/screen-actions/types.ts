@@ -28,7 +28,9 @@ export type ScreenType =
   | 'meltQuote'
   | 'paymentRequest'
   | 'receive'
-  | 'amountEntry';
+  | 'mintInfo'
+  | 'amountEntry'
+  | 'mintSelector';
 
 /**
  * Maps each screen type to the set of action names available on that screen.
@@ -40,9 +42,12 @@ export type ScreenActionName = {
   mintQuote: 'copy' | 'share';
   meltQuote: 'pay' | 'cancel';
   paymentRequest: 'confirm' | 'cancel';
-  receive: 'copy' | 'paste' | 'fixedAmount' | 'scanQr' | 'changeNpcMint';
+  receive: 'copy' | 'share' | 'paste' | 'fixedAmount' | 'scanQr' | 'changeNpcMint';
+  mintInfo: 'trust' | 'copy' | 'share';
   /** Flow amount screen — keyboard + submit; `setInput`/`toggle` are handled inside the manager. */
   amountEntry: 'setInput' | 'toggle' | 'next' | 'paste' | 'scanQr';
+  /** Mint selector screen — select a mint, inspect details, or add new mints. */
+  mintSelector: 'select' | 'getInfo' | 'addMint';
 };
 
 export interface ActionAvailability {

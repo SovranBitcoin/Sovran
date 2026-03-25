@@ -2,9 +2,25 @@ import { popup } from '../engine';
 import type { BaseOverrides } from './types';
 
 const COPY_CONFIGS = {
-  ecashToken: {
+  token: {
     title: 'Token Copied',
     text: 'Ecash token has been copied to your clipboard.',
+  },
+  paymentRequest: {
+    title: 'Payment Request Copied',
+    text: 'Payment request has been copied to your clipboard.',
+  },
+  address: {
+    title: 'Address Copied',
+    text: 'Address has been copied to your clipboard.',
+  },
+  mintUrl: {
+    title: 'Mint URL Copied',
+    text: 'Mint URL has been copied to your clipboard.',
+  },
+  p2pk: {
+    title: 'P2PK Key Copied',
+    text: 'P2PK public key has been copied to your clipboard.',
   },
   npub: {
     title: 'NPUB Copied',
@@ -14,10 +30,6 @@ const COPY_CONFIGS = {
     title: 'NSEC Copied',
     text: 'Nostr secret key has been copied to your clipboard.',
   },
-  p2pk: {
-    title: 'P2PK Key Copied',
-    text: 'P2PK public key has been copied to your clipboard.',
-  },
   mnemonic: {
     title: 'Mnemonic Copied',
     text: 'Recovery phrase has been copied to your clipboard.',
@@ -25,10 +37,6 @@ const COPY_CONFIGS = {
   cashuMnemonic: {
     title: 'Cashu Mnemonic Copied',
     text: 'Cashu recovery phrase has been copied to your clipboard.',
-  },
-  lightningAddress: {
-    title: 'Address Copied',
-    text: 'Lightning address has been copied to your clipboard.',
   },
   publicKey: {
     title: 'Public Key Copied',

@@ -58,7 +58,7 @@ export function useAccountPagerView({
   }, [accounts, account]);
 
   const handleReceive = useCallback(() => {
-    void machine.startReceive();
+    void machine.startReceive({ reset: true });
   }, [machine]);
 
   const handleScanQR = useCallback(async () => {
@@ -71,7 +71,7 @@ export function useAccountPagerView({
   }, [handlePermission, account.unit]);
 
   const handleSend = useCallback(async () => {
-    await machine.startSendEcash();
+    await machine.startSendEcash({ reset: true });
   }, [machine]);
 
   return {

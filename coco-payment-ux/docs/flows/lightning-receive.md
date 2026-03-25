@@ -284,29 +284,22 @@ function MintQuoteScreen({ mintHistoryEntry }) {
 
 ### Actions
 
-| Action  | Available when                  | What it does                                     |
-| ------- | ------------------------------- | ------------------------------------------------ |
-| `copy`  | State is not `ISSUED` or `PAID` | Copy the Lightning invoice (BOLT11) to clipboard |
-| `share` | Same as copy                    | Platform share sheet with the invoice string     |
+| Action    | Available when                  | What it does                                     |
+| --------- | ------------------------------- | ------------------------------------------------ |
+| `copy` *  | State is not `ISSUED` or `PAID` | Copy the Lightning invoice (BOLT11) to clipboard |
+| `share` * | Same as copy                    | Platform share sheet with the invoice string     |
+
+\* Built-in — works automatically when `writeClipboard` / `shareContent` are provided on the provider. No handler needed.
 
 ### Action handlers
 
+Both `copy` and `share` are **built-in** — when `writeClipboard` and `shareContent` are provided on the provider, they work automatically. The `onCopied` / `onShared` notification fires with `target` set to `'paymentRequest'`.
+
 ```tsx
 <CocoPaymentUXProvider
-  actions={{
-    mintQuote: {
-      copy: async (ctx) => {
-        await Clipboard.setStringAsync(ctx.entry.paymentRequest);
-        toast.success('Copied invoice');
-      },
-      share: async (ctx) => {
-        await ctx.shareSource?.({
-          message: ctx.entry.paymentRequest,
-          title: 'Lightning Invoice',
-        });
-      },
-    },
-  }}
+  writeClipboard={(text) => Clipboard.setStringAsync(text)}
+  shareContent={(content) => Share.share({ message: content.message, url: content.url })}
+  // No mintQuote action handlers needed — copy and share are built-in
 />
 ```
 

@@ -15,6 +15,8 @@ import {
   HistoryEntryRefresh,
   HistoryEntryTimeline,
 } from '@/features/transactions';
+import { formatAmount } from '@/shared/lib/currency';
+import { truncateMiddle } from '@/shared/lib/strings';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -31,7 +33,7 @@ interface SendTokenScreenProps {
 }
 
 export function SendTokenScreen({ sendHistoryEntry, onNavigateBack }: SendTokenScreenProps) {
-  const { entry, error, actions, source } = useScreenActions('sendToken', sendHistoryEntry);
+  const { entry, error, actions, source, mintUrl } = useScreenActions('sendToken', sendHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
 
   if (error) {
@@ -120,7 +122,7 @@ export function SendTokenScreen({ sendHistoryEntry, onNavigateBack }: SendTokenS
 
         {entry.state === 'pending' && (
           <PaymentInfo
-            copyTarget="ecashToken"
+            copyTarget="token"
             unit={entry.unit}
             data={entry.tokenString?.toString() ?? ''}
             animated={(entry.tokenString?.length ?? 0) >= 500}
@@ -135,6 +137,10 @@ export function SendTokenScreen({ sendHistoryEntry, onNavigateBack }: SendTokenS
           items={[
             source && { title: 'Source', value: source },
             { title: 'Date', value: entry.createdAt.datetime },
+            { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+            { title: 'State', value: entry.state },
+            entry.operationId && { title: 'Operation ID', value: truncateMiddle(entry.operationId, 7) },
+            mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
             entry.tokenString && {
               title: 'Token',
               value: entry.tokenString.truncate(6),

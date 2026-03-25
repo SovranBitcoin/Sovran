@@ -56,7 +56,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // ============================================================================
 
 // Extract provider from canonical_slug (same as UserMessagesScreen)
-function extractProviderFromSlug(canonicalSlug: string): string {
+function extractProviderFromSlug(canonicalSlug: string | null | undefined): string {
+  if (!canonicalSlug) return 'Unknown';
   const parts = canonicalSlug.split('/');
   const provider = parts[0] || 'Unknown';
   return provider.charAt(0).toUpperCase() + provider.slice(1);
@@ -65,7 +66,7 @@ function extractProviderFromSlug(canonicalSlug: string): string {
 // Extract model name (same as UserMessagesScreen)
 function extractModelName(model: RoutstrModel): { provider: string; modelName: string } {
   const provider = extractProviderFromSlug(model.canonical_slug);
-  const slugParts = model.canonical_slug.split('/');
+  const slugParts = (model.canonical_slug ?? '').split('/');
   let modelName = slugParts[1] || model.name;
   modelName = modelName.replace(/-\d{8}$/, '');
 

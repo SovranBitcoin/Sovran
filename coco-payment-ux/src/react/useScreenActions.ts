@@ -107,6 +107,8 @@ export type UseScreenActionsResult<S extends ScreenType, E = Record<string, unkn
   entry: E | null;
   error: string | null;
   actions: Record<ScreenActionName[S], BoundAction>;
+  /** Mint URL for this screen instance (from entry data, not global flow state). */
+  mintUrl: string | undefined;
   source: S extends 'amountEntry' ? null : string | null;
   suggestions: QuickSendSuggestion[];
 };
@@ -206,7 +208,7 @@ export function useScreenActionsWithConfig<S extends ScreenType>(
     ? (entry.suggestions as QuickSendSuggestion[])
     : [];
 
-  return { entry, error, actions, suggestions };
+  return { entry, error, actions, mintUrl: undefined, suggestions };
 }
 
 // ---------------------------------------------------------------------------
@@ -240,8 +242,12 @@ export function useScreenActions(
     getLocaleRef,
     getBtcPriceRef,
     getDisplayCurrencyRef,
+    notificationsRef,
+    writeClipboardRef,
+    shareContentRef,
   } = useCocoPaymentUXContext();
   const isAmountEntry = screenType === 'amountEntry';
+  const skipDecoration = isAmountEntry || screenType === 'mintSelector';
 
   const machineRef = useRef(machine);
   machineRef.current = machine;
@@ -251,6 +257,16 @@ export function useScreenActions(
   const getExtraContext = useCallback(
     () => ({
       paymentMachine: machineRef.current,
+      writeClipboard: writeClipboardRef.current,
+      shareContent: shareContentRef.current,
+      notify: (event: string, ...args: unknown[]) => {
+        const notifications = notificationsRef.current;
+        if (!notifications) return;
+        const handler = (notifications as Record<string, ((...a: unknown[]) => void) | undefined>)[
+          event
+        ];
+        if (typeof handler === 'function') handler(...args);
+      },
       ...(bridgeRef.current?.getExtraContext?.() ?? {}),
     }),
     []
@@ -320,23 +336,32 @@ export function useScreenActions(
   const language = screenActionsBridge?.getLocale?.() ?? getLocaleRef.current?.() ?? 'en';
 
   const entry = useMemo(() => {
-    if (isAmountEntry) return base.entry;
+    if (skipDecoration) return base.entry;
     if (screenActionsBridge?.decorateEntry) {
       return screenActionsBridge.decorateEntry(base.entry, { language });
     }
     return defaultDecorate(base.entry, language);
-  }, [isAmountEntry, base.entry, screenActionsBridge, language]);
+  }, [skipDecoration, base.entry, screenActionsBridge, language]);
 
   const source = useMemo((): string | null => {
-    if (isAmountEntry) return null;
+    if (skipDecoration) return null;
     return screenActionsBridge?.getSourceLabel?.(base.entry) ?? null;
-  }, [isAmountEntry, base.entry, screenActionsBridge]);
+  }, [skipDecoration, base.entry, screenActionsBridge]);
+
+  // Derive mintUrl from the raw entry (before decoration converts it to FormattedString).
+  const mintUrl = useMemo((): string | undefined => {
+    const raw = base.entry;
+    if (!raw) return undefined;
+    const url = raw.mintUrl ?? raw.selectedMintUrl;
+    return typeof url === 'string' && url.length > 0 ? url : undefined;
+  }, [base.entry]);
 
   if (isAmountEntry) {
     return {
       entry,
       error: base.error,
       actions: base.actions as Record<ScreenActionName['amountEntry'], BoundAction>,
+      mintUrl,
       source: null,
       suggestions: base.suggestions,
     } as UseScreenActionsResult<ScreenType, any>;
@@ -346,6 +371,7 @@ export function useScreenActions(
     entry,
     error: base.error,
     actions: base.actions,
+    mintUrl,
     source,
     suggestions: [],
   } as UseScreenActionsResult<ScreenType, any>;

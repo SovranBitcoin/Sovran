@@ -17,14 +17,12 @@ import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useScreenActions, type UseScreenActionsResult } from 'coco-payment-ux/react';
 
 import type { FormattedString } from 'coco-payment-ux';
-import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { Section } from '@/features/settings';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { HistoryEntryRefresh } from '@/features/transactions';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ModalScreenLayout } from '@/shared/ui/composed/ModalScreenLayout';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
@@ -67,7 +65,7 @@ function ReceiveLightningTab({
   return (
     <>
       {showLightningAddress && (
-        <PaymentInfo data={data.npcAddress!.toString()} copyTarget="lightningAddress" unit="sat" />
+        <PaymentInfo data={data.npcAddress!.toString()} copyTarget="address" unit="sat" />
       )}
       {showLightningAddress && (
         <View className="mx-4">
@@ -185,20 +183,17 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const muted = useThemeColor('muted');
   const [selectedTab, setSelectedTab] = useState('Lightning');
 
-  const { entry, error, actions } = useScreenActions(
+  const { entry, error, actions, mintUrl } = useScreenActions(
     'receive',
     receiveEntry as string | Record<string, unknown> | undefined
   );
 
   const receiveEntryData = entry as ReceiveHubEntry | null;
-  const selectedMintUrl = receiveEntryData?.selectedMintUrl;
-  const walletContext = useWalletContextWithOverride(selectedMintUrl);
-  usePaymentFlowMachine({ walletContext, unit });
 
   const quickAccessP2PK = useSettingsStore((state) => state.quickAccessP2PK);
   const tabs = quickAccessP2PK ? ['Lightning', 'P2PK'] : ['Lightning'];
   const isNpcMintUpdating = useNpcMintStore((s) => s.isUpdating);
-  const mintInfo = useMintInfo(selectedMintUrl);
+  const mintInfo = useMintInfo(mintUrl);
 
   if (error) {
     return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
@@ -261,7 +256,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
           data={receiveEntryData}
           unit={unit}
           mintInfo={mintInfo}
-          selectedMintUrl={selectedMintUrl}
+          selectedMintUrl={mintUrl}
           isNpcMintUpdating={isNpcMintUpdating}
           actions={actions}
           muted={muted}

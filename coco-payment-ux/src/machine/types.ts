@@ -30,6 +30,7 @@ export type FlowStep =
   | 'openMint'
   | 'openProfile'
   | 'navigateToReceive'
+  | 'reviewMint'
   | 'dismiss'
   | 'error';
 
@@ -93,9 +94,19 @@ export interface StepDataMap {
   };
   createMintQuote: { mintUrl: string; amount: number; unit: string };
   mintQuoteCreated: { historyEntry: string; unit: string };
-  openMint: { url: string };
+  openMint: {
+    url: string;
+    /** Pre-loaded mint info (populated when `operations.buildMintReviewInfo` is provided). */
+    mintInfo?: import('../types').MintReviewInfo;
+  };
   openProfile: { npub: string };
   navigateToReceive: { unit: string };
+  reviewMint: {
+    mintUrl: string;
+    token: string;
+    /** Pre-loaded mint info (populated when `operations.buildMintReviewInfo` is provided). */
+    mintInfo?: import('../types').MintReviewInfo;
+  };
   dismiss: Record<string, never>;
   error: { code: ErrorCode; message: string; data?: Record<string, unknown> };
 }
@@ -131,6 +142,10 @@ export interface FlowContext {
   supportedMintUrls?: string[];
   /** When true, force offline send (proof selector) instead of online confirmSend. */
   offline?: boolean;
+  /** Token held during mint trust review. Set on REVIEW_MINT, consumed on MINT_TRUSTED. */
+  reviewToken?: string;
+  /** Original raw input string from scan/execute. Available after EXECUTE. */
+  rawInput?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +231,8 @@ export type FlowEvent =
   | { type: 'START_SEND_ECASH' }
   | { type: 'START_RECEIVE_LIGHTNING' }
   | { type: 'START_RECEIVE' }
+  | { type: 'REVIEW_MINT'; mintUrl: string; token: string }
+  | { type: 'MINT_TRUSTED' }
   | { type: 'RESET' };
 
 // ---------------------------------------------------------------------------
@@ -254,6 +271,41 @@ export type NotificationHandlerMap = {
    * Wallet should prompt to select a mint; machine stays on enterAmount.
    */
   onMissingMintForAmount?: () => MaybeAsync;
+  /**
+   * Called when a built-in copy action succeeds. The wallet decides how to
+   * present the feedback (toast, haptic, etc.).
+   *
+   * `target` identifies what was copied: `'token'`, `'paymentRequest'`,
+   * `'address'`, `'p2pk'`, `'mintUrl'`.
+   */
+  onCopied?: (target: string, text: string) => MaybeAsync;
+  /**
+   * Called when a built-in share action completes. The wallet decides how
+   * to present feedback (toast, haptic, etc.).
+   *
+   * `target` identifies what was shared: `'token'`, `'paymentRequest'`,
+   * `'address'`, `'p2pk'`, `'mintUrl'`.
+   */
+  onShared?: (target: string, text: string) => MaybeAsync;
+  /**
+   * Called after a scan/execute input is parsed and an intent is resolved.
+   * Fires once per EXECUTE event — the wallet uses this to record scan
+   * provenance in its history store.
+   *
+   * `rawInput` is the full original string the machine received.
+   * `parsedType` is the structural type detected by the parser (e.g.
+   * `'bip321'`, `'payment'`, `'mintUrl'`).
+   * `intentType` is the resolved action (e.g. `'receiveToken'`,
+   * `'meltLightningInvoice'`).
+   * `source` is the scan source hint (e.g. `'qr'`, `'clipboard'`,
+   * `'deeplink'`) when available.
+   */
+  onScanResolved?: (data: {
+    rawInput: string;
+    parsedType: string;
+    intentType: string;
+    source?: string;
+  }) => MaybeAsync;
 };
 
 // ---------------------------------------------------------------------------
@@ -277,6 +329,18 @@ export interface MachineOperations {
     unit: string
   ) => Promise<{ historyEntry: string }>;
   buildMintListItems: (data: StepDataMap['selectMint']) => Promise<MintListItem[]>;
+  /**
+   * Trust a mint. Called internally by `mintTrusted()` when the machine is
+   * in the `reviewMint` step. The machine transitions to `receiveToken`
+   * on success or `error` on failure.
+   */
+  trustMint?: (mintUrl: string) => Promise<void>;
+  /**
+   * Load detailed mint info for the trust review screen.
+   * Called when the machine enters the `reviewMint` step.
+   * The result is attached to `stepData.mintInfo` before the handler fires.
+   */
+  buildMintReviewInfo?: (mintUrl: string) => Promise<import('../types').MintReviewInfo>;
 }
 
 // ---------------------------------------------------------------------------
@@ -294,6 +358,8 @@ export interface URDecoderLike {
 export interface ScanOptions {
   /** Source hint when data is provided. When no data, selects which source to fetch from. */
   source?: 'clipboard' | 'gallery' | string;
+  /** When true, resets all flow state before processing the scan input. */
+  reset?: boolean;
 }
 
 export interface ProcessResult {
@@ -380,7 +446,7 @@ export interface PaymentMachine {
   /** Send any event to advance the machine. */
   send: (event: FlowEvent) => Promise<void>;
   /** Process scan/paste/lightning input. Parses and routes to the appropriate flow. */
-  execute: (input: string) => Promise<void>;
+  execute: (input: string, opts?: { reset?: boolean }) => Promise<void>;
   /** Submit amount and mint for the current flow. Pass `offline: true` to force proof selection. */
   enterAmount: (
     amount: number,
@@ -402,12 +468,25 @@ export interface PaymentMachine {
    * Pass `{ scope: 'npc' }` to update NPC mint only (not selectedMint).
    */
   requestMintSelector: (opts?: { reset?: boolean; scope?: 'npc' | 'selected' }) => Promise<void>;
-  /** Start a send ecash flow. Resets context, auto-selects mint, opens amount screen. */
-  startSendEcash: () => Promise<void>;
-  /** Start a receive lightning flow. Resets context, opens amount screen for mint quote. */
+  /** Start a send ecash flow. Auto-selects mint, opens amount screen. */
+  startSendEcash: (opts?: { reset?: boolean }) => Promise<void>;
+  /** Start a receive lightning flow. Opens amount screen for mint quote. */
   startReceiveLightning: () => Promise<void>;
   /** Open the receive hub screen (Lightning address, P2PK). */
-  startReceive: () => Promise<void>;
+  startReceive: (opts?: { reset?: boolean }) => Promise<void>;
+  /**
+   * Navigate to a mint info screen for trust review.
+   * Used when a received token comes from an untrusted mint.
+   * The `reviewMint` handler is dispatched so the wallet controls the navigation.
+   */
+  reviewMint: (mintUrl: string, token: string) => Promise<void>;
+  /**
+   * Trust the mint currently being reviewed.
+   * Calls `operations.trustMint(mintUrl)` internally, then transitions
+   * from `reviewMint` back to `receiveToken` so the user can retry the
+   * redeem. On failure, transitions to `error`.
+   */
+  mintTrusted: () => Promise<void>;
   /** Clear all flow state. */
   reset: () => void;
   /**

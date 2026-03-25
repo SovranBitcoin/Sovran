@@ -34,7 +34,6 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
 interface MeltQuoteScreenProps {
   meltHistoryEntry?: MeltHistoryEntry | string;
-  selectedMintUrl?: string;
   onCancel: () => void;
   onMintSelected?: (mintUrl: string) => void;
   onRequestMintList?: () => void;
@@ -42,12 +41,11 @@ interface MeltQuoteScreenProps {
 
 export function MeltQuoteScreen({
   meltHistoryEntry,
-  selectedMintUrl,
   onCancel,
   onMintSelected,
   onRequestMintList,
 }: MeltQuoteScreenProps) {
-  const { entry, error, actions, source } = useScreenActions('meltQuote', meltHistoryEntry);
+  const { entry, error, actions, source, mintUrl } = useScreenActions('meltQuote', meltHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
 
   if (error) {
@@ -111,7 +109,7 @@ export function MeltQuoteScreen({
           <MintSelector
             width={280}
             unit={entry.unit}
-            selectedMintUrl={selectedMintUrl}
+            selectedMintUrl={mintUrl}
             onMintSelected={onMintSelected ?? (() => {})}
             onRequestMintList={onRequestMintList ?? (() => {})}
           />
@@ -125,16 +123,14 @@ export function MeltQuoteScreen({
           items={[
             source && { title: 'Source', value: source },
             { title: 'Date', value: entry.createdAt.datetime },
-            !isPreview && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
-            isPreview &&
-              entry.metadata?.meltTarget && {
-                title: 'Destination',
-                value: truncateMiddle(entry.metadata.meltTarget, 12),
-              },
-            {
-              title: 'Amount',
-              value: formatAmount({ amount: entry.amount, unit: entry.unit }),
+            { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+            { title: 'State', value: entry.state },
+            entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+            entry.metadata?.meltTarget && {
+              title: 'Destination',
+              value: truncateMiddle(entry.metadata.meltTarget, 12),
             },
+            mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
           ].flatMap((item) => (item ? [item] : []))}
         />
       </VStack>

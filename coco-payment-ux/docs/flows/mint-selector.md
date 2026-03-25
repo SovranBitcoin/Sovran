@@ -129,10 +129,16 @@ The machine passes this step data to the handler:
 <CocoPaymentUXProvider
   handlers={(machine, refs) => ({
     // ...
-    selectMint: ({ mintListItems, scope }) => {
+    selectMint: ({ mintListItems, scope, destination, unit }) => {
+      const entry = {
+        items: mintListItems ?? [],
+        scope: scope ?? 'selected',
+        destination,
+        unit,
+      };
       router.push({
         pathname: '/(send-flow)/mintSelect',
-        params: { items: JSON.stringify(mintListItems), mintScope: scope },
+        params: { mintSelectorEntry: JSON.stringify(entry) },
       });
     },
     // ...
@@ -140,25 +146,29 @@ The machine passes this step data to the handler:
 />
 ```
 
-When the user taps a mint, the screen calls:
+## Mint Selection Screen
 
-```tsx
-machine.changeMint(mintUrl);
-```
+The entry from [`useScreenActions`](/guide/architecture#thin-screens) contains the pre-built mint list items, scope, and destination. Action availability is derived from `destination` — when absent (management/persist flow), `getInfo` and `addMint` are available. When `destination` is set (payment flow), only `select` is available.
 
 ```tsx
 import { View, Text, Pressable, ScrollView } from 'react-native';
 
-function MintSelectionScreen({ items, mintScope }) {
-  const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
-  const mintListItems = JSON.parse(items);
+function MintSelectionScreen({ mintSelectorEntry }) {
+  const walletContext = useWalletContext();
+  usePaymentFlowMachine({ walletContext });
+
+  const { entry, actions } = useScreenActions('mintSelector', mintSelectorEntry);
+
+  if (!entry) return <ActivityIndicator />;
+
+  const items = entry.items ?? [];
 
   return (
     <ScrollView>
-      {mintListItems.map((item) => (
+      {items.map((item) => (
         <Pressable
           key={item.mintUrl}
-          onPress={() => machine.changeMint(item.mintUrl)}
+          onPress={() => actions.select.execute({ mintUrl: item.mintUrl })}
           disabled={item.status === 'disabled'}>
           <Text>{item.displayName}</Text>
           <Text>
@@ -167,6 +177,11 @@ function MintSelectionScreen({ items, mintScope }) {
           {item.isPreferred && <Text>Preferred</Text>}
           {item.worksOffline && <Text>Offline</Text>}
           {item.reason && <Text>{item.reason.message}</Text>}
+          {actions.getInfo.available && (
+            <Pressable onPress={() => actions.getInfo.execute({ mintUrl: item.mintUrl })}>
+              <Text>...</Text>
+            </Pressable>
+          )}
         </Pressable>
       ))}
     </ScrollView>
@@ -187,6 +202,80 @@ function MintSelectionScreen({ items, mintScope }) {
 - Show the `motd` (message of the day) as an inline notification on a mint row when it has important announcements
 - When displaying NUT support, translate NUT numbers into feature descriptions (e.g., "Offline sends" instead of "NUT-11") — skip mandatory NUTs 01-06 since all Cashu mints implement them
   :::
+
+### Actions
+
+| Action    | Available when                    | What it does                                                                       |
+| --------- | --------------------------------- | ---------------------------------------------------------------------------------- |
+| `select`  | Items exist                       | Call `machine.changeMint(mintUrl, { scope })` to continue the flow                 |
+| `getInfo` | No `destination` (management flow) | Navigate to the [Mint Info](/flows/cashu-receive#mint-review-screen) screen       |
+| `addMint` | No `destination` (management flow) | Navigate to the mint adder screen                                                 |
+
+Availability is derived from the entry's `destination` field. Payment flows set a destination (`sendEcash`, `meltQuote`, `mintQuote`, `paymentRequest`) — in that context, the user just picks a mint and continues. Management flows (e.g., home screen "Select Mint") omit `destination`, which enables `getInfo` (3-dots on each row) and `addMint` (header "+" button).
+
+### Action handlers
+
+```tsx
+<CocoPaymentUXProvider
+  actions={{
+    mintSelector: {
+      select: async (ctx) => {
+        const mintUrl = ctx.mintUrl;
+        const scope = ctx.entry.scope ?? 'selected';
+        await ctx.paymentMachine?.changeMint?.(mintUrl, { scope });
+      },
+      getInfo: async (ctx) => {
+        const mintUrl = ctx.mintUrl;
+        const info = await loadMintReviewInfo(ctx.manager, mintUrl);
+        router.navigate({
+          pathname: '/(mint-flow)/info',
+          params: { mintInfoEntry: JSON.stringify(info) },
+        });
+      },
+      addMint: async (ctx) => {
+        router.push('/(mint-flow)/add');
+      },
+    },
+  }}
+/>
+```
+
+::: info getInfo loads mint data
+The `getInfo` handler fetches full mint metadata (name, icon, trust status, audit scores) before navigating — the mint info screen receives a complete entry via route params, no data fetching needed on the target screen. This is the same pattern as `operations.buildMintReviewInfo` used by the machine's `reviewMint` and `openMint` steps.
+:::
+
+### Live updates
+
+The mint selector entry updates reactively when audit or review data arrives after the initial load. The wallet subscribes to audit and KYM store changes via [`screenActionsBridge.onEntryUpdate`](/guide/architecture#live-updates) — when scores update, each item in the entry's `items` array is enriched with the latest `kymScore`, `auditScore`, `auditState`, and related fields. No screen-side data fetching needed.
+
+```tsx
+<CocoPaymentUXProvider
+  screenActionsBridge={{
+    onEntryUpdate: (screenType, callback) => {
+      if (screenType === 'mintSelector') {
+        const unsubs = [
+          auditStore.subscribe(() => callback({ _mintItemsEnrichment: true })),
+          kymStore.subscribe(() => callback({ _mintItemsEnrichment: true })),
+        ];
+        return () => unsubs.forEach((u) => u());
+      }
+      // ...
+    },
+    mergeEntryUpdate: (current, updated) => {
+      if (updated._mintItemsEnrichment && Array.isArray(current?.items)) {
+        const items = current.items.map((item) => ({
+          ...item,
+          ...getEnrichment(item.mintUrl),
+        }));
+        return { ...current, items };
+      }
+      return defaultMerge(current, updated);
+    },
+  }}
+/>
+```
+
+The same pattern applies to the [Mint Info](/flows/cashu-receive#mint-review-screen) screen — audit and KYM data arriving after page load is merged into the entry via `_mintEnrichment` updates, keeping scores, success rates, and swap counts fresh.
 
 ### MintListItem
 

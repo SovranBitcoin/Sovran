@@ -13,6 +13,7 @@ import type { MintHistoryEntry } from 'coco-cashu-core';
 import { useScreenActions } from 'coco-payment-ux/react';
 
 import { MintSelector } from '@/features/wallet';
+import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import {
   HistoryEntryHeader,
@@ -35,7 +36,6 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 interface MintQuoteScreenProps {
   mintHistoryEntry: MintHistoryEntry | string;
   extraButtons?: ButtonHandlerButton[];
-  selectedMintUrl?: string;
   onMintSelected?: (mintUrl: string) => void;
   onRequestMintList?: () => void;
 }
@@ -43,11 +43,10 @@ interface MintQuoteScreenProps {
 export function MintQuoteScreen({
   mintHistoryEntry,
   extraButtons = [],
-  selectedMintUrl,
   onMintSelected,
   onRequestMintList,
 }: MintQuoteScreenProps) {
-  const { entry, error, actions, source } = useScreenActions('mintQuote', mintHistoryEntry);
+  const { entry, error, actions, source, mintUrl } = useScreenActions('mintQuote', mintHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
 
   if (error) {
@@ -100,7 +99,7 @@ export function MintQuoteScreen({
           <PaymentInfo
             data={[{ name: 'Lightning', value: entry.paymentRequest }]}
             unit={entry.unit}
-            copyTarget="lightningAddress"
+            copyTarget="paymentRequest"
           />
         )}
 
@@ -110,7 +109,7 @@ export function MintQuoteScreen({
           <MintSelector
             width={280}
             unit={entry.unit}
-            selectedMintUrl={selectedMintUrl}
+            selectedMintUrl={mintUrl}
             onMintSelected={onMintSelected ?? (() => {})}
             onRequestMintList={onRequestMintList ?? (() => {})}
           />
@@ -125,6 +124,11 @@ export function MintQuoteScreen({
         <DetailsSection
           items={[
             source && { title: 'Source', value: source },
+            { title: 'Date', value: entry.createdAt.datetime },
+            { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+            { title: 'State', value: entry.state },
+            entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+            mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
             {
               title: 'Invoice',
               value: truncateMiddle(entry.paymentRequest, 10),

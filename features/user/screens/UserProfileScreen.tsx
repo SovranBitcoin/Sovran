@@ -901,7 +901,9 @@ export function UserProfileScreen() {
                 <Link
                   href={{
                     pathname: '/(mint-flow)/info' as any,
-                    params: { mintUrl: profileData.mintUrl },
+                    params: {
+                      mintInfoEntry: JSON.stringify({ mintUrl: profileData.mintUrl }),
+                    },
                   }}
                   asChild>
                   <TouchableOpacity style={{ padding: 8 }}>

@@ -157,6 +157,37 @@ export interface MintListItem {
   worksOffline?: boolean;
 }
 
+/**
+ * Detailed mint info for the trust review screen. Extends `MintListItem` fields
+ * with NUT-06 metadata (description, contact, MOTD, supported NUTs) and trust status.
+ *
+ * Populated by `operations.buildMintReviewInfo()` when the machine enters
+ * the `reviewMint` step. The handler receives this in `stepData.mintInfo`.
+ */
+export interface MintReviewInfo {
+  mintUrl: string;
+  displayName: string;
+  iconUrl?: string;
+  description?: string;
+  longDescription?: string;
+  motd?: string;
+  contact?: Array<{ method: string; info: string }>;
+  nuts?: number[];
+  balance: number;
+  unit: string;
+  isPreferred: boolean;
+  isTrusted: boolean;
+  kymScore?: number;
+  auditScore?: number;
+  auditState?: string;
+  successRate?: number;
+  avgTimeMs?: number;
+  swapSuccess?: number;
+  swapTotal?: number;
+  totalMints?: number;
+  totalMelts?: number;
+}
+
 export type MintSelectionResult =
   | { type: 'selected'; mintUrl: string; balance: number }
   | { type: 'selectionNeeded'; validMints: MintCandidate[] }

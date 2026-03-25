@@ -168,6 +168,18 @@ export interface CocoPaymentUXProviderProps {
    */
   translations?: Record<string, Record<string, string>>;
   /**
+   * Platform clipboard write. When provided, built-in `copy` actions work
+   * out of the box — the wallet only needs to handle `onCopied` in
+   * `notifications` to show UI feedback.
+   */
+  writeClipboard?: (text: string) => Promise<void>;
+  /**
+   * Platform share sheet. When provided, built-in `share` actions work
+   * out of the box. Tokens include a `cashu://` URL; other content passes
+   * the raw text as `message`.
+   */
+  shareContent?: (content: { message: string; url?: string }) => Promise<void>;
+  /**
    * Optional wallet wiring for `useScreenActions` (extra context, history
    * subscriptions, decoration, scan provenance).
    */
@@ -196,6 +208,11 @@ export interface CocoPaymentUXContextValue {
   getDisplayCurrencyRef: React.MutableRefObject<
     (() => { code: string; symbol: string } | null) | undefined
   >;
+  notificationsRef: React.MutableRefObject<NotificationHandlerMap | undefined>;
+  writeClipboardRef: React.MutableRefObject<((text: string) => Promise<void>) | undefined>;
+  shareContentRef: React.MutableRefObject<
+    ((content: { message: string; url?: string }) => Promise<void>) | undefined
+  >;
 }
 
 const CocoPaymentUXContext = createContext<CocoPaymentUXContextValue | null>(null);
@@ -223,12 +240,21 @@ export function CocoPaymentUXProvider({
   getOffline,
   getBtcPrice,
   getDisplayCurrency,
+  writeClipboard,
+  shareContent,
   actions,
   screenActionsBridge,
   deepLinks,
 }: CocoPaymentUXProviderProps) {
   const getLocaleRef = useRef(getLocale);
   getLocaleRef.current = getLocale;
+
+  const notificationsRef = useRef(notifications);
+  notificationsRef.current = notifications;
+  const writeClipboardRef = useRef(writeClipboard);
+  writeClipboardRef.current = writeClipboard;
+  const shareContentRef = useRef(shareContent);
+  shareContentRef.current = shareContent;
 
   if (translations) {
     for (const [lang, dict] of Object.entries(translations)) {
@@ -360,6 +386,9 @@ export function CocoPaymentUXProvider({
       getLocaleRef,
       getBtcPriceRef,
       getDisplayCurrencyRef,
+      notificationsRef,
+      writeClipboardRef,
+      shareContentRef,
     }),
     [walletContextRef, screenActionHandlers, screenActionsBridge]
   );

@@ -152,6 +152,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   let urDecoder: ReturnType<NonNullable<typeof createURDecoder>> | null =
     createURDecoder?.() ?? null;
   let processedRef = false;
+  let lastScanSource: string | undefined;
 
   let step: FlowStep = 'idle';
   let flowCtx: FlowContext = { unit: configUnit };
@@ -161,6 +162,17 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   const listeners = new Set<() => void>();
 
   let cachedSnapshot: ExecutionState = deriveExecutionState('idle', {} as any);
+
+  function resetInternal() {
+    step = 'idle';
+    flowCtx = { unit: getUnit?.() ?? configUnit };
+    stepData = {} as any;
+    handlerExecuting = false;
+    processedRef = false;
+    if (createURDecoder) {
+      urDecoder = createURDecoder();
+    }
+  }
 
   const notify = () => {
     const locale = getLocale?.() ?? 'en';
@@ -197,11 +209,27 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           }
         : event;
 
+    const reviewMintData =
+      event.type === 'MINT_TRUSTED' && step === 'reviewMint'
+        ? (stepData as StepDataMap['reviewMint'])
+        : null;
+
     const result = transition(step, flowCtx, eventForTransition, detectors, walletCtx, unit);
 
     step = result.step;
     flowCtx = result.context;
     stepData = result.data;
+
+    if (event.type === 'EXECUTE' && notifications?.onScanResolved && flowCtx.parsed) {
+      const scanSource = lastScanSource;
+      lastScanSource = undefined;
+      void notifications.onScanResolved({
+        rawInput: event.input,
+        parsedType: flowCtx.parsed.type ?? 'unknown',
+        intentType: flowCtx.intent?.type ?? 'unknown',
+        source: scanSource,
+      });
+    }
 
     if (eventForTransition.type === 'AMOUNT_ENTERED') {
       const e = eventForTransition;
@@ -316,6 +344,51 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       }
     }
 
+    // Review mint / open mint: load detailed mint info before dispatching the handler.
+    if (
+      (step === 'reviewMint' || step === 'openMint') &&
+      operations?.buildMintReviewInfo
+    ) {
+      const mintUrl =
+        step === 'reviewMint'
+          ? (stepData as StepDataMap['reviewMint']).mintUrl
+          : (stepData as StepDataMap['openMint']).url;
+      handlerExecuting = true;
+      notify();
+      try {
+        const info = await operations.buildMintReviewInfo(mintUrl);
+        (stepData as any).mintInfo = info;
+      } catch (err) {
+        step = 'error';
+        stepData = {
+          code: 'UNSUPPORTED_INPUT',
+          message:
+            err instanceof Error ? err.message : t('LOAD_MINTS_FAILED', getLocale?.() ?? 'en'),
+        } as any;
+      }
+      handlerExecuting = false;
+      notify();
+    }
+
+    // Trust mint operation: when MINT_TRUSTED transitions to receiveToken,
+    // call operations.trustMint first. On failure, redirect to error.
+    if (reviewMintData && operations?.trustMint && step === 'receiveToken') {
+      handlerExecuting = true;
+      notify();
+      try {
+        await operations.trustMint(reviewMintData.mintUrl);
+      } catch (err) {
+        step = 'error';
+        stepData = {
+          code: 'UNSUPPORTED_INPUT',
+          message:
+            err instanceof Error ? err.message : t('TRUST_MINT_FAILED', getLocale?.() ?? 'en'),
+        } as any;
+      }
+      handlerExecuting = false;
+      notify();
+    }
+
     // Dispatch notification for error steps (fire-and-forget).
     if (step === 'error' && notifications) {
       const errorData = stepData as StepDataMap['error'];
@@ -350,16 +423,14 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   };
 
   const requestMintSelector = (opts?: { reset?: boolean; scope?: 'npc' | 'selected' }) => {
-    if (opts?.reset) {
-      step = 'idle';
-      flowCtx = { unit: getUnit?.() ?? configUnit };
-      stepData = {} as any;
-      handlerExecuting = false;
-    }
+    if (opts?.reset) resetInternal();
     return send({ type: 'REQUEST_MINT_SELECTOR', scope: opts?.scope });
   };
 
-  const execute = (input: string) => send({ type: 'EXECUTE', input });
+  const execute = (input: string, opts?: { reset?: boolean }) => {
+    if (opts?.reset) resetInternal();
+    return send({ type: 'EXECUTE', input });
+  };
 
   async function processScanData(data: string): Promise<ProcessResult> {
     const isUR = data.startsWith('ur:') || data.startsWith('UR:');
@@ -399,7 +470,10 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   const scan =
     createURDecoder || scanSources
       ? async (data?: string, options?: ScanOptions): Promise<ProcessResult> => {
+          if (options?.reset) resetInternal();
+
           const hasData = data != null && data.length > 0;
+          lastScanSource = options?.source ?? (hasData ? undefined : 'clipboard');
 
           if (hasData) {
             return processScanData(data);
@@ -464,20 +538,24 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
   const chooseProofs = (amount: number) => send({ type: 'PROOFS_CHOSEN', amount });
 
-  const startSendEcash = () => send({ type: 'START_SEND_ECASH' });
+  const startSendEcash = (opts?: { reset?: boolean }) => {
+    if (opts?.reset) resetInternal();
+    return send({ type: 'START_SEND_ECASH' });
+  };
 
   const startReceiveLightning = () => send({ type: 'START_RECEIVE_LIGHTNING' });
-  const startReceive = () => send({ type: 'START_RECEIVE' });
+  const startReceive = (opts?: { reset?: boolean }) => {
+    if (opts?.reset) resetInternal();
+    return send({ type: 'START_RECEIVE' });
+  };
+
+  const reviewMint = (mintUrl: string, token: string) =>
+    send({ type: 'REVIEW_MINT', mintUrl, token });
+
+  const mintTrusted = () => send({ type: 'MINT_TRUSTED' });
 
   const reset = () => {
-    step = 'idle';
-    flowCtx = { unit: getUnit?.() ?? configUnit };
-    stepData = {} as any;
-    handlerExecuting = false;
-    processedRef = false;
-    if (createURDecoder) {
-      urDecoder = createURDecoder();
-    }
+    resetInternal();
     notify();
   };
 
@@ -493,6 +571,8 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     startSendEcash,
     startReceiveLightning,
     startReceive,
+    reviewMint,
+    mintTrusted,
     reset,
     inspect: () => cachedSnapshot,
     getContext: () => flowCtx,

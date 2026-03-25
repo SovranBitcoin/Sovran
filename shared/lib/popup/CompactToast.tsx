@@ -32,7 +32,7 @@ export function CompactToast({
   hide,
   ...toastProps
 }: CompactToastProps) {
-  const [surface] = useThemeColor(['surface'] as const);
+  const [surface, foreground] = useThemeColor(['surface', 'foreground'] as const);
   const backgroundColor = sanitizeColor(String(surface));
 
   const handleActionPress = () => {
@@ -59,7 +59,10 @@ export function CompactToast({
         }}>
         {icon && <View>{icon}</View>}
         <View style={{ flex: 1, gap: 2 }}>
-          <Toast.Title className="text-[15px] font-semibold" numberOfLines={1}>
+          <Toast.Title
+            className="text-[15px] font-semibold"
+            style={variant === 'success' ? { color: sanitizeColor(String(foreground)) } : undefined}
+            numberOfLines={1}>
             {label}
           </Toast.Title>
           {description ? (

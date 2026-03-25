@@ -14,6 +14,9 @@ await machine.scan(qrData, { source: 'qr' });
 await machine.scan(undefined, { source: 'clipboard' });
 
 await machine.scan(undefined, { source: 'gallery' });
+
+// From outside a flow (e.g., deep link handler) — clear stale state first:
+await machine.scan(deepLinkData, { reset: true });
 ```
 
 | Call                                               | What it does                                                      |
@@ -21,8 +24,22 @@ await machine.scan(undefined, { source: 'gallery' });
 | `machine.scan(data, { source: 'qr' })`             | Parse string data directly                                        |
 | `machine.scan(undefined, { source: 'clipboard' })` | Read from clipboard via [`scanSources.clipboard`](#configuration) |
 | `machine.scan(undefined, { source: 'gallery' })`   | Read from image via [`scanSources.gallery`](#configuration)       |
+| `machine.scan(data, { reset: true })`               | Clear stale flow state before parsing — use from outside a flow   |
 
-The `source` parameter is a hint — when data is provided, it's parsed directly regardless of source. When data is omitted, `source` determines which [`ScanSources`](#configuration) function to call.
+The `source` parameter is a hint — when data is provided, it's parsed directly regardless of source. When data is omitted, `source` determines which [`ScanSources`](#configuration) function to call. Pass `{ reset: true }` to clear stale flow context before processing — use this when calling from outside a flow (e.g., deep link handlers, notification taps).
+
+## machine.execute()
+
+Shorthand for scanning when you already have a string and don't need source resolution or UR assembly:
+
+```tsx
+await machine.execute(inputString);
+
+// From outside a flow — clear stale state first:
+await machine.execute(inputString, { reset: true });
+```
+
+Equivalent to `machine.scan(data)` but always synchronous with respect to source fetching — it parses the string directly. Pass `{ reset: true }` when calling from outside a flow to clear stale context.
 
 ## Routing
 
