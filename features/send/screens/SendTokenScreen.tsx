@@ -129,7 +129,7 @@ export function SendTokenScreen({ sendHistoryEntry, onNavigateBack }: SendTokenS
           />
         )}
 
-        {mintInfo && <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />}
+        <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />
 
         <HistoryEntryTimeline historyEntry={entry} />
 

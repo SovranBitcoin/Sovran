@@ -88,24 +88,38 @@ function checkProofComposition(
   unit: string,
   ctx: FlowContext
 ): StepResult<'chooseProofs'> | null {
+  // Only show proof selector for ecash sends. Lightning melts and payment
+  // requests must always attempt the exact amount — the mint handles the
+  // swap server-side, so showing a proof picker is incorrect.
+  if (ctx.destination !== 'sendEcash') return null;
+
   const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
   if (proofAmounts.length === 0) return null;
 
   const composition = composeSatoshis(proofAmounts, amount);
-  if (composition.exactMatch) return null;
+
+  // When the device is offline, always show the proof selector — even if
+  // proofs compose exactly — because the mint swap endpoint is unreachable.
+  if (!ctx.offline && composition.exactMatch) return null;
 
   return {
     step: 'chooseProofs',
     data: {
       mintUrl,
       amount,
-      paymentRequest: ctx.paymentRequest,
-      meltTarget: ctx.meltTarget,
       unit,
       proofAmounts,
       suggestions: {
-        roundDown: composition.nearestLower != null ? { amount: composition.nearestLower } : null,
-        roundUp: composition.nearestUpper != null ? { amount: composition.nearestUpper } : null,
+        roundDown: composition.exactMatch
+          ? { amount }
+          : composition.nearestLower != null
+            ? { amount: composition.nearestLower }
+            : null,
+        roundUp: composition.exactMatch
+          ? null
+          : composition.nearestUpper != null
+            ? { amount: composition.nearestUpper }
+            : null,
       },
     },
   };
@@ -275,10 +289,11 @@ export function resolveNext(
     }
   }
 
-  // 3. Mint is valid. Check proof composition (offline mode).
+  // 3. Mint is valid. Check proof composition (ecash sends only).
   const mintUrl = ctx.mintUrl!;
+  const ctxWithDest = ctx.destination === destination ? ctx : { ...ctx, destination };
   if (needsSpendableBalance(destination)) {
-    const proofResult = checkProofComposition(walletCtx, mintUrl, amount, unit, ctx);
+    const proofResult = checkProofComposition(walletCtx, mintUrl, amount, unit, ctxWithDest);
     if (proofResult) return { ...proofResult, contextPatch: { destination } };
   }
 

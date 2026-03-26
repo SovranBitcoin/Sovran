@@ -99,7 +99,7 @@ function ReceiveLightningTab({
         </View>
       )}
 
-      {showLightningAddress && mintInfo && (
+      {showLightningAddress && (
         <HistoryEntryRefresh
           mintInfo={mintInfo}
           historyEntry={{

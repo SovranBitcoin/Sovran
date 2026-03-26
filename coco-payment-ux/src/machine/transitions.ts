@@ -390,31 +390,9 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
         },
       };
     }
+    // Melts always attempt the exact amount — the mint handles the swap
+    // server-side. Never show the proof selector for lightning sends.
     if (mintUrl) {
-      const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
-      if (proofAmounts.length > 0) {
-        const composition = composeSatoshis(proofAmounts, amount);
-        if (!composition.exactMatch) {
-          return {
-            step: 'chooseProofs',
-            context: { ...ctx, destination },
-            data: {
-              mintUrl,
-              amount,
-              unit,
-              paymentRequest: ctx.paymentRequest,
-              meltTarget: ctx.meltTarget,
-              proofAmounts,
-              suggestions: {
-                roundDown:
-                  composition.nearestLower != null ? { amount: composition.nearestLower } : null,
-                roundUp:
-                  composition.nearestUpper != null ? { amount: composition.nearestUpper } : null,
-              },
-            },
-          };
-        }
-      }
       return {
         step: 'navigateToMeltPreview',
         context: { ...ctx, destination },
@@ -441,35 +419,47 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
   }
 
   if (mintUrl) {
-    const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
-    if (proofAmounts.length > 0) {
-      const composition = composeSatoshis(proofAmounts, amount);
-      if (!composition.exactMatch) {
-        return {
-          step: 'chooseProofs',
-          context: { ...ctx, destination },
-          data: {
-            mintUrl,
-            amount,
-            unit,
-            paymentRequest: ctx.paymentRequest,
-            meltTarget: ctx.meltTarget,
-            proofAmounts,
-            suggestions: {
-              roundDown: composition.exactMatch
-                ? { amount }
-                : composition.nearestLower != null
-                  ? { amount: composition.nearestLower }
-                  : null,
-              roundUp: composition.exactMatch
-                ? null
-                : composition.nearestUpper != null
-                  ? { amount: composition.nearestUpper }
-                  : null,
+    // Only show proof selector for ecash sends — payment requests must
+    // always attempt the exact amount.
+    if (destination === 'sendEcash') {
+      const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
+      if (proofAmounts.length > 0) {
+        const composition = composeSatoshis(proofAmounts, amount);
+        // When offline, always show proof selector (mint swap unreachable).
+        if (ctx.offline || !composition.exactMatch) {
+          return {
+            step: 'chooseProofs',
+            context: { ...ctx, destination },
+            data: {
+              mintUrl,
+              amount,
+              unit,
+              proofAmounts,
+              suggestions: {
+                roundDown: composition.exactMatch
+                  ? { amount }
+                  : composition.nearestLower != null
+                    ? { amount: composition.nearestLower }
+                    : null,
+                roundUp: composition.exactMatch
+                  ? null
+                  : composition.nearestUpper != null
+                    ? { amount: composition.nearestUpper }
+                    : null,
+              },
             },
-          },
-        };
+          };
+        }
       }
+    }
+
+    // Terminal step for whichever destination we're heading to.
+    if (destination === 'paymentRequest' && ctx.paymentRequest) {
+      return {
+        step: 'navigateToPaymentRequest',
+        context: { ...ctx, destination },
+        data: { mintUrl, paymentRequest: ctx.paymentRequest, unit, amount },
+      };
     }
     return {
       step: 'confirmSend',

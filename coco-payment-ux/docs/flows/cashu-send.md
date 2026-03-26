@@ -48,9 +48,9 @@ flowchart TD
   resolve -. "needs amount" .-> enterAmt
   resolve -- "amount AND mint ready" --> offlineCheck
 
-  offlineCheck{"Can proofs compose\nexact amount?"}:::decision
-  offlineCheck -- "exact match OR online" --> execSend
-  offlineCheck -- "no exact match AND offline" --> proofStep
+  offlineCheck{"Offline OR proofs\ncan't compose exact?"}:::decision
+  offlineCheck -- "online AND exact match" --> execSend
+  offlineCheck -- "offline OR no exact match" --> proofStep
 
   proofStep["handler.chooseProofs()"]:::handler
   proofStep --> userProof
@@ -64,7 +64,7 @@ flowchart TD
 
   execSend["operations.executeSend()"]:::operation
   execSend -- "success" --> complete
-  execSend -. "failure while offline" .-> offlineCheck
+  execSend -. "failure + proofs available" .-> proofStep
 
   complete["handler.sendComplete()"]:::handler
 
@@ -202,12 +202,16 @@ For cashu sends, `destination` is `'sendEcash'` — mints need balance to cover 
 
 ### handler.chooseProofs()
 
-When the device is offline (or an online send fails), the wallet can't swap proofs with the mint to split them into the exact amount. The machine checks whether the selected mint's proofs can compose the exact amount:
+The proof selector only appears for **ecash sends** — never for lightning melts or payment requests, which always attempt the exact amount because the mint handles the swap server-side.
 
-- **Exact match** → send proceeds normally, user sees nothing extra
-- **No exact match** → this handler is called with round-down/round-up suggestions
+The machine checks whether the selected mint's proofs can compose the exact amount:
 
-Most sends go through without the user noticing. The handler only fires when proofs genuinely can't compose the exact amount without a mint swap.
+- **Online AND exact match** → send proceeds directly via `operations.executeSend()`, user sees nothing extra
+- **Offline** → always shows the proof selector, even if proofs compose exactly, because the mint swap endpoint is unreachable
+- **Online but no exact match** → shows the proof selector with round-down/round-up suggestions
+- **Online send fails** → falls back to the proof selector if proofs are available, otherwise shows an error
+
+Most sends go through without the user noticing. The handler only fires when proofs genuinely can't compose the exact amount without a mint swap, or when the device is offline.
 
 ```mermaid
 sequenceDiagram

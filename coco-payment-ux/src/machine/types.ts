@@ -140,7 +140,15 @@ export interface FlowContext {
   paymentRequest?: string;
   meltTarget?: string;
   supportedMintUrls?: string[];
-  /** When true, force offline send (proof selector) instead of online confirmSend. */
+  /**
+   * When true, force the proof selector for ecash sends instead of attempting
+   * an online confirmSend. Set from the device offline provider via `getOffline()`
+   * or explicitly via `enterAmount({ offline: true })`.
+   *
+   * Only affects `sendEcash` — melt (lightning) and payment request flows always
+   * attempt the operation regardless of offline status because the mint handles
+   * the swap server-side.
+   */
   offline?: boolean;
   /** Token held during mint trust review. Set on REVIEW_MINT, consumed on MINT_TRUSTED. */
   reviewToken?: string;

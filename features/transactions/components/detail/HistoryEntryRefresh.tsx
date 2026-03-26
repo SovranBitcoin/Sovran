@@ -8,17 +8,19 @@ import type { HistoryEntry } from 'coco-cashu-core';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface HistoryEntryRefreshProps {
-  mintInfo: GetInfoResponse;
+  mintInfo?: GetInfoResponse | null;
   historyEntry: Partial<HistoryEntry> & { type: HistoryEntry['type']; state?: string };
   onPress?: () => void;
 }
 
 export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: HistoryEntryRefreshProps) {
   const foreground = useThemeColor('foreground');
+  const loading = !mintInfo;
 
   const statusLabel =
     historyEntry.type === 'send'
@@ -39,13 +41,18 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
           size={40}
           name={mintInfo?.name}
           alt={`${mintInfo?.name || 'Mint'} icon`}
+          loading={loading}
         />
       </ListGroup.ItemPrefix>
       <ListGroup.ItemContent>
         <ListGroup.ItemTitle className="font-normal">{statusLabel}</ListGroup.ItemTitle>
-        <ListGroup.ItemDescription className="text-foreground text-base font-bold">
-          {mintInfo?.name}
-        </ListGroup.ItemDescription>
+        {loading ? (
+          <Skeleton className="mt-1 h-4 w-28 rounded-md" />
+        ) : (
+          <ListGroup.ItemDescription className="text-foreground text-base font-bold">
+            {mintInfo?.name}
+          </ListGroup.ItemDescription>
+        )}
       </ListGroup.ItemContent>
       {onPress && (
         <ListGroup.ItemSuffix>

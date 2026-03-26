@@ -86,7 +86,7 @@ export function ReceiveTokenScreen({
 
         {isRedeemed && <TransactionLocationSection transactionId={entry.id} />}
 
-        {mintInfo && <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />}
+        <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />
 
         <HistoryEntryTimeline
           historyEntry={
