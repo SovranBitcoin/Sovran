@@ -17,6 +17,7 @@ import type {
 export type FlowStep =
   | 'idle'
   | 'chooseOption'
+  | 'chooseFallbackOption'
   | 'enterAmount'
   | 'selectMint'
   | 'chooseProofs'
@@ -46,6 +47,13 @@ export interface StepDataMap {
     parsed: ParsedPaymentInput;
     options: AnnotatedOption[];
     unit: string;
+  };
+  chooseFallbackOption: {
+    parsed: ParsedPaymentInput;
+    options: AnnotatedOption[];
+    unit: string;
+    failedOptionValues: string[];
+    lastFailedMessage?: string;
   };
   enterAmount: {
     unit: string;
@@ -124,7 +132,9 @@ export type ErrorCode =
   | 'ALL_OPTIONS_DISABLED'
   | 'MISSING_MELT_TARGET'
   | 'SEND_FAILED'
-  | 'MINT_QUOTE_FAILED';
+  | 'MINT_QUOTE_FAILED'
+  | 'MELT_FAILED'
+  | 'PAYMENT_REQUEST_FAILED';
 
 // ---------------------------------------------------------------------------
 // Flow Context — accumulated data through the flow
@@ -154,6 +164,10 @@ export interface FlowContext {
   reviewToken?: string;
   /** Original raw input string from scan/execute. Available after EXECUTE. */
   rawInput?: string;
+  /** Original annotated options from BIP321 multi-option flow. Captured on first OPTION_CHOSEN. */
+  originalOptions?: AnnotatedOption[];
+  /** Option values that have been tried and failed. */
+  failedOptionValues?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -186,6 +200,7 @@ export type ExecutionState =
         | 'NO_AMOUNT'
         | 'MINT_SELECTION_REQUIRED'
         | 'OPTION_SELECTION_REQUIRED'
+        | 'FALLBACK_OPTION_REQUIRED'
         | 'PROOF_SELECTION_REQUIRED';
       message: string;
       isExecutable: false;
@@ -202,7 +217,9 @@ export type ExecutionState =
         | 'NO_BALANCE'
         | 'ALL_OPTIONS_DISABLED'
         | 'SEND_FAILED'
-        | 'MINT_QUOTE_FAILED';
+        | 'MINT_QUOTE_FAILED'
+        | 'MELT_FAILED'
+        | 'PAYMENT_REQUEST_FAILED';
       message: string;
       isExecutable: false;
       isExecuting: boolean;
@@ -241,6 +258,8 @@ export type FlowEvent =
   | { type: 'START_RECEIVE' }
   | { type: 'REVIEW_MINT'; mintUrl: string; token: string }
   | { type: 'MINT_TRUSTED' }
+  | { type: 'CONFIRM_MELT' }
+  | { type: 'CONFIRM_PAYMENT_REQUEST' }
   | { type: 'RESET' };
 
 // ---------------------------------------------------------------------------
@@ -314,6 +333,39 @@ export type NotificationHandlerMap = {
     intentType: string;
     source?: string;
   }) => MaybeAsync;
+  /**
+   * Called when a multi-step operation starts (melt, payment request).
+   * The wallet shows a processing indicator (toast/sheet).
+   */
+  onPaymentProcessing?: (data: {
+    variant: 'melt' | 'paymentRequest' | 'send';
+    mintUrl: string;
+    amount: number;
+    unit: string;
+  }) => MaybeAsync;
+  /**
+   * Called when a multi-step operation completes successfully.
+   * The wallet updates the processing indicator to show success.
+   */
+  onPaymentConfirmed?: (data: {
+    variant: 'melt' | 'paymentRequest' | 'send';
+    mintUrl: string;
+    amount: number;
+    unit: string;
+    historyEntry: string;
+  }) => MaybeAsync;
+  /**
+   * Called when a multi-step operation fails and no fallback options exist.
+   * When BIP321 fallback IS available, the machine transitions to
+   * `chooseFallbackOption` instead of firing this notification.
+   */
+  onPaymentFailed?: (data: {
+    variant: 'melt' | 'paymentRequest' | 'send';
+    mintUrl: string;
+    amount: number;
+    unit: string;
+    message: string;
+  }) => MaybeAsync;
 };
 
 // ---------------------------------------------------------------------------
@@ -349,6 +401,33 @@ export interface MachineOperations {
    * The result is attached to `stepData.mintInfo` before the handler fires.
    */
   buildMintReviewInfo?: (mintUrl: string) => Promise<import('../types').MintReviewInfo>;
+  /**
+   * Execute a lightning melt. Called when the user confirms a melt from the
+   * preview screen via `confirmMelt()`. The machine routes to the result
+   * handler on success or BIP321 fallback / error on failure.
+   */
+  executeMelt?: (
+    mintUrl: string,
+    meltTarget: string,
+    amount: number,
+    unit: string
+  ) => Promise<{ historyEntry: string }>;
+  /**
+   * Execute a payment request send. Called when the user confirms from the
+   * payment request screen via `confirmPaymentRequest()`. The machine routes
+   * to the result handler on success or BIP321 fallback / error on failure.
+   */
+  executePaymentRequest?: (
+    mintUrl: string,
+    paymentRequest: string,
+    amount: number,
+    unit: string
+  ) => Promise<{ historyEntry: string }>;
+  /**
+   * Link a scanned input string to a transaction ID for history provenance.
+   * Fire-and-forget — called after successful melt/payment-request operations.
+   */
+  linkTransaction?: (scannedInput: string, transactionId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -495,6 +574,20 @@ export interface PaymentMachine {
    * redeem. On failure, transitions to `error`.
    */
   mintTrusted: () => Promise<void>;
+  /**
+   * Confirm and execute a melt from the preview screen.
+   * Requires `operations.executeMelt` to be provided. On success, dispatches
+   * the result handler. On failure in a BIP321 multi-option flow, transitions
+   * to `chooseFallbackOption` with the failed option disabled.
+   */
+  confirmMelt: () => Promise<void>;
+  /**
+   * Confirm and execute a payment request from the preview screen.
+   * Requires `operations.executePaymentRequest` to be provided. On success,
+   * dispatches the result handler. On failure in a BIP321 multi-option flow,
+   * transitions to `chooseFallbackOption` with the failed option disabled.
+   */
+  confirmPaymentRequest: () => Promise<void>;
   /** Clear all flow state. */
   reset: () => void;
   /**

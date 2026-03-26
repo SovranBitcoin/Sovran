@@ -8,3 +8,4 @@ export { EmojiPickerContent } from './emoji-picker';
 export { ProofSelectorContent } from './proof-selector/content';
 export { ButtonHandlerContent } from './button-handler';
 export { PaymentOptionsContent } from './payment-options/content';
+export { PaymentFallbackContent } from './payment-fallback/content';

@@ -20,3 +20,7 @@ export function buttonHandlerPopup(payload: ActionSheetPayloads['button-handler'
 export function paymentOptionsPopup(payload: ActionSheetPayloads['payment-options']): void {
   showActionSheet('payment-options', payload);
 }
+
+export function paymentFallbackPopup(payload: ActionSheetPayloads['payment-fallback']): void {
+  showActionSheet('payment-fallback', payload);
+}

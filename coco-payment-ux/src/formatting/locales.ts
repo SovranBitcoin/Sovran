@@ -29,6 +29,7 @@ const en: TranslationMap = {
 
   // ExecutionState messages
   OPTION_SELECTION_REQUIRED: 'Option selection is required to continue',
+  FALLBACK_OPTION_REQUIRED: 'Choose an alternative payment method',
   NO_AMOUNT: 'Amount is required to continue',
   MINT_SELECTION_REQUIRED: 'Mint selection is required to continue',
   PROOF_SELECTION_REQUIRED: 'Proof selection is required to continue',
@@ -39,6 +40,8 @@ const en: TranslationMap = {
   UNSUPPORTED_INPUT: 'Unsupported input',
   SEND_FAILED: 'Failed to create token',
   MINT_QUOTE_FAILED: 'Failed to create mint quote',
+  MELT_FAILED: 'Lightning payment failed',
+  PAYMENT_REQUEST_FAILED: 'Payment request failed',
   LOAD_MINTS_FAILED: 'Failed to load mints',
   TRUST_MINT_FAILED: 'Failed to trust mint',
 
@@ -57,6 +60,7 @@ const ar: TranslationMap = {
   UNSUPPORTED_FOR_FLOW: 'غير مدعوم لهذا التدفق',
 
   OPTION_SELECTION_REQUIRED: 'يجب اختيار خيار للمتابعة',
+  FALLBACK_OPTION_REQUIRED: 'اختر طريقة دفع بديلة',
   NO_AMOUNT: 'يجب إدخال المبلغ للمتابعة',
   MINT_SELECTION_REQUIRED: 'يجب اختيار المنت للمتابعة',
   PROOF_SELECTION_REQUIRED: 'يجب اختيار الإثبات للمتابعة',
@@ -66,6 +70,8 @@ const ar: TranslationMap = {
   UNSUPPORTED_INPUT: 'إدخال غير مدعوم',
   SEND_FAILED: 'فشل إنشاء التوكن',
   MINT_QUOTE_FAILED: 'فشل إنشاء عرض السعر',
+  MELT_FAILED: 'فشل الدفع عبر البرق',
+  PAYMENT_REQUEST_FAILED: 'فشل طلب الدفع',
   LOAD_MINTS_FAILED: 'فشل تحميل المنتات',
   TRUST_MINT_FAILED: 'فشل الوثوق بالمنت',
 
@@ -83,6 +89,7 @@ const de: TranslationMap = {
   UNSUPPORTED_FOR_FLOW: 'Für diesen Ablauf nicht unterstützt',
 
   OPTION_SELECTION_REQUIRED: 'Option muss ausgewählt werden',
+  FALLBACK_OPTION_REQUIRED: 'Wählen Sie eine alternative Zahlungsmethode',
   NO_AMOUNT: 'Betrag muss eingegeben werden',
   MINT_SELECTION_REQUIRED: 'Mint muss ausgewählt werden',
   PROOF_SELECTION_REQUIRED: 'Proof muss ausgewählt werden',
@@ -92,6 +99,8 @@ const de: TranslationMap = {
   UNSUPPORTED_INPUT: 'Nicht unterstützte Eingabe',
   SEND_FAILED: 'Token konnte nicht erstellt werden',
   MINT_QUOTE_FAILED: 'Mint-Angebot konnte nicht erstellt werden',
+  MELT_FAILED: 'Lightning-Zahlung fehlgeschlagen',
+  PAYMENT_REQUEST_FAILED: 'Zahlungsanfrage fehlgeschlagen',
   LOAD_MINTS_FAILED: 'Mints konnten nicht geladen werden',
   TRUST_MINT_FAILED: 'Mint konnte nicht vertraut werden',
 

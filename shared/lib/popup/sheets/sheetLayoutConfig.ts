@@ -6,4 +6,5 @@ export const SHEET_LAYOUT_CONFIG: Record<CustomSheetId, SheetLayoutConfig> = {
   'button-handler': { mode: 'snapPoints', snapPoints: ['80%'] },
   'proof-selector': { mode: 'contentHeight' },
   'payment-options': { mode: 'contentHeight' },
+  'payment-fallback': { mode: 'contentHeight' },
 };

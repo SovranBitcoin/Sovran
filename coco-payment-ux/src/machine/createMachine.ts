@@ -47,6 +47,17 @@ function deriveExecutionState(
         details: data as Record<string, unknown>,
       };
 
+    case 'chooseFallbackOption':
+      return {
+        status: 'needsInput',
+        code: 'FALLBACK_OPTION_REQUIRED',
+        message: t('FALLBACK_OPTION_REQUIRED', locale),
+        isExecutable: false,
+        isExecuting: false,
+        step,
+        details: data as Record<string, unknown>,
+      };
+
     case 'enterAmount':
       return {
         status: 'needsInput',
@@ -90,7 +101,9 @@ function deriveExecutionState(
         code === 'ALL_OPTIONS_DISABLED' ||
         code === 'UNSUPPORTED_INPUT' ||
         code === 'SEND_FAILED' ||
-        code === 'MINT_QUOTE_FAILED'
+        code === 'MINT_QUOTE_FAILED' ||
+        code === 'MELT_FAILED' ||
+        code === 'PAYMENT_REQUEST_FAILED'
           ? code
           : ('UNSUPPORTED_INPUT' as const);
       return {
@@ -125,6 +138,7 @@ const INPUT_STEPS = new Set<FlowStep>([
   'enterAmount',
   'selectMint',
   'chooseOption',
+  'chooseFallbackOption',
   'chooseProofs',
 ]);
 
@@ -192,12 +206,208 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     }
   }
 
+  // Helper: route an operation failure to BIP321 fallback or error.
+  /**
+   * Route an operation failure. For BIP321 multi-option flows, marks the
+   * failed option and routes to fallback or ALL_OPTIONS_DISABLED error.
+   * For single-option flows, notifies failure but keeps the current step
+   * so the user can retry.
+   */
+  function routeOperationFailure(
+    err: unknown,
+    variant: 'melt' | 'paymentRequest',
+    failedValue: string,
+    data: { mintUrl: string; amount: number; unit: string }
+  ): void {
+    const message = err instanceof Error ? err.message : `${variant === 'melt' ? 'Melt' : 'Payment request'} failed`;
+
+    // Always notify failure so the processing notification is dismissed.
+    void notifications?.onPaymentFailed?.({
+      variant,
+      mintUrl: data.mintUrl,
+      amount: data.amount,
+      unit: data.unit,
+      message,
+    });
+
+    // BIP321 multi-option: route to fallback or exhausted error.
+    if (flowCtx.originalOptions && flowCtx.originalOptions.length > 1) {
+      const failedValues = [...(flowCtx.failedOptionValues ?? []), failedValue];
+      flowCtx.failedOptionValues = failedValues;
+
+      const reAnnotated = flowCtx.originalOptions.map((ao) =>
+        failedValues.includes(ao.option.value)
+          ? { ...ao, status: 'disabled' as const, reason: { code: 'FAILED' as const, message: 'Payment failed' } }
+          : ao
+      );
+
+      const hasViable = reAnnotated.some((o) => o.status !== 'disabled');
+
+      if (hasViable) {
+        step = 'chooseFallbackOption';
+        stepData = {
+          parsed: flowCtx.parsed!,
+          options: reAnnotated,
+          unit: flowCtx.unit,
+          failedOptionValues: failedValues,
+          lastFailedMessage: message,
+        } as any;
+        return;
+      }
+
+      step = 'error';
+      stepData = { code: 'ALL_OPTIONS_DISABLED', message: 'All payment options have failed' } as any;
+      return;
+    }
+
+    // Single-option: stay on the current step so the user can retry.
+    // Step is NOT changed — the Pay/Confirm button becomes active again.
+  }
+
   const send = async (event: import('./types').FlowEvent): Promise<void> => {
     if (sendLocked) {
       return;
     }
     sendLocked = true;
 
+    // Handle CONFIRM_MELT/CONFIRM_PAYMENT_REQUEST directly — these bypass transition().
+    // On success: stepData is updated with historyEntry but step stays unchanged
+    //   (the user is already on the screen — no re-navigation needed).
+    // On failure: step changes to chooseFallbackOption or error, and the handler is dispatched.
+
+    // If the user opened the mint selector from a terminal step and dismissed
+    // without selecting, the step is stuck on selectMint while the UI is still
+    // showing the terminal screen. Restore the terminal step from context so
+    // the CONFIRM_* guards can match.
+    if (
+      step === 'selectMint' &&
+      (event.type === 'CONFIRM_MELT' || event.type === 'CONFIRM_PAYMENT_REQUEST') &&
+      flowCtx.mintUrl &&
+      flowCtx.amount
+    ) {
+      if (flowCtx.meltTarget) {
+        step = 'navigateToMeltPreview';
+        stepData = {
+          mintUrl: flowCtx.mintUrl,
+          meltTarget: flowCtx.meltTarget,
+          amount: flowCtx.amount,
+          unit: flowCtx.unit,
+        } as any;
+      } else if (flowCtx.paymentRequest) {
+        step = 'navigateToPaymentRequest';
+        stepData = {
+          mintUrl: flowCtx.mintUrl,
+          paymentRequest: flowCtx.paymentRequest,
+          amount: flowCtx.amount,
+          unit: flowCtx.unit,
+        } as any;
+      }
+      notify();
+    }
+
+    if (event.type === 'CONFIRM_MELT' && step === 'navigateToMeltPreview' && operations?.executeMelt) {
+      const originalStep = step;
+      const data = stepData as StepDataMap['navigateToMeltPreview'];
+      handlerExecuting = true;
+      notify();
+
+      void notifications?.onPaymentProcessing?.({
+        variant: 'melt',
+        mintUrl: data.mintUrl,
+        amount: data.amount,
+        unit: data.unit,
+      });
+
+      try {
+        const result = await operations.executeMelt(data.mintUrl, data.meltTarget, data.amount, data.unit);
+
+        if (operations.linkTransaction) {
+          try {
+            const parsed = JSON.parse(result.historyEntry);
+            if (parsed?.id) operations.linkTransaction(data.meltTarget, parsed.id);
+          } catch { /* ignore parse errors */ }
+        }
+
+        void notifications?.onPaymentConfirmed?.({
+          variant: 'melt',
+          mintUrl: data.mintUrl,
+          amount: data.amount,
+          unit: data.unit,
+          historyEntry: result.historyEntry,
+        });
+
+        stepData = { ...data, historyEntry: result.historyEntry } as any;
+      } catch (err) {
+        routeOperationFailure(err, 'melt', data.meltTarget, data);
+      }
+
+      handlerExecuting = false;
+      sendLocked = false;
+      notify();
+
+      if (step !== originalStep) {
+        try {
+          await dispatchHandler(step, stepData);
+        } finally {
+          notify();
+        }
+      }
+      return;
+    }
+
+    if (event.type === 'CONFIRM_PAYMENT_REQUEST' && step === 'navigateToPaymentRequest' && operations?.executePaymentRequest) {
+      const originalStep = step;
+      const data = stepData as StepDataMap['navigateToPaymentRequest'];
+      handlerExecuting = true;
+      notify();
+
+      void notifications?.onPaymentProcessing?.({
+        variant: 'paymentRequest',
+        mintUrl: data.mintUrl,
+        amount: data.amount,
+        unit: data.unit,
+      });
+
+      try {
+        const result = await operations.executePaymentRequest(data.mintUrl, data.paymentRequest, data.amount, data.unit);
+
+        if (operations.linkTransaction) {
+          try {
+            const parsed = JSON.parse(result.historyEntry);
+            if (parsed?.id) operations.linkTransaction(data.paymentRequest, parsed.id);
+          } catch { /* ignore parse errors */ }
+        }
+
+        void notifications?.onPaymentConfirmed?.({
+          variant: 'paymentRequest',
+          mintUrl: data.mintUrl,
+          amount: data.amount,
+          unit: data.unit,
+          historyEntry: result.historyEntry,
+        });
+
+        stepData = { ...data, historyEntry: result.historyEntry } as any;
+      } catch (err) {
+        routeOperationFailure(err, 'paymentRequest', data.paymentRequest, data);
+      }
+
+      handlerExecuting = false;
+      sendLocked = false;
+      notify();
+
+      if (step !== originalStep) {
+        try {
+          await dispatchHandler(step, stepData);
+        } finally {
+          notify();
+        }
+      }
+      return;
+    }
+
+    // Wrap the main transition path so sendLocked is always released,
+    // even if transition() or an operation throws unexpectedly.
+    try {
     const walletCtx = getContext();
     const unit = getUnit?.() ?? configUnit;
 
@@ -214,11 +424,29 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         ? (stepData as StepDataMap['reviewMint'])
         : null;
 
+    // Capture original options before transition overwrites stepData.
+    const preTransitionOptions =
+      event.type === 'OPTION_CHOSEN' && (step === 'chooseOption' || step === 'chooseFallbackOption')
+        ? (stepData as StepDataMap['chooseOption']).options
+        : undefined;
+
     const result = transition(step, flowCtx, eventForTransition, detectors, walletCtx, unit);
 
     step = result.step;
     flowCtx = result.context;
     stepData = result.data;
+
+    // Save BIP321 original options for fallback (first selection only).
+    if (preTransitionOptions && preTransitionOptions.length > 1) {
+      flowCtx.originalOptions = flowCtx.originalOptions ?? preTransitionOptions;
+    }
+
+    // Clear the scan dedup guard once we leave option-selection (e.g. user
+    // picked an option, flow errored, etc.). Without this, processedRef stays
+    // true after a BIP321 flow and all subsequent scan() calls are silently dropped.
+    if (processedRef && step !== 'chooseOption' && step !== 'chooseFallbackOption') {
+      processedRef = false;
+    }
 
     if (event.type === 'EXECUTE' && notifications?.onScanResolved && flowCtx.parsed) {
       const scanSource = lastScanSource;
@@ -413,6 +641,14 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       sendLocked = false;
       notify();
     }
+
+    } catch {
+      // Safety net: release sendLocked so the machine doesn't permanently lock
+      // if transition() or an operation throws before the inner finally runs.
+      sendLocked = false;
+      handlerExecuting = false;
+      notify();
+    }
   };
 
   const changeMint = (
@@ -554,6 +790,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
   const mintTrusted = () => send({ type: 'MINT_TRUSTED' });
 
+  const confirmMelt = () => send({ type: 'CONFIRM_MELT' });
+  const confirmPaymentRequest = () => send({ type: 'CONFIRM_PAYMENT_REQUEST' });
+
   const reset = () => {
     resetInternal();
     notify();
@@ -573,6 +812,8 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     startReceive,
     reviewMint,
     mintTrusted,
+    confirmMelt,
+    confirmPaymentRequest,
     reset,
     inspect: () => cachedSnapshot,
     getContext: () => flowCtx,

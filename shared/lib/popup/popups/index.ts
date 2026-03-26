@@ -5,6 +5,7 @@ export {
   emojiPickerPopup,
   proofSelectorPopup,
   paymentOptionsPopup,
+  paymentFallbackPopup,
   buttonHandlerPopup,
 } from './actionSheets';
 export {

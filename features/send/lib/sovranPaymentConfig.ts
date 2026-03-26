@@ -70,6 +70,7 @@ import {
   operationInvalidStatePopup,
   operationNotFoundPopup,
   paymentCancelledPopup,
+  paymentFallbackPopup,
   paymentOptionsPopup,
   paymentStatusPopup,
   proofSelectorPopup,
@@ -123,6 +124,41 @@ export function createSovranNotifications(): NotificationHandlerMap {
     },
     MINT_QUOTE_FAILED: ({ code: _code, message, data: _data }) => {
       generalErrorPopup({ text: message });
+    },
+    MELT_FAILED: ({ code: _code, message, data: _data }) => {
+      generalErrorPopup({ text: message });
+    },
+    PAYMENT_REQUEST_FAILED: ({ code: _code, message, data: _data }) => {
+      sendPaymentFailedPopup({ text: message });
+    },
+    onPaymentProcessing: (data) => {
+      usePaymentStatusStore.getState().setActive({
+        variant: data.variant === 'paymentRequest' ? 'payment-request' : data.variant,
+        id: `${data.variant}-${Date.now()}`,
+        mintUrl: data.mintUrl,
+        amount: data.amount,
+        unit: data.unit,
+        state: 'processing',
+      });
+      paymentStatusPopup({
+        variant: data.variant === 'paymentRequest' ? 'payment-request' : data.variant,
+        id: `${data.variant}-${Date.now()}`,
+        mintUrl: data.mintUrl,
+        amount: data.amount,
+        unit: data.unit,
+      });
+    },
+    onPaymentConfirmed: (data) => {
+      const store = usePaymentStatusStore.getState();
+      if (store.active) {
+        store.setConfirmed(store.active.id);
+      }
+    },
+    onPaymentFailed: (data) => {
+      const store = usePaymentStatusStore.getState();
+      if (store.active) {
+        store.setFailed(store.active.id, new Error(data.message));
+      }
     },
     onScanEmpty: (source) => {
       if (source === 'clipboard') noClipboardAddressPopup();
@@ -271,6 +307,79 @@ export function createSovranOperations({
       if (!mgr) throw new Error('Wallet manager is not available');
       return loadMintReviewInfo(mgr, mintUrl, getWalletContext()?.preferredMintUrl);
     },
+
+    executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
+      if (useSettingsStore.getState().mockFailMelt) {
+        throw new Error('Mock melt failure (developer setting)');
+      }
+      const mgr = getManager();
+      if (!mgr) throw new Error('Wallet manager is not available');
+
+      const bolt11 = isLightningInvoice(meltTarget)
+        ? meltTarget
+        : await requestInvoiceFromLnurl(meltTarget, amount);
+
+      const operation = await mgr.quotes.prepareMeltBolt11(mintUrl, bolt11);
+      const result = await mgr.quotes.executeMelt(operation.id);
+
+      const entry: MeltHistoryEntry = {
+        id: result.id,
+        type: 'melt',
+        createdAt: result.createdAt,
+        mintUrl: result.mintUrl,
+        unit: 'sat',
+        quoteId: result.quoteId,
+        state: mapMeltOperationState(result.state),
+        amount: result.amount,
+        metadata: { operationId: result.id, meltTarget },
+      };
+      return { historyEntry: JSON.stringify(entry) };
+    },
+
+    executePaymentRequest: async (mintUrl, paymentRequest, amount, unit) => {
+      if (useSettingsStore.getState().mockFailPaymentRequest) {
+        throw new Error('Mock payment request failure (developer setting)');
+      }
+      const mgr = getManager();
+      if (!mgr) throw new Error('Wallet manager is not available');
+
+      const info = defaultDetectors.getPaymentRequestInfo(paymentRequest);
+      if (!info) throw new Error('Invalid payment request');
+
+      const nostrTransport = info.transports?.find((t) => t.type === 'nostr');
+      const httpTransport = info.transports?.find((t) => t.type === 'post');
+      const parsed =
+        nostrTransport && !httpTransport
+          ? buildInbandParsedPaymentRequest(paymentRequest, info, mintUrl)
+          : await mgr.wallet.processPaymentRequest(paymentRequest);
+
+      const transaction = await mgr.wallet.preparePaymentRequestTransaction(mintUrl, parsed, amount);
+      const operationId = transaction.sendOperation.id;
+
+      if (httpTransport) {
+        await mgr.wallet.handleHttpPaymentRequest(transaction);
+      } else {
+        await mgr.wallet.handleInbandPaymentRequest(transaction, async () => {});
+      }
+
+      const sendEntry = await findSendHistoryEntryByOperationId(mgr, operationId);
+      const entry = sendEntry ?? {
+        id: operationId,
+        type: 'send' as const,
+        createdAt: transaction.sendOperation.createdAt,
+        mintUrl,
+        amount,
+        unit,
+        operationId,
+        state: 'pending',
+        metadata: { paymentRequest, phase: 'delivered', tokenCreated: 'true' },
+      };
+      return { historyEntry: JSON.stringify(entry) };
+    },
+
+    linkTransaction: (scannedInput, transactionId) => {
+      useScanHistoryStore.getState().linkTransaction(scannedInput, transactionId);
+    },
   };
 }
 
@@ -382,7 +491,9 @@ export function createSovranHandlers({
         state: 'prepared',
         metadata: { paymentRequest, phase: 'preview' },
       };
-      router.navigate({
+      const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
+      const nav = isFallback ? router.replace : router.navigate;
+      nav({
         pathname: '/(send-flow)/paymentRequest' as any,
         params: { paymentRequestEntry: JSON.stringify(entry) },
       });
@@ -400,7 +511,9 @@ export function createSovranHandlers({
         amount,
         metadata: { phase: 'preview', meltTarget },
       };
-      router.navigate({
+      const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
+      const nav = isFallback ? router.replace : router.navigate;
+      nav({
         pathname: '/(send-flow)/meltQuote',
         params: { meltHistoryEntry: JSON.stringify(entry) },
       });
@@ -520,6 +633,10 @@ export function createSovranHandlers({
 
     chooseOption: (stepData) => {
       paymentOptionsPopup({ ...stepData, machine, onDismiss: onOptionDismiss });
+    },
+
+    chooseFallbackOption: (stepData) => {
+      paymentFallbackPopup({ ...stepData, machine, onDismiss: onOptionDismiss });
     },
 
     chooseProofs: (stepData) => {
@@ -875,6 +992,23 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
     meltQuote: {
       pay: async (rawCtx) => {
+        // When machine operations handle melt execution, delegate to confirmMelt().
+        // The machine runs the operation, dispatches notifications, and routes to
+        // fallback on failure. On success, stepData is updated with historyEntry.
+        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
+        if (machine?.confirmMelt) {
+          await machine.confirmMelt();
+          // On success, the machine updated stepData with historyEntry.
+          // Update the screen entry from the machine's step data.
+          const machineStep = machine.getStep();
+          if (machineStep === 'navigateToMeltPreview') {
+            const machineData = (machine as any).inspect?.()?.details ?? {};
+            // Nothing else to do — notifications handled by the machine.
+          }
+          return;
+        }
+
+        // Fallback: legacy screen action handler (when operations not provided).
         const { entry, manager } = meltQuoteCtx(rawCtx);
         let operationId = entry.metadata?.operationId as string | undefined;
         const isPreview = !entry.quoteId;
@@ -993,6 +1127,16 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
     paymentRequest: {
       confirm: async (rawCtx) => {
+        // When machine operations handle payment request execution, delegate to confirmPaymentRequest().
+        // The machine runs the operation, dispatches notifications, and routes to
+        // fallback on failure. On success, stepData is updated with historyEntry.
+        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
+        if (machine?.confirmPaymentRequest) {
+          await machine.confirmPaymentRequest();
+          return;
+        }
+
+        // Fallback: legacy screen action handler (when operations not provided).
         const ctx = paymentRequestCtx(rawCtx);
         const { entry, manager } = ctx;
         const encodedRequest = entry.metadata?.paymentRequest;

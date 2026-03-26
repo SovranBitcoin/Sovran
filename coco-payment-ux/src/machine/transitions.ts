@@ -83,7 +83,18 @@ function handleOptionChosen(
   const singleParsed = { ...parsed, options: [option.option] };
   const intent = resolveIntent(singleParsed, detectors, walletCtx);
 
-  const ctx: FlowContext = { ...currentCtx, parsed: singleParsed, intent };
+  // Clear stale intent-specific fields so each option choice starts clean.
+  // Without this, switching from payment request → lightning keeps stale
+  // supportedMintUrls/paymentRequest that taint mint selection.
+  const ctx: FlowContext = {
+    ...currentCtx,
+    parsed: singleParsed,
+    intent,
+    destination: undefined,
+    supportedMintUrls: undefined,
+    paymentRequest: undefined,
+    meltTarget: undefined,
+  };
 
   // Extract data from the newly resolved intent
   switch (intent.type) {
@@ -534,4 +545,8 @@ export function transition(
     case 'PROOFS_CHOSEN':
       return handleProofsChosen(event, currentCtx, walletCtx);
   }
+
+  // Unhandled events (e.g. CONFIRM_MELT, CONFIRM_PAYMENT_REQUEST that
+  // bypassed their guard in createMachine.ts) — return current state.
+  return { step: currentStep, context: currentCtx, data: {} as any };
 }

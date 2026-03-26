@@ -39,6 +39,8 @@ interface SettingsState {
   experimental: boolean;
   mockMode: boolean;
   mockOffline: boolean;
+  mockFailMelt: boolean;
+  mockFailPaymentRequest: boolean;
   termsAccepted: TermsAccepted | null;
   hasSeenOnboarding: boolean;
   quickAccessP2PK: boolean;
@@ -66,6 +68,8 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'passcode'> = {
   experimental: false,
   mockMode: false,
   mockOffline: false,
+  mockFailMelt: false,
+  mockFailPaymentRequest: false,
   termsAccepted: null,
   hasSeenOnboarding: false,
   quickAccessP2PK: false,
@@ -104,6 +108,10 @@ interface SettingsActions {
   getMockMode: () => boolean;
   setMockOffline: (enabled: boolean) => void;
   getMockOffline: () => boolean;
+  setMockFailMelt: (enabled: boolean) => void;
+  getMockFailMelt: () => boolean;
+  setMockFailPaymentRequest: (enabled: boolean) => void;
+  getMockFailPaymentRequest: () => boolean;
 
   // Terms acceptance
   acceptTerms: (date: string) => void;
@@ -185,6 +193,10 @@ export const useSettingsStore = create<SettingsStore>()(
       getMockMode: () => get().mockMode,
       setMockOffline: (enabled: boolean) => set({ mockOffline: enabled }),
       getMockOffline: () => get().mockOffline,
+      setMockFailMelt: (enabled: boolean) => set({ mockFailMelt: enabled }),
+      getMockFailMelt: () => get().mockFailMelt,
+      setMockFailPaymentRequest: (enabled: boolean) => set({ mockFailPaymentRequest: enabled }),
+      getMockFailPaymentRequest: () => get().mockFailPaymentRequest,
 
       // Terms
       acceptTerms: (date: string) => set({ termsAccepted: { termsAccepted: true, date } }),
@@ -242,6 +254,8 @@ export const useSettingsStore = create<SettingsStore>()(
         experimental: state.experimental,
         mockMode: state.mockMode,
         mockOffline: state.mockOffline,
+        mockFailMelt: state.mockFailMelt,
+        mockFailPaymentRequest: state.mockFailPaymentRequest,
         termsAccepted: state.termsAccepted,
         hasSeenOnboarding: state.hasSeenOnboarding,
         quickAccessP2PK: state.quickAccessP2PK,

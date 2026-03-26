@@ -227,6 +227,10 @@ export const SettingsScreen = () => {
   const setMockMode = useSettingsStore((state) => state.setMockMode);
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const setMockOffline = useSettingsStore((state) => state.setMockOffline);
+  const mockFailMelt = useSettingsStore((state) => state.mockFailMelt);
+  const setMockFailMelt = useSettingsStore((state) => state.setMockFailMelt);
+  const mockFailPaymentRequest = useSettingsStore((state) => state.mockFailPaymentRequest);
+  const setMockFailPaymentRequest = useSettingsStore((state) => state.setMockFailPaymentRequest);
 
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
@@ -351,6 +355,39 @@ export const SettingsScreen = () => {
                     </ListGroup.ItemContent>
                     <ListGroup.ItemSuffix>
                       <HeroSwitch isSelected={mockOffline} onSelectedChange={setMockOffline} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+              <Separator className="mx-4" />
+              <PressableFeedback animation={false} onPress={() => setMockFailMelt(!mockFailMelt)}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Mock Fail Melt</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <HeroSwitch isSelected={mockFailMelt} onSelectedChange={setMockFailMelt} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+              <Separator className="mx-4" />
+              <PressableFeedback
+                animation={false}
+                onPress={() => setMockFailPaymentRequest(!mockFailPaymentRequest)}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Mock Fail Payment Request</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <HeroSwitch
+                        isSelected={mockFailPaymentRequest}
+                        onSelectedChange={setMockFailPaymentRequest}
+                      />
                     </ListGroup.ItemSuffix>
                   </ListGroup.Item>
                 </PressableFeedback.Scale>

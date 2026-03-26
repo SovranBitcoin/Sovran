@@ -1,4 +1,4 @@
-import type { PaymentMachine, StepDataMap } from 'coco-payment-ux';
+import type { AnnotatedOption, PaymentMachine, ParsedPaymentInput, StepDataMap } from 'coco-payment-ux';
 import type {
   ButtonHandlerActionButton,
   ButtonHandlerButton,
@@ -36,6 +36,16 @@ export type ProfileSwitcherAction =
  * Addressable custom sheet IDs. Nested pages that only exist inside a sheet flow
  * (for example profile-switcher's import route) should stay internal to that sheet.
  */
+type PaymentFallbackPayload = {
+  parsed: ParsedPaymentInput;
+  options: AnnotatedOption[];
+  unit: string;
+  failedOptionValues: string[];
+  lastFailedMessage?: string;
+  machine: PaymentMachine;
+  onDismiss?: () => void;
+};
+
 type BaseActionSheetPayloads = {
   'profile-switcher': {
     onRequestAction: (action: ProfileSwitcherAction) => void;
@@ -43,6 +53,7 @@ type BaseActionSheetPayloads = {
   'emoji-picker': EmojiPickerPayload;
   'proof-selector': ProofSelectorPayload;
   'payment-options': PaymentOptionsPayload;
+  'payment-fallback': PaymentFallbackPayload;
 };
 
 type ButtonHandlerPushTarget = {
