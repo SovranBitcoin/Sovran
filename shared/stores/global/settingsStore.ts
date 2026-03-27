@@ -39,6 +39,7 @@ interface SettingsState {
   experimental: boolean;
   mockMode: boolean;
   mockOffline: boolean;
+  mockFailSend: boolean;
   mockFailMelt: boolean;
   mockFailPaymentRequest: boolean;
   termsAccepted: TermsAccepted | null;
@@ -68,6 +69,7 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'passcode'> = {
   experimental: false,
   mockMode: false,
   mockOffline: false,
+  mockFailSend: false,
   mockFailMelt: false,
   mockFailPaymentRequest: false,
   termsAccepted: null,
@@ -108,6 +110,8 @@ interface SettingsActions {
   getMockMode: () => boolean;
   setMockOffline: (enabled: boolean) => void;
   getMockOffline: () => boolean;
+  setMockFailSend: (enabled: boolean) => void;
+  getMockFailSend: () => boolean;
   setMockFailMelt: (enabled: boolean) => void;
   getMockFailMelt: () => boolean;
   setMockFailPaymentRequest: (enabled: boolean) => void;
@@ -193,6 +197,8 @@ export const useSettingsStore = create<SettingsStore>()(
       getMockMode: () => get().mockMode,
       setMockOffline: (enabled: boolean) => set({ mockOffline: enabled }),
       getMockOffline: () => get().mockOffline,
+      setMockFailSend: (enabled: boolean) => set({ mockFailSend: enabled }),
+      getMockFailSend: () => get().mockFailSend,
       setMockFailMelt: (enabled: boolean) => set({ mockFailMelt: enabled }),
       getMockFailMelt: () => get().mockFailMelt,
       setMockFailPaymentRequest: (enabled: boolean) => set({ mockFailPaymentRequest: enabled }),
@@ -254,6 +260,7 @@ export const useSettingsStore = create<SettingsStore>()(
         experimental: state.experimental,
         mockMode: state.mockMode,
         mockOffline: state.mockOffline,
+        mockFailSend: state.mockFailSend,
         mockFailMelt: state.mockFailMelt,
         mockFailPaymentRequest: state.mockFailPaymentRequest,
         termsAccepted: state.termsAccepted,

@@ -5,18 +5,19 @@
  * notifications, persistence, scan sources, and screen action handlers.
  */
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Share } from 'react-native';
 
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
+import { router } from 'expo-router';
 
 import { URDecoder } from '@gandlaf21/bc-ur';
 
 import type { HistoryEntry } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
 
-import type { WalletContext, MeltOperationLike } from 'coco-payment-ux';
+import type { WalletContext, MeltOperationLike, NavigationCallbacks } from 'coco-payment-ux';
 import {
   meltOperationToScreenActionEntry,
   shouldApplyEntryUpdate as defaultShouldApply,
@@ -37,6 +38,7 @@ import {
   createSovranScanSources,
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
+import { createNfcAdapter } from '@/shared/lib/nfc/adapter';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import {
   deeplinkFailedPopup,
@@ -95,7 +97,9 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   const manager = useManager();
   const receiveExtras = useReceivePaymentUXExtras();
   const { keys } = useNostrKeysContext();
-  const { isOffline } = useOfflineStatus();
+  const { isOffline: contextOffline } = useOfflineStatus();
+  const mockOffline = useSettingsStore((state) => state.mockOffline);
+  const isOffline = mockOffline || contextOffline;
   const offlineRef = useRef(isOffline);
   offlineRef.current = isOffline;
   const getOffline = useCallback(() => offlineRef.current, []);
@@ -118,6 +122,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   );
 
   const getManager = useCallback(() => manager, [manager]);
+  const [nfcAdapter] = useState(() => createNfcAdapter());
   const walletContextRef = useRef<WalletContext | null>(null);
   const getWalletContext = useCallback(() => walletContextRef.current, []);
   const getNpub = useCallback(() => npubRef.current, []);
@@ -133,6 +138,38 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   }, []);
 
   const actions = useMemo(() => createSovranScreenActionHandlers(), []);
+
+  const navigation = useMemo<NavigationCallbacks>(
+    () => ({
+      scanQr: async ({ unit, context }) => {
+        if (context === 'receive') {
+          const granted = receiveExtras?.requestCameraPermission
+            ? await receiveExtras.requestCameraPermission()
+            : false;
+          if (!granted) return;
+          router.navigate({
+            pathname: '/(receive-flow)/camera' as any,
+            params: { unit },
+          });
+        } else {
+          router.navigate({ pathname: '/camera' as any, params: { unit } });
+        }
+      },
+      mintInfo: (mintInfoEntry) => {
+        router.navigate({
+          pathname: '/(mint-flow)/info' as any,
+          params: { mintInfoEntry },
+        });
+      },
+      addMint: () => {
+        router.push('/(mint-flow)/add' as any);
+      },
+      goBack: () => {
+        router.back();
+      },
+    }),
+    [receiveExtras?.requestCameraPermission]
+  );
 
   const deepLinkUrl = Linking.useURL();
   const deepLinks = useMemo<DeepLinkConfig>(
@@ -305,7 +342,8 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
       },
       walletContextRef,
       createURDecoder: () => new URDecoder(),
-      scanSources: createSovranScanSources(),
+      scanSources: createSovranScanSources(nfcAdapter),
+      nfcAdapter,
       getOffline,
       getBtcPrice,
       getDisplayCurrency,
@@ -314,11 +352,13 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
       actions,
       screenActionsBridge,
       deepLinks,
+      navigation,
     }),
     [
       getManager,
       getWalletContext,
       getNpub,
+      nfcAdapter,
       getOffline,
       getBtcPrice,
       getDisplayCurrency,
@@ -327,6 +367,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
       actions,
       screenActionsBridge,
       deepLinks,
+      navigation,
     ]
   );
 

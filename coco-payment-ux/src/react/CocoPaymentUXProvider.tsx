@@ -25,6 +25,7 @@ import { selectMintContext } from '../machine/selectMintContext';
 import type {
   FlowContext,
   MachineOperations,
+  NfcIOAdapter,
   NotificationHandlerMap,
   PaymentMachine,
   ScanSources,
@@ -33,6 +34,7 @@ import type {
 } from '../machine/types';
 import type { MintResolutionContext } from '../machine/selectMintContext';
 import type { ScreenActionHandlerMap, ScreenType } from '../screen-actions/types';
+import type { NavigationCallbacks } from '../screen-actions/defaultHandlers';
 import type { Detectors, WalletContext } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -190,6 +192,18 @@ export interface CocoPaymentUXProviderProps {
    * `cashu://` is always accepted; pass additional schemes via customSchemes.
    */
   deepLinks?: DeepLinkConfig;
+  /**
+   * NFC I/O adapter for POS payment flows. When provided,
+   * `scan(undefined, { source: 'nfc' })` uses the adapter for read/write
+   * and auto-resolves interactive steps without user prompts.
+   */
+  nfcAdapter?: NfcIOAdapter;
+  /**
+   * Navigation callbacks for built-in default screen action handlers.
+   * When provided alongside operations, screen actions like scanQr, mintInfo,
+   * addMint, and goBack work out of the box.
+   */
+  navigation?: NavigationCallbacks;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +223,8 @@ export interface CocoPaymentUXContextValue {
     (() => { code: string; symbol: string } | null) | undefined
   >;
   notificationsRef: React.MutableRefObject<NotificationHandlerMap | undefined>;
+  operationsRef: React.MutableRefObject<Partial<MachineOperations> | undefined>;
+  navigationRef: React.MutableRefObject<NavigationCallbacks | undefined>;
   writeClipboardRef: React.MutableRefObject<((text: string) => Promise<void>) | undefined>;
   shareContentRef: React.MutableRefObject<
     ((content: { message: string; url?: string }) => Promise<void>) | undefined
@@ -245,12 +261,18 @@ export function CocoPaymentUXProvider({
   actions,
   screenActionsBridge,
   deepLinks,
+  nfcAdapter,
+  navigation,
 }: CocoPaymentUXProviderProps) {
   const getLocaleRef = useRef(getLocale);
   getLocaleRef.current = getLocale;
 
   const notificationsRef = useRef(notifications);
   notificationsRef.current = notifications;
+  const operationsRef = useRef<Partial<MachineOperations> | undefined>(operations);
+  operationsRef.current = operations;
+  const navigationRef = useRef<NavigationCallbacks | undefined>(navigation);
+  navigationRef.current = navigation;
   const writeClipboardRef = useRef(writeClipboard);
   writeClipboardRef.current = writeClipboard;
   const shareContentRef = useRef(shareContent);
@@ -339,6 +361,7 @@ export function CocoPaymentUXProvider({
       notifications: notes,
       createURDecoder: ur,
       scanSources: sources,
+      nfcAdapter,
     });
 
     handlersRef.current = factory(machineRef.current, {
@@ -387,6 +410,8 @@ export function CocoPaymentUXProvider({
       getBtcPriceRef,
       getDisplayCurrencyRef,
       notificationsRef,
+      operationsRef,
+      navigationRef,
       writeClipboardRef,
       shareContentRef,
     }),

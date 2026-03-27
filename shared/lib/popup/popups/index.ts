@@ -94,7 +94,7 @@ export {
   receiveMintUpdatedPopup,
   receiveMintUpdateFailedPopup,
 } from './receive';
-export { walletNotReadyPopup, nfcErrorPopup } from './nfc';
+export { walletNotReadyPopup, nfcErrorPopup, nfcPaymentProgressPopup } from './nfc';
 export {
   invalidTokenPopup,
   noWalletAvailablePopup,

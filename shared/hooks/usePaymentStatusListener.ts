@@ -145,11 +145,12 @@ export function usePaymentStatusListener(): void {
         const unit = 'sat';
         const store = usePaymentStatusStore.getState();
         const hadPending =
-          store.active?.id === operationId &&
-          (store.active.variant === 'send' || store.active.variant === 'payment-request');
+          (store.active?.id === operationId &&
+            (store.active.variant === 'send' || store.active.variant === 'payment-request')) ||
+          (store.active?.variant === 'payment-request' && store.active?.state === 'processing');
 
         if (hadPending) {
-          store.setConfirmed(operationId);
+          store.setConfirmed(store.active!.id, { operationId });
           return;
         }
 
@@ -171,11 +172,13 @@ export function usePaymentStatusListener(): void {
       ({ mintUrl, operationId, operation }) => {
         if (!('quoteId' in operation) || !('amount' in operation)) return;
         const store = usePaymentStatusStore.getState();
+        // Match by variant + state, not quoteId — the machine's onPaymentProcessing
+        // uses a timestamp-based ID that won't match the real quoteId.
         const hadPending =
-          store.active?.id === operation.quoteId && store.active?.state === 'processing';
+          store.active?.variant === 'melt' && store.active?.state === 'processing';
 
         if (hadPending) {
-          store.setConfirmed(operation.quoteId, { operationId });
+          store.setConfirmed(store.active!.id, { operationId });
         } else {
           const amount = operation.amount;
           const unit = 'sat';

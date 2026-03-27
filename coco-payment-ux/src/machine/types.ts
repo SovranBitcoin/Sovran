@@ -134,7 +134,10 @@ export type ErrorCode =
   | 'SEND_FAILED'
   | 'MINT_QUOTE_FAILED'
   | 'MELT_FAILED'
-  | 'PAYMENT_REQUEST_FAILED';
+  | 'PAYMENT_REQUEST_FAILED'
+  | 'NFC_WRITE_FAILED'
+  | 'NFC_SESSION_LOST'
+  | 'NFC_READ_FAILED';
 
 // ---------------------------------------------------------------------------
 // Flow Context — accumulated data through the flow
@@ -164,6 +167,8 @@ export interface FlowContext {
   reviewToken?: string;
   /** Original raw input string from scan/execute. Available after EXECUTE. */
   rawInput?: string;
+  /** Scan source hint. Persisted for the flow's lifetime (cleared on RESET). */
+  source?: string;
   /** Original annotated options from BIP321 multi-option flow. Captured on first OPTION_CHOSEN. */
   originalOptions?: AnnotatedOption[];
   /** Option values that have been tried and failed. */
@@ -219,7 +224,10 @@ export type ExecutionState =
         | 'SEND_FAILED'
         | 'MINT_QUOTE_FAILED'
         | 'MELT_FAILED'
-        | 'PAYMENT_REQUEST_FAILED';
+        | 'PAYMENT_REQUEST_FAILED'
+        | 'NFC_WRITE_FAILED'
+        | 'NFC_SESSION_LOST'
+        | 'NFC_READ_FAILED';
       message: string;
       isExecutable: false;
       isExecuting: boolean;
@@ -366,6 +374,92 @@ export type NotificationHandlerMap = {
     unit: string;
     message: string;
   }) => MaybeAsync;
+  /**
+   * Called during NFC POS payment to report progress phases.
+   * The wallet shows a "hold device steady" overlay with phase updates.
+   */
+  onNfcPaymentProgress?: (data: {
+    phase: 'reading' | 'selecting' | 'creating' | 'writing';
+  }) => MaybeAsync;
+  /**
+   * Called when NFC write-back fails after token creation.
+   * The wallet shows an error popup. If `rolledBack` is true, proofs
+   * were successfully reclaimed.
+   */
+  onNfcWriteFailed?: (data: { message: string; rolledBack: boolean }) => MaybeAsync;
+
+  // ── Screen action notifications ─────────────────────────────────────
+  // Fired by the built-in default screen action handlers. The wallet
+  // maps these to its own popup/toast/status-indicator system.
+
+  /**
+   * Called after checking a pending send token's status.
+   * `redeemed` is true when the recipient has claimed the token.
+   */
+  onSendStatusChecked?: (data: {
+    operationId: string;
+    state: string;
+    redeemed: boolean;
+  }) => MaybeAsync;
+
+  /** Called when a send token cancellation (rollback) succeeds. */
+  onSendCancelled?: (data: { operationId: string }) => MaybeAsync;
+
+  /** Called when a send token cancellation fails. */
+  onSendCancelFailed?: (data: { operationId: string; message: string }) => MaybeAsync;
+
+  /**
+   * Called when an ecash receive starts processing.
+   * The wallet shows a processing indicator.
+   */
+  onReceiveProcessing?: (data: {
+    id: string;
+    mintUrl: string;
+    amount: number;
+    unit: string;
+  }) => MaybeAsync;
+
+  /**
+   * Called when an ecash receive completes successfully.
+   * The wallet updates the processing indicator and may capture metadata
+   * (location, scan history linking, etc.).
+   */
+  onReceiveConfirmed?: (data: {
+    id: string;
+    mintUrl: string;
+    amount: number;
+    unit: string;
+    historyEntry: string;
+  }) => MaybeAsync;
+
+  /**
+   * Called when an ecash receive fails.
+   * The wallet shows an error indicator or popup.
+   */
+  onReceiveFailed?: (data: {
+    id: string;
+    mintUrl: string;
+    amount: number;
+    unit: string;
+    message: string;
+  }) => MaybeAsync;
+
+  /** Called when a melt operation is cancelled (rolled back) successfully. */
+  onMeltCancelled?: (data: { operationId: string }) => MaybeAsync;
+
+  /** Called when a melt cancellation fails. */
+  onMeltCancelFailed?: (data: { operationId: string; message: string }) => MaybeAsync;
+
+  /** Called when a received token has an unsupported unit (not 'sat'). */
+  onUnsupportedTokenUnit?: (data: { unit: string }) => MaybeAsync;
+
+  /**
+   * Called when a mint is trusted from the mintInfo screen action.
+   * The wallet navigates back (or dismisses the modal).
+   * `fromAccepter` is true when the trust was triggered from the
+   * accept-mint modal rather than the info screen.
+   */
+  onMintTrustedFromScreen?: (data: { mintUrl: string; fromAccepter: boolean }) => MaybeAsync;
 };
 
 // ---------------------------------------------------------------------------
@@ -428,6 +522,55 @@ export interface MachineOperations {
    * Fire-and-forget — called after successful melt/payment-request operations.
    */
   linkTransaction?: (scannedInput: string, transactionId: string) => void;
+  /**
+   * Execute a send for NFC POS payment. Unlike `executeSend`, returns the
+   * encoded V4 token (for NFC write-back) and the operationId (for rollback).
+   */
+  executeNfcSend?: (
+    mintUrl: string,
+    amount: number
+  ) => Promise<{ token: string; historyEntry: string; operationId: string }>;
+  /**
+   * Roll back a pending send operation. Called when NFC write-back fails
+   * after token creation to reclaim the ecash proofs.
+   */
+  rollbackSend?: (operationId: string) => Promise<void>;
+
+  // ── Screen action operations ────────────────────────────────────────
+  // These are used by the built-in default screen action handlers.
+  // When provided, screen actions work out of the box without wallet
+  // implementations. When omitted, the wallet must provide handlers.
+
+  /**
+   * Check the status of a pending send operation. Returns the current
+   * state after polling the mint. Used by the sendToken.checkStatus
+   * screen action.
+   */
+  checkSendStatus?: (operationId: string) => Promise<{ state: string }>;
+
+  /**
+   * Receive an ecash token. Calls wallet.receive(), finds the resulting
+   * history entry, and returns it. Used by the receiveToken.redeem
+   * screen action.
+   */
+  executeReceive?: (
+    tokenString: string,
+    mintUrl: string,
+    amount: number
+  ) => Promise<{ historyEntry: string }>;
+
+  /**
+   * Roll back a melt operation. Called when the user cancels from the
+   * melt quote screen. Used by the meltQuote.cancel screen action.
+   */
+  rollbackMelt?: (operationId: string) => Promise<void>;
+
+  /**
+   * Check if a mint URL is in the trusted list. Used by the
+   * receiveToken.redeem screen action to decide whether to route
+   * through the trust review flow.
+   */
+  isMintTrusted?: (mintUrl: string) => Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -468,6 +611,22 @@ export type ScanSourceResult =
 export interface ScanSources {
   clipboard?: () => Promise<ScanSourceResult>;
   gallery?: () => Promise<ScanSourceResult>;
+  nfc?: () => Promise<ScanSourceResult>;
+}
+
+// ---------------------------------------------------------------------------
+// NFC I/O Adapter — platform-injected NFC transport
+// ---------------------------------------------------------------------------
+
+export interface NfcIOAdapter {
+  /** Start IsoDep session and read the NDEF text payload from the tag. */
+  readPaymentRequest: () => Promise<string>;
+  /** Write encoded token back to the tag via NDEF (session must still be active). */
+  writeToken: (token: string) => Promise<void>;
+  /** Release the IsoDep session. Idempotent. */
+  releaseSession: () => Promise<void>;
+  /** Whether NFC hardware is available and enabled. */
+  isAvailable: () => Promise<boolean>;
 }
 
 // ---------------------------------------------------------------------------
@@ -523,6 +682,12 @@ export interface CreateMachineConfig {
    * Defaults to 'en'.
    */
   getLocale?: () => string;
+  /**
+   * NFC I/O adapter for POS payment flows. When provided, `scan(undefined, { source: 'nfc' })`
+   * reads from the adapter and the machine auto-resolves interactive steps (mint selection,
+   * option choice) without user prompts, then writes the token back to the tag.
+   */
+  nfcAdapter?: NfcIOAdapter;
 }
 
 // ---------------------------------------------------------------------------

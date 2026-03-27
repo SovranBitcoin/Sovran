@@ -38,6 +38,7 @@ import {
   type ScreenActionHandlerMap,
   type StepHandlerMap,
   type WalletContext,
+  type NfcIOAdapter,
 } from 'coco-payment-ux';
 
 import { auditMint, fetchMintInfo } from '@/shared/lib/apiClient';
@@ -61,6 +62,8 @@ import {
   missingMeltTargetPopup,
   nfcConnectionLostPopup,
   nfcEcashSharedPopup,
+  nfcErrorPopup,
+  nfcPaymentProgressPopup,
   nfcSendFailedPopup,
   noAmountPopup,
   noMintSelectedPopup,
@@ -131,18 +134,29 @@ export function createSovranNotifications(): NotificationHandlerMap {
     PAYMENT_REQUEST_FAILED: ({ code: _code, message, data: _data }) => {
       sendPaymentFailedPopup({ text: message });
     },
+    NFC_WRITE_FAILED: ({ code: _code, message, data: _data }) => {
+      nfcErrorPopup({ title: 'NFC Write Failed', message });
+    },
+    NFC_SESSION_LOST: ({ code: _code, message, data: _data }) => {
+      nfcErrorPopup({ title: 'NFC Connection Lost', message });
+    },
+    NFC_READ_FAILED: ({ code: _code, message, data: _data }) => {
+      nfcErrorPopup({ title: 'NFC Read Failed', message });
+    },
     onPaymentProcessing: (data) => {
+      const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
+      const id = `${data.variant}-${Date.now()}`;
       usePaymentStatusStore.getState().setActive({
-        variant: data.variant === 'paymentRequest' ? 'payment-request' : data.variant,
-        id: `${data.variant}-${Date.now()}`,
+        variant,
+        id,
         mintUrl: data.mintUrl,
         amount: data.amount,
         unit: data.unit,
         state: 'processing',
       });
       paymentStatusPopup({
-        variant: data.variant === 'paymentRequest' ? 'payment-request' : data.variant,
-        id: `${data.variant}-${Date.now()}`,
+        variant,
+        id,
         mintUrl: data.mintUrl,
         amount: data.amount,
         unit: data.unit,
@@ -189,10 +203,110 @@ export function createSovranNotifications(): NotificationHandlerMap {
         clipboard: 'paste',
         gallery: 'qr',
         qr: 'qr',
+        nfc: 'nfc',
         deeplink: 'deeplink',
       };
       const scanSource = sourceMap[source ?? ''] ?? 'qr';
       useScanHistoryStore.getState().addScan(rawInput, rawInput, scanType, scanSource, parsedType);
+    },
+    onNfcPaymentProgress: ({ phase }) => {
+      nfcPaymentProgressPopup({ phase });
+    },
+    onNfcWriteFailed: ({ message, rolledBack }) => {
+      nfcErrorPopup({
+        title: 'NFC Write Failed',
+        message: rolledBack ? `${message} Your funds have been returned.` : message,
+      });
+    },
+
+    // ── Screen action notifications ─────────────────────────────────
+
+    onSendStatusChecked: ({ operationId: _operationId, state, redeemed }) => {
+      if (redeemed || state === 'finalized') {
+        tokenRedeemedByRecipientPopup();
+      } else if (state === 'rolled_back') {
+        transactionAlreadyCancelledPopup();
+      } else if (state === 'not_found') {
+        operationNotFoundPopup();
+      } else if (state !== 'pending') {
+        operationInvalidStatePopup({ state });
+      } else {
+        tokenPendingNotRedeemedPopup();
+      }
+    },
+
+    onSendCancelled: (_data) => {
+      transactionCancelledPopup();
+    },
+
+    onSendCancelFailed: ({ message }) => {
+      cancelTransactionFailedPopup({ text: message });
+    },
+
+    onReceiveProcessing: ({ id, mintUrl, amount, unit }) => {
+      const store = usePaymentStatusStore.getState();
+      if (store.active?.id === id && store.active?.state === 'failed') {
+        store.setActive(null);
+      }
+      store.setActive({
+        variant: 'receive-ecash',
+        id,
+        mintUrl,
+        amount,
+        unit,
+        state: 'processing',
+      });
+      paymentStatusPopup({
+        variant: 'receive-ecash',
+        id,
+        mintUrl,
+        amount,
+        unit,
+      });
+    },
+
+    onReceiveConfirmed: async ({ id, historyEntry }) => {
+      const store = usePaymentStatusStore.getState();
+      if (store.active?.id === id) {
+        store.setConfirmed(id);
+      }
+      try {
+        const entry = JSON.parse(historyEntry);
+        if (entry.id) {
+          await captureAndStoreLocation(entry.id);
+        }
+      } catch {
+        // Non-critical — skip location capture
+      }
+    },
+
+    onReceiveFailed: ({ id, message }) => {
+      const store = usePaymentStatusStore.getState();
+      if (store.active?.id === id && store.active?.state === 'processing') {
+        store.setFailed(id, new Error(message));
+      } else {
+        receiveFailedPopup({ text: message });
+      }
+    },
+
+    onMeltCancelled: (_data) => {
+      paymentCancelledPopup();
+    },
+
+    onMeltCancelFailed: ({ message }) => {
+      couldNotCancelPopup({ text: message });
+    },
+
+    onUnsupportedTokenUnit: ({ unit }) => {
+      unsupportedTokenUnitPopup({ unit });
+    },
+
+    onMintTrustedFromScreen: ({ fromAccepter }) => {
+      if (fromAccepter) {
+        router.dismiss();
+      } else {
+        router.back();
+      }
     },
   };
 }
@@ -201,7 +315,7 @@ export function createSovranNotifications(): NotificationHandlerMap {
 // createSovranScanSources
 // =============================================================================
 
-export function createSovranScanSources(): ScanSources {
+export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources {
   return {
     clipboard: async () => {
       const rawText = (await Clipboard.getStringAsync()).trim();
@@ -228,6 +342,16 @@ export function createSovranScanSources(): ScanSources {
         return { error: err instanceof Error ? err : new Error(String(err)) };
       }
     },
+    nfc: nfcAdapter
+      ? async () => {
+          try {
+            const data = await nfcAdapter.readPaymentRequest();
+            return { data };
+          } catch (err) {
+            return { error: err instanceof Error ? err : new Error(String(err)) };
+          }
+        }
+      : undefined,
   };
 }
 
@@ -246,6 +370,9 @@ export function createSovranOperations({
 }: CreateSovranOperationsConfig): MachineOperations {
   return {
     executeSend: async (mintUrl, amount) => {
+      if (useSettingsStore.getState().mockFailSend) {
+        throw new Error('Mock send failure (developer setting)');
+      }
       const mgr = getManager();
       if (!mgr) throw new Error('Wallet manager is not available');
       await mgr.wallet.send(mintUrl, amount);
@@ -379,6 +506,93 @@ export function createSovranOperations({
 
     linkTransaction: (scannedInput, transactionId) => {
       useScanHistoryStore.getState().linkTransaction(scannedInput, transactionId);
+    },
+
+    executeNfcSend: async (mintUrl, amount) => {
+      const mgr = getManager();
+      if (!mgr) throw new Error('Wallet manager is not available');
+      const prepared = await mgr.send.prepareSend(mintUrl, amount);
+      const { operation, token } = await mgr.send.executePreparedSend(prepared.id);
+      const entry = await findSendHistoryEntryByOperationId(mgr, operation.id);
+      if (!entry) throw new Error('Send history entry not found after creation');
+      return {
+        token: getEncodedTokenV4(token),
+        historyEntry: JSON.stringify(entry),
+        operationId: operation.id,
+      };
+    },
+
+    rollbackSend: async (operationId) => {
+      const mgr = getManager();
+      if (!mgr) return;
+      try {
+        const operation = await mgr.send.getOperation(operationId);
+        if (operation && ['prepared', 'executing', 'pending'].includes(operation.state)) {
+          await mgr.send.rollback(operationId);
+        }
+      } catch (e) {
+        console.warn('[NFC] Rollback failed:', e);
+      }
+    },
+
+    // ── Screen action operations ────────────────────────────────────
+
+    checkSendStatus: async (operationId) => {
+      const mgr = getManager();
+      if (!mgr) throw new Error('Wallet manager is not available');
+
+      const operation = await mgr.send.getOperation(operationId);
+      if (!operation) return { state: 'not_found' };
+
+      if (operation.state === 'pending') {
+        await mgr.send.checkPendingOperation(operationId);
+        const updated = await mgr.send.getOperation(operationId);
+        return { state: updated?.state ?? operation.state };
+      }
+      return { state: operation.state };
+    },
+
+    executeReceive: async (tokenString, mintUrl, amount) => {
+      const mgr = getManager();
+      if (!mgr) throw new Error('Wallet manager is not available');
+
+      await mgr.wallet.receive(tokenString);
+
+      // P2PK key regeneration
+      if (useSettingsStore.getState().regenerateP2PKOnReceive) {
+        try {
+          const decoded = getDecodedToken(tokenString);
+          const hasP2PK = decoded.proofs.some((proof) => {
+            try {
+              const parsed = JSON.parse(proof.secret);
+              return Array.isArray(parsed) && parsed[0] === 'P2PK';
+            } catch {
+              return false;
+            }
+          });
+          if (hasP2PK) {
+            await mgr.keyring.generateKeyPair();
+          }
+        } catch (e) {
+          console.warn('Failed to regenerate P2PK key:', e);
+        }
+      }
+
+      const realEntry = await findReceiveHistoryEntryByToken(mgr, tokenString, mintUrl, amount);
+      if (!realEntry) throw new Error('Receive history entry not found after redemption');
+      return { historyEntry: JSON.stringify(realEntry) };
+    },
+
+    isMintTrusted: async (mintUrl) => {
+      const mgr = getManager();
+      if (!mgr) throw new Error('Wallet manager is not available');
+      return mgr.mint.isTrustedMint(mintUrl);
+    },
+
+    rollbackMelt: async (operationId) => {
+      const mgr = getManager();
+      if (!mgr) throw new Error('Wallet manager is not available');
+      await mgr.quotes.rollbackMelt(operationId, 'User cancelled');
     },
   };
 }
@@ -806,6 +1020,11 @@ function mapMeltOperationState(state: string): MeltHistoryEntry['state'] {
   return 'UNPAID';
 }
 
+/**
+ * App-specific screen action overrides. Only actions that require platform
+ * primitives not available in coco-payment-ux (NFC writer, emoji picker).
+ * All other actions are handled by the built-in default handlers.
+ */
 export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
   return {
     sendToken: {
@@ -845,625 +1064,6 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         const { entry } = sendCtx(rawCtx);
         if (!entry.token) return;
         emojiPickerPopup({ token: getEncodedTokenV4(entry.token) });
-      },
-
-      checkStatus: async (rawCtx) => {
-        const { entry, manager } = sendCtx(rawCtx);
-        if (!entry.operationId) return;
-
-        const operation = await manager.send.getOperation(entry.operationId);
-        if (!operation) {
-          operationNotFoundPopup();
-          return;
-        }
-
-        if (operation.state === 'finalized') {
-          tokenRedeemedByRecipientPopup();
-          return;
-        }
-
-        if (operation.state === 'rolled_back') {
-          transactionAlreadyCancelledPopup();
-          return;
-        }
-
-        if (operation.state !== 'pending') {
-          operationInvalidStatePopup({ state: operation.state });
-          return;
-        }
-
-        await manager.send.checkPendingOperation(entry.operationId);
-
-        const updatedOperation = await manager.send.getOperation(entry.operationId);
-        if (updatedOperation?.state === 'finalized') {
-          tokenRedeemedByRecipientPopup();
-        } else {
-          tokenPendingNotRedeemedPopup();
-        }
-      },
-
-      cancel: async (rawCtx) => {
-        const { entry, manager } = sendCtx(rawCtx);
-        if (!entry.operationId) return;
-
-        try {
-          await manager.send.rollback(entry.operationId);
-          transactionCancelledPopup();
-        } catch (error) {
-          cancelTransactionFailedPopup({
-            text: error instanceof Error ? error.message : undefined,
-          });
-        }
-      },
-    },
-
-    receiveToken: {
-      redeem: async (rawCtx) => {
-        const { entry, manager } = receiveTokenCtx(rawCtx);
-        if (!entry.token) return;
-
-        const tokenString = manager.wallet.encodeToken(entry.token);
-
-        const decoded = getDecodedToken(tokenString);
-        if (decoded.unit !== 'sat') {
-          unsupportedTokenUnitPopup({ unit: decoded.unit ?? 'unknown' });
-          return;
-        }
-
-        const isTrusted = await manager.mint.isTrustedMint(entry.mintUrl);
-        if (!isTrusted) {
-          const machine = (rawCtx as Record<string, unknown>).paymentMachine as PaymentMachine;
-          await machine.reviewMint(entry.mintUrl, tokenString);
-          return;
-        }
-
-        const store = usePaymentStatusStore.getState();
-        if (store.active?.id === entry.id && store.active?.state === 'failed') {
-          store.setActive(null);
-        }
-        store.setActive({
-          variant: 'receive-ecash',
-          id: entry.id,
-          mintUrl: entry.mintUrl,
-          amount: entry.amount,
-          unit: entry.unit ?? 'sat',
-          state: 'processing',
-        });
-        paymentStatusPopup({
-          variant: 'receive-ecash',
-          id: entry.id,
-          mintUrl: entry.mintUrl,
-          amount: entry.amount,
-          unit: entry.unit ?? 'sat',
-        });
-
-        try {
-          await manager.wallet.receive(tokenString);
-
-          if (useSettingsStore.getState().regenerateP2PKOnReceive) {
-            try {
-              const hasP2PK = decoded.proofs.some((proof) => {
-                try {
-                  const parsed = JSON.parse(proof.secret);
-                  return Array.isArray(parsed) && parsed[0] === 'P2PK';
-                } catch {
-                  return false;
-                }
-              });
-              if (hasP2PK) {
-                await manager.keyring.generateKeyPair();
-              }
-            } catch (e) {
-              console.warn('Failed to regenerate P2PK key:', e);
-            }
-          }
-
-          const realEntry = await findReceiveHistoryEntryByToken(
-            manager,
-            tokenString,
-            entry.mintUrl,
-            entry.amount
-          );
-          if (realEntry?.id) {
-            const setEntry = (rawCtx as Record<string, unknown>).setEntry as
-              | ((e: Record<string, unknown>) => void)
-              | undefined;
-            if (setEntry) {
-              setEntry(realEntry as unknown as Record<string, unknown>);
-            }
-
-            await captureAndStoreLocation(realEntry.id);
-            const rawToken = (entry.metadata as Record<string, string> | undefined)?.rawToken;
-            if (rawToken || tokenString) {
-              useScanHistoryStore.getState().linkTransaction(rawToken || tokenString, realEntry.id);
-            }
-          }
-        } catch (error) {
-          const store = usePaymentStatusStore.getState();
-          if (store.active?.id === entry.id && store.active?.state === 'processing') {
-            store.setFailed(entry.id, error);
-          } else {
-            receiveFailedPopup({ text: error instanceof Error ? error.message : undefined });
-          }
-          throw error;
-        }
-      },
-    },
-
-    meltQuote: {
-      pay: async (rawCtx) => {
-        // When machine operations handle melt execution, delegate to confirmMelt().
-        // The machine runs the operation, dispatches notifications, and routes to
-        // fallback on failure. On success, stepData is updated with historyEntry.
-        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
-        if (machine?.confirmMelt) {
-          await machine.confirmMelt();
-          // On success, the machine updated stepData with historyEntry.
-          // Update the screen entry from the machine's step data.
-          const machineStep = machine.getStep();
-          if (machineStep === 'navigateToMeltPreview') {
-            const machineData = (machine as any).inspect?.()?.details ?? {};
-            // Nothing else to do — notifications handled by the machine.
-          }
-          return;
-        }
-
-        // Fallback: legacy screen action handler (when operations not provided).
-        const { entry, manager } = meltQuoteCtx(rawCtx);
-        let operationId = entry.metadata?.operationId as string | undefined;
-        const isPreview = !entry.quoteId;
-        let screenEntry: EntryRecord = entry as unknown as EntryRecord;
-        let paymentId = entry.quoteId || operationId || entry.id;
-
-        const setScreenEntry = (patch: EntryRecord) => {
-          screenEntry = mergeScreenEntry(screenEntry, patch);
-          const setEntry = (rawCtx as Record<string, unknown>).setEntry as
-            | ((e: Record<string, unknown>) => void)
-            | undefined;
-          setEntry?.(screenEntry);
-        };
-
-        if (isPreview) {
-          const meltTarget = entry.metadata?.meltTarget;
-          if (!meltTarget) throw new Error('Missing meltTarget in metadata');
-
-          const bolt11 = isLightningInvoice(meltTarget)
-            ? meltTarget
-            : await requestInvoiceFromLnurl(meltTarget, entry.amount);
-
-          const operation = await manager.quotes.prepareMeltBolt11(entry.mintUrl, bolt11);
-          operationId = operation.id;
-          paymentId = operation.quoteId;
-          setScreenEntry({
-            id: operation.id,
-            type: 'melt',
-            createdAt: operation.createdAt,
-            mintUrl: operation.mintUrl,
-            unit: entry.unit,
-            quoteId: operation.quoteId,
-            state: 'UNPAID',
-            amount: operation.amount,
-            metadata: { phase: 'ready', operationId: operation.id },
-          });
-        }
-
-        const quoteId = !isPreview ? entry.quoteId : paymentId;
-
-        const store = usePaymentStatusStore.getState();
-        if (paymentId && store.active?.id === paymentId && store.active?.state === 'failed') {
-          store.setActive(null);
-        }
-        store.setActive({
-          variant: 'melt',
-          id: paymentId,
-          mintUrl: entry.mintUrl,
-          amount: entry.amount,
-          unit: entry.unit,
-          state: 'processing',
-        });
-
-        paymentStatusPopup({
-          variant: 'melt',
-          id: paymentId,
-          mintUrl: entry.mintUrl,
-          amount: entry.amount,
-          unit: entry.unit,
-          operationId,
-        });
-
-        const result = operationId
-          ? await manager.quotes.executeMelt(operationId)
-          : quoteId
-            ? await manager.quotes.executeMeltByQuote(entry.mintUrl, quoteId)
-            : null;
-
-        if (result) {
-          setScreenEntry({
-            id: result.id,
-            type: 'melt',
-            createdAt: result.createdAt,
-            mintUrl: result.mintUrl,
-            unit: entry.unit,
-            quoteId: result.quoteId,
-            state: mapMeltOperationState(result.state),
-            amount: result.amount,
-            metadata: { operationId: result.id },
-          });
-
-          const meltTarget = entry.metadata?.meltTarget as string | undefined;
-          if (meltTarget && result.id) {
-            useScanHistoryStore.getState().linkTransaction(meltTarget, result.id);
-          }
-        }
-      },
-
-      cancel: async (rawCtx) => {
-        const { entry, manager } = meltQuoteCtx(rawCtx);
-        const operationId = entry.metadata?.operationId as string | undefined;
-
-        if (!operationId && !entry.quoteId) {
-          return;
-        }
-
-        try {
-          if (operationId) {
-            await manager.quotes.rollbackMelt(operationId, 'User cancelled');
-          }
-          // todo: I think here we should be calling some internal function of the machine/coco-payment-ux like ctx.statusUpdate({... type: 'CANCELLED', ... }) or something along these lines and then we have in our createSovranNotifications we handle it. Look at how createSovranNoticiations are currently called.
-          paymentCancelledPopup();
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Unknown error';
-          if (
-            msg.includes('Cannot rollback') ||
-            msg.includes('not found') ||
-            msg.includes('No melt operation')
-          ) {
-            return;
-          }
-          couldNotCancelPopup({ text: msg });
-        }
-      },
-    },
-
-    paymentRequest: {
-      confirm: async (rawCtx) => {
-        // When machine operations handle payment request execution, delegate to confirmPaymentRequest().
-        // The machine runs the operation, dispatches notifications, and routes to
-        // fallback on failure. On success, stepData is updated with historyEntry.
-        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
-        if (machine?.confirmPaymentRequest) {
-          await machine.confirmPaymentRequest();
-          return;
-        }
-
-        // Fallback: legacy screen action handler (when operations not provided).
-        const ctx = paymentRequestCtx(rawCtx);
-        const { entry, manager } = ctx;
-        const encodedRequest = entry.metadata?.paymentRequest;
-        if (!encodedRequest) return;
-
-        const info = defaultDetectors.getPaymentRequestInfo(encodedRequest);
-        if (!info) return;
-
-        const { mintUrl, amount } = entry;
-        let screenEntry: EntryRecord = entry as unknown as EntryRecord;
-        const setScreenEntry = (patch: EntryRecord) => {
-          screenEntry = mergeScreenEntry(screenEntry, patch);
-          ctx.setEntry?.(screenEntry);
-        };
-        const restorePreviewEntry = () => {
-          screenEntry = entry as unknown as EntryRecord;
-          ctx.setEntry?.(screenEntry);
-        };
-
-        try {
-          const nostrTransport = info.transports?.find((t) => t.type === 'nostr');
-          const httpTransport = info.transports?.find((t) => t.type === 'post');
-          const parsed =
-            nostrTransport && !httpTransport
-              ? buildInbandParsedPaymentRequest(encodedRequest, info, mintUrl)
-              : await manager.wallet.processPaymentRequest(encodedRequest);
-
-          if (httpTransport) {
-            const transaction = await manager.wallet.preparePaymentRequestTransaction(
-              mintUrl,
-              parsed,
-              amount
-            );
-            const operationId = transaction.sendOperation.id;
-            const preparedEntry =
-              (await findSendHistoryEntryByOperationId(manager, operationId)) ??
-              ({
-                id: operationId,
-                type: 'send',
-                createdAt: transaction.sendOperation.createdAt,
-                mintUrl,
-                amount,
-                unit: entry.unit,
-                operationId,
-                state: 'prepared',
-              } as SendHistoryEntry);
-
-            setScreenEntry({
-              ...(preparedEntry as unknown as EntryRecord),
-              metadata: {
-                paymentRequest: encodedRequest,
-                phase: 'created',
-                operationId,
-              },
-            });
-
-            try {
-              await manager.wallet.handleHttpPaymentRequest(transaction);
-            } catch (error) {
-              await manager.send.rollback(operationId);
-              restorePreviewEntry();
-              throw error;
-            }
-
-            setScreenEntry({
-              state: 'pending',
-              metadata: { phase: 'delivered', tokenCreated: 'true' },
-            });
-
-            if (encodedRequest && operationId) {
-              useScanHistoryStore.getState().linkTransaction(encodedRequest, operationId);
-            }
-
-            usePaymentStatusStore.getState().setActive({
-              variant: 'payment-request',
-              id: operationId,
-              mintUrl,
-              amount,
-              unit: entry.unit,
-              state: 'processing',
-            });
-            paymentStatusPopup({
-              variant: 'payment-request',
-              id: operationId,
-              mintUrl,
-              amount,
-              unit: entry.unit,
-            });
-            return;
-          }
-
-          if (nostrTransport) {
-            const transaction = await manager.wallet.preparePaymentRequestTransaction(
-              mintUrl,
-              parsed,
-              amount
-            );
-            const operationId = transaction.sendOperation.id;
-            const preparedEntry =
-              (await findSendHistoryEntryByOperationId(manager, operationId)) ??
-              ({
-                id: operationId,
-                type: 'send',
-                createdAt: transaction.sendOperation.createdAt,
-                mintUrl,
-                amount,
-                unit: entry.unit,
-                operationId,
-                state: 'prepared',
-              } as SendHistoryEntry);
-
-            setScreenEntry({
-              ...(preparedEntry as unknown as EntryRecord),
-              metadata: {
-                paymentRequest: encodedRequest,
-                phase: 'created',
-                operationId,
-              },
-            });
-
-            let tokenCreated = false;
-            try {
-              await manager.wallet.handleInbandPaymentRequest(transaction, async (token) => {
-                tokenCreated = true;
-                setScreenEntry({
-                  state: 'pending',
-                  metadata: {
-                    tokenCreated: 'true',
-                  },
-                });
-
-                const payload = {
-                  id: encodedRequest,
-                  mint: mintUrl,
-                  unit: entry.unit,
-                  proofs: token.proofs,
-                };
-
-                await ctx.sendDirectMessage(nostrTransport.target, JSON.stringify(payload));
-
-                setScreenEntry({
-                  metadata: {
-                    phase: 'delivered',
-                    tokenCreated: 'true',
-                    nostrSent: 'true',
-                  },
-                });
-              });
-            } catch (error) {
-              if (tokenCreated) {
-                await manager.send.rollback(operationId);
-              }
-              restorePreviewEntry();
-              throw error;
-            }
-
-            if (encodedRequest && operationId) {
-              useScanHistoryStore.getState().linkTransaction(encodedRequest, operationId);
-            }
-
-            usePaymentStatusStore.getState().setActive({
-              variant: 'payment-request',
-              id: operationId,
-              mintUrl,
-              amount,
-              unit: entry.unit,
-              state: 'processing',
-            });
-            paymentStatusPopup({
-              variant: 'payment-request',
-              id: operationId,
-              mintUrl,
-              amount,
-              unit: entry.unit,
-            });
-            return;
-          }
-
-          const transaction = await manager.wallet.preparePaymentRequestTransaction(
-            mintUrl,
-            parsed,
-            amount
-          );
-          await manager.wallet.handleInbandPaymentRequest(transaction, async () => {});
-
-          if (encodedRequest && transaction.sendOperation.id) {
-            useScanHistoryStore.getState().linkTransaction(encodedRequest, transaction.sendOperation.id);
-          }
-
-          const sendEntry = await findSendHistoryEntryByOperationId(
-            manager,
-            transaction.sendOperation.id
-          );
-
-          if (sendEntry) {
-            router.replace({
-              pathname: '/(send-flow)/sendToken',
-              params: { sendHistoryEntry: JSON.stringify(sendEntry) },
-            });
-          } else {
-            setScreenEntry({
-              id: transaction.sendOperation.id,
-              type: 'send',
-              createdAt: transaction.sendOperation.createdAt,
-              mintUrl,
-              amount,
-              unit: entry.unit,
-              operationId: transaction.sendOperation.id,
-              state: 'pending',
-              metadata: {
-                paymentRequest: encodedRequest,
-                phase: 'delivered',
-                tokenCreated: 'true',
-              },
-            });
-          }
-        } catch (error) {
-          sendPaymentFailedPopup({ text: error instanceof Error ? error.message : undefined });
-        }
-      },
-
-      cancel: async (_rawCtx) => {
-        router.back();
-      },
-    },
-
-    receive: {
-      paste: async (rawCtx) => {
-        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
-        await machine?.scan?.();
-      },
-
-      fixedAmount: async (rawCtx) => {
-        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
-        await machine?.startReceiveLightning?.();
-      },
-
-      scanQr: async (rawCtx) => {
-        const requestCamera = (rawCtx as { requestCameraPermission?: () => Promise<boolean> })
-          .requestCameraPermission;
-        const granted = requestCamera ? await requestCamera() : false;
-        if (!granted) return;
-        const unit = (rawCtx.entry as { unit?: string }).unit ?? 'sat';
-        router.navigate({
-          pathname: '/(receive-flow)/camera',
-          params: { unit },
-        });
-      },
-
-      changeNpcMint: async (rawCtx) => {
-        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
-        await machine?.requestMintSelector?.({ scope: 'npc' });
-      },
-    },
-
-    mintInfo: {
-      trust: async (rawCtx) => {
-        const entry = rawCtx.entry as Record<string, unknown>;
-        const mintUrl = entry.mintUrl as string;
-        if (!mintUrl) return;
-
-        const manager = rawCtx.manager as Manager;
-        await manager.mint.addMint(mintUrl, { trusted: true });
-
-        if (entry.fromAccepter === true) {
-          router.dismiss();
-        } else {
-          router.back();
-        }
-      },
-    },
-
-    mintSelector: {
-      select: async (rawCtx) => {
-        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
-        const mintUrl = (rawCtx as Record<string, unknown>).mintUrl as string | undefined;
-        const entry = rawCtx.entry as Record<string, unknown>;
-        const scope = (entry.scope as 'npc' | 'selected') ?? 'selected';
-        if (!mintUrl || !machine) return;
-        await machine.changeMint(mintUrl, { scope });
-      },
-      getInfo: async (rawCtx) => {
-        const mintUrl = (rawCtx as Record<string, unknown>).mintUrl as string | undefined;
-        if (!mintUrl) return;
-        const manager = rawCtx.manager as Manager | null;
-        let entry: Record<string, unknown> = { mintUrl };
-        if (manager) {
-          try {
-            const info = await loadMintReviewInfo(manager, mintUrl);
-            entry = { ...info };
-          } catch {
-            /* fall through with bare mintUrl */
-          }
-        }
-        router.navigate({
-          pathname: '/(mint-flow)/info' as any,
-          params: { mintInfoEntry: JSON.stringify(entry) },
-        });
-      },
-      addMint: async () => {
-        router.push('/(mint-flow)/add' as any);
-      },
-    },
-
-    amountEntry: {
-      next: async (rawCtx) => {
-        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
-        if (!machine) return;
-        const entry = rawCtx.entry as Record<string, unknown>;
-        const effectiveSat = entry.effectiveSatAmount;
-        const mintUrl = typeof entry.selectedMintUrl === 'string' ? entry.selectedMintUrl : '';
-        if (typeof effectiveSat !== 'number' || effectiveSat <= 0) return;
-        const destination = entry.destination as Destination | undefined;
-        if (!destination) return;
-        void machine.enterAmount(effectiveSat, mintUrl, { destination });
-      },
-      paste: async (rawCtx) => {
-        const entry = rawCtx.entry as { destination?: string };
-        if (entry.destination !== 'sendEcash') return;
-        const machine = (rawCtx as { paymentMachine?: PaymentMachine }).paymentMachine;
-        await machine?.scan?.();
-      },
-      scanQr: async (rawCtx) => {
-        const entry = rawCtx.entry as { destination?: string; unit?: string };
-        if (entry.destination !== 'sendEcash') return;
-        const unit = entry.unit ?? 'sat';
-        router.navigate({ pathname: '/camera', params: { unit } });
       },
     },
   };

@@ -53,6 +53,7 @@ export type {
   NotificationHandlerMap,
   ScanSourceResult,
   ScanSources,
+  NfcIOAdapter,
 } from './machine/types';
 
 export type {
@@ -87,13 +88,16 @@ export {
   mergeEntryUpdate,
   decorateEntry,
   meltOperationToScreenActionEntry,
+  createDefaultScreenActionHandlers,
 } from './screen-actions';
 export type {
   ActionAvailability,
   ActionHandler,
   ActionState,
   DecoratedEntryFields,
+  DefaultScreenActionHandlersConfig,
   MeltOperationLike,
+  NavigationCallbacks,
   ScreenActionContext,
   ScreenActionHandlerMap,
   ScreenActionManager,

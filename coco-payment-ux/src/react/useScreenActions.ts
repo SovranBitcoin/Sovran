@@ -23,6 +23,7 @@ import {
   mergeEntryUpdate as defaultMerge,
   decorateEntry as defaultDecorate,
 } from '../screen-actions/createManager';
+import { createDefaultScreenActionHandlers } from '../screen-actions/defaultHandlers';
 import type { QuickSendSuggestion } from '../amount-actions/types';
 import type {
   ActionState,
@@ -89,6 +90,8 @@ export type BoundAction = ActionState & {
 export interface UseScreenActionsConfig<S extends ScreenType> {
   screenType: S;
   handlers: ScreenActionHandlerMap[S];
+  /** Default handlers used as fallback when no wallet handler is registered. */
+  defaultHandlers?: ScreenActionHandlerMap[S];
   entryParam: Record<string, unknown> | string | undefined;
   getExtraContext?: () => Record<string, unknown>;
   onEntryUpdate?: (callback: (entry: Record<string, unknown>) => void) => () => void;
@@ -123,6 +126,7 @@ export function useScreenActionsWithConfig<S extends ScreenType>(
   const {
     screenType,
     handlers,
+    defaultHandlers,
     entryParam,
     getExtraContext,
     onEntryUpdate,
@@ -154,6 +158,7 @@ export function useScreenActionsWithConfig<S extends ScreenType>(
     managerRef.current = createScreenActionManager<S>({
       screenType,
       handlers,
+      defaultHandlers,
       getContext: () => ({
         entry: managerRef.current?.getEntry() ?? {},
         manager: null,
@@ -243,6 +248,8 @@ export function useScreenActions(
     getBtcPriceRef,
     getDisplayCurrencyRef,
     notificationsRef,
+    operationsRef,
+    navigationRef,
     writeClipboardRef,
     shareContentRef,
   } = useCocoPaymentUXContext();
@@ -286,6 +293,34 @@ export function useScreenActions(
     : screenActionHandlers[screenType as Exclude<ScreenType, 'amountEntry'>];
   const handlers = (handlersRaw ?? {}) as ScreenActionHandlerMap[typeof screenType];
 
+  // Build default handlers from operations + notifications + navigation.
+  // Uses refs so the handlers always read fresh values.
+  const allDefaults = useMemo(
+    () =>
+      createDefaultScreenActionHandlers({
+        getMachine: () => machineRef.current,
+        getOperations: () => operationsRef.current,
+        notify: (event: string, ...args: unknown[]) => {
+          const notifications = notificationsRef.current;
+          if (!notifications) return;
+          const handler = (notifications as Record<string, ((...a: unknown[]) => void) | undefined>)[
+            event
+          ];
+          if (typeof handler === 'function') handler(...args);
+        },
+        navigation: {
+          scanQr: (...args) => navigationRef.current?.scanQr?.(...args),
+          mintInfo: (...args) => navigationRef.current?.mintInfo?.(...args),
+          addMint: () => navigationRef.current?.addMint?.(),
+          goBack: () => navigationRef.current?.goBack?.(),
+        },
+      }),
+    [] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const defaultHandlersForScreen = (
+    isAmountEntry ? allDefaults.amountEntry : allDefaults[screenType as Exclude<ScreenType, 'amountEntry'>]
+  ) as ScreenActionHandlerMap[typeof screenType];
+
   const shouldApply = screenActionsBridge?.shouldApplyEntryUpdate ?? defaultShouldApply;
   const mergeEntry = screenActionsBridge?.mergeEntryUpdate ?? defaultMerge;
 
@@ -325,6 +360,7 @@ export function useScreenActions(
   const base = useScreenActionsWithConfig({
     screenType: screenType as ScreenType,
     handlers,
+    defaultHandlers: defaultHandlersForScreen,
     entryParam,
     getExtraContext,
     onEntryUpdate: isAmountEntry ? undefined : onEntryUpdate,

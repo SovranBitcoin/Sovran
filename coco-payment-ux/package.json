@@ -8,7 +8,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./react": "./src/react/index.ts"
+    "./react": "./src/react/index.ts",
+    "./operations": "./src/operations/index.ts"
   },
   "files": [
     "src"
@@ -19,17 +20,28 @@
     "nostr-tools": "^2.0.0"
   },
   "peerDependencies": {
-    "react": ">=18.0.0"
+    "react": ">=18.0.0",
+    "coco-cashu-core": ">=1.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
+    },
+    "coco-cashu-core": {
+      "optional": true
     }
   },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "fast-check": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0"
   },
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run __tests__/unit",
+    "test:flows": "vitest run __tests__/flows",
+    "test:property": "vitest run __tests__/property"
   }
 }

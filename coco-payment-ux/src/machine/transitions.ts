@@ -29,12 +29,13 @@ function handleExecute(
   input: string,
   detectors: Detectors,
   walletCtx: WalletContext,
-  unit: string
+  unit: string,
+  offline?: boolean
 ): TransitionResult {
   const parsed = parsePaymentInput(input, detectors);
   const intent = resolveIntent(parsed, detectors, walletCtx);
 
-  const ctx: FlowContext = { parsed, intent, unit, rawInput: input };
+  const ctx: FlowContext = { parsed, intent, unit, rawInput: input, offline };
 
   // Extract known data from the intent into context
   switch (intent.type) {
@@ -189,37 +190,9 @@ function handleProofsChosen(
   const ctx: FlowContext = { ...currentCtx, amount: event.amount };
   const destination = ctx.destination ?? 'sendEcash';
 
-  if (!ctx.intent) {
-    if (destination === 'paymentRequest' && ctx.paymentRequest) {
-      return {
-        step: 'navigateToPaymentRequest',
-        context: ctx,
-        data: {
-          mintUrl: ctx.mintUrl!,
-          paymentRequest: ctx.paymentRequest,
-          unit: ctx.unit,
-          amount: event.amount,
-        },
-      };
-    }
-
-    if (destination === 'meltQuote' && ctx.meltTarget) {
-      return {
-        step: 'navigateToMeltPreview',
-        context: ctx,
-        data: {
-          mintUrl: ctx.mintUrl!,
-          meltTarget: ctx.meltTarget,
-          unit: ctx.unit,
-          amount: event.amount,
-        },
-      };
-    }
-
-    return resolveFromContext(ctx, walletCtx);
-  }
-
-  // After proof selection, go straight to terminal (proofs already validated)
+  // After proof selection, go straight to terminal — proofs are already
+  // validated and we must not re-enter resolveFromContext (which would
+  // re-check proof composition and loop back to chooseProofs when offline).
   const mintUrl = ctx.mintUrl!;
 
   if (destination === 'paymentRequest' && ctx.paymentRequest) {
@@ -285,8 +258,8 @@ function handleMintSelectorRequested(
 // Flow entry handlers — reset context and resolve first step
 // ---------------------------------------------------------------------------
 
-function handleStartSendEcash(walletCtx: WalletContext, unit: string): TransitionResult {
-  const ctx: FlowContext = { unit, destination: 'sendEcash' };
+function handleStartSendEcash(walletCtx: WalletContext, unit: string, offline?: boolean): TransitionResult {
+  const ctx: FlowContext = { unit, destination: 'sendEcash', offline };
   const selection = selectMint(walletCtx);
 
   switch (selection.type) {
@@ -434,33 +407,34 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
     // always attempt the exact amount.
     if (destination === 'sendEcash') {
       const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
-      if (proofAmounts.length > 0) {
+      if (proofAmounts.length > 0 && ctx.offline) {
+        // Online: skip proof selector — the mint handles swaps server-side
+        // via executeSend. If executeSend fails, the catch block in
+        // createMachine falls back to chooseProofs.
+        // Offline: always show proof selector since the mint is unreachable.
         const composition = composeSatoshis(proofAmounts, amount);
-        // When offline, always show proof selector (mint swap unreachable).
-        if (ctx.offline || !composition.exactMatch) {
-          return {
-            step: 'chooseProofs',
-            context: { ...ctx, destination },
-            data: {
-              mintUrl,
-              amount,
-              unit,
-              proofAmounts,
-              suggestions: {
-                roundDown: composition.exactMatch
-                  ? { amount }
-                  : composition.nearestLower != null
-                    ? { amount: composition.nearestLower }
-                    : null,
-                roundUp: composition.exactMatch
-                  ? null
-                  : composition.nearestUpper != null
-                    ? { amount: composition.nearestUpper }
-                    : null,
-              },
+        return {
+          step: 'chooseProofs',
+          context: { ...ctx, destination },
+          data: {
+            mintUrl,
+            amount,
+            unit,
+            proofAmounts,
+            suggestions: {
+              roundDown: composition.exactMatch
+                ? { amount }
+                : composition.nearestLower != null
+                  ? { amount: composition.nearestLower }
+                  : null,
+              roundUp: composition.exactMatch
+                ? null
+                : composition.nearestUpper != null
+                  ? { amount: composition.nearestUpper }
+                  : null,
             },
-          };
-        }
+          },
+        };
       }
     }
 
@@ -499,54 +473,63 @@ export function transition(
   event: FlowEvent,
   detectors: Detectors,
   walletCtx: WalletContext,
-  unit: string
+  unit: string,
+  /** Current offline status from the provider. Stamped onto every result
+   *  context so that proof-composition checks always see the real-time
+   *  value — even when a handler creates a fresh FlowContext. */
+  offline?: boolean
 ): TransitionResult {
+  function stamp(result: TransitionResult): TransitionResult {
+    if (offline != null) result.context.offline = offline;
+    return result;
+  }
+
   // Global events: work from any state
   switch (event.type) {
     case 'EXECUTE':
-      return handleExecute(event.input, detectors, walletCtx, unit);
+      return stamp(handleExecute(event.input, detectors, walletCtx, unit, offline));
     case 'RESET':
-      return { step: 'idle', context: { unit }, data: {} as any };
+      return stamp({ step: 'idle', context: { unit }, data: {} as any });
     case 'REQUEST_MINT_SELECTOR':
-      return handleMintSelectorRequested(event, currentCtx, walletCtx);
+      return stamp(handleMintSelectorRequested(event, currentCtx, walletCtx));
     case 'START_SEND_ECASH':
-      return handleStartSendEcash(walletCtx, unit);
+      return stamp(handleStartSendEcash(walletCtx, unit, offline));
     case 'START_RECEIVE_LIGHTNING':
-      return handleStartReceiveLightning(walletCtx, unit);
+      return stamp(handleStartReceiveLightning(walletCtx, unit));
     case 'START_RECEIVE':
-      return handleStartReceive(unit);
+      return stamp(handleStartReceive(unit));
     case 'REVIEW_MINT':
-      return {
+      return stamp({
         step: 'reviewMint',
         context: { ...currentCtx, reviewToken: event.token },
         data: { mintUrl: event.mintUrl, token: event.token },
-      };
+      });
     case 'MINT_TRUSTED': {
       const token = currentCtx.reviewToken;
       if (token) {
-        return {
+        return stamp({
           step: 'receiveToken',
           context: { ...currentCtx, reviewToken: undefined },
           data: { token },
-        };
+        });
       }
-      return { step: currentStep, context: currentCtx, data: {} as any };
+      return stamp({ step: currentStep, context: currentCtx, data: {} as any });
     }
   }
 
   // State-specific events
   switch (event.type) {
     case 'OPTION_CHOSEN':
-      return handleOptionChosen(event, currentCtx, detectors, walletCtx);
+      return stamp(handleOptionChosen(event, currentCtx, detectors, walletCtx));
     case 'AMOUNT_ENTERED':
-      return handleAmountEntered(event, currentCtx, walletCtx);
+      return stamp(handleAmountEntered(event, currentCtx, walletCtx));
     case 'MINT_SELECTED':
-      return handleMintSelected(event, currentCtx, walletCtx);
+      return stamp(handleMintSelected(event, currentCtx, walletCtx));
     case 'PROOFS_CHOSEN':
-      return handleProofsChosen(event, currentCtx, walletCtx);
+      return stamp(handleProofsChosen(event, currentCtx, walletCtx));
   }
 
   // Unhandled events (e.g. CONFIRM_MELT, CONFIRM_PAYMENT_REQUEST that
   // bypassed their guard in createMachine.ts) — return current state.
-  return { step: currentStep, context: currentCtx, data: {} as any };
+  return stamp({ step: currentStep, context: currentCtx, data: {} as any });
 }

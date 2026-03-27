@@ -96,11 +96,13 @@ function checkProofComposition(
   const proofAmounts = walletCtx.proofAmounts[mintUrl] ?? [];
   if (proofAmounts.length === 0) return null;
 
-  const composition = composeSatoshis(proofAmounts, amount);
+  // Online: always skip the proof selector — the mint handles swaps
+  // server-side via executeSend. If executeSend fails, the catch block
+  // in createMachine falls back to chooseProofs.
+  if (!ctx.offline) return null;
 
-  // When the device is offline, always show the proof selector — even if
-  // proofs compose exactly — because the mint swap endpoint is unreachable.
-  if (!ctx.offline && composition.exactMatch) return null;
+  // Offline: always show the proof selector since the mint is unreachable.
+  const composition = composeSatoshis(proofAmounts, amount);
 
   return {
     step: 'chooseProofs',

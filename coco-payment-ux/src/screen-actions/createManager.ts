@@ -34,12 +34,14 @@ interface CreateScreenActionManagerConfig<S extends ScreenType> {
   getContext: () => ScreenActionContext;
   /** When provided (amountEntry screens), creates an internal AmountActionManager. */
   amountConfig?: CreateAmountActionManagerConfig;
+  /** Default handlers for this screen type. Used as fallback when no wallet handler is registered. */
+  defaultHandlers?: ScreenActionHandlerMap[S];
 }
 
 export function createScreenActionManager<S extends ScreenType>(
   config: CreateScreenActionManagerConfig<S>
 ): ScreenActionManager<S> {
-  const { screenType, handlers, getContext, amountConfig } = config;
+  const { screenType, handlers, getContext, amountConfig, defaultHandlers } = config;
 
   let entry: Record<string, unknown> | null = null;
   const loadingActions = new Set<string>();
@@ -143,8 +145,15 @@ export function createScreenActionManager<S extends ScreenType>(
       | undefined;
     const handler = handlerMap?.[action as string];
 
+    const defaultHandlerMap = defaultHandlers as
+      | Record<string, ((ctx: ScreenActionContext) => void | Promise<void>) | undefined>
+      | undefined;
+    const defaultHandler = defaultHandlerMap?.[action as string];
+
+    // Three-tier fallback: wallet override → default handler → built-in copy/share
     const effectiveHandler =
       handler ??
+      defaultHandler ??
       (action === 'copy' && CONTENT_EXTRACTORS[screenType]
         ? (ctx: ScreenActionContext) => builtinCopyHandler(screenType, ctx)
         : action === 'share' && CONTENT_EXTRACTORS[screenType]
@@ -380,7 +389,17 @@ export function shouldApplyEntryUpdate(
     const uo =
       getStringField(updatedEntry, 'operationId') ??
       getStringField(getMetadata(updatedEntry), 'operationId');
-    return !!co && co === uo;
+    if (co && uo && co === uo) return true;
+
+    // Preview entries (no operationId yet) match by mintUrl + amount
+    const isPreview = currentId?.startsWith('pr-preview-') ?? false;
+    if (!isPreview) return false;
+
+    const cm = getStringField(currentEntry, 'mintUrl');
+    const um = getStringField(updatedEntry, 'mintUrl');
+    const ca = getNumberField(currentEntry, 'amount');
+    const ua = getNumberField(updatedEntry, 'amount');
+    return !!cm && cm === um && typeof ca === 'number' && ca === ua;
   }
 
   if (currentType === 'melt') {
@@ -396,7 +415,17 @@ export function shouldApplyEntryUpdate(
       getStringField(getMetadata(updatedEntry), 'operationId') ??
       getStringField(updatedEntry, 'operationId') ??
       getStringField(updatedEntry, 'id');
-    return !!co && co === uo;
+    if (co && uo && co === uo) return true;
+
+    // Preview entries (no quoteId yet) match by mintUrl + amount
+    const isPreview = currentId?.startsWith('melt-preview-') ?? false;
+    if (!isPreview) return false;
+
+    const cm = getStringField(currentEntry, 'mintUrl');
+    const um = getStringField(updatedEntry, 'mintUrl');
+    const ca = getNumberField(currentEntry, 'amount');
+    const ua = getNumberField(updatedEntry, 'amount');
+    return !!cm && cm === um && typeof ca === 'number' && ca === ua;
   }
 
   if (currentType === 'receive') {

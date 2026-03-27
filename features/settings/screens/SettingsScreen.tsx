@@ -227,6 +227,8 @@ export const SettingsScreen = () => {
   const setMockMode = useSettingsStore((state) => state.setMockMode);
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const setMockOffline = useSettingsStore((state) => state.setMockOffline);
+  const mockFailSend = useSettingsStore((state) => state.mockFailSend);
+  const setMockFailSend = useSettingsStore((state) => state.setMockFailSend);
   const mockFailMelt = useSettingsStore((state) => state.mockFailMelt);
   const setMockFailMelt = useSettingsStore((state) => state.setMockFailMelt);
   const mockFailPaymentRequest = useSettingsStore((state) => state.mockFailPaymentRequest);
@@ -355,6 +357,20 @@ export const SettingsScreen = () => {
                     </ListGroup.ItemContent>
                     <ListGroup.ItemSuffix>
                       <HeroSwitch isSelected={mockOffline} onSelectedChange={setMockOffline} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+              <Separator className="mx-4" />
+              <PressableFeedback animation={false} onPress={() => setMockFailSend(!mockFailSend)}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Mock Fail Send</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <HeroSwitch isSelected={mockFailSend} onSelectedChange={setMockFailSend} />
                     </ListGroup.ItemSuffix>
                   </ListGroup.Item>
                 </PressableFeedback.Scale>

@@ -103,7 +103,10 @@ function deriveExecutionState(
         code === 'SEND_FAILED' ||
         code === 'MINT_QUOTE_FAILED' ||
         code === 'MELT_FAILED' ||
-        code === 'PAYMENT_REQUEST_FAILED'
+        code === 'PAYMENT_REQUEST_FAILED' ||
+        code === 'NFC_WRITE_FAILED' ||
+        code === 'NFC_SESSION_LOST' ||
+        code === 'NFC_READ_FAILED'
           ? code
           : ('UNSUPPORTED_INPUT' as const);
       return {
@@ -161,6 +164,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     notifications,
     createURDecoder,
     scanSources,
+    nfcAdapter,
   } = config;
 
   let urDecoder: ReturnType<NonNullable<typeof createURDecoder>> | null =
@@ -411,11 +415,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     const walletCtx = getContext();
     const unit = getUnit?.() ?? configUnit;
 
+    // Resolve current offline status once per event. Passed into
+    // transition() so every code path (EXECUTE, AMOUNT_ENTERED, etc.)
+    // sees the real-time value from the provider.
+    const offline = getOffline?.() ?? false;
+
     const eventForTransition =
       event.type === 'AMOUNT_ENTERED'
         ? {
             ...event,
-            offline: event.offline ?? getOffline?.() ?? false,
+            offline: event.offline ?? offline,
           }
         : event;
 
@@ -430,7 +439,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         ? (stepData as StepDataMap['chooseOption']).options
         : undefined;
 
-    const result = transition(step, flowCtx, eventForTransition, detectors, walletCtx, unit);
+    const result = transition(step, flowCtx, eventForTransition, detectors, walletCtx, unit, offline);
 
     step = result.step;
     flowCtx = result.context;
@@ -448,15 +457,18 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       processedRef = false;
     }
 
-    if (event.type === 'EXECUTE' && notifications?.onScanResolved && flowCtx.parsed) {
+    if (event.type === 'EXECUTE') {
       const scanSource = lastScanSource;
       lastScanSource = undefined;
-      void notifications.onScanResolved({
-        rawInput: event.input,
-        parsedType: flowCtx.parsed.type ?? 'unknown',
-        intentType: flowCtx.intent?.type ?? 'unknown',
-        source: scanSource,
-      });
+      flowCtx.source = scanSource;
+      if (notifications?.onScanResolved && flowCtx.parsed) {
+        void notifications.onScanResolved({
+          rawInput: event.input,
+          parsedType: flowCtx.parsed.type ?? 'unknown',
+          intentType: flowCtx.intent?.type ?? 'unknown',
+          source: scanSource,
+        });
+      }
     }
 
     if (eventForTransition.type === 'AMOUNT_ENTERED') {
@@ -475,6 +487,121 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         const shouldPersist = event.persist ?? isPersistOnlyPath;
         if (shouldPersist) {
           onPersistMint(event.mintUrl);
+        }
+      }
+    }
+
+    // NFC auto-resolve: when source is 'nfc' and an adapter is available,
+    // automatically resolve interactive steps (option choice, mint selection)
+    // and auto-execute payment request sends with NFC write-back.
+    if (flowCtx.source === 'nfc' && nfcAdapter) {
+      let nfcResolved = false;
+
+      // Loop because auto-resolving one step (e.g. chooseOption) may produce
+      // another step (e.g. selectMint) that also needs auto-resolution.
+      while (!nfcResolved) {
+        if (step === 'chooseOption' || step === 'chooseFallbackOption') {
+          const options = (stepData as StepDataMap['chooseOption']).options;
+          const best =
+            options.find((o) => o.option.kind === 'paymentRequest' && o.status !== 'disabled') ??
+            options.find((o) => o.option.kind === 'lightningInvoice' && o.status !== 'disabled') ??
+            options.find((o) => o.status !== 'disabled');
+          if (best) {
+            const walletCtxInner = getContext();
+            const unitInner = getUnit?.() ?? configUnit;
+            const r = transition(step, flowCtx, { type: 'OPTION_CHOSEN', option: best.option }, detectors, walletCtxInner, unitInner, offline);
+            step = r.step;
+            flowCtx = r.context;
+            flowCtx.source = 'nfc';
+            stepData = r.data;
+            continue;
+          }
+          // No viable option
+          nfcResolved = true;
+        } else if (step === 'selectMint') {
+          const data = stepData as StepDataMap['selectMint'];
+          const best = data.candidates[0];
+          if (best) {
+            void notifications?.onNfcPaymentProgress?.({ phase: 'selecting' });
+            const walletCtxInner = getContext();
+            const unitInner = getUnit?.() ?? configUnit;
+            const r = transition(step, flowCtx, { type: 'MINT_SELECTED', mintUrl: best.mintUrl }, detectors, walletCtxInner, unitInner, offline);
+            step = r.step;
+            flowCtx = r.context;
+            flowCtx.source = 'nfc';
+            stepData = r.data;
+            continue;
+          }
+          // No candidates — will be handled by error dispatch below
+          nfcResolved = true;
+        } else if (step === 'enterAmount') {
+          // NFC requires amount in payment request — if we reach enterAmount, the request lacked it
+          await nfcAdapter.releaseSession();
+          step = 'error';
+          stepData = {
+            code: 'NFC_READ_FAILED',
+            message: 'Payment request must include an amount for NFC payment',
+          } as any;
+          nfcResolved = true;
+        } else if (step === 'navigateToPaymentRequest' && operations?.executeNfcSend) {
+          // Auto-execute: create token → write back to NFC tag
+          const data = stepData as StepDataMap['navigateToPaymentRequest'];
+          handlerExecuting = true;
+          notify();
+
+          void notifications?.onNfcPaymentProgress?.({ phase: 'creating' });
+
+          let nfcSendResult: { token: string; historyEntry: string; operationId: string } | null = null;
+          try {
+            nfcSendResult = await operations.executeNfcSend(data.mintUrl, data.amount);
+
+            void notifications?.onNfcPaymentProgress?.({ phase: 'writing' });
+            await nfcAdapter.writeToken(nfcSendResult.token);
+            await nfcAdapter.releaseSession();
+
+            // Link transaction for scan history provenance
+            if (operations.linkTransaction && flowCtx.rawInput) {
+              try {
+                const parsed = JSON.parse(nfcSendResult.historyEntry);
+                if (parsed?.id) operations.linkTransaction(flowCtx.rawInput, parsed.id);
+              } catch { /* ignore parse errors */ }
+            }
+
+            void notifications?.onPaymentConfirmed?.({
+              variant: 'send',
+              mintUrl: data.mintUrl,
+              amount: data.amount,
+              unit: data.unit,
+              historyEntry: nfcSendResult.historyEntry,
+            });
+
+            step = 'sendComplete';
+            stepData = { historyEntry: nfcSendResult.historyEntry } as any;
+          } catch (err) {
+            // Write-back or send failed — rollback if token was created
+            let rolledBack = false;
+            if (nfcSendResult && operations.rollbackSend) {
+              try {
+                await operations.rollbackSend(nfcSendResult.operationId);
+                rolledBack = true;
+              } catch { /* rollback best-effort */ }
+            }
+            await nfcAdapter.releaseSession();
+
+            const message = err instanceof Error ? err.message : 'NFC write failed';
+            void notifications?.onNfcWriteFailed?.({ message, rolledBack });
+
+            step = 'error';
+            stepData = { code: 'NFC_WRITE_FAILED', message } as any;
+          }
+
+          handlerExecuting = false;
+          nfcResolved = true;
+        } else {
+          // Terminal step that isn't navigateToPaymentRequest (e.g. navigateToMeltPreview,
+          // error, receiveToken) — release NFC session and proceed normally.
+          await nfcAdapter.releaseSession();
+          nfcResolved = true;
         }
       }
     }
@@ -721,7 +848,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
               ? scanSources?.clipboard
               : source === 'gallery'
                 ? scanSources?.gallery
-                : undefined;
+                : source === 'nfc'
+                  ? scanSources?.nfc
+                  : undefined;
 
           if (!sourceFn) {
             return { urInProgress: false };
