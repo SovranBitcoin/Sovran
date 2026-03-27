@@ -147,7 +147,8 @@ export function usePaymentStatusListener(): void {
         const hadPending =
           (store.active?.id === operationId &&
             (store.active.variant === 'send' || store.active.variant === 'payment-request')) ||
-          (store.active?.variant === 'payment-request' && store.active?.state === 'processing');
+          (store.active?.variant === 'payment-request' &&
+            (store.active?.state === 'processing' || store.active?.state === 'delivered'));
 
         if (hadPending) {
           store.setConfirmed(store.active!.id, { operationId });

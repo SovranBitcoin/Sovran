@@ -73,8 +73,9 @@ function paymentRequestAvailability(
 ): AvailabilityMap<'paymentRequest'> {
   const metadata = entry.metadata as Record<string, unknown> | undefined;
   const phase = metadata?.phase as string | undefined;
-  const isPreview = phase === 'preview' || !phase;
-  const isDelivered = phase === 'delivered';
+  const hasOperationId = !!(entry.operationId || metadata?.operationId);
+  const isPreview = (phase === 'preview' || !phase) && !hasOperationId;
+  const isDelivered = phase === 'delivered' || hasOperationId;
 
   return {
     confirm: { available: isPreview },
@@ -160,6 +161,17 @@ const AVAILABILITY_FNS: {
   amountEntry: amountEntryAvailability,
   mintSelector: mintSelectorAvailability,
 };
+
+/**
+ * Pure check — is the payment request entry still in preview state?
+ * Returns false once an operationId is present (i.e. the operation executed).
+ */
+export function isPaymentRequestPreview(entry: Record<string, unknown>): boolean {
+  const metadata = entry.metadata as Record<string, unknown> | undefined;
+  const phase = metadata?.phase as string | undefined;
+  const hasOperationId = !!(entry.operationId || metadata?.operationId);
+  return (phase === 'preview' || !phase) && !hasOperationId;
+}
 
 /**
  * Pure function — derives which actions are available from the history entry.

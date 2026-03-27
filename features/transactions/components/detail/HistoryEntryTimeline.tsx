@@ -266,23 +266,14 @@ function buildTimeline({
       // For normal: prepared=0, pending=1, finalized=2
       let currentIndex: number;
       if (isPaymentRequestMode) {
-        if (!tokenCreated && !nostrSent) {
-          // Awaiting send - nothing is complete yet, prepared is next
-          currentIndex = -1;
-        } else if (tokenCreated && !nostrSent) {
-          // Token created but Nostr not yet sent - prepared complete, nostrSent is next
-          currentIndex = 0;
-        } else if (nostrSent) {
-          // Nostr sent - use txState to determine progress
-          if (txState === 'prepared') {
-            currentIndex = 1; // nostrSent is current/complete
-          } else if (txState === 'pending') {
-            currentIndex = 2; // pending is current
-          } else if (txState === 'finalized') {
-            currentIndex = 3; // finalized is current
-          } else {
-            currentIndex = 1;
-          }
+        // Derive timeline position from core send state.
+        // PAYMENT_REQUEST_STATES: ['prepared', 'nostrSent', 'pending', 'finalized']
+        if (txState === 'prepared') {
+          currentIndex = 0; // "Created" is current
+        } else if (txState === 'pending') {
+          currentIndex = 2; // "Pending" — token created + delivered
+        } else if (txState === 'finalized') {
+          currentIndex = 3; // "Claimed" — recipient claimed
         } else {
           currentIndex = 0;
         }
@@ -523,18 +514,14 @@ const getCardLabel = (
       const sendTx = historyEntry as SendHistoryEntry;
       const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
       const label = isPaymentRequestMode ? 'Payment' : 'Send';
-      if (!tokenCreated && !nostrSent && isPaymentRequestMode) {
-        status = 'Ready';
-      } else if (tokenCreated && !nostrSent) {
-        status = 'Delivering';
-      } else if (sendTx.state === 'rolledBack') {
+      if (sendTx.state === 'rolledBack') {
         status = 'Cancelled';
       } else if (sendTx.state === 'finalized') {
         status = 'Complete';
       } else if (sendTx.state === 'pending') {
         status = 'In Progress';
       } else {
-        status = nostrSent ? 'Sent' : 'Ready';
+        status = 'Ready';
       }
       return `${label} • ${status}`;
     }

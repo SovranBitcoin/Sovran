@@ -571,6 +571,16 @@ export interface MachineOperations {
    * through the trust review flow.
    */
   isMintTrusted?: (mintUrl: string) => Promise<boolean>;
+
+  // ── Nostr ─────────────────────────────────────────────────────────────
+
+  /**
+   * Send a NIP-17 gift-wrapped direct message to an nprofile.
+   * Used internally by `executePaymentRequest` for Nostr transport.
+   * The wallet provides this by wrapping `sendDirectMessageToRelays`
+   * with the user's private key.
+   */
+  sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

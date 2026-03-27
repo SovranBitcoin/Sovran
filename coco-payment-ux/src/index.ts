@@ -84,6 +84,7 @@ export type {
 export {
   createScreenActionManager,
   getAvailableActions,
+  isPaymentRequestPreview,
   shouldApplyEntryUpdate,
   mergeEntryUpdate,
   decorateEntry,
@@ -109,6 +110,15 @@ export type {
 export { FormattedTimestamp } from './formatting';
 export { FormattedString, type TruncateMode } from './formatting';
 export { localizeReason, type LocalizedReason } from './formatting';
+
+// Nostr (NIP-17 gift wrap + relay publishing)
+export {
+  sendDirectMessageToRelays,
+  buildGiftWrappedDM,
+  buildGiftWrappedDMPair,
+  unwrapGiftWrap,
+  type UnwrappedDM,
+} from './nostr';
 
 // Domain types
 export type {

@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { shouldApplyEntryUpdate } from '../../src/screen-actions/createManager';
+import { shouldApplyEntryUpdate, mergeEntryUpdate } from '../../src/screen-actions/createManager';
 
 const MINT1 = 'https://mint1.example.com';
 const MINT2 = 'https://mint2.example.com';
@@ -237,5 +237,104 @@ describe('shouldApplyEntryUpdate — send preview fallback', () => {
       amount: 100,
     };
     expect(shouldApplyEntryUpdate(current, updated)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mergeEntryUpdate — phase upgrade when operationId arrives
+// ---------------------------------------------------------------------------
+
+describe('mergeEntryUpdate — phase upgrade on operationId', () => {
+  it('upgrades phase from "preview" to "delivered" when operationId arrives', () => {
+    const current = {
+      id: 'pr-preview-123',
+      type: 'send',
+      mintUrl: MINT1,
+      amount: 100,
+      state: 'prepared',
+      metadata: { paymentRequest: 'creq...', phase: 'preview' },
+    };
+    const updated = {
+      id: 'real-id',
+      type: 'send',
+      mintUrl: MINT1,
+      amount: 100,
+      state: 'pending',
+      operationId: 'op-1',
+    };
+    const merged = mergeEntryUpdate(current, updated);
+    expect((merged.metadata as any).phase).toBe('delivered');
+    expect(merged.operationId).toBe('op-1');
+    expect(merged.state).toBe('pending');
+  });
+
+  it('upgrades phase when operationId is in metadata', () => {
+    const current = {
+      id: 'pr-preview-123',
+      type: 'send',
+      mintUrl: MINT1,
+      amount: 100,
+      metadata: { phase: 'preview' },
+    };
+    const updated = {
+      id: 'real-id',
+      type: 'send',
+      mintUrl: MINT1,
+      amount: 100,
+      metadata: { operationId: 'op-1' },
+    };
+    const merged = mergeEntryUpdate(current, updated);
+    expect((merged.metadata as any).phase).toBe('delivered');
+  });
+
+  it('preserves phase "preview" when no operationId', () => {
+    const current = {
+      id: 'pr-preview-123',
+      type: 'send',
+      mintUrl: MINT1,
+      amount: 100,
+      metadata: { phase: 'preview' },
+    };
+    const updated = {
+      id: 'pr-preview-123',
+      type: 'send',
+      mintUrl: MINT1,
+      amount: 100,
+      state: 'prepared',
+    };
+    const merged = mergeEntryUpdate(current, updated);
+    expect((merged.metadata as any).phase).toBe('preview');
+  });
+
+  it('does not touch phase when updated entry explicitly sets it', () => {
+    const current = {
+      id: 'pr-preview-123',
+      type: 'send',
+      metadata: { phase: 'preview' },
+    };
+    const updated = {
+      id: 'real-id',
+      type: 'send',
+      operationId: 'op-1',
+      metadata: { phase: 'custom-phase' },
+    };
+    const merged = mergeEntryUpdate(current, updated);
+    expect((merged.metadata as any).phase).toBe('custom-phase');
+  });
+
+  it('preserves paymentRequest metadata through merge', () => {
+    const current = {
+      id: 'pr-preview-123',
+      type: 'send',
+      metadata: { paymentRequest: 'creq...', phase: 'preview' },
+    };
+    const updated = {
+      id: 'real-id',
+      type: 'send',
+      operationId: 'op-1',
+    };
+    const merged = mergeEntryUpdate(current, updated);
+    expect((merged.metadata as any).paymentRequest).toBe('creq...');
+    expect((merged.metadata as any).phase).toBe('delivered');
   });
 });

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 import { parsePaymentError } from '@/shared/lib/popup/parsePaymentError';
 
-export type PaymentStatusState = 'processing' | 'confirmed' | 'failed';
+export type PaymentStatusState = 'processing' | 'delivered' | 'confirmed' | 'failed';
 
 export interface ActivePaymentStatus {
   variant: 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
@@ -23,6 +23,7 @@ export interface ActivePaymentStatus {
 type PaymentStatusStore = {
   active: ActivePaymentStatus | null;
   setActive: (payment: ActivePaymentStatus | null) => void;
+  setDelivered: (id: string) => void;
   setConfirmed: (id: string, extra?: { operationId?: string; receiveEntryId?: string }) => void;
   setFailed: (id: string, error?: unknown) => void;
 };
@@ -30,6 +31,10 @@ type PaymentStatusStore = {
 export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
   active: null,
   setActive: (payment) => set({ active: payment }),
+  setDelivered: (id) =>
+    set((s) =>
+      s.active?.id === id ? { active: { ...s.active!, state: 'delivered' as const } } : s
+    ),
   setConfirmed: (id, extra) =>
     set((s) =>
       s.active?.id === id ? { active: { ...s.active!, state: 'confirmed' as const, ...extra } } : s

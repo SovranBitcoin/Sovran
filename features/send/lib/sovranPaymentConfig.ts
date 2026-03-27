@@ -165,7 +165,11 @@ export function createSovranNotifications(): NotificationHandlerMap {
     onPaymentConfirmed: (data) => {
       const store = usePaymentStatusStore.getState();
       if (store.active) {
-        store.setConfirmed(store.active.id);
+        if (data.variant === 'paymentRequest') {
+          store.setDelivered(store.active.id);
+        } else {
+          store.setConfirmed(store.active.id);
+        }
       }
     },
     onPaymentFailed: (data) => {
@@ -362,11 +366,13 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
 interface CreateSovranOperationsConfig {
   getManager: () => Manager | null;
   getWalletContext: () => WalletContext | null;
+  sendNostrDM: (nprofile: string, message: string) => Promise<void>;
 }
 
 export function createSovranOperations({
   getManager,
   getWalletContext,
+  sendNostrDM,
 }: CreateSovranOperationsConfig): MachineOperations {
   return {
     executeSend: async (mintUrl, amount) => {
@@ -463,45 +469,8 @@ export function createSovranOperations({
       return { historyEntry: JSON.stringify(entry) };
     },
 
-    executePaymentRequest: async (mintUrl, paymentRequest, amount, unit) => {
-      if (useSettingsStore.getState().mockFailPaymentRequest) {
-        throw new Error('Mock payment request failure (developer setting)');
-      }
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-
-      const info = defaultDetectors.getPaymentRequestInfo(paymentRequest);
-      if (!info) throw new Error('Invalid payment request');
-
-      const nostrTransport = info.transports?.find((t) => t.type === 'nostr');
-      const httpTransport = info.transports?.find((t) => t.type === 'post');
-      const parsed =
-        nostrTransport && !httpTransport
-          ? buildInbandParsedPaymentRequest(paymentRequest, info, mintUrl)
-          : await mgr.wallet.processPaymentRequest(paymentRequest);
-
-      const transaction = await mgr.wallet.preparePaymentRequestTransaction(mintUrl, parsed, amount);
-      const operationId = transaction.sendOperation.id;
-
-      if (httpTransport) {
-        await mgr.wallet.handleHttpPaymentRequest(transaction);
-      } else {
-        await mgr.wallet.handleInbandPaymentRequest(transaction, async () => {});
-      }
-
-      const sendEntry = await findSendHistoryEntryByOperationId(mgr, operationId);
-      const entry = sendEntry ?? {
-        id: operationId,
-        type: 'send' as const,
-        createdAt: transaction.sendOperation.createdAt,
-        mintUrl,
-        amount,
-        unit,
-        operationId,
-        state: 'pending',
-        metadata: { paymentRequest, phase: 'delivered', tokenCreated: 'true' },
-      };
-      return { historyEntry: JSON.stringify(entry) };
+    sendNostrDM: async (nprofile, message) => {
+      await sendNostrDM(nprofile, message);
     },
 
     linkTransaction: (scannedInput, transactionId) => {
@@ -868,7 +837,6 @@ export function createSovranHandlers({
 // =============================================================================
 
 type Ctx<E> = ScreenActionContext<E> & { manager: Manager };
-type EntryRecord = Record<string, unknown>;
 
 function sendCtx(ctx: ScreenActionContext): Ctx<SendHistoryEntry> {
   return ctx as Ctx<SendHistoryEntry>;
@@ -884,53 +852,6 @@ function receiveTokenCtx(ctx: ScreenActionContext): Ctx<ReceiveHistoryEntry> {
 
 function meltQuoteCtx(ctx: ScreenActionContext): Ctx<MeltHistoryEntry> {
   return ctx as Ctx<MeltHistoryEntry>;
-}
-
-type PaymentRequestEntry = {
-  id: string;
-  type: 'send';
-  createdAt: number;
-  mintUrl: string;
-  amount: number;
-  unit: string;
-  state: string;
-  metadata: {
-    paymentRequest: string;
-    phase: string;
-    tokenCreated?: string;
-    nostrSent?: string;
-    operationId?: string;
-  };
-};
-
-type PaymentRequestCtx = ScreenActionContext<PaymentRequestEntry> & {
-  manager: Manager;
-  sendDirectMessage: (nprofile: string, message: string) => Promise<void>;
-  setEntry?: (entry: Record<string, unknown>) => void;
-};
-
-function paymentRequestCtx(ctx: ScreenActionContext): PaymentRequestCtx {
-  return ctx as unknown as PaymentRequestCtx;
-}
-
-function isRecord(value: unknown): value is EntryRecord {
-  return typeof value === 'object' && value !== null;
-}
-
-function mergeScreenEntry(currentEntry: EntryRecord, patch: EntryRecord): EntryRecord {
-  const currentMetadata = isRecord(currentEntry.metadata) ? currentEntry.metadata : {};
-  const patchMetadata = isRecord(patch.metadata) ? patch.metadata : {};
-
-  return {
-    ...currentEntry,
-    ...patch,
-    ...((Object.keys(currentMetadata).length > 0 || Object.keys(patchMetadata).length > 0) && {
-      metadata: {
-        ...currentMetadata,
-        ...patchMetadata,
-      },
-    }),
-  };
 }
 
 async function findSendHistoryEntryByOperationId(
@@ -994,25 +915,7 @@ async function findReceiveHistoryEntryByToken(
   return null;
 }
 
-function buildInbandParsedPaymentRequest(
-  encodedRequest: string,
-  info: NonNullable<ReturnType<typeof defaultDetectors.getPaymentRequestInfo>>,
-  mintUrl: string
-): Parameters<Manager['wallet']['preparePaymentRequestTransaction']>[1] {
-  const requiredMints = info.mints ?? [];
-  const matchingMints =
-    requiredMints.length > 0
-      ? requiredMints.filter((candidate) => candidate === mintUrl)
-      : [mintUrl];
 
-  return {
-    paymentRequest: encodedRequest as never,
-    matchingMints,
-    requiredMints,
-    amount: info.amount,
-    transport: { type: 'inband' as const },
-  } as Parameters<Manager['wallet']['preparePaymentRequestTransaction']>[1];
-}
 
 function mapMeltOperationState(state: string): MeltHistoryEntry['state'] {
   if (state === 'finalized') return 'PAID';

@@ -12,6 +12,7 @@
 import React from 'react';
 
 import type { SendHistoryEntry } from 'coco-cashu-core';
+import { isPaymentRequestPreview } from 'coco-payment-ux';
 import { useScreenActions } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
 import { formatAmount } from '@/shared/lib/currency';
@@ -54,10 +55,9 @@ export function PaymentRequestScreen({
     return <ScreenLoadingState message="Loading payment request..." />;
   }
 
-  const phase = entry.metadata?.phase as string | undefined;
   const tokenCreated = entry.metadata?.tokenCreated === 'true';
   const nostrSent = entry.metadata?.nostrSent === 'true';
-  const isPreview = phase === 'preview' || !phase;
+  const isPreview = isPaymentRequestPreview(entry);
 
   const anyLoading = actions.confirm.loading || actions.cancel.loading;
 

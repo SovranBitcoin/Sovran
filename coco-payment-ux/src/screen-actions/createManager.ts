@@ -457,11 +457,25 @@ export function mergeEntryUpdate(
   const cm = getMetadata(currentEntry);
   const um = getMetadata(updatedEntry);
 
-  return {
+  const merged = {
     ...(currentEntry ?? {}),
     ...updatedEntry,
     ...((cm || um) && { metadata: { ...(cm ?? {}), ...(um ?? {}) } }),
   };
+
+  // When a real operationId arrives, stale phase:'preview' must be upgraded.
+  // The real entry from the DB carries operationId but no metadata, so the
+  // merge preserves the preview entry's phase. Fix it here to keep the
+  // merged entry self-consistent.
+  const mergedMeta = getMetadata(merged);
+  if (
+    mergedMeta?.phase === 'preview' &&
+    (typeof merged.operationId === 'string' || typeof mergedMeta?.operationId === 'string')
+  ) {
+    (mergedMeta as Record<string, unknown>).phase = 'delivered';
+  }
+
+  return merged;
 }
 
 // ---------------------------------------------------------------------------

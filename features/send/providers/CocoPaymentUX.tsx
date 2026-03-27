@@ -22,7 +22,9 @@ import {
   meltOperationToScreenActionEntry,
   shouldApplyEntryUpdate as defaultShouldApply,
   mergeEntryUpdate as defaultMerge,
+  sendDirectMessageToRelays,
 } from 'coco-payment-ux';
+import { createDefaultOperations } from 'coco-payment-ux/operations';
 import {
   CocoPaymentUXProvider as PaymentUXProviderBase,
   type CocoPaymentUXProviderProps,
@@ -39,7 +41,6 @@ import {
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
 import { createNfcAdapter } from '@/shared/lib/nfc/adapter';
-import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import {
   deeplinkFailedPopup,
   receiveMintUpdatedPopup,
@@ -195,7 +196,6 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
     () => ({
       getExtraContext: () => ({
         manager: getManager(),
-        sendDirectMessage,
         requestCameraPermission: receiveExtras?.requestCameraPermission,
       }),
       onEntryUpdate: (screenType, callback) => {
@@ -308,7 +308,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         return labels[scan.source] ?? null;
       },
     }),
-    [getManager, sendDirectMessage, receiveExtras?.requestCameraPermission]
+    [getManager, receiveExtras?.requestCameraPermission]
   );
 
   const providerProps = useMemo<Omit<CocoPaymentUXProviderProps, 'children'>>(
@@ -320,7 +320,10 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           getManager,
           getNpub,
         }),
-      operations: createSovranOperations({ getManager, getWalletContext }),
+      operations: {
+        ...createDefaultOperations({ getManager, sendNostrDM: sendDirectMessage }),
+        ...createSovranOperations({ getManager, getWalletContext, sendNostrDM: sendDirectMessage }),
+      },
       notifications: createSovranNotifications(),
       savePreferredMint: (mintUrl) => {
         const pubkey = pubkeyRef.current;

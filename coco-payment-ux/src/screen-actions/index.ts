@@ -6,7 +6,7 @@ export {
   meltOperationToScreenActionEntry,
   type MeltOperationLike,
 } from './createManager';
-export { getAvailableActions } from './availability';
+export { getAvailableActions, isPaymentRequestPreview } from './availability';
 export {
   createDefaultScreenActionHandlers,
   type DefaultScreenActionHandlersConfig,

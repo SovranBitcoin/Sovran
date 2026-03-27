@@ -7,7 +7,6 @@
 //
 // App-side operations (NOT included):
 //   executeMelt        — needs requestInvoiceFromLnurl (lightning address resolution)
-//   executePaymentRequest — needs Nostr transport / complex HTTP routing
 //   buildMintReviewInfo   — needs KYM/audit API calls (external APIs)
 //   linkTransaction       — needs app-specific scan history store
 // ---------------------------------------------------------------------------
@@ -15,7 +14,8 @@
 import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import type { Manager } from 'coco-cashu-core';
 import type { MachineOperations, StepDataMap } from '../machine/types';
-import type { MintListItem } from '../types';
+import type { MintListItem, PaymentRequestInfo } from '../types';
+import { defaultDetectors } from '../detectors';
 
 // ---------------------------------------------------------------------------
 // History lookup helper
@@ -41,6 +41,8 @@ async function findSendHistoryEntryByOperationId(
 export interface DefaultOperationsConfig {
   getManager: () => Manager | null;
   getProofAmounts?: () => Record<string, number[]>;
+  /** Required for Nostr payment request transport. Wallet wraps sendDirectMessageToRelays with the user's private key. */
+  sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +185,81 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
       const mgr = requireManager();
       return mgr.mint.isTrustedMint(mintUrl);
     },
+
+    executePaymentRequest: async (mintUrl, paymentRequest, amount, unit) => {
+      const mgr = requireManager();
+
+      const info = defaultDetectors.getPaymentRequestInfo(paymentRequest);
+      if (!info) throw new Error('Invalid payment request');
+
+      const nostrTransport = info.transports?.find((t) => t.type === 'nostr');
+      const httpTransport = info.transports?.find((t) => t.type === 'post');
+      const parsed =
+        nostrTransport && !httpTransport
+          ? buildInbandParsed(paymentRequest, info, mintUrl)
+          : await mgr.wallet.processPaymentRequest(paymentRequest);
+
+      const transaction = await mgr.wallet.preparePaymentRequestTransaction(mintUrl, parsed, amount);
+      const operationId = transaction.sendOperation.id;
+
+      if (httpTransport) {
+        await mgr.wallet.handleHttpPaymentRequest(transaction);
+      } else if (nostrTransport) {
+        await mgr.wallet.handleInbandPaymentRequest(transaction, async (token) => {
+          const sendNostrDM = config.sendNostrDM;
+          if (!sendNostrDM) throw new Error('sendNostrDM operation is required for Nostr payment requests');
+          const payload = {
+            id: paymentRequest,
+            mint: mintUrl,
+            unit,
+            proofs: token.proofs,
+          };
+          await sendNostrDM(nostrTransport.target, JSON.stringify(payload));
+        });
+      } else {
+        await mgr.wallet.handleInbandPaymentRequest(transaction, async () => {});
+      }
+
+      const historyEntry = await findSendHistoryEntryByOperationId(mgr, operationId);
+      const entry = historyEntry
+        ? JSON.parse(historyEntry)
+        : {
+            id: operationId,
+            type: 'send' as const,
+            createdAt: transaction.sendOperation.createdAt,
+            mintUrl,
+            amount,
+            unit,
+            operationId,
+            state: 'pending',
+            metadata: { paymentRequest, phase: 'delivered', tokenCreated: 'true' },
+          };
+      return { historyEntry: JSON.stringify(entry) };
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Payment request helpers
+// ---------------------------------------------------------------------------
+
+function buildInbandParsed(
+  encodedRequest: string,
+  info: PaymentRequestInfo,
+  mintUrl: string
+): any {
+  const requiredMints = info.mints ?? [];
+  const matchingMints =
+    requiredMints.length > 0
+      ? requiredMints.filter((candidate) => candidate === mintUrl)
+      : [mintUrl];
+
+  return {
+    paymentRequest: encodedRequest,
+    matchingMints,
+    requiredMints,
+    amount: info.amount,
+    transport: { type: 'inband' as const },
   };
 }
 

@@ -41,6 +41,7 @@ const CASES = {
   'payment-request': {
     message: 'Payment request sent',
     submessagePending: 'Waiting for recipient',
+    submessageDelivered: 'Delivered to recipient',
     submessageConfirmed: 'Claimed by recipient',
     submessageFailed: 'Payment failed',
     history: { type: 'send' as const, idField: 'operationId' as const },
@@ -92,13 +93,16 @@ export function PaymentStatusToast({
   const hide = toastProps.hide as (ids?: string | string[] | 'all') => void;
   const config = CASES[variant];
   const active = usePaymentStatusStore((s) => s.active);
+  const isDelivered = active?.id === paymentId && active?.state === 'delivered';
   const isConfirmed = active?.id === paymentId && active?.state === 'confirmed';
   const isFailed = active?.id === paymentId && active?.state === 'failed';
-  const status: 'pending' | 'confirmed' | 'failed' = isConfirmed
+  const status: 'pending' | 'delivered' | 'confirmed' | 'failed' = isConfirmed
     ? 'confirmed'
     : isFailed
       ? 'failed'
-      : 'pending';
+      : isDelivered
+        ? 'delivered'
+        : 'pending';
   // For melt: operationId may be set by melt-op:finalized after toast mounts
   const effectiveOperationId =
     variant === 'melt' ? (active?.operationId ?? operationId) : operationId;
@@ -114,9 +118,11 @@ export function PaymentStatusToast({
     ? confirmedSubmessage
     : isFailed
       ? (active?.errorMessage ?? config.submessageFailed)
-      : 'submessagePending' in config
-        ? config.submessagePending
-        : confirmedSubmessage;
+      : isDelivered && 'submessageDelivered' in config
+        ? config.submessageDelivered
+        : 'submessagePending' in config
+          ? config.submessagePending
+          : confirmedSubmessage;
 
   // --- Animated colors ---
   const [foreground, overlay, success, danger] = useThemeColor([
