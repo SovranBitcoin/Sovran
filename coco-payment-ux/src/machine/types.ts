@@ -460,6 +460,60 @@ export type NotificationHandlerMap = {
    * accept-mint modal rather than the info screen.
    */
   onMintTrustedFromScreen?: (data: { mintUrl: string; fromAccepter: boolean }) => MaybeAsync;
+
+  // ── State change notifications ────────────────────────────────────
+  // Broader lifecycle notifications for state updates (zustand stores,
+  // analytics, location capture, etc.) — not just UI feedback.
+
+  /**
+   * Called when the user's preferred mint changes. Replaces the
+   * `savePreferredMint` callback prop — wallets persist via this
+   * notification instead.
+   */
+  onPreferredMintChanged?: (data: { mintUrl: string }) => MaybeAsync;
+
+  /**
+   * Called when the NPC (Nostr Private Custody) mint changes. Replaces
+   * the `saveNpcMint` callback prop.
+   */
+  onNpcMintChanged?: (data: { mintUrl: string }) => MaybeAsync;
+
+  /**
+   * Called after any transaction is created (send, receive, melt,
+   * mint-quote). Wallets use this for scan history linking, location
+   * capture, analytics, etc.
+   */
+  onTransactionCreated?: (data: {
+    transactionId: string;
+    type: 'send' | 'receive' | 'melt' | 'mint';
+    mintUrl: string;
+    amount: number;
+    unit: string;
+    rawInput?: string;
+    source?: string;
+  }) => MaybeAsync;
+
+  /**
+   * Called after a P2PK-locked ecash receive completes. Wallets use
+   * this to decide whether to regenerate the P2PK key pair.
+   */
+  onP2PKReceiveCompleted?: (data: {
+    transactionId: string;
+    mintUrl: string;
+    hadP2PKProofs: boolean;
+  }) => MaybeAsync;
+
+  /**
+   * Called when a melt operation creates a quote and begins execution.
+   * Wallets use this for lifecycle tracking.
+   */
+  onMeltQuoteCreated?: (data: {
+    mintUrl: string;
+    operationId: string;
+    amount: number;
+    unit: string;
+    meltTarget: string;
+  }) => MaybeAsync;
 };
 
 // ---------------------------------------------------------------------------
@@ -557,7 +611,7 @@ export interface MachineOperations {
     tokenString: string,
     mintUrl: string,
     amount: number
-  ) => Promise<{ historyEntry: string }>;
+  ) => Promise<{ historyEntry: string; hadP2PKProofs?: boolean }>;
 
   /**
    * Roll back a melt operation. Called when the user cancels from the
@@ -649,17 +703,6 @@ export interface CreateMachineConfig {
   getContext: () => WalletContext;
   getUnit?: () => string;
   unit?: string;
-  /**
-   * Called when the machine determines the mint selection should be persisted.
-   * Auto-triggered on the persist-only path (no destination = home screen selection).
-   * Can be forced via `changeMint(url, { persist: true })` or suppressed with `false`.
-   */
-  onPersistMint?: (mintUrl: string) => void;
-  /**
-   * Called when changeMint is invoked with scope: 'npc'.
-   * Updates the NPC (Lightning address) mint only, not selectedMint.
-   */
-  onNpcMintChange?: (mintUrl: string) => void;
   /**
    * Async operations the machine executes for action steps.
    * When provided, confirmSend/createMintQuote/selectMint are handled

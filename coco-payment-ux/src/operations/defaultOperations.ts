@@ -1,24 +1,25 @@
 // ---------------------------------------------------------------------------
 // Default Operations — backed by coco-cashu-core Manager
 //
-// Operations that only need the Manager API. Wallet apps get these out of
-// the box and only need to provide what's app-specific: handlers
-// (navigation), notifications (UI), and platform primitives.
+// Complete operations that use the Manager API + built-in LNURL resolution.
+// Wallet apps get these out of the box and only need to provide what's
+// app-specific: handlers (navigation), notifications (UI), and platform
+// primitives.
 //
-// App-side operations (NOT included):
-//   executeMelt        — needs requestInvoiceFromLnurl (lightning address resolution)
-//   buildMintReviewInfo   — needs KYM/audit API calls (external APIs)
+// App-side operations (NOT included here, injected via enrichment callbacks):
 //   linkTransaction       — needs app-specific scan history store
+//   KYM/audit enrichment  — external APIs, injected via enrichMintListItem/enrichMintReviewInfo
 // ---------------------------------------------------------------------------
 
-import { getEncodedTokenV4 } from '@cashu/cashu-ts';
+import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
 import type { Manager } from 'coco-cashu-core';
 import type { MachineOperations, StepDataMap } from '../machine/types';
-import type { MintListItem, PaymentRequestInfo } from '../types';
+import type { MintListItem, MintReviewInfo, PaymentRequestInfo } from '../types';
 import { defaultDetectors } from '../detectors';
+import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from '../lnurl';
 
 // ---------------------------------------------------------------------------
-// History lookup helper
+// History lookup helpers
 // ---------------------------------------------------------------------------
 
 async function findSendHistoryEntryByOperationId(
@@ -34,6 +35,23 @@ async function findSendHistoryEntryByOperationId(
   return entry ? JSON.stringify(entry) : null;
 }
 
+function mapMeltOperationState(state: string): string {
+  if (state === 'finalized') return 'PAID';
+  if (state === 'pending' || state === 'executing') return 'PENDING';
+  return 'UNPAID';
+}
+
+function hasP2PKProofs(proofs: ReadonlyArray<{ secret: string }>): boolean {
+  return proofs.some((proof) => {
+    try {
+      const parsed = JSON.parse(proof.secret);
+      return Array.isArray(parsed) && parsed[0] === 'P2PK';
+    } catch {
+      return false;
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -41,8 +59,13 @@ async function findSendHistoryEntryByOperationId(
 export interface DefaultOperationsConfig {
   getManager: () => Manager | null;
   getProofAmounts?: () => Record<string, number[]>;
+  getPreferredMintUrl?: () => string | undefined;
   /** Required for Nostr payment request transport. Wallet wraps sendDirectMessageToRelays with the user's private key. */
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
+  /** Optional enrichment for mint list items (e.g. KYM/audit scores). */
+  enrichMintListItem?: (mintUrl: string) => Partial<MintListItem>;
+  /** Optional enrichment for mint review info (e.g. KYM/audit scores). */
+  enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,14 +111,30 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
         mgr.wallet.getBalances(),
       ]);
 
+      // Fetch NUT-06 mint info for each mint in parallel.
+      // getAllTrustedMints() returns stored records without display metadata;
+      // getMintInfo() returns the NUT-06 info with name/icon_url.
+      const mintInfoMap = new Map<string, any>();
+      await Promise.all(
+        allTrustedMints.map(async (mint: any) => {
+          try {
+            const info = await mgr.mint.getMintInfo(mint.mintUrl);
+            if (info) mintInfoMap.set(mint.mintUrl, info);
+          } catch {
+            // Mint info fetch failed — display name will fall back to URL
+          }
+        })
+      );
+
       const supportedSet = data.supportedMintUrls
         ? new Set(data.supportedMintUrls)
         : null;
 
       const proofAmounts = getProofAmounts?.() ?? {};
 
-      return allTrustedMints.map((mint: any): MintListItem => {
+      const items = allTrustedMints.map((mint: any): MintListItem => {
         const mintUrl = mint.mintUrl;
+        const info: any = mintInfoMap.get(mintUrl) ?? {};
         const balance = balances[mintUrl] ?? 0;
         const isInCandidate = data.candidates.some((c) => c.mintUrl === mintUrl);
 
@@ -113,17 +152,26 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
           reason = { code: 'NO_BALANCE', message: 'No balance' };
         }
 
+        const enrichment = config.enrichMintListItem?.(mintUrl) ?? {};
         return {
           mintUrl,
-          displayName: mint.displayName ?? mint.mintUrl,
-          iconUrl: mint.iconUrl,
+          displayName: info.name ?? mintUrl,
+          iconUrl: info.icon_url ?? undefined,
           balance,
           unit: data.unit,
           status,
           reason,
           isPreferred: false,
+          ...enrichment,
         };
       });
+
+      items.sort((a, b) => {
+        if (a.status !== b.status) return a.status === 'available' ? -1 : 1;
+        return b.balance - a.balance;
+      });
+
+      return items;
     },
 
     trustMint: async (mintUrl) => {
@@ -176,14 +224,81 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
     executeReceive: async (tokenString, mintUrl, _amount) => {
       const mgr = requireManager();
       await mgr.wallet.receive(tokenString);
+
+      let hadP2PK = false;
+      try {
+        const decoded = getDecodedToken(tokenString);
+        hadP2PK = hasP2PKProofs(decoded.proofs);
+      } catch {
+        // Non-critical — skip P2PK detection
+      }
+
       const historyEntry = await findReceiveHistoryEntry(mgr, tokenString, mintUrl);
       if (!historyEntry) throw new Error('Receive history entry not found after redemption');
-      return { historyEntry };
+      return { historyEntry, hadP2PKProofs: hadP2PK };
     },
 
     isMintTrusted: async (mintUrl) => {
       const mgr = requireManager();
       return mgr.mint.isTrustedMint(mintUrl);
+    },
+
+    executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
+      const mgr = requireManager();
+
+      const bolt11 = isLightningInvoiceBolt11(meltTarget)
+        ? meltTarget
+        : await requestInvoiceFromLnurl(meltTarget, amount);
+
+      const operation = await mgr.quotes.prepareMeltBolt11(mintUrl, bolt11);
+      const result = await mgr.quotes.executeMelt(operation.id);
+
+      const entry = {
+        id: result.id,
+        type: 'melt' as const,
+        createdAt: (result as any).createdAt ?? Date.now(),
+        mintUrl: (result as any).mintUrl ?? mintUrl,
+        unit: 'sat',
+        quoteId: (result as any).quoteId ?? '',
+        state: mapMeltOperationState(result.state),
+        amount: (result as any).amount ?? amount,
+        metadata: { operationId: result.id, meltTarget },
+      };
+      return { historyEntry: JSON.stringify(entry) };
+    },
+
+    rollbackMelt: async (operationId) => {
+      const mgr = requireManager();
+      await (mgr.quotes as any).rollbackMelt(operationId, 'User cancelled');
+    },
+
+    buildMintReviewInfo: async (mintUrl): Promise<MintReviewInfo> => {
+      const mgr = requireManager();
+      const [mintInfo, balances, isTrusted] = await Promise.all([
+        mgr.mint.getMintInfo(mintUrl).catch(() => undefined),
+        mgr.wallet.getBalances(),
+        mgr.mint.isTrustedMint(mintUrl),
+      ]);
+
+      const info: any = mintInfo ?? {};
+      const preferredMintUrl = config.getPreferredMintUrl?.();
+      const enrichment = config.enrichMintReviewInfo?.(mintUrl) ?? {};
+
+      return {
+        mintUrl,
+        displayName: info.name ?? mintUrl,
+        iconUrl: info.icon_url ?? undefined,
+        description: info.description ?? undefined,
+        longDescription: info.description_long ?? undefined,
+        motd: info.motd ?? undefined,
+        contact: info.contact ?? undefined,
+        nuts: info.nuts ? Object.keys(info.nuts).map(Number) : undefined,
+        balance: balances[mintUrl] ?? 0,
+        unit: 'sat',
+        isPreferred: mintUrl === preferredMintUrl,
+        isTrusted,
+        ...enrichment,
+      };
     },
 
     executePaymentRequest: async (mintUrl, paymentRequest, amount, unit) => {

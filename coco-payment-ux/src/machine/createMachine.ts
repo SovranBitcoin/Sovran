@@ -158,8 +158,6 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     getOffline,
     getLocale,
     unit: configUnit = 'sat',
-    onPersistMint,
-    onNpcMintChange,
     operations,
     notifications,
     createURDecoder,
@@ -340,6 +338,28 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           historyEntry: result.historyEntry,
         });
 
+        try {
+          const parsed = JSON.parse(result.historyEntry);
+          if (parsed?.id) {
+            void notifications?.onTransactionCreated?.({
+              transactionId: parsed.id,
+              type: 'melt',
+              mintUrl: data.mintUrl,
+              amount: data.amount,
+              unit: data.unit,
+              rawInput: flowCtx.rawInput,
+              source: flowCtx.source,
+            });
+            void notifications?.onMeltQuoteCreated?.({
+              mintUrl: data.mintUrl,
+              operationId: parsed.id,
+              amount: data.amount,
+              unit: data.unit,
+              meltTarget: data.meltTarget,
+            });
+          }
+        } catch { /* ignore parse errors */ }
+
         stepData = { ...data, historyEntry: result.historyEntry } as any;
       } catch (err) {
         routeOperationFailure(err, 'melt', data.meltTarget, data);
@@ -389,6 +409,21 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           unit: data.unit,
           historyEntry: result.historyEntry,
         });
+
+        try {
+          const parsed = JSON.parse(result.historyEntry);
+          if (parsed?.id) {
+            void notifications?.onTransactionCreated?.({
+              transactionId: parsed.id,
+              type: 'send',
+              mintUrl: data.mintUrl,
+              amount: data.amount,
+              unit: data.unit,
+              rawInput: flowCtx.rawInput,
+              source: flowCtx.source,
+            });
+          }
+        } catch { /* ignore parse errors */ }
 
         stepData = { ...data, historyEntry: result.historyEntry } as any;
       } catch (err) {
@@ -478,15 +513,15 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       }
     }
 
-    // Mint selection callbacks: scope 'npc' → onNpcMintChange; else → onPersistMint when applicable.
+    // Mint selection notifications: scope 'npc' → onNpcMintChanged; else → onPreferredMintChanged when applicable.
     if (event.type === 'MINT_SELECTED') {
       if (event.scope === 'npc') {
-        onNpcMintChange?.(event.mintUrl);
-      } else if (onPersistMint) {
+        void notifications?.onNpcMintChanged?.({ mintUrl: event.mintUrl });
+      } else {
         const isPersistOnlyPath = step === 'dismiss' && !flowCtx.destination;
         const shouldPersist = event.persist ?? isPersistOnlyPath;
         if (shouldPersist) {
-          onPersistMint(event.mintUrl);
+          void notifications?.onPreferredMintChanged?.({ mintUrl: event.mintUrl });
         }
       }
     }
@@ -575,6 +610,21 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
               historyEntry: nfcSendResult.historyEntry,
             });
 
+            try {
+              const parsed = JSON.parse(nfcSendResult.historyEntry);
+              if (parsed?.id) {
+                void notifications?.onTransactionCreated?.({
+                  transactionId: parsed.id,
+                  type: 'send',
+                  mintUrl: data.mintUrl,
+                  amount: data.amount,
+                  unit: data.unit,
+                  rawInput: flowCtx.rawInput,
+                  source: 'nfc',
+                });
+              }
+            } catch { /* ignore parse errors */ }
+
             step = 'sendComplete';
             stepData = { historyEntry: nfcSendResult.historyEntry } as any;
           } catch (err) {
@@ -618,6 +668,21 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           const result = await operations.executeSend(data.mintUrl, data.amount);
           step = 'sendComplete';
           stepData = result as any;
+
+          try {
+            const parsed = JSON.parse(result.historyEntry);
+            if (parsed?.id) {
+              void notifications?.onTransactionCreated?.({
+                transactionId: parsed.id,
+                type: 'send',
+                mintUrl: data.mintUrl,
+                amount: data.amount,
+                unit: flowCtx.unit,
+                rawInput: flowCtx.rawInput,
+                source: flowCtx.source,
+              });
+            }
+          } catch { /* ignore parse errors */ }
         } catch (err) {
           const walletCtx = getContext();
           const proofAmounts = walletCtx.proofAmounts[data.mintUrl] ?? [];
@@ -669,6 +734,21 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           const result = await operations.executeMintQuote(data.mintUrl, data.amount, data.unit);
           step = 'mintQuoteCreated';
           stepData = { historyEntry: result.historyEntry, unit: data.unit } as any;
+
+          try {
+            const parsed = JSON.parse(result.historyEntry);
+            if (parsed?.id) {
+              void notifications?.onTransactionCreated?.({
+                transactionId: parsed.id,
+                type: 'mint',
+                mintUrl: data.mintUrl,
+                amount: data.amount,
+                unit: data.unit,
+                rawInput: flowCtx.rawInput,
+                source: flowCtx.source,
+              });
+            }
+          } catch { /* ignore parse errors */ }
         } catch (err) {
           step = 'error';
           stepData = {
