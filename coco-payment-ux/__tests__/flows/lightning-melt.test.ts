@@ -291,4 +291,75 @@ describe('lightning melt — confirmMelt notification sequence', () => {
     expect(parsed.state).toBe('PAID');
     expect(typeof parsed.id).toBe('string');
   });
+
+  it('full success sequence: onPaymentProcessing → onPaymentConfirmed → onTransactionCreated → onMeltQuoteCreated', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount(200, MINT1);
+
+    // Clear notifications from the routing phase (onScanResolved fires during execute)
+    tm.notificationCalls.length = 0;
+
+    await tm.machine.confirmMelt();
+
+    const keys = tm.notificationCalls.map((c) => c.key);
+    expect(keys).toEqual([
+      'onPaymentProcessing',
+      'onPaymentConfirmed',
+      'onTransactionCreated',
+      'onMeltQuoteCreated',
+    ]);
+  });
+
+  it('onTransactionCreated carries type=melt with transactionId, mintUrl, amount, unit', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.confirmMelt();
+
+    const txCreated = tm.notificationCalls.find((c) => c.key === 'onTransactionCreated');
+    expect(txCreated!.data).toMatchObject({
+      type: 'melt',
+      mintUrl: MINT1,
+      amount: 200,
+      unit: 'sat',
+      transactionId: expect.any(String),
+    });
+  });
+
+  it('onMeltQuoteCreated carries mintUrl, operationId, amount, unit, meltTarget', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount(200, MINT1);
+    await tm.machine.confirmMelt();
+
+    const meltQuote = tm.notificationCalls.find((c) => c.key === 'onMeltQuoteCreated');
+    expect(meltQuote!.data).toMatchObject({
+      mintUrl: MINT1,
+      operationId: expect.any(String),
+      amount: 200,
+      unit: 'sat',
+      meltTarget: INPUTS.lightningAddress,
+    });
+  });
+
+  it('full failure sequence: only onPaymentProcessing → onPaymentFailed (no txCreated, no meltQuoteCreated)', async () => {
+    const tm = createTestMachine({
+      operations: {
+        executeMelt: async () => { throw new Error('Route not found'); },
+      },
+    });
+    await tm.machine.execute(INPUTS.lightningAddress, { reset: true });
+    await tm.machine.enterAmount(200, MINT1);
+
+    tm.notificationCalls.length = 0;
+
+    await tm.machine.confirmMelt();
+
+    const keys = tm.notificationCalls.map((c) => c.key);
+    expect(keys).toEqual([
+      'onPaymentProcessing',
+      'onPaymentFailed',
+    ]);
+  });
 });

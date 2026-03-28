@@ -185,6 +185,27 @@ export function createDefaultScreenActionHandlers(
             unit,
             historyEntry: result.historyEntry,
           });
+
+          try {
+            const parsed = JSON.parse(result.historyEntry);
+            if (parsed?.id) {
+              notify('onTransactionCreated', {
+                transactionId: parsed.id,
+                type: 'receive',
+                mintUrl,
+                amount: amount ?? 0,
+                unit,
+              });
+            }
+          } catch { /* ignore parse errors */ }
+
+          if (result.hadP2PKProofs != null) {
+            notify('onP2PKReceiveCompleted', {
+              transactionId: id,
+              mintUrl,
+              hadP2PKProofs: result.hadP2PKProofs,
+            });
+          }
         } catch (err) {
           notify('onReceiveFailed', {
             id,

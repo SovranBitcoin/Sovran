@@ -1,6 +1,7 @@
 import React from 'react';
 import { router } from 'expo-router';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { TOAST_COPY } from '@/shared/lib/paymentCopy';
 import { popup } from '../engine';
 import { showCustomToast } from '../bridge';
 import { fmt } from '../format';
@@ -27,41 +28,42 @@ type PaymentStatusCase = {
 
 const PAYMENT_STATUS_CASES: Record<PaymentStatusVariant, PaymentStatusCase> = {
   receive: {
-    message: 'Payment received',
-    submessagePending: 'Processing...',
-    submessageConfirmed: (amount, unit) => fmt`Received ${{ amount, unit }}`,
-    submessageFailed: 'Payment failed',
+    message: TOAST_COPY.receive.message,
+    submessagePending: TOAST_COPY.receive.processing,
+    submessageConfirmed: (amount, unit) => fmt`${TOAST_COPY.receive.confirmed} ${{ amount, unit }}`,
+    submessageFailed: TOAST_COPY.receive.failed,
     history: { type: 'mint', idField: 'quoteId' },
     route: { pathname: '/mintQuote', paramKey: 'mintHistoryEntry' },
   },
   send: {
-    message: 'Payment sent',
-    submessageConfirmed: (amount, unit) => fmt`Sent ${{ amount, unit }}`,
-    submessageFailed: 'Payment failed',
+    message: TOAST_COPY.send.message,
+    submessagePending: TOAST_COPY.send.processing,
+    submessageConfirmed: (amount, unit) => fmt`${TOAST_COPY.send.confirmed} ${{ amount, unit }}`,
+    submessageFailed: TOAST_COPY.send.failed,
     history: { type: 'send', idField: 'operationId' },
     route: { pathname: '/sendToken', paramKey: 'sendHistoryEntry' },
   },
   'payment-request': {
-    message: 'Payment request sent',
-    submessagePending: 'Waiting for recipient',
-    submessageConfirmed: 'Claimed by recipient',
-    submessageFailed: 'Payment failed',
+    message: TOAST_COPY['payment-request'].message,
+    submessagePending: TOAST_COPY['payment-request'].processing,
+    submessageConfirmed: TOAST_COPY['payment-request'].confirmed,
+    submessageFailed: TOAST_COPY['payment-request'].failed,
     history: { type: 'send', idField: 'operationId' },
     route: { pathname: '/sendToken', paramKey: 'sendHistoryEntry' },
   },
   melt: {
-    message: 'Payment sent',
-    submessagePending: 'Processing...',
-    submessageConfirmed: (amount, unit) => fmt`Sent ${{ amount, unit }}`,
-    submessageFailed: 'Payment failed',
+    message: TOAST_COPY.melt.message,
+    submessagePending: TOAST_COPY.melt.processing,
+    submessageConfirmed: (amount, unit) => fmt`${TOAST_COPY.melt.confirmed} ${{ amount, unit }}`,
+    submessageFailed: TOAST_COPY.melt.failed,
     history: { type: 'melt', idField: 'quoteId' },
     route: { pathname: '/meltQuote', paramKey: 'meltHistoryEntry' },
   },
   'receive-ecash': {
-    message: 'Payment received',
-    submessagePending: 'Processing...',
-    submessageConfirmed: (amount, unit) => fmt`Received ${{ amount, unit }}`,
-    submessageFailed: 'Payment failed',
+    message: TOAST_COPY['receive-ecash'].message,
+    submessagePending: TOAST_COPY['receive-ecash'].processing,
+    submessageConfirmed: (amount, unit) => fmt`${TOAST_COPY['receive-ecash'].confirmed} ${{ amount, unit }}`,
+    submessageFailed: TOAST_COPY['receive-ecash'].failed,
     history: { type: 'receive', idField: 'id' },
     route: { pathname: '/receiveToken', paramKey: 'receiveHistoryEntry' },
   },

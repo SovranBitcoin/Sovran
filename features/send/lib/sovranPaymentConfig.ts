@@ -1,14 +1,14 @@
 /**
  * @fileoverview Sovran payment flow config — single source for coco-payment-ux glue
  *
- * All four factory functions that inject Sovran-specific behavior into coco-payment-ux:
- * - createSovranNotifications: error/notification popups
- * - createSovranOperations: executeSend, executeMintQuote, buildMintListItems
+ * Factory functions that inject Sovran-specific behavior into coco-payment-ux:
+ * - createSovranNotifications: error/notification popups + state updates
  * - createSovranHandlers: step handlers (navigation, popups, dismiss)
- * - createSovranScreenActionHandlers: post-terminal actions (copy, share, NFC, redeem, pay)
+ * - createSovranScreenActionHandlers: post-terminal actions (NFC, emoji picker)
+ * - createSovranScanSources: scan input sources (clipboard, gallery, NFC)
  *
- * Consumed by CocoPaymentUXProvider (notifications, operations, handlers, actions) and
- * useScreenActions (screen action handlers from context).
+ * Operations (executeSend, executeMelt, buildMintListItems, etc.) are now built-in
+ * via createCocoPaymentUX in the library.
  */
 
 
@@ -17,7 +17,7 @@ import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 
-import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
+import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import type {
   Manager,
   SendHistoryEntry,
@@ -26,29 +26,16 @@ import type {
   ReceiveHistoryEntry,
 } from 'coco-cashu-core';
 import {
-  defaultDetectors,
-  buildMintAvailability,
-  type Destination,
-  type MachineOperations,
   type NotificationHandlerMap,
   type PaymentMachine,
   type ScanSources,
   type ScreenActionContext,
-  type MintReviewInfo,
   type ScreenActionHandlerMap,
   type StepHandlerMap,
-  type WalletContext,
   type NfcIOAdapter,
 } from 'coco-payment-ux';
 
-import { auditMint, fetchMintInfo } from '@/shared/lib/apiClient';
-import { buildMintListItems } from '@/shared/lib/buildMintListItems';
-import { getMintDisplayName, normalizeMintUrlKey } from '@/shared/lib/url';
-import {
-  buildReceiveHistoryEntry,
-  isLightningInvoice,
-  requestInvoiceFromLnurl,
-} from '@/shared/lib/cashu/utils';
+import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
 import { writeTokenToNFC } from '@/shared/lib/nfc';
 import {
@@ -79,6 +66,8 @@ import {
   proofSelectorPopup,
   qrScanFailedPopup,
   receiveFailedPopup,
+  receiveMintUpdatedPopup,
+  receiveMintUpdateFailedPopup,
   sendPaymentFailedPopup,
   tokenPendingNotRedeemedPopup,
   tokenRedeemedByRecipientPopup,
@@ -88,8 +77,7 @@ import {
   unsupportedTokenUnitPopup,
 } from '@/shared/lib/popup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
-import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
-import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -99,7 +87,15 @@ import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 // createSovranNotifications
 // =============================================================================
 
-export function createSovranNotifications(): NotificationHandlerMap {
+interface CreateSovranNotificationsConfig {
+  getPubkey?: () => string | undefined;
+  getPrivateKey?: () => Uint8Array | undefined;
+  getManager?: () => Manager | null;
+}
+
+export function createSovranNotifications(
+  config?: CreateSovranNotificationsConfig
+): NotificationHandlerMap {
   return {
     NO_AMOUNT: ({ code: _code, message: _message, data: _data }) => {
       noAmountPopup();
@@ -167,6 +163,12 @@ export function createSovranNotifications(): NotificationHandlerMap {
       if (store.active) {
         if (data.variant === 'paymentRequest') {
           store.setDelivered(store.active.id);
+        } else if (data.variant === 'melt' && data.historyEntry) {
+          try {
+            const parsed = JSON.parse(data.historyEntry);
+            if (parsed.state === 'PENDING') return;
+          } catch { /* fall through to confirm */ }
+          store.setConfirmed(store.active.id);
         } else {
           store.setConfirmed(store.active.id);
         }
@@ -312,6 +314,44 @@ export function createSovranNotifications(): NotificationHandlerMap {
         router.back();
       }
     },
+
+    // ── State change notifications ──────────────────────────────────
+
+    onPreferredMintChanged: ({ mintUrl }) => {
+      const pubkey = config?.getPubkey?.();
+      if (pubkey) {
+        useMintStore.getState().setSelectedMint(pubkey, mintUrl);
+      }
+    },
+
+    onNpcMintChanged: async ({ mintUrl }) => {
+      const pk = config?.getPrivateKey?.();
+      if (pk) {
+        const ok = await useNpcMintStore.getState().updateServerMint(mintUrl, pk);
+        if (ok) receiveMintUpdatedPopup();
+        else receiveMintUpdateFailedPopup();
+      }
+    },
+
+    onTransactionCreated: async ({ transactionId, rawInput }) => {
+      if (rawInput) {
+        useScanHistoryStore.getState().linkTransaction(rawInput, transactionId);
+      }
+      await captureAndStoreLocation(transactionId);
+    },
+
+    onP2PKReceiveCompleted: async ({ hadP2PKProofs }) => {
+      if (hadP2PKProofs && useSettingsStore.getState().regenerateP2PKOnReceive) {
+        const mgr = config?.getManager?.();
+        if (mgr) {
+          try {
+            await mgr.keyring.generateKeyPair();
+          } catch {
+            // Non-critical — skip P2PK key regeneration
+          }
+        }
+      }
+    },
   };
 }
 
@@ -356,278 +396,6 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
           }
         }
       : undefined,
-  };
-}
-
-// =============================================================================
-// createSovranOperations
-// =============================================================================
-
-interface CreateSovranOperationsConfig {
-  getManager: () => Manager | null;
-  getWalletContext: () => WalletContext | null;
-  sendNostrDM: (nprofile: string, message: string) => Promise<void>;
-}
-
-export function createSovranOperations({
-  getManager,
-  getWalletContext,
-  sendNostrDM,
-}: CreateSovranOperationsConfig): MachineOperations {
-  return {
-    executeSend: async (mintUrl, amount) => {
-      if (useSettingsStore.getState().mockFailSend) {
-        throw new Error('Mock send failure (developer setting)');
-      }
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-      await mgr.wallet.send(mintUrl, amount);
-      const history = await mgr.history.getPaginatedHistory();
-      const entry = history.find(
-        (h) => h.type === 'send' && (h as SendHistoryEntry).mintUrl === mintUrl
-      ) as SendHistoryEntry | undefined;
-      if (!entry) throw new Error('Send history entry not found after creation');
-      return { historyEntry: JSON.stringify(entry) };
-    },
-
-    executeMintQuote: async (mintUrl, amount, _unit) => {
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-      const mintQuote = await mgr.quotes.createMintQuote(mintUrl, amount);
-      const history = await mgr.history.getPaginatedHistory();
-      const entry = history.find(
-        (h) => h.type === 'mint' && (h as MintHistoryEntry).quoteId === mintQuote.quote
-      ) as MintHistoryEntry | undefined;
-      if (!entry) throw new Error('Mint quote history entry not found after creation');
-      return { historyEntry: JSON.stringify(entry) };
-    },
-
-    buildMintListItems: async (stepData) => {
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-      const [allTrustedMints, balances] = await Promise.all([
-        mgr.mint.getAllTrustedMints(),
-        mgr.wallet.getBalances(),
-      ]);
-      const availability = allTrustedMints.map((mint) =>
-        buildMintAvailability({
-          mintUrl: mint.mintUrl,
-          balance: balances[mint.mintUrl] ?? 0,
-          supportedMintUrls: stepData.supportedMintUrls,
-          amount: stepData.amount,
-          destination: stepData.destination,
-        })
-      );
-      const offlineCheck =
-        (stepData.destination === 'sendEcash' || stepData.destination === 'paymentRequest') &&
-        stepData.amount
-          ? {
-              amount: stepData.amount,
-              proofAmounts: getWalletContext()?.proofAmounts ?? {},
-            }
-          : undefined;
-      return buildMintListItems(allTrustedMints, availability, offlineCheck);
-    },
-
-    trustMint: async (mintUrl) => {
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-      await mgr.mint.addMint(mintUrl, { trusted: true });
-    },
-
-    buildMintReviewInfo: async (mintUrl): Promise<MintReviewInfo> => {
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-      return loadMintReviewInfo(mgr, mintUrl, getWalletContext()?.preferredMintUrl);
-    },
-
-    executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
-      if (useSettingsStore.getState().mockFailMelt) {
-        throw new Error('Mock melt failure (developer setting)');
-      }
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-
-      const bolt11 = isLightningInvoice(meltTarget)
-        ? meltTarget
-        : await requestInvoiceFromLnurl(meltTarget, amount);
-
-      const operation = await mgr.quotes.prepareMeltBolt11(mintUrl, bolt11);
-      const result = await mgr.quotes.executeMelt(operation.id);
-
-      const entry: MeltHistoryEntry = {
-        id: result.id,
-        type: 'melt',
-        createdAt: result.createdAt,
-        mintUrl: result.mintUrl,
-        unit: 'sat',
-        quoteId: result.quoteId,
-        state: mapMeltOperationState(result.state),
-        amount: result.amount,
-        metadata: { operationId: result.id, meltTarget },
-      };
-      return { historyEntry: JSON.stringify(entry) };
-    },
-
-    sendNostrDM: async (nprofile, message) => {
-      await sendNostrDM(nprofile, message);
-    },
-
-    linkTransaction: (scannedInput, transactionId) => {
-      useScanHistoryStore.getState().linkTransaction(scannedInput, transactionId);
-    },
-
-    executeNfcSend: async (mintUrl, amount) => {
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-      const prepared = await mgr.send.prepareSend(mintUrl, amount);
-      const { operation, token } = await mgr.send.executePreparedSend(prepared.id);
-      const entry = await findSendHistoryEntryByOperationId(mgr, operation.id);
-      if (!entry) throw new Error('Send history entry not found after creation');
-      return {
-        token: getEncodedTokenV4(token),
-        historyEntry: JSON.stringify(entry),
-        operationId: operation.id,
-      };
-    },
-
-    rollbackSend: async (operationId) => {
-      const mgr = getManager();
-      if (!mgr) return;
-      try {
-        const operation = await mgr.send.getOperation(operationId);
-        if (operation && ['prepared', 'executing', 'pending'].includes(operation.state)) {
-          await mgr.send.rollback(operationId);
-        }
-      } catch (e) {
-        console.warn('[NFC] Rollback failed:', e);
-      }
-    },
-
-    // ── Screen action operations ────────────────────────────────────
-
-    checkSendStatus: async (operationId) => {
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-
-      const operation = await mgr.send.getOperation(operationId);
-      if (!operation) return { state: 'not_found' };
-
-      if (operation.state === 'pending') {
-        await mgr.send.checkPendingOperation(operationId);
-        const updated = await mgr.send.getOperation(operationId);
-        return { state: updated?.state ?? operation.state };
-      }
-      return { state: operation.state };
-    },
-
-    executeReceive: async (tokenString, mintUrl, amount) => {
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-
-      await mgr.wallet.receive(tokenString);
-
-      // P2PK key regeneration
-      if (useSettingsStore.getState().regenerateP2PKOnReceive) {
-        try {
-          const decoded = getDecodedToken(tokenString);
-          const hasP2PK = decoded.proofs.some((proof) => {
-            try {
-              const parsed = JSON.parse(proof.secret);
-              return Array.isArray(parsed) && parsed[0] === 'P2PK';
-            } catch {
-              return false;
-            }
-          });
-          if (hasP2PK) {
-            await mgr.keyring.generateKeyPair();
-          }
-        } catch (e) {
-          console.warn('Failed to regenerate P2PK key:', e);
-        }
-      }
-
-      const realEntry = await findReceiveHistoryEntryByToken(mgr, tokenString, mintUrl, amount);
-      if (!realEntry) throw new Error('Receive history entry not found after redemption');
-      return { historyEntry: JSON.stringify(realEntry) };
-    },
-
-    isMintTrusted: async (mintUrl) => {
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-      return mgr.mint.isTrustedMint(mintUrl);
-    },
-
-    rollbackMelt: async (operationId) => {
-      const mgr = getManager();
-      if (!mgr) throw new Error('Wallet manager is not available');
-      await mgr.quotes.rollbackMelt(operationId, 'User cancelled');
-    },
-  };
-}
-
-// =============================================================================
-// Shared helpers
-// =============================================================================
-
-async function loadMintReviewInfo(
-  mgr: Manager,
-  mintUrl: string,
-  preferredMintUrl?: string
-): Promise<MintReviewInfo> {
-  const [mintInfoResult, auditResult, balances, isTrusted] = await Promise.all([
-    fetchMintInfo(mintUrl),
-    auditMint({ mintUrl }),
-    mgr.wallet.getBalances(),
-    mgr.mint.isTrustedMint(mintUrl),
-  ]);
-
-  const mintInfo = mintInfoResult.isOk() ? mintInfoResult.value : undefined;
-  const auditData = auditResult.isOk() ? auditResult.value : undefined;
-
-  if (auditData && mintInfo) {
-    useAuditMintStore.getState().setCached(mintUrl, auditData, mintInfo);
-  }
-
-  const normalizedUrl = normalizeMintUrlKey(mintUrl);
-  const kymScore = useKYMMintStore.getState().getCached(normalizedUrl)?.score;
-
-  const swaps = auditData?.swaps ?? [];
-  const swapSuccess = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
-  const swapTotal = swaps.length;
-  const successRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
-  const auditScore = typeof successRate === 'number' ? successRate * 5 : undefined;
-
-  const successfulTimes = swaps
-    .filter((s) => s.state === 'OK' && typeof s.time_taken === 'number' && s.time_taken > 0)
-    .map((s) => s.time_taken);
-  const avgTimeMs =
-    successfulTimes.length > 0
-      ? successfulTimes.reduce((sum, t) => sum + t, 0) / successfulTimes.length
-      : undefined;
-
-  return {
-    mintUrl,
-    displayName: getMintDisplayName(mintUrl, mintInfo),
-    iconUrl: mintInfo?.icon_url ?? undefined,
-    description: mintInfo?.description ?? undefined,
-    longDescription: mintInfo?.description_long ?? undefined,
-    motd: mintInfo?.motd ?? undefined,
-    contact: mintInfo?.contact ?? undefined,
-    nuts: mintInfo?.nuts ? Object.keys(mintInfo.nuts).map(Number) : undefined,
-    balance: balances[mintUrl] ?? 0,
-    unit: 'sat',
-    isPreferred: mintUrl === preferredMintUrl,
-    isTrusted,
-    kymScore,
-    auditScore,
-    auditState: auditData?.state,
-    successRate,
-    avgTimeMs,
-    swapSuccess,
-    swapTotal,
-    totalMints: auditData?.n_mints,
-    totalMelts: auditData?.n_melts,
   };
 }
 
@@ -852,75 +620,6 @@ function receiveTokenCtx(ctx: ScreenActionContext): Ctx<ReceiveHistoryEntry> {
 
 function meltQuoteCtx(ctx: ScreenActionContext): Ctx<MeltHistoryEntry> {
   return ctx as Ctx<MeltHistoryEntry>;
-}
-
-async function findSendHistoryEntryByOperationId(
-  manager: Manager,
-  operationId: string,
-  attempts: number = 3
-): Promise<SendHistoryEntry | null> {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const history = await manager.history.getPaginatedHistory(0, 100);
-    const entry = history.find(
-      (item) => item.type === 'send' && (item as SendHistoryEntry).operationId === operationId
-    ) as SendHistoryEntry | undefined;
-
-    if (entry) {
-      return entry;
-    }
-
-    if (attempt < attempts - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    }
-  }
-
-  return null;
-}
-
-async function findReceiveHistoryEntryByToken(
-  manager: Manager,
-  tokenString: string,
-  mintUrl: string,
-  amount: number,
-  attempts: number = 3
-): Promise<ReceiveHistoryEntry | null> {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const history = await manager.history.getPaginatedHistory(0, 100);
-    const entry = history.find((item) => {
-      if (item.type !== 'receive') {
-        return false;
-      }
-
-      const receiveEntry = item as ReceiveHistoryEntry;
-      if (receiveEntry.token) {
-        try {
-          return getEncodedTokenV4(receiveEntry.token) === tokenString;
-        } catch {
-          // Fall back to mint/amount matching below.
-        }
-      }
-
-      return receiveEntry.mintUrl === mintUrl && receiveEntry.amount === amount;
-    }) as ReceiveHistoryEntry | undefined;
-
-    if (entry) {
-      return entry;
-    }
-
-    if (attempt < attempts - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    }
-  }
-
-  return null;
-}
-
-
-
-function mapMeltOperationState(state: string): MeltHistoryEntry['state'] {
-  if (state === 'finalized') return 'PAID';
-  if (state === 'pending' || state === 'executing') return 'PENDING';
-  return 'UNPAID';
 }
 
 /**

@@ -261,6 +261,60 @@ describe('receiveToken default handlers', () => {
       expect(notifications.find((n) => n.event === 'onReceiveConfirmed')).toBeTruthy();
     });
 
+    it('notification sequence: onReceiveProcessing → onReceiveConfirmed → onTransactionCreated', async () => {
+      const { handlers, notifications } = createMockConfig();
+      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
+
+      await mgr.execute('redeem');
+
+      const events = notifications.map((n) => n.event);
+      expect(events).toEqual([
+        'onReceiveProcessing',
+        'onReceiveConfirmed',
+        'onTransactionCreated',
+      ]);
+    });
+
+    it('onReceiveProcessing carries id, mintUrl, amount, unit', async () => {
+      const { handlers, notifications } = createMockConfig();
+      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
+
+      await mgr.execute('redeem');
+
+      const processing = notifications.find((n) => n.event === 'onReceiveProcessing');
+      expect(processing!.args[0]).toMatchObject({
+        id: 'receive-preview-1',
+        mintUrl: MINT1,
+        amount: 1,
+        unit: 'sat',
+      });
+    });
+
+    it('onReceiveConfirmed carries historyEntry', async () => {
+      const { handlers, notifications } = createMockConfig();
+      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
+
+      await mgr.execute('redeem');
+
+      const confirmed = notifications.find((n) => n.event === 'onReceiveConfirmed');
+      const data = confirmed!.args[0] as Record<string, unknown>;
+      expect(data.historyEntry).toEqual(expect.any(String));
+      expect(data.id).toBe('receive-preview-1');
+    });
+
+    it('onTransactionCreated carries type=receive', async () => {
+      const { handlers, notifications } = createMockConfig();
+      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
+
+      await mgr.execute('redeem');
+
+      const txCreated = notifications.find((n) => n.event === 'onTransactionCreated');
+      expect(txCreated!.args[0]).toMatchObject({
+        type: 'receive',
+        mintUrl: MINT1,
+      });
+    });
+
     it('updates entry with real history data', async () => {
       const realEntry = { id: 'rx-real', type: 'receive', mintUrl: MINT1, amount: 1 };
       const { handlers } = createMockConfig({
@@ -329,6 +383,26 @@ describe('receiveToken default handlers', () => {
 
       await expect(mgr.execute('redeem')).rejects.toThrow('Token already spent');
       expect(notifications.find((n) => n.event === 'onReceiveFailed')).toBeTruthy();
+    });
+
+    it('notification sequence on failure: onReceiveProcessing → onReceiveFailed (no confirmed/txCreated)', async () => {
+      const { handlers, notifications } = createMockConfig({
+        operations: {
+          executeReceive: vi.fn(async () => {
+            throw new Error('Already spent');
+          }),
+          isMintTrusted: vi.fn(async () => true),
+        },
+      });
+
+      const { mgr } = createManager('receiveToken', handlers, tokenEntry());
+      await expect(mgr.execute('redeem')).rejects.toThrow();
+
+      const events = notifications.map((n) => n.event);
+      expect(events).toEqual([
+        'onReceiveProcessing',
+        'onReceiveFailed',
+      ]);
     });
   });
 });

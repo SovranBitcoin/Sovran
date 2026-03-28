@@ -238,4 +238,54 @@ describe('payment request — confirmPaymentRequest notification sequence', () =
     expect(typeof opCall!.args[1]).toBe('string'); // paymentRequest string
     expect(opCall!.args[3]).toBe('sat');
   });
+
+  it('full success sequence: onPaymentProcessing → onPaymentConfirmed → onTransactionCreated', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+
+    // Clear notifications from the routing phase (onScanResolved fires during execute)
+    tm.notificationCalls.length = 0;
+
+    await tm.machine.confirmPaymentRequest();
+
+    const keys = tm.notificationCalls.map((c) => c.key);
+    expect(keys).toEqual([
+      'onPaymentProcessing',
+      'onPaymentConfirmed',
+      'onTransactionCreated',
+    ]);
+  });
+
+  it('onTransactionCreated carries type=send with transactionId, mintUrl, unit', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+    await tm.machine.confirmPaymentRequest();
+
+    const txCreated = tm.notificationCalls.find((c) => c.key === 'onTransactionCreated');
+    expect(txCreated!.data).toMatchObject({
+      type: 'send',
+      mintUrl: MINT1,
+      unit: 'sat',
+      transactionId: expect.any(String),
+    });
+  });
+
+  it('full failure sequence: only onPaymentProcessing → onPaymentFailed (no txCreated)', async () => {
+    const tm = createTestMachine({
+      operations: {
+        executePaymentRequest: async () => { throw new Error('Transport down'); },
+      },
+    });
+    await tm.machine.execute(INPUTS.paymentRequestBasic, { reset: true });
+
+    tm.notificationCalls.length = 0;
+
+    await tm.machine.confirmPaymentRequest();
+
+    const keys = tm.notificationCalls.map((c) => c.key);
+    expect(keys).toEqual([
+      'onPaymentProcessing',
+      'onPaymentFailed',
+    ]);
+  });
 });

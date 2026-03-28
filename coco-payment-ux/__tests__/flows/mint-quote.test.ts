@@ -232,3 +232,83 @@ describe('mint quote — result data', () => {
     expect(typeof parsed.id).toBe('string');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Notification timeline
+// ---------------------------------------------------------------------------
+
+/**
+ * Mint quote fires a single notification on success: onTransactionCreated
+ * with type='mint'. There is no processing/confirmed pair — that pattern
+ * is reserved for melt and payment request flows where there's a two-phase
+ * lifecycle (processing → confirmed/failed).
+ *
+ * Compare with:
+ *   - ecash send:      onTransactionCreated (type=send)
+ *   - lightning melt:  onPaymentProcessing → onPaymentConfirmed → onTransactionCreated → onMeltQuoteCreated
+ *   - payment request: onPaymentProcessing → onPaymentConfirmed → onTransactionCreated
+ *   - mint quote:      onTransactionCreated (type=mint) ← this file
+ */
+describe('mint quote — notification timeline', () => {
+  it('fires only onTransactionCreated on success', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startReceiveLightning();
+    await tm.machine.enterAmount(1000, MINT1);
+    tm.assertStep('mintQuoteCreated');
+
+    const keys = tm.notificationCalls.map((c) => c.key);
+    expect(keys).toEqual(['onTransactionCreated']);
+  });
+
+  it('onTransactionCreated carries type=mint with mintUrl, amount, unit, transactionId', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startReceiveLightning();
+    await tm.machine.enterAmount(1000, MINT1);
+
+    const txCreated = tm.notificationCalls.find((c) => c.key === 'onTransactionCreated');
+    expect(txCreated!.data).toMatchObject({
+      type: 'mint',
+      mintUrl: MINT1,
+      amount: 1000,
+      unit: 'sat',
+      transactionId: expect.any(String),
+    });
+  });
+
+  it('does not fire onPaymentProcessing or onPaymentConfirmed (melt/PR only)', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startReceiveLightning();
+    await tm.machine.enterAmount(1000, MINT1);
+
+    const keys = tm.notificationCalls.map((c) => c.key);
+    expect(keys).not.toContain('onPaymentProcessing');
+    expect(keys).not.toContain('onPaymentConfirmed');
+  });
+
+  it('fires MINT_QUOTE_FAILED error notification on failure', async () => {
+    const tm = createTestMachine({
+      operations: {
+        executeMintQuote: async () => { throw new Error('Mint offline'); },
+      },
+    });
+    await tm.machine.startReceiveLightning();
+    await tm.machine.enterAmount(1000, MINT1);
+    tm.assertStep('error');
+
+    const keys = tm.notificationCalls.map((c) => c.key);
+    expect(keys).toContain('MINT_QUOTE_FAILED');
+  });
+
+  it('fires no onTransactionCreated on failure', async () => {
+    const tm = createTestMachine({
+      operations: {
+        executeMintQuote: async () => { throw new Error('Mint offline'); },
+      },
+    });
+    await tm.machine.startReceiveLightning();
+    await tm.machine.enterAmount(1000, MINT1);
+
+    const keys = tm.notificationCalls.map((c) => c.key);
+    expect(keys).not.toContain('onTransactionCreated');
+  });
+});

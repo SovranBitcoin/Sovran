@@ -171,3 +171,43 @@ describe('receive token — table-driven scenarios', () => {
     await runScenario(scenario);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Notification timeline — machine level
+// ---------------------------------------------------------------------------
+
+/**
+ * Unlike send, melt, and mint quote, the receive token flow fires NO machine
+ * notifications. The machine only routes to the receiveToken step — the actual
+ * receive operation (and its notifications: onReceiveProcessing, onReceiveConfirmed,
+ * onTransactionCreated) fires from the screen action handler (receiveToken.redeem).
+ *
+ * These tests document that the machine layer is intentionally silent during
+ * receive routing. Screen-action notification coverage lives in
+ * __tests__/screen-actions/defaultHandlers.test.ts.
+ */
+describe('receive token — no machine notifications during routing', () => {
+  it('fires no payment notifications when routing to receiveToken', async () => {
+    const tm = createTestMachine();
+    await tm.machine.execute(INPUTS.cashuTokenV3, { reset: true });
+    tm.assertStep('receiveToken');
+
+    // onScanResolved fires for any execute() call — that's expected.
+    // But no payment notifications (processing, confirmed, txCreated) should fire.
+    const paymentKeys = tm.notificationCalls
+      .map((c) => c.key)
+      .filter((k) => k !== 'onScanResolved');
+    expect(paymentKeys).toHaveLength(0);
+  });
+
+  it('fires no notifications during trust review flow', async () => {
+    const tm = createTestMachine();
+    await tm.machine.reviewMint('https://new.mint.example.com', INPUTS.cashuTokenV3);
+    tm.assertStep('reviewMint');
+
+    await tm.machine.mintTrusted();
+    tm.assertStep('receiveToken');
+
+    expect(tm.notificationCalls).toHaveLength(0);
+  });
+});

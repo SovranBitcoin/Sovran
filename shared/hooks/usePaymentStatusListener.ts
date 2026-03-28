@@ -168,19 +168,32 @@ export function usePaymentStatusListener(): void {
       }
     );
 
+    const offMeltRolledBack = manager.on(
+      'melt-op:rolled-back',
+      ({ operation }: { operation: { error?: string } }) => {
+        const store = usePaymentStatusStore.getState();
+        if (store.active?.variant === 'melt' && store.active?.state === 'processing') {
+          store.setFailed(store.active.id, new Error(operation.error ?? 'Payment was rolled back'));
+        }
+      }
+    );
+
     const offMeltFinalized = manager.on(
       'melt-op:finalized',
       ({ mintUrl, operationId, operation }) => {
         if (!('quoteId' in operation) || !('amount' in operation)) return;
         const store = usePaymentStatusStore.getState();
-        // Match by variant + state, not quoteId — the machine's onPaymentProcessing
+        // Match by variant, not quoteId — the machine's onPaymentProcessing
         // uses a timestamp-based ID that won't match the real quoteId.
-        const hadPending =
-          store.active?.variant === 'melt' && store.active?.state === 'processing';
+        const hadActive =
+          store.active?.variant === 'melt' &&
+          (store.active?.state === 'processing' || store.active?.state === 'confirmed');
 
-        if (hadPending) {
+        if (hadActive) {
+          // Still processing → confirm. Already confirmed → just merge operationId for View button.
           store.setConfirmed(store.active!.id, { operationId });
         } else {
+          // Background melt (no active toast) — show new confirmed toast
           const amount = operation.amount;
           const unit = 'sat';
           store.setActive({
@@ -211,6 +224,7 @@ export function usePaymentStatusListener(): void {
       offRedeemed();
       offReceiveCreated();
       offSendFinalized();
+      offMeltRolledBack();
       offMeltFinalized();
     };
   }, [manager]);

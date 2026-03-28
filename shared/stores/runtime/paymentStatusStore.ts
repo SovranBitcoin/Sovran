@@ -36,12 +36,19 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
       s.active?.id === id ? { active: { ...s.active!, state: 'delivered' as const } } : s
     ),
   setConfirmed: (id, extra) =>
-    set((s) =>
-      s.active?.id === id ? { active: { ...s.active!, state: 'confirmed' as const, ...extra } } : s
-    ),
-  setFailed: (id, error) =>
     set((s) => {
       if (s.active?.id !== id) return s;
+      if (s.active.state === 'confirmed') {
+        // Already confirmed — only merge extra data (operationId, receiveEntryId)
+        return extra ? { active: { ...s.active!, ...extra } } : s;
+      }
+      if (s.active.state === 'failed') return s;
+      return { active: { ...s.active!, state: 'confirmed' as const, ...extra } };
+    }),
+  setFailed: (id, error) =>
+    set((s) => {
+      if (s.active?.id !== id || s.active.state === 'failed' || s.active.state === 'confirmed')
+        return s;
       const errorMessage = error !== undefined ? parsePaymentError(error) : undefined;
       return {
         active: { ...s.active!, state: 'failed' as const, errorMessage },

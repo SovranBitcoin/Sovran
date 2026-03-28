@@ -1,12 +1,38 @@
 # Architecture
 
+## Two-Layer Design
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Layer 2: CocoPaymentUXProvider (React)                 │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │  handlers (navigation)                            │  │
+│  │  notifications (UI popups + state persistence)    │  │
+│  │  screenActionsBridge (app-specific subscriptions) │  │
+│  │  deepLinks, navigation, actions                   │  │
+│  └───────────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────┤
+│  Layer 1: createCocoPaymentUX (TypeScript core)         │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │  WalletContextTracker (Manager event → context)   │  │
+│  │  Built-in operations (send, melt, receive, ...)   │  │
+│  │  LNURL resolution                                 │  │
+│  │  Enrichment callbacks                             │  │
+│  └───────────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────┤
+│  coco-cashu-core Manager                                │
+└─────────────────────────────────────────────────────────┘
+```
+
+Layer 1 is framework-agnostic. It accepts a Manager and returns an instance with operations and wallet context tracking. Layer 2 is a thin React wrapper that creates the PaymentMachine and wires in app-specific concerns.
+
 ## Separation of Concerns
 
 ```mermaid
 graph TD
   subgraph CocoPaymentUXProvider
     M["Machine\n(routing)"] --> O["Operations\n(wallet IO)"]
-    M --> N["Notifications\n(optional UX)"]
+    M --> N["Notifications\n(UX + state)"]
     M --> H["Handlers\n(navigation)"]
     M --> S["Screen Actions\n(terminal screens)"]
   end
@@ -21,7 +47,6 @@ These two systems are intentionally separate. A terminal screen doesn't need to 
 A screen's job is to call one hook and render:
 
 ```tsx
-// Correct: screen is rendering + action binding
 function MeltQuoteScreen({ meltHistoryEntry }) {
   const { entry, error, actions, mintUrl, source } = useScreenActions('meltQuote', meltHistoryEntry);
 
@@ -55,36 +80,39 @@ The `mintUrl` field is derived from the raw entry (`entry.mintUrl` or `entry.sel
 const machine = usePaymentFlowMachine({ walletContext, unit });
 const { isExecuting } = useExecutionState(machine);
 
-// Disable buttons during async operations
 <MintRow disabled={isExecuting} onPress={() => machine.changeMint(item.mintUrl)} />;
 ```
 
 **`isExecuting = true`** during async operations: `executeSend`, `executeMintQuote`, `buildMintListItems`.
 
-**`isExecuting = false`** during input steps: `enterAmount`, `selectMint`, `chooseOption`, `chooseProofs`. These are user-facing steps where a global spinner would be wrong.
-
-```ts
-// Full ExecutionState shape:
-type ExecutionState =
-  | { status: 'ready';      code: 'READY';      isExecuting: boolean; isExecutable: true;  step: FlowStep }
-  | { status: 'needsInput'; code: 'NO_AMOUNT' | 'MINT_SELECTION_REQUIRED' | ...;
-      isExecuting: boolean; isExecutable: false; message: string }
-  | { status: 'blocked';    code: 'NO_VALID_MINT' | 'INSUFFICIENT_BALANCE' | ...;
-      isExecuting: boolean; isExecutable: false; message: string }
-```
+**`isExecuting = false`** during input steps: `enterAmount`, `selectMint`, `chooseOption`, `chooseProofs`.
 
 ## Mint Persistence
 
-The library doesn't store mints — it invokes callbacks:
+Mint selection is persisted via notifications. The machine emits `onPreferredMintChanged` or `onNpcMintChanged` at the right time; the wallet decides how to persist:
 
-```tsx
-// User selects send/receive mint
-savePreferredMint: (mintUrl) => mintStore.setSelectedMint(pubkey, mintUrl),
-
-// NPC/Lightning-address mint changed
-saveNpcMint: async (mintUrl) => npcMintStore.updateServerMint(mintUrl, privateKey),
+```ts
+// In your notification handlers:
+onPreferredMintChanged: ({ mintUrl }) => {
+  mintStore.setSelectedMint(pubkey, mintUrl);
+},
+onNpcMintChanged: async ({ mintUrl }) => {
+  await npcMintStore.updateServerMint(mintUrl, privateKey);
+},
 
 // Mint selection events carry scope metadata:
-machine.changeMint(mintUrl, { scope: 'selected' });  // → savePreferredMint
-machine.changeMint(mintUrl, { scope: 'npc' });        // → saveNpcMint
+machine.changeMint(mintUrl, { scope: 'selected' });  // → onPreferredMintChanged
+machine.changeMint(mintUrl, { scope: 'npc' });        // → onNpcMintChanged
 ```
+
+## What Stays in the Wallet App
+
+| Concern | Why |
+|---|---|
+| Step handlers (navigation routing) | App-specific router paths |
+| Notification UI (popups/toasts) | App-specific UI presentation |
+| Notification state updates (zustand stores) | App-specific persistence layer |
+| Screen action overrides (NFC writer, emoji picker) | Platform-specific features |
+| ScreenActionsBridge (NPC, audit/KYM enrichment) | App-specific store subscriptions |
+| Deep link config (schemes, ignored hosts) | App-specific routing |
+| Scan sources (emoji decode, camera) | Platform-specific implementations |

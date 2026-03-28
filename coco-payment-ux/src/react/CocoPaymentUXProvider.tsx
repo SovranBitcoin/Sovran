@@ -36,6 +36,7 @@ import type { MintResolutionContext } from '../machine/selectMintContext';
 import type { ScreenActionHandlerMap, ScreenType } from '../screen-actions/types';
 import type { NavigationCallbacks } from '../screen-actions/defaultHandlers';
 import type { Detectors, WalletContext } from '../types';
+import type { CocoPaymentUXInstance } from '../core/createCocoPaymentUX';
 
 // ---------------------------------------------------------------------------
 // ScreenActionsBridge — optional wallet hooks for useScreenActions
@@ -109,6 +110,13 @@ export interface PaymentFlowRefs {
 export interface CocoPaymentUXProviderProps {
   children: React.ReactNode;
   /**
+   * Optional CocoPaymentUXInstance from `createCocoPaymentUX()`.
+   * When provided, supplies built-in operations and wallet context tracking.
+   * The machine uses the instance's tracker for wallet context instead of
+   * requiring `walletContextRef` and `usePaymentFlowMachine({ walletContext })`.
+   */
+  instance?: CocoPaymentUXInstance;
+  /**
    * Factory called once after the machine is created. Returns the
    * `StepHandlerMap` for the machine.
    */
@@ -117,19 +125,8 @@ export interface CocoPaymentUXProviderProps {
   operations?: MachineOperations;
   /** Error/validation notification handlers. */
   notifications?: NotificationHandlerMap;
-  /** Called when the machine wants to persist the user's preferred mint. */
-  savePreferredMint?: (mintUrl: string) => void;
-  /** Called when changeMint is invoked with scope: 'npc'. Updates NPC mint only. */
-  saveNpcMint?: (mintUrl: string) => void | Promise<void>;
-  /** Called when the provider mounts. Syncs NPC mint from server (wallet-specific). */
-  onNpcMintSync?: () => void | Promise<void>;
   /** Custom protocol detectors. Falls back to built-in detectors. */
   detectors?: Detectors;
-  /**
-   * Optional external wallet context ref. When provided, the provider
-   * uses this ref instead of creating an internal one.
-   */
-  walletContextRef?: React.MutableRefObject<WalletContext | null>;
   /**
    * Factory that creates a URDecoder for animated QR assembly.
    */
@@ -241,34 +238,44 @@ const EMPTY_SCREEN_ACTIONS = {} as ScreenActionHandlerMap;
 
 export function CocoPaymentUXProvider({
   children,
+  instance,
   handlers: handlersFactory,
-  operations,
+  operations: operationsProp,
   notifications,
-  savePreferredMint,
-  saveNpcMint,
-  onNpcMintSync,
   detectors,
-  walletContextRef: externalWalletContextRef,
-  createURDecoder,
-  scanSources,
-  getLocale,
+  createURDecoder: createURDecoderProp,
+  scanSources: scanSourcesProp,
+  getLocale: getLocaleProp,
   translations,
-  getOffline,
-  getBtcPrice,
-  getDisplayCurrency,
-  writeClipboard,
-  shareContent,
+  getOffline: getOfflineProp,
+  getBtcPrice: getBtcPriceProp,
+  getDisplayCurrency: getDisplayCurrencyProp,
+  writeClipboard: writeClipboardProp,
+  shareContent: shareContentProp,
   actions,
   screenActionsBridge,
   deepLinks,
-  nfcAdapter,
+  nfcAdapter: nfcAdapterProp,
   navigation,
 }: CocoPaymentUXProviderProps) {
+  // Resolve props from instance.config when not explicitly provided
+  const ic = instance?.config;
+  const getLocale = getLocaleProp ?? ic?.getLocale;
+  const getOffline = getOfflineProp ?? ic?.getOffline;
+  const getBtcPrice = getBtcPriceProp ?? ic?.getBtcPrice;
+  const getDisplayCurrency = getDisplayCurrencyProp ?? ic?.getDisplayCurrency;
+  const writeClipboard = writeClipboardProp ?? ic?.platform?.clipboard?.write;
+  const shareContent = shareContentProp ?? ic?.platform?.share;
+  const scanSources = scanSourcesProp ?? ic?.platform?.scanSources;
+  const nfcAdapter = nfcAdapterProp ?? ic?.platform?.nfc;
+  const createURDecoder = createURDecoderProp ?? ic?.platform?.createURDecoder;
+
   const getLocaleRef = useRef(getLocale);
   getLocaleRef.current = getLocale;
 
   const notificationsRef = useRef(notifications);
   notificationsRef.current = notifications;
+  const operations = operationsProp ?? instance?.operations;
   const operationsRef = useRef<Partial<MachineOperations> | undefined>(operations);
   operationsRef.current = operations;
   const navigationRef = useRef<NavigationCallbacks | undefined>(navigation);
@@ -292,8 +299,7 @@ export function CocoPaymentUXProvider({
   const getDisplayCurrencyRef = useRef(getDisplayCurrency);
   getDisplayCurrencyRef.current = getDisplayCurrency;
 
-  const internalWalletContextRef = useRef<WalletContext | null>(null);
-  const walletContextRef = externalWalletContextRef ?? internalWalletContextRef;
+  const walletContextRef = useRef<WalletContext | null>(null);
   const unitRef = useRef('sat');
   const optionDismissRef = useRef<(() => void) | undefined>(undefined);
   const handlersRef = useRef<StepHandlerMap>({});
@@ -303,8 +309,6 @@ export function CocoPaymentUXProvider({
     handlersFactory,
     operations,
     notifications,
-    savePreferredMint,
-    saveNpcMint,
     detectors,
     createURDecoder,
     scanSources,
@@ -316,8 +320,6 @@ export function CocoPaymentUXProvider({
     handlersFactory,
     operations,
     notifications,
-    savePreferredMint,
-    saveNpcMint,
     detectors,
     createURDecoder,
     scanSources,
@@ -331,8 +333,6 @@ export function CocoPaymentUXProvider({
       handlersFactory: factory,
       operations: ops,
       notifications: notes,
-      savePreferredMint: persist,
-      saveNpcMint: npcMint,
       detectors: det,
       createURDecoder: ur,
       scanSources: sources,
@@ -346,18 +346,18 @@ export function CocoPaymentUXProvider({
         }
       ) as StepHandlerMap,
       detectors: det,
-      getContext: () => {
-        if (!walletContextRef.current) {
-          throw new Error('CocoPaymentUXProvider has no wallet context bound yet.');
-        }
-        return walletContextRef.current;
-      },
+      getContext: instance
+        ? () => instance.tracker.getContext()
+        : () => {
+            if (!walletContextRef.current) {
+              throw new Error('CocoPaymentUXProvider has no wallet context bound yet.');
+            }
+            return walletContextRef.current;
+          },
       getUnit: () => unitRef.current,
       getOffline: () => getOfflineRef.current?.() ?? false,
       getLocale: () => getLocaleRef.current?.() ?? 'en',
-      onPersistMint: persist,
-      onNpcMintChange: npcMint,
-      operations: ops,
+      operations: ops as MachineOperations | undefined,
       notifications: notes,
       createURDecoder: ur,
       scanSources: sources,
@@ -368,10 +368,6 @@ export function CocoPaymentUXProvider({
       getOptionDismiss: () => optionDismissRef.current,
     });
   }
-
-  useEffect(() => {
-    void onNpcMintSync?.();
-  }, [onNpcMintSync]);
 
   // Deep link processing
   useEffect(() => {

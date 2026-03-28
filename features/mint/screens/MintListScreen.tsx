@@ -56,6 +56,7 @@ export function MintListScreen({
   onInspectMint,
   onClose,
 }: MintListScreenProps) {
+  console.log('items123123', items);
   const foreground = useThemeColor('foreground');
   const scrollY = useSharedValue(0);
   const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);

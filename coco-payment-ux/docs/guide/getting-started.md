@@ -1,106 +1,72 @@
 # Getting Started
 
-Mount `CocoPaymentUXProvider` once at your app root. All hooks read from this context.
+## Two-Layer Architecture
 
-## Provider
+coco-payment-ux has two layers:
 
-```tsx
-<CocoPaymentUXProvider
-  handlers={(machine, refs) =>
-    createHandlers({
-      machine,
-      onOptionDismiss: () => refs.getOptionDismiss()?.(),
-      getManager,
-    })
-  }
-  operations={{
-    executeSend: async (mintUrl, amount) => {
-      await manager.wallet.send(mintUrl, amount);
-      const entry = await findLatestSendEntry(mintUrl);
-      return { historyEntry: JSON.stringify(entry) };
-    },
-    executeMintQuote: async (mintUrl, amount, unit) => {
-      const quote = await manager.quotes.createMintQuote(mintUrl, amount);
-      const entry = await findMintEntryByQuoteId(quote.quote);
-      return { historyEntry: JSON.stringify(entry) };
-    },
-    buildMintListItems: async (stepData) => {
-      const [mints, balances] = await Promise.all([
-        manager.mint.getAllTrustedMints(),
-        manager.wallet.getBalances(),
-      ]);
-      return buildMintListItems(mints, balances, stepData);
-    },
-  }}
-  notifications={{
-    NO_AMOUNT: () => noAmountPopup(),
-    NO_VALID_MINT: () => noValidMintPopup(),
-    INSUFFICIENT_BALANCE: () => balanceTooLowPopup(),
-    UNSUPPORTED_INPUT: () => unsupportedInputPopup(),
-    ALL_OPTIONS_DISABLED: () => allOptionsDisabledPopup(),
-    SEND_FAILED: ({ message }) => generalErrorPopup(message),
-    onScanEmpty: (source) => {
-      source === 'clipboard' ? noClipboardAddressPopup() : noQrCodeFoundPopup();
-    },
-    onScanError: (source, err) => generalErrorPopup(err.message),
-  }}
-  actions={screenActionHandlers}
-  savePreferredMint={(mintUrl) => mintStore.setSelectedMint(pubkey, mintUrl)}
-  saveNpcMint={async (mintUrl) => npcMintStore.updateServerMint(mintUrl, privateKey)}
-  onNpcMintSync={async () => npcMintStore.syncFromServer(manager)}
-  scanSources={{
-    clipboard: async () => {
-      const text = (await Clipboard.getStringAsync()).trim();
-      if (!text) return { empty: true };
-      return { data: isEncoded(text) ? decode(text) : text };
-    },
-    gallery: async () => {
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'] });
-      if (result.canceled) return { canceled: true };
-      const codes = await scanFromURLAsync(result.assets[0].uri, ['qr']);
-      if (codes.length === 0) return { empty: true };
-      return { data: codes[0].data };
-    },
-  }}
-  screenActionsBridge={{
-    getExtraContext: () => ({ manager: getManager(), sendDirectMessage }),
-    onEntryUpdate: (screenType, callback) => {
-      const unsub = manager.on('history:updated', ({ entry }) => callback(entry));
-      return () => unsub();
-    },
-    getSourceLabel: (entry) => scanHistoryStore.find(entry.id)?.source,
-  }}
-  getOffline={() => netInfo.isOffline}
-  getBtcPrice={() => priceStore.getBtcPrice(displayCurrency)}
-  getDisplayCurrency={() => ({ code: 'usd', symbol: '$' })}
-  createURDecoder={() => new URDecoder()}
-  deepLinks={{ url: linkingUrl, customSchemes: ['cashu'] }}>
-  <App />
-</CocoPaymentUXProvider>
-```
+1. **`createCocoPaymentUX(config)`** — framework-agnostic TypeScript core. Creates an instance with built-in operations and live wallet context tracking from a coco-cashu-core Manager.
+2. **`CocoPaymentUXProvider`** — thin React wrapper. Accepts the instance plus app-specific concerns (handlers, notifications, navigation).
 
-## Wallet Context
-
-Built per-profile, passed per-screen. The provider doesn't own wallet state.
+## Minimal Setup
 
 ```tsx
-const walletContext: WalletContext = {
-  trustedMintUrls: ['https://mint.example.com'],
-  mintBalances: { 'https://mint.example.com': 4200 },
-  proofAmounts: { 'https://mint.example.com': [1, 2, 4, 8, 16, 64, 128, 256, 512] },
-  preferredMintUrl: 'https://mint.example.com',
-};
+import { useManager } from 'coco-cashu-react';
+import { createCocoPaymentUX } from 'coco-payment-ux';
+import { CocoPaymentUXProvider } from 'coco-payment-ux/react';
 
-// Every flow screen binds wallet context to the machine
-const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
+function PaymentProvider({ children }) {
+  const manager = useManager();
+
+  const instance = useMemo(
+    () =>
+      createCocoPaymentUX({
+        manager,
+        platform: {
+          clipboard: { write: (text) => Clipboard.setStringAsync(text).then(() => {}) },
+          share: (content) => Share.share({ message: content.message }).then(() => {}),
+          nfc: nfcAdapter,
+          scanSources: { clipboard: readClipboard, gallery: scanGallery },
+          createURDecoder: () => new URDecoder(),
+        },
+        sendNostrDM: async (nprofile, message) => { /* ... */ },
+        getOffline: () => offlineRef.current,
+        getBtcPrice: () => priceStore.getBtcPrice(currency),
+        getDisplayCurrency: () => ({ code: 'usd', symbol: '$' }),
+        enrichMintListItem: (url) => getAuditData(url),
+        enrichMintReviewInfo: (url) => getAuditData(url),
+      }),
+    [manager]
+  );
+
+  return (
+    <CocoPaymentUXProvider
+      instance={instance}
+      handlers={(machine, refs) => createHandlers({ machine })}
+      notifications={createNotifications()}
+      scanSources={scanSources}
+      createURDecoder={() => new URDecoder()}
+      nfcAdapter={nfcAdapter}
+      getOffline={() => offlineRef.current}
+      getBtcPrice={() => priceStore.getBtcPrice(currency)}
+      getDisplayCurrency={() => ({ code: 'usd', symbol: '$' })}
+      actions={screenActionHandlers}
+      screenActionsBridge={bridge}
+      deepLinks={{ url: linkingUrl, customSchemes: ['myapp'] }}
+      navigation={{ scanQr, mintInfo, addMint, goBack }}
+    >
+      {children}
+    </CocoPaymentUXProvider>
+  );
+}
 ```
 
-Screens can override the preferred mint when a flow requires a specific one:
+## What the Instance Provides
 
-```tsx
-const walletContext = useWalletContextWithOverride(selectedMintUrl);
-const machine = usePaymentFlowMachine({ walletContext, unit });
-```
+`createCocoPaymentUX` builds:
+
+- **Wallet context tracking** — subscribes to Manager events (`proofs:*`, `mint:*`) and maintains a live `WalletContext` with balances, trusted mints, and proof amounts
+- **Built-in operations** — `executeSend`, `executeMintQuote`, `executeMelt` (with LNURL resolution), `executeReceive`, `buildMintListItems`, `buildMintReviewInfo`, `checkSendStatus`, `rollbackSend`, `rollbackMelt`, `isMintTrusted`, `trustMint`, `executeNfcSend`, `linkTransaction`, `sendNostrDM`
+- **Enrichment** — optional `enrichMintListItem` and `enrichMintReviewInfo` callbacks inject app-specific data (KYM scores, audit data) into mint list items and review info
 
 ## Handlers, Operations, Notifications
 
@@ -108,7 +74,7 @@ const machine = usePaymentFlowMachine({ walletContext, unit });
 | ----------------- | --------------------------------------- | -------------------------------------- |
 | **Handlers**      | Navigate given prepared step data       | Check balance, validate, derive rules  |
 | **Operations**    | Run async wallet I/O, return facts      | Navigate, show UI                      |
-| **Notifications** | Show optional feedback (toasts, popups) | Control flow — missing keys are no-ops |
+| **Notifications** | Show feedback + persist state changes   | Control flow — missing keys are no-ops |
 
 The machine decides which handler to call. Handlers never check "should I show amount entry?" — the machine already resolved that.
 
@@ -118,12 +84,22 @@ sendComplete: ({ historyEntry }) => {
   router.navigate({ pathname: '/sendToken', params: { sendHistoryEntry: historyEntry } });
 },
 
-// Operation — async wallet work, returns facts for the next transition
-executeSend: async (mintUrl, amount) => {
-  await manager.wallet.send(mintUrl, amount);
-  return { historyEntry: JSON.stringify(await findLatestSendEntry(mintUrl)) };
-},
-
-// Notification — optional popup, ignored if not registered
+// Notification — UI feedback (optional popup, ignored if not registered)
 INSUFFICIENT_BALANCE: () => balanceTooLowPopup(),
+
+// Notification — state change (persist to store, also optional)
+onPreferredMintChanged: ({ mintUrl }) => mintStore.setSelectedMint(pubkey, mintUrl),
+onTransactionCreated: ({ transactionId }) => captureLocation(transactionId),
 ```
+
+## Notifications for State Changes
+
+Notifications serve dual purpose — UI feedback and state persistence. The machine emits these at the right time; the wallet decides what to do:
+
+| Notification | Purpose |
+|---|---|
+| `onPreferredMintChanged({ mintUrl })` | Persist preferred mint selection |
+| `onNpcMintChanged({ mintUrl })` | Sync NPC/Lightning-address mint to server |
+| `onTransactionCreated({ transactionId, type, mintUrl, ... })` | Link scan history, capture location |
+| `onP2PKReceiveCompleted({ hadP2PKProofs })` | Regenerate P2PK key if needed |
+| `onMeltQuoteCreated({ mintUrl, operationId, ... })` | Track melt lifecycle |

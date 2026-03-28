@@ -22,6 +22,13 @@ import type {
 } from 'coco-cashu-core';
 
 import { AnimatedCheckpointDot, type CheckpointDotType } from '@/shared/blocks/transfer';
+import {
+  MINT_COPY,
+  MELT_COPY,
+  SEND_COPY,
+  PAYMENT_REQUEST_COPY,
+  RECEIVE_COPY,
+} from '@/shared/lib/paymentCopy';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -50,36 +57,10 @@ const MELT_STATES = [MeltQuoteState.UNPAID, MeltQuoteState.PENDING, MeltQuoteSta
 
 // Send states from coco: 'prepared' | 'pending' | 'finalized' | 'rolledBack'
 const SEND_STATES = ['prepared', 'pending', 'finalized'] as const;
-// Payment request states include Nostr Send step
-const PAYMENT_REQUEST_STATES = ['prepared', 'nostrSent', 'pending', 'finalized'] as const;
-const SEND_STATE_LABELS: Record<string, string> = {
-  prepared: 'Created',
-  nostrSent: 'Delivered',
-  pending: 'Pending',
-  finalized: 'Claimed',
-  rolledBack: 'Cancelled',
-};
-
+// Payment request states: Created → Delivered → Claimed (no separate "Pending" step)
+const PAYMENT_REQUEST_STATES = ['prepared', 'nostrSent', 'finalized'] as const;
 // Receive states: pending (in memory, not yet redeemed) → redeemed (claimed to wallet)
 const RECEIVE_STATES = ['pending', 'redeemed'] as const;
-const RECEIVE_STATE_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  redeemed: 'Added to wallet',
-  alreadySpent: 'Already spent',
-};
-
-// Mint/Melt state display labels
-const MINT_STATE_LABELS: Record<string, string> = {
-  [MintQuoteState.UNPAID]: 'Waiting for payment',
-  [MintQuoteState.PAID]: 'Payment received',
-  [MintQuoteState.ISSUED]: 'Complete',
-};
-
-const MELT_STATE_LABELS: Record<string, string> = {
-  [MeltQuoteState.UNPAID]: 'Ready to send',
-  [MeltQuoteState.PENDING]: 'Sending',
-  [MeltQuoteState.PAID]: 'Sent',
-};
 
 const EXPIRED_STATE = 'expired';
 
@@ -124,49 +105,42 @@ function buildTimeline({
         return [
           {
             state: MintQuoteState.UNPAID,
-            displayLabel: MINT_STATE_LABELS[MintQuoteState.UNPAID],
+            displayLabel: MINT_COPY.UNPAID.label,
             stepType: 'complete',
             timestamp: mintTx.createdAt,
           },
           {
             state: EXPIRED_STATE,
-            displayLabel: 'Expired',
+            displayLabel: MINT_COPY.expired.label,
             stepType: 'expired',
-            info: 'Invoice expired without payment',
+            info: MINT_COPY.expired.info,
           },
         ];
       }
 
-      const currentIndex = MINT_STATES.indexOf(mintTx.state);
-      return MINT_STATES.map((state, index) => {
-        let stepType: TimelineStepType;
-        if (index < currentIndex) {
-          stepType = 'complete';
-        } else if (index === currentIndex) {
-          stepType = index === MINT_STATES.length - 1 ? 'success' : 'current';
-        } else if (index === currentIndex + 1) {
-          stepType = 'next-pending';
-        } else {
-          stepType = 'future-small';
-        }
-
-        let info: string | undefined;
-        if (stepType === 'current' && state === MintQuoteState.UNPAID) {
-          info = 'Pay the invoice to receive funds';
-        } else if (stepType === 'next-pending' && state === MintQuoteState.ISSUED) {
-          info = 'Adding to wallet...';
-        } else if (stepType === 'success' && state === MintQuoteState.ISSUED) {
-          info = `+${mintTx.amount} sats added to wallet`;
-        }
-
-        return {
-          state,
-          displayLabel: MINT_STATE_LABELS[state],
-          stepType,
-          timestamp: index <= currentIndex ? mintTx.createdAt : undefined,
-          info,
-        };
-      });
+      // UNPAID/PAID are waiting states — use next-pending (grey spinner), not current (green)
+      switch (mintTx.state) {
+        case MintQuoteState.UNPAID:
+          return [
+            { state: MintQuoteState.UNPAID, displayLabel: MINT_COPY.UNPAID.label, stepType: 'next-pending' as TimelineStepType, info: MINT_COPY.UNPAID.info },
+            { state: MintQuoteState.PAID, displayLabel: MINT_COPY.PAID.label, stepType: 'future-small' as TimelineStepType },
+            { state: MintQuoteState.ISSUED, displayLabel: MINT_COPY.ISSUED.label, stepType: 'future-small' as TimelineStepType },
+          ];
+        case MintQuoteState.PAID:
+          return [
+            { state: MintQuoteState.UNPAID, displayLabel: MINT_COPY.UNPAID.label, stepType: 'complete' as TimelineStepType, timestamp: mintTx.createdAt },
+            { state: MintQuoteState.PAID, displayLabel: MINT_COPY.PAID.label, stepType: 'next-pending' as TimelineStepType, info: MINT_COPY.PAID.info },
+            { state: MintQuoteState.ISSUED, displayLabel: MINT_COPY.ISSUED.label, stepType: 'future-small' as TimelineStepType },
+          ];
+        case MintQuoteState.ISSUED:
+          return [
+            { state: MintQuoteState.UNPAID, displayLabel: MINT_COPY.UNPAID.label, stepType: 'complete' as TimelineStepType, timestamp: mintTx.createdAt },
+            { state: MintQuoteState.PAID, displayLabel: MINT_COPY.PAID.label, stepType: 'complete' as TimelineStepType, timestamp: mintTx.createdAt },
+            { state: MintQuoteState.ISSUED, displayLabel: MINT_COPY.ISSUED.label, stepType: 'success' as TimelineStepType, info: MINT_COPY.ISSUED.info(mintTx.amount) },
+          ];
+        default:
+          return [];
+      }
     }
 
     case 'melt': {
@@ -180,49 +154,42 @@ function buildTimeline({
         return [
           {
             state: MeltQuoteState.UNPAID,
-            displayLabel: 'Unpaid',
+            displayLabel: MELT_COPY.UNPAID.label,
             stepType: 'complete',
             timestamp: meltTx.createdAt,
           },
           {
             state: EXPIRED_STATE,
-            displayLabel: 'Expired',
+            displayLabel: MELT_COPY.expired.label,
             stepType: 'expired',
-            info: 'Quote expired',
+            info: MELT_COPY.expired.info,
           },
         ];
       }
 
-      const currentIndex = MELT_STATES.indexOf(meltTx.state);
-      return MELT_STATES.map((state, index) => {
-        let stepType: TimelineStepType;
-        if (index < currentIndex) {
-          stepType = 'complete';
-        } else if (index === currentIndex) {
-          stepType = index === MELT_STATES.length - 1 ? 'success' : 'current';
-        } else if (index === currentIndex + 1) {
-          stepType = 'next-pending';
-        } else {
-          stepType = 'future-small';
-        }
-
-        let info: string | undefined;
-        if (stepType === 'current' && state === MeltQuoteState.UNPAID) {
-          info = 'Tap Send to complete payment';
-        } else if (stepType === 'current' && state === MeltQuoteState.PENDING) {
-          info = 'Payment in progress...';
-        } else if (stepType === 'success' && state === MeltQuoteState.PAID) {
-          info = 'Payment complete';
-        }
-
-        return {
-          state,
-          displayLabel: MELT_STATE_LABELS[state],
-          stepType,
-          timestamp: index <= currentIndex ? meltTx.createdAt : undefined,
-          info,
-        };
-      });
+      // UNPAID is a waiting state; PENDING is active processing (lightning payment routing)
+      switch (meltTx.state) {
+        case MeltQuoteState.UNPAID:
+          return [
+            { state: MeltQuoteState.UNPAID, displayLabel: MELT_COPY.UNPAID.label, stepType: 'next-pending' as TimelineStepType, info: MELT_COPY.UNPAID.info },
+            { state: MeltQuoteState.PENDING, displayLabel: MELT_COPY.PENDING.label, stepType: 'future-small' as TimelineStepType },
+            { state: MeltQuoteState.PAID, displayLabel: MELT_COPY.PAID.label, stepType: 'future-small' as TimelineStepType },
+          ];
+        case MeltQuoteState.PENDING:
+          return [
+            { state: MeltQuoteState.UNPAID, displayLabel: MELT_COPY.UNPAID.label, stepType: 'complete' as TimelineStepType, timestamp: meltTx.createdAt },
+            { state: MeltQuoteState.PENDING, displayLabel: MELT_COPY.PENDING.label, stepType: 'current' as TimelineStepType, info: MELT_COPY.PENDING.info },
+            { state: MeltQuoteState.PAID, displayLabel: MELT_COPY.PAID.label, stepType: 'future-small' as TimelineStepType },
+          ];
+        case MeltQuoteState.PAID:
+          return [
+            { state: MeltQuoteState.UNPAID, displayLabel: MELT_COPY.UNPAID.label, stepType: 'complete' as TimelineStepType, timestamp: meltTx.createdAt },
+            { state: MeltQuoteState.PENDING, displayLabel: MELT_COPY.PENDING.label, stepType: 'complete' as TimelineStepType, timestamp: meltTx.createdAt },
+            { state: MeltQuoteState.PAID, displayLabel: MELT_COPY.PAID.label, stepType: 'success' as TimelineStepType, info: MELT_COPY.PAID.info },
+          ];
+        default:
+          return [];
+      }
     }
 
     case 'send': {
@@ -234,7 +201,7 @@ function buildTimeline({
         const rolledBackTimeline: TimelineItem[] = [
           {
             state: 'prepared',
-            displayLabel: SEND_STATE_LABELS.prepared,
+            displayLabel: SEND_COPY.prepared.label,
             stepType: 'complete',
             timestamp: sendTx.createdAt,
           },
@@ -243,77 +210,81 @@ function buildTimeline({
         if (nostrSent) {
           rolledBackTimeline.push({
             state: 'nostrSent',
-            displayLabel: SEND_STATE_LABELS.nostrSent,
+            displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label,
             stepType: 'complete',
             timestamp: sendTx.createdAt,
           });
         }
         rolledBackTimeline.push({
           state: 'rolledBack',
-          displayLabel: SEND_STATE_LABELS.rolledBack,
+          displayLabel: SEND_COPY.rolledBack.label,
           stepType: 'rolled-back',
-          info: 'Token funds returned to your balance',
+          info: SEND_COPY.rolledBack.info,
         });
         return rolledBackTimeline;
       }
 
       // Determine if this is payment request mode (tokenCreated or nostrSent props indicate PR mode)
       const isPaymentRequestMode = tokenCreated !== undefined || nostrSent;
-      const states = isPaymentRequestMode ? PAYMENT_REQUEST_STATES : SEND_STATES;
 
-      // Map coco state to timeline index
-      // For payment request: prepared=0, nostrSent=1, pending=2, finalized=3
-      // For normal: prepared=0, pending=1, finalized=2
-      let currentIndex: number;
       if (isPaymentRequestMode) {
-        // Derive timeline position from core send state.
-        // PAYMENT_REQUEST_STATES: ['prepared', 'nostrSent', 'pending', 'finalized']
-        if (txState === 'prepared') {
-          currentIndex = 0; // "Created" is current
-        } else if (txState === 'pending') {
-          currentIndex = 2; // "Pending" — token created + delivered
-        } else if (txState === 'finalized') {
-          currentIndex = 3; // "Claimed" — recipient claimed
-        } else {
-          currentIndex = 0;
+        // Payment request: Created → Delivered → Claimed
+        switch (txState) {
+          case 'prepared':
+            return [
+              { state: 'prepared', displayLabel: PAYMENT_REQUEST_COPY.prepared.label, stepType: 'current' as TimelineStepType, info: PAYMENT_REQUEST_COPY.prepared.info },
+              { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'next-pending' as TimelineStepType },
+              { state: 'finalized', displayLabel: PAYMENT_REQUEST_COPY.finalized.label, stepType: 'future-small' as TimelineStepType },
+            ];
+          case 'pending':
+            if (nostrSent) {
+              return [
+                { state: 'prepared', displayLabel: PAYMENT_REQUEST_COPY.prepared.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
+                { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt, info: PAYMENT_REQUEST_COPY.nostrSent.infoSent },
+                { state: 'finalized', displayLabel: PAYMENT_REQUEST_COPY.finalized.label, stepType: 'next-pending' as TimelineStepType, info: SEND_COPY.pending.info },
+              ];
+            }
+            return [
+              { state: 'prepared', displayLabel: PAYMENT_REQUEST_COPY.prepared.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
+              { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'current' as TimelineStepType, info: PAYMENT_REQUEST_COPY.nostrSent.infoSending },
+              { state: 'finalized', displayLabel: PAYMENT_REQUEST_COPY.finalized.label, stepType: 'future-small' as TimelineStepType },
+            ];
+          case 'finalized':
+            return [
+              { state: 'prepared', displayLabel: PAYMENT_REQUEST_COPY.prepared.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
+              { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt, info: PAYMENT_REQUEST_COPY.nostrSent.infoSent },
+              { state: 'finalized', displayLabel: PAYMENT_REQUEST_COPY.finalized.label, stepType: 'success' as TimelineStepType, info: PAYMENT_REQUEST_COPY.finalized.info },
+            ];
+          default:
+            return [];
         }
-      } else {
-        currentIndex = SEND_STATES.indexOf(txState as (typeof SEND_STATES)[number]);
       }
 
-      return states.map((state, index) => {
-        let stepType: TimelineStepType;
-        if (index < currentIndex) {
-          stepType = 'complete';
-        } else if (index === currentIndex) {
-          stepType = index === states.length - 1 ? 'success' : 'current';
-        } else if (index === currentIndex + 1) {
-          stepType = 'next-pending';
-        } else {
-          stepType = 'future-small';
-        }
-
-        let info: string | undefined;
-        if (stepType === 'current' && state === 'prepared') {
-          info = 'Ready to share';
-        } else if (stepType === 'complete' && state === 'nostrSent') {
-          info = 'Sent via Nostr';
-        } else if (stepType === 'current' && state === 'nostrSent') {
-          info = 'Sending...';
-        } else if (stepType === 'current' && state === 'pending') {
-          info = 'Waiting for recipient';
-        } else if (stepType === 'success' && state === 'finalized') {
-          info = 'Claimed by recipient';
-        }
-
-        return {
-          state,
-          displayLabel: SEND_STATE_LABELS[state],
-          stepType,
-          timestamp: index <= currentIndex ? sendTx.createdAt : undefined,
-          info,
-        };
-      });
+      // Standard send: Created → Pending → Claimed
+      // 'pending' is a passive waiting state (token shared, nothing actively processing)
+      // so it uses next-pending (clock) not current (spinner)
+      switch (txState) {
+        case 'prepared':
+          return [
+            { state: 'prepared', displayLabel: SEND_COPY.prepared.label, stepType: 'current' as TimelineStepType, info: SEND_COPY.prepared.info },
+            { state: 'pending', displayLabel: SEND_COPY.pending.label, stepType: 'next-pending' as TimelineStepType },
+            { state: 'finalized', displayLabel: SEND_COPY.finalized.label, stepType: 'future-small' as TimelineStepType },
+          ];
+        case 'pending':
+          return [
+            { state: 'prepared', displayLabel: SEND_COPY.prepared.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
+            { state: 'pending', displayLabel: SEND_COPY.pending.label, stepType: 'next-pending' as TimelineStepType, info: SEND_COPY.pending.info },
+            { state: 'finalized', displayLabel: SEND_COPY.finalized.label, stepType: 'future-small' as TimelineStepType },
+          ];
+        case 'finalized':
+          return [
+            { state: 'prepared', displayLabel: SEND_COPY.prepared.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
+            { state: 'pending', displayLabel: SEND_COPY.pending.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
+            { state: 'finalized', displayLabel: SEND_COPY.finalized.label, stepType: 'success' as TimelineStepType, info: SEND_COPY.finalized.info },
+          ];
+        default:
+          return [];
+      }
     }
 
     case 'receive': {
@@ -325,47 +296,31 @@ function buildTimeline({
         return [
           {
             state: 'pending',
-            displayLabel: RECEIVE_STATE_LABELS.pending,
+            displayLabel: RECEIVE_COPY.pending.label,
             stepType: 'complete',
             timestamp: receiveTx.createdAt,
           },
           {
             state: 'alreadySpent',
-            displayLabel: RECEIVE_STATE_LABELS.alreadySpent,
+            displayLabel: RECEIVE_COPY.alreadySpent.label,
             stepType: 'already-spent',
-            info: 'Token was already redeemed elsewhere',
+            info: RECEIVE_COPY.alreadySpent.info,
           },
         ];
       }
 
-      const currentIndex = RECEIVE_STATES.indexOf(txState as (typeof RECEIVE_STATES)[number]);
-      const effectiveIndex = currentIndex === -1 ? RECEIVE_STATES.length - 1 : currentIndex;
+      // 'pending' is a waiting state — token received, needs user action to redeem
+      if (txState === 'pending') {
+        return [
+          { state: 'pending', displayLabel: RECEIVE_COPY.pending.label, stepType: 'next-pending' as TimelineStepType, info: RECEIVE_COPY.pending.info },
+          { state: 'redeemed', displayLabel: RECEIVE_COPY.redeemed.label, stepType: 'future-small' as TimelineStepType },
+        ];
+      }
 
-      return RECEIVE_STATES.map((state, index) => {
-        let stepType: TimelineStepType;
-        if (index < effectiveIndex) {
-          stepType = 'complete';
-        } else if (index === effectiveIndex) {
-          stepType = index === RECEIVE_STATES.length - 1 ? 'success' : 'current';
-        } else {
-          stepType = 'next-pending';
-        }
-
-        let info: string | undefined;
-        if (stepType === 'current' && state === 'pending') {
-          info = 'Tap Redeem to add to wallet';
-        } else if (stepType === 'success' && state === 'redeemed') {
-          info = `+${receiveTx.amount} sats added to wallet`;
-        }
-
-        return {
-          state,
-          displayLabel: RECEIVE_STATE_LABELS[state],
-          stepType,
-          timestamp: index <= effectiveIndex ? receiveTx.createdAt : undefined,
-          info,
-        };
-      });
+      return [
+        { state: 'pending', displayLabel: RECEIVE_COPY.pending.label, stepType: 'complete' as TimelineStepType, timestamp: receiveTx.createdAt },
+        { state: 'redeemed', displayLabel: RECEIVE_COPY.redeemed.label, stepType: 'success' as TimelineStepType, info: RECEIVE_COPY.redeemed.info(receiveTx.amount) },
+      ];
     }
 
     default:
@@ -554,6 +509,11 @@ const getStatusHeader = (timeline: TimelineItem[]): string => {
   );
   if (current) {
     return current.displayLabel.toUpperCase();
+  }
+  // Waiting states (e.g. send pending): no active step, show the next milestone
+  const nextUp = timeline.find((item) => item.stepType === 'next-pending');
+  if (nextUp) {
+    return nextUp.displayLabel.toUpperCase();
   }
   return timeline[timeline.length - 1]?.displayLabel.toUpperCase() || '';
 };

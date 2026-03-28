@@ -11,6 +11,7 @@ import Animated, {
 import { router } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { blendColors, sanitizeColor } from '@/shared/lib/colorExtraction';
+import { TOAST_COPY } from '@/shared/lib/paymentCopy';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { PaymentStatusIcon } from './PaymentStatusIcon';
@@ -24,42 +25,43 @@ const ICON_SIZE = 32;
 
 const CASES = {
   receive: {
-    message: 'Payment received',
-    submessagePending: 'Processing...',
-    submessageConfirmed: (amount: number, unit: string) => fmt`Received ${{ amount, unit }}`,
-    submessageFailed: 'Payment failed',
+    message: TOAST_COPY.receive.message,
+    submessagePending: TOAST_COPY.receive.processing,
+    submessageConfirmed: (amount: number, unit: string) => fmt`${TOAST_COPY.receive.confirmed} ${{ amount, unit }}`,
+    submessageFailed: TOAST_COPY.receive.failed,
     history: { type: 'mint' as const, idField: 'quoteId' as const },
     route: { pathname: '/mintQuote' as const, paramKey: 'mintHistoryEntry' },
   },
   send: {
-    message: 'Payment sent',
-    submessageConfirmed: (amount: number, unit: string) => fmt`Sent ${{ amount, unit }}`,
-    submessageFailed: 'Payment failed',
+    message: TOAST_COPY.send.message,
+    submessagePending: TOAST_COPY.send.processing,
+    submessageConfirmed: (amount: number, unit: string) => fmt`${TOAST_COPY.send.confirmed} ${{ amount, unit }}`,
+    submessageFailed: TOAST_COPY.send.failed,
     history: { type: 'send' as const, idField: 'operationId' as const },
     route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
   },
   'payment-request': {
-    message: 'Payment request sent',
-    submessagePending: 'Waiting for recipient',
-    submessageDelivered: 'Delivered to recipient',
-    submessageConfirmed: 'Claimed by recipient',
-    submessageFailed: 'Payment failed',
+    message: TOAST_COPY['payment-request'].message,
+    submessagePending: TOAST_COPY['payment-request'].processing,
+    submessageDelivered: TOAST_COPY['payment-request'].delivered,
+    submessageConfirmed: TOAST_COPY['payment-request'].confirmed,
+    submessageFailed: TOAST_COPY['payment-request'].failed,
     history: { type: 'send' as const, idField: 'operationId' as const },
     route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
   },
   melt: {
-    message: 'Payment sent',
-    submessagePending: 'Processing...',
-    submessageConfirmed: (amount: number, unit: string) => fmt`Sent ${{ amount, unit }}`,
-    submessageFailed: 'Payment failed',
+    message: TOAST_COPY.melt.message,
+    submessagePending: TOAST_COPY.melt.processing,
+    submessageConfirmed: (amount: number, unit: string) => fmt`${TOAST_COPY.melt.confirmed} ${{ amount, unit }}`,
+    submessageFailed: TOAST_COPY.melt.failed,
     history: { type: 'melt' as const, idField: 'quoteId' as const },
     route: { pathname: '/meltQuote' as const, paramKey: 'meltHistoryEntry' },
   },
   'receive-ecash': {
-    message: 'Payment received',
-    submessagePending: 'Processing...',
-    submessageConfirmed: (amount: number, unit: string) => fmt`Received ${{ amount, unit }}`,
-    submessageFailed: 'Payment failed',
+    message: TOAST_COPY['receive-ecash'].message,
+    submessagePending: TOAST_COPY['receive-ecash'].processing,
+    submessageConfirmed: (amount: number, unit: string) => fmt`${TOAST_COPY['receive-ecash'].confirmed} ${{ amount, unit }}`,
+    submessageFailed: TOAST_COPY['receive-ecash'].failed,
     history: { type: 'receive' as const, idField: 'id' as const },
     route: { pathname: '/receiveToken' as const, paramKey: 'receiveHistoryEntry' },
   },

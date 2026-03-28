@@ -365,3 +365,83 @@ describe('ecash send — historyEntry data', () => {
     expect(typeof parsed.id).toBe('string');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Notification timeline — which notifications fire during ecash send
+// ---------------------------------------------------------------------------
+
+/**
+ * Ecash send fires a different set of notifications than melt or payment
+ * request flows. There is no processing/confirmed pair — the machine
+ * executes the send inline and only fires onTransactionCreated on success.
+ *
+ * Compare with:
+ *   - lightning-melt: onPaymentProcessing → onPaymentConfirmed → onTransactionCreated → onMeltQuoteCreated
+ *   - payment-request: onPaymentProcessing → onPaymentConfirmed → onTransactionCreated
+ *   - ecash send:      onTransactionCreated (only)
+ */
+describe('ecash send — notification timeline', () => {
+  it('fires only onTransactionCreated on success', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+    tm.assertStep('sendComplete');
+
+    const keys = tm.notificationCalls.map((c) => c.key);
+    expect(keys).toEqual(['onTransactionCreated']);
+  });
+
+  it('onTransactionCreated carries type=send, mintUrl, amount, unit, transactionId', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+
+    const txCreated = tm.notificationCalls.find((c) => c.key === 'onTransactionCreated');
+    expect(txCreated!.data).toMatchObject({
+      type: 'send',
+      mintUrl: MINT1,
+      amount: 100,
+      unit: 'sat',
+      transactionId: expect.any(String),
+    });
+  });
+
+  it('does not fire onPaymentProcessing or onPaymentConfirmed (melt/PR only)', async () => {
+    const tm = createTestMachine();
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+
+    const keys = tm.notificationCalls.map((c) => c.key);
+    expect(keys).not.toContain('onPaymentProcessing');
+    expect(keys).not.toContain('onPaymentConfirmed');
+  });
+
+  it('fires no notifications when executeSend fails and falls back to chooseProofs', async () => {
+    const tm = createTestMachine({
+      wallet: WALLETS.noExactProofs,
+      operations: {
+        executeSend: async () => { throw new Error('Mint unreachable'); },
+      },
+    });
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+    tm.assertStep('chooseProofs');
+
+    expect(tm.notificationCalls).toHaveLength(0);
+  });
+
+  it('fires SEND_FAILED error notification when send fails with no fallback', async () => {
+    const tm = createTestMachine({
+      wallet: WALLETS.noBalance,
+      operations: {
+        executeSend: async () => { throw new Error('No proofs'); },
+      },
+    });
+    await tm.machine.startSendEcash();
+    await tm.machine.enterAmount(100, MINT1);
+    tm.assertStep('error');
+
+    const keys = tm.notificationCalls.map((c) => c.key);
+    expect(keys).toContain('SEND_FAILED');
+  });
+});

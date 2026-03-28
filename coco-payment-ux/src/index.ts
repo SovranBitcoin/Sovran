@@ -2,6 +2,20 @@
 // coco-payment-ux — public API
 // ---------------------------------------------------------------------------
 
+// Core factory (framework-agnostic entry point)
+export {
+  createCocoPaymentUX,
+  createMachineFromInstance,
+  createWalletContextTracker,
+  type CocoPaymentUXConfig,
+  type CocoPaymentUXInstance,
+  type CreateMachineFromInstanceConfig,
+  type WalletContextTracker,
+} from './core';
+
+// Re-export Manager type so consumers don't need to import coco-cashu-core
+export type { Manager } from 'coco-cashu-core';
+
 // Machine (state machine core)
 export { createPaymentMachine } from './machine/createMachine';
 export { resolveNext } from './machine/resolveNext';
@@ -110,6 +124,16 @@ export type {
 export { FormattedTimestamp } from './formatting';
 export { FormattedString, type TruncateMode } from './formatting';
 export { localizeReason, type LocalizedReason } from './formatting';
+
+// LNURL resolution (lightning address & lnurlp → bolt11)
+export {
+  requestInvoiceFromLnurl,
+  getLnurlPayParams,
+  parseLightningAddress,
+  parseLnurlp,
+  decodeUrlOrAddress,
+  isLightningInvoiceBolt11,
+} from './lnurl';
 
 // Nostr (NIP-17 gift wrap + relay publishing)
 export {

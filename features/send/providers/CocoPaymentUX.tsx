@@ -1,11 +1,12 @@
 /**
  * @fileoverview Sovran CocoPaymentUXProvider — wires coco-payment-ux to the app
  *
- * Passes flat props into coco’s CocoPaymentUXProvider: step handlers, operations,
- * notifications, persistence, scan sources, and screen action handlers.
+ * Uses createCocoPaymentUX for built-in operations and wallet context tracking.
+ * Sovran only provides: handlers (navigation), notifications (UI + state),
+ * platform primitives, and app-specific enrichment.
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Share } from 'react-native';
 
 import * as Clipboard from 'expo-clipboard';
@@ -14,20 +15,18 @@ import { router } from 'expo-router';
 
 import { URDecoder } from '@gandlaf21/bc-ur';
 
-import type { HistoryEntry } from 'coco-cashu-core';
 import { useManager } from 'coco-cashu-react';
 
-import type { WalletContext, MeltOperationLike, NavigationCallbacks } from 'coco-payment-ux';
+import type { MeltOperationLike, NavigationCallbacks } from 'coco-payment-ux';
 import {
+  createCocoPaymentUX,
   meltOperationToScreenActionEntry,
   shouldApplyEntryUpdate as defaultShouldApply,
   mergeEntryUpdate as defaultMerge,
   sendDirectMessageToRelays,
 } from 'coco-payment-ux';
-import { createDefaultOperations } from 'coco-payment-ux/operations';
 import {
   CocoPaymentUXProvider as PaymentUXProviderBase,
-  type CocoPaymentUXProviderProps,
   type DeepLinkConfig,
   type ScreenActionsBridge,
 } from 'coco-payment-ux/react';
@@ -36,16 +35,11 @@ import { useReceivePaymentUXExtras } from '@/features/receive/providers/ReceiveP
 import {
   createSovranHandlers,
   createSovranNotifications,
-  createSovranOperations,
   createSovranScanSources,
   createSovranScreenActionHandlers,
 } from '@/features/send/lib/sovranPaymentConfig';
 import { createNfcAdapter } from '@/shared/lib/nfc/adapter';
-import {
-  deeplinkFailedPopup,
-  receiveMintUpdatedPopup,
-  receiveMintUpdateFailedPopup,
-} from '@/shared/lib/popup';
+import { deeplinkFailedPopup } from '@/shared/lib/popup';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
@@ -105,27 +99,14 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   offlineRef.current = isOffline;
   const getOffline = useCallback(() => offlineRef.current, []);
 
-  const pubkeyRef = useRef(keys?.pubkey);
-  pubkeyRef.current = keys?.pubkey;
   const npubRef = useRef(keys?.npub);
   npubRef.current = keys?.npub;
+  const pubkeyRef = useRef(keys?.pubkey);
+  pubkeyRef.current = keys?.pubkey;
   const privateKeyRef = useRef(keys?.privateKey);
   privateKeyRef.current = keys?.privateKey;
 
-  const writeClipboard = useCallback(
-    (text: string) => Clipboard.setStringAsync(text).then(() => {}),
-    []
-  );
-  const shareContent = useCallback(
-    (content: { message: string; url?: string }) =>
-      Share.share({ message: content.message, url: content.url }).then(() => {}),
-    []
-  );
-
-  const getManager = useCallback(() => manager, [manager]);
   const [nfcAdapter] = useState(() => createNfcAdapter());
-  const walletContextRef = useRef<WalletContext | null>(null);
-  const getWalletContext = useCallback(() => walletContextRef.current, []);
   const getNpub = useCallback(() => npubRef.current, []);
 
   const getBtcPrice = useCallback(() => {
@@ -137,6 +118,40 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
     const symbol = FIAT_SYMBOLS[currency];
     return symbol ? { code: currency, symbol } : null;
   }, []);
+
+  const instance = useMemo(
+    () =>
+      createCocoPaymentUX({
+        manager,
+        platform: {
+          clipboard: { write: (text: string) => Clipboard.setStringAsync(text).then(() => {}) },
+          share: (content) => Share.share({ message: content.message, url: content.url }).then(() => {}),
+          nfc: nfcAdapter,
+          scanSources: createSovranScanSources(nfcAdapter),
+          createURDecoder: () => new URDecoder(),
+        },
+        sendNostrDM: async (nprofile, message) => {
+          const pk = privateKeyRef.current;
+          if (!pk) throw new Error('Nostr keys not available');
+          await sendDirectMessageToRelays({ senderPrivateKey: pk, nprofile, message });
+        },
+        getOffline,
+        getLocale: () => useSettingsStore.getState().language || 'en',
+        getBtcPrice,
+        getDisplayCurrency,
+        getPreferredMintUrl: () => {
+          const pk = pubkeyRef.current;
+          return pk ? useMintStore.getState().getSelectedMint(pk) : undefined;
+        },
+        enrichMintListItem: (url) => getMintEnrichment(url) as any,
+        enrichMintReviewInfo: (url) => getMintEnrichment(url) as any,
+      }),
+    [manager, nfcAdapter, getOffline, getBtcPrice, getDisplayCurrency]
+  );
+
+  useEffect(() => {
+    return () => instance.dispose();
+  }, [instance]);
 
   const actions = useMemo(() => createSovranScreenActionHandlers(), []);
 
@@ -183,30 +198,20 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
     [deepLinkUrl, keys?.pubkey]
   );
 
-  const sendDirectMessage = useCallback(
-    async (nprofile: string, message: string) => {
-      const pk = keys?.privateKey;
-      if (!pk) throw new Error('Nostr keys not available');
-      await sendDirectMessageToRelays({ senderPrivateKey: pk, nprofile, message });
-    },
-    [keys?.privateKey]
-  );
-
   const screenActionsBridge = useMemo<ScreenActionsBridge>(
     () => ({
       getExtraContext: () => ({
-        manager: getManager(),
+        manager,
         requestCameraPermission: receiveExtras?.requestCameraPermission,
       }),
       onEntryUpdate: (screenType, callback) => {
-        const mgr = getManager();
         const unsubscribes: (() => void)[] = [];
 
         if (screenType !== 'mintSelector' && screenType !== 'mintInfo') {
           unsubscribes.push(
-            mgr.on(
+            manager.on(
               'history:updated',
-              ({ entry: updated }: { mintUrl: string; entry: HistoryEntry }) => {
+              ({ entry: updated }: { mintUrl: string; entry: any }) => {
                 callback(updated as unknown as EntryRecord);
               }
             )
@@ -217,7 +222,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           const subscribeMeltOperation = (
             eventName: 'melt-op:prepared' | 'melt-op:pending' | 'melt-op:finalized'
           ) =>
-            mgr.on(
+            manager.on(
               eventName,
               ({ operation }: { mintUrl: string; operation: MeltOperationLike }) => {
                 const updatedEntry = meltOperationToScreenActionEntry(operation);
@@ -308,71 +313,31 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         return labels[scan.source] ?? null;
       },
     }),
-    [getManager, receiveExtras?.requestCameraPermission]
+    [manager, receiveExtras?.requestCameraPermission]
   );
 
-  const providerProps = useMemo<Omit<CocoPaymentUXProviderProps, 'children'>>(
-    () => ({
-      handlers: (machine, refs) =>
+  return (
+    <PaymentUXProviderBase
+      instance={instance}
+      handlers={(machine, refs) =>
         createSovranHandlers({
           machine,
           onOptionDismiss: () => refs.getOptionDismiss()?.(),
-          getManager,
+          getManager: () => manager,
           getNpub,
-        }),
-      operations: {
-        ...createDefaultOperations({ getManager, sendNostrDM: sendDirectMessage }),
-        ...createSovranOperations({ getManager, getWalletContext, sendNostrDM: sendDirectMessage }),
-      },
-      notifications: createSovranNotifications(),
-      savePreferredMint: (mintUrl) => {
-        const pubkey = pubkeyRef.current;
-        if (pubkey) {
-          useMintStore.getState().setSelectedMint(pubkey, mintUrl);
-        }
-      },
-      saveNpcMint: async (mintUrl) => {
-        const pk = privateKeyRef.current;
-        if (pk) {
-          const ok = await useNpcMintStore.getState().updateServerMint(mintUrl, pk);
-          if (ok) receiveMintUpdatedPopup();
-          else receiveMintUpdateFailedPopup();
-        }
-      },
-      onNpcMintSync: async () => {
-        const mgr = getManager();
-        if (mgr) await useNpcMintStore.getState().syncFromServer(mgr);
-      },
-      walletContextRef,
-      createURDecoder: () => new URDecoder(),
-      scanSources: createSovranScanSources(nfcAdapter),
-      nfcAdapter,
-      getOffline,
-      getBtcPrice,
-      getDisplayCurrency,
-      writeClipboard,
-      shareContent,
-      actions,
-      screenActionsBridge,
-      deepLinks,
-      navigation,
-    }),
-    [
-      getManager,
-      getWalletContext,
-      getNpub,
-      nfcAdapter,
-      getOffline,
-      getBtcPrice,
-      getDisplayCurrency,
-      writeClipboard,
-      shareContent,
-      actions,
-      screenActionsBridge,
-      deepLinks,
-      navigation,
-    ]
+        })
+      }
+      notifications={createSovranNotifications({
+        getPubkey: () => pubkeyRef.current,
+        getPrivateKey: () => privateKeyRef.current,
+        getManager: () => manager,
+      })}
+      actions={actions}
+      screenActionsBridge={screenActionsBridge}
+      deepLinks={deepLinks}
+      navigation={navigation}
+    >
+      {children}
+    </PaymentUXProviderBase>
   );
-
-  return <PaymentUXProviderBase {...providerProps}>{children}</PaymentUXProviderBase>;
 }

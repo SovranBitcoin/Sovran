@@ -43,6 +43,17 @@ export const MINT3 = 'https://mint3.example.com';
 /** A mint URL that NO wallet fixture trusts. Used for negative tests. */
 export const UNTRUSTED_MINT = 'https://untrusted.example.com';
 
+/**
+ * Mint metadata — simulates what getAllTrustedMints() returns from the Manager.
+ * Used by mock buildMintListItems to return realistic displayName/iconUrl
+ * instead of echoing back raw URLs.
+ */
+export const MINT_METADATA: Record<string, { displayName: string; iconUrl: string }> = {
+  [MINT1]: { displayName: 'Mint One', iconUrl: 'https://mint1.example.com/icon.png' },
+  [MINT2]: { displayName: 'Mint Two', iconUrl: 'https://mint2.example.com/icon.png' },
+  [MINT3]: { displayName: 'Mint Three', iconUrl: 'https://mint3.example.com/icon.png' },
+};
+
 // ---------------------------------------------------------------------------
 // Wallet state fixtures
 // ---------------------------------------------------------------------------

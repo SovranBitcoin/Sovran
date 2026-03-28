@@ -45,6 +45,7 @@
 import type { MachineOperations, StepDataMap } from '../../src/machine/types';
 import type { MintListItem } from '../../src/types';
 import type { OperationCall } from './types';
+import { MINT_METADATA } from './fixtures';
 
 // ---------------------------------------------------------------------------
 // Default stub responses
@@ -145,19 +146,28 @@ export function createMockOperations(
     })),
 
     // buildMintListItems: builds the UI data for the mint picker.
-    // Default: mirrors candidates back as available MintListItems.
+    // Default: mirrors candidates back as available MintListItems with
+    // realistic displayName/iconUrl from MINT_METADATA (simulates what
+    // getAllTrustedMints() returns from the Manager in production).
     buildMintListItems: wrap(
       'buildMintListItems',
-      async (data: StepDataMap['selectMint']): Promise<MintListItem[]> =>
-        data.candidates.map((c) => ({
+      async (data: StepDataMap['selectMint']): Promise<MintListItem[]> => {
+        const items = data.candidates.map((c) => ({
           mintUrl: c.mintUrl,
-          displayName: c.mintUrl,
+          displayName: MINT_METADATA[c.mintUrl]?.displayName ?? c.mintUrl,
+          iconUrl: MINT_METADATA[c.mintUrl]?.iconUrl,
           balance: c.balance,
           unit: data.unit,
           status: 'available' as const,
-          reason: null,
+          reason: null as MintListItem['reason'],
           isPreferred: false,
-        }))
+        }));
+        items.sort((a, b) => {
+          if (a.status !== b.status) return a.status === 'available' ? -1 : 1;
+          return b.balance - a.balance;
+        });
+        return items;
+      }
     ),
 
     // trustMint: adds a mint to the trusted list (no-op in tests)
