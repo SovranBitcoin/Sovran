@@ -93,6 +93,25 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
       return { historyEntry: JSON.stringify(entry) };
     },
 
+    executeOfflineSend: async (mintUrl, amount) => {
+      const mgr = requireManager();
+      const prepared = await mgr.send.prepareSend(mintUrl, amount);
+
+      if (prepared.needsSwap) {
+        await mgr.send.rollback(prepared.id);
+        throw new Error('Offline send requires exact proof match');
+      }
+
+      await mgr.send.executePreparedSend(prepared.id);
+
+      const history = await mgr.history.getPaginatedHistory(0, 25);
+      const entry = history.find(
+        (h: any) => h.type === 'send' && h.mintUrl === mintUrl
+      );
+      if (!entry) throw new Error('Send history entry not found after offline send');
+      return { historyEntry: JSON.stringify(entry) };
+    },
+
     executeMintQuote: async (mintUrl, amount, _unit) => {
       const mgr = requireManager();
       const mintQuote = await mgr.quotes.createMintQuote(mintUrl, amount);

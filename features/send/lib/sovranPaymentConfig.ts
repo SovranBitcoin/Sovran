@@ -424,10 +424,13 @@ export function createSovranHandlers({
       });
     },
 
-    sendComplete: ({ historyEntry }) => {
+    sendComplete: ({ historyEntry, mintWasOffline }) => {
       router.navigate({
         pathname: '/(send-flow)/sendToken',
-        params: { sendHistoryEntry: historyEntry },
+        params: {
+          sendHistoryEntry: historyEntry,
+          ...(mintWasOffline ? { mintWasOffline: 'true' } : {}),
+        },
       });
     },
 

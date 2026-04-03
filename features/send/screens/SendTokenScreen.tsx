@@ -8,6 +8,7 @@
 
 import React from 'react';
 
+import { Alert } from 'heroui-native';
 import type { SendHistoryEntry } from 'coco-cashu-core';
 import { useScreenActions } from 'coco-payment-ux/react';
 import {
@@ -29,10 +30,11 @@ import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
+  mintWasOffline?: boolean;
   onNavigateBack: () => void;
 }
 
-export function SendTokenScreen({ sendHistoryEntry, onNavigateBack }: SendTokenScreenProps) {
+export function SendTokenScreen({ sendHistoryEntry, mintWasOffline, onNavigateBack }: SendTokenScreenProps) {
   const { entry, error, actions, source, mintUrl } = useScreenActions('sendToken', sendHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
 
@@ -119,6 +121,18 @@ export function SendTokenScreen({ sendHistoryEntry, onNavigateBack }: SendTokenS
     <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
       <VStack gap={12}>
         <HistoryEntryHeader historyEntry={entry} />
+
+        {mintWasOffline && (
+          <Alert status="warning" className="bg-surface-secondary">
+            <Alert.Content>
+              <Alert.Title>Mint was offline</Alert.Title>
+              <Alert.Description>
+                This token was created offline. The recipient may have trouble
+                redeeming it until the mint is back online.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+        )}
 
         {entry.state === 'pending' && (
           <PaymentInfo

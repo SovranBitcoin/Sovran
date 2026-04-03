@@ -1,3 +1,4 @@
+import { NetworkError, HttpResponseError } from 'coco-cashu-core';
 import { defaultDetectors } from '../detectors';
 import { t } from '../formatting/locales';
 import { composeSatoshis } from '../offline';
@@ -15,6 +16,16 @@ import type {
   ScanSourceResult,
   StepDataMap,
 } from './types';
+
+// ---------------------------------------------------------------------------
+// Mint-offline error detection
+// ---------------------------------------------------------------------------
+
+function isMintOfflineError(err: unknown): boolean {
+  if (err instanceof NetworkError) return true;
+  if (err instanceof HttpResponseError && err.status >= 500) return true;
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // Derive ExecutionState from step
@@ -687,7 +698,44 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           const walletCtx = getContext();
           const proofAmounts = walletCtx.proofAmounts[data.mintUrl] ?? [];
           let handled = false;
-          if (proofAmounts.length > 0) {
+
+          // Phase 1: If mint is offline and exact proofs exist, auto offline send
+          if (
+            isMintOfflineError(err) &&
+            operations.executeOfflineSend &&
+            proofAmounts.length > 0
+          ) {
+            const composition = composeSatoshis(proofAmounts, data.amount);
+            if (composition.exactMatch) {
+              try {
+                const result = await operations.executeOfflineSend(data.mintUrl, data.amount);
+                step = 'sendComplete';
+                stepData = { historyEntry: result.historyEntry, mintWasOffline: true } as any;
+
+                try {
+                  const parsed = JSON.parse(result.historyEntry);
+                  if (parsed?.id) {
+                    void notifications?.onTransactionCreated?.({
+                      transactionId: parsed.id,
+                      type: 'send',
+                      mintUrl: data.mintUrl,
+                      amount: data.amount,
+                      unit: flowCtx.unit,
+                      rawInput: flowCtx.rawInput,
+                      source: flowCtx.source,
+                    });
+                  }
+                } catch { /* ignore parse errors */ }
+
+                handled = true;
+              } catch {
+                // Offline send failed — fall through to proof selector
+              }
+            }
+          }
+
+          // Phase 2: Proof selector fallback (existing behavior)
+          if (!handled && proofAmounts.length > 0) {
             const composition = composeSatoshis(proofAmounts, data.amount);
             const hasOptions =
               composition.exactMatch ||
@@ -716,6 +764,8 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
               handled = true;
             }
           }
+
+          // Phase 3: Error
           if (!handled) {
             step = 'error';
             stepData = {

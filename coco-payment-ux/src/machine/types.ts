@@ -92,7 +92,7 @@ export interface StepDataMap {
   };
   receiveToken: { token: string };
   confirmSend: { mintUrl: string; amount: number };
-  sendComplete: { historyEntry: string };
+  sendComplete: { historyEntry: string; mintWasOffline?: boolean };
   navigateToMeltPreview: { mintUrl: string; meltTarget: string; unit: string; amount: number };
   navigateToPaymentRequest: {
     mintUrl: string;
@@ -531,6 +531,12 @@ export type NotificationHandlerMap = {
  */
 export interface MachineOperations {
   executeSend: (mintUrl: string, amount: number) => Promise<{ historyEntry: string }>;
+  /**
+   * Execute a send using only local proofs (no mint contact).
+   * Used as an automatic fallback when the mint is offline but exact-match
+   * proofs exist. Returns the same shape as executeSend.
+   */
+  executeOfflineSend?: (mintUrl: string, amount: number) => Promise<{ historyEntry: string }>;
   executeMintQuote: (
     mintUrl: string,
     amount: number,

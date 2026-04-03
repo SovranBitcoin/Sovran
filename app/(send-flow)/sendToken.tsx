@@ -11,12 +11,19 @@ import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { SendTokenScreen } from '@/features/send';
 
 function ModalScreen() {
-  const { sendHistoryEntry } = useLocalSearchParams<{ sendHistoryEntry?: string }>();
+  const { sendHistoryEntry, mintWasOffline } = useLocalSearchParams<{
+    sendHistoryEntry?: string;
+    mintWasOffline?: string;
+  }>();
 
   return (
     <>
       <Stack.Screen options={{ title: 'Send Ecash' }} />
-      <SendTokenScreen sendHistoryEntry={sendHistoryEntry} onNavigateBack={() => router.back()} />
+      <SendTokenScreen
+        sendHistoryEntry={sendHistoryEntry}
+        mintWasOffline={mintWasOffline === 'true'}
+        onNavigateBack={() => router.back()}
+      />
     </>
   );
 }
