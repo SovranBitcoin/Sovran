@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { HistoryEntry } from 'coco-cashu-core';
-import { useManager } from 'coco-cashu-react';
+import type { HistoryEntry } from '@cashu/coco-core';
+import { useManager } from '@cashu/coco-react';
 
 type UseHistoryEntryResult<T extends HistoryEntry> = {
   /** The current history entry (updated via events) */

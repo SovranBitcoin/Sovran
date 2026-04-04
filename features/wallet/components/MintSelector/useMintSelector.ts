@@ -3,7 +3,7 @@ import { useWindowDimensions } from 'react-native';
 
 import type { MintAvailability } from 'coco-payment-ux';
 
-import { useBalanceContext } from 'coco-cashu-react';
+import { useBalanceContext } from '@cashu/coco-react';
 
 import { useMintManagement } from '@/features/mint';
 import {

@@ -14,7 +14,7 @@ import { WalletHealthModalContent } from '@/features/health/components/WalletHea
 import type { HealthCta } from '@/features/health/lib/walletHealth';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
-import { useMints } from 'coco-cashu-react';
+import { useMints } from '@cashu/coco-react';
 
 const DEFAULT_CURRENCIES = ['SAT'];
 const HEADER_OVERLAP = 24;

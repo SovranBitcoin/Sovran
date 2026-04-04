@@ -21,13 +21,13 @@
   },
   "peerDependencies": {
     "react": ">=18.0.0",
-    "coco-cashu-core": ">=1.0.0"
+    "@cashu/coco-core": ">=1.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
     },
-    "coco-cashu-core": {
+    "@cashu/coco-core": {
       "optional": true
     }
   },

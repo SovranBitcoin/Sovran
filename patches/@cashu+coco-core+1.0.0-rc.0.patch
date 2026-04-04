@@ -1,0 +1,106 @@
+diff --git a/node_modules/@cashu/coco-core/dist/index.cjs b/node_modules/@cashu/coco-core/dist/index.cjs
+index bedc7ad..863e344 100644
+--- a/node_modules/@cashu/coco-core/dist/index.cjs
++++ b/node_modules/@cashu/coco-core/dist/index.cjs
+@@ -8639,6 +8639,7 @@ var ConsoleLogger = class ConsoleLogger {
+ 		info: 2,
+ 		debug: 3
+ 	};
++	static MAX_VALUE_LEN = 120;
+ 	constructor(prefix = "coco", options = {}) {
+ 		this.prefix = prefix;
+ 		this.level = options.level ?? "info";
+@@ -8646,21 +8647,36 @@ var ConsoleLogger = class ConsoleLogger {
+ 	shouldLog(level) {
+ 		return ConsoleLogger.levelPriority[level] <= ConsoleLogger.levelPriority[this.level];
+ 	}
++	_compactMeta(meta) {
++		if (meta.length === 0) return "";
++		const compact = (v) => {
++			if (v == null) return String(v);
++			if (typeof v === "string") return v.length > ConsoleLogger.MAX_VALUE_LEN ? v.slice(0, ConsoleLogger.MAX_VALUE_LEN) + "…" : v;
++			if (Array.isArray(v)) return `[${v.length} items]`;
++			if (typeof v === "object") {
++				const out = {};
++				for (const [k, val] of Object.entries(v)) out[k] = compact(val);
++				return out;
++			}
++			return v;
++		};
++		try { return " " + JSON.stringify(meta.length === 1 ? compact(meta[0]) : meta.map(compact)); } catch { return ""; }
++	}
+ 	error(message, ...meta) {
+ 		if (!this.shouldLog("error")) return;
+-		console.error(`[${this.prefix}] ERROR: ${message}`, ...meta);
++		console.error(`[${this.prefix}] ERROR: ${message}${this._compactMeta(meta)}`);
+ 	}
+ 	warn(message, ...meta) {
+ 		if (!this.shouldLog("warn")) return;
+-		console.warn(`[${this.prefix}] WARN: ${message}`, ...meta);
++		console.warn(`[${this.prefix}] WARN: ${message}${this._compactMeta(meta)}`);
+ 	}
+ 	info(message, ...meta) {
+ 		if (!this.shouldLog("info")) return;
+-		console.info(`[${this.prefix}] INFO: ${message}`, ...meta);
++		console.info(`[${this.prefix}] INFO: ${message}${this._compactMeta(meta)}`);
+ 	}
+ 	debug(message, ...meta) {
+ 		if (!this.shouldLog("debug")) return;
+-		console.debug(`[${this.prefix}] DEBUG: ${message}`, ...meta);
++		console.debug(`[${this.prefix}] DEBUG: ${message}${this._compactMeta(meta)}`);
+ 	}
+ 	log(level, message, ...meta) {
+ 		switch (level) {
+diff --git a/node_modules/@cashu/coco-core/dist/index.js b/node_modules/@cashu/coco-core/dist/index.js
+index ac52de1..96a1c87 100644
+--- a/node_modules/@cashu/coco-core/dist/index.js
++++ b/node_modules/@cashu/coco-core/dist/index.js
+@@ -8639,6 +8639,7 @@ var ConsoleLogger = class ConsoleLogger {
+ 		info: 2,
+ 		debug: 3
+ 	};
++	static MAX_VALUE_LEN = 120;
+ 	constructor(prefix = "coco", options = {}) {
+ 		this.prefix = prefix;
+ 		this.level = options.level ?? "info";
+@@ -8646,21 +8647,36 @@ var ConsoleLogger = class ConsoleLogger {
+ 	shouldLog(level) {
+ 		return ConsoleLogger.levelPriority[level] <= ConsoleLogger.levelPriority[this.level];
+ 	}
++	_compactMeta(meta) {
++		if (meta.length === 0) return "";
++		const compact = (v) => {
++			if (v == null) return String(v);
++			if (typeof v === "string") return v.length > ConsoleLogger.MAX_VALUE_LEN ? v.slice(0, ConsoleLogger.MAX_VALUE_LEN) + "…" : v;
++			if (Array.isArray(v)) return `[${v.length} items]`;
++			if (typeof v === "object") {
++				const out = {};
++				for (const [k, val] of Object.entries(v)) out[k] = compact(val);
++				return out;
++			}
++			return v;
++		};
++		try { return " " + JSON.stringify(meta.length === 1 ? compact(meta[0]) : meta.map(compact)); } catch { return ""; }
++	}
+ 	error(message, ...meta) {
+ 		if (!this.shouldLog("error")) return;
+-		console.error(`[${this.prefix}] ERROR: ${message}`, ...meta);
++		console.error(`[${this.prefix}] ERROR: ${message}${this._compactMeta(meta)}`);
+ 	}
+ 	warn(message, ...meta) {
+ 		if (!this.shouldLog("warn")) return;
+-		console.warn(`[${this.prefix}] WARN: ${message}`, ...meta);
++		console.warn(`[${this.prefix}] WARN: ${message}${this._compactMeta(meta)}`);
+ 	}
+ 	info(message, ...meta) {
+ 		if (!this.shouldLog("info")) return;
+-		console.info(`[${this.prefix}] INFO: ${message}`, ...meta);
++		console.info(`[${this.prefix}] INFO: ${message}${this._compactMeta(meta)}`);
+ 	}
+ 	debug(message, ...meta) {
+ 		if (!this.shouldLog("debug")) return;
+-		console.debug(`[${this.prefix}] DEBUG: ${message}`, ...meta);
++		console.debug(`[${this.prefix}] DEBUG: ${message}${this._compactMeta(meta)}`);
+ 	}
+ 	log(level, message, ...meta) {
+ 		switch (level) {

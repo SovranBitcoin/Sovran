@@ -68,14 +68,17 @@ export async function requestInvoiceFromLnurl(
   meltTarget: string,
   amountSats: number
 ): Promise<string> {
+  console.info('[LNURL] Resolving invoice | target:', meltTarget.slice(0, 40), '| amount:', amountSats, 'sats');
   const params = await getLnurlPayParams(meltTarget);
   if (!params || !params.callback) {
+    console.warn('[LNURL] Invalid params for target:', meltTarget, '| params:', params);
     throw new Error('Invalid LNURL or lightning address');
   }
 
   const amountMsats = amountSats * 1000;
 
   if (amountMsats < params.minSendable || amountMsats > params.maxSendable) {
+    console.warn('[LNURL] Amount out of range:', amountSats, 'sats | min:', params.minSendable / 1000, '| max:', params.maxSendable / 1000);
     throw new Error(
       `Amount must be between ${params.minSendable / 1000} and ${params.maxSendable / 1000} sats`
     );
@@ -85,9 +88,11 @@ export async function requestInvoiceFromLnurl(
   const data = await response.json();
 
   if (!data.pr) {
+    console.warn('[LNURL] No invoice returned | callback:', params.callback, '| response:', JSON.stringify(data).slice(0, 200));
     throw new Error('No invoice returned from LNURL endpoint');
   }
 
+  console.info('[LNURL] Invoice received | length:', data.pr.length);
   return data.pr;
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { NDKEvent } from '@nostr-dev-kit/ndk-mobile';
-import type { Mint } from 'coco-cashu-core';
+import type { Mint } from '@cashu/coco-core';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { prefetchImages } from '@/shared/lib/imageCache';
 import { decryptNip04Events } from '../lib/decryptNip04Events';

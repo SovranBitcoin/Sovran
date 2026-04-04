@@ -9,7 +9,7 @@ import React from 'react';
 
 import { router } from 'expo-router';
 
-import type { MintHistoryEntry } from 'coco-cashu-core';
+import type { MintHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
 
 import { MintSelector } from '@/features/wallet';
@@ -20,6 +20,8 @@ import {
   HistoryEntryRefresh,
   HistoryEntryTimeline,
   TransactionLocationSection,
+  useBip321Info,
+  Bip321MethodIcons,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -48,6 +50,7 @@ export function MintQuoteScreen({
 }: MintQuoteScreenProps) {
   const { entry, error, actions, source, mintUrl } = useScreenActions('mintQuote', mintHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
+  const bip321 = useBip321Info(entry?.id);
 
   if (error) {
     return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
@@ -124,6 +127,8 @@ export function MintQuoteScreen({
         <DetailsSection
           items={[
             source && { title: 'Source', value: source },
+            bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+            bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" /> },
             { title: 'Date', value: entry.createdAt.datetime },
             { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
             { title: 'State', value: entry.state },

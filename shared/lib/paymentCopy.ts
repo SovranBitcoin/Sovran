@@ -36,10 +36,10 @@ export const SEND_COPY = {
 // ── Payment request (NUT-18 / Nostr) ──────────────────────────────────
 
 export const PAYMENT_REQUEST_COPY = {
-  prepared:   { label: 'Created',   info: 'Creating token...' },
-  nostrSent:  { label: 'Delivered', infoSending: 'Sending...', infoSent: 'Sent via Nostr' },
-  finalized:  { label: 'Claimed',   info: 'Claimed by recipient' },
-  rolledBack: { label: 'Cancelled', info: 'Token funds returned to your balance' },
+  prepared:   { label: 'Created',     info: 'Creating token...' },
+  nostrSent:  { label: 'Delivered',   infoSending: 'Sending...', infoSent: 'Sent via Nostr' },
+  finalized:  { label: 'Claimed',     info: 'Claimed by recipient' },
+  rolledBack: { label: 'Rolled Back', info: 'Delivery failed — funds returned to your balance' },
 } as const;
 
 // ── Receive (ecash token) ─────────────────────────────────────────────

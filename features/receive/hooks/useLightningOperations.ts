@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-import { useManager } from 'coco-cashu-react';
+import { useManager } from '@cashu/coco-react';
 
 /**
  * Wraps `manager.quotes.createMintQuote` with loading/error state.
@@ -19,7 +19,7 @@ export function useLightningOperations() {
       setError(null);
 
       try {
-        return await manager.quotes.createMintQuote(mintUrl, amount);
+        return await manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' });
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to create mint quote');
         setError(error);

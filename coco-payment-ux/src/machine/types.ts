@@ -340,6 +340,10 @@ export type NotificationHandlerMap = {
     parsedType: string;
     intentType: string;
     source?: string;
+    /** Container format — `'bip321'` when the input was a bitcoin: URI. */
+    container?: string;
+    /** Payment option kinds available in the input (e.g. `['lightningInvoice', 'paymentRequest']`). */
+    optionKinds?: string[];
   }) => MaybeAsync;
   /**
    * Called when a multi-step operation starts (melt, payment request).
@@ -373,6 +377,7 @@ export type NotificationHandlerMap = {
     amount: number;
     unit: string;
     message: string;
+    rolledBack?: boolean;
   }) => MaybeAsync;
   /**
    * Called during NFC POS payment to report progress phases.
@@ -576,7 +581,7 @@ export interface MachineOperations {
     paymentRequest: string,
     amount: number,
     unit: string
-  ) => Promise<{ historyEntry: string }>;
+  ) => Promise<{ historyEntry: string; rolledBack?: boolean; errorMessage?: string }>;
   /**
    * Link a scanned input string to a transaction ID for history provenance.
    * Fire-and-forget — called after successful melt/payment-request operations.
@@ -811,7 +816,7 @@ export interface PaymentMachine {
    * dispatches the result handler. On failure in a BIP321 multi-option flow,
    * transitions to `chooseFallbackOption` with the failed option disabled.
    */
-  confirmPaymentRequest: () => Promise<void>;
+  confirmPaymentRequest: () => Promise<{ rolledBack: boolean }>;
   /** Clear all flow state. */
   reset: () => void;
   /**

@@ -9,7 +9,7 @@
 // the instance does everything else.
 // ---------------------------------------------------------------------------
 
-import type { Manager } from 'coco-cashu-core';
+import type { Manager } from '@cashu/coco-core';
 import { createPaymentMachine } from '../machine/createMachine';
 import type {
   MachineOperations,
@@ -51,6 +51,9 @@ export interface CocoPaymentUXConfig {
 
   enrichMintListItem?: (mintUrl: string) => Partial<MintListItem>;
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
+
+  /** Dev: when true, executePaymentRequest simulates a delivery failure to test rollback. */
+  shouldMockFailPaymentRequest?: () => boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +96,7 @@ export function createCocoPaymentUX(config: CocoPaymentUXConfig): CocoPaymentUXI
     sendNostrDM,
     enrichMintListItem,
     enrichMintReviewInfo,
+    shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
   });
 
   return {

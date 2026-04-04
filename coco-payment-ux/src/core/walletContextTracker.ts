@@ -5,7 +5,7 @@
 // WalletContext. Framework-agnostic — no React dependency.
 // ---------------------------------------------------------------------------
 
-import type { Manager } from 'coco-cashu-core';
+import type { Manager } from '@cashu/coco-core';
 import type { WalletContext } from '../types';
 
 export interface WalletContextTrackerConfig {
@@ -64,7 +64,8 @@ export function createWalletContextTracker(
           amounts[(mint as any).mintUrl] = proofs
             .map((p) => p.amount)
             .sort((a, b) => a - b);
-        } catch {
+        } catch (e) {
+          console.warn('[walletContextTracker] getReadyProofs failed for', (mint as any).mintUrl, e instanceof Error ? e.message : e);
           amounts[(mint as any).mintUrl] = [];
         }
       }

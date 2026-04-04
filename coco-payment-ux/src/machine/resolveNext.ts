@@ -132,6 +132,7 @@ function checkProofComposition(
 // ---------------------------------------------------------------------------
 
 function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
+  console.info('[resolveNext] → terminal | destination:', destination, '| mint:', ctx.mintUrl, '| amount:', ctx.amount);
   const { mintUrl, amount, unit, meltTarget } = ctx;
 
   switch (destination) {
@@ -206,9 +207,12 @@ export function resolveNext(
   const destination = getDestination(intent, ctx);
   const supportedMintUrls = ctx.supportedMintUrls;
   const unit = ctx.unit;
+  console.info('[resolveNext] Routing | intent:', intent.type, '| destination:', destination, '| amount:', ctx.amount, '| mint:', ctx.mintUrl || '(none)');
 
   // 1. Need amount?
   if (needsAmount(destination, ctx)) {
+    console.info('[resolveNext] → enterAmount (amount needed)');
+
     const preselectedMintUrl = ctx.mintUrl ?? walletCtx.preferredMintUrl;
     return {
       step: 'enterAmount',

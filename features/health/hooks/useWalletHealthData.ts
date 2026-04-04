@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
-import type { HistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
-import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
+import type { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
+import { useBalanceContext, useMints, usePaginatedHistory } from '@cashu/coco-react';
 
 import { useMintDistributionStore } from '@/shared/stores/profile/mintDistributionStore';
 

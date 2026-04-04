@@ -31,10 +31,12 @@ export async function sendDirectMessageToRelays(params: {
 }): Promise<void> {
   const decoded = nip19.decode(params.nprofile);
   if (decoded.type !== 'nprofile') {
+    console.warn('[sendDirectMessage] Expected nprofile, got:', decoded.type, '| input:', params.nprofile.slice(0, 30));
     throw new Error('Invalid nprofile format');
   }
 
   const { pubkey, relays } = decoded.data;
+  console.info('[sendDirectMessage] Sending NIP-17 DM | pubkey:', pubkey.slice(0, 12) + '…', '| relayCount:', (relays?.length ?? 0) || 'using defaults');
   const relayUrls =
     relays?.length && relays.length > 0
       ? relays
@@ -50,6 +52,7 @@ export async function sendDirectMessageToRelays(params: {
   const pool = new SimplePool();
   try {
     await Promise.any(pool.publish(uniqueRelays, wrap));
+    console.info('[sendDirectMessage] DM published to relays');
   } finally {
     pool.close(uniqueRelays);
   }

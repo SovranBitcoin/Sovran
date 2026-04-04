@@ -1,4 +1,4 @@
-import { NetworkError, HttpResponseError } from 'coco-cashu-core';
+import { NetworkError, HttpResponseError } from '@cashu/coco-core';
 import { defaultDetectors } from '../detectors';
 import { t } from '../formatting/locales';
 import { composeSatoshis } from '../offline';
@@ -186,6 +186,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   let stepData: StepDataMap[FlowStep] = {} as any;
   let handlerExecuting = false;
   let sendLocked = false;
+  let lastPaymentRequestResult: { rolledBack: boolean } = { rolledBack: false };
   const listeners = new Set<() => void>();
 
   let cachedSnapshot: ExecutionState = deriveExecutionState('idle', {} as any);
@@ -230,7 +231,8 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     err: unknown,
     variant: 'melt' | 'paymentRequest',
     failedValue: string,
-    data: { mintUrl: string; amount: number; unit: string }
+    data: { mintUrl: string; amount: number; unit: string },
+    opts?: { rolledBack?: boolean }
   ): void {
     const message = err instanceof Error ? err.message : `${variant === 'melt' ? 'Melt' : 'Payment request'} failed`;
 
@@ -241,6 +243,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       amount: data.amount,
       unit: data.unit,
       message,
+      rolledBack: opts?.rolledBack,
     });
 
     // BIP321 multi-option: route to fallback or exhausted error.
@@ -279,9 +282,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
   const send = async (event: import('./types').FlowEvent): Promise<void> => {
     if (sendLocked) {
+      console.info('[PaymentMachine] Event ignored (locked) | type:', event.type);
       return;
     }
     sendLocked = true;
+    console.info('[PaymentMachine] Event received | type:', event.type, '| currentStep:', step);
 
     // Handle CONFIRM_MELT/CONFIRM_PAYMENT_REQUEST directly — these bypass transition().
     // On success: stepData is updated with historyEntry but step stays unchanged
@@ -321,6 +326,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     if (event.type === 'CONFIRM_MELT' && step === 'navigateToMeltPreview' && operations?.executeMelt) {
       const originalStep = step;
       const data = stepData as StepDataMap['navigateToMeltPreview'];
+      console.info('[PaymentMachine] CONFIRM_MELT | mintUrl:', data.mintUrl, '| amount:', data.amount, '| target:', data.meltTarget?.slice(0, 30));
       handlerExecuting = true;
       notify();
 
@@ -333,12 +339,13 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
       try {
         const result = await operations.executeMelt(data.mintUrl, data.meltTarget, data.amount, data.unit);
+        console.info('[PaymentMachine] Melt succeeded | mintUrl:', data.mintUrl);
 
         if (operations.linkTransaction) {
           try {
             const parsed = JSON.parse(result.historyEntry);
             if (parsed?.id) operations.linkTransaction(data.meltTarget, parsed.id);
-          } catch { /* ignore parse errors */ }
+          } catch (e) { console.warn('[PaymentMachine] JSON parse failed:', e instanceof Error ? e.message : e); }
         }
 
         void notifications?.onPaymentConfirmed?.({
@@ -369,10 +376,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
               meltTarget: data.meltTarget,
             });
           }
-        } catch { /* ignore parse errors */ }
+        } catch (e) { console.warn('[PaymentMachine] JSON parse failed:', e instanceof Error ? e.message : e); }
 
         stepData = { ...data, historyEntry: result.historyEntry } as any;
       } catch (err) {
+        console.warn('[PaymentMachine] Melt failed:', err instanceof Error ? err.message : err);
         routeOperationFailure(err, 'melt', data.meltTarget, data);
       }
 
@@ -393,6 +401,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     if (event.type === 'CONFIRM_PAYMENT_REQUEST' && step === 'navigateToPaymentRequest' && operations?.executePaymentRequest) {
       const originalStep = step;
       const data = stepData as StepDataMap['navigateToPaymentRequest'];
+      console.info('[PaymentMachine] CONFIRM_PAYMENT_REQUEST | mintUrl:', data.mintUrl, '| amount:', data.amount);
       handlerExecuting = true;
       notify();
 
@@ -406,38 +415,58 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       try {
         const result = await operations.executePaymentRequest(data.mintUrl, data.paymentRequest, data.amount, data.unit);
 
-        if (operations.linkTransaction) {
+        if (result.rolledBack) {
+          // Delivery failed but ecash was reclaimed — route through standard
+          // failure path so BIP321 multi-option flows show the fallback selector.
+          console.warn('[PaymentMachine] Payment request rolled back | mintUrl:', data.mintUrl, '| error:', result.errorMessage);
+          lastPaymentRequestResult = { rolledBack: true };
+          routeOperationFailure(
+            new Error(result.errorMessage ?? 'Delivery failed'),
+            'paymentRequest',
+            data.paymentRequest,
+            data,
+            { rolledBack: true },
+          );
+        } else {
+          // Normal success path
+          console.info('[PaymentMachine] Payment request succeeded | mintUrl:', data.mintUrl);
+          lastPaymentRequestResult = { rolledBack: false };
+
+          if (operations.linkTransaction) {
+            try {
+              const parsed = JSON.parse(result.historyEntry);
+              if (parsed?.id) operations.linkTransaction(data.paymentRequest, parsed.id);
+            } catch (e) { console.warn('[PaymentMachine] JSON parse failed:', e instanceof Error ? e.message : e); }
+          }
+
+          void notifications?.onPaymentConfirmed?.({
+            variant: 'paymentRequest',
+            mintUrl: data.mintUrl,
+            amount: data.amount,
+            unit: data.unit,
+            historyEntry: result.historyEntry,
+          });
+
           try {
             const parsed = JSON.parse(result.historyEntry);
-            if (parsed?.id) operations.linkTransaction(data.paymentRequest, parsed.id);
-          } catch { /* ignore parse errors */ }
+            if (parsed?.id) {
+              void notifications?.onTransactionCreated?.({
+                transactionId: parsed.id,
+                type: 'send',
+                mintUrl: data.mintUrl,
+                amount: data.amount,
+                unit: data.unit,
+                rawInput: flowCtx.rawInput,
+                source: flowCtx.source,
+              });
+            }
+          } catch (e) { console.warn('[PaymentMachine] JSON parse failed:', e instanceof Error ? e.message : e); }
+
+          stepData = { ...data, historyEntry: result.historyEntry } as any;
         }
-
-        void notifications?.onPaymentConfirmed?.({
-          variant: 'paymentRequest',
-          mintUrl: data.mintUrl,
-          amount: data.amount,
-          unit: data.unit,
-          historyEntry: result.historyEntry,
-        });
-
-        try {
-          const parsed = JSON.parse(result.historyEntry);
-          if (parsed?.id) {
-            void notifications?.onTransactionCreated?.({
-              transactionId: parsed.id,
-              type: 'send',
-              mintUrl: data.mintUrl,
-              amount: data.amount,
-              unit: data.unit,
-              rawInput: flowCtx.rawInput,
-              source: flowCtx.source,
-            });
-          }
-        } catch { /* ignore parse errors */ }
-
-        stepData = { ...data, historyEntry: result.historyEntry } as any;
       } catch (err) {
+        console.warn('[PaymentMachine] Payment request failed:', err instanceof Error ? err.message : err);
+        lastPaymentRequestResult = { rolledBack: false };
         routeOperationFailure(err, 'paymentRequest', data.paymentRequest, data);
       }
 
@@ -485,11 +514,15 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         ? (stepData as StepDataMap['chooseOption']).options
         : undefined;
 
+    const prevStep = step;
     const result = transition(step, flowCtx, eventForTransition, detectors, walletCtx, unit, offline);
 
     step = result.step;
     flowCtx = result.context;
     stepData = result.data;
+    if (step !== prevStep) {
+      console.info('[PaymentMachine] Transition | from:', prevStep, '→', step, '| event:', event.type);
+    }
 
     // Save BIP321 original options for fallback (first selection only).
     if (preTransitionOptions && preTransitionOptions.length > 1) {
@@ -508,11 +541,16 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       lastScanSource = undefined;
       flowCtx.source = scanSource;
       if (notifications?.onScanResolved && flowCtx.parsed) {
+        const optionKinds = flowCtx.parsed.options.length > 0
+          ? [...new Set(flowCtx.parsed.options.map((o) => o.kind))]
+          : undefined;
         void notifications.onScanResolved({
           rawInput: event.input,
           parsedType: flowCtx.parsed.type ?? 'unknown',
           intentType: flowCtx.intent?.type ?? 'unknown',
           source: scanSource,
+          container: flowCtx.parsed.container ?? undefined,
+          optionKinds,
         });
       }
     }
@@ -610,7 +648,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
               try {
                 const parsed = JSON.parse(nfcSendResult.historyEntry);
                 if (parsed?.id) operations.linkTransaction(flowCtx.rawInput, parsed.id);
-              } catch { /* ignore parse errors */ }
+              } catch (e) { console.warn('[PaymentMachine] JSON parse failed:', e instanceof Error ? e.message : e); }
             }
 
             void notifications?.onPaymentConfirmed?.({
@@ -634,7 +672,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
                   source: 'nfc',
                 });
               }
-            } catch { /* ignore parse errors */ }
+            } catch (e) { console.warn('[PaymentMachine] JSON parse failed:', e instanceof Error ? e.message : e); }
 
             step = 'sendComplete';
             stepData = { historyEntry: nfcSendResult.historyEntry } as any;
@@ -673,10 +711,12 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     if (operations) {
       if (step === 'confirmSend') {
         const data = stepData as StepDataMap['confirmSend'];
+        console.info('[PaymentMachine] confirmSend | mintUrl:', data.mintUrl, '| amount:', data.amount);
         handlerExecuting = true;
         notify();
         try {
           const result = await operations.executeSend(data.mintUrl, data.amount);
+          console.info('[PaymentMachine] Send succeeded → sendComplete');
           step = 'sendComplete';
           stepData = result as any;
 
@@ -693,7 +733,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
                 source: flowCtx.source,
               });
             }
-          } catch { /* ignore parse errors */ }
+          } catch (e) { console.warn('[PaymentMachine] JSON parse failed:', e instanceof Error ? e.message : e); }
         } catch (err) {
           const walletCtx = getContext();
           const proofAmounts = walletCtx.proofAmounts[data.mintUrl] ?? [];
@@ -705,10 +745,12 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             operations.executeOfflineSend &&
             proofAmounts.length > 0
           ) {
+            console.info('[PaymentMachine] Send failed (mint offline), attempting offline send | mintUrl:', data.mintUrl);
             const composition = composeSatoshis(proofAmounts, data.amount);
             if (composition.exactMatch) {
               try {
                 const result = await operations.executeOfflineSend(data.mintUrl, data.amount);
+                console.info('[PaymentMachine] Offline send succeeded → sendComplete');
                 step = 'sendComplete';
                 stepData = { historyEntry: result.historyEntry, mintWasOffline: true } as any;
 
@@ -725,11 +767,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
                       source: flowCtx.source,
                     });
                   }
-                } catch { /* ignore parse errors */ }
+                } catch (e) { console.warn('[PaymentMachine] JSON parse failed:', e instanceof Error ? e.message : e); }
 
                 handled = true;
-              } catch {
-                // Offline send failed — fall through to proof selector
+              } catch (e) {
+                console.warn('[PaymentMachine] Offline send failed, falling through to proof selector:', e instanceof Error ? e.message : e);
               }
             }
           }
@@ -778,10 +820,12 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         notify();
       } else if (step === 'createMintQuote') {
         const data = stepData as StepDataMap['createMintQuote'];
+        console.info('[PaymentMachine] createMintQuote | mintUrl:', data.mintUrl, '| amount:', data.amount);
         handlerExecuting = true;
         notify();
         try {
           const result = await operations.executeMintQuote(data.mintUrl, data.amount, data.unit);
+          console.info('[PaymentMachine] Mint quote created → mintQuoteCreated');
           step = 'mintQuoteCreated';
           stepData = { historyEntry: result.historyEntry, unit: data.unit } as any;
 
@@ -798,8 +842,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
                 source: flowCtx.source,
               });
             }
-          } catch { /* ignore parse errors */ }
+          } catch (e) { console.warn('[PaymentMachine] JSON parse failed:', e instanceof Error ? e.message : e); }
         } catch (err) {
+          console.warn('[PaymentMachine] Mint quote failed:', err instanceof Error ? err.message : err);
           step = 'error';
           stepData = {
             code: 'MINT_QUOTE_FAILED',
@@ -899,9 +944,10 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       notify();
     }
 
-    } catch {
+    } catch (err) {
       // Safety net: release sendLocked so the machine doesn't permanently lock
       // if transition() or an operation throws before the inner finally runs.
+      console.warn('[PaymentMachine] Unhandled error in transition safety net:', err instanceof Error ? err.message : err);
       sendLocked = false;
       handlerExecuting = false;
       notify();
@@ -1050,7 +1096,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   const mintTrusted = () => send({ type: 'MINT_TRUSTED' });
 
   const confirmMelt = () => send({ type: 'CONFIRM_MELT' });
-  const confirmPaymentRequest = () => send({ type: 'CONFIRM_PAYMENT_REQUEST' });
+  const confirmPaymentRequest = async () => {
+    lastPaymentRequestResult = { rolledBack: false };
+    await send({ type: 'CONFIRM_PAYMENT_REQUEST' });
+    return lastPaymentRequestResult;
+  };
 
   const reset = () => {
     resetInternal();

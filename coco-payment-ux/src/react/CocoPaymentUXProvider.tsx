@@ -388,6 +388,7 @@ export function CocoPaymentUXProvider({
     if (ignored.has(host)) return;
 
     machineRef.current.scan(host, { source: 'deeplink' }).catch((err) => {
+      console.warn('[DeepLink] scan failed for host:', host, err instanceof Error ? err.message : err);
       deepLinks.onError?.(err instanceof Error ? err : new Error(String(err)));
     });
   }, [deepLinks?.url]); // eslint-disable-line react-hooks/exhaustive-deps

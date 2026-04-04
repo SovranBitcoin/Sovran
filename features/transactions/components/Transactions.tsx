@@ -6,7 +6,7 @@ import { Link } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import _ from 'lodash';
 
-import { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 
 import Icon from 'assets/icons';
 import { SwapTransactionRow } from '@/features/transactions/components/SwapTransactionRow';

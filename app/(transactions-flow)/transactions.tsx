@@ -11,7 +11,7 @@ import React, { useCallback } from 'react';
 import { TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { TransactionsScreen, useTransactionsFilter } from '@/features/transactions';
-import { HistoryEntry, ReceiveHistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry, ReceiveHistoryEntry } from '@cashu/coco-core';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';

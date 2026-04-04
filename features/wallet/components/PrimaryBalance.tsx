@@ -25,8 +25,8 @@ import { liquidGlassModifiers, supportsLiquidGlass } from '@/shared/lib/version'
 import { useRouter } from 'expo-router';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { reservedProofsFreedPopup, reservedProofsFailedPopup } from '@/shared/lib/popup';
-import { usePaginatedHistory } from 'coco-cashu-react';
-import type { SendHistoryEntry } from 'coco-cashu-core';
+import { usePaginatedHistory } from '@cashu/coco-react';
+import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
 
@@ -192,8 +192,8 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
       try {
         const manager = CocoManager.getInstance();
 
-        await manager.recoverPendingSendOperations();
-        await manager.recoverPendingMeltOperations();
+        await manager.ops.send.recovery.run();
+        await manager.ops.melt.recovery.run();
         reservedProofsFreedPopup({
           text:
             'Recovery completed.\n' +

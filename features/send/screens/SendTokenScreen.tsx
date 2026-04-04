@@ -9,12 +9,14 @@
 import React from 'react';
 
 import { Alert } from 'heroui-native';
-import type { SendHistoryEntry } from 'coco-cashu-core';
+import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
   HistoryEntryTimeline,
+  useBip321Info,
+  Bip321MethodIcons,
 } from '@/features/transactions';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -37,6 +39,7 @@ interface SendTokenScreenProps {
 export function SendTokenScreen({ sendHistoryEntry, mintWasOffline, onNavigateBack }: SendTokenScreenProps) {
   const { entry, error, actions, source, mintUrl } = useScreenActions('sendToken', sendHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
+  const bip321 = useBip321Info(entry?.id);
 
   if (error) {
     return <ScreenErrorState message={error} onGoBack={onNavigateBack} />;
@@ -150,6 +153,8 @@ export function SendTokenScreen({ sendHistoryEntry, mintWasOffline, onNavigateBa
         <DetailsSection
           items={[
             source && { title: 'Source', value: source },
+            bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+            bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" /> },
             { title: 'Date', value: entry.createdAt.datetime },
             { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
             { title: 'State', value: entry.state },

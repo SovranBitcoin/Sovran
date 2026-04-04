@@ -1,5 +1,5 @@
-import { initializeCoco, MemoryRepositories } from 'coco-cashu-core';
-import type { Manager } from 'coco-cashu-core';
+import { initializeCoco, MemoryRepositories } from '@cashu/coco-core';
+import type { Manager } from '@cashu/coco-core';
 
 export const TEST_MINT = process.env.TEST_MINT_URL || 'https://mint.minibits.cash/Bitcoin';
 
@@ -13,11 +13,11 @@ export async function createTestManager(): Promise<Manager> {
     repo: repos,
     seedGetter: async () => TEST_SEED,
     watchers: {
-      mintQuoteWatcher: { disabled: true },
+      mintOperationWatcher: { disabled: true },
       proofStateWatcher: { disabled: true },
     },
     processors: {
-      mintQuoteProcessor: { disabled: true },
+      mintOperationProcessor: { disabled: true },
     },
   });
 }
@@ -36,8 +36,8 @@ export async function fundWallet(
 ): Promise<boolean> {
   try {
     await addTrustedMint(manager, mintUrl);
-    const quote = await manager.quotes.createMintQuote(mintUrl, amount);
-    await manager.quotes.redeemMintQuote(mintUrl, quote.quote);
+    const mintOp = await manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' });
+    await manager.ops.mint.execute(mintOp.id);
     return true;
   } catch {
     return false;

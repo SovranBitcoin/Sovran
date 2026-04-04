@@ -15,7 +15,7 @@ import { decode } from '@gandlaf21/bolt11-decode';
 import _ from 'lodash';
 import { twMerge } from 'tailwind-merge';
 
-import type { HistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
+import type { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 
 /** Outgoing = ecash send or Lightning melt */
 export function isOutgoingTransaction(entry: Pick<HistoryEntry, 'type'>): boolean {

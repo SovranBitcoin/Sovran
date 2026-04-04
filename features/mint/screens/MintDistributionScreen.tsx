@@ -15,7 +15,7 @@ import Icon from 'assets/icons';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { MintDistributionItem, DistributionBar } from '@/features/mint/components/distribution';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
-import { useMints, useBalanceContext } from 'coco-cashu-react';
+import { useMints, useBalanceContext } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import {
   useMintDistributionStore,

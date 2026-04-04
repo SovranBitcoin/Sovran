@@ -9,7 +9,7 @@ import Icon from 'assets/icons';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useMintManagement } from '@/features/mint';
 import { useNavigation, router } from 'expo-router';
-import { Mint } from 'coco-cashu-core';
+import { Mint } from '@cashu/coco-core';
 import opacity from 'hex-color-opacity';
 import { Button, Card } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -93,7 +93,7 @@ export const SettingsRecoveryScreen: React.FC = () => {
       setCurrentMintIndex(mints.length); // Show "recovering pending transactions" state
       try {
         const manager = CocoManager.getInstance();
-        await manager.send.recoverPendingOperations();
+        await manager.ops.send.recovery.run();
       } catch (error) {
         console.warn('Failed to recover pending operations:', error);
       }

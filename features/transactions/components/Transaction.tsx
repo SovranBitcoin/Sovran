@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 
-import { HistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry, ReceiveHistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
 
@@ -25,6 +25,15 @@ const useScanSource = (transactionId: string): ScanSource | null => {
   return useScanHistoryStore((state) => {
     const entry = state.entries.find((e) => e.transactionId === transactionId);
     return entry?.source ?? null;
+  });
+};
+
+/** Returns BIP321 option kinds for a transaction, or null if not BIP321. */
+const useBip321Options = (transactionId: string): string[] | null => {
+  return useScanHistoryStore((state) => {
+    const entry = state.entries.find((e) => e.transactionId === transactionId);
+    if (entry?.container !== 'bip321' || !entry.optionKinds?.length) return null;
+    return entry.optionKinds;
   });
 };
 
@@ -119,8 +128,9 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
 
   const handlePress = onPress ? () => onPress(historyEntry) : defaultHandlePress;
 
-  // Get scan source (NFC or QR) - subscribes to store for reactivity
+  // Get scan source (NFC or QR) and BIP321 options - subscribes to store for reactivity
   const scanSource = useScanSource(historyEntry.id);
+  const bip321Options = useBip321Options(historyEntry.id);
 
   return (
     <TouchableOpacity
@@ -172,6 +182,29 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
                   color={opacity(foreground, 0.8)}
                 />
               )}
+              {bip321Options && (() => {
+                const hasLightning = bip321Options.some((k) =>
+                  k === 'lightningInvoice' || k === 'lightningAddress' || k === 'lnurlp'
+                );
+                const hasEcash = bip321Options.some((k) =>
+                  k === 'paymentRequest' || k === 'ecashToken'
+                );
+                const usedLightning = historyEntry.type === 'melt';
+                // Sort: used method first
+                const items = [
+                  hasLightning && { name: 'mdi:lightning-bolt', used: usedLightning },
+                  hasEcash && { name: 'majesticons:coins', used: !usedLightning },
+                ].filter(Boolean) as { name: string; used: boolean }[];
+                items.sort((a, b) => (a.used === b.used ? 0 : a.used ? -1 : 1));
+                return items.map((item) => (
+                  <Icon
+                    key={item.name}
+                    name={item.name}
+                    size={10}
+                    color={opacity(foreground, item.used ? 0.8 : 0.4)}
+                  />
+                ));
+              })()}
             </HStack>
             <UntranslatedText
               overpass

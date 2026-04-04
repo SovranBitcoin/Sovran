@@ -29,7 +29,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { useHistoryWithMelts } from '@/features/transactions';
-import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
+import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 import {
   useSwapTransactionsStore,
   type SwapLeg,

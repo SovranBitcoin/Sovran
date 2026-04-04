@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { HistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry } from '@cashu/coco-core';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';

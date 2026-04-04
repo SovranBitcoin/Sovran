@@ -7,7 +7,7 @@
 
 import { useMemo } from 'react';
 
-import { useBalanceContext, useMints } from 'coco-cashu-react';
+import { useBalanceContext, useMints } from '@cashu/coco-react';
 
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';

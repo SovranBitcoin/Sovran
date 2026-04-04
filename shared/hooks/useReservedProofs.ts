@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useManager } from 'coco-cashu-react';
-import type { CoreProof } from 'coco-cashu-core';
+import { useManager } from '@cashu/coco-react';
+import type { CoreProof } from '@cashu/coco-core';
 
 type UnsafeManager = {
   proofRepository?: {

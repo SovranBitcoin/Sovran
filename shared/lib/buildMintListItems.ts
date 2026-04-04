@@ -1,4 +1,4 @@
-import type { Mint } from 'coco-cashu-core';
+import type { Mint } from '@cashu/coco-core';
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
 import { composeSatoshis, type MintAvailability, type MintListItem } from 'coco-payment-ux';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';

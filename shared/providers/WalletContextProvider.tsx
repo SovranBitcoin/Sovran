@@ -10,7 +10,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { useBalanceContext, useManager, useMints } from 'coco-cashu-react';
+import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
 import type { WalletContext } from 'coco-payment-ux';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';

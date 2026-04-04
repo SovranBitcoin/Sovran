@@ -34,6 +34,7 @@ function handleExecute(
 ): TransitionResult {
   const parsed = parsePaymentInput(input, detectors);
   const intent = resolveIntent(parsed, detectors, walletCtx);
+  console.info('[transitions.execute] Parsed input | type:', parsed.type, '| intent:', intent.type);
 
   const ctx: FlowContext = { parsed, intent, unit, rawInput: input, offline };
 
@@ -123,6 +124,7 @@ function handleAmountEntered(
   currentCtx: FlowContext,
   walletCtx: WalletContext
 ): TransitionResult {
+  console.info('[transitions.amountEntered] Amount:', event.amount, '| mintUrl:', event.mintUrl || '(none)', '| destination:', event.destination ?? currentCtx.destination);
   const shouldResetContext = !!event.destination && event.destination !== currentCtx.destination;
   const ctx: FlowContext = shouldResetContext
     ? {
@@ -154,6 +156,7 @@ function handleMintSelected(
   currentCtx: FlowContext,
   walletCtx: WalletContext
 ): TransitionResult {
+  console.info('[transitions.mintSelected] Mint:', event.mintUrl, '| amount:', event.amount, '| destination:', event.destination ?? currentCtx.destination);
   const shouldResetContext = !!event.destination && event.destination !== currentCtx.destination;
   const ctx: FlowContext = shouldResetContext
     ? {
@@ -259,8 +262,10 @@ function handleMintSelectorRequested(
 // ---------------------------------------------------------------------------
 
 function handleStartSendEcash(walletCtx: WalletContext, unit: string, offline?: boolean): TransitionResult {
+  console.info('[transitions] startSendEcash | unit:', unit, '| offline:', offline ?? false);
   const ctx: FlowContext = { unit, destination: 'sendEcash', offline };
   const selection = selectMint(walletCtx);
+  console.info('[transitions] Mint selection result:', selection.type, selection.type === 'selected' ? '| mint:' + selection.mintUrl : '');
 
   switch (selection.type) {
     case 'selected':
@@ -295,6 +300,7 @@ function handleStartSendEcash(walletCtx: WalletContext, unit: string, offline?: 
 
 function handleStartReceiveLightning(walletCtx: WalletContext, unit: string): TransitionResult {
   const mintUrl = walletCtx.preferredMintUrl ?? walletCtx.trustedMintUrls[0] ?? '';
+  console.info('[transitions] startReceiveLightning | unit:', unit, '| mintUrl:', mintUrl || '(none)');
   const ctx: FlowContext = { unit, destination: 'mintQuote', mintUrl };
 
   return {
@@ -325,6 +331,7 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
   const unit = ctx.unit;
   const amount = ctx.amount;
   const mintUrl = ctx.mintUrl;
+  console.info('[transitions.resolveFromContext] destination:', destination, '| amount:', amount, '| mintUrl:', mintUrl || '(none)');
 
   if (destination === 'mintQuote') {
     if (amount == null || amount <= 0) {

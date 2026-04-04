@@ -29,7 +29,7 @@
  * @see {@link https://github.com/gandlaf21/bolt11-decode} BOLT11 Decode
  */
 
-import { getDecodedToken, type ReceiveHistoryEntry } from 'coco-cashu-core';
+import { getDecodedToken, type ReceiveHistoryEntry } from '@cashu/coco-core';
 
 import { decode } from '@gandlaf21/bolt11-decode';
 

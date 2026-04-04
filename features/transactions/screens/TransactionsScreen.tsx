@@ -15,7 +15,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Transactions } from '@/features/transactions/components/Transactions';
 import { MonthSelector } from '@/features/transactions/components/MonthSelector';
-import { HistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry } from '@cashu/coco-core';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 

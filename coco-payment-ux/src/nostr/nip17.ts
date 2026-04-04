@@ -186,7 +186,8 @@ export function unwrapGiftWrap(
       kind: rumor.kind,
       tags: rumor.tags || [],
     };
-  } catch {
+  } catch (e) {
+    console.warn('[unwrapGiftWrap] Failed to unwrap DM:', e instanceof Error ? e.message : e);
     return null;
   }
 }

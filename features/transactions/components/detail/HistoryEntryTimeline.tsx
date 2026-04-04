@@ -19,7 +19,7 @@ import type {
   MeltHistoryEntry,
   SendHistoryEntry,
   ReceiveHistoryEntry,
-} from 'coco-cashu-core';
+} from '@cashu/coco-core';
 
 import { AnimatedCheckpointDot, type CheckpointDotType } from '@/shared/blocks/transfer';
 import {
@@ -198,10 +198,12 @@ function buildTimeline({
 
       // Handle rolled back as a special terminal state
       if (txState === 'rolledBack') {
+        const isPaymentRequestRollback = tokenCreated !== undefined || nostrSent;
+        const copy = isPaymentRequestRollback ? PAYMENT_REQUEST_COPY : SEND_COPY;
         const rolledBackTimeline: TimelineItem[] = [
           {
             state: 'prepared',
-            displayLabel: SEND_COPY.prepared.label,
+            displayLabel: copy.prepared.label,
             stepType: 'complete',
             timestamp: sendTx.createdAt,
           },
@@ -217,9 +219,9 @@ function buildTimeline({
         }
         rolledBackTimeline.push({
           state: 'rolledBack',
-          displayLabel: SEND_COPY.rolledBack.label,
+          displayLabel: copy.rolledBack.label,
           stepType: 'rolled-back',
-          info: SEND_COPY.rolledBack.info,
+          info: copy.rolledBack.info,
         });
         return rolledBackTimeline;
       }
@@ -229,11 +231,12 @@ function buildTimeline({
 
       if (isPaymentRequestMode) {
         // Payment request: Created → Delivered → Claimed
+        // tokenCreated distinguishes "preparing token" (spinner) from "token ready" (checkmark)
         switch (txState) {
           case 'prepared':
             return [
-              { state: 'prepared', displayLabel: PAYMENT_REQUEST_COPY.prepared.label, stepType: 'current' as TimelineStepType, info: PAYMENT_REQUEST_COPY.prepared.info },
-              { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'next-pending' as TimelineStepType },
+              { state: 'prepared', displayLabel: PAYMENT_REQUEST_COPY.prepared.label, stepType: (tokenCreated ? 'complete' : 'next-pending') as TimelineStepType, info: PAYMENT_REQUEST_COPY.prepared.info, ...(tokenCreated ? { timestamp: sendTx.createdAt } : {}) },
+              { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'future-small' as TimelineStepType },
               { state: 'finalized', displayLabel: PAYMENT_REQUEST_COPY.finalized.label, stepType: 'future-small' as TimelineStepType },
             ];
           case 'pending':
@@ -246,7 +249,7 @@ function buildTimeline({
             }
             return [
               { state: 'prepared', displayLabel: PAYMENT_REQUEST_COPY.prepared.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
-              { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'current' as TimelineStepType, info: PAYMENT_REQUEST_COPY.nostrSent.infoSending },
+              { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'next-pending' as TimelineStepType, info: PAYMENT_REQUEST_COPY.nostrSent.infoSending },
               { state: 'finalized', displayLabel: PAYMENT_REQUEST_COPY.finalized.label, stepType: 'future-small' as TimelineStepType },
             ];
           case 'finalized':

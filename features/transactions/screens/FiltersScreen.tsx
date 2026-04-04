@@ -5,8 +5,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { HistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
-import { useMints } from 'coco-cashu-react';
+import { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
+import { useMints } from '@cashu/coco-react';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';

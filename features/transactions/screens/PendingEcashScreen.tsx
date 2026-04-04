@@ -13,7 +13,7 @@ import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Transaction } from '@/features/transactions/components/Transaction';
 import Icon from 'assets/icons';
-import { SendHistoryEntry, HistoryEntry, Mint } from 'coco-cashu-core';
+import { SendHistoryEntry, HistoryEntry, Mint } from '@cashu/coco-core';
 import { extractDomain } from '@/shared/lib/url';
 import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
@@ -32,7 +32,7 @@ import Animated, {
   withDelay,
 } from 'react-native-reanimated';
 import { rollbackSuccessPopup, rollbackPartialPopup } from '@/shared/lib/popup';
-import { useMints, usePaginatedHistory, useManager } from 'coco-cashu-react';
+import { useMints, usePaginatedHistory, useManager } from '@cashu/coco-react';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { PendingEcashCardFrame } from '@/shared/blocks/pending/PendingEcashCardFrame';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -391,7 +391,7 @@ export function PendingEcashScreen() {
       setRollingBackIds((prev) => new Set(prev).add(tx.operationId));
 
       try {
-        await manager.send.rollback(tx.operationId);
+        await manager.ops.send.reclaim(tx.operationId);
         successCount++;
       } catch (error) {
         console.error(`Failed to rollback ${tx.operationId}:`, error);

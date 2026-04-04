@@ -24,7 +24,7 @@ import type {
   MeltHistoryEntry,
   MintHistoryEntry,
   ReceiveHistoryEntry,
-} from 'coco-cashu-core';
+} from '@cashu/coco-core';
 import {
   type NotificationHandlerMap,
   type PaymentMachine,
@@ -50,7 +50,7 @@ import {
   nfcConnectionLostPopup,
   nfcEcashSharedPopup,
   nfcErrorPopup,
-  nfcPaymentProgressPopup,
+  nfcProgressPopup,
   nfcSendFailedPopup,
   noAmountPopup,
   noMintSelectedPopup,
@@ -82,6 +82,7 @@ import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
+import { useNfcProgressStore } from '@/shared/stores/runtime/nfcProgressStore';
 
 // =============================================================================
 // createSovranNotifications
@@ -131,7 +132,12 @@ export function createSovranNotifications(
       sendPaymentFailedPopup({ text: message });
     },
     NFC_WRITE_FAILED: ({ code: _code, message, data: _data }) => {
-      nfcErrorPopup({ title: 'NFC Write Failed', message });
+      const nfcStore = useNfcProgressStore.getState();
+      if (nfcStore.active) {
+        nfcStore.setFailed(message);
+      } else {
+        nfcErrorPopup({ title: 'NFC Write Failed', message });
+      }
     },
     NFC_SESSION_LOST: ({ code: _code, message, data: _data }) => {
       nfcErrorPopup({ title: 'NFC Connection Lost', message });
@@ -159,6 +165,12 @@ export function createSovranNotifications(
       });
     },
     onPaymentConfirmed: (data) => {
+      const nfcStore = useNfcProgressStore.getState();
+      if (nfcStore.active) {
+        nfcStore.setConfirmed();
+        return;
+      }
+
       const store = usePaymentStatusStore.getState();
       if (store.active) {
         if (data.variant === 'paymentRequest') {
@@ -177,7 +189,10 @@ export function createSovranNotifications(
     onPaymentFailed: (data) => {
       const store = usePaymentStatusStore.getState();
       if (store.active) {
-        store.setFailed(store.active.id, new Error(data.message));
+        const msg = data.rolledBack
+          ? `${data.message}\nYour funds have been returned.`
+          : data.message;
+        store.setFailed(store.active.id, new Error(msg));
       }
     },
     onScanEmpty: (source) => {
@@ -194,7 +209,7 @@ export function createSovranNotifications(
     onCopied: (target) => {
       copyPopup(target as Parameters<typeof copyPopup>[0]);
     },
-    onScanResolved: ({ rawInput, parsedType, intentType, source }) => {
+    onScanResolved: ({ rawInput, parsedType, intentType, source, container, optionKinds }) => {
       const typeMap: Record<string, 'ecash' | 'lightning' | 'npub' | 'mint' | 'paymentRequest' | 'unknown'> = {
         receiveToken: 'ecash',
         meltLightningInvoice: 'lightning',
@@ -213,16 +228,24 @@ export function createSovranNotifications(
         deeplink: 'deeplink',
       };
       const scanSource = sourceMap[source ?? ''] ?? 'qr';
-      useScanHistoryStore.getState().addScan(rawInput, rawInput, scanType, scanSource, parsedType);
+      useScanHistoryStore.getState().addScan(rawInput, rawInput, scanType, scanSource, parsedType, container, optionKinds);
     },
     onNfcPaymentProgress: ({ phase }) => {
-      nfcPaymentProgressPopup({ phase });
+      const store = useNfcProgressStore.getState();
+      const isFirstPhase = store.active === null;
+      store.setPhase(phase);
+      if (isFirstPhase) {
+        nfcProgressPopup();
+      }
     },
     onNfcWriteFailed: ({ message, rolledBack }) => {
-      nfcErrorPopup({
-        title: 'NFC Write Failed',
-        message: rolledBack ? `${message} Your funds have been returned.` : message,
-      });
+      const errorMsg = rolledBack ? `${message} Your funds have been returned.` : message;
+      const nfcStore = useNfcProgressStore.getState();
+      if (nfcStore.active) {
+        nfcStore.setFailed(errorMsg);
+      } else {
+        nfcErrorPopup({ title: 'NFC Write Failed', message: errorMsg });
+      }
     },
 
     // ── Screen action notifications ─────────────────────────────────
@@ -648,7 +671,7 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
 
         if (lostConnection && entry.operationId) {
           try {
-            await manager.send.rollback(entry.operationId);
+            await manager.ops.send.reclaim(entry.operationId);
             nfcConnectionLostPopup();
             return;
           } catch (rollbackError) {

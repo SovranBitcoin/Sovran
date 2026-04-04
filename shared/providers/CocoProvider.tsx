@@ -1,6 +1,6 @@
 import React, { createContext, useEffect, useState, ReactNode, useRef } from 'react';
-import { CocoCashuProvider } from 'coco-cashu-react';
-import { Manager } from 'coco-cashu-core';
+import { CocoCashuProvider } from '@cashu/coco-react';
+import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -171,9 +171,9 @@ export function CocoProvider({ children }: CocoProviderProps) {
         try {
           bgStage.log('Recovering pending operations...');
           initLog('Coco-bg', 'recoverPendingSendOperations...');
-          await manager.recoverPendingSendOperations();
+          await manager.ops.send.recovery.run();
           initLog('Coco-bg', 'recoverPendingMeltOperations...');
-          await manager.recoverPendingMeltOperations();
+          await manager.ops.melt.recovery.run();
           initLog('Coco-bg', 'recovery done');
         } catch (recoveryErr) {
           initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);

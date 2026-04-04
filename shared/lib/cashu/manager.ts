@@ -1,5 +1,5 @@
-import { Manager, ConsoleLogger } from 'coco-cashu-core';
-import { ExpoSqliteRepositories } from 'coco-cashu-expo-sqlite';
+import { Manager, ConsoleLogger } from '@cashu/coco-core';
+import { ExpoSqliteRepositories } from '@cashu/coco-expo-sqlite';
 import * as SQLite from 'expo-sqlite';
 import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
 import { NPCPlugin } from 'coco-cashu-plugin-npc';
@@ -211,7 +211,7 @@ export class CocoManager {
     // Mint quote watcher
     try {
       initLog('CocoManager', 'enabling mint quote watcher...');
-      await this.instance.enableMintQuoteWatcher({ watchExistingPendingOnStart: true });
+      await this.instance.enableMintOperationWatcher({ watchExistingPendingOnStart: true });
       initLog('CocoManager', 'mint quote watcher enabled');
     } catch (error) {
       console.warn('Failed to enable mint quote watcher:', error);
@@ -220,7 +220,7 @@ export class CocoManager {
     // Mint quote processor
     try {
       initLog('CocoManager', 'enabling mint quote processor...');
-      await this.instance.enableMintQuoteProcessor({
+      await this.instance.enableMintOperationProcessor({
         processIntervalMs: 5000,
         maxRetries: 3,
         baseRetryDelayMs: 1000,
@@ -292,14 +292,14 @@ export class CocoManager {
         }
 
         try {
-          await this.instance.disableMintQuoteProcessor();
+          await this.instance.disableMintOperationProcessor();
           console.log('Mint quote processor disabled');
         } catch (error) {
           console.warn('Failed to disable mint quote processor:', error);
         }
 
         try {
-          await this.instance.disableMintQuoteWatcher();
+          await this.instance.disableMintOperationWatcher();
           console.log('Mint quote watcher disabled');
         } catch (error) {
           console.warn('Failed to disable mint quote watcher:', error);
@@ -419,14 +419,14 @@ export class CocoManager {
       }
 
       try {
-        await this.instance.disableMintQuoteWatcher();
+        await this.instance.disableMintOperationWatcher();
         console.log('Mint quote watcher disabled');
       } catch (error) {
         console.warn('Failed to disable mint quote watcher:', error);
       }
 
       try {
-        await this.instance.disableMintQuoteProcessor();
+        await this.instance.disableMintOperationProcessor();
         console.log('Mint quote processor disabled');
       } catch (error) {
         console.warn('Failed to disable mint quote processor:', error);
@@ -672,7 +672,7 @@ export class CocoManager {
       for (const [operationId, proofs] of proofsByOperationId.entries()) {
         try {
           // Prefer “proper rollback” (it may need to swap/recover), rather than simply unreserving.
-          const sendOp = (await manager.send.getOperation(operationId).catch(() => null)) as {
+          const sendOp = (await manager.ops.send.get(operationId).catch(() => null)) as {
             state?: string;
           } | null;
           if (sendOp) {
@@ -696,7 +696,11 @@ export class CocoManager {
               }
               continue;
             }
-            await manager.send.rollback(operationId);
+            if (sendOp.state === 'prepared') {
+              await manager.ops.send.cancel(operationId);
+            } else {
+              await manager.ops.send.reclaim(operationId);
+            }
             rolledBackSendOperations++;
             continue;
           }

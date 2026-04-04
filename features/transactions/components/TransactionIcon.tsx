@@ -2,7 +2,7 @@ import React from 'react';
 import { ActivityIndicator } from 'react-native';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
-import { HistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface TransactionIconProps {

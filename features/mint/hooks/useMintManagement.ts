@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { Mint } from 'coco-cashu-core';
-import { useManager } from 'coco-cashu-react';
+import type { Mint } from '@cashu/coco-core';
+import { useManager } from '@cashu/coco-react';
 
 /**
  * Manages the trusted-mints list and common mint operations via the coco Manager.

@@ -11,7 +11,7 @@
 
 import React from 'react';
 
-import type { SendHistoryEntry } from 'coco-cashu-core';
+import type { SendHistoryEntry } from '@cashu/coco-core';
 import { isPaymentRequestPreview } from 'coco-payment-ux';
 import { useScreenActions } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
@@ -21,6 +21,8 @@ import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
   HistoryEntryTimeline,
+  useBip321Info,
+  Bip321MethodIcons,
 } from '@/features/transactions';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -46,6 +48,7 @@ export function PaymentRequestScreen({
 }: PaymentRequestScreenProps) {
   const { entry, error, actions, source, mintUrl } = useScreenActions('paymentRequest', paymentRequestEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
+  const bip321 = useBip321Info(entry?.id);
 
   if (error) {
     return <ScreenErrorState message={error} onGoBack={onCancel} />;
@@ -123,6 +126,8 @@ export function PaymentRequestScreen({
         <DetailsSection
           items={[
             source ? { title: 'Source', value: source } : null,
+            bip321.isBip321 ? { title: 'Format', value: 'BIP 321' } : null,
+            bip321.optionKinds ? { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" /> } : null,
             { title: 'Date', value: entry.createdAt.datetime },
             { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
             entry.transportLabel ? { title: 'Transport', value: entry.transportLabel } : null,

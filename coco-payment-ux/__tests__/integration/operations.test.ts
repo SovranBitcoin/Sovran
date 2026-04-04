@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import type { Manager } from 'coco-cashu-core';
+import type { Manager } from '@cashu/coco-core';
 import { createCocoPaymentUX } from '../../src/core/createCocoPaymentUX';
 import type { CocoPaymentUXInstance } from '../../src/core/createCocoPaymentUX';
 import { createTestManager, addTrustedMint, fundWallet, TEST_MINT } from './helpers/setup';

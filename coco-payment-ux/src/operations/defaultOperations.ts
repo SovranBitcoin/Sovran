@@ -12,7 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
-import type { Manager } from 'coco-cashu-core';
+import type { Manager } from '@cashu/coco-core';
 import type { MachineOperations, StepDataMap } from '../machine/types';
 import type { MintListItem, MintReviewInfo, PaymentRequestInfo } from '../types';
 import { defaultDetectors } from '../detectors';
@@ -53,6 +53,61 @@ function hasP2PKProofs(proofs: ReadonlyArray<{ secret: string }>): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Payment request rollback helpers
+// ---------------------------------------------------------------------------
+
+async function attemptRollback(mgr: Manager, operationId: string): Promise<boolean> {
+  try {
+    const operation = await mgr.ops.send.get(operationId);
+    if (operation && operation.state === 'prepared') {
+      console.info('[attemptRollback] Cancelling prepared operation | operationId:', operationId);
+      await mgr.ops.send.cancel(operationId);
+    } else if (operation && ['executing', 'pending'].includes(operation.state)) {
+      console.info('[attemptRollback] Reclaiming', operation.state, 'operation | operationId:', operationId);
+      await mgr.ops.send.reclaim(operationId);
+    } else {
+      console.warn('[attemptRollback] Operation in unexpected state:', operation?.state, '| operationId:', operationId);
+      return false;
+    }
+    console.info('[attemptRollback] Rollback successful | operationId:', operationId);
+    return true;
+  } catch (e) {
+    console.warn('[attemptRollback] Rollback failed | operationId:', operationId, e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
+function buildRolledBackResult(
+  operationId: string,
+  mintUrl: string,
+  amount: number,
+  unit: string,
+  paymentRequest: string,
+  transportType: 'nostr' | 'http',
+  errorMessage: string,
+): { historyEntry: string; rolledBack: true; errorMessage: string } {
+  const entry = {
+    id: operationId,
+    type: 'send' as const,
+    createdAt: Date.now(),
+    mintUrl,
+    amount,
+    unit,
+    operationId,
+    state: 'rolledBack',
+    metadata: {
+      paymentRequest,
+      phase: 'rolledBack',
+      tokenCreated: 'true',
+      transportType,
+      errorMessage,
+    },
+  };
+  console.info('[executePaymentRequest] Rolled back | operationId:', operationId, '| error:', errorMessage);
+  return { historyEntry: JSON.stringify(entry), rolledBack: true, errorMessage };
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -66,6 +121,8 @@ export interface DefaultOperationsConfig {
   enrichMintListItem?: (mintUrl: string) => Partial<MintListItem>;
   /** Optional enrichment for mint review info (e.g. KYM/audit scores). */
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
+  /** When true, executePaymentRequest simulates a delivery failure to test rollback. */
+  shouldMockFailPaymentRequest?: () => boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,54 +134,96 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
   function requireManager(): Manager {
     const mgr = getManager();
-    if (!mgr) throw new Error('Wallet manager is not available');
+    if (!mgr) {
+      console.warn('[requireManager] Wallet manager is not available — getManager() returned null');
+      throw new Error('Wallet manager is not available');
+    }
     return mgr;
   }
 
   return {
     executeSend: async (mintUrl, amount) => {
       const mgr = requireManager();
-      await mgr.wallet.send(mintUrl, amount);
-      const history = await mgr.history.getPaginatedHistory(0, 25);
-      const entry = history.find(
-        (h: any) => h.type === 'send' && h.mintUrl === mintUrl
-      );
-      if (!entry) throw new Error('Send history entry not found after creation');
+      console.info('[executeSend] Preparing | mintUrl:', mintUrl, '| amount:', amount);
+      const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
+      console.info('[executeSend] Executing | operationId:', prepared.id);
+      const { operation } = await mgr.ops.send.execute(prepared.id);
+      console.info('[executeSend] Complete | operationId:', operation.id, '| state:', (operation as any).state);
+
+      // Try history first (should be there after execute), fall back to
+      // constructing from the operation result to avoid a race.
+      const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
+      if (historyEntry) return { historyEntry };
+
+      console.warn('[executeSend] History entry not found, building from operation | operationId:', operation.id);
+      const entry = {
+        id: operation.id,
+        type: 'send' as const,
+        createdAt: (operation as any).createdAt ?? Date.now(),
+        mintUrl: (operation as any).mintUrl ?? mintUrl,
+        unit: 'sat',
+        state: 'pending',
+        amount: (operation as any).amount ?? amount,
+        metadata: { operationId: operation.id },
+      };
       return { historyEntry: JSON.stringify(entry) };
     },
 
     executeOfflineSend: async (mintUrl, amount) => {
       const mgr = requireManager();
-      const prepared = await mgr.send.prepareSend(mintUrl, amount);
+      const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
 
       if (prepared.needsSwap) {
-        await mgr.send.rollback(prepared.id);
+        console.warn('[executeOfflineSend] Needs swap, cancelling | operationId:', prepared.id, '| mintUrl:', mintUrl, '| amount:', amount);
+        await mgr.ops.send.cancel(prepared.id);
         throw new Error('Offline send requires exact proof match');
       }
 
-      await mgr.send.executePreparedSend(prepared.id);
+      const { operation } = await mgr.ops.send.execute(prepared.id);
 
-      const history = await mgr.history.getPaginatedHistory(0, 25);
-      const entry = history.find(
-        (h: any) => h.type === 'send' && h.mintUrl === mintUrl
-      );
-      if (!entry) throw new Error('Send history entry not found after offline send');
+      const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
+      if (historyEntry) return { historyEntry };
+
+      console.warn('[executeOfflineSend] History entry not found, building from operation | operationId:', operation.id);
+      const entry = {
+        id: operation.id,
+        type: 'send' as const,
+        createdAt: (operation as any).createdAt ?? Date.now(),
+        mintUrl: (operation as any).mintUrl ?? mintUrl,
+        unit: 'sat',
+        state: 'pending',
+        amount: (operation as any).amount ?? amount,
+        metadata: { operationId: operation.id },
+      };
       return { historyEntry: JSON.stringify(entry) };
     },
 
     executeMintQuote: async (mintUrl, amount, _unit) => {
       const mgr = requireManager();
-      const mintQuote = await mgr.quotes.createMintQuote(mintUrl, amount);
-      const history = await mgr.history.getPaginatedHistory(0, 25);
-      const entry = history.find(
-        (h: any) => h.type === 'mint' && h.quoteId === mintQuote.quote
-      );
-      if (!entry) throw new Error('Mint quote history entry not found after creation');
+      console.info('[executeMintQuote] Preparing mint quote | mintUrl:', mintUrl, '| amount:', amount);
+      const mintOp = await mgr.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' });
+      console.info('[executeMintQuote] Quote created | operationId:', mintOp.id, '| quoteId:', mintOp.quoteId);
+
+      // Build entry directly from the operation result to avoid a race
+      // where getPaginatedHistory runs before HistoryService persists the row.
+      const entry = {
+        id: mintOp.id,
+        type: 'mint' as const,
+        createdAt: (mintOp as any).createdAt ?? Date.now(),
+        mintUrl: (mintOp as any).mintUrl ?? mintUrl,
+        unit: (mintOp as any).unit ?? 'sat',
+        quoteId: mintOp.quoteId,
+        state: 'UNPAID',
+        amount: (mintOp as any).amount ?? amount,
+        paymentRequest: (mintOp as any).request,
+        metadata: { operationId: mintOp.id },
+      };
       return { historyEntry: JSON.stringify(entry) };
     },
 
     buildMintListItems: async (data: StepDataMap['selectMint']): Promise<MintListItem[]> => {
       const mgr = requireManager();
+      console.info('[buildMintListItems] Building mint list | unit:', data.unit);
       const [allTrustedMints, balances] = await Promise.all([
         mgr.mint.getAllTrustedMints(),
         mgr.wallet.getBalances(),
@@ -139,8 +238,8 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
           try {
             const info = await mgr.mint.getMintInfo(mint.mintUrl);
             if (info) mintInfoMap.set(mint.mintUrl, info);
-          } catch {
-            // Mint info fetch failed — display name will fall back to URL
+          } catch (e) {
+            console.warn('[buildMintListItems] getMintInfo failed for', mint.mintUrl, e instanceof Error ? e.message : e);
           }
         })
       );
@@ -195,15 +294,21 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
     trustMint: async (mintUrl) => {
       const mgr = requireManager();
+      console.info('[trustMint] Trusting mint | mintUrl:', mintUrl);
       await mgr.mint.addMint(mintUrl, { trusted: true });
     },
 
     executeNfcSend: async (mintUrl, amount) => {
       const mgr = requireManager();
-      const prepared = await mgr.send.prepareSend(mintUrl, amount);
-      const { operation, token } = await mgr.send.executePreparedSend(prepared.id);
+      console.info('[executeNfcSend] Preparing NFC send | mintUrl:', mintUrl, '| amount:', amount);
+      const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
+      const { operation, token } = await mgr.ops.send.execute(prepared.id);
+      console.info('[executeNfcSend] NFC token created | operationId:', operation.id);
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
-      if (!historyEntry) throw new Error('Send history entry not found after creation');
+      if (!historyEntry) {
+        console.warn('[executeNfcSend] History entry not found | operationId:', operation.id, '| mintUrl:', mintUrl, '| amount:', amount);
+        throw new Error('Send history entry not found after creation');
+      }
       return {
         token: getEncodedTokenV4(token),
         historyEntry,
@@ -214,13 +319,18 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
     rollbackSend: async (operationId) => {
       const mgr = getManager();
       if (!mgr) return;
+      console.info('[rollbackSend] Starting | operationId:', operationId);
       try {
-        const operation = await mgr.send.getOperation(operationId);
-        if (operation && ['prepared', 'executing', 'pending'].includes(operation.state)) {
-          await mgr.send.rollback(operationId);
+        const operation = await mgr.ops.send.get(operationId);
+        if (operation && operation.state === 'prepared') {
+          console.info('[rollbackSend] Cancelling prepared operation | operationId:', operationId);
+          await mgr.ops.send.cancel(operationId);
+        } else if (operation && ['executing', 'pending'].includes(operation.state)) {
+          console.info('[rollbackSend] Reclaiming', operation.state, 'operation | operationId:', operationId);
+          await mgr.ops.send.reclaim(operationId);
         }
-      } catch {
-        // Best-effort rollback — swallow errors
+      } catch (e) {
+        console.warn('[rollbackSend] Best-effort rollback failed | operationId:', operationId, e instanceof Error ? e.message : e);
       }
     },
 
@@ -228,13 +338,13 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
     checkSendStatus: async (operationId) => {
       const mgr = requireManager();
-      const operation = await mgr.send.getOperation(operationId);
+      const operation = await mgr.ops.send.get(operationId);
       if (!operation) {
         return { state: 'not_found' };
       }
       if (operation.state === 'pending') {
-        await mgr.send.checkPendingOperation(operationId);
-        const updated = await mgr.send.getOperation(operationId);
+        await mgr.ops.send.refresh(operationId);
+        const updated = await mgr.ops.send.get(operationId);
         return { state: updated?.state ?? operation.state };
       }
       return { state: operation.state };
@@ -242,19 +352,36 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
     executeReceive: async (tokenString, mintUrl, _amount) => {
       const mgr = requireManager();
+      console.info('[executeReceive] Receiving token | mintUrl:', mintUrl, '| token:', tokenString.slice(0, 20) + '…');
       await mgr.wallet.receive(tokenString);
+      console.info('[executeReceive] Token received');
 
       let hadP2PK = false;
+      let tokenAmount = 0;
       try {
         const decoded = getDecodedToken(tokenString);
         hadP2PK = hasP2PKProofs(decoded.proofs);
-      } catch {
-        // Non-critical — skip P2PK detection
+        tokenAmount = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
+      } catch (e) {
+        console.warn('[executeReceive] P2PK detection failed:', e instanceof Error ? e.message : e);
       }
 
+      // Try history first, fall back to constructing from known data
+      // to avoid race where history write hasn't flushed yet.
       const historyEntry = await findReceiveHistoryEntry(mgr, tokenString, mintUrl);
-      if (!historyEntry) throw new Error('Receive history entry not found after redemption');
-      return { historyEntry, hadP2PKProofs: hadP2PK };
+      if (historyEntry) return { historyEntry, hadP2PKProofs: hadP2PK };
+
+      console.warn('[executeReceive] History entry not found, building from token data | mintUrl:', mintUrl);
+      const entry = {
+        id: `redeemed-${Date.now()}`,
+        type: 'receive' as const,
+        createdAt: Date.now(),
+        mintUrl,
+        unit: 'sat',
+        amount: tokenAmount,
+        metadata: { rawToken: tokenString },
+      };
+      return { historyEntry: JSON.stringify(entry), hadP2PKProofs: hadP2PK };
     },
 
     isMintTrusted: async (mintUrl) => {
@@ -264,13 +391,16 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
     executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
       const mgr = requireManager();
+      console.info('[executeMelt] Starting | mintUrl:', mintUrl, '| amount:', amount, '| target:', meltTarget.slice(0, 30) + '…');
 
       const bolt11 = isLightningInvoiceBolt11(meltTarget)
         ? meltTarget
         : await requestInvoiceFromLnurl(meltTarget, amount);
 
-      const operation = await mgr.quotes.prepareMeltBolt11(mintUrl, bolt11);
-      const result = await mgr.quotes.executeMelt(operation.id);
+      const operation = await mgr.ops.melt.prepare({ mintUrl, method: 'bolt11', methodData: { invoice: bolt11 } });
+      console.info('[executeMelt] Executing | operationId:', operation.id);
+      const result = await mgr.ops.melt.execute(operation.id);
+      console.info('[executeMelt] Complete | operationId:', result.id, '| state:', result.state);
 
       const entry = {
         id: result.id,
@@ -288,13 +418,15 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
     rollbackMelt: async (operationId) => {
       const mgr = requireManager();
-      await (mgr.quotes as any).rollbackMelt(operationId, 'User cancelled');
+      console.info('[rollbackMelt] Cancelling | operationId:', operationId);
+      await mgr.ops.melt.cancel(operationId, 'User cancelled');
+      console.info('[rollbackMelt] Cancelled | operationId:', operationId);
     },
 
     buildMintReviewInfo: async (mintUrl): Promise<MintReviewInfo> => {
       const mgr = requireManager();
       const [mintInfo, balances, isTrusted] = await Promise.all([
-        mgr.mint.getMintInfo(mintUrl).catch(() => undefined),
+        mgr.mint.getMintInfo(mintUrl).catch((e) => { console.warn('[buildMintReviewInfo] getMintInfo failed for', mintUrl, e instanceof Error ? e.message : e); return undefined; }),
         mgr.wallet.getBalances(),
         mgr.mint.isTrustedMint(mintUrl),
       ]);
@@ -322,36 +454,80 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
     executePaymentRequest: async (mintUrl, paymentRequest, amount, unit) => {
       const mgr = requireManager();
+      console.info('[executePaymentRequest] Starting | mintUrl:', mintUrl, '| amount:', amount);
 
       const info = defaultDetectors.getPaymentRequestInfo(paymentRequest);
-      if (!info) throw new Error('Invalid payment request');
+      if (!info) {
+        console.warn('[executePaymentRequest] Failed to parse payment request:', paymentRequest.slice(0, 60));
+        throw new Error('Invalid payment request');
+      }
 
       const nostrTransport = info.transports?.find((t) => t.type === 'nostr');
       const httpTransport = info.transports?.find((t) => t.type === 'post');
-      const parsed =
-        nostrTransport && !httpTransport
-          ? buildInbandParsed(paymentRequest, info, mintUrl)
-          : await mgr.wallet.processPaymentRequest(paymentRequest);
 
-      const transaction = await mgr.wallet.preparePaymentRequestTransaction(mintUrl, parsed, amount);
-      const operationId = transaction.sendOperation.id;
+      let operationId: string;
 
-      if (httpTransport) {
-        await mgr.wallet.handleHttpPaymentRequest(transaction);
-      } else if (nostrTransport) {
-        await mgr.wallet.handleInbandPaymentRequest(transaction, async (token) => {
-          const sendNostrDM = config.sendNostrDM;
-          if (!sendNostrDM) throw new Error('sendNostrDM operation is required for Nostr payment requests');
-          const payload = {
-            id: paymentRequest,
-            mint: mintUrl,
-            unit,
-            proofs: token.proofs,
-          };
+      if (nostrTransport && !httpTransport) {
+        console.info('[executePaymentRequest] Using Nostr transport');
+        // Nostr transport: use ops.send directly since PaymentRequestsApi doesn't support Nostr
+        const sendNostrDM = config.sendNostrDM;
+        if (!sendNostrDM) {
+          console.warn('[executePaymentRequest] sendNostrDM not configured for Nostr payment request');
+          throw new Error('sendNostrDM operation is required for Nostr payment requests');
+        }
+
+        const effectiveAmount = info.amount ?? amount;
+        if (!effectiveAmount) {
+          console.warn('[executePaymentRequest] No amount provided for Nostr payment request');
+          throw new Error('Amount is required for Nostr payment requests');
+        }
+
+        const prepared = await mgr.ops.send.prepare({ mintUrl, amount: effectiveAmount });
+        const { operation, token } = await mgr.ops.send.execute(prepared.id);
+        operationId = operation.id;
+
+        const payload = {
+          id: paymentRequest,
+          mint: mintUrl,
+          unit,
+          proofs: token.proofs,
+        };
+        try {
+          if (config.shouldMockFailPaymentRequest?.()) {
+            throw new Error('Mock delivery failure (dev)');
+          }
           await sendNostrDM(nostrTransport.target, JSON.stringify(payload));
-        });
+          console.info('[executePaymentRequest] Nostr DM sent | operationId:', operationId);
+        } catch (deliveryErr) {
+          console.warn('[executePaymentRequest] Nostr delivery failed | operationId:', operationId, deliveryErr instanceof Error ? deliveryErr.message : deliveryErr);
+          const rollbackResult = await attemptRollback(mgr, operationId);
+          if (rollbackResult) {
+            const errorMessage = deliveryErr instanceof Error ? deliveryErr.message : 'Nostr delivery failed';
+            return buildRolledBackResult(operationId, mintUrl, effectiveAmount, unit, paymentRequest, 'nostr', errorMessage);
+          }
+          throw deliveryErr;
+        }
       } else {
-        await mgr.wallet.handleInbandPaymentRequest(transaction, async () => {});
+        console.info('[executePaymentRequest] Using HTTP transport');
+        // HTTP or inband transport: use paymentRequests API
+        const parsed = await mgr.paymentRequests.parse(paymentRequest);
+        const transaction = await mgr.paymentRequests.prepare(parsed, { mintUrl, amount });
+        operationId = transaction.sendOperation.id;
+        try {
+          if (config.shouldMockFailPaymentRequest?.()) {
+            throw new Error('Mock delivery failure (dev)');
+          }
+          await mgr.paymentRequests.execute(transaction);
+          console.info('[executePaymentRequest] HTTP payment request executed | operationId:', operationId);
+        } catch (deliveryErr) {
+          console.warn('[executePaymentRequest] HTTP delivery failed | operationId:', operationId, deliveryErr instanceof Error ? deliveryErr.message : deliveryErr);
+          const rollbackResult = await attemptRollback(mgr, operationId);
+          if (rollbackResult) {
+            const errorMessage = deliveryErr instanceof Error ? deliveryErr.message : 'HTTP delivery failed';
+            return buildRolledBackResult(operationId, mintUrl, amount, unit, paymentRequest, 'http', errorMessage);
+          }
+          throw deliveryErr;
+        }
       }
 
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operationId);
@@ -360,14 +536,23 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
         : {
             id: operationId,
             type: 'send' as const,
-            createdAt: transaction.sendOperation.createdAt,
+            createdAt: Date.now(),
             mintUrl,
             amount,
             unit,
             operationId,
             state: 'pending',
-            metadata: { paymentRequest, phase: 'delivered', tokenCreated: 'true' },
           };
+      // Enrich with transport metadata so the screen can show progress
+      entry.metadata = {
+        ...(entry.metadata ?? {}),
+        paymentRequest,
+        phase: 'delivered',
+        tokenCreated: 'true',
+        ...(nostrTransport ? { nostrSent: 'true', transportType: 'nostr' } : { transportType: 'http' }),
+      };
+      entry.operationId = entry.operationId ?? operationId;
+      console.info('[executePaymentRequest] Done | operationId:', operationId, '| transport:', nostrTransport ? 'nostr' : 'http');
       return { historyEntry: JSON.stringify(entry) };
     },
   };

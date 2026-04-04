@@ -1,4 +1,4 @@
-import { Manager } from 'coco-cashu-core';
+import { Manager } from '@cashu/coco-core';
 import { CheckStateEnum } from '@cashu/cashu-ts';
 import { store } from '@/redux/store/store.deprecated';
 import { RootState } from '@/redux/store/reducer.deprecated';
@@ -108,7 +108,7 @@ export class DataMigration {
       if (!Array.isArray(proofs) || proofs.length === 0) continue;
 
       try {
-        const keysets = await this.manager.mint.getKeysets(mintUrl);
+        const { keysets } = await this.manager.mint.addMint(mintUrl, { trusted: true });
         const keysetUnitMap = new Map(
           keysets.map((k: { id: string; unit: string }) => [k.id, k.unit])
         );
@@ -127,7 +127,7 @@ export class DataMigration {
           continue;
         }
 
-        const wallet = await this.manager.walletService.getWallet(mintUrl);
+        const wallet = await (this.manager as any).walletService.getWallet(mintUrl);
         const proofStates = await wallet.checkProofsStates(satProofs);
 
         for (let i = 0; i < satProofs.length; i++) {
@@ -144,7 +144,7 @@ export class DataMigration {
             continue;
           }
 
-          await this.manager.proofService.saveProofs(mintUrl, [
+          await (this.manager as any).proofService.saveProofs(mintUrl, [
             { ...proof, mintUrl, state: 'ready' as const },
           ]);
           result.proofsMigrated++;
@@ -179,7 +179,7 @@ export class DataMigration {
     for (const [mintUrl, counters] of Object.entries(profile.counters)) {
       for (const [keysetId, counter] of Object.entries(counters)) {
         try {
-          await this.manager.counterService.overwriteCounter(mintUrl, keysetId, counter);
+          await (this.manager as any).counterService.overwriteCounter(mintUrl, keysetId, counter);
           result.countersMigrated++;
           console.log(`Migrated counter for ${mintUrl}:${keysetId}: ${counter}`);
         } catch (error) {

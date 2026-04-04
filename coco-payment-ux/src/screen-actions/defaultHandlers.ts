@@ -60,7 +60,8 @@ function encodeToken(entry: EntryLike): string | null {
   if (!token) return null;
   try {
     return getEncodedTokenV4(token as Parameters<typeof getEncodedTokenV4>[0]);
-  } catch {
+  } catch (e) {
+    console.warn('[encodeToken] Failed to encode token:', e instanceof Error ? e.message : e);
     return null;
   }
 }
@@ -85,7 +86,9 @@ export function createDefaultScreenActionHandlers(
         const ops = getOperations();
         if (!ops?.checkSendStatus) return;
 
+        console.info('[sendToken.checkStatus] Checking | operationId:', operationId);
         const result = await ops.checkSendStatus(operationId);
+        console.info('[sendToken.checkStatus] Result | operationId:', operationId, '| state:', result.state);
         notify('onSendStatusChecked', {
           operationId,
           state: result.state,
@@ -101,10 +104,13 @@ export function createDefaultScreenActionHandlers(
         const ops = getOperations();
         if (!ops?.rollbackSend) return;
 
+        console.info('[sendToken.cancel] Cancelling | operationId:', operationId);
         try {
           await ops.rollbackSend(operationId);
+          console.info('[sendToken.cancel] Cancelled | operationId:', operationId);
           notify('onSendCancelled', { operationId });
         } catch (err) {
+          console.warn('[sendToken.cancel] Failed | operationId:', operationId, err instanceof Error ? err.message : err);
           notify('onSendCancelFailed', {
             operationId,
             message: err instanceof Error ? err.message : String(err),
@@ -132,8 +138,8 @@ export function createDefaultScreenActionHandlers(
             notify('onUnsupportedTokenUnit', { unit: decoded.unit });
             return;
           }
-        } catch {
-          // If decode fails, proceed anyway — let executeReceive handle it
+        } catch (e) {
+          console.warn('[receiveToken] Token decode failed for unit check, proceeding:', e instanceof Error ? e.message : e);
         }
 
         // Check mint trust
@@ -150,6 +156,7 @@ export function createDefaultScreenActionHandlers(
         }
 
         // Dispatch processing notification
+        console.info('[receiveToken.redeem] Processing | mintUrl:', mintUrl, '| amount:', amount, '| id:', id);
         notify('onReceiveProcessing', { id, mintUrl, amount: amount ?? 0, unit });
 
         // Execute receive
@@ -157,14 +164,17 @@ export function createDefaultScreenActionHandlers(
 
         try {
           const result = await ops.executeReceive(tokenString, mintUrl, amount ?? 0);
+          console.info('[receiveToken.redeem] Received successfully | mintUrl:', mintUrl);
 
           // Update screen entry with real history entry
           const setEntry = (ctx as EntryLike).setEntry as
             | ((e: EntryLike) => void)
             | undefined;
+          console.info('[receiveToken.redeem] setEntry available:', !!setEntry, '| historyEntry available:', !!result.historyEntry);
           if (setEntry && result.historyEntry) {
             try {
               const realEntry = JSON.parse(result.historyEntry);
+              console.info('[receiveToken.redeem] Updating screen entry | id:', realEntry.id, '| type:', realEntry.type, '| amount:', realEntry.amount);
               setEntry(realEntry);
 
               // Link transaction for scan history
@@ -173,9 +183,11 @@ export function createDefaultScreenActionHandlers(
                   getString(getMetadata(entry), 'rawToken') ?? tokenString;
                 ops.linkTransaction(rawToken, realEntry.id);
               }
-            } catch {
-              // JSON parse failed — skip entry update
+            } catch (e) {
+              console.warn('[receiveToken] History entry parse failed:', e instanceof Error ? e.message : e);
             }
+          } else {
+            console.warn('[receiveToken.redeem] Cannot update screen entry — setEntry:', !!setEntry, '| historyEntry:', !!result.historyEntry);
           }
 
           notify('onReceiveConfirmed', {
@@ -222,6 +234,7 @@ export function createDefaultScreenActionHandlers(
     // ── meltQuote ────────────────────────────────────────────────────
     meltQuote: {
       pay: async (_ctx: ScreenActionContext) => {
+        console.info('[meltQuote.pay] Confirming melt payment');
         const machine = getMachine();
         if (machine?.confirmMelt) {
           await machine.confirmMelt();
@@ -241,9 +254,11 @@ export function createDefaultScreenActionHandlers(
         if (!ops?.rollbackMelt) return;
 
         const rollbackId = operationId ?? quoteId!;
+        console.info('[meltQuote.cancel] Cancelling | operationId:', rollbackId);
 
         try {
           await ops.rollbackMelt(rollbackId);
+          console.info('[meltQuote.cancel] Cancelled | operationId:', rollbackId);
           notify('onMeltCancelled', { operationId: rollbackId });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -254,6 +269,7 @@ export function createDefaultScreenActionHandlers(
             msg.includes('not found') ||
             msg.includes('No melt operation')
           ) {
+            console.warn('[meltCancel] Expected rollback error (already finalized/rolled back):', msg);
             return;
           }
           notify('onMeltCancelFailed', { operationId: rollbackId, message: msg });
@@ -263,10 +279,60 @@ export function createDefaultScreenActionHandlers(
 
     // ── paymentRequest ───────────────────────────────────────────────
     paymentRequest: {
-      confirm: async (_ctx: ScreenActionContext) => {
+      confirm: async (ctx: ScreenActionContext) => {
         const machine = getMachine();
-        if (machine?.confirmPaymentRequest) {
-          await machine.confirmPaymentRequest();
+        if (!machine?.confirmPaymentRequest) return;
+
+        // Capture the entry before the async call for reference.
+        const preEntry = ctx.entry as EntryLike;
+        console.info('[paymentRequest.confirm] Confirming | operationId:', getString(getMetadata(preEntry), 'operationId') ?? getString(preEntry, 'operationId') ?? '-');
+
+        const result = await machine.confirmPaymentRequest();
+
+        const setEntry = ctx.setEntry as ((e: EntryLike) => void) | undefined;
+
+        // If the delivery failed and ecash was rolled back, set the entry
+        // to rolledBack state instead of enriching with delivered metadata.
+        if (result.rolledBack) {
+          console.info('[paymentRequest.confirm] Rolled back — setting rolledBack entry');
+          if (setEntry) {
+            const metadata = ((preEntry?.metadata ?? {}) as Record<string, unknown>);
+            const operationId = getString(getMetadata(preEntry), 'operationId') ??
+              getString(preEntry, 'operationId') ?? getString(preEntry, 'id');
+            setEntry({
+              ...preEntry,
+              state: 'rolledBack',
+              operationId,
+              metadata: {
+                ...metadata,
+                operationId,
+                phase: 'rolledBack',
+                tokenCreated: 'true',
+              },
+            } as EntryLike);
+          }
+          return;
+        }
+
+        // Success path — enrich the screen entry with delivery metadata.
+        if (setEntry) {
+          const metadata = ((preEntry?.metadata ?? {}) as Record<string, unknown>);
+          const operationId = getString(getMetadata(preEntry), 'operationId') ??
+            getString(preEntry, 'operationId') ?? getString(preEntry, 'id');
+          const enriched = {
+            ...preEntry,
+            state: 'pending',
+            operationId,
+            metadata: {
+              ...metadata,
+              operationId,
+              phase: 'delivered',
+              tokenCreated: 'true',
+              nostrSent: 'true',
+            },
+          };
+          console.info('[paymentRequest.confirm] Enriching screen entry | id:', (enriched as any).id, '| operationId:', operationId);
+          setEntry(enriched as EntryLike);
         }
       },
 
@@ -309,7 +375,9 @@ export function createDefaultScreenActionHandlers(
         const ops = getOperations();
         if (!ops?.trustMint) return;
 
+        console.info('[mintInfo.trust] Trusting mint | mintUrl:', mintUrl);
         await ops.trustMint(mintUrl);
+        console.info('[mintInfo.trust] Mint trusted | mintUrl:', mintUrl);
         notify('onMintTrustedFromScreen', {
           mintUrl,
           fromAccepter: entry.fromAccepter === true,
@@ -325,6 +393,7 @@ export function createDefaultScreenActionHandlers(
         const entry = ctx.entry as EntryLike;
         const scope = (entry.scope as 'npc' | 'selected') ?? 'selected';
         if (!mintUrl || !machine) return;
+        console.info('[mintSelector.select] Selecting mint | mintUrl:', mintUrl, '| scope:', scope);
         await machine.changeMint(mintUrl, { scope });
       },
 
@@ -338,8 +407,8 @@ export function createDefaultScreenActionHandlers(
           try {
             const info = await ops.buildMintReviewInfo(mintUrl);
             infoEntry = { ...(info as unknown as EntryLike) };
-          } catch {
-            // Fall through with bare mintUrl
+          } catch (e) {
+            console.warn('[mintInfo] buildMintReviewInfo failed for', mintUrl, e instanceof Error ? e.message : e);
           }
         }
         navigation.mintInfo?.(JSON.stringify(infoEntry));
@@ -362,6 +431,7 @@ export function createDefaultScreenActionHandlers(
         if (typeof effectiveSat !== 'number' || effectiveSat <= 0) return;
         const destination = entry.destination as Destination | undefined;
         if (!destination) return;
+        console.info('[amountEntry.next] Amount confirmed | amount:', effectiveSat, '| mintUrl:', mintUrl || '(none)', '| destination:', destination);
         void machine.enterAmount(effectiveSat, mintUrl, { destination });
       },
 

@@ -34,7 +34,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { usePaginatedHistory } from 'coco-cashu-react';
+import { usePaginatedHistory } from '@cashu/coco-react';
 import { WalletHealthCard } from '@/features/health';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';

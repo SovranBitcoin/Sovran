@@ -14,7 +14,7 @@ export {
 } from './core';
 
 // Re-export Manager type so consumers don't need to import coco-cashu-core
-export type { Manager } from 'coco-cashu-core';
+export type { Manager } from '@cashu/coco-core';
 
 // Machine (state machine core)
 export { createPaymentMachine } from './machine/createMachine';
@@ -22,7 +22,7 @@ export { resolveNext } from './machine/resolveNext';
 export { selectMintContext, buildMintAvailability } from './machine/selectMintContext';
 
 // Pipeline utilities (usable standalone)
-export { parsePaymentInput } from './parse';
+export { parsePaymentInput, isBip321 } from './parse';
 export { resolveIntent } from './intent';
 export { defaultDetectors } from './detectors';
 export { annotateOptions } from './annotate';

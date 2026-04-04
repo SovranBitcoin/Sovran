@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 
 import type { Token } from '@cashu/cashu-ts';
-import { getEncodedToken, type SendHistoryEntry } from 'coco-cashu-core';
-import { useManager } from 'coco-cashu-react';
+import { getEncodedToken, type SendHistoryEntry } from '@cashu/coco-core';
+import { useManager } from '@cashu/coco-react';
 
 type SendStatus = 'idle' | 'loading' | 'success' | 'error';
 
@@ -73,11 +73,11 @@ export function useSendWithHistory() {
       });
 
       try {
-        const prepared = await manager.send.prepareSend(mintUrl, amount);
+        const prepared = await manager.ops.send.prepare({ mintUrl, amount });
         targetOperationId = prepared.id;
         preparedOperationId = prepared.id;
 
-        const { token, operation } = await manager.send.executePreparedSend(prepared.id);
+        const { token, operation } = await manager.ops.send.execute(prepared.id);
 
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error('Timeout waiting for history entry')), 5000);
@@ -116,9 +116,11 @@ export function useSendWithHistory() {
 
         if (preparedOperationId) {
           try {
-            const operation = await manager.send.getOperation(preparedOperationId);
-            if (operation && ['prepared', 'executing', 'pending'].includes(operation.state)) {
-              await manager.send.rollback(preparedOperationId);
+            const operation = await manager.ops.send.get(preparedOperationId);
+            if (operation && operation.state === 'prepared') {
+              await manager.ops.send.cancel(preparedOperationId);
+            } else if (operation && ['executing', 'pending'].includes(operation.state)) {
+              await manager.ops.send.reclaim(preparedOperationId);
             }
           } catch (rollbackError) {
             console.warn(

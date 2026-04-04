@@ -1,4 +1,4 @@
-import type { Mint } from 'coco-cashu-core';
+import type { Mint } from '@cashu/coco-core';
 
 import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 

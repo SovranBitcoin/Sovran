@@ -35,6 +35,10 @@ interface ScanHistoryEntry {
   source: ScanSource;
   /** Structural input type from the parser (e.g., 'bip321', 'payment', 'mintUrl') */
   inputType?: string;
+  /** Container format (e.g., 'bip321' when input was a bitcoin: URI) */
+  container?: string;
+  /** Payment option kinds available in the input (e.g., ['lightningInvoice', 'paymentRequest']) */
+  optionKinds?: string[];
   /** Timestamp when scanned */
   scannedAt: number;
   /** ID of the transaction history entry this scan resulted in */
@@ -47,7 +51,7 @@ interface ScanHistoryState {
 
 interface ScanHistoryActions {
   /** Add a scan to history */
-  addScan: (raw: string, processed: string, type: ScanType, source: ScanSource, inputType?: string) => void;
+  addScan: (raw: string, processed: string, type: ScanType, source: ScanSource, inputType?: string, container?: string, optionKinds?: string[]) => void;
   /** Get all scan history entries */
   getEntries: () => ScanHistoryEntry[];
   /** Get entries filtered by type */
@@ -87,7 +91,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       entries: [],
 
       // Add a scan to history
-      addScan: (raw: string, processed: string, type: ScanType, source: ScanSource, inputType?: string) => {
+      addScan: (raw: string, processed: string, type: ScanType, source: ScanSource, inputType?: string, container?: string, optionKinds?: string[]) => {
         const { entries } = get();
         const now = Date.now();
 
@@ -102,6 +106,8 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
             source,
             scannedAt: now,
             ...(inputType != null && { inputType }),
+            ...(container != null && { container }),
+            ...(optionKinds != null && { optionKinds }),
           };
           set({ entries: updated });
         } else {
@@ -113,6 +119,8 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
             type,
             source,
             ...(inputType != null && { inputType }),
+            ...(container != null && { container }),
+            ...(optionKinds != null && { optionKinds }),
             scannedAt: now,
           };
           set({ entries: [...entries, newEntry] });

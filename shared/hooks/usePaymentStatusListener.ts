@@ -9,7 +9,7 @@
 
 import { useEffect, useRef } from 'react';
 
-import { useManagerContext } from 'coco-cashu-react';
+import { useManagerContext } from '@cashu/coco-react';
 
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';

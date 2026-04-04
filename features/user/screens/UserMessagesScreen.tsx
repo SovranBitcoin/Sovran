@@ -76,7 +76,7 @@ import { isValidEcashToken } from '@/shared/lib/cashu/utils';
 import { ROUTSTR_PUBKEY } from '@/shared/lib/constants';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { checkBalance, sendMessage, getModels, RoutstrModel } from '@/shared/lib/routstr/api';
-import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
+import { getDecodedToken, ReceiveHistoryEntry } from '@cashu/coco-core';
 import { Proof } from '@cashu/cashu-ts';
 import { formatAmount } from '@/shared/lib/currency';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';

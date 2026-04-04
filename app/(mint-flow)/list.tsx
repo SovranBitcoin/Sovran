@@ -10,7 +10,7 @@ import React, { useMemo } from 'react';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
 
-import { useBalanceContext, useMints } from 'coco-cashu-react';
+import { useBalanceContext, useMints } from '@cashu/coco-react';
 import type { MintAvailability } from 'coco-payment-ux';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

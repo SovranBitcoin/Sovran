@@ -15,7 +15,7 @@ import { router } from 'expo-router';
 
 import { URDecoder } from '@gandlaf21/bc-ur';
 
-import { useManager } from 'coco-cashu-react';
+import { useManager } from '@cashu/coco-react';
 
 import type { MeltOperationLike, NavigationCallbacks } from 'coco-payment-ux';
 import {
@@ -145,6 +145,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         },
         enrichMintListItem: (url) => getMintEnrichment(url) as any,
         enrichMintReviewInfo: (url) => getMintEnrichment(url) as any,
+        shouldMockFailPaymentRequest: () => useSettingsStore.getState().mockFailPaymentRequest,
       }),
     [manager, nfcAdapter, getOffline, getBtcPrice, getDisplayCurrency]
   );
@@ -212,6 +213,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
             manager.on(
               'history:updated',
               ({ entry: updated }: { mintUrl: string; entry: any }) => {
+                console.info(`[onEntryUpdate] history:updated for ${screenType} | type:`, updated?.type, '| id:', updated?.id, '| state:', updated?.state, '| quoteId:', updated?.quoteId ?? '-');
                 callback(updated as unknown as EntryRecord);
               }
             )

@@ -12,7 +12,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
-import { useMints, useBalanceContext, useManager } from 'coco-cashu-react';
+import { useMints, useBalanceContext, useManager } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { useLightningOperations } from '@/features/receive/hooks/useLightningOperations';
 import { MIN_FEE_RESERVE } from '@/features/mint/components/rebalance';
@@ -512,7 +512,7 @@ export function MintRebalancePlanScreen() {
         setLegLocalStatus('invoiceReady');
 
         const prepareForInvoice = async (invoiceToPay: string) => {
-          const prepared = await manager.quotes.prepareMeltBolt11(fromMintUrl, invoiceToPay);
+          const prepared = await manager.ops.melt.prepare({ mintUrl: fromMintUrl, method: 'bolt11', methodData: { invoice: invoiceToPay } });
           updateStepState(id, { operationId: prepared.id });
           {
             const legId = ensureLegId();
@@ -607,7 +607,7 @@ export function MintRebalancePlanScreen() {
                 preparedMeltOp = await prepareForInvoice(invoice);
               }
 
-              const result = (await manager.quotes.executeMelt(preparedMeltOp.id)) as unknown as
+              const result = (await manager.ops.melt.execute(preparedMeltOp.id)) as unknown as
                 | { state?: string; id?: string }
                 | undefined;
 
@@ -618,7 +618,7 @@ export function MintRebalancePlanScreen() {
                 const start = Date.now();
 
                 while (Date.now() - start < maxWaitMs) {
-                  const decision = await manager.quotes.checkPendingMelt(opId);
+                  const decision = await manager.ops.melt.refresh(opId);
                   if (decision === 'finalize') return;
                   if (decision === 'rollback') {
                     throw new Error('Melt payment rolled back by mint');
@@ -638,7 +638,7 @@ export function MintRebalancePlanScreen() {
               if (msg.includes('Melt operation already in progress')) {
                 await new Promise((resolve) => setTimeout(resolve, 900));
                 preparedMeltOp = await prepareForInvoice(invoice);
-                await manager.quotes.executeMelt(preparedMeltOp.id);
+                await manager.ops.melt.execute(preparedMeltOp.id);
                 return;
               }
 
@@ -1004,7 +1004,7 @@ export function MintRebalancePlanScreen() {
                 let hopTransferAmt = hopAmount;
                 for (let att = 0; att <= MAX_PREPARE_RETRIES; att++) {
                   try {
-                    hopPrepared = await manager.quotes.prepareMeltBolt11(hopFrom, hopInvoice);
+                    hopPrepared = await manager.ops.melt.prepare({ mintUrl: hopFrom, method: 'bolt11', methodData: { invoice: hopInvoice } });
                     break;
                   } catch (pErr) {
                     const pm = pErr instanceof Error ? pErr.message : String(pErr);
@@ -1022,7 +1022,7 @@ export function MintRebalancePlanScreen() {
 
                 // Execute melt
                 updateStepState(hopStepId, { status: 'melting' });
-                const hopResult = (await manager.quotes.executeMelt(hopPrepared.id)) as unknown as
+                const hopResult = (await manager.ops.melt.execute(hopPrepared.id)) as unknown as
                   | { state?: string; id?: string }
                   | undefined;
 
@@ -1032,7 +1032,7 @@ export function MintRebalancePlanScreen() {
                   const maxWait = 15000;
                   const start = Date.now();
                   while (Date.now() - start < maxWait) {
-                    const dec = await manager.quotes.checkPendingMelt(opId);
+                    const dec = await manager.ops.melt.refresh(opId);
                     if (dec === 'finalize') break;
                     if (dec === 'rollback') throw new Error('Hop melt rolled back');
                     await new Promise((r) => setTimeout(r, 2000));

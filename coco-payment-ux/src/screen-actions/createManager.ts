@@ -184,6 +184,7 @@ export function createScreenActionManager<S extends ScreenType>(
   const getEntry = (): Record<string, unknown> | null => getEffectiveEntry();
 
   const setEntry = (newEntry: Record<string, unknown>): void => {
+    console.info(`[ScreenActionManager:${screenType}] setEntry | id:`, newEntry?.id, '| type:', newEntry?.type, '| state:', newEntry?.state);
     entry = newEntry;
     notify();
   };
@@ -251,7 +252,8 @@ const CONTENT_EXTRACTORS: Partial<Record<ScreenType, ContentExtractor>> = {
         text: getEncodedTokenV4(token as Parameters<typeof getEncodedTokenV4>[0]),
         target: 'token',
       };
-    } catch {
+    } catch (e) {
+      console.warn('[clipboard] Token encode failed:', e instanceof Error ? e.message : e);
       return null;
     }
   },
@@ -361,8 +363,8 @@ function getReceiveTokenString(entry: EntryRecord | null | undefined): string | 
   if (token) {
     try {
       return getEncodedTokenV4(token as Parameters<typeof getEncodedTokenV4>[0]);
-    } catch {
-      /* fall through */
+    } catch (e) {
+      console.warn('[getReceiveTokenString] Token encode failed:', e instanceof Error ? e.message : e);
     }
   }
   return getStringField(getMetadata(entry), 'rawToken');
@@ -381,6 +383,26 @@ export function shouldApplyEntryUpdate(
   const currentId = getStringField(currentEntry, 'id');
   const updatedId = getStringField(updatedEntry, 'id');
   if (currentId && updatedId && currentId === updatedId) return true;
+
+  if (currentType === 'mint') {
+    const cq = getStringField(currentEntry, 'quoteId');
+    const uq = getStringField(updatedEntry, 'quoteId');
+    if (cq && uq && cq === uq) {
+      console.info('[shouldApplyEntryUpdate] mint: matched by quoteId |', cq);
+      return true;
+    }
+
+    const co =
+      getStringField(getMetadata(currentEntry), 'operationId') ??
+      getStringField(currentEntry, 'operationId');
+    const uo =
+      getStringField(getMetadata(updatedEntry), 'operationId') ??
+      getStringField(updatedEntry, 'operationId');
+    if (co && uo && co === uo) {
+      console.info('[shouldApplyEntryUpdate] mint: matched by operationId |', co);
+      return true;
+    }
+  }
 
   if (currentType === 'send') {
     const co =
@@ -434,13 +456,18 @@ export function shouldApplyEntryUpdate(
     if (ct && ut && ct === ut) return true;
 
     const isPreview = currentId?.startsWith('receive-') ?? false;
-    if (!isPreview) return false;
+    if (!isPreview) {
+      console.info('[shouldApplyEntryUpdate] receive: not a preview entry, skipping | currentId:', currentId, '| updatedId:', updatedId);
+      return false;
+    }
 
     const cm = getStringField(currentEntry, 'mintUrl');
     const um = getStringField(updatedEntry, 'mintUrl');
     const ca = getNumberField(currentEntry, 'amount');
     const ua = getNumberField(updatedEntry, 'amount');
-    return !!cm && cm === um && typeof ca === 'number' && ca === ua;
+    const matched = !!cm && cm === um && typeof ca === 'number' && ca === ua;
+    console.info('[shouldApplyEntryUpdate] receive preview match:', matched, '| mintUrl:', cm === um, '| amount:', ca, '→', ua);
+    return matched;
   }
 
   return false;
@@ -520,8 +547,8 @@ export function decorateEntry(raw: EntryRecord | null, language: string): EntryR
         'middle',
         language
       );
-    } catch {
-      /* skip */
+    } catch (e) {
+      console.warn('[buildEntryContent] Token encode failed:', e instanceof Error ? e.message : e);
     }
   }
 

@@ -5,7 +5,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
-import { HistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface MonthItem {

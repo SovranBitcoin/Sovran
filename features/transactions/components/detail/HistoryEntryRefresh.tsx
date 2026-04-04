@@ -4,7 +4,7 @@ import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
-import type { HistoryEntry } from 'coco-cashu-core';
+import type { HistoryEntry } from '@cashu/coco-core';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';

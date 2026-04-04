@@ -13,7 +13,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import Icon from 'assets/icons';
-import { useManager } from 'coco-cashu-react';
+import { useManager } from '@cashu/coco-react';
 import {
   keysLoadFailedPopup,
   keyGenerateFailedPopup,
@@ -25,7 +25,7 @@ import {
 } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { Section } from '@/features/settings';
-import type { Keypair } from 'coco-cashu-core';
+import type { Keypair } from '@cashu/coco-core';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { nip19 } from 'nostr-tools';
