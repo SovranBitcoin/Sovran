@@ -72,11 +72,7 @@ const PLACES_CACHE_TTL = 60 * 60 * 1000;
 /** 24 hours for individual place details */
 const PLACE_DETAILS_CACHE_TTL = 24 * 60 * 60 * 1000;
 
-const BTCMAP_API_URL =
-  'https://api.btcmap.org/v4/places?fields=id,lat,lon,icon,comments,boosted_until,deleted_at,updated_at&include_deleted=false';
-
-const BTCMAP_PLACE_DETAILS_FIELDS =
-  'id,lat,lon,icon,comments,boosted_until,deleted_at,updated_at,name,address,description,phone,website,twitter,facebook,instagram,email,opening_hours,created_at,verified_at,osm_id,osm_url,osm:contact:instagram,osm:contact:twitter,osm:contact:facebook,osm:contact:phone,osm:contact:website,osm:contact:email,required_app_url,osm:payment:onchain,osm:payment:lightning,osm:payment:lightning_contactless,osm:payment:bitcoin,osm:payment:uri,osm:payment:coinos,osm:payment:pouch,osm:amenity,osm:category,osm:survey:date,osm:check_date,osm:check_date:currency:XBT';
+const SOVRAN_API_BASE = 'https://api.sovran.money/api/btcmap';
 
 function isCacheExpired(timestamp: number, ttl: number): boolean {
   return Date.now() - timestamp > ttl;
@@ -131,7 +127,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
         set({ isLoading: true, error: null });
 
         try {
-          const response = await fetch(BTCMAP_API_URL);
+          const response = await fetch(`${SOVRAN_API_BASE}/places`);
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
@@ -177,7 +173,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
 
         try {
           const response = await fetch(
-            `https://api.btcmap.org/v4/places/${id}?fields=${BTCMAP_PLACE_DETAILS_FIELDS}`
+            `${SOVRAN_API_BASE}/places/${id}`
           );
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
