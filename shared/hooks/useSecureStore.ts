@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { log } from '@/shared/lib/logger';
 
 // Keys for secure storage
 const STORAGE_KEYS = {
@@ -53,7 +54,7 @@ const useSecureStore = (key: StorageKey, autoLoad: boolean = true): UseSecureSto
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to load from secure storage';
       setError(errorMessage);
-      console.error(`Failed to retrieve ${key}:`, err);
+      log.error('hooks.secure_store.retrieve_failed', { key, error: err });
     } finally {
       setLoading(false);
     }
@@ -76,7 +77,7 @@ const useSecureStore = (key: StorageKey, autoLoad: boolean = true): UseSecureSto
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to store value';
         setError(errorMessage);
-        console.error(`Failed to store ${key}:`, err);
+        log.error('hooks.secure_store.store_failed', { key, error: err });
         return false;
       }
     },
@@ -95,7 +96,7 @@ const useSecureStore = (key: StorageKey, autoLoad: boolean = true): UseSecureSto
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to remove value';
       setError(errorMessage);
-      console.error(`Failed to remove ${key}:`, err);
+      log.error('hooks.secure_store.remove_failed', { key, error: err });
       return false;
     }
   }, [key, getSecureOptions]);
@@ -172,7 +173,7 @@ export const useCashuMnemonic = (accountIndex: number = 0, autoLoad: boolean = t
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load cashu mnemonic';
       setError(errorMessage);
-      console.error('Failed to load cashu mnemonic:', err);
+      log.error('hooks.secure_store.load_cashu_mnemonic_failed', { error: err });
       setLocalCashuMnemonic(null);
     } finally {
       setLoading(false);

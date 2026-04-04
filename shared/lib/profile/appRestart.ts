@@ -13,6 +13,7 @@ import { DevSettings } from 'react-native';
 
 import * as Updates from 'expo-updates';
 import RNRestart from 'react-native-restart';
+import { log } from '../logger';
 
 /**
  * Restart the app using the best available mechanism for the current build.
@@ -28,7 +29,7 @@ export async function restartApp(): Promise<boolean> {
     RNRestart.restart();
     return true;
   } catch (e) {
-    console.warn('[appRestart] RNRestart.restart() failed:', e);
+    log.warn('profile.restart.rn_restart_failed', { error: e });
   }
 
   if (Updates.isEnabled) {
@@ -36,10 +37,10 @@ export async function restartApp(): Promise<boolean> {
       await Updates.reloadAsync();
       return true;
     } catch (e) {
-      console.warn('[appRestart] Updates.reloadAsync() failed:', e);
+      log.warn('profile.restart.expo_reload_failed', { error: e });
     }
   }
 
-  console.error('[appRestart] All restart methods failed');
+  log.error('profile.restart.all_methods_failed');
   return false;
 }

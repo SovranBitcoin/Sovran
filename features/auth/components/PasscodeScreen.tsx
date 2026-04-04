@@ -11,6 +11,7 @@ import AnimatedSpriteBackground from '@/shared/ui/composed/SpriteView';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log } from '@/shared/lib/logger';
 
 interface Props {
   passcode: string;
@@ -60,12 +61,14 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
     setValue(val);
     if (val.length === passcode.length) {
       if (val === passcode) {
+        log.info('auth.passcode.verify_success');
         Animated.timing(opacity, {
           toValue: 0,
           duration: 300,
           useNativeDriver: true,
         }).start(() => onSuccess());
       } else {
+        log.warn('auth.passcode.verify_failed');
         Animated.sequence([
           Animated.timing(shake, {
             toValue: -10,

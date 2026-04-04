@@ -14,6 +14,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import Icon from 'assets/icons';
 import { useManager } from '@cashu/coco-react';
+import { log, Screen } from '@/shared/lib/logger';
 import {
   keysLoadFailedPopup,
   keyGenerateFailedPopup,
@@ -229,7 +230,7 @@ export const SettingsKeyringScreen: React.FC = () => {
       const allKeys = await manager.keyring.getAllKeyPairs();
       setKeypairs(allKeys);
     } catch (error) {
-      console.error('Failed to load keypairs:', error);
+      log.error('settings.keyring.load_failed', { error });
       keysLoadFailedPopup();
     } finally {
       setIsLoading(false);
@@ -252,7 +253,7 @@ export const SettingsKeyringScreen: React.FC = () => {
       keyGeneratedPopup();
       await loadKeypairs();
     } catch (error) {
-      console.error('Failed to generate keypair:', error);
+      log.error('settings.keyring.generate_failed', { error });
       keyGenerateFailedPopup();
     } finally {
       setIsGenerating(false);
@@ -327,7 +328,7 @@ export const SettingsKeyringScreen: React.FC = () => {
                 invalidKeyFormatPopup();
               }
             } catch (error) {
-              console.error('Failed to import key:', error);
+              log.error('settings.keyring.import_failed', { error });
               keyImportFailedPopup();
             }
           },
@@ -346,6 +347,7 @@ export const SettingsKeyringScreen: React.FC = () => {
   };
 
   return (
+    <Screen name="SettingsKeyringScreen">
     <>
       <Stack.Screen
         options={{
@@ -447,5 +449,6 @@ export const SettingsKeyringScreen: React.FC = () => {
         <Spacer size={32} />
       </ModalLayoutWrapper>
     </>
+    </Screen>
   );
 };

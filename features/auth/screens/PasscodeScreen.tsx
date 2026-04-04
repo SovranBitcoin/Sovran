@@ -12,10 +12,12 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import NumericKeyboard from '@/features/auth/components/NumericKeyboard';
 import { passcodeNotMatchPopup } from '@/shared/lib/popup';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 const PASSCODE_LENGTH = 4;
 
 export function PasscodeScreen() {
+  useLifecycleLogger('PasscodeScreen');
   const setPasscode = useSettingsStore((state) => state.setPasscode);
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [code, setCode] = useState('');
@@ -42,6 +44,7 @@ export function PasscodeScreen() {
 
   return (
     <Container>
+      <Screen name="PasscodeScreen">
       <ScrollView className={'px-4'}>
         <Card
           message="Forgetting your passcode will prevent you from accessing your wallet."
@@ -72,6 +75,7 @@ export function PasscodeScreen() {
               icon: 'reset',
               variant: 'secondary',
               onPress: async () => {
+                log.info('auth.passcode.reset', { step });
                 setPasscode('');
                 setStep('create');
                 setCode('');
@@ -86,9 +90,11 @@ export function PasscodeScreen() {
               disabled: confirm.length !== PASSCODE_LENGTH,
               onPress: async () => {
                 if (code === confirm && code.length === PASSCODE_LENGTH) {
+                  log.info('auth.passcode.set_success');
                   setPasscode(code);
                   router.back();
                 } else {
+                  log.warn('auth.passcode.mismatch');
                   passcodeNotMatchPopup();
                 }
               },
@@ -96,6 +102,7 @@ export function PasscodeScreen() {
           ]}
         />
       </ScrollView>
+      </Screen>
     </Container>
   );
 }

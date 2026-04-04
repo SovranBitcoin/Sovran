@@ -31,7 +31,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { useInitializationStage } from './InitializationProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { initLog } from '@/shared/lib/initTiming';
+import { log, initLog } from '@/shared/lib/logger';
 
 interface NostrKeys {
   npub: string;
@@ -136,7 +136,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         return derivedKeys;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to derive Nostr keys';
-        console.error('Failed to derive Nostr keys:', err);
+        log.error('nostr.keys.derive_failed', { error: err });
         throw new Error(errorMessage);
       }
     },
@@ -164,7 +164,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         return derivedCashuMnemonic;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to derive cashu mnemonic';
-        console.error('Failed to derive cashu mnemonic:', err);
+        log.error('nostr.keys.cashu_mnemonic_failed', { error: err });
         throw new Error(errorMessage);
       }
     },
@@ -223,7 +223,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to refresh keys';
       setError(errorMessage);
-      console.error('Failed to refresh Nostr keys:', err);
+      log.error('nostr.keys.refresh_failed', { error: err });
     } finally {
       setIsLoading(false);
     }

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
+import { log } from '@/shared/lib/logger';
 import { themeVariables, getThemeVariables } from '@/shared/lib/themeEngine';
 import { Uniwind } from 'uniwind';
 
@@ -31,7 +32,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setCurrentTheme(themeName);
       setThemeStore(themeName);
     } else {
-      console.warn(`Theme "${themeName}" not found in available themes`);
+      log.warn('theme.not_found', { themeName });
     }
   };
 

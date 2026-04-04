@@ -15,6 +15,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
+import { log } from '@/shared/lib/logger';
 import { npubToPubkeySafe } from '@/shared/lib/nostr/client';
 import { LegendList, type LegendListRenderItemProps, type LegendListRef } from '@legendapp/list';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -500,7 +501,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
           }
         );
       } catch (error) {
-        console.error('HomeFeed: Failed to load feed', error);
+        log.error('feed.home.load_failed', { error });
         setFeedItems([]);
         setMetricsMap(new Map());
         setQuotedEventsMap(new Map());
@@ -704,7 +705,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
       );
       return newItems;
     } catch (error) {
-      console.error('HomeFeed: loadMore failed', error);
+      log.error('feed.home.load_more_failed', { error });
       return [];
     } finally {
       client.close();

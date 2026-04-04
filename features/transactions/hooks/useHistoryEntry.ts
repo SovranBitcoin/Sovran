@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { HistoryEntry } from '@cashu/coco-core';
 import { useManager } from '@cashu/coco-react';
+import { log } from '@/shared/lib/logger';
 
 type UseHistoryEntryResult<T extends HistoryEntry> = {
   /** The current history entry (updated via events) */
@@ -36,6 +37,7 @@ export function useHistoryEntry<T extends HistoryEntry>(
   // Parse initialEntry - handles both string (from route params) and object
   const { parsed, parseError } = useMemo(() => {
     if (!initialEntry) {
+      log.warn('tx.history_entry.missing');
       return {
         parsed: null,
         parseError: 'Missing transaction data. Please try again.',
@@ -44,11 +46,14 @@ export function useHistoryEntry<T extends HistoryEntry>(
 
     if (typeof initialEntry === 'string') {
       try {
+        const result = JSON.parse(initialEntry) as T;
+        log.debug('tx.history_entry.parsed', { id: result.id, type: result.type });
         return {
-          parsed: JSON.parse(initialEntry) as T,
+          parsed: result,
           parseError: null,
         };
       } catch {
+        log.error('tx.history_entry.parse_error');
         return {
           parsed: null,
           parseError: 'Invalid transaction data. Please try again.',
@@ -76,6 +81,7 @@ export function useHistoryEntry<T extends HistoryEntry>(
     const handleHistoryUpdated = ({ entry }: { mintUrl: string; entry: HistoryEntry }) => {
       // Match by id and type for type safety
       if (entry.id === parsed.id && entry.type === parsed.type) {
+        log.debug('tx.history_entry.updated', { id: entry.id, type: entry.type });
         setCurrentEntry(entry as T);
       }
     };

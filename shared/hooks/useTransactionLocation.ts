@@ -8,6 +8,7 @@
 
 import * as Location from 'expo-location';
 
+import { log } from '@/shared/lib/logger';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import {
   useTransactionLocationStore,
@@ -44,7 +45,7 @@ export async function getLocationForTransaction(): Promise<TransactionCoordinate
       longitude: location.coords.longitude,
     };
   } catch (error) {
-    console.error('[getLocationForTransaction] Failed:', error);
+    log.error('hooks.tx_location.get_failed', { error });
     return null;
   }
 }

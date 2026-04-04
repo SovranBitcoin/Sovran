@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Keyboard } from 'react-native';
 import { searchUsers as apiSearchUsers, type UserProfile } from '@/shared/lib/apiClient';
+import { paymentLog } from '@/shared/lib/logger';
 import { useSearchHistoryStore } from '@/shared/stores/profile/searchHistoryStore';
 import { router } from 'expo-router';
 
@@ -33,6 +34,7 @@ export function useContactSearch(searchQuery: string) {
       setHasSearched(true);
 
       try {
+        paymentLog.debug('payment.contacts.search', { query, limit: 10 });
         const result = await apiSearchUsers({ query, limit: 10 });
         if (result.isOk()) {
           const data = result.value;
@@ -52,6 +54,7 @@ export function useContactSearch(searchQuery: string) {
                 profile: { ...res, pubkey: profileEventPubkey },
               };
             });
+            paymentLog.info('payment.contacts.search.results', { query, resultCount: formatted.length });
             setSearchResults(formatted);
             if (formatted.length > 0) addSearchToHistory(query, 'payments');
           } else {
@@ -60,7 +63,8 @@ export function useContactSearch(searchQuery: string) {
         } else {
           setSearchResults([]);
         }
-      } catch {
+      } catch (err) {
+        paymentLog.error('payment.contacts.search.error', { query, error: err instanceof Error ? err : new Error(String(err)) });
         setSearchResults([]);
       } finally {
         setSearchLoading(false);

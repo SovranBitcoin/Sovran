@@ -4,6 +4,7 @@ import {
   TouchableOpacityProps,
   GestureResponderEvent,
 } from 'react-native';
+import { log } from '@/shared/lib/logger';
 import { EnhancedHaptics } from './Haptics';
 
 interface TouchPosition {
@@ -118,7 +119,7 @@ export const TouchableOpacity: FC<EnhancedTouchableOpacityProps> = ({
         }
       } catch (error) {
         // Silently fail if haptics are not supported
-        console.warn('Haptic feedback not supported on this device:', error);
+        log.warn('ui.haptics.not_supported', { type: 'touchable', error });
       }
     },
     [shouldUseHaptics, type, impactStyle, notificationType, onPressStart, onPressEnd]

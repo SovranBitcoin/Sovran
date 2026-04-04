@@ -14,8 +14,11 @@ import { HomeFeed } from '@/features/feed/components/HomeFeed';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import Icon from '@/assets/icons';
+import { Screen, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 export function FeedScreen() {
+  useLifecycleLogger('FeedScreen', feedLog);
+
   const { isSearching, searchQuery } = useFeedSearch();
   const [activeFilter, setActiveFilter] = useState('Trending');
   const [foreground, surface, separator] = useThemeColor([
@@ -28,6 +31,7 @@ export function FeedScreen() {
     useContactSearch(searchQuery);
 
   const handleFilterChange = useCallback((filter: string) => {
+    feedLog.info('feed.filter.change', { filter });
     setActiveFilter(filter);
   }, []);
 
@@ -45,10 +49,11 @@ export function FeedScreen() {
 
   const renderSearchEmpty = useCallback(() => {
     if (showNoResults) {
+      feedLog.info('feed.search.no_results', { query: searchQuery });
       return <NoResultsFound />;
     }
     return null;
-  }, [showNoResults]);
+  }, [showNoResults, searchQuery]);
 
   const renderFeedEmpty = useCallback(() => {
     return (
@@ -87,7 +92,7 @@ export function FeedScreen() {
   const showSearchUI = isSearching;
 
   return (
-    <View style={styles.root}>
+    <Screen name="FeedScreen" style={styles.root}>
       {/* Filters strip — always visible, switches between feed tabs and search tabs */}
       <View
         style={[
@@ -121,7 +126,7 @@ export function FeedScreen() {
           <HomeFeed activeFilter={activeFilter} />
         )}
       </ScreenContainer>
-    </View>
+    </Screen>
   );
 }
 

@@ -7,6 +7,7 @@ import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log } from '@/shared/lib/logger';
 
 interface MonthItem {
   key: string;
@@ -45,8 +46,9 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
   ] as const);
 
   const handlePress = useCallback(() => {
+    log.info('transaction.month.select', { monthKey: item.key, label: item.label });
     onPress(item.key);
-  }, [item.key, onPress]);
+  }, [item.key, item.label, onPress]);
 
   return (
     <TouchableOpacity onPress={handlePress}>

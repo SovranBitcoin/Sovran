@@ -12,6 +12,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log, storeLog } from '@/shared/lib/logger';
 
 export interface ProfileEntry {
   /**
@@ -93,8 +94,10 @@ export const useProfileStore = create<ProfileStore>()(
         source?: 'derived' | 'imported',
         externalChain?: number
       ) => {
+        storeLog.info('store.profile.add', { accountIndex, source, externalChain });
         set((state) => {
           if (state.profiles.some((p) => p.accountIndex === accountIndex)) {
+            storeLog.debug('store.profile.add.skip_duplicate', { accountIndex });
             return state;
           }
           const effectiveChain = externalChain ?? (source === 'imported' ? 1 : undefined);
@@ -119,9 +122,10 @@ export const useProfileStore = create<ProfileStore>()(
         const { profiles } = get();
         // Only switch if the profile exists
         if (!profiles.some((p) => p.accountIndex === accountIndex)) {
-          console.warn(`ProfileStore: Cannot switch to unknown profile ${accountIndex}`);
+          log.warn('store.profile.unknown_profile', { accountIndex });
           return false;
         }
+        storeLog.info('store.profile.switch', { accountIndex });
         set({ activeAccountIndex: accountIndex });
         return true;
       },
@@ -130,14 +134,15 @@ export const useProfileStore = create<ProfileStore>()(
         const { profiles, activeAccountIndex } = get();
         // Cannot remove the last profile
         if (profiles.length <= 1) {
-          console.warn('ProfileStore: Cannot remove the last profile');
+          log.warn('store.profile.cannot_remove_last');
           return false;
         }
         // Cannot remove the currently active profile
         if (accountIndex === activeAccountIndex) {
-          console.warn('ProfileStore: Cannot remove the currently active profile');
+          log.warn('store.profile.cannot_remove_active');
           return false;
         }
+        storeLog.info('store.profile.remove', { accountIndex });
         set((state) => ({
           profiles: state.profiles.filter((p) => p.accountIndex !== accountIndex),
         }));
@@ -153,6 +158,7 @@ export const useProfileStore = create<ProfileStore>()(
       },
 
       updateProfileBalance: (accountIndex: number, balanceSats: number) => {
+        storeLog.debug('store.profile.update_balance', { accountIndex, balanceSats });
         set((state) => ({
           profiles: state.profiles.map((p) =>
             p.accountIndex === accountIndex ? { ...p, cachedBalanceSats: balanceSats } : p
@@ -165,6 +171,7 @@ export const useProfileStore = create<ProfileStore>()(
       },
 
       markCocoMigrationComplete: (accountIndex: number) => {
+        storeLog.info('store.profile.mark_coco_migration_complete', { accountIndex });
         set((state) => ({
           cocoMigrationComplete: {
             ...state.cocoMigrationComplete,
@@ -174,6 +181,7 @@ export const useProfileStore = create<ProfileStore>()(
       },
 
       updateProfileMetadata: (accountIndex: number, displayName?: string, picture?: string) => {
+        storeLog.debug('store.profile.update_metadata', { accountIndex, displayName });
         set((state) => ({
           profiles: state.profiles.map((p) =>
             p.accountIndex === accountIndex

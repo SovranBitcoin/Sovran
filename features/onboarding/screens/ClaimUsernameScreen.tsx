@@ -30,6 +30,7 @@ import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { finalizeEvent } from 'nostr-tools';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
@@ -257,6 +258,7 @@ function generateNip98Auth(url: string, method: string, privateKey: Uint8Array):
 }
 
 export function ClaimUsernameScreen() {
+  useLifecycleLogger('ClaimUsernameScreen');
   const [foreground, surfaceForeground, accent, surface, background] = useThemeColor([
     'foreground',
     'surface-foreground',
@@ -336,6 +338,7 @@ export function ClaimUsernameScreen() {
     setAvailabilityResults(initialResults);
 
     // Check all domains in parallel
+    log.info('onboarding.claim.check_availability', { username: name });
     const results = await Promise.all(
       DOMAINS.map(async (domain) => {
         try {
@@ -357,6 +360,10 @@ export function ClaimUsernameScreen() {
       })
     );
 
+    log.info('onboarding.claim.availability_results', {
+      username: name,
+      available: results.filter((r) => r.available).map((r) => r.domain),
+    });
     setAvailabilityResults(results);
     setIsChecking(false);
   }, []);
@@ -392,9 +399,10 @@ export function ClaimUsernameScreen() {
   // Generate NIP-98 auth for npub.cash and navigate to local server with auth
   const handleContinue = useCallback(() => {
     Keyboard.dismiss();
+    log.info('onboarding.claim.continue', { username, domain: selectedDomain });
 
     if (!nostrKeys?.privateKey) {
-      console.error('No Nostr private key available');
+      log.error('onboarding.claim.no_private_key');
       return;
     }
 
@@ -436,6 +444,7 @@ export function ClaimUsernameScreen() {
   );
 
   return (
+    <Screen name="ClaimUsernameScreen">
     <>
       <Stack.Screen
         options={{
@@ -593,6 +602,7 @@ export function ClaimUsernameScreen() {
         </VStack>
       </ModalLayoutWrapper>
     </>
+    </Screen>
   );
 }
 

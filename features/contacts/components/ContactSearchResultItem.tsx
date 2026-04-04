@@ -6,6 +6,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { paymentLog } from '@/shared/lib/logger';
 
 type Props = {
   result: DisplayResult;
@@ -30,7 +31,12 @@ export const ContactSearchResultItem = ({ result, loading, onPress }: Props) => 
 
   return (
     <Pressable
-      onPress={() => !isLoading && onPress(result)}
+      onPress={() => {
+        if (!isLoading) {
+          paymentLog.info('contact.search.result.press', { pubkey: result.pubkey });
+          onPress(result);
+        }
+      }}
       style={({ pressed }) => [
         styles.container,
         pressed && !isLoading && { backgroundColor: surfaceSecondary },

@@ -20,6 +20,7 @@ import { DraggableContactsList } from '../components/DraggableContactsList';
 import { useContactSearch, type DisplayResult } from '../hooks/useContactSearch';
 import { useRecentContacts } from '../hooks/useRecentContacts';
 import { useMintContacts } from '../hooks/useMintContacts';
+import { Screen, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 const SearchResultItem = React.memo(
   ({
@@ -49,6 +50,7 @@ interface PaymentsScreenProps {
 }
 
 export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps) {
+  useLifecycleLogger('PaymentsScreen', paymentLog);
   useBackgroundConfig({ blurMode: 'full', backgroundOpacity: 0.25 });
 
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
@@ -93,10 +95,12 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
   }, [profileEvents]);
 
   useEffect(() => {
+    paymentLog.debug('payment.profiles.loaded', { count: profilesMap.size });
     prefetchImages(Array.from(profilesMap.values()).map((p: any) => p?.picture));
   }, [profilesMap]);
 
   const handleTabPress = useCallback((tab: string, _index: number) => {
+    paymentLog.info('payment.tab.change', { tab });
     setSelectedTab(tab);
   }, []);
 
@@ -104,6 +108,7 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
 
   return (
     <LayoutDebugWrapper scrollable={false}>
+      <Screen name="PaymentsScreen">
       <ScrollableGradientOverlay contentHeight={windowHeight * 1.5} />
 
       <SafeAreaView style={styles.flex1} edges={['bottom']}>
@@ -165,6 +170,7 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
           </View>
         </View>
       </SafeAreaView>
+      </Screen>
     </LayoutDebugWrapper>
   );
 }

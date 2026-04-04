@@ -16,6 +16,7 @@ import _ from 'lodash';
 import { twMerge } from 'tailwind-merge';
 
 import type { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
+import { log } from './logger';
 
 /** Outgoing = ecash send or Lightning melt */
 export function isOutgoingTransaction(entry: Pick<HistoryEntry, 'type'>): boolean {
@@ -53,7 +54,7 @@ export function mintHistoryEntryExpired(historyEntry: MintHistoryEntry): boolean
 
     return Date.now() > expiryTime;
   } catch (error) {
-    console.error('Error decoding payment request:', error);
+    log.error('utils.decode_payment_request_failed', { error });
     return false;
   }
 }
@@ -91,7 +92,7 @@ export function getMintHistoryEntryTimeUntilExpiry(historyEntry: MintHistoryEntr
       return `expires in ${seconds}s`;
     }
   } catch (error) {
-    console.error('Error calculating expiry time:', error);
+    log.error('utils.expiry_calc_failed', { error });
     return null;
   }
 }

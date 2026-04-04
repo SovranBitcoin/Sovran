@@ -4,10 +4,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StoriesCarousel, type StoryUser } from '@/features/feed/components/nostr/StoriesCarousel';
+import { Screen, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 const CLOSE_DELAY_MS = 350;
 
 export function StoriesScreen() {
+  useLifecycleLogger('StoriesScreen', feedLog);
+
   const insets = useSafeAreaInsets();
   const { startIndex, storyUsersJson } = useLocalSearchParams<{
     startIndex?: string;
@@ -21,14 +24,18 @@ export function StoriesScreen() {
     if (!storyUsersJson) return [];
     try {
       return JSON.parse(storyUsersJson);
-    } catch {
+    } catch (e) {
+      feedLog.error('feed.stories.parse_failed', { error: e instanceof Error ? e : new Error(String(e)) });
       return [];
     }
   }, [storyUsersJson]);
 
+  feedLog.debug('feed.stories.open', { startIndex: Number(startIndex) || 0, userCount: storyUsers.length });
+
   const handleClose = () => {
     if (closeRequestedRef.current) return;
     closeRequestedRef.current = true;
+    feedLog.info('feed.stories.close');
     setIsClosing(true);
   };
 
@@ -43,21 +50,20 @@ export function StoriesScreen() {
   if (storyUsers.length === 0) {
     if (!closeRequestedRef.current) {
       closeRequestedRef.current = true;
+      feedLog.warn('feed.stories.empty', { reason: 'no_story_users' });
       setTimeout(() => router.back(), 0);
     }
     return null;
   }
 
   return (
-    <View
-      className="flex-1 bg-black"
-      style={{ paddingTop: insets.top + 6, paddingBottom: insets.bottom + 6 }}>
+    <Screen name="StoriesScreen" style={{ flex: 1, backgroundColor: 'black', paddingTop: insets.top + 6, paddingBottom: insets.bottom + 6 }}>
       <StoriesCarousel
         storyUsers={storyUsers}
         startIndex={Number(startIndex) || 0}
         onClose={handleClose}
         isClosing={isClosing}
       />
-    </View>
+    </Screen>
   );
 }

@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { MintInfo } from '@cashu/cashu-ts';
 
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
+import { cashuLog } from '@/shared/lib/logger';
 
 /**
  * Loads mint info for a given mint URL.
@@ -17,9 +18,11 @@ export function useMintInfo(mintUrl: string | undefined | null): MintInfo | null
   const cachedInfo = useMemo(() => {
     if (!mintUrl) return null;
     const match = mints.find((m) => m.mintUrl === mintUrl);
-    return match?.mintInfo && Object.keys(match.mintInfo).length > 0
+    const hit = match?.mintInfo && Object.keys(match.mintInfo).length > 0
       ? (match.mintInfo as MintInfo)
       : null;
+    if (mintUrl) cashuLog.debug('mintInfo.cache', { mintUrl, hit: !!hit });
+    return hit;
   }, [mintUrl, mints]);
 
   const [fetchedInfo, setFetchedInfo] = useState<MintInfo | null>(null);
@@ -30,11 +33,16 @@ export function useMintInfo(mintUrl: string | undefined | null): MintInfo | null
       return;
     }
     let mounted = true;
+    cashuLog.info('mintInfo.fetch.start', { mintUrl });
     getMintInfo(mintUrl)
       .then((info) => {
-        if (mounted) setFetchedInfo(info as MintInfo);
+        if (mounted) {
+          cashuLog.info('mintInfo.fetch.ok', { mintUrl, hasInfo: !!info });
+          setFetchedInfo(info as MintInfo);
+        }
       })
-      .catch(() => {
+      .catch((err) => {
+        cashuLog.warn('mintInfo.fetch.fail', { mintUrl, error: err });
         if (mounted) setFetchedInfo(null);
       });
     return () => {

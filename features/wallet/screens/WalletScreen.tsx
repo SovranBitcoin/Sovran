@@ -17,10 +17,12 @@ import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
 import { View } from '@/shared/ui/primitives/View/View';
 import { isAndroidLiquidHeaderSupported } from '@/navigation/nativeTabs';
 import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
+import { Screen, useLifecycleLogger } from '@/shared/lib/logger';
 
 const ACCOUNTS = [{ unit: 'sat' }];
 
 export function WalletScreen() {
+  useLifecycleLogger('WalletScreen');
   useBackgroundConfig({ blurMode: 'partial' });
 
   const { height: windowHeight } = useWindowDimensions();
@@ -45,21 +47,23 @@ export function WalletScreen() {
       onContentSizeChange={onContentSizeChange}
       refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}
       contentContainerStyle={{ padding: 0, paddingTop: androidHeaderPadding }}>
-      <ScrollableGradientOverlay contentHeight={contentHeight} />
+      <Screen name="WalletScreen">
+        <ScrollableGradientOverlay contentHeight={contentHeight} />
 
-      <AccountPagerView accounts={ACCOUNTS} setAccount={setAccount} account={account} />
+        <AccountPagerView accounts={ACCOUNTS} setAccount={setAccount} account={account} />
 
-      <View
-        className="p-4 pb-24 pt-4"
-        style={{
-          minHeight: windowHeight - windowHeight * 0.5 - 88,
-          gap: 16,
-        }}>
-        <Transactions account={account} showMore={true} history={history} hideExpired={true} />
-        <SpentThisMonth history={history} unit={account.unit} />
-        <ReceivedThisMonth history={history} unit={account.unit} />
-        <BitcoinNearYou />
-      </View>
+        <View
+          className="p-4 pb-24 pt-4"
+          style={{
+            minHeight: windowHeight - windowHeight * 0.5 - 88,
+            gap: 16,
+          }}>
+          <Transactions account={account} showMore={true} history={history} hideExpired={true} />
+          <SpentThisMonth history={history} unit={account.unit} />
+          <ReceivedThisMonth history={history} unit={account.unit} />
+          <BitcoinNearYou />
+        </View>
+      </Screen>
     </LayoutDebugWrapper>
   );
 }

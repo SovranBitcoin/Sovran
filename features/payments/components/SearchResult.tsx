@@ -6,6 +6,7 @@ import { UserProfile } from '@/shared/lib/apiClient';
 import { ProfileImage } from './ProfileImage';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { PressableFeedback } from 'heroui-native';
+import { paymentLog } from '@/shared/lib/logger';
 
 interface SearchResultProps {
   result: {
@@ -28,7 +29,10 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
     return <HStack spacing={8} align="center"></HStack>;
   }
   return (
-    <PressableFeedback animation={false} onPress={onPress}>
+    <PressableFeedback animation={false} onPress={() => {
+      paymentLog.info('payment.search.result.press', { pubkey: result.pubkey });
+      onPress();
+    }}>
       <PressableFeedback.Ripple />
       <HStack spacing={8} align="center" style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
         <ProfileImage loading={loading} profile={result.profile} />

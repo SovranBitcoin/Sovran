@@ -5,6 +5,7 @@ import {
   type NostrProfileResponse,
   type TopFollower,
 } from '@/shared/lib/apiClient';
+import { log } from '@/shared/lib/logger';
 
 export type { TopFollower };
 
@@ -27,13 +28,16 @@ export function useNostrProfile(pubkey: string | null): UseNostrProfileResult {
       return;
     }
 
+    log.debug('feed.profile.fetch.start', { pubkey });
     setIsLoading(true);
     setError(null);
 
     const result = await fetchNostrProfile(pubkey);
     if (result.isOk()) {
+      log.debug('feed.profile.fetch.success', { pubkey, hasData: !!result.value });
       setData(result.value);
     } else {
+      log.warn('feed.profile.fetch.error', { pubkey, error: result.error });
       setError(result.error);
       setData(null);
     }

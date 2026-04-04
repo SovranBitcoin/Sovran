@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useCallback, ReactNode } from 'react';
 import { useSharedValue, withTiming, SharedValue, Easing } from 'react-native-reanimated';
 import { useFocusEffect } from 'expo-router';
+import { log } from '@/shared/lib/logger';
 
 /**
  * Blur mode options for background configuration
@@ -107,6 +108,11 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
 
   const setConfig = useCallback(
     (config: BackgroundConfig) => {
+      log.debug('background.config.update', {
+        blurMode: config.blurMode,
+        blurIntensity: config.blurIntensity,
+        backgroundOpacity: config.backgroundOpacity,
+      });
       const defaults = DEFAULT_CONFIGS[config.blurMode];
       const intensity = config.blurIntensity ?? defaults.blurIntensity;
       const gradientStart = config.blurGradientStart ?? defaults.blurGradientStart;

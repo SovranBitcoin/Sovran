@@ -1,6 +1,7 @@
 import type { Mint } from '@cashu/coco-core';
 
 import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
+import { walletLog } from '@/shared/lib/logger';
 
 type HealthSeverity = 'ok' | 'warn' | 'error' | 'info';
 
@@ -87,8 +88,9 @@ export function normalizeBpLargestRemainder(
  * For 'sat', mints with no NUT-4 metadata are included (backwards-compat default).
  */
 export function getMintsForUnit(trustedMints: Mint[], unit: string): Mint[] {
+  walletLog.debug('health.mints_for_unit.start', { unit, totalMints: trustedMints.length });
   const u = unit.toLowerCase();
-  return trustedMints.filter((mint) => {
+  const result = trustedMints.filter((mint) => {
     const methods = mint.mintInfo?.nuts?.['4']?.methods;
     if (u === 'sat') {
       if (!methods) return true;
@@ -97,6 +99,8 @@ export function getMintsForUnit(trustedMints: Mint[], unit: string): Mint[] {
     if (!methods) return false;
     return methods.some((m) => m.unit?.toLowerCase() === u);
   });
+  walletLog.debug('health.mints_for_unit.done', { unit, matchedMints: result.length });
+  return result;
 }
 
 export function computeWalletHealth({
@@ -112,6 +116,7 @@ export function computeWalletHealth({
   desiredDistributionBp: Record<string, number> | undefined;
   pendingOutgoingCount: number;
 }): WalletHealthResult {
+  walletLog.debug('health.compute.start', { unit, mintCount: mintUrlsForUnit.length, pendingOutgoingCount });
   const normalizedUnit = unit.toLowerCase();
   const desired = desiredDistributionBp || {};
 
@@ -200,6 +205,13 @@ export function computeWalletHealth({
 
   // Keep card minimal: only show up to 2 chips on the card; modal can show everything.
   const minimalChips = chips.slice(0, 2);
+
+  walletLog.debug('health.computed', {
+    unit: normalizedUnit,
+    chipCount: chips.length,
+    signalCount: signals.length,
+    severities: signals.map((s) => s.severity),
+  });
 
   return { unit: normalizedUnit, chips: minimalChips, signals };
 }

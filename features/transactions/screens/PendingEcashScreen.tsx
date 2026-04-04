@@ -31,6 +31,7 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { rollbackSuccessPopup, rollbackPartialPopup } from '@/shared/lib/popup';
 import { useMints, usePaginatedHistory, useManager } from '@cashu/coco-react';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
@@ -217,6 +218,7 @@ function MintTabs({ mints, selectedMintUrl, onMintChange, pendingByMint, scrollY
 // ============================================================================
 
 export function PendingEcashScreen() {
+  useLifecycleLogger('PendingEcashScreen');
   const [green400, foreground, surfaceForeground, muted, background] = useThemeColor([
     'green-400',
     'foreground',
@@ -382,6 +384,7 @@ export function PendingEcashScreen() {
   const handleSweep = useCallback(async () => {
     if (isSweeping || displayedTransactions.length === 0) return;
 
+    log.info('transactions.pending.sweep.start', { count: displayedTransactions.length, mintUrl: effectiveSelectedMint });
     setIsSweeping(true);
     let successCount = 0;
     let failCount = 0;
@@ -394,7 +397,7 @@ export function PendingEcashScreen() {
         await manager.ops.send.reclaim(tx.operationId);
         successCount++;
       } catch (error) {
-        console.error(`Failed to rollback ${tx.operationId}:`, error);
+        log.error('transactions.rollback_failed', { operationId: tx.operationId, error });
         failCount++;
       } finally {
         // Remove from rolling back set
@@ -407,6 +410,7 @@ export function PendingEcashScreen() {
     }
 
     setIsSweeping(false);
+    log.info('transactions.pending.sweep.complete', { successCount, failCount });
 
     if (failCount === 0) {
       rollbackSuccessPopup(
@@ -461,23 +465,24 @@ export function PendingEcashScreen() {
   ]);
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          presentation: 'card',
-          animation: 'fade',
-          headerShown: true,
-          headerTransparent: true,
-          headerShadowVisible: false,
-          headerTitle: '',
-          headerBackVisible: false,
-          headerTintColor: foreground,
-          headerBlurEffect: 'none',
-          headerBackground: () => null,
-          headerLeft: CloseButton,
-        }}
-      />
-      <RNView style={{ flex: 1 }}>
+    <Screen name="PendingEcashScreen">
+      <>
+        <Stack.Screen
+          options={{
+            presentation: 'card',
+            animation: 'fade',
+            headerShown: true,
+            headerTransparent: true,
+            headerShadowVisible: false,
+            headerTitle: '',
+            headerBackVisible: false,
+            headerTintColor: foreground,
+            headerBlurEffect: 'none',
+            headerBackground: () => null,
+            headerLeft: CloseButton,
+          }}
+        />
+        <RNView style={{ flex: 1 }}>
         {/* Scrollable content underneath the sticky header */}
         <ModalLayoutWrapper
           contentPadding={0}
@@ -623,8 +628,9 @@ export function PendingEcashScreen() {
             </Animated.View>
           </RNView>
         </RNView>
-      </RNView>
-    </>
+        </RNView>
+      </>
+    </Screen>
   );
 }
 

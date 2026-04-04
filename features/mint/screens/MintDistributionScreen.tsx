@@ -22,12 +22,14 @@ import {
   TOTAL_BASIS_POINTS,
 } from '@/shared/stores/profile/mintDistributionStore';
 import opacity from 'hex-color-opacity';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 const DISTRIBUTION_BAR_HEIGHT = 48;
 const CURRENCY_TABS_HEIGHT = 48;
 const STICKY_CONTENT_HEIGHT = DISTRIBUTION_BAR_HEIGHT + CURRENCY_TABS_HEIGHT;
 
 export function MintDistributionScreen() {
+  useLifecycleLogger('MintDistributionScreen');
   const [foreground, background, danger] = useThemeColor([
     'foreground',
     'background',
@@ -132,6 +134,7 @@ export function MintDistributionScreen() {
 
   const handleDistributionChange = useCallback(
     (mintUrl: string, bp: number) => {
+      log.debug('mint.distribution.change', { mintUrl, basisPoints: bp, currency: selectedCurrency });
       setMintDistribution(selectedCurrency, mintUrl, bp, mintUrls);
     },
     [selectedCurrency, mintUrls, setMintDistribution]
@@ -152,6 +155,7 @@ export function MintDistributionScreen() {
   );
 
   const handleEqualize = useCallback(() => {
+    log.info('mint.distribution.equalize', { currency: selectedCurrency, mintCount: mintUrls.length });
     equalizeMints(selectedCurrency, mintUrls);
   }, [selectedCurrency, mintUrls, equalizeMints]);
 
@@ -183,6 +187,7 @@ export function MintDistributionScreen() {
   );
 
   const handleRebalance = useCallback(() => {
+    log.info('mint.distribution.rebalance', { currency: selectedCurrency });
     router.navigate({
       pathname: '/rebalancePlan',
       params: { unit: selectedCurrency },
@@ -213,6 +218,7 @@ export function MintDistributionScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: background }}>
+      <Screen name="MintDistributionScreen">
       <Stack.Screen
         options={{
           title: 'Balance split',
@@ -292,6 +298,7 @@ export function MintDistributionScreen() {
           </Text>
         </View>
       </ModalLayoutWrapper>
+      </Screen>
     </GestureHandlerRootView>
   );
 }

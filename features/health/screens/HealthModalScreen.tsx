@@ -15,6 +15,7 @@ import type { HealthCta } from '@/features/health/lib/walletHealth';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { useMints } from '@cashu/coco-react';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 const DEFAULT_CURRENCIES = ['SAT'];
 const HEADER_OVERLAP = 24;
@@ -36,6 +37,7 @@ function getCurrenciesFromMints(trustedMints: any[]): string[] {
 }
 
 export function HealthModalScreen() {
+  useLifecycleLogger('HealthModalScreen');
   const params = useLocalSearchParams<{ unit?: string }>();
   const initialUnit = (params.unit || 'sat').toLowerCase();
 
@@ -64,6 +66,7 @@ export function HealthModalScreen() {
   );
 
   const handleAction = useCallback((action: HealthCta) => {
+    log.info('health.action', { type: action.type, unit: 'unit' in action ? action.unit : undefined });
     if (action.type === 'openPendingEcash') {
       router.navigate('/pendingEcash');
       return;
@@ -83,6 +86,7 @@ export function HealthModalScreen() {
   }, [hero, unit]);
 
   return (
+    <Screen name="HealthModalScreen">
     <>
       <Stack.Screen
         options={{
@@ -158,6 +162,7 @@ export function HealthModalScreen() {
         )}
       </WalletHealthModalContent>
     </>
+    </Screen>
   );
 }
 

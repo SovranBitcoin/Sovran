@@ -6,7 +6,7 @@ import { Buffer } from 'buffer';
 import NfcManager from 'react-native-nfc-manager';
 import { NfcError } from './errors';
 import { STATUS_CODES, STATUS_OK } from './constants';
-import { logDebug, logError } from './logger';
+import { nfcLog } from '../logger';
 
 export interface ApduResponse {
   ok: boolean;
@@ -25,7 +25,7 @@ export function getStatusMessage(sw: string): string {
 
 export async function sendApdu(command: number[], label?: string): Promise<ApduResponse> {
   const cmdHex = hex(command);
-  logDebug(`>> APDU${label ? ` [${label}]` : ''}: ${cmdHex}`);
+  nfcLog.debug('nfc.apdu.send', { label, command: cmdHex });
 
   try {
     if (!NfcManager.isoDepHandler) {
@@ -42,7 +42,7 @@ export async function sendApdu(command: number[], label?: string): Promise<ApduR
     const sw = hexResp.slice(-4);
     const ok = sw.toLowerCase() === STATUS_OK.toLowerCase();
 
-    logDebug(`<< Response: ${hexResp} (SW: ${sw} - ${getStatusMessage(sw)})`);
+    nfcLog.debug('nfc.apdu.response', { response: hexResp, sw, status: getStatusMessage(sw) });
 
     return {
       ok,
@@ -53,7 +53,7 @@ export async function sendApdu(command: number[], label?: string): Promise<ApduR
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStr = errorMessage || 'Unknown error';
-    logError('APDU transceive failed:', errorStr);
+    nfcLog.error('nfc.apdu.transceive_failed', { error: errorStr });
 
     if (errorStr.includes('Tag was lost') || errorStr.includes('TagLost')) {
       throw new NfcError(

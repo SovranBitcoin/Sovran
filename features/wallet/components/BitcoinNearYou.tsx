@@ -14,6 +14,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 import { useShallow } from 'zustand/react/shallow';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log } from '@/shared/lib/logger';
 
 const DEFAULT_LAT = 51.5074;
 const DEFAULT_LON = -0.1278;
@@ -157,7 +158,9 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
   );
 
   useEffect(() => {
-    fetchPlaces().catch(() => {});
+    fetchPlaces().catch((err) => {
+      log.warn('bitcoin.nearby.fetch.error', { error: err instanceof Error ? err : new Error(String(err)) });
+    });
   }, [fetchPlaces]);
 
   const [coords, setCoords] = useState({

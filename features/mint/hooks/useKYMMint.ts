@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 
+import { cashuLog } from '@/shared/lib/logger';
 import {
   isCashuRecommendationEvent,
   extractMintUrlFromEvent,
@@ -54,8 +55,11 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
 
     const cached = getCached(normalizedMintUrl);
     if (cached && !isStale(normalizedMintUrl)) {
+      cashuLog.debug('mint.kym.cache.hit', { mintUrl: normalizedMintUrl, score: cached.score, recommendations: cached.recommendations.length });
       setScore(cached.score);
       setRecommendations(cached.recommendations);
+    } else {
+      cashuLog.debug('mint.kym.cache.miss', { mintUrl: normalizedMintUrl });
     }
   }, [normalizedMintUrl, getCached, isStale]);
 
@@ -118,10 +122,12 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
       const totalScore = validRecommendations.reduce((sum, rec) => sum + rec.score, 0);
       const avgScore = Number((totalScore / validRecommendations.length).toFixed(2));
 
+      cashuLog.info('mint.kym.fetch', { mintUrl: normalizedMintUrl, score: avgScore, recommendationCount: validRecommendations.length });
       setScore(avgScore);
       setRecommendations(validRecommendations);
       setCached(normalizedMintUrl, avgScore, validRecommendations);
-    } catch {
+    } catch (err) {
+      cashuLog.error('mint.kym.error', { mintUrl: normalizedMintUrl, error: err instanceof Error ? err : new Error(String(err)) });
       setError('Failed to process mint recommendations. Please try again.');
       const cached = getCached(normalizedMintUrl);
       if (cached && !isStale(normalizedMintUrl)) {

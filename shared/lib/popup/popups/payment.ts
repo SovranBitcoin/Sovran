@@ -1,5 +1,6 @@
 import React from 'react';
 import { router } from 'expo-router';
+import { log } from '../../logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { TOAST_COPY } from '@/shared/lib/paymentCopy';
 import { popup } from '../engine';
@@ -126,7 +127,7 @@ export function paymentStatusPopup(payload: {
         });
       }
     } catch (e) {
-      console.warn('Could not open transaction:', e);
+      log.warn('popup.open_transaction_failed', { error: e });
     }
   };
 

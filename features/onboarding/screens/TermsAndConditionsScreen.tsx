@@ -6,6 +6,7 @@ import { Button, Card, ControlField, Label } from 'heroui-native';
 import Container from '@/shared/ui/composed/Container';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 const TERMS_TEXT = `IMPORTANT NOTICE: THESE TERMS OF SERVICE INCLUDE A MEDIATION-FIRST CLAUSE REQUIRING MEDIATION BEFORE ARBITRATION OR LITIGATION. PLEASE READ THESE TERMS CAREFULLY. IF YOU DO NOT AGREE, DO NOT USE SOVRAN.
 
@@ -152,10 +153,12 @@ export function TermsAndConditionsScreen({
   checkboxText = 'I have read and agree to the Terms and Conditions',
   showCheckbox = true,
 }: TermsAndConditionsScreenProps) {
+  useLifecycleLogger('TermsAndConditionsScreen');
   const [isChecked, setIsChecked] = useState(false);
 
   return (
     <Container className="bg-surface">
+      <Screen name="TermsAndConditionsScreen">
       <VStack spacing={16} flex={1} className="p-4">
         <Text bold size={32} className="text-foreground py-2 text-center">
           {title}
@@ -188,6 +191,7 @@ export function TermsAndConditionsScreen({
           </Button>
         </VStack>
       </VStack>
+      </Screen>
     </Container>
   );
 }

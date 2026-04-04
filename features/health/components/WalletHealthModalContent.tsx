@@ -26,6 +26,7 @@ import { useWalletHealthData } from '../hooks/useWalletHealthData';
 import type { HealthCta } from '../lib/walletHealth';
 import { formatPctFromBp, normalizeBpLargestRemainder } from '../lib/walletHealth';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
+import { walletLog } from '@/shared/lib/logger';
 
 const HERO_PADDING = 18;
 const HEART_RING_SIZE = 72;
@@ -187,12 +188,14 @@ export function WalletHealthModalContent({
   }, [totalBalance, hasDesired, needsRebalance, red, primary50]);
 
   const handleRebalancePress = useCallback(() => {
+    walletLog.info('wallet.health.rebalance.press', { unit: normalizedUnit, maxDriftBp });
     onAction({ type: 'openRebalancePlan', unit: normalizedUnit });
-  }, [onAction, normalizedUnit]);
+  }, [onAction, normalizedUnit, maxDriftBp]);
 
   const handleSplitPress = useCallback(() => {
+    walletLog.info('wallet.health.split.press', { unit: normalizedUnit, hasDesired });
     onAction({ type: 'openBalanceSplit', unit: normalizedUnit });
-  }, [onAction, normalizedUnit]);
+  }, [onAction, normalizedUnit, hasDesired]);
 
   const heroStats = useMemo(() => {
     return [

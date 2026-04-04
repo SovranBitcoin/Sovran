@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { log, storeLog } from '@/shared/lib/logger';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -61,6 +62,7 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
       addSearch: (query: string, context: string = 'default') => {
         const trimmedQuery = query.trim();
         if (!trimmedQuery || trimmedQuery.length < 2) return;
+        storeLog.debug('store.search_history.add', { context });
 
         set((state) => {
           const contextSearches = state.recentSearches[context] || [];
@@ -95,6 +97,7 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
       },
 
       removeSearch: (query: string, context: string = 'default') => {
+        storeLog.debug('store.search_history.remove', { context });
         set((state) => {
           const contextSearches = state.recentSearches[context] || [];
           const filteredSearches = contextSearches.filter(
@@ -111,6 +114,7 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
       },
 
       clearSearches: (context?: string) => {
+        storeLog.info('store.search_history.clear', { context: context ?? 'all' });
         if (context) {
           set((state) => ({
             recentSearches: {
@@ -128,7 +132,7 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
           await profileStorage.removeItem('search-history-store');
           set({ recentSearches: {} });
         } catch (error) {
-          console.error('SearchHistoryStore: Failed to clear data:', error);
+          log.error('store.search_history.clear_failed', { error });
         }
       },
     }),

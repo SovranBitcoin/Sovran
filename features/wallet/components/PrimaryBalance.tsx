@@ -29,6 +29,7 @@ import { usePaginatedHistory } from '@cashu/coco-react';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
+import { walletLog } from '@/shared/lib/logger';
 
 interface Account {
   unit: CurrencyUnit;
@@ -189,11 +190,13 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
   const handleReservedPress = useCallback(() => {
     const recoverPending = async () => {
+      walletLog.info('wallet.reserved.recovery_start', { reservedTotal });
       try {
         const manager = CocoManager.getInstance();
 
         await manager.ops.send.recovery.run();
         await manager.ops.melt.recovery.run();
+        walletLog.info('wallet.reserved.recovery_complete');
         reservedProofsFreedPopup({
           text:
             'Recovery completed.\n' +
@@ -201,6 +204,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
             'If reserved balance is still stuck, use force cleanup.',
         });
       } catch (error) {
+        walletLog.error('wallet.reserved.recovery_failed', { error: error instanceof Error ? error : new Error(String(error)) });
         reservedProofsFailedPopup({
           text: error instanceof Error ? error.message : 'Unknown error',
         });

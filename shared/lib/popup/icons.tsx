@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import React from 'react';
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
+import { log } from '../logger';
 
 export type PopupIcon = `emoji:${string}` | `icon:${string}` | `custom:${string}` | ReactNode;
 
@@ -39,7 +40,7 @@ export function resolvePopupIcon(icon: PopupIcon | undefined, size: number): Rea
     if (Component) {
       return <Component size={size} />;
     }
-    console.warn(`[popup/icons] Unknown custom icon: "${key}"`);
+    log.warn('popup.unknown_icon', { key });
     return <Text size={30}>💡</Text>;
   }
 

@@ -24,6 +24,7 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import opacity from 'hex-color-opacity';
 import { PressableFeedback, SearchField } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 const CARD_GAP = 12;
 const HORIZONTAL_PADDING = 20;
@@ -205,6 +206,8 @@ const ThemeCard = React.memo(
 ThemeCard.displayName = 'ThemeCard';
 
 export function SettingsThemeScreen() {
+  useLifecycleLogger('SettingsThemeScreen');
+
   const foreground = useThemeColor('foreground');
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
@@ -218,10 +221,11 @@ export function SettingsThemeScreen() {
 
   const handleThemePress = useCallback(
     (themeName: string) => {
+      log.info('settings.theme.change', { from: currentTheme, to: themeName });
       setTheme(themeName);
       router.back();
     },
-    [setTheme]
+    [setTheme, currentTheme]
   );
 
   // Filter themes based on search
@@ -279,8 +283,13 @@ export function SettingsThemeScreen() {
 
   const hasResults = filteredBaseThemes.length > 0 || filteredBackgroundThemes.length > 0;
 
+  if (searchText && !hasResults) {
+    log.debug('settings.theme.search.no_results', { query: searchText });
+  }
+
   return (
     <Container>
+      <Screen name="SettingsThemeScreen">
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
         showsVerticalScrollIndicator={false}>
@@ -332,6 +341,7 @@ export function SettingsThemeScreen() {
           </View>
         )}
       </ScrollView>
+      </Screen>
     </Container>
   );
 }

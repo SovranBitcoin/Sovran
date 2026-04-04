@@ -44,6 +44,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import Icon from 'assets/icons';
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
 import { extractDomain } from '@/shared/lib/url';
+import { log, Screen } from '@/shared/lib/logger';
 
 // StepState is imported from components/blocks/rebalance (groupSteps.ts)
 
@@ -129,7 +130,7 @@ export function MintRebalancePlanScreen() {
   const swapLegIdByStepIdRef = useRef<Record<string, string>>({});
 
   const appendDebug = useCallback((entry: Record<string, unknown>) => {
-    console.log('[REBALANCE]', JSON.stringify({ ...entry, _ts: new Date().toISOString() }));
+    log.debug('mint.rebalance.step', entry);
   }, []);
 
   const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
@@ -296,7 +297,7 @@ export function MintRebalancePlanScreen() {
 
     while (executionLockRef.current) {
       if (Date.now() - startTime > maxWaitMs) {
-        console.warn('Timed out waiting for execution lock');
+        log.warn('mint.rebalance.lock_timeout');
         return false;
       }
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
@@ -314,7 +315,7 @@ export function MintRebalancePlanScreen() {
       // Wait for any existing operation to complete instead of returning early
       const gotLock = await waitForLock();
       if (!gotLock) {
-        console.warn('Failed to acquire execution lock for step:', step.id);
+        log.warn('mint.rebalance.lock_failed', { stepId: step.id });
         return false;
       }
       if (abortRef.current || runIdRef.current !== runId) return false;
@@ -807,7 +808,7 @@ export function MintRebalancePlanScreen() {
                   await manager.mint.trustMint(url);
                   temporarilyTrusted.push(url);
                 } catch (trustErr) {
-                  console.warn('Failed to temporarily trust intermediary:', url, trustErr);
+                  log.warn('mint.rebalance.trust_failed', { url, error: trustErr });
                 }
               }
             }
@@ -1114,7 +1115,7 @@ export function MintRebalancePlanScreen() {
             for (const url of temporarilyTrusted) {
               const bal = finalBals[url] ?? 0;
               if (bal > 0) {
-                console.warn(`Keeping temp middleman ${url} trusted — ${bal} sats remain`);
+                log.warn('mint.rebalance.middleman_kept', { url, balance: bal });
                 continue;
               }
               try {
@@ -1176,7 +1177,7 @@ export function MintRebalancePlanScreen() {
            *
            * We still mark the step done if the melt succeeded; eventual consistency will catch up.
            */
-          console.warn('Balance did not increase within timeout, but melt succeeded');
+          log.warn('mint.rebalance.balance_timeout');
         }
 
         // Mark as done
@@ -1434,7 +1435,7 @@ export function MintRebalancePlanScreen() {
             await manager.mint.trustMint(url);
             temporarilyTrusted.push(url);
           } catch (err) {
-            console.warn('Failed to temporarily trust intermediary mint:', url, err);
+            log.warn('mint.rebalance.trust_failed', { url, error: err });
           }
         }
       }
@@ -1499,13 +1500,13 @@ export function MintRebalancePlanScreen() {
         for (const url of temporarilyTrusted) {
           const bal = balances[url] ?? 0;
           if (bal > 0) {
-            console.warn(`Keeping temporary middleman ${url} trusted — ${bal} sats still on mint`);
+            log.warn('mint.rebalance.middleman_kept', { url, balance: bal });
             continue;
           }
           try {
             await manager.mint.untrustMint(url);
           } catch (err) {
-            console.warn('Failed to untrust temporary middleman mint:', url, err);
+            log.warn('mint.rebalance.untrust_failed', { url, error: err });
           }
         }
       }
@@ -1619,7 +1620,7 @@ export function MintRebalancePlanScreen() {
   ]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: background }}>
+    <Screen name="MintRebalancePlanScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: 'Rebalance Plan',
@@ -1807,6 +1808,6 @@ export function MintRebalancePlanScreen() {
           </View>
         )}
       </ModalLayoutWrapper>
-    </View>
+    </Screen>
   );
 }

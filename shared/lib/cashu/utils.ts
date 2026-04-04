@@ -33,6 +33,8 @@ import { getDecodedToken, type ReceiveHistoryEntry } from '@cashu/coco-core';
 
 import { decode } from '@gandlaf21/bolt11-decode';
 
+import { log } from '../logger';
+
 /**
  * Validates if a string is a valid ecash token by attempting to decode it
  *
@@ -54,8 +56,10 @@ import { decode } from '@gandlaf21/bolt11-decode';
 export function isValidEcashToken(token: string): boolean {
   try {
     getDecodedToken(token);
+    log.debug('cashu.utils.validate_ecash_token', { valid: true, tokenLen: token.length });
     return true;
   } catch {
+    log.debug('cashu.utils.validate_ecash_token', { valid: false, tokenLen: token.length });
     return false;
   }
 }
@@ -81,8 +85,10 @@ export function isValidEcashToken(token: string): boolean {
 export const isLightningInvoice = (invoice: string): boolean => {
   try {
     decode(invoice);
+    log.debug('cashu.utils.validate_lightning_invoice', { valid: true, invoiceLen: invoice.length });
     return true;
   } catch {
+    log.debug('cashu.utils.validate_lightning_invoice', { valid: false, invoiceLen: invoice.length });
     return false;
   }
 };
@@ -172,14 +178,17 @@ export const requestInvoiceFromLnurl = async (
   meltTarget: string,
   amountSats: number
 ): Promise<string> => {
+  log.info('cashu.utils.request_invoice_from_lnurl.start', { targetLen: meltTarget.length, amountSats });
   const params = await getLnurlPayParams(meltTarget);
   if (!params || !params.callback) {
+    log.error('cashu.utils.request_invoice_from_lnurl.invalid_params', { hasParams: !!params, hasCallback: !!params?.callback });
     throw new Error('Invalid LNURL or lightning address');
   }
 
   const amountMsats = amountSats * 1000;
 
   if (amountMsats < params.minSendable || amountMsats > params.maxSendable) {
+    log.error('cashu.utils.request_invoice_from_lnurl.amount_out_of_range', { amountMsats, minSendable: params.minSendable, maxSendable: params.maxSendable });
     throw new Error(
       `Amount must be between ${params.minSendable / 1000} and ${params.maxSendable / 1000} sats`
     );
@@ -189,9 +198,11 @@ export const requestInvoiceFromLnurl = async (
   const data = await response.json();
 
   if (!data.pr) {
+    log.error('cashu.utils.request_invoice_from_lnurl.no_invoice', { amountSats });
     throw new Error('No invoice returned from LNURL endpoint');
   }
 
+  log.info('cashu.utils.request_invoice_from_lnurl.success', { amountSats, invoiceLen: data.pr.length });
   return data.pr;
 };
 
@@ -215,8 +226,11 @@ function sumProofAmounts(proofs: ReadonlyArray<{ amount: number }>): number {
 export function getEcashTokenAmount(token: string): number | undefined {
   try {
     const decoded = getDecodedToken(token);
-    return sumProofAmounts(decoded.proofs);
+    const amount = sumProofAmounts(decoded.proofs);
+    log.debug('cashu.utils.get_ecash_token_amount', { amount, proofCount: decoded.proofs.length, mint: decoded.mint });
+    return amount;
   } catch {
+    log.warn('cashu.utils.get_ecash_token_amount.decode_failed', { tokenLen: token.length });
     return undefined;
   }
 }
@@ -252,8 +266,11 @@ export function buildReceiveHistoryEntry(
   rawToken: string,
   unitOverride?: string
 ): ReceiveHistoryEntry {
+  log.info('cashu.utils.build_receive_history_entry', { tokenLen: rawToken.length, unitOverride });
   const decodedToken = getDecodedToken(rawToken);
   const p2pkPubkey = extractP2PKPubkey(decodedToken.proofs);
+  const amount = sumProofAmounts(decodedToken.proofs);
+  log.debug('cashu.utils.build_receive_history_entry.decoded', { amount, proofCount: decodedToken.proofs.length, mint: decodedToken.mint, hasP2pk: !!p2pkPubkey });
   return {
     id: `receive-${Date.now()}`,
     type: 'receive',

@@ -31,6 +31,7 @@ import {
   type ScreenActionsBridge,
 } from 'coco-payment-ux/react';
 
+import { log } from '@/shared/lib/logger';
 import { useReceivePaymentUXExtras } from '@/features/receive/providers/ReceivePaymentUXExtras';
 import {
   createSovranHandlers,
@@ -213,7 +214,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
             manager.on(
               'history:updated',
               ({ entry: updated }: { mintUrl: string; entry: any }) => {
-                console.info(`[onEntryUpdate] history:updated for ${screenType} | type:`, updated?.type, '| id:', updated?.id, '| state:', updated?.state, '| quoteId:', updated?.quoteId ?? '-');
+                log.info('send.entry_updated', { screenType, type: updated?.type, id: updated?.id, state: updated?.state, quoteId: updated?.quoteId });
                 callback(updated as unknown as EntryRecord);
               }
             )

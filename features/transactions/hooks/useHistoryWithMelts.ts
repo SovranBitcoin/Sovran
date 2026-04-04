@@ -3,6 +3,7 @@ import { useManager, usePaginatedHistory } from '@cashu/coco-react';
 import type { MeltHistoryEntry } from '@cashu/coco-core';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
+import { log } from '@/shared/lib/logger';
 
 /**
  * Shape of a MeltOperation from coco's MeltOperationRepository.
@@ -89,10 +90,18 @@ export function useHistoryWithMelts(pageSize = 100) {
         .map(meltOpToHistoryEntry)
         .filter((e): e is MeltHistoryEntry => e !== null);
 
+      log.debug('tx.melt_ops.fetched', {
+        finalized: finalized.length,
+        pending: pending.length,
+        prepared: prepared.length,
+        converted: entries.length,
+      });
+
       if (isMountedRef.current) {
         setMeltEntries(entries);
       }
     } catch {
+      log.warn('tx.melt_ops.fetch_error');
       // Repository may not be accessible — fall back to history-only
     }
   }, [manager]);
@@ -132,7 +141,9 @@ export function useHistoryWithMelts(pageSize = 100) {
     const newMelts = meltEntries.filter((m) => !existingQuoteIds.has(m.quoteId));
     if (newMelts.length === 0) return paginatedResult.history;
 
-    return [...paginatedResult.history, ...newMelts].sort((a, b) => b.createdAt - a.createdAt);
+    const merged = [...paginatedResult.history, ...newMelts].sort((a, b) => b.createdAt - a.createdAt);
+    log.debug('tx.history.merged', { paginatedCount: paginatedResult.history.length, supplementedMelts: newMelts.length, totalCount: merged.length });
+    return merged;
   }, [paginatedResult.history, meltEntries]);
 
   // Wrap refresh to also re-fetch melt operations

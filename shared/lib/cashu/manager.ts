@@ -12,7 +12,7 @@ import {
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
-import { initLog } from '@/shared/lib/initTiming';
+import { cashuLog, initLog } from '../logger';
 
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
@@ -123,6 +123,7 @@ export class CocoManager {
 
     this.isInitializing = true;
     this.instance = null;
+    const initStart = performance.now();
 
     try {
       // 1. SQLite database (async to avoid blocking JS thread during profile switch)
@@ -177,10 +178,11 @@ export class CocoManager {
         plugins
       );
       initLog('CocoManager', 'Manager created');
+      cashuLog.info('cashu.manager.initialized', { duration_ms: Math.round((performance.now() - initStart) * 100) / 100 });
 
       return this.instance;
     } catch (error) {
-      console.error('Failed to initialize Coco Manager:', error);
+      cashuLog.error('cashu.manager.init_failed', { error });
       throw error;
     } finally {
       this.isInitializing = false;
@@ -196,6 +198,8 @@ export class CocoManager {
     if (!this.instance) {
       throw new Error('Manager not initialized. Call initialize() first.');
     }
+    const syncStart = performance.now();
+    cashuLog.info('cashu.manager.watchers_sync.start');
 
     // NPC initial sync
     if (this.npcPlugin) {
@@ -204,7 +208,7 @@ export class CocoManager {
         await this.npcPlugin.sync();
         initLog('CocoManager', 'NPC sync done');
       } catch (error) {
-        console.warn('Initial NPC sync failed (non-fatal):', error);
+        cashuLog.warn('cashu.manager.npc_sync_failed', { error });
       }
     }
 
@@ -214,7 +218,7 @@ export class CocoManager {
       await this.instance.enableMintOperationWatcher({ watchExistingPendingOnStart: true });
       initLog('CocoManager', 'mint quote watcher enabled');
     } catch (error) {
-      console.warn('Failed to enable mint quote watcher:', error);
+      cashuLog.warn('cashu.manager.quote_watcher_failed', { error });
     }
 
     // Mint quote processor
@@ -228,7 +232,7 @@ export class CocoManager {
       });
       initLog('CocoManager', 'mint quote processor enabled');
     } catch (error) {
-      console.warn('Failed to enable mint quote processor:', error);
+      cashuLog.warn('cashu.manager.quote_processor_failed', { error });
     }
 
     // Proof state watcher
@@ -237,15 +241,17 @@ export class CocoManager {
       await this.instance.enableProofStateWatcher();
       initLog('CocoManager', 'proof state watcher enabled');
     } catch (error) {
-      console.warn('Failed to enable proof state watcher:', error);
+      cashuLog.warn('cashu.manager.proof_watcher_failed', { error });
       try {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         await this.instance.enableProofStateWatcher();
         initLog('CocoManager', 'proof state watcher enabled on retry');
       } catch (retryError) {
-        console.error('Proof state watcher retry failed:', retryError);
+        cashuLog.error('cashu.manager.proof_watcher_retry_failed', { error: retryError });
       }
     }
+
+    cashuLog.info('cashu.manager.watchers_sync.done', { duration_ms: Math.round((performance.now() - syncStart) * 100) / 100 });
   }
 
   /**
@@ -281,37 +287,37 @@ export class CocoManager {
       }
 
       try {
-        console.log('Cleaning up Coco Manager...');
+        cashuLog.info('cashu.manager.cleanup_start');
 
         // Disable watchers in reverse order to prevent conflicts
         try {
           await this.instance.disableProofStateWatcher();
-          console.log('Proof state watcher disabled');
+          cashuLog.debug('cashu.manager.proof_watcher_disabled');
         } catch (error) {
-          console.warn('Failed to disable proof state watcher:', error);
+          cashuLog.warn('cashu.manager.proof_watcher_disable_failed', { error });
         }
 
         try {
           await this.instance.disableMintOperationProcessor();
-          console.log('Mint quote processor disabled');
+          cashuLog.debug('cashu.manager.quote_processor_disabled');
         } catch (error) {
-          console.warn('Failed to disable mint quote processor:', error);
+          cashuLog.warn('cashu.manager.quote_processor_disable_failed', { error });
         }
 
         try {
           await this.instance.disableMintOperationWatcher();
-          console.log('Mint quote watcher disabled');
+          cashuLog.debug('cashu.manager.quote_watcher_disabled');
         } catch (error) {
-          console.warn('Failed to disable mint quote watcher:', error);
+          cashuLog.warn('cashu.manager.quote_watcher_disable_failed', { error });
         }
 
         // Close the SQLite connection to prevent "database is locked" on revisit
         if (this.db) {
           try {
             await this.db.closeAsync();
-            console.log('SQLite connection closed');
+            cashuLog.debug('cashu.manager.sqlite_closed');
           } catch (dbError) {
-            console.warn('Failed to close SQLite connection:', dbError);
+            cashuLog.warn('cashu.manager.sqlite_close_failed', { error: dbError });
           }
           this.db = null;
         }
@@ -319,9 +325,9 @@ export class CocoManager {
         // Clear the instance
         this.instance = null;
         this.clearSensitiveRuntimeState();
-        console.log('Coco Manager cleanup completed');
+        cashuLog.info('cashu.manager.cleanup_done');
       } catch (error) {
-        console.error('Failed to cleanup Coco Manager:', error);
+        cashuLog.error('cashu.manager.cleanup_failed', { error });
         if (this.db) {
           try {
             await this.db.closeAsync();
@@ -359,14 +365,14 @@ export class CocoManager {
         const { useProfileStore } = await import('@/shared/stores/global/profileStore');
         const activeProfile = useProfileStore.getState().getActiveProfile();
         if (!activeProfile) {
-          console.warn('No active profile found for imported signer');
+          cashuLog.warn('cashu.manager.no_active_profile');
           return null;
         }
         const { retrieveImportedNsec } = await import('@/shared/lib/nostr/secureStorage');
         const { nip19 } = await import('nostr-tools');
         const nsecValue = await retrieveImportedNsec(activeProfile.pubkey);
         if (!nsecValue) {
-          console.warn('Imported nsec not found in SecureStore');
+          cashuLog.warn('cashu.manager.nsec_not_found');
           return null;
         }
         const decoded = nip19.decode(nsecValue);
@@ -377,14 +383,14 @@ export class CocoManager {
       initLog('CocoManager', 'signerKey not set — deriving from mnemonic (slow path)');
       const mnemonic = await retrieveMnemonic();
       if (!mnemonic) {
-        console.warn('No mnemonic found for NPC plugin');
+        cashuLog.warn('cashu.manager.no_mnemonic');
         return null;
       }
 
       const { privateKey } = deriveNostrKeys(mnemonic, this.accountIndex);
       return new NsecSigner(privateKey);
     } catch (error) {
-      console.error('Failed to create signer for NPC plugin:', error);
+      cashuLog.error('cashu.manager.signer_creation_failed', { error });
       return null;
     }
   }
@@ -399,9 +405,9 @@ export class CocoManager {
 
     try {
       await this.instance.enableProofStateWatcher();
-      console.log('Proof state watcher enabled separately');
+      cashuLog.debug('cashu.manager.proof_watcher_enabled');
     } catch (error) {
-      console.warn('Failed to enable proof state watcher:', error);
+      cashuLog.warn('cashu.manager.proof_watcher_enable_failed', { error });
       throw error;
     }
   }
@@ -413,23 +419,23 @@ export class CocoManager {
     if (this.instance) {
       try {
         await this.instance.disableProofStateWatcher();
-        console.log('Proof state watcher disabled');
+        cashuLog.debug('cashu.manager.proof_watcher_disabled');
       } catch (error) {
-        console.warn('Failed to disable proof state watcher:', error);
+        cashuLog.warn('cashu.manager.proof_watcher_disable_failed', { error });
       }
 
       try {
         await this.instance.disableMintOperationWatcher();
-        console.log('Mint quote watcher disabled');
+        cashuLog.debug('cashu.manager.quote_watcher_disabled');
       } catch (error) {
-        console.warn('Failed to disable mint quote watcher:', error);
+        cashuLog.warn('cashu.manager.quote_watcher_disable_failed', { error });
       }
 
       try {
         await this.instance.disableMintOperationProcessor();
-        console.log('Mint quote processor disabled');
+        cashuLog.debug('cashu.manager.quote_processor_disabled');
       } catch (error) {
-        console.warn('Failed to disable mint quote processor:', error);
+        cashuLog.warn('cashu.manager.quote_processor_disable_failed', { error });
       }
     }
   }
@@ -440,9 +446,9 @@ export class CocoManager {
   private static async deleteDatabase(dbName: string): Promise<void> {
     try {
       await SQLite.deleteDatabaseAsync(dbName);
-      console.log(`✅ Deleted coco database: ${dbName}`);
+      cashuLog.info('cashu.manager.db_deleted', { dbName });
     } catch (error) {
-      console.warn(`⚠️ SQLite.deleteDatabaseAsync failed for ${dbName}:`, error);
+      cashuLog.warn('cashu.manager.db_delete_failed', { dbName, error });
       try {
         const dbDirectory = FileSystem.documentDirectory;
         const dbPath = `${dbDirectory}SQLite/${dbName}`;
@@ -450,9 +456,9 @@ export class CocoManager {
         for (const filePath of filesToDelete) {
           await FileSystem.deleteAsync(filePath, { idempotent: true });
         }
-        console.log(`✅ Deleted ${dbName} via FileSystem fallback`);
+        cashuLog.info('cashu.manager.db_deleted_fallback', { dbName });
       } catch (fsError) {
-        console.warn(`⚠️ FileSystem fallback failed for ${dbName}:`, fsError);
+        cashuLog.warn('cashu.manager.db_delete_fallback_failed', { dbName, error: fsError });
       }
     }
   }
@@ -471,7 +477,7 @@ export class CocoManager {
       const dbName = this.getDbName();
       await this.deleteDatabase(dbName);
     } catch (error) {
-      console.error('Failed to clear Coco data:', error);
+      cashuLog.error('cashu.manager.clear_data_failed', { error });
       throw error;
     }
   }
@@ -508,9 +514,9 @@ export class CocoManager {
       }
 
       await this.reset();
-      console.log('CocoManager complete reset finished');
+      cashuLog.info('cashu.manager.reset_done');
     } catch (error) {
-      console.error('Failed to complete reset CocoManager:', error);
+      cashuLog.error('cashu.manager.reset_failed', { error });
       throw error;
     }
   }
@@ -545,7 +551,7 @@ export class CocoManager {
         // WAL might not exist, that's okay
       }
 
-      console.log('Database exported to:', exportPath);
+      cashuLog.info('cashu.manager.db_exported', { exportPath });
 
       // Share the file
       if (await Sharing.isAvailableAsync()) {
@@ -557,7 +563,7 @@ export class CocoManager {
 
       return exportPath;
     } catch (error) {
-      console.error('Failed to export database:', error);
+      cashuLog.error('cashu.manager.db_export_failed', { error });
       throw error;
     }
   }
@@ -809,10 +815,10 @@ export class CocoManager {
 
       const secrets = inflight.map((p) => p.secret);
       await svc.restoreProofsToReady(mintUrl, secrets);
-      console.log(`[CocoManager] Restored ${secrets.length} inflight proofs on ${mintUrl}`);
+      cashuLog.info('cashu.manager.proofs_restored', { count: secrets.length, mintUrl });
       return secrets.length;
     } catch (err) {
-      console.warn('[CocoManager] Failed to restore inflight proofs:', err);
+      cashuLog.warn('cashu.manager.proofs_restore_failed', { error: err });
       return 0;
     }
   }

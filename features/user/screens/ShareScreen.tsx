@@ -18,6 +18,7 @@ import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { Tabs } from '@/shared/ui/composed/Tabs';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Screen, nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 // Configuration for different share types
 export const SHARE_CONFIGS = {
@@ -75,7 +76,11 @@ export interface ShareScreenProps {
 }
 
 export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScreenProps) {
+  useLifecycleLogger('ShareScreen', nostrLog);
+
   const foreground = useThemeColor('foreground');
+
+  nostrLog.info('share.screen.open', { type });
 
   // Determine if we should show tabs
   const showP2pkTabs = type === 'p2pk' && npub;
@@ -113,6 +118,7 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
 
   const handleTabPress = useCallback(
     (tab: string) => {
+      nostrLog.info('share.tab.change', { tab });
       setSelectedTab(tab);
       // Notify parent of title change
       if (onTitleChange) {
@@ -133,12 +139,14 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
   );
 
   const handleCopy = useCallback(async () => {
+    nostrLog.info('share.copy', { target: config.copyTarget });
     await Clipboard.setStringAsync(activeData);
     copyPopup(config.copyTarget);
   }, [activeData, config.copyTarget]);
 
   return (
     <ModalLayoutWrapper>
+      <Screen name="ShareScreen">
       {/* Tab bar - only show if npub is available for p2pk type */}
       {showTabs && (
         <View style={{ marginBottom: 16 }}>
@@ -176,6 +184,7 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
           </PressableFeedback>
         </ListGroup>
       </Section>
+      </Screen>
     </ModalLayoutWrapper>
   );
 }

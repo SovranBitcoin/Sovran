@@ -11,6 +11,7 @@ import React from 'react';
 import { Alert } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
@@ -37,17 +38,20 @@ interface SendTokenScreenProps {
 }
 
 export function SendTokenScreen({ sendHistoryEntry, mintWasOffline, onNavigateBack }: SendTokenScreenProps) {
+  useLifecycleLogger('SendTokenScreen');
   const { entry, error, actions, source, mintUrl } = useScreenActions('sendToken', sendHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
   if (error) {
+    log.warn('send.token.error', { error });
     return <ScreenErrorState message={error} onGoBack={onNavigateBack} />;
   }
 
   if (!entry) {
     return <ScreenLoadingState message="Loading transaction..." />;
   }
+  log.debug('send.token.render', { state: entry.state, amount: entry.amount, unit: entry.unit, mintWasOffline });
 
   const bottomButtons = (
     <BottomButtons>
@@ -122,51 +126,53 @@ export function SendTokenScreen({ sendHistoryEntry, mintWasOffline, onNavigateBa
 
   return (
     <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
-      <VStack gap={12}>
-        <HistoryEntryHeader historyEntry={entry} />
+      <Screen name="SendTokenScreen">
+        <VStack gap={12}>
+          <HistoryEntryHeader historyEntry={entry} />
 
-        {mintWasOffline && (
-          <Alert status="warning" className="bg-surface-secondary">
-            <Alert.Content>
-              <Alert.Title>Mint was offline</Alert.Title>
-              <Alert.Description>
-                This token was created offline. The recipient may have trouble
-                redeeming it until the mint is back online.
-              </Alert.Description>
-            </Alert.Content>
-          </Alert>
-        )}
+          {mintWasOffline && (
+            <Alert status="warning" className="bg-surface-secondary">
+              <Alert.Content>
+                <Alert.Title>Mint was offline</Alert.Title>
+                <Alert.Description>
+                  This token was created offline. The recipient may have trouble
+                  redeeming it until the mint is back online.
+                </Alert.Description>
+              </Alert.Content>
+            </Alert>
+          )}
 
-        {entry.state === 'pending' && (
-          <PaymentInfo
-            copyTarget="token"
-            unit={entry.unit}
-            data={entry.tokenString?.toString() ?? ''}
-            animated={(entry.tokenString?.length ?? 0) >= 500}
+          {entry.state === 'pending' && (
+            <PaymentInfo
+              copyTarget="token"
+              unit={entry.unit}
+              data={entry.tokenString?.toString() ?? ''}
+              animated={(entry.tokenString?.length ?? 0) >= 500}
+            />
+          )}
+
+          <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />
+
+          <HistoryEntryTimeline historyEntry={entry} />
+
+          <DetailsSection
+            items={[
+              source && { title: 'Source', value: source },
+              bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+              bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" /> },
+              { title: 'Date', value: entry.createdAt.datetime },
+              { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+              { title: 'State', value: entry.state },
+              entry.operationId && { title: 'Operation ID', value: truncateMiddle(entry.operationId, 7) },
+              mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+              entry.tokenString && {
+                title: 'Token',
+                value: entry.tokenString.truncate(6),
+              },
+            ].flatMap((item) => (item ? [item] : []))}
           />
-        )}
-
-        <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />
-
-        <HistoryEntryTimeline historyEntry={entry} />
-
-        <DetailsSection
-          items={[
-            source && { title: 'Source', value: source },
-            bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-            bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" /> },
-            { title: 'Date', value: entry.createdAt.datetime },
-            { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
-            { title: 'State', value: entry.state },
-            entry.operationId && { title: 'Operation ID', value: truncateMiddle(entry.operationId, 7) },
-            mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
-            entry.tokenString && {
-              title: 'Token',
-              value: entry.tokenString.truncate(6),
-            },
-          ].flatMap((item) => (item ? [item] : []))}
-        />
-      </VStack>
+        </VStack>
+      </Screen>
     </ModalLayoutWrapper>
   );
 }

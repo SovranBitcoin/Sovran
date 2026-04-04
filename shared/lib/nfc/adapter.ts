@@ -15,18 +15,18 @@ import { SELECT_AID, SELECT_NDEF, readBinary, updateBinary, MAX_CHUNK_SIZE } fro
 import { sendApdu, getStatusMessage } from './apdu';
 import { buildTextNdef, decodeTextRecord } from './ndef';
 import { isNfcSupported, isNfcEnabled } from './status';
-import { log, logDebug, logError, logWarn } from './logger';
+import { nfcLog } from '../logger';
 
 export function createNfcAdapter(): NfcIOAdapter {
   let sessionActive = false;
 
   return {
     async readPaymentRequest(): Promise<string> {
-      log('NFC adapter: starting read...');
+      nfcLog.info('nfc.adapter.read_start');
 
       await NfcManager.requestTechnology(NfcTech.IsoDep);
       sessionActive = true;
-      log('IsoDep session acquired');
+      nfcLog.info('nfc.adapter.isodep_acquired');
 
       let r = await sendApdu(SELECT_AID, 'SELECT AID');
       if (!r.ok) {
@@ -56,7 +56,7 @@ export function createNfcAdapter(): NfcIOAdapter {
       }
 
       const nlen = (r.payload[0] << 8) | r.payload[1];
-      logDebug(`NLEN = ${nlen} bytes`);
+      nfcLog.debug('nfc.adapter.nlen', { nlen });
 
       if (nlen === 0) {
         throw new NfcError(
@@ -77,7 +77,7 @@ export function createNfcAdapter(): NfcIOAdapter {
         }
         ndefBytes = r.payload;
       } else {
-        logDebug('Large NDEF message, reading in chunks...');
+        nfcLog.debug('nfc.adapter.read_chunked', { nlen });
         let offset = 2;
         let remaining = nlen;
         while (remaining > 0) {
@@ -97,7 +97,7 @@ export function createNfcAdapter(): NfcIOAdapter {
       }
 
       const text = decodeTextRecord(ndefBytes);
-      log(`Read payment request (${text.length} chars)`);
+      nfcLog.info('nfc.adapter.read_complete', { chars: text.length });
 
       if (!text || text.length === 0) {
         throw new NfcError(
@@ -110,7 +110,7 @@ export function createNfcAdapter(): NfcIOAdapter {
     },
 
     async writeToken(token: string): Promise<void> {
-      log('NFC adapter: writing token...');
+      nfcLog.info('nfc.adapter.write_start');
 
       let r = await sendApdu(SELECT_NDEF, 'SELECT NDEF (write)');
       if (!r.ok) {
@@ -140,7 +140,7 @@ export function createNfcAdapter(): NfcIOAdapter {
       const totalChunks = Math.ceil(body.length / MAX_CHUNK_SIZE);
       for (let chunkNum = 0; offset - 2 < body.length; chunkNum++) {
         const chunk = body.slice(offset - 2, offset - 2 + MAX_CHUNK_SIZE);
-        logDebug(`Writing chunk ${chunkNum + 1}/${totalChunks}: ${chunk.length} bytes`);
+        nfcLog.debug('nfc.adapter.write_chunk', { chunk: chunkNum + 1, totalChunks, bytes: chunk.length });
         r = await sendApdu(updateBinary(offset, chunk), `WRITE chunk ${chunkNum + 1}`);
         if (!r.ok) {
           throw new NfcError(
@@ -162,7 +162,7 @@ export function createNfcAdapter(): NfcIOAdapter {
         );
       }
 
-      log('Token written successfully');
+      nfcLog.info('nfc.adapter.write_success');
     },
 
     async releaseSession(): Promise<void> {
@@ -170,9 +170,9 @@ export function createNfcAdapter(): NfcIOAdapter {
       sessionActive = false;
       try {
         await NfcManager.cancelTechnologyRequest();
-        log('IsoDep session released');
+        nfcLog.info('nfc.adapter.session_released');
       } catch (e) {
-        logWarn('Failed to release NFC session:', e);
+        nfcLog.warn('nfc.adapter.release_failed', { error: e });
       }
     },
 

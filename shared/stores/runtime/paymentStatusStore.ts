@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { parsePaymentError } from '@/shared/lib/popup/parsePaymentError';
+import { log } from '@/shared/lib/logger';
 
 export type PaymentStatusState = 'processing' | 'delivered' | 'confirmed' | 'failed';
 
@@ -30,19 +31,31 @@ type PaymentStatusStore = {
 
 export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
   active: null,
-  setActive: (payment) => set({ active: payment }),
+  setActive: (payment) => {
+    log.info('payment.status.set_active', payment ? { variant: payment.variant, id: payment.id, state: payment.state, amount: payment.amount, unit: payment.unit } : { cleared: true });
+    set({ active: payment });
+  },
   setDelivered: (id) =>
-    set((s) =>
-      s.active?.id === id ? { active: { ...s.active!, state: 'delivered' as const } } : s
-    ),
+    set((s) => {
+      if (s.active?.id === id) {
+        log.info('payment.status.delivered', { id, variant: s.active.variant, from: s.active.state });
+        return { active: { ...s.active!, state: 'delivered' as const } };
+      }
+      return s;
+    }),
   setConfirmed: (id, extra) =>
     set((s) => {
       if (s.active?.id !== id) return s;
       if (s.active.state === 'confirmed') {
         // Already confirmed — only merge extra data (operationId, receiveEntryId)
+        log.debug('payment.status.confirmed.merge_extra', { id, hasExtra: !!extra });
         return extra ? { active: { ...s.active!, ...extra } } : s;
       }
-      if (s.active.state === 'failed') return s;
+      if (s.active.state === 'failed') {
+        log.debug('payment.status.confirmed.skip_failed', { id });
+        return s;
+      }
+      log.info('payment.status.confirmed', { id, variant: s.active.variant, from: s.active.state, hasOperationId: !!extra?.operationId, hasReceiveEntryId: !!extra?.receiveEntryId });
       return { active: { ...s.active!, state: 'confirmed' as const, ...extra } };
     }),
   setFailed: (id, error) =>
@@ -50,6 +63,7 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
       if (s.active?.id !== id || s.active.state === 'failed' || s.active.state === 'confirmed')
         return s;
       const errorMessage = error !== undefined ? parsePaymentError(error) : undefined;
+      log.error('payment.status.failed', { id, variant: s.active.variant, from: s.active.state, errorMessage });
       return {
         active: { ...s.active!, state: 'failed' as const, errorMessage },
       };

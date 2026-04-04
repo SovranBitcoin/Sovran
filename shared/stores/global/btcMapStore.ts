@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log, storeLog } from '@/shared/lib/logger';
 
 interface BTCMapPlace {
   id: number;
@@ -124,6 +125,8 @@ export const useBTCMapStore = create<BTCMapStore>()(
           if (cached && cached.length > 0) return cached;
         }
 
+        storeLog.info('store.btc_map.fetch_places.start', { forceRefresh });
+        const startTime = performance.now();
         set({ isLoading: true, error: null });
 
         try {
@@ -133,6 +136,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
           }
 
           const data: BTCMapPlace[] = await response.json();
+          storeLog.info('store.btc_map.fetch_places.success', { count: data.length, duration_ms: Math.round((performance.now() - startTime) * 100) / 100 });
 
           set({
             placesCache: { data, timestamp: Date.now() },
@@ -143,6 +147,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
           return data;
         } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to load merchants';
+          storeLog.error('store.btc_map.fetch_places.failed', { error: errorMessage, duration_ms: Math.round((performance.now() - startTime) * 100) / 100 });
           set({ isLoading: false, error: errorMessage });
 
           const cache = get().placesCache;
@@ -169,6 +174,8 @@ export const useBTCMapStore = create<BTCMapStore>()(
           }
         }
 
+        storeLog.info('store.btc_map.fetch_details.start', { id, forceRefresh });
+        const startTime = performance.now();
         set({ isLoadingDetails: true });
 
         try {
@@ -180,6 +187,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
           }
 
           const data: BTCMapPlaceDetails = await response.json();
+          storeLog.info('store.btc_map.fetch_details.success', { id, duration_ms: Math.round((performance.now() - startTime) * 100) / 100 });
 
           set((s) => ({
             placeDetailsCache: {
@@ -192,17 +200,26 @@ export const useBTCMapStore = create<BTCMapStore>()(
 
           return data;
         } catch (error: unknown) {
-          console.error('BTCMapStore: Failed to fetch place details:', error);
+          log.error('store.btc_map.fetch_details_failed', { error });
           set({ isLoadingDetails: false });
           throw error;
         }
       },
 
-      setSelectedPlace: (place) => set({ selectedPlace: place }),
+      setSelectedPlace: (place) => {
+        storeLog.debug('store.btc_map.set_selected_place', { id: place?.id ?? null });
+        set({ selectedPlace: place });
+      },
 
-      setError: (error) => set({ error }),
+      setError: (error) => {
+        if (error) storeLog.warn('store.btc_map.set_error', { error });
+        set({ error });
+      },
 
-      clearCache: () => set({ placesCache: null, placeDetailsCache: {} }),
+      clearCache: () => {
+        storeLog.info('store.btc_map.clear_cache');
+        set({ placesCache: null, placeDetailsCache: {} });
+      },
 
       clearAllData: async () => {
         try {
@@ -216,7 +233,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
             error: null,
           });
         } catch (error) {
-          console.error('BTCMapStore: Error clearing data:', error);
+          log.error('store.btc_map.clear_failed', { error });
           throw error;
         }
       },
@@ -230,7 +247,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
       }),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('BTCMapStore: Failed to rehydrate from storage:', error);
+          log.warn('store.btc_map.rehydrate_failed', { error });
         }
       },
     }

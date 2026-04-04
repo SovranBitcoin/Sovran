@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
+import { log } from '../logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { blendColors, sanitizeColor } from '@/shared/lib/colorExtraction';
 import { TOAST_COPY } from '@/shared/lib/paymentCopy';
@@ -205,7 +206,7 @@ export function PaymentStatusToast({
         });
       }
     } catch (e) {
-      console.warn('Could not open transaction:', e);
+      log.warn('popup.open_transaction_failed', { error: e });
     }
     hide();
   };

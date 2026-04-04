@@ -16,6 +16,7 @@ import * as Clipboard from 'expo-clipboard';
 import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
+import { paymentLog } from '@/shared/lib/logger';
 
 import { getEncodedTokenV4 } from '@cashu/cashu-ts';
 import type {
@@ -97,8 +98,10 @@ interface CreateSovranNotificationsConfig {
 export function createSovranNotifications(
   config?: CreateSovranNotificationsConfig
 ): NotificationHandlerMap {
+  paymentLog.debug('payment.notifications.created');
   return {
     NO_AMOUNT: ({ code: _code, message: _message, data: _data }) => {
+      paymentLog.warn('payment.notification.no_amount');
       noAmountPopup();
     },
     NO_VALID_MINT: ({ code: _code, message, data: _data }) => {
@@ -120,12 +123,14 @@ export function createSovranNotifications(
       missingMeltTargetPopup();
     },
     SEND_FAILED: ({ code: _code, message, data: _data }) => {
+      paymentLog.error('payment.notification.send_failed', { message });
       generalErrorPopup({ text: message });
     },
     MINT_QUOTE_FAILED: ({ code: _code, message, data: _data }) => {
       generalErrorPopup({ text: message });
     },
     MELT_FAILED: ({ code: _code, message, data: _data }) => {
+      paymentLog.error('payment.notification.melt_failed', { message });
       generalErrorPopup({ text: message });
     },
     PAYMENT_REQUEST_FAILED: ({ code: _code, message, data: _data }) => {
@@ -146,6 +151,7 @@ export function createSovranNotifications(
       nfcErrorPopup({ title: 'NFC Read Failed', message });
     },
     onPaymentProcessing: (data) => {
+      paymentLog.info('payment.processing', { variant: data.variant, mintUrl: data.mintUrl, amount: data.amount, unit: data.unit });
       const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
       const id = `${data.variant}-${Date.now()}`;
       usePaymentStatusStore.getState().setActive({
@@ -165,6 +171,7 @@ export function createSovranNotifications(
       });
     },
     onPaymentConfirmed: (data) => {
+      paymentLog.info('payment.confirmed', { variant: data.variant });
       const nfcStore = useNfcProgressStore.getState();
       if (nfcStore.active) {
         nfcStore.setConfirmed();
@@ -187,6 +194,7 @@ export function createSovranNotifications(
       }
     },
     onPaymentFailed: (data) => {
+      paymentLog.error('payment.failed', { message: data.message, rolledBack: data.rolledBack });
       const store = usePaymentStatusStore.getState();
       if (store.active) {
         const msg = data.rolledBack
@@ -273,6 +281,7 @@ export function createSovranNotifications(
     },
 
     onReceiveProcessing: ({ id, mintUrl, amount, unit }) => {
+      paymentLog.info('payment.receive.processing', { id, mintUrl, amount, unit });
       const store = usePaymentStatusStore.getState();
       if (store.active?.id === id && store.active?.state === 'failed') {
         store.setActive(null);
@@ -295,6 +304,7 @@ export function createSovranNotifications(
     },
 
     onReceiveConfirmed: async ({ id, historyEntry }) => {
+      paymentLog.info('payment.receive.confirmed', { id });
       const store = usePaymentStatusStore.getState();
       if (store.active?.id === id) {
         store.setConfirmed(id);
@@ -310,6 +320,7 @@ export function createSovranNotifications(
     },
 
     onReceiveFailed: ({ id, message }) => {
+      paymentLog.error('payment.receive.failed', { id, message });
       const store = usePaymentStatusStore.getState();
       if (store.active?.id === id && store.active?.state === 'processing') {
         store.setFailed(id, new Error(message));
@@ -383,14 +394,21 @@ export function createSovranNotifications(
 // =============================================================================
 
 export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources {
+  paymentLog.debug('payment.scan_sources.created', { hasNfc: !!nfcAdapter });
   return {
     clipboard: async () => {
+      paymentLog.debug('payment.scan.clipboard.start');
       const rawText = (await Clipboard.getStringAsync()).trim();
       const decodedText = isEncoded(rawText) ? decode(rawText) : rawText;
-      if (!decodedText) return { empty: true };
+      if (!decodedText) {
+        paymentLog.debug('payment.scan.clipboard.empty');
+        return { empty: true };
+      }
+      paymentLog.info('payment.scan.clipboard.found', { chars: decodedText.length });
       return { data: decodedText };
     },
     gallery: async () => {
+      paymentLog.debug('payment.scan.gallery.start');
       try {
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ['images'],
@@ -398,14 +416,22 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
           quality: 1,
         });
 
-        if (result.canceled || !result.assets?.[0]?.uri) return { canceled: true };
+        if (result.canceled || !result.assets?.[0]?.uri) {
+          paymentLog.debug('payment.scan.gallery.canceled');
+          return { canceled: true };
+        }
 
         const scannedCodes = await scanFromURLAsync(result.assets[0].uri, ['qr']);
 
-        if (scannedCodes.length === 0) return { empty: true };
+        if (scannedCodes.length === 0) {
+          paymentLog.debug('payment.scan.gallery.no_qr');
+          return { empty: true };
+        }
 
+        paymentLog.info('payment.scan.gallery.found', { dataLen: scannedCodes[0].data.length });
         return { data: scannedCodes[0].data };
       } catch (err) {
+        paymentLog.error('payment.scan.gallery.failed', { error: err instanceof Error ? err : new Error(String(err)) });
         return { error: err instanceof Error ? err : new Error(String(err)) };
       }
     },
@@ -439,8 +465,10 @@ export function createSovranHandlers({
   getManager,
   getNpub,
 }: CreateSovranHandlersConfig): StepHandlerMap {
+  paymentLog.debug('payment.handlers.created');
   return {
     receiveToken: ({ token }) => {
+      paymentLog.info('payment.step.receive_token');
       router.navigate({
         pathname: '/(receive-flow)/receiveToken',
         params: { receiveHistoryEntry: JSON.stringify(buildReceiveHistoryEntry(token)) },
@@ -448,6 +476,7 @@ export function createSovranHandlers({
     },
 
     sendComplete: ({ historyEntry, mintWasOffline }) => {
+      paymentLog.info('payment.step.send_complete', { mintWasOffline: !!mintWasOffline });
       router.navigate({
         pathname: '/(send-flow)/sendToken',
         params: {
@@ -458,6 +487,7 @@ export function createSovranHandlers({
     },
 
     navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit }) => {
+      paymentLog.info('payment.step.navigate_payment_request', { mintUrl, amount, unit });
       const entry = {
         id: `pr-preview-${Date.now()}`,
         type: 'send',
@@ -477,6 +507,7 @@ export function createSovranHandlers({
     },
 
     navigateToMeltPreview: ({ mintUrl, meltTarget, amount, unit }) => {
+      paymentLog.info('payment.step.navigate_melt_preview', { mintUrl, amount, unit });
       const entry: MeltHistoryEntry = {
         id: `melt-preview-${Date.now()}`,
         type: 'melt',
@@ -657,11 +688,16 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
   return {
     sendToken: {
       nfc: async (rawCtx) => {
+        paymentLog.info('payment.screen_action.nfc.start');
         const { entry, manager } = sendCtx(rawCtx);
-        if (!entry.token) return;
+        if (!entry.token) {
+          paymentLog.warn('payment.screen_action.nfc.no_token');
+          return;
+        }
 
         const writeResult = await writeTokenToNFC(getEncodedTokenV4(entry.token));
         if (writeResult.success) {
+          paymentLog.info('payment.screen_action.nfc.success');
           nfcEcashSharedPopup();
           return;
         }
@@ -670,11 +706,13 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           writeResult.errorCode === 'TAG_LOST' || writeResult.errorCode === 'TRANSCEIVE_FAILED';
 
         if (lostConnection && entry.operationId) {
+          paymentLog.warn('payment.screen_action.nfc.connection_lost', { operationId: entry.operationId });
           try {
             await manager.ops.send.reclaim(entry.operationId);
             nfcConnectionLostPopup();
             return;
           } catch (rollbackError) {
+            paymentLog.error('payment.screen_action.nfc.rollback_failed', { error: rollbackError });
             nfcSendFailedPopup({
               rollbackFailed: true,
               text: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),

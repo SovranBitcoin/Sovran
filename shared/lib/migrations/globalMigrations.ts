@@ -14,6 +14,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { PROFILE_SCOPED_STORE_KEYS } from '@/shared/lib/cashu/profileScopedStorage';
+import { log } from '../logger';
 
 const GLOBAL_MIGRATIONS_COMPLETED_KEY = 'global-migrations-completed';
 
@@ -62,9 +63,7 @@ async function migrateIndexKeysToPubkeyKeys(): Promise<void> {
     }
   }
 
-  console.log(
-    `[GlobalMigrations] index-to-pubkey: moved ${migratedCount} keys across ${profiles.length} profiles`
-  );
+  log.info('migrations.global.index_to_pubkey', { migratedCount, profileCount: profiles.length });
 }
 
 /**
@@ -107,9 +106,9 @@ export async function runGlobalMigrations(): Promise<void> {
       await migration.run();
       completedIds.add(migration.id);
       await writeCompletedMigrationIds(completedIds);
-      console.log(`[GlobalMigrations] Completed: ${migration.id}`);
+      log.info('migrations.global.completed', { migrationId: migration.id });
     } catch (error) {
-      console.error(`[GlobalMigrations] Migration "${migration.id}" failed:`, error);
+      log.error('migrations.global.failed', { migrationId: migration.id, error });
     }
   }
 }

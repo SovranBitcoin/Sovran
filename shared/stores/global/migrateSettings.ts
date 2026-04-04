@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log } from '@/shared/lib/logger';
 import { useSettingsStore } from './settingsStore';
 
 /**
@@ -7,12 +8,12 @@ import { useSettingsStore } from './settingsStore';
  */
 export const migrateSettingsFromRedux = async (reduxState?: any) => {
   try {
-    console.log('SettingsMigration: Starting migration from Redux to Zustand...');
+    log.info('settings.migration.start');
 
     // Check if we already have Zustand settings
     const existingZustandSettings = await AsyncStorage.getItem('settings-store');
     if (existingZustandSettings) {
-      console.log('SettingsMigration: Zustand settings already exist, skipping migration');
+      log.debug('settings.migration.already_exists');
       return;
     }
 
@@ -21,22 +22,22 @@ export const migrateSettingsFromRedux = async (reduxState?: any) => {
     if (reduxState) {
       // Use the provided Redux state (from migration context)
       settings = reduxState.settings?.settings;
-      console.log('SettingsMigration: Using provided Redux state:', settings);
+      log.debug('settings.migration.using_redux_state', { settings });
     } else {
       // Try to get Redux settings from AsyncStorage
       const reduxSettings = await AsyncStorage.getItem('persist:root');
       if (!reduxSettings) {
-        console.log('SettingsMigration: No Redux settings found, using defaults');
+        log.debug('settings.migration.no_redux_settings');
         return;
       }
 
       const parsedReduxSettings = JSON.parse(reduxSettings);
       settings = parsedReduxSettings.settings?.settings;
-      console.log('SettingsMigration: Found Redux settings from storage:', settings);
+      log.debug('settings.migration.found_redux_settings', { settings });
     }
 
     if (!settings) {
-      console.log('SettingsMigration: No settings found in Redux data');
+      log.debug('settings.migration.no_settings_in_redux');
       return;
     }
 
@@ -45,38 +46,38 @@ export const migrateSettingsFromRedux = async (reduxState?: any) => {
 
     // Set theme (unified with background image)
     if (settings.theme) {
-      console.log('SettingsMigration: Migrating theme:', settings.theme);
+      log.debug('settings.migration.theme', { theme: settings.theme });
       zustandStore.setTheme(settings.theme);
     }
 
     // Set language
     if (settings.lang) {
-      console.log('SettingsMigration: Migrating language:', settings.lang);
+      log.debug('settings.migration.language', { lang: settings.lang });
       zustandStore.setLanguage(settings.lang);
     }
 
     // Set display BTC
     if (settings.display_btc !== undefined) {
-      console.log('SettingsMigration: Migrating display_btc:', settings.display_btc);
+      log.debug('settings.migration.display_btc', { displayBtc: settings.display_btc });
       zustandStore.setDisplayBtc(settings.display_btc);
     }
 
     // Set experimental
     if (settings.experimental !== undefined) {
-      console.log('SettingsMigration: Migrating experimental:', settings.experimental);
+      log.debug('settings.migration.experimental', { experimental: settings.experimental });
       zustandStore.setExperimental(settings.experimental);
     }
 
     // Set terms accepted
     if (settings.termsAccepted) {
-      console.log('SettingsMigration: Migrating termsAccepted:', settings.termsAccepted);
+      log.debug('settings.migration.terms_accepted', { termsAccepted: settings.termsAccepted });
       zustandStore.acceptTerms(settings.termsAccepted.date);
     }
 
     // Note: Passcode is not migrated for security reasons
 
-    console.log('SettingsMigration: Migration completed successfully');
+    log.info('settings.migration.done');
   } catch (error) {
-    console.error('SettingsMigration: Error during migration:', error);
+    log.error('settings.migration.failed', { error });
   }
 };

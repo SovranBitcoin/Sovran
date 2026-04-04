@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { log, storeLog } from '@/shared/lib/logger';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -175,6 +176,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
         newBp: number,
         allMintUrls: string[]
       ) => {
+        storeLog.debug('store.mint_dist.set', { unit, mintUrl, newBp });
         const normalizedUnit = unit.toLowerCase();
         const clampedBp = Math.max(0, Math.min(TOTAL_BASIS_POINTS, Math.round(newBp)));
 
@@ -277,6 +279,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
 
       // Initialize distribution for a unit
       initializeDistribution: (unit: string, mintUrls: string[]) => {
+        storeLog.info('store.mint_dist.initialize', { unit, mintCount: mintUrls.length });
         const normalizedUnit = unit.toLowerCase();
 
         set((state) => {
@@ -356,6 +359,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
 
       // Equalize among active mints only
       equalizeMints: (unit: string, mintUrls: string[]) => {
+        storeLog.info('store.mint_dist.equalize', { unit, mintCount: mintUrls.length });
         const normalizedUnit = unit.toLowerCase();
 
         set((state) => {
@@ -398,6 +402,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
 
       // Set mint to 100%
       maxMint: (unit: string, mintUrl: string, allMintUrls: string[]) => {
+        storeLog.info('store.mint_dist.max', { unit, mintUrl });
         const normalizedUnit = unit.toLowerCase();
 
         set((state) => {
@@ -418,6 +423,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
 
       // Set mint to 0% and redistribute
       minMint: (unit: string, mintUrl: string, allMintUrls: string[]) => {
+        storeLog.info('store.mint_dist.min', { unit, mintUrl });
         const normalizedUnit = unit.toLowerCase();
 
         set((state) => {
@@ -482,6 +488,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
 
       // Clear distribution for a unit
       clearDistribution: (unit: string) => {
+        storeLog.info('store.mint_dist.clear', { unit });
         const normalizedUnit = unit.toLowerCase();
 
         set((state) => {
@@ -496,7 +503,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
           await profileStorage.removeItem('mint-distribution-store');
           set({ distributions: {} });
         } catch (error) {
-          console.error('MintDistributionStore: Error clearing data:', error);
+          log.error('store.mint_dist.clear_failed', { error });
           throw error;
         }
       },
@@ -507,9 +514,9 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
       partialize: (state) => ({ distributions: state.distributions }),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
-          console.warn('MintDistributionStore: Failed to rehydrate from storage:', error);
+          log.warn('store.mint_dist.rehydrate_failed', { error });
         } else if (__DEV__) {
-          console.log('MintDistributionStore: Successfully rehydrated:', state?.distributions);
+          log.debug('store.mint_dist.rehydrated', { distributions: state?.distributions });
         }
       },
     }

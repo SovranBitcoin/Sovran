@@ -17,6 +17,7 @@ import { useWalletContextWithOverride } from '@/shared/providers/WalletContextPr
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { View } from '@/shared/ui/primitives/View/View';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 import { AmountSelector } from './AmountSelector';
 
@@ -25,10 +26,14 @@ interface AmountFlowScreenProps {
 }
 
 export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
+  useLifecycleLogger('AmountFlowScreen');
   const foreground = useThemeColor('foreground');
   const background = useThemeColor('background');
 
   const { entry, error, actions, suggestions, mintUrl } = useScreenActions('amountEntry', amountEntry);
+  if (error) {
+    log.warn('send.amount_flow.error', { error });
+  }
 
   const walletContext = useWalletContextWithOverride();
   const machine = usePaymentFlowMachine({ walletContext, unit: 'sat' });
@@ -36,6 +41,7 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
 
   const handleMintSelected = useCallback(
     (mintUrl: string) => {
+      log.info('send.amount_flow.mint_selected', { mintUrl });
       void machine.changeMint(mintUrl);
     },
     [machine]
@@ -58,7 +64,7 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
   const isSendOperation = entry.destination !== 'mintQuote';
 
   return (
-    <>
+    <Screen name="AmountFlowScreen">
       <Stack.Screen
         options={{
           title: 'Select Amount',
@@ -92,6 +98,6 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
           machineBusy={isExecuting}
         />
       </View>
-    </>
+    </Screen>
   );
 }

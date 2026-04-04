@@ -18,6 +18,7 @@ import { MonthSelector } from '@/features/transactions/components/MonthSelector'
 import { HistoryEntry } from '@cashu/coco-core';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 type PaymentType = 'all' | 'lightning' | 'ecash';
@@ -56,6 +57,7 @@ export function TransactionsScreen({
   filterMonth,
   onMonthChange,
 }: TransactionsScreenProps) {
+  useLifecycleLogger('TransactionsScreen');
   // Use external filter props if provided, otherwise use internal state
   const selectedCurrency = filterCurrency || initialAccount?.unit || 'sat';
   const paymentType = filterPaymentType;
@@ -97,6 +99,15 @@ export function TransactionsScreen({
 
   const { history, isFetching } = useHistoryWithMelts();
 
+  log.debug('tx.list.render', {
+    totalHistory: history.length,
+    isFetching,
+    currency: selectedCurrency,
+    paymentType,
+    direction,
+    tab,
+  });
+
   const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}-${selectedMonth}`;
 
   // Filter by currency and payment type/direction
@@ -137,6 +148,7 @@ export function TransactionsScreen({
       stickyContentHeight={MONTH_SELECTOR_HEIGHT}
       useCustomScrollView
       onHeaderHeightChange={setTotalHeaderHeight}>
+      <Screen name="TransactionsScreen">
       {/* Transaction list with proper header spacer */}
       <Transactions
         listKey={listKey}
@@ -154,6 +166,7 @@ export function TransactionsScreen({
         header={listHeader}
         disableContentInsetAdjustment
       />
+      </Screen>
     </ModalLayoutWrapper>
   );
 }

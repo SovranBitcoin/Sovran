@@ -3,6 +3,7 @@ import { CheckStateEnum } from '@cashu/cashu-ts';
 import { store } from '@/redux/store/store.deprecated';
 import { RootState } from '@/redux/store/reducer.deprecated';
 import { CashuProfile } from '@/redux/cashu/types.deprecated';
+import { cashuLog } from '../logger';
 
 /**
  * Data migration utility to move from Redux-based Cashu state to Coco repositories.
@@ -33,7 +34,8 @@ export class DataMigration {
   async migrateFromRedux(): Promise<MigrationResult> {
     const profile = this.getReduxProfile();
 
-    console.log(`Starting Redux to Coco migration for account ${this.accountIndex}...`);
+    cashuLog.info('cashu.migration.start', { accountIndex: this.accountIndex });
+    const migrationStart = performance.now();
 
     const result: MigrationResult = {
       mintsMigrated: 0,
@@ -43,21 +45,21 @@ export class DataMigration {
     };
 
     if (!profile) {
-      console.log(`No Redux profile found at index ${this.accountIndex}, skipping migration`);
+      cashuLog.info('cashu.migration.no_profile', { accountIndex: this.accountIndex });
       return result;
     }
 
-    console.log('Redux profile data:', JSON.stringify(profile, null, 2));
+    cashuLog.debug('cashu.migration.profile_data', { profile });
 
     try {
       await this.migrateMints(profile, result);
       await this.migrateProofs(profile, result);
       await this.migrateCounters(profile, result);
 
-      console.log('Migration completed:', result);
+      cashuLog.info('cashu.migration.completed', { result, duration_ms: Math.round((performance.now() - migrationStart) * 100) / 100 });
       return result;
     } catch (error) {
-      console.error('Migration failed:', error);
+      cashuLog.error('cashu.migration.failed', { error });
       result.errors.push({
         type: 'migration_failed',
         message: error instanceof Error ? error.message : 'Unknown error',
@@ -77,24 +79,24 @@ export class DataMigration {
     }
 
     const mintUrls = Array.from(uniqueMints);
-    console.log(`Found ${mintUrls.length} unique mints to migrate:`, mintUrls);
+    cashuLog.info('cashu.migration.mints_found', { count: mintUrls.length, mintUrls });
 
     for (const mintUrl of mintUrls) {
       try {
-        console.log(`Adding mint: ${mintUrl}`);
+        cashuLog.debug('cashu.migration.adding_mint', { mintUrl });
         await this.manager.mint.addMint(mintUrl, { trusted: true });
 
         try {
           const mintInfo = await this.manager.mint.getMintInfo(mintUrl);
-          console.log(`Mint info loaded for ${mintUrl}:`, mintInfo);
+          cashuLog.debug('cashu.migration.mint_info_loaded', { mintUrl });
         } catch (infoError) {
-          console.warn(`Failed to load mint info for ${mintUrl}:`, infoError);
+          cashuLog.warn('cashu.migration.mint_info_failed', { mintUrl, error: infoError });
         }
 
         result.mintsMigrated++;
-        console.log(`Migrated mint: ${mintUrl}`);
+        cashuLog.info('cashu.migration.mint_migrated', { mintUrl });
       } catch (error) {
-        console.error(`Failed to migrate mint ${mintUrl}:`, error);
+        cashuLog.error('cashu.migration.mint_failed', { mintUrl, error });
         result.errors.push({
           type: 'mint_migration_failed',
           message: `Failed to migrate mint ${mintUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -116,14 +118,14 @@ export class DataMigration {
         const satProofs = proofs.filter((proof) => {
           const unit = keysetUnitMap.get(proof.id);
           if (unit !== 'sat') {
-            console.log(`Skipping non-sat proof (unit: ${unit || 'unknown'}) for ${mintUrl}`);
+            cashuLog.debug('cashu.migration.skip_non_sat', { unit, mintUrl });
             return false;
           }
           return true;
         });
 
         if (satProofs.length === 0) {
-          console.log(`No sat proofs to migrate for ${mintUrl}`);
+          cashuLog.debug('cashu.migration.no_proofs', { mintUrl });
           continue;
         }
 
@@ -135,12 +137,12 @@ export class DataMigration {
           const state = proofStates[i];
 
           if (state.state === CheckStateEnum.SPENT) {
-            console.log(`Skipping spent proof for ${mintUrl}`);
+            cashuLog.debug('cashu.migration.skip_spent', { mintUrl });
             continue;
           }
 
           if (state.state === CheckStateEnum.PENDING) {
-            console.log(`Skipping pending proof for ${mintUrl}`);
+            cashuLog.debug('cashu.migration.skip_pending', { mintUrl });
             continue;
           }
 
@@ -150,9 +152,9 @@ export class DataMigration {
           result.proofsMigrated++;
         }
 
-        console.log(`Migrated proofs for ${mintUrl}`);
+        cashuLog.info('cashu.migration.proofs_migrated', { mintUrl });
       } catch (error) {
-        console.error(`Failed to migrate proofs for ${mintUrl}:`, error);
+        cashuLog.error('cashu.migration.proofs_failed', { mintUrl, error });
         result.errors.push({
           type: 'proofs_migration_failed',
           message: `Failed to migrate proofs for ${mintUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -164,24 +166,24 @@ export class DataMigration {
   private async migrateCounters(profile: CashuProfile, result: MigrationResult): Promise<void> {
     let totalCounters = 0;
 
-    console.log('Profile counters:', profile.counters);
+    cashuLog.debug('cashu.migration.counters', { counters: profile.counters });
     for (const [, counters] of Object.entries(profile.counters)) {
       totalCounters += Object.keys(counters).length;
     }
 
     if (totalCounters === 0) {
-      console.log('No counters found to migrate');
+      cashuLog.debug('cashu.migration.no_counters');
       return;
     }
 
-    console.log(`Found ${totalCounters} counters to migrate`);
+    cashuLog.info('cashu.migration.counters_found', { count: totalCounters });
 
     for (const [mintUrl, counters] of Object.entries(profile.counters)) {
       for (const [keysetId, counter] of Object.entries(counters)) {
         try {
           await (this.manager as any).counterService.overwriteCounter(mintUrl, keysetId, counter);
           result.countersMigrated++;
-          console.log(`Migrated counter for ${mintUrl}:${keysetId}: ${counter}`);
+          cashuLog.debug('cashu.migration.counter_migrated', { mintUrl, keysetId, counter });
         } catch (error) {
           result.errors.push({
             type: 'counter_migration_failed',

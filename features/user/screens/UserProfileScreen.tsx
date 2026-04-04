@@ -67,6 +67,7 @@ import { useDominantColor, getContrastColors } from '@/shared/lib/colorExtractio
 import type { VideoPostRecord, StoryUser } from '@/features/feed';
 import { ListGroup, PressableFeedback, Skeleton as HeroSkeleton } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Screen, nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
@@ -614,6 +615,8 @@ const BannerWithAvatar = React.memo(BannerWithAvatarComponent);
 // ============================================================================
 
 export function UserProfileScreen() {
+  useLifecycleLogger('UserProfileScreen', nostrLog);
+
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
@@ -755,6 +758,7 @@ export function UserProfileScreen() {
 
   const handleAvatarStoryPress = useCallback(() => {
     if (userVideoPosts.length === 0) return;
+    nostrLog.info('user.profile.story.view', { pubkey, videoCount: userVideoPosts.length });
     const storyUser: StoryUser = {
       pubkey,
       profile: userInfo ? { name: displayName, picture: userInfo.picture } : undefined,
@@ -775,30 +779,36 @@ export function UserProfileScreen() {
 
   const handleCopy = useCallback(async (text: string, target: CopyTarget) => {
     try {
+      nostrLog.info('user.profile.copy', { target });
       await Clipboard.setStringAsync(text);
       copyPopup(target);
-    } catch {
+    } catch (e) {
+      nostrLog.error('user.profile.copy.failed', { target, error: e instanceof Error ? e : new Error(String(e)) });
       copyFailedPopup();
     }
   }, []);
 
   const handleOpenLink = useCallback(async (url: string) => {
     try {
+      nostrLog.info('user.profile.open_link', { url });
       const fullUrl = url.startsWith('http') ? url : `https://${url}`;
       await Linking.openURL(fullUrl);
-    } catch {
+    } catch (e) {
+      nostrLog.error('user.profile.open_link.failed', { url, error: e instanceof Error ? e : new Error(String(e)) });
       openLinkFailedPopup();
     }
   }, []);
 
   const handleToggleFollow = useCallback(async () => {
     if (!pubkey || !nostrKeys?.pubkey || !ndk) {
+      nostrLog.warn('user.profile.follow.precondition_failed', { hasPubkey: !!pubkey, hasNostrKeys: !!nostrKeys?.pubkey, hasNdk: !!ndk });
       engagementUpdateFailedPopup('follow');
       return;
     }
     if (nostrKeys.pubkey === pubkey || followInFlight) return;
 
     const shouldFollow = !isFollowingProfile;
+    nostrLog.info('user.profile.follow.toggle', { pubkey, shouldFollow });
     setFollowOptimistic(pubkey, shouldFollow, true);
 
     const nextTags = buildUpdatedContactTags(
@@ -815,9 +825,11 @@ export function UserProfileScreen() {
       contactEvent.content = contactsContent;
       contactEvent.created_at = createdAt;
       await contactEvent.publish();
+      nostrLog.info('user.profile.follow.published', { pubkey, shouldFollow });
       setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAt });
       clearFollowOptimistic(pubkey);
-    } catch {
+    } catch (e) {
+      nostrLog.error('user.profile.follow.failed', { pubkey, error: e instanceof Error ? e : new Error(String(e)) });
       clearFollowOptimistic(pubkey);
       engagementUpdateFailedPopup('follow');
     }
@@ -891,7 +903,7 @@ export function UserProfileScreen() {
   }, [npub, userInfo, handleCopy, handleOpenLink, iconColor]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: background }}>
+    <Screen name="UserProfileScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: isMetadataLoading ? 'Profile' : displayName,
@@ -1020,6 +1032,7 @@ export function UserProfileScreen() {
               text: 'Send Message',
               variant: 'primary',
               onPress: async () => {
+                nostrLog.info('user.profile.send_message', { pubkey });
                 router.navigate({
                   pathname: '/(user-flow)/userMessages' as any,
                   params: { pubkey },
@@ -1029,7 +1042,7 @@ export function UserProfileScreen() {
           ]}
         />
       </BottomButtons>
-    </View>
+    </Screen>
   );
 }
 

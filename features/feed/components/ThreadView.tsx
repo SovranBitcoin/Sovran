@@ -37,6 +37,7 @@ import { PostCard } from './nostr/PostCard';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { feedLog } from '@/shared/lib/logger';
 
 // ============================================================================
 // Types
@@ -198,6 +199,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     let cancelled = false;
     setIsLoading(true);
     setError(null);
+
+    feedLog.info('thread.load.start', { eventId });
 
     const fetchThread = async () => {
       const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
@@ -386,14 +389,23 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         const expectedReplies = targetMetrics?.replyCount ?? 0;
         setHiddenReplyCount(Math.max(0, expectedReplies - replies.length));
 
+        feedLog.info('thread.load.done', {
+          eventId,
+          parents: parents.length,
+          replies: replies.length,
+          profiles: profiles.size,
+          hiddenReplies: Math.max(0, expectedReplies - replies.length),
+        });
+
         setThreadItems(items);
         setProfilesMap(profiles);
         setMetricsMap(metrics);
         setQuotedEventsMap(quotedEvents);
         setDataVersion((v) => v + 1);
         setIsLoading(false);
-      } catch {
+      } catch (err) {
         if (!cancelled) {
+          feedLog.error('thread.load.error', { eventId, error: err instanceof Error ? err : new Error(String(err)) });
           setError('Failed to load thread');
           setIsLoading(false);
         }

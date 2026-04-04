@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ReactNode } from 'react';
+import { log, storeLog } from '@/shared/lib/logger';
 import type { PopupIcon, PopupTextSegment } from '@/shared/lib/popup';
 import type { LiveSheetConfig, LiveSheetStatus } from '@/shared/lib/popup/liveSheetTypes';
 import type { ActionSheetPayloads } from '@/shared/lib/popup/actionSheetTypes';
@@ -53,31 +54,35 @@ export const usePopupStore = create<PopupStore>((set, get) => ({
   isOpen: false,
   destroyed: false,
   open: (payload) => {
+    storeLog.info('store.popup.open', isCustomSheetPayload(payload) ? { sheetId: payload.sheetId } : { message: (payload as StandardSheetPayload).message });
     set({ current: payload, isOpen: true, destroyed: false });
   },
   update: (partial) => {
     const { current } = get();
     if (!current || isCustomSheetPayload(current)) return;
+    storeLog.debug('store.popup.update');
     set({ current: { ...current, ...partial } });
   },
   close: () => {
+    storeLog.debug('store.popup.close');
     const { current } = get();
     if (current && !isCustomSheetPayload(current) && current.onClose) {
       try {
         current.onClose({ reason: 'dismiss' });
       } catch (error) {
-        console.error('popup onClose callback failed', error);
+        log.error('store.popup.on_close_failed', { error });
       }
     }
     set({ current: null, isOpen: false });
   },
   destroySheet: () => {
+    storeLog.debug('store.popup.destroy');
     const { current } = get();
     if (current && !isCustomSheetPayload(current) && current.onClose) {
       try {
         current.onClose({ reason: 'dismiss' });
       } catch (error) {
-        console.error('popup onClose callback failed', error);
+        log.error('store.popup.on_close_failed', { error });
       }
     }
     set({ current: null, isOpen: false, destroyed: true });

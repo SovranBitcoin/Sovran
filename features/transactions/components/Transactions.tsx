@@ -19,6 +19,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/time';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
+import { log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   useSwapTransactionsStore,
@@ -282,6 +283,7 @@ export const Transactions = React.memo(
     }, [pending, confirmed, expired, showMore, days]);
 
     const sectionsToDisplay = useMemo(() => {
+      log.debug('transactions.sections_computed', { tab, pending: sections.pending.length, confirmed: sections.confirmed.length, expired: sections.expired.length, total: sections.all.length });
       if (tab === 'Pending') return sections.pending;
       if (tab === 'Confirmed') return sections.confirmed;
       if (tab === 'Expired') return sections.expired;

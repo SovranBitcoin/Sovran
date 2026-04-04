@@ -3,7 +3,7 @@ import { NDKCacheAdapterSqlite, NDKPrivateKeySigner, useNDK } from '@nostr-dev-k
 import { relays } from '@/shared/ndk';
 import { useInitializationStage } from './InitializationProvider';
 import { useNostrKeysContext } from './NostrKeysProvider';
-import { initLog } from '@/shared/lib/initTiming';
+import { initLog, nostrLog } from '@/shared/lib/logger';
 
 interface NostrNDKContextValue {
   isInitialized: boolean;
@@ -43,27 +43,40 @@ export function NostrNDKProvider({
 
   useEffect(() => {
     if (hasInitialized.current) return;
-    if (!stage.canStart) return;
-    if (!nostrKeys?.privateKey) return;
+    if (!stage.canStart) {
+      nostrLog.debug('provider.ndk.waiting', { reason: 'stage_not_ready' });
+      return;
+    }
+    if (!nostrKeys?.privateKey) {
+      nostrLog.debug('provider.ndk.waiting', { reason: 'no_private_key' });
+      return;
+    }
 
     hasInitialized.current = true;
     initLog('NDK', 'starting NDK initialization...');
+    nostrLog.info('provider.ndk.init_start', { relayCount: relays.length, relays, accountIndex: activeAccountIndex });
 
     stage.log('Initializing NDK with signer...');
 
-    // Initialize NDK with cache adapter, relays, and signer
-    // @ts-ignore - initializeNDK expects slightly different types
-    initializeNDK({
-      cacheAdapter,
-      explicitRelayUrls: relays,
-      signer: new NDKPrivateKeySigner(nostrKeys.privateKey),
-    });
+    try {
+      // Initialize NDK with cache adapter, relays, and signer
+      // @ts-ignore - initializeNDK expects slightly different types
+      initializeNDK({
+        cacheAdapter,
+        explicitRelayUrls: relays,
+        signer: new NDKPrivateKeySigner(nostrKeys.privateKey),
+      });
 
-    initLog('NDK', 'initializeNDK() returned');
-    setIsInitialized(true);
-    stage.log('Nostr initialized');
-    stage.complete();
-    initLog('NDK', 'stage complete');
+      initLog('NDK', 'initializeNDK() returned');
+      nostrLog.info('provider.ndk.init_complete', { relayCount: relays.length });
+      setIsInitialized(true);
+      stage.log('Nostr initialized');
+      stage.complete();
+      initLog('NDK', 'stage complete');
+    } catch (err) {
+      nostrLog.error('provider.ndk.init_failed', { error: err instanceof Error ? err : new Error(String(err)) });
+      stage.error(err instanceof Error ? err.message : 'NDK initialization failed');
+    }
   }, [stage.canStart, initializeNDK, nostrKeys?.privateKey, stage]);
 
   return <NostrNDKContext.Provider value={{ isInitialized }}>{children}</NostrNDKContext.Provider>;

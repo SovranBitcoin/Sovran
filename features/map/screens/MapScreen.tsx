@@ -54,6 +54,7 @@ import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from '@/shared/lib/
 import { useShallow } from 'zustand/react/shallow';
 import { getOrBuildBTCMapClusterManager } from '@/shared/lib/map/btcMapClusterCache';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
+import { Screen, log } from '@/shared/lib/logger';
 
 // ============================================================================
 // Types & Constants
@@ -505,7 +506,7 @@ export function MapScreen() {
   useEffect(() => {
     // Defer fetch until after modal transition completes
     const task = InteractionManager.runAfterInteractions(() => {
-      fetchPlaces().catch(console.error);
+      fetchPlaces().catch((error) => log.error('map.places.fetch_failed', { error }));
     });
 
     return () => task.cancel();
@@ -558,7 +559,7 @@ export function MapScreen() {
         setMapCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 12 });
         updateMarkersForCamera(safe.latitude, safe.longitude, 12);
       } catch (err) {
-        console.error('Location error:', err);
+        log.error('map.location.error', { error: err });
       }
     });
 
@@ -573,7 +574,7 @@ export function MapScreen() {
       setMapCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 15 });
       updateMarkersForCamera(safe.latitude, safe.longitude, 15);
     } catch (err) {
-      console.error('Location error:', err);
+      log.error('map.location.error', { error: err });
     }
   }, [setMapCamera, updateMarkersForCamera]);
 
@@ -638,7 +639,7 @@ export function MapScreen() {
 
   if (error || mapUnavailableOnAndroid) {
     return (
-      <View style={[styles.container, { backgroundColor: background }]}>
+      <Screen name="MapScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.errorContainer}>
           <Icon name="mdi:alert-circle" size={48} color={opacity(foreground, 0.4)} />
           <Text size={16} style={{ color: opacity(foreground, 0.5), marginTop: 16 }}>
@@ -654,12 +655,12 @@ export function MapScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <Screen name="MapScreen" style={styles.container}>
       {/* Show a placeholder background immediately while map loads */}
       {!isMapReady && (
         <View style={[StyleSheet.absoluteFillObject, styles.mapSkeleton]}>
@@ -715,7 +716,7 @@ export function MapScreen() {
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
       />
-    </View>
+    </Screen>
   );
 }
 

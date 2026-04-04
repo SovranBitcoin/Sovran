@@ -16,6 +16,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 const StarRating = React.memo(function StarRating({
   score,
@@ -274,6 +275,7 @@ const HeaderStats = React.memo(function HeaderStats({
 });
 
 export function MintReviewsScreen() {
+  useLifecycleLogger('MintReviewsScreen');
   const background = useThemeColor('background');
   const insets = useSafeAreaInsets();
   const { mintUrl } = useLocalSearchParams<{ mintUrl: string }>();
@@ -284,10 +286,15 @@ export function MintReviewsScreen() {
     loading: kymLoading,
   } = useKYMMint(mintUrl || '');
 
+  log.debug('mint.reviews.load', { mintUrl, kymLoading, score: kymScore });
+
   const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
     const timeout = setTimeout(() => {
-      if (kymLoading) setTimedOut(true);
+      if (kymLoading) {
+        setTimedOut(true);
+        log.warn('mint.reviews.timeout', { mintUrl });
+      }
     }, 5000);
     return () => clearTimeout(timeout);
   }, [kymLoading]);
@@ -328,7 +335,7 @@ export function MintReviewsScreen() {
   const showEmptyState = !isLoading && totalReviews === 0;
 
   return (
-    <View className="flex-1" style={{ backgroundColor: background }}>
+    <Screen name="MintReviewsScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen options={{ title: 'Reviews' }} />
 
       {showEmptyState ? (
@@ -366,6 +373,6 @@ export function MintReviewsScreen() {
           ]}
         />
       </BottomButtons>
-    </View>
+    </Screen>
   );
 }

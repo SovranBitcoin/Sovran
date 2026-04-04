@@ -46,6 +46,7 @@ import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useAuditedMints, type AuditedMintData } from '@/features/mint/hooks/useAuditedMints';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import opacity from 'hex-color-opacity';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 // Height constant for currency tabs (same as MintListScreen)
 const CURRENCY_TABS_HEIGHT = 48;
@@ -313,6 +314,7 @@ const MintItem = memo(function MintItem({
 });
 
 export function MintAddScreen() {
+  useLifecycleLogger('MintAddScreen');
   const foreground = useThemeColor('foreground');
   const { width: windowWidth } = useWindowDimensions();
 
@@ -502,9 +504,11 @@ export function MintAddScreen() {
     }
     if (isAdding) return;
 
+    log.info('mint.add.batch.start', { count: selectedMints.size });
     setIsAdding(true);
     try {
       if (!CocoManager.isInitialized()) {
+        log.error('mint.add.batch.manager_not_initialized');
         managerNotInitializedPopup();
         setIsAdding(false);
         return;
@@ -540,6 +544,7 @@ export function MintAddScreen() {
         }
       }
 
+      log.info('mint.add.batch.complete', { added: results.length, failed: errors.length });
       if (errors.length === 0) {
         mintsAddedPopup({ added: results.length });
         router.back();
@@ -550,6 +555,7 @@ export function MintAddScreen() {
         mintsAddFailedPopup();
       }
     } catch {
+      log.error('mint.add.batch.unexpected_error');
       mintsAddFailedPopup();
     } finally {
       setIsAdding(false);
@@ -692,7 +698,7 @@ export function MintAddScreen() {
   const renderHeaderRight = useCallback(() => headerRightButton, [headerRightButton]);
 
   return (
-    <>
+    <Screen name="MintAddScreen">
       <Stack.Screen
         options={{
           title: 'Add Mints',
@@ -733,6 +739,6 @@ export function MintAddScreen() {
           />
         )}
       </ModalLayoutWrapper>
-    </>
+    </Screen>
   );
 }

@@ -1,10 +1,13 @@
 import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 
+import { feedLog } from '@/shared/lib/logger';
+
 /**
  * Scroll position tracking via Reanimated shared value.
  * Stays on the UI thread without JS re-renders during scroll.
  */
 export function useScrollViewOffset() {
+  feedLog.debug('feed.scroll.offset.init');
   const scrollOffsetY = useSharedValue(0);
 
   const scrollHandler = useAnimatedScrollHandler({

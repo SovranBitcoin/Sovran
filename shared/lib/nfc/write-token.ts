@@ -9,7 +9,7 @@ import { SELECT_AID, SELECT_NDEF, updateBinary, MAX_CHUNK_SIZE } from './constan
 import { sendApdu, getStatusMessage } from './apdu';
 import { buildTextNdef } from './ndef';
 import { isNfcSupported, isNfcEnabled } from './status';
-import { log, logDebug, logError, logWarn } from './logger';
+import { nfcLog } from '../logger';
 
 export interface NfcTokenWriteResult {
   success: boolean;
@@ -18,7 +18,7 @@ export interface NfcTokenWriteResult {
 }
 
 export async function writeTokenToNFC(token: string): Promise<NfcTokenWriteResult> {
-  log('Starting NFC token write...');
+  nfcLog.info('nfc.write.start');
 
   if (!(await isNfcSupported())) {
     return {
@@ -33,7 +33,7 @@ export async function writeTokenToNFC(token: string): Promise<NfcTokenWriteResul
 
   try {
     await NfcManager.requestTechnology(NfcTech.IsoDep);
-    log('IsoDep technology acquired');
+    nfcLog.info('nfc.write.isodep_acquired');
 
     let r = await sendApdu(SELECT_AID, 'SELECT AID');
     if (!r.ok) {
@@ -50,7 +50,7 @@ export async function writeTokenToNFC(token: string): Promise<NfcTokenWriteResul
     }
 
     const ndef = buildTextNdef(token);
-    logDebug(`NDEF message: NLEN=${(ndef[0] << 8) | ndef[1]}, total=${ndef.length} bytes`);
+    nfcLog.debug('nfc.write.ndef_message', { nlen: (ndef[0] << 8) | ndef[1], totalBytes: ndef.length });
 
     r = await sendApdu(updateBinary(0, [ndef[0], ndef[1]]), 'WRITE NLEN');
     if (!r.ok) {
@@ -66,7 +66,7 @@ export async function writeTokenToNFC(token: string): Promise<NfcTokenWriteResul
     const totalChunks = Math.ceil(body.length / MAX_CHUNK_SIZE);
     for (let chunkNum = 0; offset - 2 < body.length; chunkNum++) {
       const chunk = body.slice(offset - 2, offset - 2 + MAX_CHUNK_SIZE);
-      logDebug(`Writing chunk ${chunkNum + 1}/${totalChunks}: ${chunk.length} bytes`);
+      nfcLog.debug('nfc.write.chunk', { chunk: chunkNum + 1, totalChunks, bytes: chunk.length });
       r = await sendApdu(updateBinary(offset, chunk), `WRITE chunk ${chunkNum + 1}`);
       if (!r.ok) {
         throw new NfcError(
@@ -78,10 +78,10 @@ export async function writeTokenToNFC(token: string): Promise<NfcTokenWriteResul
       offset += chunk.length;
     }
 
-    log('Token written to NFC successfully!');
+    nfcLog.info('nfc.write.success');
     return { success: true };
   } catch (error) {
-    logError('NFC token write failed:', error);
+    nfcLog.error('nfc.write.failed', { error });
     if (error instanceof NfcError) {
       return { success: false, errorCode: error.code, errorMessage: error.message };
     }
@@ -91,7 +91,7 @@ export async function writeTokenToNFC(token: string): Promise<NfcTokenWriteResul
     try {
       await NfcManager.cancelTechnologyRequest();
     } catch (e) {
-      logWarn('Failed to release NFC technology:', e);
+      nfcLog.warn('nfc.write.release_failed', { error: e });
     }
   }
 }

@@ -1,4 +1,5 @@
 import * as ExpoHaptics from 'expo-haptics';
+import { log } from '@/shared/lib/logger';
 
 /**
  * Type definitions for the Haptics module
@@ -41,7 +42,7 @@ class EnhancedHaptics {
     try {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-      console.warn('Copy haptic not supported:', error);
+      log.warn('ui.haptics.not_supported', { type: 'copy', error });
     }
   }
 
@@ -53,7 +54,7 @@ class EnhancedHaptics {
     try {
       await Haptics.selectionAsync();
     } catch (error) {
-      console.warn('Navigation haptic not supported:', error);
+      log.warn('ui.haptics.not_supported', { type: 'navigation', error });
     }
   }
 
@@ -65,7 +66,7 @@ class EnhancedHaptics {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (error) {
-      console.warn('Button haptic not supported:', error);
+      log.warn('ui.haptics.not_supported', { type: 'button', error });
     }
   }
 
@@ -77,7 +78,7 @@ class EnhancedHaptics {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (error) {
-      console.warn('Action haptic not supported:', error);
+      log.warn('ui.haptics.not_supported', { type: 'action', error });
     }
   }
 
@@ -89,7 +90,7 @@ class EnhancedHaptics {
     try {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } catch (error) {
-      console.warn('Error haptic not supported:', error);
+      log.warn('ui.haptics.not_supported', { type: 'error', error });
     }
   }
 
@@ -101,7 +102,7 @@ class EnhancedHaptics {
     try {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } catch (error) {
-      console.warn('Warning haptic not supported:', error);
+      log.warn('ui.haptics.not_supported', { type: 'warning', error });
     }
   }
 
@@ -113,7 +114,7 @@ class EnhancedHaptics {
     try {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
-      console.warn('Success haptic not supported:', error);
+      log.warn('ui.haptics.not_supported', { type: 'success', error });
     }
   }
 
@@ -125,7 +126,7 @@ class EnhancedHaptics {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     } catch (error) {
-      console.warn('Destructive haptic not supported:', error);
+      log.warn('ui.haptics.not_supported', { type: 'destructive', error });
     }
   }
 }

@@ -23,6 +23,7 @@ import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { cashuLog, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 const CURRENCY_TABS_HEIGHT = 48;
 
@@ -56,11 +57,14 @@ export function MintListScreen({
   onInspectMint,
   onClose,
 }: MintListScreenProps) {
-  console.log('items123123', items);
+  useLifecycleLogger('MintListScreen', cashuLog);
+
   const foreground = useThemeColor('foreground');
   const scrollY = useSharedValue(0);
   const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
   const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
+
+  cashuLog.debug('mint.list.render', { itemCount: items.length, isExecuting });
 
   // Derive available currencies from items (no mint metadata needed — unit is in the item)
   const availableCurrencies = useMemo(() => {
@@ -75,12 +79,17 @@ export function MintListScreen({
   }, [items, selectedCurrency]);
 
   const handleCurrencyChange = useCallback((currency: string) => {
+    cashuLog.info('mint.list.currency.change', { currency });
     setSelectedCurrency(currency);
   }, []);
 
   const handleMintPress = useCallback(
     (item: MintListItem) => {
-      if (isExecuting || item.status !== 'available') return;
+      if (isExecuting || item.status !== 'available') {
+        cashuLog.debug('mint.list.select.blocked', { mintUrl: item.mintUrl, isExecuting, status: item.status });
+        return;
+      }
+      cashuLog.info('mint.list.select', { mintUrl: item.mintUrl, unit: item.unit });
       onMintSelect(item);
     },
     [isExecuting, onMintSelect]
@@ -161,20 +170,22 @@ export function MintListScreen({
       useCustomScrollView
       onHeaderHeightChange={setTotalHeaderHeight}
       bottomContent={bottomButtons}>
-      <LegendList
-        data={filteredItems}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.mintUrl}
-        extraData={isExecuting}
-        estimatedItemSize={120}
-        drawDistance={300}
-        style={{ flex: 1, height: 0 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={emptyComponent}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-      />
+      <Screen name="MintListScreen">
+        <LegendList
+          data={filteredItems}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.mintUrl}
+          extraData={isExecuting}
+          estimatedItemSize={120}
+          drawDistance={300}
+          style={{ flex: 1, height: 0 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={emptyComponent}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        />
+      </Screen>
     </ModalLayoutWrapper>
   );
 }

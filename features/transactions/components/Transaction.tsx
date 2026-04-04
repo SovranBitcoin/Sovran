@@ -15,6 +15,7 @@ import { formatAmount } from '@/shared/lib/currency';
 import { convertTime } from '@/shared/lib/time';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log } from '@/shared/lib/logger';
 import { useScanHistoryStore, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 
 /**
@@ -51,6 +52,7 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
   );
 
   const handlePress = useCallback((): void => {
+    log.debug('transaction.press', { type: historyEntry.type, id: historyEntry.id });
     // Using router.navigate instead of router.push to prevent duplicate navigation
     switch (historyEntry.type) {
       case 'mint': {

@@ -23,6 +23,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Button } from '@/shared/ui/primitives/Button';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 import { CameraLayout } from './CameraLayout';
 import type { CameraScreenProps, ScanningData } from './types';
@@ -46,6 +47,7 @@ function applyScanResult(
 }
 
 export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
+  useLifecycleLogger('CameraScreen');
   const { unit } = useLocalSearchParams<{ unit?: string }>();
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
@@ -101,12 +103,14 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
       if (appStateRef.current !== 'active' || !isFocused) return;
       if (!isUr && isProcessingRef.current) return;
 
+      log.info('camera.scan.detected', { type: data.type ?? 'qr', isUr, dataLength: data.data.length });
       isProcessingRef.current = true;
       setLoading(true);
       try {
         const result = await machine.scan?.(data.data, { source: data.type ?? 'qr' });
         applyScanResult(result, setProgress, setLoading, isProcessingRef);
-      } catch {
+      } catch (err) {
+        log.error('camera.scan.failed', { error: err instanceof Error ? err : new Error(String(err)) });
         setLoading(false);
         setProgress(0);
         isProcessingRef.current = false;
@@ -124,12 +128,14 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
 
   const handleClipboardPress = useCallback(async () => {
     if (scanLocked) return;
+    log.info('camera.scan.clipboard');
     isProcessingRef.current = true;
     setLoading(true);
     try {
       const result = await machine.scan?.();
       applyScanResult(result, setProgress, setLoading, isProcessingRef);
-    } catch {
+    } catch (err) {
+      log.error('camera.scan.clipboard_failed', { error: err instanceof Error ? err : new Error(String(err)) });
       setLoading(false);
       setProgress(0);
       isProcessingRef.current = false;
@@ -138,12 +144,14 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
 
   const handleGalleryPress = useCallback(async () => {
     if (scanLocked) return;
+    log.info('camera.scan.gallery');
     isProcessingRef.current = true;
     setLoading(true);
     try {
       const result = await machine.scan?.(undefined, { source: 'gallery' });
       applyScanResult(result, setProgress, setLoading, isProcessingRef);
-    } catch {
+    } catch (err) {
+      log.error('camera.scan.gallery_failed', { error: err instanceof Error ? err : new Error(String(err)) });
       setLoading(false);
       setProgress(0);
       isProcessingRef.current = false;
@@ -254,6 +262,8 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
   );
 
   return (
-    <CameraLayout {...shared}>{Platform.OS === 'ios' ? iosButtons : androidButtons}</CameraLayout>
+    <Screen name="CameraScreen">
+      <CameraLayout {...shared}>{Platform.OS === 'ios' ? iosButtons : androidButtons}</CameraLayout>
+    </Screen>
   );
 }

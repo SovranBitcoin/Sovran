@@ -1,6 +1,7 @@
 import React, { useEffect, createContext } from 'react';
 import { usePricelistStore, BitcoinPrices } from '@/shared/stores/global/pricelistStore';
 import { PRICELIST_URL } from '@/shared/lib/apiClient';
+import { log } from '@/shared/lib/logger';
 
 interface PricelistContextType {
   btcPrice?: number;
@@ -33,7 +34,7 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
     const connect = () => {
       if (ws?.readyState === WebSocket.OPEN) return;
 
-      console.log('PricelistProvider: Connecting to WebSocket...');
+      log.info('pricelist.ws.connecting');
       setLoading(true);
       setError(null);
 
@@ -41,7 +42,7 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
         ws = new WebSocket(PRICELIST_URL);
 
         ws.onopen = () => {
-          console.log('PricelistProvider: WebSocket connected');
+          log.info('pricelist.ws.connected');
           setLoading(false);
           setError(null);
           reconnectAttempts = 0; // Reset on successful connection
@@ -50,7 +51,7 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            console.log('PricelistProvider: Received data:', data);
+            log.debug('pricelist.ws.data', { data });
 
             // Handle multi-currency format: { btcPrices: { USD, GBP, EUR } }
             if (data?.btcPrices && typeof data.btcPrices === 'object') {
@@ -73,27 +74,25 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
               setBtcPrice(data.usd.btc);
             }
           } catch (err) {
-            console.error('PricelistProvider: Error parsing WebSocket data:', err);
+            log.error('pricelist.ws.parse_error', { error: err });
             setError('Failed to parse price data');
           }
         };
 
         ws.onerror = (err) => {
-          console.error('PricelistProvider: WebSocket error:', err);
+          log.error('pricelist.ws.error', { error: err });
           setError('Connection error');
           setLoading(false);
         };
 
         ws.onclose = () => {
-          console.log('PricelistProvider: WebSocket closed');
+          log.info('pricelist.ws.closed');
           setLoading(false);
 
           // Attempt to reconnect if we haven't exceeded max attempts
           if (reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++;
-            console.log(
-              `PricelistProvider: Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`
-            );
+            log.info('pricelist.ws.reconnecting', { attempt: reconnectAttempts, max: maxReconnectAttempts });
 
             reconnectTimeout = setTimeout(
               () => {
@@ -102,12 +101,12 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
               reconnectDelay * Math.pow(2, reconnectAttempts - 1)
             ); // Exponential backoff
           } else {
-            console.error('PricelistProvider: Max reconnection attempts reached');
+            log.error('pricelist.ws.max_reconnects');
             setError('Connection lost. Please check your internet connection.');
           }
         };
       } catch (err) {
-        console.error('PricelistProvider: Error creating WebSocket:', err);
+        log.error('pricelist.ws.create_failed', { error: err });
         setError('Failed to connect to price feed');
         setLoading(false);
       }

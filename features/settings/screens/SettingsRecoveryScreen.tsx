@@ -6,6 +6,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
+import { log, Screen } from '@/shared/lib/logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useMintManagement } from '@/features/mint';
 import { useNavigation, router } from 'expo-router';
@@ -95,7 +96,7 @@ export const SettingsRecoveryScreen: React.FC = () => {
         const manager = CocoManager.getInstance();
         await manager.ops.send.recovery.run();
       } catch (error) {
-        console.warn('Failed to recover pending operations:', error);
+        log.warn('settings.recovery.failed', { error });
       }
 
       // Reload mints/balances
@@ -310,6 +311,7 @@ export const SettingsRecoveryScreen: React.FC = () => {
 
   return (
     <Container>
+      <Screen name="SettingsRecoveryScreen">
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ flexGrow: 1 }}
@@ -319,6 +321,7 @@ export const SettingsRecoveryScreen: React.FC = () => {
         {recoveryState === 'complete' && renderCompleteState()}
         {recoveryState === 'error' && renderErrorState()}
       </ScrollView>
+      </Screen>
     </Container>
   );
 };

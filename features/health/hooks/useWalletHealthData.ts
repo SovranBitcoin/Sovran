@@ -4,6 +4,7 @@ import type { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import { useBalanceContext, useMints, usePaginatedHistory } from '@cashu/coco-react';
 
 import { useMintDistributionStore } from '@/shared/stores/profile/mintDistributionStore';
+import { walletLog } from '@/shared/lib/logger';
 
 import { getMintsForUnit } from '../lib/walletHealth';
 
@@ -39,6 +40,13 @@ export function useWalletHealthData(unit: string) {
   }, [history, normalizedUnit]);
 
   const desiredDistributionBp = distributions[normalizedUnit] || {};
+
+  walletLog.debug('health.data.computed', {
+    unit: normalizedUnit,
+    mintCount: mintUrlsForUnit.length,
+    pendingOutgoingCount,
+    hasDistribution: Object.values(desiredDistributionBp).some((v) => (v || 0) > 0),
+  });
 
   return {
     normalizedUnit,

@@ -23,6 +23,7 @@ import { Spinner } from '@/shared/ui/primitives/Spinner';
 import opacity from 'hex-color-opacity';
 import { Checkbox } from '@/shared/ui/primitives/Checkbox';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { cashuLog } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 interface MintItemProps {
@@ -89,7 +90,10 @@ const MintItem: React.FC<MintItemProps> = ({
       key={item.mintUrl}
       className="bg-surface mb-1 rounded-2xl p-4"
       style={{ opacity: itemOpacity }}
-      onPress={onPress}
+      onPress={() => {
+        cashuLog.debug('mint_item.press', { mintUrl: item.mintUrl, displayName: item.displayName, status: item.status });
+        onPress();
+      }}
       disabled={isDisabled}>
       <VStack gap={0}>
         <HStack align="center" gap={12}>

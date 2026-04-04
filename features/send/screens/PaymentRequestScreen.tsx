@@ -15,6 +15,7 @@ import type { SendHistoryEntry } from '@cashu/coco-core';
 import { isPaymentRequestPreview } from 'coco-payment-ux';
 import { useScreenActions } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import {
@@ -46,11 +47,13 @@ export function PaymentRequestScreen({
   onMintSelected,
   onRequestMintList,
 }: PaymentRequestScreenProps) {
+  useLifecycleLogger('PaymentRequestScreen');
   const { entry, error, actions, source, mintUrl } = useScreenActions('paymentRequest', paymentRequestEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
   if (error) {
+    log.warn('send.payment_request.error', { error });
     return <ScreenErrorState message={error} onGoBack={onCancel} />;
   }
 
@@ -61,6 +64,7 @@ export function PaymentRequestScreen({
   const tokenCreated = entry.metadata?.tokenCreated === 'true';
   const nostrSent = entry.metadata?.nostrSent === 'true';
   const isPreview = isPaymentRequestPreview(entry);
+  log.debug('send.payment_request.render', { isPreview, amount: entry.amount, unit: entry.unit, tokenCreated, nostrSent });
 
   const anyLoading = actions.confirm.loading || actions.cancel.loading;
 
@@ -100,50 +104,52 @@ export function PaymentRequestScreen({
 
   return (
     <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
-      <VStack gap={12}>
-        <HistoryEntryHeader
-          pendingData={{ amount: entry.amount, unit: entry.unit, type: 'send' }}
-        />
-
-        {isPreview ? (
-          <MintSelector
-            width={280}
-            unit={entry.unit}
-            selectedMintUrl={mintUrl}
-            onMintSelected={onMintSelected ?? (() => {})}
-            onRequestMintList={onRequestMintList ?? (() => {})}
+      <Screen name="PaymentRequestScreen">
+        <VStack gap={12}>
+          <HistoryEntryHeader
+            pendingData={{ amount: entry.amount, unit: entry.unit, type: 'send' }}
           />
-        ) : mintInfo ? (
-          <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
-        ) : null}
 
-        <HistoryEntryTimeline
-          historyEntry={entry}
-          tokenCreated={tokenCreated}
-          nostrSent={nostrSent}
-        />
+          {isPreview ? (
+            <MintSelector
+              width={280}
+              unit={entry.unit}
+              selectedMintUrl={mintUrl}
+              onMintSelected={onMintSelected ?? (() => {})}
+              onRequestMintList={onRequestMintList ?? (() => {})}
+            />
+          ) : mintInfo ? (
+            <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
+          ) : null}
 
-        <DetailsSection
-          items={[
-            source ? { title: 'Source', value: source } : null,
-            bip321.isBip321 ? { title: 'Format', value: 'BIP 321' } : null,
-            bip321.optionKinds ? { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" /> } : null,
-            { title: 'Date', value: entry.createdAt.datetime },
-            { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
-            entry.transportLabel ? { title: 'Transport', value: entry.transportLabel } : null,
-            entry.paymentRequestInfo?.mints?.length
-              ? {
-                  title: 'Allowed Mints',
-                  value: `${entry.paymentRequestInfo.mints.length} mint(s)`,
-                }
-              : null,
-            entry.operationId
-              ? { title: 'Operation ID', value: truncateMiddle(entry.operationId, 7) }
-              : null,
-            mintUrl ? { title: 'Mint', value: truncateMiddle(mintUrl, 12) } : null,
-          ].flatMap((item) => (item ? [item] : []))}
-        />
-      </VStack>
+          <HistoryEntryTimeline
+            historyEntry={entry}
+            tokenCreated={tokenCreated}
+            nostrSent={nostrSent}
+          />
+
+          <DetailsSection
+            items={[
+              source ? { title: 'Source', value: source } : null,
+              bip321.isBip321 ? { title: 'Format', value: 'BIP 321' } : null,
+              bip321.optionKinds ? { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" /> } : null,
+              { title: 'Date', value: entry.createdAt.datetime },
+              { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+              entry.transportLabel ? { title: 'Transport', value: entry.transportLabel } : null,
+              entry.paymentRequestInfo?.mints?.length
+                ? {
+                    title: 'Allowed Mints',
+                    value: `${entry.paymentRequestInfo.mints.length} mint(s)`,
+                  }
+                : null,
+              entry.operationId
+                ? { title: 'Operation ID', value: truncateMiddle(entry.operationId, 7) }
+                : null,
+              mintUrl ? { title: 'Mint', value: truncateMiddle(mintUrl, 12) } : null,
+            ].flatMap((item) => (item ? [item] : []))}
+          />
+        </VStack>
+      </Screen>
     </ModalLayoutWrapper>
   );
 }

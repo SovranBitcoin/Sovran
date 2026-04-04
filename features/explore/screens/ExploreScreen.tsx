@@ -1,3 +1,4 @@
+import { Screen, log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
@@ -1092,7 +1093,7 @@ const ExploreScreen = () => {
             setModels(freshModels);
             setCachedModels(freshModels);
           } catch (error) {
-            console.error('Failed to refresh models:', error);
+            log.error('explore.models.refresh_failed', { error });
           }
         }
         return;
@@ -1103,7 +1104,7 @@ const ExploreScreen = () => {
         setModels(fetchedModels);
         setCachedModels(fetchedModels);
       } catch (error) {
-        console.error('Failed to fetch models:', error);
+        log.error('explore.models.fetch_failed', { error });
       }
       setModelsLoading(false);
     };
@@ -1162,6 +1163,7 @@ const ExploreScreen = () => {
     <LayoutDebugWrapper
       onContentSizeChange={onContentSizeChange}
       contentContainerStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}>
+      <Screen name="ExploreScreen">
       <ScrollableGradientOverlay contentHeight={contentHeight} />
 
       <VStack style={{ paddingBottom: 96 }}>
@@ -1343,6 +1345,7 @@ const ExploreScreen = () => {
 
         <Spacer size={20} />
       </VStack>
+      </Screen>
     </LayoutDebugWrapper>
   );
 };

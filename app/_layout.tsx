@@ -9,7 +9,7 @@ import 'intl/locale-data/jsonp/en';
 import 'react-native-reanimated';
 
 import { useFonts } from '@/shared/hooks/useFonts';
-import { initLog } from '@/shared/lib/initTiming';
+import { initLog, createFetchLogger, log } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Image, LogBox, TouchableOpacity, Platform, View } from 'react-native';
@@ -67,6 +67,10 @@ SplashScreen.preventAutoHideAsync();
 initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called');
 
 LogBox.ignoreAllLogs();
+
+// global.fetch = createFetchLogger(); // KILL_SWITCH
+
+// TODO: Wire createNavigationLogger() when Expo Router exposes onStateChange
 
 const IOS_SPLASH_IMAGE_WIDTH = 390;
 const REINIT_SPLASH_IMAGE = require('../assets/images/dark.png');

@@ -1,5 +1,7 @@
 import { nip19 } from 'nostr-tools';
 
+import { nostrLog } from '../logger';
+
 /**
  * Converts an npub-encoded Nostr public key to its hex representation.
  * Returns the input unchanged if it doesn't start with 'npub'.
@@ -10,6 +12,7 @@ export function npubToPubkey(npub: string): string {
   if (npub.startsWith('npub')) {
     const data = nip19.decode(npub);
     if (data.type === 'npub') {
+      nostrLog.debug('nostr.client.npub_to_pubkey', { inputLen: npub.length, type: data.type });
       return data.data;
     }
   }
@@ -20,8 +23,10 @@ export function npubToPubkey(npub: string): string {
 export function npubToPubkeySafe(npub: string): string | null {
   try {
     const decoded = nip19.decode(npub);
+    nostrLog.debug('nostr.client.npub_to_pubkey_safe', { type: decoded.type, success: decoded.type === 'npub' });
     return decoded.type === 'npub' ? decoded.data : null;
   } catch {
+    nostrLog.warn('nostr.client.npub_to_pubkey_safe.failed', { inputLen: npub?.length });
     return null;
   }
 }
@@ -46,12 +51,16 @@ export interface NostrEvent {
  */
 export function parseRecommendation(raw: string): { score: number; comment: string } | null {
   const match = raw.match(/^\s*\[(\d+)\/(\d+)\]\s*(.*)$/);
-  if (!match) return null;
+  if (!match) {
+    nostrLog.debug('nostr.client.parse_recommendation.no_match', { rawLen: raw.length });
+    return null;
+  }
   const score = parseInt(match[1], 10);
   const outOf = parseInt(match[2], 10);
   const comment = match[3] ?? '';
   if (!Number.isFinite(score) || score < 0 || score > 5) return null;
   if (outOf !== 5) return null;
+  nostrLog.debug('nostr.client.parse_recommendation', { score, commentLen: comment.length });
   return { score, comment };
 }
 
@@ -73,5 +82,7 @@ export function isCashuRecommendationEvent(e: NostrEvent): boolean {
  */
 export function extractMintUrlFromEvent(e: NostrEvent): string | null {
   const urlTag = e.tags.find((t) => t[0] === 'u');
-  return urlTag?.[1] || null;
+  const url = urlTag?.[1] || null;
+  nostrLog.debug('nostr.client.extract_mint_url', { found: url !== null, eventId: e.id?.slice(0, 8) });
+  return url;
 }

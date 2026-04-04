@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NDKEvent, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { paymentLog } from '@/shared/lib/logger';
 import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
@@ -101,7 +102,7 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       }
     });
 
-    return Array.from(contactMap.entries())
+    const contacts = Array.from(contactMap.entries())
       .map(([pubkey, entry]) => ({
         type: 'contact',
         pubkey,
@@ -110,6 +111,9 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
         timestamp: entry.timestamp,
       }))
       .sort((a, b) => b.timestamp - a.timestamp);
+
+    paymentLog.debug('payment.contacts.recent', { contactCount: contacts.length, nip04Events: dmEvents?.length ?? 0, nip17Events: unwrappedDMs.length });
+    return contacts;
   }, [dmEvents, unwrappedDMs, nostrKeys?.pubkey]);
 
   // Merge default contacts with recent activity contacts
@@ -151,8 +155,10 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
 
       try {
         const results = await decryptNip04Events(contactsWithDefaults, nostrKeys.privateKey);
+        paymentLog.debug('payment.contacts.decrypt', { decryptedCount: results.length });
         if (!cancelled) setDecryptedContacts(results);
-      } catch {
+      } catch (err) {
+        paymentLog.error('payment.contacts.decrypt.error', { error: err instanceof Error ? err : new Error(String(err)) });
         if (!cancelled) setDecryptedContacts(contactsWithDefaults);
       }
     };

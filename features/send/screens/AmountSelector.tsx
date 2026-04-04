@@ -7,6 +7,7 @@ import { useCallback, useMemo } from 'react';
 import { Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
+import { walletLog, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 import type { ScreenActionName } from 'coco-payment-ux';
 import type { BoundAction, QuickSendSuggestion } from 'coco-payment-ux/react';
@@ -132,6 +133,8 @@ export function AmountSelector({
   transactionType,
   machineBusy = false,
 }: AmountSelectorProps) {
+  useLifecycleLogger('AmountSelector', walletLog);
+
   const [foreground, background, danger] = useThemeColor([
     'foreground',
     'background',
@@ -156,13 +159,15 @@ export function AmountSelector({
 
   const handleKeyPress = useCallback(
     (value: string) => {
+      walletLog.debug('amount.input.key', { value, inputMode });
       void actions.setInput.execute({ input: value });
     },
-    [actions.setInput]
+    [actions.setInput, inputMode]
   );
 
   const handleSuggestionTap = useCallback(
     (suggestion: QuickSendSuggestion) => {
+      walletLog.info('amount.suggestion.tap', { satoshis: suggestion.satoshis, label: suggestion.label, mode: suggestion.inputMode });
       void actions.setInput.execute({
         input: suggestion.inputValue,
         mode: suggestion.inputMode,
@@ -172,12 +177,14 @@ export function AmountSelector({
   );
 
   const handleToggle = useCallback(() => {
+    walletLog.info('amount.input.toggle', { fromMode: inputMode });
     void actions.toggle.execute();
-  }, [actions.toggle]);
+  }, [actions.toggle, inputMode]);
 
   const handleNext = useCallback(async () => {
+    walletLog.info('amount.next', { numericValue, inputMode, unit, transactionType });
     await actions.next.execute();
-  }, [actions.next]);
+  }, [actions.next, numericValue, inputMode, unit, transactionType]);
 
   const nextLoading = machineBusy || actions.next.loading;
   const nextDisabled = !actions.next.available;
@@ -190,6 +197,7 @@ export function AmountSelector({
         icon: 'lets-icons:copy',
         variant: 'secondary',
         onPress: async () => {
+          walletLog.info('amount.paste');
           await actions.paste.execute();
         },
         loading: actions.paste.loading,
@@ -201,6 +209,7 @@ export function AmountSelector({
         icon: 'stash:qr-code',
         variant: 'secondary',
         onPress: async () => {
+          walletLog.info('amount.scan_qr');
           await actions.scanQr.execute();
         },
         loading: actions.scanQr.loading,
@@ -210,7 +219,7 @@ export function AmountSelector({
   }, [actions.paste, actions.scanQr]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: background }}>
+    <Screen name="AmountSelector" style={{ flex: 1, backgroundColor: background }}>
       <View style={{ flex: 1, paddingTop: topPadding, paddingHorizontal: 16 }}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <VStack align="center" spacing={centerSpacing}>
@@ -310,6 +319,6 @@ export function AmountSelector({
           />
         </HStack>
       </BottomButtons>
-    </View>
+    </Screen>
   );
 }

@@ -4,6 +4,7 @@ import FilterItem from '@/features/contacts/components/search/SearchFilterItem';
 import { SEARCH_FILTERS_HEIGHT } from '@/features/contacts/lib/constants/styles';
 import { PRIMAL_FEED_SPECS, categoryToLabel } from './HomeFeed';
 import { CATEGORY_NPUBS } from './nostr/categoryNpubs';
+import { feedLog } from '@/shared/lib/logger';
 
 const SEARCH_FILTERS = ['People'] as const;
 
@@ -33,6 +34,7 @@ export const FeedFilters = ({ isSearching, onFilterChange }: FeedFiltersProps) =
   }
 
   const handleFilterChange = (filter: string) => {
+    feedLog.info('feed.filter.change', { filter, isSearching });
     setActiveFilterItem(filter);
     onFilterChange?.(filter);
   };

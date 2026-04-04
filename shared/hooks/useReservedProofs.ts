@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useManager } from '@cashu/coco-react';
 import type { CoreProof } from '@cashu/coco-core';
 
+import { walletLog } from '@/shared/lib/logger';
+
 type UnsafeManager = {
   proofRepository?: {
     getReservedProofs?: () => Promise<CoreProof[]>;
@@ -23,6 +25,7 @@ export function useReservedProofs(): ReservedProofsResult {
   const loadReserved = useCallback(async () => {
     const repo = (manager as unknown as UnsafeManager).proofRepository;
     if (!repo?.getReservedProofs) {
+      walletLog.debug('reservedProofs.noRepo', { available: false });
       setReservedTotal(0);
       setReservedProofs([]);
       return;
@@ -30,9 +33,12 @@ export function useReservedProofs(): ReservedProofsResult {
 
     try {
       const proofs = await repo.getReservedProofs();
-      setReservedTotal(proofs.reduce((sum, proof) => sum + proof.amount, 0));
+      const total = proofs.reduce((sum, proof) => sum + proof.amount, 0);
+      walletLog.info('reservedProofs.loaded', { count: proofs.length, total });
+      setReservedTotal(total);
       setReservedProofs(proofs as (CoreProof & { usedByOperationId?: string })[]);
-    } catch {
+    } catch (err) {
+      walletLog.error('reservedProofs.error', { error: err });
       setReservedTotal(0);
       setReservedProofs([]);
     }

@@ -10,6 +10,7 @@ import React from 'react';
 
 import type { ReceiveHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
@@ -37,11 +38,13 @@ export function ReceiveTokenScreen({
   receiveHistoryEntry,
   onNavigateBack,
 }: ReceiveTokenScreenProps) {
+  useLifecycleLogger('ReceiveTokenScreen');
   const { entry, error, actions, source, mintUrl } = useScreenActions('receiveToken', receiveHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
   if (error) {
+    log.warn('receive.token.error', { error });
     return <ScreenErrorState message={error} onGoBack={onNavigateBack} />;
   }
 
@@ -50,6 +53,7 @@ export function ReceiveTokenScreen({
   }
 
   const isRedeemed = !(entry.id?.startsWith('receive-') ?? false);
+  log.debug('receive.token.render', { isRedeemed, amount: entry.amount, unit: entry.unit });
 
   const bottomButtons = (
     <BottomButtons>
@@ -84,32 +88,34 @@ export function ReceiveTokenScreen({
 
   return (
     <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
-      <VStack gap={12}>
-        <HistoryEntryHeader historyEntry={entry} />
+      <Screen name="ReceiveTokenScreen">
+        <VStack gap={12}>
+          <HistoryEntryHeader historyEntry={entry} />
 
-        {isRedeemed && <TransactionLocationSection transactionId={entry.id} />}
+          {isRedeemed && <TransactionLocationSection transactionId={entry.id} />}
 
-        <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />
+          <HistoryEntryRefresh historyEntry={entry} mintInfo={mintInfo} />
 
-        <HistoryEntryTimeline
-          historyEntry={
-            { ...entry, state: isRedeemed ? 'redeemed' : 'pending' } as ReceiveHistoryEntry
-          }
-        />
+          <HistoryEntryTimeline
+            historyEntry={
+              { ...entry, state: isRedeemed ? 'redeemed' : 'pending' } as ReceiveHistoryEntry
+            }
+          />
 
-        <DetailsSection
-          items={[
-            source && { title: 'Source', value: source },
-            bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-            bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" /> },
-            { title: 'Date', value: entry.createdAt.datetime },
-            { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
-            mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
-            entry.p2pkPubkey && { title: 'P2PK', value: entry.p2pkPubkey.truncate(8) },
-            entry.tokenString && { title: 'Token', value: entry.tokenString.truncate(6) },
-          ].flatMap((item) => (item ? [item] : []))}
-        />
-      </VStack>
+          <DetailsSection
+            items={[
+              source && { title: 'Source', value: source },
+              bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+              bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" /> },
+              { title: 'Date', value: entry.createdAt.datetime },
+              { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+              mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+              entry.p2pkPubkey && { title: 'P2PK', value: entry.p2pkPubkey.truncate(8) },
+              entry.tokenString && { title: 'Token', value: entry.tokenString.truncate(6) },
+            ].flatMap((item) => (item ? [item] : []))}
+          />
+        </VStack>
+      </Screen>
     </ModalLayoutWrapper>
   );
 }

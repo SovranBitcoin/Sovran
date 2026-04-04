@@ -14,6 +14,7 @@ import Animated, {
 import Container from '@/shared/ui/composed/Container';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { deleteAllProfiles } from '@/shared/lib/profile/profileSessionOrchestrator';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -129,15 +130,19 @@ const styles = StyleSheet.create({
 });
 
 export function DeleteScreen() {
+  useLifecycleLogger('DeleteScreen');
   const foreground = useThemeColor('foreground');
   const [danger, red400] = useThemeColor(['danger', 'red-400'] as const);
 
   const handleDelete = useCallback(async () => {
+    log.warn('settings.delete.confirmed', { reason: 'user_initiated_slide_to_delete' });
     await deleteAllProfiles();
+    log.info('settings.delete.complete');
   }, []);
 
   return (
     <Container>
+      <Screen name="DeleteScreen">
       <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
         <VStack spacing={24} className="flex-1 items-center justify-center px-6">
           <View
@@ -206,6 +211,7 @@ export function DeleteScreen() {
           </VStack>
         </VStack>
       </ScrollView>
+      </Screen>
     </Container>
   );
 }

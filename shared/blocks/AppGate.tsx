@@ -4,6 +4,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { TermsAndConditionsScreen } from '@/features/onboarding/screens/TermsAndConditionsScreen';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import OnboardingScreen from '@/features/onboarding/components/OnboardingScreen';
+import { log } from '@/shared/lib/logger';
 
 interface AppGateProps {
   children: React.ReactNode;
@@ -21,9 +22,11 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
   const completeOnboarding = useSettingsStore((state) => state.completeOnboarding);
 
   if (!isTermsAccepted) {
+    log.debug('gate.app.blocked', { reason: 'terms_not_accepted' });
     return (
       <TermsAndConditionsScreen
         onClose={() => {
+          log.info('gate.app.terms_accepted');
           acceptTerms(new Date().toISOString());
         }}
       />
@@ -31,13 +34,19 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
   }
 
   if (!hasSeenOnboarding) {
-    return <OnboardingScreen onComplete={completeOnboarding} />;
+    log.debug('gate.app.blocked', { reason: 'onboarding_not_seen' });
+    return <OnboardingScreen onComplete={() => {
+      log.info('gate.app.onboarding_complete');
+      completeOnboarding();
+    }} />;
   }
 
   if (isLoading || !isReady) {
+    log.debug('gate.app.blocked', { reason: 'keys_not_ready', isLoading, isReady });
     return null;
   }
 
+  log.debug('gate.app.ready');
   return <>{children}</>;
 };
 

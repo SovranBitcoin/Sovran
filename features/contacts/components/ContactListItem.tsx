@@ -5,6 +5,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
+import { paymentLog } from '@/shared/lib/logger';
 
 type ContactListItemProps = {
   pubkey: string | null;
@@ -50,6 +51,7 @@ export const ContactListItem = ({
 
   const handlePress = () => {
     if (!pubkeyStr) return;
+    paymentLog.info('contact.item.press', { pubkey: pubkeyStr, type });
     router.navigate({
       pathname: '/(user-flow)/profile' as any,
       params: { pubkey: pubkeyStr },

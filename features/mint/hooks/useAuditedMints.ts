@@ -4,6 +4,7 @@ import { auditMint, fetchMintInfo, type AuditMintResponse } from '@/shared/lib/a
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
+import { log } from '@/shared/lib/logger';
 
 interface AuditInfo {
   url: string;
@@ -106,12 +107,14 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
     const initialData: Record<string, AuditedMintData> = {};
     const urlsToFetch: { normalized: string; original: string }[] = [];
 
+    let cacheHits = 0;
     mintUrls.forEach((url) => {
       const normalized = normalizeMintUrlKey(url);
       const cached = getCached(normalized);
       const stale = isStale(normalized);
 
       if (cached && !stale) {
+        cacheHits++;
         initialData[normalized] = {
           auditInfo: transformAuditData(cached.auditData),
           mintInfo: cached.mintInfo,
@@ -122,6 +125,7 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
         urlsToFetch.push({ normalized, original: url });
       }
     });
+    log.debug('mint.audit.batch.init', { total: mintUrls.length, cacheHits, toFetch: urlsToFetch.length });
 
     setData(initialData);
 
@@ -171,6 +175,8 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
           setCached(normalized, auditResult.value, mintInfo);
         }
 
+        log.debug('mint.audit.fetch.success', { mintUrl: normalized, hasAudit: !!auditInfo, hasMintInfo: !!mintInfo });
+
         if (mountedRef.current) {
           setData((prev) => ({
             ...prev,
@@ -178,6 +184,7 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
           }));
         }
       } catch {
+        log.warn('mint.audit.fetch.error', { mintUrl: normalized });
         if (mountedRef.current) {
           setData((prev) => ({
             ...prev,

@@ -2,6 +2,7 @@ import React, { memo, useEffect, useState } from 'react';
 import 'react-native-get-random-values';
 import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
+import { log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { useWindowDimensions, ActivityIndicator } from 'react-native';
@@ -97,7 +98,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
       setParts(encodedParts);
       setEncodingError(null);
     } catch (error) {
-      console.error('Error encoding address:', error);
+      log.error('ui.qrcode.encode_failed', { error });
       setEncodingError(error instanceof Error ? error.message : 'Failed to encode QR data');
       // Don't fall back to raw address if it's too large - it will just error again
       setParts([]);

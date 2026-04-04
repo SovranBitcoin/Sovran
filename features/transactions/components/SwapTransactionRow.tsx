@@ -10,6 +10,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { convertTime } from '@/shared/lib/time';
 import type { SwapGroup } from '@/shared/stores/profile/swapTransactionsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log } from '@/shared/lib/logger';
 
 interface Props {
   group: SwapGroup;
@@ -26,11 +27,12 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
   }, [group.legs, group.state, foreground, danger, success]);
 
   const handlePress = useCallback(() => {
+    log.info('transaction.swap.press', { groupId: group.id, state: group.state, legs: group.legs.length });
     router.navigate({
       pathname: '/swap' as any,
       params: { groupId: group.id },
     });
-  }, [group.id]);
+  }, [group.id, group.state, group.legs.length]);
 
   return (
     <TouchableOpacity

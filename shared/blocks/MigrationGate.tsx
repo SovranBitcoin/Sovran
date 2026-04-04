@@ -2,7 +2,7 @@ import React, { useState, useEffect, ReactNode, useRef } from 'react';
 import { store } from '@/redux/store/store.deprecated';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { isMigrationsComplete, setMigrationsComplete } from '@/shared/lib/nostr/secureStorage';
-import { initLog } from '@/shared/lib/initTiming';
+import { initLog, log } from '@/shared/lib/logger';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
 interface MigrationGateProps {
@@ -38,12 +38,14 @@ export default function MigrationGate({ children }: MigrationGateProps) {
       try {
         setIsChecking(true);
         const accountIndex = useProfileStore.getState().activeAccountIndex;
+        log.info('gate.migration.check_start', { accountIndex });
         initLog('MigrationGate', `starting migration check for account ${accountIndex}`);
 
         initLog('MigrationGate', 'reading SecureStore flag...');
         const alreadyDone = await isMigrationsComplete(accountIndex);
         initLog('MigrationGate', `SecureStore flag = ${alreadyDone}`);
         if (alreadyDone) {
+          log.info('gate.migration.fast_path', { accountIndex });
           setMigrationsCompleteDone(true);
           stage.log('Migrations already complete');
           stage.complete();
@@ -102,6 +104,7 @@ export default function MigrationGate({ children }: MigrationGateProps) {
         }
 
         if (attempts >= maxAttempts) {
+          log.warn('gate.migration.timeout', { attempts: maxAttempts, pollIntervalMs: pollInterval });
           initLog('MigrationGate', 'TIMEOUT — proceeding anyway');
         }
 
@@ -111,8 +114,10 @@ export default function MigrationGate({ children }: MigrationGateProps) {
 
         setMigrationsCompleteDone(true);
         stage.complete();
+        log.info('gate.migration.complete', { accountIndex, pollAttempts: attempts });
         initLog('MigrationGate', 'stage complete — rendering children');
       } catch (error) {
+        log.error('gate.migration.failed', { error: error instanceof Error ? error : new Error(String(error)) });
         initLog('MigrationGate', `ERROR: ${error}`);
         const errorMessage = error instanceof Error ? error.message : 'Migration check failed';
         stage.error(errorMessage);

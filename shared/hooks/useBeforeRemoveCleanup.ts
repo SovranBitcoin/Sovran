@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
+import { log } from '@/shared/lib/logger';
 
 /**
  * Run async cleanup when the user tries to leave the screen (back, swipe, hardware back).
@@ -42,7 +43,7 @@ export function useBeforeRemoveCleanup(options: {
         ) {
           // Already finalized/rolled back or op gone – allow leave
         } else {
-          console.warn('[useBeforeRemoveCleanup] cleanup failed:', err);
+          log.warn('hooks.before_remove.cleanup_failed', { error: err });
         }
       }
       navigation.dispatch(data.action);

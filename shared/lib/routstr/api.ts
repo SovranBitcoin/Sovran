@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { apiLog } from '../logger';
 
 const ROUTSTR_BASE_URL = 'https://api.routstr.com/v1';
 
@@ -189,6 +190,8 @@ function createRoutstrClient(apiKey: string): OpenAI {
 // ── Public API ───────────────────────────────────────────────────────────
 
 export async function getModels(): Promise<RoutstrModel[]> {
+  apiLog.info('api.routstr.models.start');
+  const start = performance.now();
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/models`, {
       method: 'GET',
@@ -197,13 +200,18 @@ export async function getModels(): Promise<RoutstrModel[]> {
     if (!response.ok) await throwResponseError(response);
 
     const data: ModelsResponse = await response.json();
-    return data.data.filter((model) => model.enabled);
+    const enabled = data.data.filter((model) => model.enabled);
+    apiLog.info('api.routstr.models.success', { count: enabled.length, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
+    return enabled;
   } catch (error) {
+    apiLog.error('api.routstr.models.failed', { error, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
     toRoutstrError(error);
   }
 }
 
 export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
+  apiLog.debug('api.routstr.balance.start');
+  const start = performance.now();
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/`, {
       method: 'GET',
@@ -215,13 +223,16 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
     if (!response.ok) await throwResponseError(response);
 
     const data = await response.json();
-    return {
+    const result = {
       balance: data.balance || 0,
       total_spent: data.total_spent || 0,
       api_key: data.api_key,
       reserved: data.reserved || 0,
     };
+    apiLog.info('api.routstr.balance.success', { balance: result.balance, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
+    return result;
   } catch (error) {
+    apiLog.error('api.routstr.balance.failed', { error, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
     toRoutstrError(error);
   }
 }
@@ -231,6 +242,8 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
  * signaling the caller to use the token directly as an API key.
  */
 async function createWalletFromToken(cashuToken: string): Promise<CreateWalletResponse | null> {
+  apiLog.info('api.routstr.wallet.create.start');
+  const start = performance.now();
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/create`, {
       method: 'POST',
@@ -238,10 +251,14 @@ async function createWalletFromToken(cashuToken: string): Promise<CreateWalletRe
       body: JSON.stringify({ cashu_token: cashuToken }),
     });
 
-    if (response.status === 404) return null;
+    if (response.status === 404) {
+      apiLog.info('api.routstr.wallet.create.not_available', { duration_ms: Math.round((performance.now() - start) * 100) / 100 });
+      return null;
+    }
     if (!response.ok) await throwResponseError(response);
 
     const data = await response.json();
+    apiLog.info('api.routstr.wallet.create.success', { balance: data.balance || 0, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
     return {
       api_key: data.api_key,
       balance: data.balance || 0,
@@ -251,11 +268,14 @@ async function createWalletFromToken(cashuToken: string): Promise<CreateWalletRe
   } catch (error: unknown) {
     const asAny = error as Record<string, unknown>;
     if (asAny?.status === 404) return null;
+    apiLog.error('api.routstr.wallet.create.failed', { error, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
     throw error;
   }
 }
 
 async function topUpBalance(apiKey: string, cashuToken: string): Promise<TopUpResponse> {
+  apiLog.info('api.routstr.wallet.topup.start');
+  const start = performance.now();
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/topup`, {
       method: 'POST',
@@ -268,8 +288,11 @@ async function topUpBalance(apiKey: string, cashuToken: string): Promise<TopUpRe
     if (!response.ok) await throwResponseError(response);
 
     const data = await response.json();
-    return { added_amount: data.msats || 0 };
+    const result = { added_amount: data.msats || 0 };
+    apiLog.info('api.routstr.wallet.topup.success', { addedAmount: result.added_amount, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
+    return result;
   } catch (error) {
+    apiLog.error('api.routstr.wallet.topup.failed', { error, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
     toRoutstrError(error);
   }
 }
@@ -286,7 +309,7 @@ async function* parseSSEStream(
     return;
   }
 
-  if (__DEV__) console.warn('ReadableStream not available, falling back to full-text SSE parsing');
+  apiLog.warn('routstr.sse.no_readable_stream');
   yield* parseSSEFromText(await response.text());
 }
 
@@ -301,7 +324,7 @@ function tryParseSSELine(
   try {
     return JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk;
   } catch {
-    if (__DEV__) console.warn('Failed to parse SSE chunk:', data.substring(0, 100));
+    apiLog.warn('routstr.sse.parse_failed', { preview: data.substring(0, 100) });
     return null;
   }
 }
@@ -367,6 +390,8 @@ export async function sendMessage(
   stream?: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
 }> {
   const { model = 'gpt-3.5-turbo', temperature = 0.7, max_tokens = 200, stream = false } = options;
+  apiLog.info('api.routstr.chat.start', { model, stream, messageCount: messages.length });
+  const start = performance.now();
 
   try {
     if (stream) {
@@ -380,6 +405,7 @@ export async function sendMessage(
       });
       if (!response.ok) await throwResponseError(response);
 
+      apiLog.info('api.routstr.chat.stream_started', { model, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
       return { stream: parseSSEStream(response) };
     }
 
@@ -391,8 +417,10 @@ export async function sendMessage(
       max_tokens,
       stream: false,
     });
+    apiLog.info('api.routstr.chat.success', { model, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
     return { response };
   } catch (error: unknown) {
+    apiLog.error('api.routstr.chat.failed', { model, error, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
     if (error && typeof error === 'object' && 'status' in error) {
       const e = error as Record<string, unknown>;
       const status = e.status as number;

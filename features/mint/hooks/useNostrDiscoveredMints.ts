@@ -4,6 +4,7 @@ import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 import { fetchMintInfo } from '@/shared/lib/apiClient';
+import { cashuLog } from '@/shared/lib/logger';
 import {
   isCashuRecommendationEvent,
   extractMintUrlFromEvent,
@@ -114,6 +115,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
 
       if (urlsToProcess.length === 0) return;
 
+      cashuLog.info('mint.nostr.discovered', { newUrls: urlsToProcess.length, totalProcessed: processedUrls.current.size });
       urlsToProcess.forEach(async (url) => {
         const recommendations = recommendationsByUrl.get(url)!;
         const score = averageScore(recommendations);
@@ -126,17 +128,20 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
             recommendations,
             mintInfo: mintInfoResult.isOk() ? mintInfoResult.value : null,
           });
-        } catch {
+        } catch (err) {
+          cashuLog.warn('mint.nostr.info.error', { url, error: err instanceof Error ? err : new Error(String(err)) });
           appendMintIfNew(setMints, { url, score, recommendations, mintInfo: null });
         }
       });
-    } catch {
+    } catch (err) {
+      cashuLog.error('mint.nostr.error', { error: err instanceof Error ? err : new Error(String(err)) });
       setError('Failed to process mint recommendations. Please try again.');
     }
   }, [events, knownMints, eose]);
 
   useEffect(() => {
     if (retryCount > 0) {
+      cashuLog.info('mint.nostr.retry', { retryCount });
       setMints([]);
       setError(null);
       setLoading(true);

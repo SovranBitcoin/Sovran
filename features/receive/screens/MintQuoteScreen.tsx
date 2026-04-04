@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 
 import type { MintHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 import { MintSelector } from '@/features/wallet';
 import { formatAmount } from '@/shared/lib/currency';
@@ -48,11 +49,13 @@ export function MintQuoteScreen({
   onMintSelected,
   onRequestMintList,
 }: MintQuoteScreenProps) {
+  useLifecycleLogger('MintQuoteScreen');
   const { entry, error, actions, source, mintUrl } = useScreenActions('mintQuote', mintHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
   if (error) {
+    log.warn('receive.mint_quote.error', { error });
     return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
   }
 
@@ -61,6 +64,7 @@ export function MintQuoteScreen({
   }
 
   const isPaid = entry.state === 'ISSUED' || entry.state === 'PAID';
+  log.debug('receive.mint_quote.render', { state: entry.state, isPaid, amount: entry.amount, unit: entry.unit });
 
   const bottomButtons = (
     <BottomButtons>
@@ -96,51 +100,53 @@ export function MintQuoteScreen({
 
   return (
     <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
-      <VStack gap={12}>
-        <HistoryEntryHeader historyEntry={entry} />
-        {!isPaid && (
-          <PaymentInfo
-            data={[{ name: 'Lightning', value: entry.paymentRequest }]}
-            unit={entry.unit}
-            copyTarget="paymentRequest"
+      <Screen name="MintQuoteScreen">
+        <VStack gap={12}>
+          <HistoryEntryHeader historyEntry={entry} />
+          {!isPaid && (
+            <PaymentInfo
+              data={[{ name: 'Lightning', value: entry.paymentRequest }]}
+              unit={entry.unit}
+              copyTarget="paymentRequest"
+            />
+          )}
+
+          {isPaid && <TransactionLocationSection transactionId={entry.id} />}
+
+          {!isPaid ? (
+            <MintSelector
+              width={280}
+              unit={entry.unit}
+              selectedMintUrl={mintUrl}
+              onMintSelected={onMintSelected ?? (() => {})}
+              onRequestMintList={onRequestMintList ?? (() => {})}
+            />
+          ) : mintInfo ? (
+            <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
+          ) : null}
+
+          {entry.metadata?.memo && <Card message={entry.metadata.memo} variant="info" />}
+
+          <HistoryEntryTimeline historyEntry={entry} />
+
+          <DetailsSection
+            items={[
+              source && { title: 'Source', value: source },
+              bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+              bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" /> },
+              { title: 'Date', value: entry.createdAt.datetime },
+              { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+              { title: 'State', value: entry.state },
+              entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+              mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+              {
+                title: 'Invoice',
+                value: truncateMiddle(entry.paymentRequest, 10),
+              },
+            ].flatMap((item) => (item ? [item] : []))}
           />
-        )}
-
-        {isPaid && <TransactionLocationSection transactionId={entry.id} />}
-
-        {!isPaid ? (
-          <MintSelector
-            width={280}
-            unit={entry.unit}
-            selectedMintUrl={mintUrl}
-            onMintSelected={onMintSelected ?? (() => {})}
-            onRequestMintList={onRequestMintList ?? (() => {})}
-          />
-        ) : mintInfo ? (
-          <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
-        ) : null}
-
-        {entry.metadata?.memo && <Card message={entry.metadata.memo} variant="info" />}
-
-        <HistoryEntryTimeline historyEntry={entry} />
-
-        <DetailsSection
-          items={[
-            source && { title: 'Source', value: source },
-            bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-            bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" /> },
-            { title: 'Date', value: entry.createdAt.datetime },
-            { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
-            { title: 'State', value: entry.state },
-            entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
-            mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
-            {
-              title: 'Invoice',
-              value: truncateMiddle(entry.paymentRequest, 10),
-            },
-          ].flatMap((item) => (item ? [item] : []))}
-        />
-      </VStack>
+        </VStack>
+      </Screen>
     </ModalLayoutWrapper>
   );
 }

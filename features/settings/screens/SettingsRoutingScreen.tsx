@@ -18,12 +18,14 @@ import {
   Slider,
   Switch as HeroSwitch,
 } from 'heroui-native';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 // ---------------------------------------------------------------------------
 // Main screen
 // ---------------------------------------------------------------------------
 
 export function SettingsRoutingScreen() {
+  useLifecycleLogger('SettingsRoutingScreen');
   const middlemanRouting = useSettingsStore((state) => state.middlemanRouting);
   const setMiddlemanRouting = useSettingsStore((state) => state.setMiddlemanRouting);
   const minTransferThreshold = useSettingsStore((state) => state.minTransferThreshold);
@@ -31,6 +33,7 @@ export function SettingsRoutingScreen() {
 
   const update = useCallback(
     (partial: Partial<MiddlemanRoutingSettings>) => {
+      log.info('settings.routing.change', { ...partial });
       setMiddlemanRouting(partial);
     },
     [setMiddlemanRouting]
@@ -40,6 +43,7 @@ export function SettingsRoutingScreen() {
 
   return (
     <Container>
+      <Screen name="SettingsRoutingScreen">
       <ScrollView
         className="px-4"
         contentInsetAdjustmentBehavior="automatic"
@@ -206,6 +210,7 @@ export function SettingsRoutingScreen() {
           </VStack>
         </Section>
       </ScrollView>
+      </Screen>
     </Container>
   );
 }

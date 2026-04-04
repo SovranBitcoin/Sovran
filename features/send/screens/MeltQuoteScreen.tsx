@@ -16,6 +16,7 @@ import React from 'react';
 import type { MeltHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
@@ -47,11 +48,13 @@ export function MeltQuoteScreen({
   onMintSelected,
   onRequestMintList,
 }: MeltQuoteScreenProps) {
+  useLifecycleLogger('MeltQuoteScreen');
   const { entry, error, actions, source, mintUrl } = useScreenActions('meltQuote', meltHistoryEntry);
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
   if (error) {
+    log.warn('send.melt_quote.error', { error });
     return <ScreenErrorState message={error} onGoBack={onCancel} />;
   }
 
@@ -61,6 +64,7 @@ export function MeltQuoteScreen({
 
   const isPreview = !entry.quoteId;
   const anyLoading = actions.pay.loading || actions.cancel.loading;
+  log.debug('send.melt_quote.render', { state: entry.state, isPreview, amount: entry.amount, unit: entry.unit });
 
   const bottomButtons = (
     <BottomButtons>
@@ -105,40 +109,42 @@ export function MeltQuoteScreen({
 
   return (
     <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
-      <VStack gap={12}>
-        <HistoryEntryHeader historyEntry={entry} />
+      <Screen name="MeltQuoteScreen">
+        <VStack gap={12}>
+          <HistoryEntryHeader historyEntry={entry} />
 
-        {entry.state === 'UNPAID' ? (
-          <MintSelector
-            width={280}
-            unit={entry.unit}
-            selectedMintUrl={mintUrl}
-            onMintSelected={onMintSelected ?? (() => {})}
-            onRequestMintList={onRequestMintList ?? (() => {})}
+          {entry.state === 'UNPAID' ? (
+            <MintSelector
+              width={280}
+              unit={entry.unit}
+              selectedMintUrl={mintUrl}
+              onMintSelected={onMintSelected ?? (() => {})}
+              onRequestMintList={onRequestMintList ?? (() => {})}
+            />
+          ) : mintInfo ? (
+            <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
+          ) : null}
+
+          <HistoryEntryTimeline historyEntry={entry} />
+
+          <DetailsSection
+            items={[
+              source && { title: 'Source', value: source },
+              bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+              bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" /> },
+              { title: 'Date', value: entry.createdAt.datetime },
+              { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+              { title: 'State', value: entry.state },
+              entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+              entry.metadata?.meltTarget && {
+                title: 'Destination',
+                value: truncateMiddle(entry.metadata.meltTarget, 12),
+              },
+              mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+            ].flatMap((item) => (item ? [item] : []))}
           />
-        ) : mintInfo ? (
-          <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
-        ) : null}
-
-        <HistoryEntryTimeline historyEntry={entry} />
-
-        <DetailsSection
-          items={[
-            source && { title: 'Source', value: source },
-            bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-            bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" /> },
-            { title: 'Date', value: entry.createdAt.datetime },
-            { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
-            { title: 'State', value: entry.state },
-            entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
-            entry.metadata?.meltTarget && {
-              title: 'Destination',
-              value: truncateMiddle(entry.metadata.meltTarget, 12),
-            },
-            mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
-          ].flatMap((item) => (item ? [item] : []))}
-        />
-      </VStack>
+        </VStack>
+      </Screen>
     </ModalLayoutWrapper>
   );
 }

@@ -19,6 +19,7 @@ import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import opacity from 'hex-color-opacity';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 type PaymentType = 'all' | 'lightning' | 'ecash';
 type Direction = 'all' | 'incoming' | 'outgoing';
@@ -117,6 +118,7 @@ const MintSelectorChip: React.FC<{
 };
 
 export function FiltersScreen() {
+  useLifecycleLogger('FiltersScreen');
   const foreground = useThemeColor('foreground');
   const { trustedMints } = useMints();
   const { history } = useHistoryWithMelts();
@@ -152,6 +154,7 @@ export function FiltersScreen() {
   );
 
   const handleApply = useCallback(() => {
+    log.info('tx.filters.apply', { currency, paymentType, direction, status, mintUrl });
     router.dismissTo({
       pathname: '/transactions',
       params: {
@@ -165,6 +168,7 @@ export function FiltersScreen() {
   }, [currency, paymentType, direction, status, mintUrl]);
 
   const handleReset = useCallback(() => {
+    log.info('tx.filters.reset');
     setCurrency('sat');
     setPaymentType('all');
     setDirection('all');
@@ -274,6 +278,7 @@ export function FiltersScreen() {
           </Pressable>
         </View>
       }>
+      <Screen name="FiltersScreen">
       <View style={styles.filterContent}>
         <Section title="Mint">
           <ScrollView
@@ -373,6 +378,7 @@ export function FiltersScreen() {
           />
         </Section>
       </View>
+      </Screen>
     </ModalScreenLayout>
   );
 }

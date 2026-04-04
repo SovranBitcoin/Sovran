@@ -53,6 +53,7 @@ import { router } from 'expo-router';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 interface Props {
   groupId: string | undefined;
@@ -207,6 +208,7 @@ CollapsedLegGroup.displayName = 'CollapsedLegGroup';
 // -----------------------------------------------------------------------
 
 export function SwapTransactionScreen({ groupId }: Props) {
+  useLifecycleLogger('SwapTransactionScreen');
   const [foreground, muted, danger, success] = useThemeColor([
     'foreground',
     'muted',
@@ -222,6 +224,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
   const toggleExpanded = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    log.debug('tx.swap.toggle_expanded', { groupId });
     setExpanded((prev) => {
       chevronRotation.value = withTiming(prev ? 0 : 180, {
         duration: 280,
@@ -343,6 +346,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
   }, [group, legGroups, historyByQuoteId]);
 
   if (!groupId || !group) {
+    log.warn('tx.swap.not_found', { groupId });
     return (
       <ModalLayoutWrapper>
         <View style={styles.center}>
@@ -351,6 +355,8 @@ export function SwapTransactionScreen({ groupId }: Props) {
       </ModalLayoutWrapper>
     );
   }
+
+  log.debug('tx.swap.display', { groupId, state: group.state, legCount: legGroups.length, totalReceived, totalFees });
 
   const unit = group.unit || 'sat';
   const isFailed = group.state === 'cancelled';
@@ -365,6 +371,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
   return (
     <ModalLayoutWrapper contentPadding={0}>
+      <Screen name="SwapTransactionScreen">
       <VStack gap={12}>
         {/* ── Header: amount + swap icon (matches HistoryEntryHeader pattern) ── */}
         <HStack align="center" justify="space-between" className="p-5 pb-0 pt-0">
@@ -547,6 +554,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
           ]}
         />
       </VStack>
+      </Screen>
     </ModalLayoutWrapper>
   );
 }

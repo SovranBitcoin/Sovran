@@ -98,6 +98,7 @@ import { truncateMiddle } from '@/shared/lib/strings';
 import { getUsername } from '@/shared/lib/username';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Screen, log } from '@/shared/lib/logger';
 
 function formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp * 1000);
@@ -274,7 +275,7 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
     mintUrl = decoded.mint || '';
     isValid = true;
   } catch (error) {
-    console.error('Failed to decode cashu token:', error);
+    log.error('user.messages.cashu_decode_failed', { error });
     isValid = false;
   }
 
@@ -613,7 +614,7 @@ const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
           padding({ all: 0 }),
         ]}
         onPress={() => {
-          console.log('Pressed model:', model.id);
+          log.debug('user.messages.model_selected', { modelId: model.id });
           onSelect(model.id);
         }}>
         <SwiftUIHStack
@@ -905,19 +906,19 @@ export function UserMessagesScreen({
     try {
       const cached = getCachedModels();
       if (cached && cached.length > 0) {
-        console.log('Using cached models:', cached);
+        log.debug('user.messages.models_cached', { count: cached.length });
         setAvailableModels(cached);
       } else {
-        console.log('Fetching models from API...');
+        log.debug('user.messages.models_fetching');
         const models = await getModels();
-        console.log('Loaded models:', models.length);
+        log.debug('user.messages.models_loaded', { count: models.length });
         if (models && models.length > 0) {
           setCachedModels(models);
           setAvailableModels(models);
         }
       }
     } catch (error) {
-      console.error('Failed to load models:', error);
+      log.error('user.messages.models_load_failed', { error });
     }
   }, [getCachedModels, setCachedModels]);
 
@@ -967,7 +968,7 @@ export function UserMessagesScreen({
             setBalance(balanceData.balance);
           })
           .catch((error) => {
-            console.error('Failed to check balance:', error);
+            log.error('user.messages.balance_check_failed', { error });
           });
       }
     });
@@ -1085,7 +1086,7 @@ export function UserMessagesScreen({
                 pubkey: senderPubkey,
               };
             } catch (error) {
-              console.error('Failed to decrypt NIP-04 message:', error);
+              log.error('user.messages.nip04_decrypt_failed', { error });
               processedEventIds.current.add(event.id);
               return null;
             }
@@ -1113,7 +1114,7 @@ export function UserMessagesScreen({
           return merged.sort((a, b) => a.created_at - b.created_at);
         });
       } catch (error) {
-        console.error('Error processing NIP-04 DMs:', error);
+        log.error('user.messages.nip04_process_failed', { error });
       } finally {
         setIsLoading(false);
       }
@@ -1183,7 +1184,7 @@ export function UserMessagesScreen({
       setBalance(balanceData.balance);
       balanceRefreshedPopup({ balance: formatBalance(balanceData.balance) });
     } catch (error: any) {
-      console.error('Failed to refresh balance:', error);
+      log.error('user.messages.balance_refresh_failed', { error });
       balanceRefreshFailedPopup({ text: error.error?.message });
     } finally {
       setIsRefreshingBalance(false);
@@ -1348,20 +1349,7 @@ export function UserMessagesScreen({
           delta?.content || (delta as any)?.message?.content || (delta as any)?.text || null;
 
         if (chunkCount <= 5) {
-          console.log('Stream chunk:', {
-            chunkCount,
-            hasContent: !!content,
-            contentLength: content?.length,
-            contentPreview: content?.substring(0, 30),
-            finishReason,
-            isStreamComplete,
-            chunkStructure: {
-              hasChoices: !!chunk.choices,
-              choicesLength: chunk.choices?.length,
-              hasDelta: !!chunk.choices?.[0]?.delta,
-              deltaKeys: chunk.choices?.[0]?.delta ? Object.keys(chunk.choices[0].delta) : [],
-            },
-          });
+          log.debug('user.messages.stream_chunk', { chunkCount, hasContent: !!content });
         }
 
         if (content) {
@@ -1392,12 +1380,7 @@ export function UserMessagesScreen({
 
       isStreamComplete = true;
 
-      console.log('Streaming completed:', {
-        totalChunks: chunkCount,
-        finalContentLength: fullContent.length,
-        hasReceivedAnyContent,
-        isStreamComplete,
-      });
+      log.debug('user.messages.stream_complete', { totalChunks: chunkCount, contentLength: fullContent.length });
 
       if (!isAnonymous && fullContent) {
         updateMessage(assistantMessageId, fullContent);
@@ -1414,7 +1397,7 @@ export function UserMessagesScreen({
       setStreamingMessageId(null);
 
       if (!hasReceivedAnyContent && chunkCount > 0) {
-        console.warn('No content received from stream after', chunkCount, 'chunks');
+        log.warn('user.messages.stream_empty', { chunkCount });
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessageId
@@ -1430,7 +1413,7 @@ export function UserMessagesScreen({
         const balanceData = await checkBalance(apiKey);
         setBalance(balanceData.balance);
       } catch (error) {
-        console.error('Failed to refresh balance:', error);
+        log.error('user.messages.balance_refresh_failed', { error });
       }
     } catch (error: any) {
       if (error.status === 402) {
@@ -1475,7 +1458,7 @@ export function UserMessagesScreen({
         return;
       }
 
-      console.error('Error sending message:', error);
+      log.error('user.messages.send_failed', { error });
       sendMessageFailedPopup({ text: error.error?.message });
 
       setStreamingMessageId(null);
@@ -1510,7 +1493,7 @@ export function UserMessagesScreen({
 
   const handleNostrDMSend = async (text: string) => {
     if (!ndk || !nostrKeys?.privateKey || !nostrKeys?.pubkey || !pubkey) {
-      console.error('Missing required data for sending DM');
+      log.error('user.messages.dm_missing_data');
       sendMessageFailedPopup();
       return;
     }
@@ -1560,7 +1543,7 @@ export function UserMessagesScreen({
 
       await wrapEvent.publish();
 
-      console.log('NIP-17 DM sent successfully:', wrapEvent.id);
+      log.info('user.messages.dm_sent', { eventId: wrapEvent.id });
 
       // Publish the self-copy so we can retrieve our own sent messages later
       const selfWrapEvent = new NDKEvent(ndk);
@@ -1575,7 +1558,7 @@ export function UserMessagesScreen({
       processedEventIds.current.add(selfWrapEvent.id);
 
       await selfWrapEvent.publish().catch((err: unknown) => {
-        console.warn('Failed to publish self-copy of DM:', err);
+        log.warn('user.messages.dm_self_copy_failed', { error: err });
       });
 
       setMessages((prev) =>
@@ -1584,7 +1567,7 @@ export function UserMessagesScreen({
         )
       );
     } catch (error) {
-      console.error('Failed to send DM:', error);
+      log.error('user.messages.dm_send_failed', { error });
 
       setMessages((prev) => prev.filter((msg) => msg.id !== tempMessageId));
 
@@ -1595,7 +1578,7 @@ export function UserMessagesScreen({
   };
 
   const handleSendMoney = () => {
-    console.log('[LIGHTNING-FLOW] handleSendMoney called', { lud16, userInfo: userInfo?.name });
+    log.debug('user.messages.send_money', { lud16, userName: userInfo?.name });
     if (!lud16 || !userInfo) return;
 
     buttonHandlerPopup({
@@ -1719,6 +1702,7 @@ export function UserMessagesScreen({
       style={{ flex: 1 }}
       behavior="translate-with-padding"
       keyboardVerticalOffset={headerHeight + 16}>
+      <Screen name="UserMessagesScreen">
       <Stack.Screen
         options={{
           headerShown: true,
@@ -2281,6 +2265,7 @@ export function UserMessagesScreen({
           onSwitchModel={() => setIsModelSwitchBottomSheetOpen(true)}
         />
       )}
+      </Screen>
     </KeyboardAvoidingView>
   );
 }

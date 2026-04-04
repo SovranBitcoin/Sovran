@@ -21,6 +21,7 @@ import opacity from 'hex-color-opacity';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -219,6 +220,7 @@ const SettingsListActionItem: React.FC<{
 };
 
 export const SettingsScreen = () => {
+  useLifecycleLogger('SettingsScreen');
   const sendLocationEnabled = useSettingsStore((state) => state.sendLocationEnabled);
   const setSendLocationEnabled = useSettingsStore((state) => state.setSendLocationEnabled);
   const devMode = useSettingsStore((state) => state.experimental);
@@ -247,21 +249,27 @@ export const SettingsScreen = () => {
 
     if (tapCountRef.current >= 3) {
       tapCountRef.current = 0;
-      setDevMode(!devMode);
-      devModePopup(!devMode);
+      const newMode = !devMode;
+      log.info('settings.dev_mode.toggle', { enabled: newMode });
+      setDevMode(newMode);
+      devModePopup(newMode);
     }
   }, [devMode, setDevMode]);
 
   const handleExportDatabase = async () => {
+    log.info('settings.export_database.start');
     try {
       await CocoManager.exportDatabase();
+      log.info('settings.export_database.success');
     } catch (error) {
+      log.error('settings.export_database.error', { error: error instanceof Error ? error : new Error(String(error)) });
       Alert.alert('Export Failed', error instanceof Error ? error.message : 'Unknown error');
     }
   };
 
   return (
     <Container>
+      <Screen name="SettingsScreen">
       <ScrollView className="px-4">
         <Section title="Account">
           <ProfileButton />
@@ -430,6 +438,7 @@ export const SettingsScreen = () => {
           </VStack>
         </TouchableOpacity>
       </ScrollView>
+      </Screen>
     </Container>
   );
 };

@@ -7,6 +7,7 @@
 
 import { useState, useCallback } from 'react';
 
+import { log } from '@/shared/lib/logger';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import {
   useTransactionLocation,
@@ -73,7 +74,7 @@ export function useTransactionLocationSection(
       }
       return false;
     } catch (error) {
-      console.error('Failed to capture location:', error);
+      log.error('hooks.tx_location.capture_failed', { error });
       return false;
     } finally {
       setIsCapturing(false);

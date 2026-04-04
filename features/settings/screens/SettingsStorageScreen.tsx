@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, Share } from 'react-native';
+import { Alert, RefreshControl, ScrollView, Share } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
+import * as Clipboard from 'expo-clipboard';
+import { log, Screen } from '@/shared/lib/logger';
 
 import Container from '@/shared/ui/composed/Container';
 import {
@@ -162,6 +164,7 @@ export const SettingsStorageScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isCopyingLogs, setIsCopyingLogs] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [zustandGroups, setZustandGroups] = useState<ZustandInventory>(EMPTY_ZUSTAND_GROUPS);
   const [secureStoreKeys, setSecureStoreKeys] = useState<string[]>([]);
@@ -219,6 +222,18 @@ export const SettingsStorageScreen = () => {
     }
   }, []);
 
+  const handleCopyDebugLogs = useCallback(async () => {
+    setIsCopyingLogs(true);
+    try {
+      await Clipboard.setStringAsync(log.dumpForLLM());
+      Alert.alert('Copied', 'Debug logs copied to clipboard.');
+    } catch (copyError) {
+      setError(copyError instanceof Error ? copyError.message : 'Copy failed');
+    } finally {
+      setIsCopyingLogs(false);
+    }
+  }, []);
+
   const subtitle = useMemo(() => {
     if (isLoading) {
       return 'Loading storage inventory...';
@@ -263,6 +278,7 @@ export const SettingsStorageScreen = () => {
 
   return (
     <Container>
+      <Screen name="SettingsStorageScreen">
       <ScrollView
         className="px-4"
         refreshControl={
@@ -290,6 +306,13 @@ export const SettingsStorageScreen = () => {
                 isDisabled={isSharing}
                 onPress={handleShareDump}>
                 <Button.Label>{isSharing ? 'Exporting...' : 'Share Full Dump'}</Button.Label>
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                isDisabled={isCopyingLogs}
+                onPress={handleCopyDebugLogs}>
+                <Button.Label>{isCopyingLogs ? 'Copying...' : 'Copy Debug Logs'}</Button.Label>
               </Button>
             </View>
             {error ? (
@@ -344,6 +367,7 @@ export const SettingsStorageScreen = () => {
           emptyLabel="No coco database files currently exist."
         />
       </ScrollView>
+      </Screen>
     </Container>
   );
 };

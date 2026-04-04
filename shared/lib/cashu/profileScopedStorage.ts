@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { unstable_batchedUpdates } from 'react-native';
 import { StateStorage } from 'zustand/middleware';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { log } from '../logger';
 
 /**
  * Module-level flag to prevent persist middleware from writing to storage
@@ -193,5 +194,5 @@ async function rehydrateProfileStores(): Promise<void> {
     useNostrSocialStore.persist.rehydrate(),
   ]);
 
-  console.log('[ProfileScopedStorage] All profile stores rehydrated');
+  log.info('cashu.storage.rehydrated');
 }

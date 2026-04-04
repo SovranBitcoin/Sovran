@@ -15,6 +15,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import OnboardingSlideItem from './OnboardingSlideItem';
 import OnboardingPagination from './OnboardingPagination';
 import { OnboardingCarouselProps, OnboardingSlide } from './types';
+import { log } from '@/shared/lib/logger';
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<OnboardingSlide>);
 
@@ -42,6 +43,7 @@ const OnboardingInnerCarousel: React.FC<OnboardingCarouselProps> = ({
       if (viewableItems.length > 0) {
         const viewableItem = viewableItems[0];
         if (viewableItem && viewableItem.index !== null) {
+          log.info('onboarding.slide.change', { slideIndex: viewableItem.index });
           setCurrentSlideIndex(viewableItem.index);
         }
       }

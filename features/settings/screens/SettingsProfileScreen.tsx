@@ -15,6 +15,7 @@ import { Button, Card, Description, Input, Label, TextField } from 'heroui-nativ
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 const DebugRow: React.FC<{ label: string; value: string }> = ({ label, value }) => {
   const foreground = useThemeColor('foreground');
@@ -31,6 +32,7 @@ const DebugRow: React.FC<{ label: string; value: string }> = ({ label, value }) 
 };
 
 export const SettingsProfileScreen = () => {
+  useLifecycleLogger('SettingsProfileScreen');
   const { value: mnemonic, loading: mnemonicLoading } = useMnemonic();
   const { value: cashuMnemonic, loading: cashuMnemonicLoading } = useCashuMnemonic();
   const { keys: nostrKeys, isLoading: nostrKeysLoading } = useNostrKeysContext();
@@ -43,12 +45,14 @@ export const SettingsProfileScreen = () => {
 
   const handleCopy = async (text: string, target: CopyTarget) => {
     if (text) {
+      log.info('settings.profile.copy', { target });
       await Clipboard.setStringAsync(text);
       copyPopup(target, { duration: 1000 });
     }
   };
 
   const toggleFieldVisibility = (field: keyof typeof visibleFields) => {
+    log.debug('settings.profile.toggle_visibility', { field });
     setVisibleFields((prev) => ({
       ...prev,
       [field]: !prev[field],
@@ -125,6 +129,7 @@ export const SettingsProfileScreen = () => {
 
   return (
     <Container>
+      <Screen name="SettingsProfileScreen">
       <ScrollView className="px-4">
         <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
           Profile Details
@@ -233,6 +238,7 @@ export const SettingsProfileScreen = () => {
           </View>
         )}
       </ScrollView>
+      </Screen>
     </Container>
   );
 };

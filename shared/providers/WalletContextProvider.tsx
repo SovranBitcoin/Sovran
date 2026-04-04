@@ -15,6 +15,7 @@ import type { WalletContext } from 'coco-payment-ux';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { walletLog } from '@/shared/lib/logger';
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
 
@@ -55,6 +56,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   const trustedMintUrls = useMemo(() => trustedMints.map((m) => m.mintUrl), [trustedMints]);
 
   const fetchProofAmounts = useCallback(async () => {
+    walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', { mintCount: trustedMints.length });
     const proofService = (
       manager as unknown as {
         proofService: { getReadyProofs: (url: string) => Promise<Array<{ amount: number }>> };
@@ -65,10 +67,12 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
       try {
         const proofs = await proofService.getReadyProofs(mint.mintUrl);
         next[mint.mintUrl] = proofs.map((p) => p.amount).sort((a, b) => a - b);
-      } catch {
+      } catch (err) {
+        walletLog.warn('provider.wallet_context.proof_fetch_failed', { mintUrl: mint.mintUrl, error: err instanceof Error ? err : new Error(String(err)) });
         next[mint.mintUrl] = [];
       }
     }
+    walletLog.debug('provider.wallet_context.fetch_proof_amounts_done', { mintCount: trustedMints.length });
     setProofAmounts(next);
   }, [manager, trustedMints]);
 
@@ -81,15 +85,19 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     return rest as Record<string, number>;
   }, [mintBalances]);
 
-  const value = useMemo<WalletContext>(
-    () => ({
+  const value = useMemo<WalletContext>(() => {
+    walletLog.info('provider.wallet_context.value_updated', {
+      trustedMintCount: trustedMintUrls.length,
+      totalBalance: Object.values(mintBalancesOnly).reduce((sum, b) => sum + b, 0),
+      preferredMintUrl,
+    });
+    return {
       trustedMintUrls,
       mintBalances: mintBalancesOnly,
       preferredMintUrl,
       proofAmounts,
-    }),
-    [trustedMintUrls, mintBalancesOnly, preferredMintUrl, proofAmounts]
-  );
+    };
+  }, [trustedMintUrls, mintBalancesOnly, preferredMintUrl, proofAmounts]);
 
   return <WalletContextCtx.Provider value={value}>{children}</WalletContextCtx.Provider>;
 }

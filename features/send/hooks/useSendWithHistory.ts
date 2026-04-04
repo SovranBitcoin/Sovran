@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import type { Token } from '@cashu/cashu-ts';
+import { log } from '@/shared/lib/logger';
 import { getEncodedToken, type SendHistoryEntry } from '@cashu/coco-core';
 import { useManager } from '@cashu/coco-react';
 
@@ -52,6 +53,7 @@ export function useSendWithHistory() {
       isSendingRef.current = true;
       setStatus('loading');
       setError(null);
+      log.info('send.flow.start', { mintUrl, amount });
 
       let capturedEntry: SendHistoryEntry | null = null;
       let resolveEntryPromise: (entry: SendHistoryEntry) => void;
@@ -109,6 +111,7 @@ export function useSendWithHistory() {
         const result = { token, historyEntry, operationId: operation.id };
         setData(result);
         setStatus('success');
+        log.info('send.flow.complete', { operationId: operation.id, amount });
         opts.onSuccess?.(result);
         return result;
       } catch (e) {
@@ -123,14 +126,12 @@ export function useSendWithHistory() {
               await manager.ops.send.reclaim(preparedOperationId);
             }
           } catch (rollbackError) {
-            console.warn(
-              '[useSendWithHistory] Failed to rollback failed send operation:',
-              rollbackError
-            );
+            log.warn('send.rollback_failed', { error: rollbackError });
           }
         }
 
         const err = e instanceof Error ? e : new Error(String(e));
+        log.error('send.flow.failed', { mintUrl, amount, error: err });
         setError(err);
         setStatus('error');
         opts.onError?.(err);

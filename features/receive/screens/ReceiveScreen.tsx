@@ -15,6 +15,7 @@ import { router } from 'expo-router';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
 import { useScreenActions, type UseScreenActionsResult } from 'coco-payment-ux/react';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 import type { FormattedString } from 'coco-payment-ux';
 import { Section } from '@/features/settings';
@@ -180,6 +181,7 @@ interface ReceiveScreenProps {
 }
 
 export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
+  useLifecycleLogger('ReceiveScreen');
   const muted = useThemeColor('muted');
   const [selectedTab, setSelectedTab] = useState('Lightning');
 
@@ -196,12 +198,14 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   const mintInfo = useMintInfo(mintUrl);
 
   if (error) {
+    log.warn('receive.screen.error', { error });
     return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
   }
 
   if (!receiveEntryData) {
     return <ScreenLoadingState message="Loading..." />;
   }
+  log.debug('receive.screen.render', { unit, selectedTab, hasNpcAddress: Boolean(receiveEntryData.npcAddress), mintUrl });
 
   return (
     <ModalScreenLayout
@@ -241,29 +245,31 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
           ]}
         />
       }>
-      {quickAccessP2PK && (
-        <View className="mx-4 mb-4">
-          <Tabs
-            tabs={tabs}
-            selectedTab={selectedTab}
-            handleTabPress={(tab) => setSelectedTab(tab)}
-          />
-        </View>
-      )}
+      <Screen name="ReceiveScreen">
+        {quickAccessP2PK && (
+          <View className="mx-4 mb-4">
+            <Tabs
+              tabs={tabs}
+              selectedTab={selectedTab}
+              handleTabPress={(tab) => setSelectedTab(tab)}
+            />
+          </View>
+        )}
 
-      {selectedTab === 'Lightning' ? (
-        <ReceiveLightningTab
-          data={receiveEntryData}
-          unit={unit}
-          mintInfo={mintInfo}
-          selectedMintUrl={mintUrl}
-          isNpcMintUpdating={isNpcMintUpdating}
-          actions={actions}
-          muted={muted}
-        />
-      ) : (
-        <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
-      )}
+        {selectedTab === 'Lightning' ? (
+          <ReceiveLightningTab
+            data={receiveEntryData}
+            unit={unit}
+            mintInfo={mintInfo}
+            selectedMintUrl={mintUrl}
+            isNpcMintUpdating={isNpcMintUpdating}
+            actions={actions}
+            muted={muted}
+          />
+        ) : (
+          <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
+        )}
+      </Screen>
     </ModalScreenLayout>
   );
 }

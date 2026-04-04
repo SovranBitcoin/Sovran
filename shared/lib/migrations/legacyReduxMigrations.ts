@@ -1,6 +1,6 @@
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { DataMigration } from '@/shared/lib/cashu/migration';
-import { initLog } from '@/shared/lib/initTiming';
+import { log, initLog } from '../logger';
 import {
   deriveCashuMnemonic,
   deriveNostrKeys,
@@ -164,10 +164,7 @@ async function migrateReduxCashuProfiles(
       if (needsMigration) {
         const result = await migration.migrateFromRedux();
         if (result.errors.length > 0) {
-          console.warn(
-            `Legacy Redux->Coco migration completed with errors for account ${accountIndex}:`,
-            result.errors
-          );
+          log.warn('migrations.legacy.completed_with_errors', { accountIndex, errors: result.errors });
         }
       }
 

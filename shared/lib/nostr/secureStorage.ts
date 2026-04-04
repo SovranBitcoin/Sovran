@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 
+import { log } from '../logger';
+
 // Keys for secure storage
 const STORAGE_KEYS = {
   USER_MNEMONIC: 'user_mnemonic',
@@ -70,7 +72,7 @@ export async function storeMnemonic(mnemonic: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('Failed to store mnemonic:', error);
+    log.error('nostr.secure.store_mnemonic_failed', { error });
     return false;
   }
 }
@@ -87,7 +89,7 @@ export async function retrieveMnemonic(): Promise<string | null> {
 
     return mnemonic;
   } catch (error) {
-    console.error('Failed to retrieve mnemonic:', error);
+    log.error('nostr.secure.retrieve_mnemonic_failed', { error });
     return null;
   }
 }
@@ -100,7 +102,7 @@ async function generateMnemonic(): Promise<string> {
   try {
     const debugMnemonic = getDebugMnemonicOverride();
     if (debugMnemonic) {
-      console.log('Using debug mnemonic from EXPO_PUBLIC_DEBUG_MNEMONIC');
+      log.debug('nostr.secure.using_debug_mnemonic');
       return debugMnemonic;
     }
 
@@ -111,10 +113,10 @@ async function generateMnemonic(): Promise<string> {
     // Generate mnemonic from entropy
     const mnemonic = bip39.entropyToMnemonic(entropy, wordlist);
 
-    console.log('Generated new mnemonic');
+    log.info('nostr.secure.mnemonic_generated');
     return mnemonic;
   } catch (error) {
-    console.error('Failed to generate mnemonic:', error);
+    log.error('nostr.secure.generate_mnemonic_failed', { error });
     throw new Error('Failed to generate mnemonic');
   }
 }
@@ -128,25 +130,25 @@ export async function ensureMnemonicExists(): Promise<string | null> {
     // Check if mnemonic already exists
     const existingMnemonic = await retrieveMnemonic();
     if (existingMnemonic) {
-      console.log('Mnemonic already exists');
+      log.debug('nostr.secure.mnemonic_exists');
       return existingMnemonic;
     }
 
     // Generate new mnemonic
-    console.log('No mnemonic found, generating new one...');
+    log.info('nostr.secure.generating_mnemonic');
     const newMnemonic = await generateMnemonic();
 
     // Store the new mnemonic
     const stored = await storeMnemonic(newMnemonic);
     if (!stored) {
-      console.error('Failed to store newly generated mnemonic');
+      log.error('nostr.secure.store_new_mnemonic_failed');
       return null;
     }
 
-    console.log('New mnemonic generated and stored successfully');
+    log.info('nostr.secure.mnemonic_stored');
     return newMnemonic;
   } catch (error) {
-    console.error('Failed to ensure mnemonic exists:', error);
+    log.error('nostr.secure.ensure_mnemonic_failed', { error });
     return null;
   }
 }
@@ -179,17 +181,17 @@ export async function clearAllSecureData(
 
     const clearPromises = keysToDelete.map((key) =>
       SecureStore.deleteItemAsync(key, options).catch((error) => {
-        console.warn(`Failed to clear ${key}:`, error);
+        log.warn('nostr.secure.clear_key_failed', { key, error });
         return false;
       })
     );
 
     await Promise.all(clearPromises);
 
-    console.log('All secure storage data cleared successfully');
+    log.info('nostr.secure.all_data_cleared');
     return true;
   } catch (error) {
-    console.error('Failed to clear secure storage:', error);
+    log.error('nostr.secure.clear_all_failed', { error });
     return false;
   }
 }
@@ -219,15 +221,15 @@ export async function clearPerProfileSecureData(
     await Promise.all(
       keysToDelete.map((key) =>
         SecureStore.deleteItemAsync(key, options).catch((error) => {
-          console.warn(`Failed to clear ${key}:`, error);
+          log.warn('nostr.secure.clear_key_failed', { key, error });
         })
       )
     );
 
-    console.log('Per-profile secure data cleared successfully');
+    log.info('nostr.secure.profile_data_cleared');
     return true;
   } catch (error) {
-    console.error('Failed to clear per-profile secure storage:', error);
+    log.error('nostr.secure.clear_profile_failed', { error });
     return false;
   }
 }
@@ -263,7 +265,7 @@ export async function storeDerivedKeys(
     await SecureStore.setItemAsync(derivedKeysKey(accountIndex), JSON.stringify(keys), options);
     return true;
   } catch (error) {
-    console.error('Failed to store derived keys:', error);
+    log.error('nostr.secure.store_keys_failed', { error });
     return false;
   }
 }
@@ -275,7 +277,7 @@ export async function retrieveDerivedKeys(accountIndex: number): Promise<CachedD
     if (!raw) return null;
     return JSON.parse(raw) as CachedDerivedKeys;
   } catch (error) {
-    console.error('Failed to retrieve derived keys:', error);
+    log.error('nostr.secure.retrieve_keys_failed', { error });
     return null;
   }
 }
@@ -291,7 +293,7 @@ export async function storeCashuMnemonic(
     await SecureStore.setItemAsync(cashuMnemonicKey(accountIndex), payload, options);
     return true;
   } catch (error) {
-    console.error('Failed to store cashu mnemonic:', error);
+    log.error('nostr.secure.store_cashu_mnemonic_failed', { error });
     return false;
   }
 }
@@ -305,7 +307,7 @@ export async function retrieveCashuMnemonic(
     if (!raw) return null;
     return JSON.parse(raw) as { value: string; mnemonicHash: string };
   } catch (error) {
-    console.error('Failed to retrieve cashu mnemonic:', error);
+    log.error('nostr.secure.retrieve_cashu_mnemonic_failed', { error });
     return null;
   }
 }
@@ -343,7 +345,7 @@ export async function isMigrationsComplete(accountIndex: number = 0): Promise<bo
 
     return false;
   } catch (error) {
-    console.error('Failed to check migrations complete flag:', error);
+    log.error('nostr.secure.check_migration_flag_failed', { error });
     return false;
   }
 }
@@ -354,7 +356,7 @@ export async function setMigrationsComplete(accountIndex: number = 0): Promise<b
     await SecureStore.setItemAsync(migrationsCompleteKey(accountIndex), 'true', options);
     return true;
   } catch (error) {
-    console.error('Failed to set migrations complete flag:', error);
+    log.error('nostr.secure.set_migration_flag_failed', { error });
     return false;
   }
 }
@@ -371,7 +373,7 @@ export async function storeImportedNsec(pubkeyHex: string, nsecValue: string): P
     await SecureStore.setItemAsync(importedNsecKey(pubkeyHex), nsecValue, options);
     return true;
   } catch (error) {
-    console.error('Failed to store imported nsec:', error);
+    log.error('nostr.secure.store_nsec_failed', { error });
     return false;
   }
 }
@@ -381,7 +383,7 @@ export async function retrieveImportedNsec(pubkeyHex: string): Promise<string | 
     const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
     return await SecureStore.getItemAsync(importedNsecKey(pubkeyHex), options);
   } catch (error) {
-    console.error('Failed to retrieve imported nsec:', error);
+    log.error('nostr.secure.retrieve_nsec_failed', { error });
     return null;
   }
 }
@@ -392,7 +394,7 @@ export async function deleteImportedNsec(pubkeyHex: string): Promise<boolean> {
     await SecureStore.deleteItemAsync(importedNsecKey(pubkeyHex), options);
     return true;
   } catch (error) {
-    console.error('Failed to delete imported nsec:', error);
+    log.error('nostr.secure.delete_nsec_failed', { error });
     return false;
   }
 }

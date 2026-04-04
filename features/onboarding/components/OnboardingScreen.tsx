@@ -19,6 +19,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import OnboardingInnerCarousel from './OnboardingInnerCarousel';
 import { OnboardingSlide } from './types';
 
@@ -35,6 +36,7 @@ type OnboardingScreenProps = {
 };
 
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
+  useLifecycleLogger('OnboardingScreen');
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
   const insets = useSafeAreaInsets();
@@ -167,6 +169,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   }));
 
   const onGetStartedPress = () => {
+    log.info('onboarding.completed', { slidesSeen: currentSlideIndex + 1 });
     onComplete();
   };
 

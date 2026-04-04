@@ -16,6 +16,7 @@ import Animated, {
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { cashuLog } from '@/shared/lib/logger';
 // Size constants
 const LARGE_ICON_SIZE = 28;
 const SMALL_ICON_SIZE = 22;
@@ -218,6 +219,7 @@ export function MintCurrencyTabs({
 
   const handleCurrencyChange = useCallback(
     (currency: string) => {
+      cashuLog.info('mint.currency.tab.select', { currency });
       onCurrencyChange(currency);
     },
     [onCurrencyChange]

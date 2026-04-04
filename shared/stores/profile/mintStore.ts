@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { log, storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 
@@ -25,6 +26,7 @@ export const useMintStore = create<MintStore>()(
       selectedMints: {},
 
       setSelectedMint: (pubkey: string, mintUrl: string) => {
+        storeLog.info('store.mint.set_selected', { mintUrl });
         set((state) => ({
           selectedMints: { ...state.selectedMints, [pubkey]: mintUrl },
         }));
@@ -33,6 +35,7 @@ export const useMintStore = create<MintStore>()(
       getSelectedMint: (pubkey: string) => get().selectedMints[pubkey],
 
       clearSelectedMint: (pubkey: string) => {
+        storeLog.info('store.mint.clear_selected');
         set((state) => {
           const { [pubkey]: _, ...rest } = state.selectedMints;
           return { selectedMints: rest };
@@ -46,7 +49,7 @@ export const useMintStore = create<MintStore>()(
           await profileStorage.removeItem('mint-store');
           set({ selectedMints: {} });
         } catch (error) {
-          console.error('MintStore: Error clearing data:', error);
+          log.error('store.mint.clear_failed', { error });
           throw error;
         }
       },
@@ -59,7 +62,7 @@ export const useMintStore = create<MintStore>()(
       }),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('MintStore: Failed to rehydrate:', error);
+          log.warn('store.mint.rehydrate_failed', { error });
         }
       },
     }

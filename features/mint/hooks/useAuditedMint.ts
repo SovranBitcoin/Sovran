@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 import { auditMint, fetchMintInfo, type AuditMintResponse } from '@/shared/lib/apiClient';
+import { cashuLog } from '@/shared/lib/logger';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 
 // Transform API response to match expected interface structure
@@ -104,14 +105,16 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
         const stale = isStale(mintUrl);
 
         if (cached && !stale) {
-          // Use cached data
+          cashuLog.debug('mint.audit.cache.hit', { mintUrl });
           setAuditInfo(transformAuditData(cached.auditData));
           setMintInfo(cached.mintInfo);
           setLoading(false);
           return;
         }
+        cashuLog.debug('mint.audit.cache.miss', { mintUrl });
 
         // Fetch audit data directly from API
+        cashuLog.info('mint.audit.fetch', { mintUrl });
         const auditResult = await auditMint({ mintUrl });
         if (auditResult.isOk()) {
           const auditData = auditResult.value;
@@ -131,12 +134,14 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
 
           // Cache both audit data and mint info if both succeeded
           if (auditResult.isOk()) {
+            cashuLog.info('mint.audit.complete', { mintUrl, score: transformAuditData(auditResult.value).score });
             setCached(mintUrl, auditResult.value, mintInfoData);
           }
         } else {
           setMintInfo(undefined);
         }
-      } catch {
+      } catch (err) {
+        cashuLog.error('mint.audit.error', { mintUrl, error: err instanceof Error ? err : new Error(String(err)) });
         setError('Failed to load mint information');
         setAuditInfo(undefined);
         setMintInfo(undefined);

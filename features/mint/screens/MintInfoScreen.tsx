@@ -30,6 +30,7 @@ import { useScreenActions } from 'coco-payment-ux/react';
 import opacity from 'hex-color-opacity';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 function ProgressRingComponent({
   size = 84,
@@ -406,7 +407,8 @@ function RatingBarChartComponent({ score }: { score: number }) {
 const RatingBarChart = React.memo(RatingBarChartComponent);
 
 export function MintInfoScreen() {
-  const foreground = useThemeColor('foreground');
+  useLifecycleLogger('MintInfoScreen');
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const [danger, success, warning] = useThemeColor(['danger', 'success', 'yellow-300'] as const);
   const insets = useSafeAreaInsets();
   const { mintInfoEntry: entryParam } = useLocalSearchParams<{ mintInfoEntry?: string }>();
@@ -415,8 +417,11 @@ export function MintInfoScreen() {
   const mintUrl = (entry?.mintUrl as string) ?? '';
   const displayName = (entry?.displayName as string) ?? mintUrl;
 
+  log.debug('mint.info.display', { mintUrl, displayName, hasEntry: !!entry });
+
   const handleContactPress = useCallback(
     async (method: string, info: string) => {
+      log.info('mint.info.contact.press', { method });
       try {
         switch (method.toLowerCase()) {
           case 'email':
@@ -444,7 +449,7 @@ export function MintInfoScreen() {
     | undefined;
 
   return (
-    <View className="bg-background flex-1">
+    <Screen name="MintInfoScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: entry?.fromAccepter ? 'Verify Mint' : displayName || 'Mint Details',
@@ -643,7 +648,7 @@ export function MintInfoScreen() {
           }
         />
       </BottomButtons>
-    </View>
+    </Screen>
   );
 }
 

@@ -12,6 +12,7 @@ import { prefetchImages } from '@/shared/lib/imageCache';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { useContactsSearch } from '@/app/(drawer)/(tabs)/contacts/_layout';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { ContactListItem } from '../components/ContactListItem';
 import { ContactSearchResultItem } from '../components/ContactSearchResultItem';
@@ -21,6 +22,7 @@ import { SEARCH_FILTERS_HEIGHT } from '../lib/constants/styles';
 import { HEADER_SPRING_CONFIG } from '../lib/constants/animation-configs';
 
 export const ContactsScreen = () => {
+  useLifecycleLogger('ContactsScreen');
   const { isSearching, searchQuery } = useContactsSearch();
   const [activeFilter, setActiveFilter] = useState('All');
   const [foreground, surface, separator] = useThemeColor([
@@ -100,6 +102,7 @@ export const ContactsScreen = () => {
   }, [activeFilter, displayContacts, displayMints]);
 
   const handleFilterChange = useCallback((filter: string) => {
+    log.debug('contacts.filter_changed', { filter });
     setActiveFilter(filter);
   }, []);
 
@@ -172,7 +175,7 @@ export const ContactsScreen = () => {
   }));
 
   return (
-    <View style={styles.root}>
+    <Screen name="ContactsScreen" style={styles.root}>
       {/* Spacer that animates to push content below the transparent header + filters */}
       <Animated.View style={rTopStyle} />
 
@@ -218,7 +221,7 @@ export const ContactsScreen = () => {
           />
         )}
       </ScreenContainer>
-    </View>
+    </Screen>
   );
 };
 

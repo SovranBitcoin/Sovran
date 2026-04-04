@@ -22,6 +22,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useWalletHealthData } from '../hooks/useWalletHealthData';
 import { computeWalletHealth } from '../lib/walletHealth';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
+import { walletLog } from '@/shared/lib/logger';
 
 function chipIconName(label: string): string {
   const key = label.toLowerCase();
@@ -62,9 +63,10 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
   }, [normalizedUnit, mintUrlsForUnit, balance, desiredDistributionBp, pendingOutgoingCount]);
 
   const handlePress = useCallback(() => {
+    walletLog.info('wallet.health.card.press', { unit: normalizedUnit, chips: health.chips.map(c => c.label) });
     hero.registerRef('walletHealth', 'source', cardRef.current);
     hero.startWalletHealth(normalizedUnit);
-  }, [hero, normalizedUnit]);
+  }, [hero, normalizedUnit, health.chips]);
 
   const pressed = useSharedValue(0);
 
