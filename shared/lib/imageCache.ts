@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { log } from '@/shared/lib/logger';
 
 const prefetchedUrls = new Set<string>();
 
@@ -13,9 +14,12 @@ export async function prefetchImage(url?: string | null): Promise<void> {
 
   prefetchedUrls.add(normalized);
   try {
+    const t0 = performance.now();
     await Image.prefetch(normalized, 'memory-disk');
+    const duration_ms = Math.round((performance.now() - t0) * 100) / 100;
+    log.debug('image.prefetch', { url: normalized.slice(0, 40), duration_ms });
   } catch {
-    // Ignore cache warm failures; rendering still proceeds normally.
+    log.debug('image.prefetch.fail', { url: normalized.slice(0, 40) });
   }
 }
 
@@ -27,8 +31,7 @@ export async function prefetchImages(
   if (newUrls.length === 0) return;
   const t0 = performance.now();
   await Promise.all(urls.map((url) => prefetchImage(url)));
-  const duration = Math.round((performance.now() - t0) * 100) / 100;
-  if (duration > 200) {
-    console.warn(`[perf] prefetchImages(${newUrls.length} new) took ${duration}ms`);
-  }
+  const duration_ms = Math.round((performance.now() - t0) * 100) / 100;
+  const level = duration_ms > 200 ? 'warn' : 'debug';
+  log[level]('image.prefetch.batch', { count: newUrls.length, duration_ms });
 }

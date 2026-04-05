@@ -199,6 +199,45 @@ The logger has a built-in 50ms dedup window: when the same event name fires mult
 
 The stats mode includes **template-based dedup analysis** — it groups entries by event name and shows which param keys vary, helping identify events that should be rate-limited or collapsed.
 
+## Background theme performance
+
+The image background theming system is instrumented for performance analysis. Use these filters to isolate background-related events:
+
+```bash
+# All background/theme events:
+npm run log-doctor -- timeline --latest --event "bg\.|theme\.|image\."
+
+# Blur transitions during tab navigation:
+npm run log-doctor -- timeline --latest --event "bg\.blur"
+
+# Image loading performance:
+npm run log-doctor -- timeline --latest --event "image\.(loaded|prefetch)"
+
+# Render frequency of background components:
+npm run log-doctor -- renders --latest
+```
+
+**Events logged:**
+
+| Event | Level | What it tells you |
+|-------|-------|-------------------|
+| `bg.blur.transition` | INFO | Blur mode change (none/partial/full/gradient) on tab focus |
+| `bg.view.render` | DEBUG | AnimatedBackgroundView render — theme, isImageTheme, blurTint |
+| `bg.sprite.render` | DEBUG | SpriteView render — whether image theme is active |
+| `bg.sprite.motion.start/stop` | DEBUG | DeviceMotion subscription lifecycle |
+| `theme.css_vars.applied` | INFO | CSS variable update timing (varCount, duration_ms) |
+| `image.loaded` | DEBUG | Image load with dimensions, duration_ms, cache type |
+| `image.prefetch` | DEBUG | Individual image prefetch timing |
+| `image.prefetch.batch` | DEBUG/WARN | Batch prefetch (warns if >200ms) |
+| `render.count` (AnimatedBackgroundView) | DEBUG | Render count from useRenderLogger |
+| `render.count` (ScrollableGradientOverlay) | DEBUG | Render count from useRenderLogger |
+
+**What to look for:**
+- `bg.blur.transition` frequency — should only fire on tab changes, not every render
+- `image.loaded duration_ms` — first load vs cached (should be <50ms cached)
+- `bg.view.render` count — excessive re-renders indicate missing memoization
+- `theme.css_vars.applied duration_ms` — should be <5ms; spikes indicate layout thrashing
+
 ## What to audit
 
 **Performance**: Run `stats` then `slow --threshold 200`. Look for PBKDF2 seed derivation, network waterfalls, sync operations blocking the JS thread. Run `gc` for memory leaks and thread blocks.

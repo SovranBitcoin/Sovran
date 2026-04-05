@@ -5,12 +5,14 @@ import { View } from '@/shared/ui/primitives/View/View';
 import Image from '@/shared/ui/primitives/Image';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
 import { useTheme } from '@/shared/providers/ThemeProvider';
+import { log } from '@/shared/lib/logger';
 
 const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string }) => {
   const motion = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   useEffect(() => {
     DeviceMotion.setUpdateInterval(50);
+    log.debug('bg.sprite.motion.start', { intervalMs: 50 });
     const subscription = DeviceMotion.addListener(({ rotation }) => {
       if (rotation) {
         const { beta = 0, gamma = 0 } = rotation;
@@ -25,15 +27,22 @@ const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string
         }).start();
       }
     });
-    return () => subscription.remove();
+    return () => {
+      log.debug('bg.sprite.motion.stop');
+      subscription.remove();
+    };
   }, [motion]);
 
   const theme = useTheme();
 
   const backgroundImageSource = backgroundImageThemes[theme.currentTheme];
 
-  if (!backgroundImageSource)
+  if (!backgroundImageSource) {
+    log.debug('bg.sprite.render', { theme: theme.currentTheme, hasImage: false });
     return <View style={[StyleSheet.absoluteFillObject, { backgroundColor }]}></View>;
+  }
+
+  log.debug('bg.sprite.render', { theme: theme.currentTheme, hasImage: true });
 
   return (
     <Animated.View

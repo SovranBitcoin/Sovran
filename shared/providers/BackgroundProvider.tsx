@@ -108,18 +108,6 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
 
   const setConfig = useCallback(
     (config: BackgroundConfig) => {
-      log.debug('background.config.update', {
-        blurMode: config.blurMode,
-        blurIntensity: config.blurIntensity,
-        backgroundOpacity: config.backgroundOpacity,
-      });
-      const defaults = DEFAULT_CONFIGS[config.blurMode];
-      const intensity = config.blurIntensity ?? defaults.blurIntensity;
-      const gradientStart = config.blurGradientStart ?? defaults.blurGradientStart;
-      const gradientEnd = config.blurGradientEnd ?? defaults.blurGradientEnd;
-      const bgOpacity = config.backgroundOpacity ?? 1;
-      const bgColor = config.backgroundColor ?? ''; // Empty string = use theme default
-
       // Map blur mode to number
       const modeMap: Record<BlurMode, number> = {
         none: 0,
@@ -127,9 +115,27 @@ export function BackgroundProvider({ children }: BackgroundProviderProps) {
         full: 2,
         gradient: 3,
       };
+      const targetMode = modeMap[config.blurMode];
+      const bgOpacity = config.backgroundOpacity ?? 1;
+
+      // Skip if mode and opacity haven't changed — avoids redundant animations on tab refocus
+      if (blurMode.value === targetMode && backgroundOpacity.value === bgOpacity) {
+        return;
+      }
+
+      log.info('bg.blur.transition', {
+        blurMode: config.blurMode,
+        backgroundOpacity: bgOpacity,
+        animationMs: ANIMATION_CONFIG.duration,
+      });
+      const defaults = DEFAULT_CONFIGS[config.blurMode];
+      const intensity = config.blurIntensity ?? defaults.blurIntensity;
+      const gradientStart = config.blurGradientStart ?? defaults.blurGradientStart;
+      const gradientEnd = config.blurGradientEnd ?? defaults.blurGradientEnd;
+      const bgColor = config.backgroundColor ?? ''; // Empty string = use theme default
 
       // Animate to new values
-      blurMode.value = modeMap[config.blurMode];
+      blurMode.value = targetMode;
       blurIntensity.value = withTiming(intensity, ANIMATION_CONFIG);
       blurGradientStart.value = withTiming(gradientStart, ANIMATION_CONFIG);
       blurGradientEnd.value = withTiming(gradientEnd, ANIMATION_CONFIG);

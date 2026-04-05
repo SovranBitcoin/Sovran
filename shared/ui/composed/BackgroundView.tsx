@@ -12,6 +12,7 @@ import AnimatedSpriteBackground from './SpriteView';
 import { View } from '@/shared/ui/primitives/View/View';
 import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { supportsBlur } from '@/shared/lib/version';
+import { log, useRenderLogger } from '@/shared/lib/logger';
 
 type BlurTint =
   | 'light'
@@ -100,6 +101,7 @@ function ScrollableGradientOverlayComponent({
   showGradientOverlay = true,
   gradientOverlayOpacity = 0.33,
 }: ScrollableGradientOverlayProps) {
+  useRenderLogger('ScrollableGradientOverlay');
   const background = useThemeColor('background');
   const primaryColor950 = useMemo(() => background, [background]);
 
@@ -215,8 +217,8 @@ function AnimatedBackgroundViewComponent({
   blurTint = 'dark',
   style,
 }: AnimatedBackgroundViewProps) {
+  useRenderLogger('AnimatedBackgroundView');
   const surface = useThemeColor('surface');
-  const primaryColor900 = useMemo(() => surface, [surface]);
 
   // Get gradient colors for background image themes
   const currentTheme = useSettingsStore((state) => state.getTheme());
@@ -226,6 +228,12 @@ function AnimatedBackgroundViewComponent({
     }
     return null;
   }, [currentTheme]);
+
+  log.debug('bg.view.render', {
+    theme: currentTheme,
+    isImageTheme: !!gradientColors,
+    blurTint,
+  });
 
   // Get animated values from context
   const { partialBlurOpacity, fullBlurOpacity, backgroundOpacity, backgroundColor } =
@@ -251,7 +259,7 @@ function AnimatedBackgroundViewComponent({
 
   // Animated styles for background color (use theme default if empty)
   const backgroundColorAnimatedStyle = useAnimatedStyle(() => ({
-    backgroundColor: backgroundColor.value || primaryColor900,
+    backgroundColor: backgroundColor.value || surface,
   }));
 
   return (
@@ -261,7 +269,7 @@ function AnimatedBackgroundViewComponent({
 
       {/* Animated background image or solid color - with configurable opacity */}
       <Animated.View style={[StyleSheet.absoluteFillObject, backgroundAnimatedStyle]}>
-        <AnimatedSpriteBackground backgroundColor={primaryColor900} />
+        <AnimatedSpriteBackground backgroundColor={surface} />
 
         {/* Gradient overlay for image themes */}
         {gradientColors && (
