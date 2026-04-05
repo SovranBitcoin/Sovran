@@ -48,6 +48,8 @@ import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
+import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
+import { fetchNostrProfile } from '@/shared/lib/apiClient';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -65,6 +67,11 @@ function getMintEnrichment(mintUrl: string): EntryRecord {
 
   const enrichment: EntryRecord = {};
   if (kym) enrichment.kymScore = kym.score;
+  const profile = useMintProfileStore.getState().getCached(normalized);
+  if (profile) {
+    enrichment.contactFollowers = profile.followers;
+    enrichment.contactReputation = Math.round(profile.reputation);
+  }
   if (audit) {
     const swaps = audit.auditData.swaps ?? [];
     const swapSuccess = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
@@ -108,6 +115,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   privateKeyRef.current = keys?.privateKey;
 
   const [nfcAdapter] = useState(() => createNfcAdapter());
+  const p2pkKeyRefreshedRef = useRef<((newKey: string | null) => void) | null>(null);
   const getNpub = useCallback(() => npubRef.current, []);
 
   const getBtcPrice = useCallback(() => {
@@ -146,6 +154,21 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         },
         enrichMintListItem: (url) => getMintEnrichment(url) as any,
         enrichMintReviewInfo: (url) => getMintEnrichment(url) as any,
+        fetchMintProfiles: (mintInfoMap) => {
+          for (const [mintUrl, info] of mintInfoMap.entries()) {
+            const contacts = info?.contact;
+            if (!Array.isArray(contacts)) continue;
+            const nostrContact = contacts.find((c: any) => c.method === 'nostr' && c.info);
+            if (!nostrContact) continue;
+            const store = useMintProfileStore.getState();
+            if (!store.isStale(mintUrl)) continue;
+            fetchNostrProfile(nostrContact.info).then((result) => {
+              if (result.isOk()) {
+                store.setCached(mintUrl, result.value.followers, result.value.score);
+              }
+            }).catch(() => {});
+          }
+        },
         shouldMockFailPaymentRequest: () => useSettingsStore.getState().mockFailPaymentRequest,
       }),
     [manager, nfcAdapter, getOffline, getBtcPrice, getDisplayCurrency]
@@ -201,7 +224,12 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   );
 
   const screenActionsBridge = useMemo<ScreenActionsBridge>(
-    () => ({
+    () => {
+      // Closure state for async mint-info fetches triggered from mergeEntryUpdate.
+      let mintInfoCallback: ((entry: EntryRecord) => void) | null = null;
+      let mintInfoFetchingUrl: string | null = null;
+
+      return {
       getExtraContext: () => ({
         manager,
         requestCameraPermission: receiveExtras?.requestCameraPermission,
@@ -245,6 +273,10 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
               callback({ _npcMintUpdate: true } as EntryRecord);
             })
           );
+          p2pkKeyRefreshedRef.current = (newKey: string | null) => {
+            callback({ _p2pkKeyUpdate: true, p2pkKey: newKey } as EntryRecord);
+          };
+          unsubscribes.push(() => { p2pkKeyRefreshedRef.current = null; });
         }
 
         if (screenType === 'mintInfo' || screenType === 'mintSelector') {
@@ -257,6 +289,14 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           };
           unsubscribes.push(useAuditMintStore.subscribe(pushEnrichment));
           unsubscribes.push(useKYMMintStore.subscribe(pushEnrichment));
+          unsubscribes.push(useMintProfileStore.subscribe(pushEnrichment));
+
+          if (screenType === 'mintInfo') {
+            mintInfoCallback = callback;
+            unsubscribes.push(() => { mintInfoCallback = null; mintInfoFetchingUrl = null; });
+            // Fire immediately so already-cached data is applied on mount
+            pushEnrichment();
+          }
         }
 
         return () => {
@@ -266,7 +306,9 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
       shouldApplyEntryUpdate: (current, updated) => {
         if (!current) return false;
         if (updated?._npcMintUpdate && current.type === 'receive') return true;
+        if (updated?._p2pkKeyUpdate && current.type === 'receive') return true;
         if (updated?._mintEnrichment && typeof current.mintUrl === 'string') return true;
+        if (updated?._mintInfoFetched && typeof current.mintUrl === 'string') return true;
         if (updated?._mintItemsEnrichment && Array.isArray(current.items)) return true;
         return defaultShouldApply(current, updated);
       },
@@ -276,9 +318,52 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           const npcMintUrl = useNpcMintStore.getState().getActiveMintUrl();
           return { ...current, selectedMintUrl: npcMintUrl, mintUrl: npcMintUrl ?? '' };
         }
+        if (updated._p2pkKeyUpdate && current.type === 'receive') {
+          return { ...current, p2pkKey: updated.p2pkKey ?? undefined };
+        }
         if (updated._mintEnrichment && typeof current.mintUrl === 'string') {
           const enrichment = getMintEnrichment(current.mintUrl as string);
-          return { ...current, ...enrichment };
+          const merged = { ...current, ...enrichment };
+
+          // Bare entry (e.g. navigated from user profile with only mintUrl) —
+          // kick off an async fetch of full mint info from the mint API.
+          const mintUrl = current.mintUrl as string;
+          if (
+            !current.displayName &&
+            !current._mintInfoFetched &&
+            mintInfoCallback &&
+            mintInfoFetchingUrl !== mintUrl
+          ) {
+            mintInfoFetchingUrl = mintUrl;
+            const cb = mintInfoCallback;
+            (async () => {
+              try {
+                const [mintInfo, isTrusted] = await Promise.all([
+                  manager.mint.getMintInfo(mintUrl).catch(() => undefined),
+                  manager.mint.isTrustedMint(mintUrl).catch(() => false),
+                ]);
+                const info: any = mintInfo ?? {};
+                cb({
+                  _mintInfoFetched: true,
+                  displayName: info.name ?? mintUrl,
+                  iconUrl: info.icon_url,
+                  description: info.description,
+                  longDescription: info.description_long,
+                  motd: info.motd,
+                  contact: info.contact,
+                  isTrusted,
+                } as EntryRecord);
+              } catch (e) {
+                log.warn('send.mint_info_fetch_failed', { mintUrl, error: e instanceof Error ? e : new Error(String(e)) });
+              }
+            })();
+          }
+
+          return merged;
+        }
+        if (updated._mintInfoFetched && typeof current?.mintUrl === 'string') {
+          const { _mintInfoFetched, ...rest } = updated;
+          return { ...current, ...rest, _mintInfoFetched: true };
         }
         if (updated._mintItemsEnrichment && Array.isArray(current.items)) {
           const items = (current.items as EntryRecord[]).map((item) => {
@@ -315,7 +400,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         };
         return labels[scan.source] ?? null;
       },
-    }),
+    }; },
     [manager, receiveExtras?.requestCameraPermission]
   );
 
@@ -334,6 +419,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         getPubkey: () => pubkeyRef.current,
         getPrivateKey: () => privateKeyRef.current,
         getManager: () => manager,
+        onP2pkKeyRefreshed: (newKey) => p2pkKeyRefreshedRef.current?.(newKey),
       })}
       actions={actions}
       screenActionsBridge={screenActionsBridge}

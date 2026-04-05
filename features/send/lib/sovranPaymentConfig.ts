@@ -47,11 +47,11 @@ import {
   couldNotCancelPopup,
   emojiPickerPopup,
   generalErrorPopup,
+  mintUnreachablePopup,
   missingMeltTargetPopup,
   nfcConnectionLostPopup,
   nfcEcashSharedPopup,
   nfcErrorPopup,
-  nfcProgressPopup,
   nfcSendFailedPopup,
   noAmountPopup,
   noMintSelectedPopup,
@@ -83,7 +83,6 @@ import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
-import { useNfcProgressStore } from '@/shared/stores/runtime/nfcProgressStore';
 
 // =============================================================================
 // createSovranNotifications
@@ -93,6 +92,7 @@ interface CreateSovranNotificationsConfig {
   getPubkey?: () => string | undefined;
   getPrivateKey?: () => Uint8Array | undefined;
   getManager?: () => Manager | null;
+  onP2pkKeyRefreshed?: (newPublicKeyHex: string | null) => void;
 }
 
 export function createSovranNotifications(
@@ -122,27 +122,34 @@ export function createSovranNotifications(
     MISSING_MELT_TARGET: ({ code: _code, message: _message, data: _data }) => {
       missingMeltTargetPopup();
     },
-    SEND_FAILED: ({ code: _code, message, data: _data }) => {
+    SEND_FAILED: ({ code: _code, message, data }) => {
       paymentLog.error('payment.notification.send_failed', { message });
-      generalErrorPopup({ text: message });
+      if (data?.mintUnreachable) {
+        mintUnreachablePopup();
+      } else {
+        generalErrorPopup({ text: message });
+      }
     },
-    MINT_QUOTE_FAILED: ({ code: _code, message, data: _data }) => {
-      generalErrorPopup({ text: message });
+    MINT_QUOTE_FAILED: ({ code: _code, message, data }) => {
+      if (data?.mintUnreachable) {
+        mintUnreachablePopup();
+      } else {
+        generalErrorPopup({ text: message });
+      }
     },
-    MELT_FAILED: ({ code: _code, message, data: _data }) => {
+    MELT_FAILED: ({ code: _code, message, data }) => {
       paymentLog.error('payment.notification.melt_failed', { message });
-      generalErrorPopup({ text: message });
+      if (data?.mintUnreachable) {
+        mintUnreachablePopup();
+      } else {
+        generalErrorPopup({ text: message });
+      }
     },
     PAYMENT_REQUEST_FAILED: ({ code: _code, message, data: _data }) => {
       sendPaymentFailedPopup({ text: message });
     },
     NFC_WRITE_FAILED: ({ code: _code, message, data: _data }) => {
-      const nfcStore = useNfcProgressStore.getState();
-      if (nfcStore.active) {
-        nfcStore.setFailed(message);
-      } else {
-        nfcErrorPopup({ title: 'NFC Write Failed', message });
-      }
+      nfcErrorPopup({ title: 'NFC Write Failed', message });
     },
     NFC_SESSION_LOST: ({ code: _code, message, data: _data }) => {
       nfcErrorPopup({ title: 'NFC Connection Lost', message });
@@ -172,12 +179,6 @@ export function createSovranNotifications(
     },
     onPaymentConfirmed: (data) => {
       paymentLog.info('payment.confirmed', { variant: data.variant });
-      const nfcStore = useNfcProgressStore.getState();
-      if (nfcStore.active) {
-        nfcStore.setConfirmed();
-        return;
-      }
-
       const store = usePaymentStatusStore.getState();
       if (store.active) {
         if (data.variant === 'paymentRequest') {
@@ -238,22 +239,9 @@ export function createSovranNotifications(
       const scanSource = sourceMap[source ?? ''] ?? 'qr';
       useScanHistoryStore.getState().addScan(rawInput, rawInput, scanType, scanSource, parsedType, container, optionKinds);
     },
-    onNfcPaymentProgress: ({ phase }) => {
-      const store = useNfcProgressStore.getState();
-      const isFirstPhase = store.active === null;
-      store.setPhase(phase);
-      if (isFirstPhase) {
-        nfcProgressPopup();
-      }
-    },
     onNfcWriteFailed: ({ message, rolledBack }) => {
       const errorMsg = rolledBack ? `${message} Your funds have been returned.` : message;
-      const nfcStore = useNfcProgressStore.getState();
-      if (nfcStore.active) {
-        nfcStore.setFailed(errorMsg);
-      } else {
-        nfcErrorPopup({ title: 'NFC Write Failed', message: errorMsg });
-      }
+      nfcErrorPopup({ title: 'NFC Write Failed', message: errorMsg });
     },
 
     // ── Screen action notifications ─────────────────────────────────
@@ -276,8 +264,12 @@ export function createSovranNotifications(
       transactionCancelledPopup();
     },
 
-    onSendCancelFailed: ({ message }) => {
-      cancelTransactionFailedPopup({ text: message });
+    onSendCancelFailed: ({ message, mintUnreachable }) => {
+      if (mintUnreachable) {
+        mintUnreachablePopup();
+      } else {
+        cancelTransactionFailedPopup({ text: message });
+      }
     },
 
     onReceiveProcessing: ({ id, mintUrl, amount, unit }) => {
@@ -333,8 +325,12 @@ export function createSovranNotifications(
       paymentCancelledPopup();
     },
 
-    onMeltCancelFailed: ({ message }) => {
-      couldNotCancelPopup({ text: message });
+    onMeltCancelFailed: ({ message, mintUnreachable }) => {
+      if (mintUnreachable) {
+        mintUnreachablePopup();
+      } else {
+        couldNotCancelPopup({ text: message });
+      }
     },
 
     onUnsupportedTokenUnit: ({ unit }) => {
@@ -380,6 +376,8 @@ export function createSovranNotifications(
         if (mgr) {
           try {
             await mgr.keyring.generateKeyPair();
+            const keypair = await mgr.keyring.getLatestKeyPair();
+            config?.onP2pkKeyRefreshed?.(keypair?.publicKeyHex ?? null);
           } catch {
             // Non-critical — skip P2PK key regeneration
           }
@@ -466,6 +464,9 @@ export function createSovranHandlers({
   getNpub,
 }: CreateSovranHandlersConfig): StepHandlerMap {
   paymentLog.debug('payment.handlers.created');
+
+  const mgr = getManager();
+
   return {
     receiveToken: ({ token }) => {
       paymentLog.info('payment.step.receive_token');
@@ -567,18 +568,18 @@ export function createSovranHandlers({
     },
 
     navigateToReceive: async ({ unit }) => {
+      const t0 = performance.now();
       const npub = getNpub?.();
       const selectedMintUrl = useNpcMintStore.getState().getActiveMintUrl();
+
       let p2pkKey: string | undefined;
-      const mgr = getManager();
       if (mgr) {
         try {
           const keypair = await mgr.keyring.getLatestKeyPair();
-          p2pkKey = keypair?.publicKeyHex;
-        } catch {
-          /* ignore */
-        }
+          p2pkKey = keypair?.publicKeyHex ?? undefined;
+        } catch { /* ignore */ }
       }
+
       const entry = {
         type: 'receive',
         id: 'receive-hub',
@@ -593,9 +594,11 @@ export function createSovranHandlers({
         pathname: '/(receive-flow)/receive',
         params: { receiveEntry: JSON.stringify(entry), unit },
       });
+      paymentLog.info('navigate.receive.done', { duration_ms: performance.now() - t0 });
     },
 
     enterAmount: ({ unit, preselectedMintUrl, constraints }) => {
+      const t0 = performance.now();
       const entry = {
         destination: constraints.destination,
         unit,
@@ -609,6 +612,7 @@ export function createSovranHandlers({
         pathname: pathname as any,
         params: { amountEntry: JSON.stringify(entry) },
       });
+      paymentLog.info('navigate.enterAmount.done', { duration_ms: performance.now() - t0 });
     },
 
     selectMint: ({

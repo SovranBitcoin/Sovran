@@ -54,8 +54,9 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
     }
 
     const cached = getCached(normalizedMintUrl);
-    if (cached && !isStale(normalizedMintUrl)) {
-      cashuLog.debug('mint.kym.cache.hit', { mintUrl: normalizedMintUrl, score: cached.score, recommendations: cached.recommendations.length });
+    if (cached) {
+      const stale = isStale(normalizedMintUrl);
+      cashuLog.debug(stale ? 'mint.kym.cache.stale' : 'mint.kym.cache.hit', { mintUrl: normalizedMintUrl, score: cached.score, recommendations: cached.recommendations.length });
       setScore(cached.score);
       setRecommendations(cached.recommendations);
     } else {
@@ -108,14 +109,8 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
       });
 
       if (validRecommendations.length === 0) {
-        const cached = getCached(normalizedMintUrl);
-        if (cached && !isStale(normalizedMintUrl)) {
-          setScore(cached.score);
-          setRecommendations(cached.recommendations);
-        } else {
-          setScore(undefined);
-          setRecommendations(undefined);
-        }
+        // No matching events in this subscription — keep whatever was
+        // loaded from cache (Effect 1) instead of overwriting with empty.
         return;
       }
 
@@ -129,14 +124,7 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
     } catch (err) {
       cashuLog.error('mint.kym.error', { mintUrl: normalizedMintUrl, error: err instanceof Error ? err : new Error(String(err)) });
       setError('Failed to process mint recommendations. Please try again.');
-      const cached = getCached(normalizedMintUrl);
-      if (cached && !isStale(normalizedMintUrl)) {
-        setScore(cached.score);
-        setRecommendations(cached.recommendations);
-      } else {
-        setScore(undefined);
-        setRecommendations(undefined);
-      }
+      // Keep whatever was loaded from cache rather than clearing on error.
     } finally {
       if (eose) setLoading(false);
     }

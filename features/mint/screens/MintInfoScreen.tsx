@@ -453,7 +453,7 @@ export function MintInfoScreen() {
       <Stack.Screen
         options={{
           title: entry?.fromAccepter ? 'Verify Mint' : displayName || 'Mint Details',
-          headerRight: entry?.fromAccepter
+          headerRight: entry?.fromAccepter || !(typeof entry?.kymScore === 'number' && entry.kymScore >= 0)
             ? undefined
             : () => (
                 <Link
@@ -496,16 +496,20 @@ export function MintInfoScreen() {
 
           <Spacer size={16} />
 
-          <RatingBarChart score={(entry?.kymScore as number) ?? -1} />
+          {typeof entry?.kymScore === 'number' && entry.kymScore >= 0 && (
+            <RatingBarChart score={entry.kymScore} />
+          )}
 
-          <StatsGrid
-            successRate={entry?.successRate as number | undefined}
-            avgTimeMs={entry?.avgTimeMs as number | undefined}
-            swapSuccess={entry?.swapSuccess as number | undefined}
-            swapTotal={entry?.swapTotal as number | undefined}
-            totalMints={entry?.totalMints as number | undefined}
-            totalMelts={entry?.totalMelts as number | undefined}
-          />
+          {entry?.auditState != null && (
+            <StatsGrid
+              successRate={entry?.successRate as number | undefined}
+              avgTimeMs={entry?.avgTimeMs as number | undefined}
+              swapSuccess={entry?.swapSuccess as number | undefined}
+              swapTotal={entry?.swapTotal as number | undefined}
+              totalMints={entry?.totalMints as number | undefined}
+              totalMelts={entry?.totalMelts as number | undefined}
+            />
+          )}
         </VStack>
 
         {typeof entry?.description === 'string' && (
