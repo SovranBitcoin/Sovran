@@ -37,7 +37,7 @@ import { PostCard } from './nostr/PostCard';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { feedLog } from '@/shared/lib/logger';
+import { feedLog, Log } from '@/shared/lib/logger';
 
 // ============================================================================
 // Types
@@ -489,44 +489,46 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   }
 
   return (
-    <ImageOverlayProvider
-      getDisplayMetrics={getDisplayMetrics}
-      getEngagementState={getEngagementState}>
-      <View style={[styles.container, { backgroundColor: background }]}>
-        <LegendList
-          data={threadItems}
-          keyExtractor={threadKeyExtractor}
-          getItemType={threadItemType}
-          estimatedItemSize={200}
-          drawDistance={500}
-          renderItem={renderItem}
-          extraData={`${dataVersion}:${engagementRevision}`}
-          recycleItems
-          ListFooterComponent={
-            hiddenReplyCount > 0 ? (
-              <View style={styles.hiddenReplyFooter}>
-                <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
-                  {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not loaded
-                </Text>
-              </View>
-            ) : null
-          }
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: 120 }}
-          showsVerticalScrollIndicator={false}
-          onScroll={
-            imageOverlay?.scrollOffsetY != null
-              ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                  imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
-                }
-              : undefined
-          }
-          scrollEventThrottle={16}
-          initialScrollIndex={targetIndex > 0 ? targetIndex : undefined}
-        />
-        <AnimatedImageOverlay />
-      </View>
-    </ImageOverlayProvider>
+    <Log name="ThreadView">
+      <ImageOverlayProvider
+        getDisplayMetrics={getDisplayMetrics}
+        getEngagementState={getEngagementState}>
+        <View style={[styles.container, { backgroundColor: background }]}>
+          <LegendList
+            data={threadItems}
+            keyExtractor={threadKeyExtractor}
+            getItemType={threadItemType}
+            estimatedItemSize={200}
+            drawDistance={500}
+            renderItem={renderItem}
+            extraData={`${dataVersion}:${engagementRevision}`}
+            recycleItems
+            ListFooterComponent={
+              hiddenReplyCount > 0 ? (
+                <View style={styles.hiddenReplyFooter}>
+                  <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
+                    {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not loaded
+                  </Text>
+                </View>
+              ) : null
+            }
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: 120 }}
+            showsVerticalScrollIndicator={false}
+            onScroll={
+              imageOverlay?.scrollOffsetY != null
+                ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+                    imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
+                  }
+                : undefined
+            }
+            scrollEventThrottle={16}
+            initialScrollIndex={targetIndex > 0 ? targetIndex : undefined}
+          />
+          <AnimatedImageOverlay />
+        </View>
+      </ImageOverlayProvider>
+    </Log>
   );
 }
 

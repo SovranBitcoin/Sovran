@@ -95,8 +95,13 @@ export class ClusterManager {
   /**
    * Load points into the cluster index
    * This builds the spatial index - do this once when data changes
+   *
+   * WARNING: Supercluster.load() is synchronous and blocks the JS thread.
+   * With 30K+ points this can take several seconds. Callers must schedule
+   * this off the critical path (setTimeout / InteractionManager).
    */
   load(points: GeoPoint[]): void {
+    const t0 = performance.now();
     // Convert to GeoJSON features
     const features = points.map((p) => ({
       type: 'Feature' as const,
@@ -112,6 +117,10 @@ export class ClusterManager {
 
     this.cluster.load(features);
     this.loaded = true;
+    const duration = Math.round((performance.now() - t0) * 100) / 100;
+    if (duration > 100) {
+      console.warn(`[perf] Supercluster.load(${points.length} points) took ${duration}ms — JS thread was blocked`);
+    }
   }
 
   /**

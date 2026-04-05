@@ -41,6 +41,7 @@ import {
   getMintHistoryEntryTimeUntilExpiry,
 } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 interface HistoryEntryTimelineProps {
   historyEntry: HistoryEntry;
@@ -650,6 +651,7 @@ export function HistoryEntryTimeline({
   };
 
   return (
+    <Log name="HistoryEntryTimeline">
     <View className="bg-surface-secondary mx-4 rounded-2xl p-5">
       {/* Card Label */}
       <Text size={11} bold style={[styles.cardLabel, { color: foreground50 }]}>
@@ -752,6 +754,7 @@ export function HistoryEntryTimeline({
         })}
       </View>
     </View>
+    </Log>
   );
 }
 

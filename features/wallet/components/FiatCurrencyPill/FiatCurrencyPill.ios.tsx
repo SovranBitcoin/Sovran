@@ -8,6 +8,7 @@ import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { FiatCurrencyPillLiquid } from './FiatCurrencyPill.liquid';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
+import { Log } from '@/shared/lib/logger';
 
 export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactElement {
   const shared = useFiatCurrencyPill(props);
@@ -47,6 +48,7 @@ export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactEleme
   const longPressHandler = enableCurrencyMenu && onPress ? openCurrencySheet : undefined;
 
   return (
+    <Log name="FiatCurrencyPill">
     <TouchableOpacity
       disabled={!primaryHandler && !longPressHandler}
       onPress={primaryHandler}
@@ -69,5 +71,6 @@ export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactEleme
         </Text>
       </HStack>
     </TouchableOpacity>
+    </Log>
   );
 }

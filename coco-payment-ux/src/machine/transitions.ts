@@ -232,14 +232,16 @@ function handleMintSelectorRequested(
   const amount = ctx.amount;
   const candidates = getValidMintCandidates(walletCtx, { minAmount: amount });
 
-  // For mintQuote, all trusted mints are candidates (no balance requirement)
-  const finalCandidates =
-    ctx.destination === 'mintQuote'
-      ? walletCtx.trustedMintUrls.map((mintUrl) => ({
-          mintUrl,
-          balance: walletCtx.mintBalances[mintUrl] ?? 0,
-        }))
-      : candidates;
+  // Balance filtering only applies in send-type flows (melt/send/payment request).
+  // All other cases (no destination, mintQuote, scope override) show every trusted mint.
+  const allTrustedCandidates = walletCtx.trustedMintUrls.map((mintUrl) => ({
+    mintUrl,
+    balance: walletCtx.mintBalances[mintUrl] ?? 0,
+  }));
+  const needsBalanceFilter =
+    ctx.destination === 'paymentRequest' || ctx.destination === 'meltQuote' || ctx.destination === 'sendEcash';
+  const skipBalanceFilter = !needsBalanceFilter || event.scope === 'selected' || event.scope === 'npc';
+  const finalCandidates = skipBalanceFilter ? allTrustedCandidates : candidates;
 
   return {
     step: 'selectMint',

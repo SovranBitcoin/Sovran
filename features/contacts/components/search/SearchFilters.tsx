@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { FlatList, View, StyleSheet } from 'react-native';
 import FilterItem from './SearchFilterItem';
 import { SEARCH_FILTERS_HEIGHT } from '../../lib/constants/styles';
+import { Log } from '@/shared/lib/logger';
 
 const FILTERS = ['All', 'Recent', 'Mints'] as const;
 
@@ -19,26 +20,28 @@ export const SearchFilters = ({ onFilterChange }: SearchFiltersProps) => {
   };
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        ref={flatListRef}
-        data={FILTERS as unknown as string[]}
-        keyExtractor={(item) => item}
-        renderItem={({ item, index }) => (
-          <FilterItem
-            item={item}
-            index={index}
-            flatListRef={flatListRef}
-            activeFilterItem={activeFilterItem}
-            setActiveFilterItem={handleFilterChange}
-          />
-        )}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      />
-    </View>
+    <Log name="SearchFilters">
+      <View style={styles.container}>
+        <FlatList
+          ref={flatListRef}
+          data={FILTERS as unknown as string[]}
+          keyExtractor={(item) => item}
+          renderItem={({ item, index }) => (
+            <FilterItem
+              item={item}
+              index={index}
+              flatListRef={flatListRef}
+              activeFilterItem={activeFilterItem}
+              setActiveFilterItem={handleFilterChange}
+            />
+          )}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        />
+      </View>
+    </Log>
   );
 };
 

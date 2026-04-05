@@ -11,6 +11,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 interface HistoryEntryRefreshProps {
   mintInfo?: GetInfoResponse | null;
@@ -63,17 +64,19 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
   );
 
   return (
-    <View className="mx-4">
-      <ListGroup variant="secondary">
-        {onPress ? (
-          <PressableFeedback animation={false} onPress={onPress}>
-            <PressableFeedback.Scale>{row}</PressableFeedback.Scale>
-            <PressableFeedback.Ripple />
-          </PressableFeedback>
-        ) : (
-          row
-        )}
-      </ListGroup>
-    </View>
+    <Log name="HistoryEntryRefresh">
+      <View className="mx-4">
+        <ListGroup variant="secondary">
+          {onPress ? (
+            <PressableFeedback animation={false} onPress={onPress}>
+              <PressableFeedback.Scale>{row}</PressableFeedback.Scale>
+              <PressableFeedback.Ripple />
+            </PressableFeedback>
+          ) : (
+            row
+          )}
+        </ListGroup>
+      </View>
+    </Log>
   );
 }

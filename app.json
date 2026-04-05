@@ -37,8 +37,8 @@
       "versionCode": 2,
       "userInterfaceStyle": "dark",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/dark.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/light-t.png",
+        "backgroundColor": "#000000"
       },
       "permissions": [
         "android.permission.CAMERA",
@@ -50,7 +50,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/dark.png"
+      "favicon": "./assets/images/light-t.png"
     },
     "plugins": [
       [
@@ -70,8 +70,8 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/dark.png",
-          "backgroundColor": "#030303",
+          "image": "./assets/images/light-t.png",
+          "backgroundColor": "#000000",
           "resizeMode": "contain",
           "imageWidth": 390
         }

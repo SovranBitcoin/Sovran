@@ -3,8 +3,8 @@ import { FlatList, View, StyleSheet } from 'react-native';
 import FilterItem from '@/features/contacts/components/search/SearchFilterItem';
 import { SEARCH_FILTERS_HEIGHT } from '@/features/contacts/lib/constants/styles';
 import { PRIMAL_FEED_SPECS, categoryToLabel } from './HomeFeed';
-import { CATEGORY_NPUBS } from './nostr/categoryNpubs';
-import { feedLog } from '@/shared/lib/logger';
+import { CATEGORY_PUBKEYS } from './nostr/categoryNpubs';
+import { feedLog, Log } from '@/shared/lib/logger';
 
 const SEARCH_FILTERS = ['People'] as const;
 
@@ -16,7 +16,7 @@ type FeedFiltersProps = {
 export const FeedFilters = ({ isSearching, onFilterChange }: FeedFiltersProps) => {
   const feedFilters = useMemo(() => {
     const primalNames = PRIMAL_FEED_SPECS.map((s) => s.name);
-    const categoryNames = Object.keys(CATEGORY_NPUBS).map(categoryToLabel);
+    const categoryNames = Object.keys(CATEGORY_PUBKEYS).map(categoryToLabel);
     return [...primalNames];
   }, []);
 
@@ -40,26 +40,28 @@ export const FeedFilters = ({ isSearching, onFilterChange }: FeedFiltersProps) =
   };
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        ref={flatListRef}
-        data={filters}
-        keyExtractor={(item) => item}
-        renderItem={({ item, index }) => (
-          <FilterItem
-            item={item}
-            index={index}
-            flatListRef={flatListRef}
-            activeFilterItem={activeFilterItem}
-            setActiveFilterItem={handleFilterChange}
-          />
-        )}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      />
-    </View>
+    <Log name="FeedFilters">
+      <View style={styles.container}>
+        <FlatList
+          ref={flatListRef}
+          data={filters}
+          keyExtractor={(item) => item}
+          renderItem={({ item, index }) => (
+            <FilterItem
+              item={item}
+              index={index}
+              flatListRef={flatListRef}
+              activeFilterItem={activeFilterItem}
+              setActiveFilterItem={handleFilterChange}
+            />
+          )}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        />
+      </View>
+    </Log>
   );
 };
 

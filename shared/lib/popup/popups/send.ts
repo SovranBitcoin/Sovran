@@ -32,6 +32,16 @@ export function operationNotFoundPopup(overrides?: BaseOverrides): void {
   });
 }
 
+export function mintUnreachablePopup(overrides?: TextOverrides): void {
+  popup({
+    message: 'Could not connect to mint',
+    text: 'Check your connection or try again later.',
+    icon: 'icon:mdi:wifi-off',
+    type: 'error',
+    ...overrides,
+  });
+}
+
 export function couldNotCancelPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Could not cancel',

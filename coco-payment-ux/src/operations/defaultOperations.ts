@@ -121,6 +121,12 @@ export interface DefaultOperationsConfig {
   enrichMintListItem?: (mintUrl: string) => Partial<MintListItem>;
   /** Optional enrichment for mint review info (e.g. KYM/audit scores). */
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
+  /**
+   * Fire-and-forget callback to populate profile data (followers/reputation)
+   * for mints that have Nostr operator contacts. Called with the mint info map
+   * after NUT-06 info is resolved; the wallet stores results for enrichment.
+   */
+  fetchMintProfiles?: (mintInfoMap: Map<string, any>) => void;
   /** When true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
 }
@@ -223,7 +229,8 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
     buildMintListItems: async (data: StepDataMap['selectMint']): Promise<MintListItem[]> => {
       const mgr = requireManager();
-      console.info('[buildMintListItems] Building mint list | unit:', data.unit);
+      const t0 = performance.now();
+      console.info('[buildMintListItems] Building mint list | unit:', data.unit, '| scope:', data.scope, '| destination:', data.destination);
       const [allTrustedMints, balances] = await Promise.all([
         mgr.mint.getAllTrustedMints(),
         mgr.wallet.getBalances(),
@@ -237,12 +244,21 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
         allTrustedMints.map(async (mint: any) => {
           try {
             const info = await mgr.mint.getMintInfo(mint.mintUrl);
-            if (info) mintInfoMap.set(mint.mintUrl, info);
+            if (info) {
+              mintInfoMap.set(mint.mintUrl, info);
+              console.info('[buildMintListItems] getMintInfo OK', mint.mintUrl, '| name:', info.name, '| icon:', !!info.icon_url);
+            } else {
+              console.warn('[buildMintListItems] getMintInfo returned null for', mint.mintUrl);
+            }
           } catch (e) {
             console.warn('[buildMintListItems] getMintInfo failed for', mint.mintUrl, e instanceof Error ? e.message : e);
           }
         })
       );
+      console.info('[buildMintListItems] info resolved:', mintInfoMap.size, '/', allTrustedMints.length, '| duration:', Math.round(performance.now() - t0), 'ms');
+
+      // Trigger background profile fetch for mints with Nostr operator contacts
+      config.fetchMintProfiles?.(mintInfoMap);
 
       const supportedSet = data.supportedMintUrls
         ? new Set(data.supportedMintUrls)
@@ -259,13 +275,19 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
         let status: 'available' | 'disabled' = 'available';
         let reason: MintListItem['reason'] = null;
 
+        // Balance checks only apply in send-type flows (melt/send/payment request).
+        // All other cases (no destination, mintQuote, scope override) allow every mint.
+        const needsBalanceCheck =
+          data.destination === 'paymentRequest' || data.destination === 'meltQuote' || data.destination === 'sendEcash';
+        const skipBalanceCheck = !needsBalanceCheck || data.scope === 'selected' || data.scope === 'npc';
+
         if (supportedSet && !supportedSet.has(mintUrl)) {
           status = 'disabled';
           reason = { code: 'NOT_IN_PAYMENT_REQUEST', message: 'Not accepted by payment request' };
-        } else if (data.amount && balance < data.amount) {
+        } else if (!skipBalanceCheck && data.amount && balance < data.amount) {
           status = 'disabled';
           reason = { code: 'INSUFFICIENT_BALANCE', message: 'Insufficient balance' };
-        } else if (!isInCandidate && balance <= 0) {
+        } else if (!skipBalanceCheck && !isInCandidate && balance <= 0) {
           status = 'disabled';
           reason = { code: 'NO_BALANCE', message: 'No balance' };
         }

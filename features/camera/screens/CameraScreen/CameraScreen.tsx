@@ -96,12 +96,19 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
     }, [machine])
   );
 
+  const lastScanRef = useRef<{ data: string; t: number }>({ data: '', t: 0 });
+
   const handleScan = useCallback(
     async (data: ScanningData) => {
       if (scanLocked) return;
       const isUr = data.data.toLowerCase().startsWith('ur:');
       if (appStateRef.current !== 'active' || !isFocused) return;
       if (!isUr && isProcessingRef.current) return;
+
+      // Debounce: skip identical scans within 500ms
+      const now = Date.now();
+      if (data.data === lastScanRef.current.data && now - lastScanRef.current.t < 500) return;
+      lastScanRef.current = { data: data.data, t: now };
 
       log.info('camera.scan.detected', { type: data.type ?? 'qr', isUr, dataLength: data.data.length });
       isProcessingRef.current = true;

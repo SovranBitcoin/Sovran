@@ -86,16 +86,21 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
     let mounted = true;
     let interval: ReturnType<typeof setInterval> | null = null;
     let networkSubscription: { remove: () => void } | null = null;
+    let lastOffline: boolean | null = null;
 
     const applyState = (state: Network.NetworkState) => {
       if (!mounted) return;
       const nowOffline = isOfflineFromState(state);
-      log.debug('provider.offline.network_state', {
-        isConnected: state.isConnected,
-        isInternetReachable: state.isInternetReachable,
-        type: state.type,
-        resolvedOffline: nowOffline,
-      });
+      // Only log when state actually changes to reduce noise
+      if (lastOffline !== nowOffline) {
+        log.debug('provider.offline.network_state', {
+          isConnected: state.isConnected,
+          isInternetReachable: state.isInternetReachable,
+          type: state.type,
+          resolvedOffline: nowOffline,
+        });
+        lastOffline = nowOffline;
+      }
       setNetworkOffline((prev) => {
         if (prev !== nowOffline) {
           log.info('provider.offline.transition', { from: prev ? 'offline' : 'online', to: nowOffline ? 'offline' : 'online' });

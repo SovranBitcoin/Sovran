@@ -15,7 +15,6 @@ export {
   nostrPaymentSentPopup,
   paymentCancelledPopup,
   nfcEcashSharedPopup,
-  nfcPaymentSentPopup,
   nfcConnectionLostPopup,
   nfcSendFailedPopup,
 } from './payment';
@@ -68,6 +67,7 @@ export {
   newVersionPopup,
   copyFailedPopup,
   openLinkFailedPopup,
+  walletStillLoadingPopup,
   engagementUpdateFailedPopup,
 } from './general';
 export {
@@ -80,6 +80,7 @@ export {
   cancelTransactionFailedPopup,
   quoteCreationFailedPopup,
   operationNotFoundPopup,
+  mintUnreachablePopup,
   couldNotCancelPopup,
   operationInvalidStatePopup,
   invalidNostrTransportPopup,
@@ -94,7 +95,7 @@ export {
   receiveMintUpdatedPopup,
   receiveMintUpdateFailedPopup,
 } from './receive';
-export { walletNotReadyPopup, nfcErrorPopup, nfcProgressPopup } from './nfc';
+export { walletNotReadyPopup, nfcErrorPopup } from './nfc';
 export {
   invalidTokenPopup,
   noWalletAvailablePopup,

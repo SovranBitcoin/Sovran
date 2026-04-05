@@ -64,6 +64,7 @@ export const ContactsScreen = () => {
   });
 
   const profilesMap = useMemo(() => {
+    const t0 = performance.now();
     const map = new Map<string, any>();
     profileEvents?.forEach((event) => {
       try {
@@ -72,6 +73,10 @@ export const ContactsScreen = () => {
         // Skip invalid profile JSON
       }
     });
+    const duration = Math.round((performance.now() - t0) * 100) / 100;
+    if (duration > 20) {
+      log.warn('contacts.profiles_parse.slow', { duration_ms: duration, count: map.size });
+    }
     return map;
   }, [profileEvents]);
 

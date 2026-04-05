@@ -105,6 +105,9 @@ async function teardownAndRestart(): Promise<boolean> {
   return restarted;
 }
 
+// ── Synchronous in-memory guard (supplements the async AsyncStorage guard) ──
+let transitionInFlight = false;
+
 // ── Public API ───────────────────────────────────────────────────
 
 export async function switchToExistingProfile(opts: {
@@ -112,11 +115,24 @@ export async function switchToExistingProfile(opts: {
   resetStages?: TransitionControls['resetStages'];
   cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
+  if (transitionInFlight) {
+    log.warn('profile.orchestrator.switch_blocked_in_flight');
+    return false;
+  }
+  if (!CocoManager.isReadyForCleanup()) {
+    log.warn('profile.orchestrator.switch_blocked_coco_not_ready', {
+      isInitialized: CocoManager.isInitialized(),
+    });
+    return false;
+  }
+  transitionInFlight = true;
+
   const resetStages = opts.resetStages ?? registeredControls?.resetStages;
   const cancelResetStages = opts.cancelResetStages ?? registeredControls?.cancelResetStages;
 
-  if (!(await beginTransition())) return false;
+  if (!(await beginTransition())) { transitionInFlight = false; return false; }
   try {
+    log.info('profile.orchestrator.switch_start', { accountIndex: opts.accountIndex });
     resetStages?.({ holdUntilCancel: true });
     usePopupStore.getState().close();
 
@@ -129,14 +145,19 @@ export async function switchToExistingProfile(opts: {
 
     await flushProfileStoreToDisk();
     const restarted = await teardownAndRestart();
-    if (!restarted) cancelResetStages?.();
+    if (!restarted) {
+      cancelResetStages?.();
+      transitionInFlight = false;
+      await endTransition();
+    }
+    // If restarted, leave transitionInFlight=true — the module is about to reload.
     return true;
   } catch (error) {
     log.error('profile.orchestrator.switch_failed', { error });
     cancelResetStages?.();
-    return false;
-  } finally {
+    transitionInFlight = false;
     await endTransition();
+    return false;
   }
 }
 
@@ -149,12 +170,16 @@ export async function createAndSwitchProfile(opts?: {
   const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
   const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
 
+  if (transitionInFlight) return false;
+  transitionInFlight = true;
+
   if (!getKeysForAccount) {
     log.error('profile.orchestrator.no_key_derivation');
+    transitionInFlight = false;
     return false;
   }
 
-  if (!(await beginTransition())) return false;
+  if (!(await beginTransition())) { transitionInFlight = false; return false; }
   try {
     resetStages?.({ holdUntilCancel: true });
     usePopupStore.getState().close();
@@ -178,14 +203,18 @@ export async function createAndSwitchProfile(opts?: {
 
     await flushProfileStoreToDisk();
     const restarted = await teardownAndRestart();
-    if (!restarted) cancelResetStages?.();
+    if (!restarted) {
+      cancelResetStages?.();
+      transitionInFlight = false;
+      await endTransition();
+    }
     return true;
   } catch (error) {
     log.error('profile.orchestrator.create_failed', { error });
     cancelResetStages?.();
-    return false;
-  } finally {
+    transitionInFlight = false;
     await endTransition();
+    return false;
   }
 }
 
@@ -209,7 +238,10 @@ export async function deleteAllProfiles(opts?: {
   const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
   const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
 
-  if (!(await beginTransition())) return false;
+  if (transitionInFlight) return false;
+  transitionInFlight = true;
+
+  if (!(await beginTransition())) { transitionInFlight = false; return false; }
   try {
     resetStages?.({ holdUntilCancel: true });
     usePopupStore.getState().close();
@@ -258,6 +290,8 @@ export async function deleteAllProfiles(opts?: {
     const restarted = await teardownAndRestart();
     if (!restarted) {
       cancelResetStages?.();
+      transitionInFlight = false;
+      await endTransition();
       const { Alert } = await import('react-native');
       Alert.alert('Restart Required', 'Please close and reopen the app to complete the reset.', [
         { text: 'OK' },
@@ -267,8 +301,8 @@ export async function deleteAllProfiles(opts?: {
   } catch (error) {
     log.error('profile.orchestrator.delete_all_failed', { error });
     cancelResetStages?.();
-    return false;
-  } finally {
+    transitionInFlight = false;
     await endTransition();
+    return false;
   }
 }

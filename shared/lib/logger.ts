@@ -40,6 +40,11 @@ import { useEffect, useRef, useContext, createContext } from 'react';
 import React, { Component, type ReactNode, type ErrorInfo } from 'react';
 import { Platform } from 'react-native';
 
+// ─── Master switch ──────────────────────────────────────────────────────────
+// Set to false to silence ALL log output (console + ring buffer).
+// Useful when profiling to eliminate logging overhead.
+const SHOW_LOGS = true;
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
@@ -70,6 +75,13 @@ interface LoggerOptions {
    * for crash reports or on-demand export. Default: 100
    */
   ringBufferSize?: number;
+  /**
+   * Dedup window in ms. When the same event name fires multiple times within
+   * this window, subsequent entries are collapsed into the first one with a
+   * `_dedup` count instead of emitting separate entries. Set to 0 to disable.
+   * Default: 50
+   */
+  dedupWindowMs?: number;
 }
 
 interface LogEntry {
@@ -365,7 +377,10 @@ function getCallerLocation(stackOffset: number = 3): SourceLocation {
 }
 
 function simplifyPath(fullPath: string): string {
-  const cleaned = fullPath.replace(/^file:\/\//, '').replace(/\?.*$/, '');
+  const cleaned = fullPath
+    .replace(/^file:\/\//, '')
+    .replace(/\?.*$/, '') // strip ?query strings
+    .replace(/\/\/&.*$/, ''); // strip Hermes bundle params (//&platform=ios&…)
   const parts = cleaned.split(/[\\/]/);
   return parts.slice(-3).join('/');
 }
@@ -548,6 +563,7 @@ export function createLogger(options: LoggerOptions = {}): Logger {
     async = true,
     enabled = true,
     ringBufferSize = 100,
+    dedupWindowMs = 50,
   } = options;
 
   let minSeverity = LEVEL_SEVERITY[level];
@@ -555,9 +571,30 @@ export function createLogger(options: LoggerOptions = {}): Logger {
   const ringBuffer = new RingBuffer<LogEntry>(ringBufferSize);
   let hasLoggedDevice = false;
 
+  // ── Dedup state ──
+  let lastEvent = '';
+  let lastEventTime = 0;
+  let lastEntry: LogEntry | null = null;
+  let dedupCount = 0;
+
   function emit(logLevel: LogLevel, event: string, params?: Record<string, unknown>): void {
-    if (!enabled) return;
+    if (!SHOW_LOGS || !enabled) return;
     if (LEVEL_SEVERITY[logLevel] < minSeverity) return;
+
+    // Collapse rapid-fire identical event names into a single entry with _dedup count.
+    // Warnings/errors are never deduped — you always want to see those.
+    if (dedupWindowMs > 0 && logLevel !== 'warn' && logLevel !== 'error' && logLevel !== 'fatal') {
+      const t = now();
+      if (event === lastEvent && t - lastEventTime < dedupWindowMs && lastEntry) {
+        dedupCount++;
+        (lastEntry.params ??= {})._dedup = dedupCount;
+        lastEventTime = t;
+        return;
+      }
+      lastEvent = event;
+      lastEventTime = t;
+      dedupCount = 1;
+    }
 
     const src = getCallerLocation(3);
 
@@ -611,6 +648,7 @@ export function createLogger(options: LoggerOptions = {}): Logger {
 
     // Always push to ring buffer (even if async)
     ringBuffer.push(entry);
+    lastEntry = entry;
 
     const write = () => {
       for (const transport of transports) {
@@ -669,7 +707,24 @@ export function createLogger(options: LoggerOptions = {}): Logger {
         '===========================',
         '',
       ].join('\n');
-      return header + logs.map((e) => JSON.stringify(e)).join('\n');
+      return (
+        header +
+        logs
+          .map((e) => {
+            // Compress src to save tokens: "func:line" when file is useless bundle path
+            const src = e.src;
+            if (src) {
+              const f = src.file;
+              if (!f || f === 'unknown' || f.includes('index.bundle') || f.includes('bundle/')) {
+                const compressed =
+                  src.func !== 'unknown' ? `${src.func}:${src.line}` : String(src.line);
+                return JSON.stringify({ ...e, src: compressed });
+              }
+            }
+            return JSON.stringify(e);
+          })
+          .join('\n')
+      );
     },
 
     timed: async <T>(
@@ -756,6 +811,57 @@ export const apiLog = log.child({ module: 'api' });
 export const storeLog = log.child({ module: 'store' });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Performance Helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Schedule work via InteractionManager with JS-thread-block detection.
+ *
+ * In React Native, InteractionManager.runAfterInteractions() fires immediately
+ * when no animations are registered, and setTimeout callbacks are delayed when
+ * the JS thread is blocked. This helper logs the *intended* vs *actual* delay
+ * so frozen-thread issues show up clearly in log-doctor's timeline.
+ *
+ * Usage:
+ *   const cancel = deferWork('map.cluster_build', () => {
+ *     // heavy synchronous work
+ *   });
+ *   return () => cancel();
+ */
+export function deferWork(label: string, work: () => void, delayMs = 0): { cancel: () => void } {
+  const scheduled = performance.now();
+  let cancelled = false;
+  let interactionHandle: { cancel: () => void } | null = null;
+
+  const timer = setTimeout(() => {
+    if (cancelled) return;
+    const { InteractionManager } = require('react-native');
+    interactionHandle = InteractionManager.runAfterInteractions(() => {
+      if (cancelled) return;
+      const actual = performance.now();
+      const drift = Math.round((actual - scheduled - delayMs) * 100) / 100;
+      if (drift > 500) {
+        log.warn('perf.defer.drift', { label, intended_ms: delayMs, drift_ms: drift });
+      }
+      const t0 = performance.now();
+      work();
+      const duration = Math.round((performance.now() - t0) * 100) / 100;
+      if (duration > 100) {
+        log.warn('perf.defer.slow_work', { label, duration_ms: duration });
+      }
+    });
+  }, delayMs);
+
+  return {
+    cancel: () => {
+      cancelled = true;
+      clearTimeout(timer);
+      interactionHandle?.cancel();
+    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // REACT HOOKS — Render & Performance Debugging
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -773,7 +879,6 @@ export function useRenderLogger(
   warnAfter: number = 20,
   logger: Logger = log
 ): void {
-  return; // KILL_SWITCH
   const renderCount = useRef(0);
   const mountTime = useRef(_perfNow());
   renderCount.current += 1;
@@ -817,7 +922,6 @@ export function useWhyDidUpdate(
   currentProps: Record<string, unknown>,
   logger: Logger = log
 ): void {
-  return; // KILL_SWITCH
   const prevProps = useRef<Record<string, unknown> | undefined>(undefined);
   const compactOpts = { maxStringLength: 80, maxArrayItems: 3, maxDepth: 2, maxObjectKeys: 8 };
 
@@ -871,7 +975,6 @@ export function useStateLogger<T>(
   initialValue: T,
   logger: Logger = log
 ): [T, (value: T | ((prev: T) => T)) => void] {
-  return React.useState<T>(initialValue); // KILL_SWITCH
   const [state, _setState] = React.useState<T>(initialValue);
   const compactOpts = { maxStringLength: 80, maxArrayItems: 3, maxDepth: 2, maxObjectKeys: 8 };
 
@@ -898,7 +1001,6 @@ export function useStateLogger<T>(
 
 /** Logs mount and unmount events for a component. */
 export function useLifecycleLogger(componentName: string, logger: Logger = log): void {
-  return; // KILL_SWITCH
   useEffect(() => {
     logger.info('lifecycle.mount', { component: componentName });
     return () => logger.info('lifecycle.unmount', { component: componentName });
@@ -930,7 +1032,6 @@ export function useLoggedQuery<T extends Record<string, unknown>>(
   queryResult: T,
   logger: Logger = log
 ): T {
-  return queryResult; // KILL_SWITCH
   const compactOpts = { maxStringLength: 80, maxArrayItems: 3, maxDepth: 2, maxObjectKeys: 10 };
   const prevSnapshot = useRef<string | undefined>(undefined);
 
@@ -1024,8 +1125,8 @@ function extractVisibleContent(node: ReactNode, depth: number = 0, maxDepth: num
   }
 }
 
-interface ScreenProps {
-  /** Screen name — used as the log path and correlation key */
+interface LogProps {
+  /** Component name — used as the log path and correlation key */
   name: string;
   children: ReactNode;
   /** Logger instance. Defaults to the global `log` */
@@ -1035,28 +1136,16 @@ interface ScreenProps {
 }
 
 /**
- * Wrap your screen's return in <Screen name="..."> to automatically log
- * the visible content.
+ * Wrap any visual component in <Log name="..."> to automatically log
+ * the visible content tree on mount and diffs on re-render.
  *
- * - With style prop: renders a <View style={style}> wrapper (use when Screen
- *   replaces the outermost View).
+ * Nests: a <Log> inside another <Log> produces paths like "ParentScreen/ChildCard".
+ *
+ * - With style prop: renders a <View style={style}> wrapper.
  * - Without style: layout-invisible (just a context provider). Safe inside
  *   ScrollViews, ModalLayoutWrappers, etc.
  */
-export function Screen({
-  name,
-  children,
-  logger: _logger,
-  style,
-}: ScreenProps): React.ReactElement {
-  // KILL_SWITCH — bypass all Screen logic, just render children with optional View
-  if (style) {
-    const { View } = require('react-native');
-    return React.createElement(View, { style }, children);
-  }
-  return React.createElement(React.Fragment, null, children);
-  // END KILL_SWITCH
-
+export function Log({ name, children, logger: _logger, style }: LogProps): React.ReactElement {
   const parentPath = useContext(UIPathContext);
   const path = parentPath ? `${parentPath}/${name}` : name;
   const screenLogger = _logger ?? log;
@@ -1097,6 +1186,9 @@ export function Screen({
   }
   return React.createElement(UIPathContext.Provider, { value: path }, children);
 }
+
+/** @deprecated Use `Log` instead — same component, better name. */
+export const Screen = Log;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ERROR BOUNDARY

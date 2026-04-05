@@ -34,6 +34,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useRoutstrStore, RoutstrSession } from '@/shared/stores/profile/routstrStore';
 import { getUsername } from '@/shared/lib/username';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 interface SessionsPanelProps {
   isOpen: boolean;
@@ -343,7 +344,7 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
   }
 
   return (
-    <>
+    <Log name="SessionsPanel">
       {/* Backdrop */}
       <Animated.View
         style={[
@@ -505,6 +506,6 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
           </GestureDetector>
         </GestureHandlerRootView>
       </Animated.View>
-    </>
+    </Log>
   );
 };

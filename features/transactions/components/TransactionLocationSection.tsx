@@ -25,6 +25,7 @@ import { useTransactionLocationSection } from '@/shared/hooks/useTransactionLoca
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 interface TransactionLocationSectionProps {
   /** The transaction's history entry ID */
@@ -252,6 +253,8 @@ export function TransactionLocationSection({ transactionId }: TransactionLocatio
   }
 
   return (
-    <TransactionLocationMap latitude={location.latitude} longitude={location.longitude} grayscale />
+    <Log name="TransactionLocationSection">
+      <TransactionLocationMap latitude={location.latitude} longitude={location.longitude} grayscale />
+    </Log>
   );
 }

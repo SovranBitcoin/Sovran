@@ -10,7 +10,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { convertTime } from '@/shared/lib/time';
 import type { SwapGroup } from '@/shared/stores/profile/swapTransactionsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log } from '@/shared/lib/logger';
+import { log, Log } from '@/shared/lib/logger';
 
 interface Props {
   group: SwapGroup;
@@ -35,35 +35,37 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
   }, [group.id, group.state, group.legs.length]);
 
   return (
-    <TouchableOpacity
-      className="flex-row items-center justify-between bg-transparent px-4 py-5"
-      onPress={handlePress}>
-      <HStack spacing={12} flex={1}>
-        <View className="relative h-7 w-7 items-center justify-center bg-transparent">
-          <Icon name="mdi:swap-horizontal" color={opacity(foreground, 0.9)} size={28} />
-        </View>
+    <Log name="SwapTransactionRow">
+      <TouchableOpacity
+        className="flex-row items-center justify-between bg-transparent px-4 py-5"
+        onPress={handlePress}>
+        <HStack spacing={12} flex={1}>
+          <View className="relative h-7 w-7 items-center justify-center bg-transparent">
+            <Icon name="mdi:swap-horizontal" color={opacity(foreground, 0.9)} size={28} />
+          </View>
 
-        <VStack spacing={0} flex={1}>
-          <HStack justify="space-between" align="flex-end">
-            <UntranslatedText color={foreground} bold size={14}>
-              Swap
-            </UntranslatedText>
-            <UntranslatedText bold size={14} color={aggregate.color}>
-              {aggregate.text}
-            </UntranslatedText>
-          </HStack>
+          <VStack spacing={0} flex={1}>
+            <HStack justify="space-between" align="flex-end">
+              <UntranslatedText color={foreground} bold size={14}>
+                Swap
+              </UntranslatedText>
+              <UntranslatedText bold size={14} color={aggregate.color}>
+                {aggregate.text}
+              </UntranslatedText>
+            </HStack>
 
-          <HStack justify="space-between" align="center">
-            <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
-              {convertTime(new Date(group.createdAt))}
-            </UntranslatedText>
-            <UntranslatedText bold size={10} color={opacity(foreground, 0.8)}>
-              {group.legs.length} {group.legs.length === 1 ? 'step' : 'steps'}
-            </UntranslatedText>
-          </HStack>
-        </VStack>
-      </HStack>
-    </TouchableOpacity>
+            <HStack justify="space-between" align="center">
+              <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
+                {convertTime(new Date(group.createdAt))}
+              </UntranslatedText>
+              <UntranslatedText bold size={10} color={opacity(foreground, 0.8)}>
+                {group.legs.length} {group.legs.length === 1 ? 'step' : 'steps'}
+              </UntranslatedText>
+            </HStack>
+          </VStack>
+        </HStack>
+      </TouchableOpacity>
+    </Log>
   );
 });
 

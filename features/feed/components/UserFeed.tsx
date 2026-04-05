@@ -26,7 +26,7 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
 import { StyleSheet, InteractionManager, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { log } from '@/shared/lib/logger';
+import { log, Log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -1006,14 +1006,16 @@ function UserFeedInner({
   );
 
   return (
-    <ImageOverlayProvider
-      getDisplayMetrics={getDisplayMetrics}
-      getEngagementState={getEngagementState}
-      onSwipeUpToNextPost={onSwipeUpToNextPost}
-      getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
-      {feedList}
-      <AnimatedImageOverlay />
-    </ImageOverlayProvider>
+    <Log name="UserFeed">
+      <ImageOverlayProvider
+        getDisplayMetrics={getDisplayMetrics}
+        getEngagementState={getEngagementState}
+        onSwipeUpToNextPost={onSwipeUpToNextPost}
+        getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
+        {feedList}
+        <AnimatedImageOverlay />
+      </ImageOverlayProvider>
+    </Log>
   );
 }
 

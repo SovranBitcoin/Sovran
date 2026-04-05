@@ -37,10 +37,15 @@ export function getOrBuildBTCMapClusterManager(
     return existing.manager;
   }
 
+  const t0 = performance.now();
   const manager = new ClusterManager(options);
   manager.load(points);
   CACHE.set(cacheKey, { manager, createdAt: Date.now(), pointsCount: points.length });
   evictIfNeeded();
+  const duration = Math.round((performance.now() - t0) * 100) / 100;
+  if (duration > 50) {
+    console.warn(`[perf] cluster.build(${points.length} points) ${duration}ms — cache miss for "${cacheKey}"`);
+  }
   return manager;
 }
 export function prewarmBTCMapClusterManager(

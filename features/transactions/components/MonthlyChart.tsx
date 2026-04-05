@@ -11,6 +11,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import type { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -282,6 +283,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
   const changeIcon = 'mdi:arrow-up';
 
   return (
+    <Log name="MonthlyChart">
     <RNView style={[styles.card, { borderColor }]}>
       <BlurCardFrame accentColor={muted}>
         <RNView style={styles.container}>
@@ -376,6 +378,7 @@ const MonthlyChart = React.memo(function MonthlyChart({
         </RNView>
       </BlurCardFrame>
     </RNView>
+    </Log>
   );
 });
 

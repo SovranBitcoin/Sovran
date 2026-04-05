@@ -14,7 +14,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
 import { useShallow } from 'zustand/react/shallow';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log } from '@/shared/lib/logger';
+import { log, Log } from '@/shared/lib/logger';
 
 const DEFAULT_LAT = 51.5074;
 const DEFAULT_LON = -0.1278;
@@ -235,41 +235,43 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
   const titleColor = opacity(foreground, 0.66);
 
   return (
-    <Link href="/(map-flow)" asChild>
-      <TouchableOpacity activeOpacity={0.85}>
-        <RNView
-          className="overflow-hidden rounded-[20px] border"
-          style={{ borderCurve: 'continuous', borderColor: opacity(muted, 0.3) }}>
-          <BlurCardFrame accentColor={muted}>
-            <RNView className="relative z-[1]">
-              <MapPreview
-                latitude={offsetCoords.latitude}
-                longitude={offsetCoords.longitude}
-                markers={nearbyMarkers}
-              />
+    <Log name="BitcoinNearYou">
+      <Link href="/(map-flow)" asChild>
+        <TouchableOpacity activeOpacity={0.85}>
+          <RNView
+            className="overflow-hidden rounded-[20px] border"
+            style={{ borderCurve: 'continuous', borderColor: opacity(muted, 0.3) }}>
+            <BlurCardFrame accentColor={muted}>
+              <RNView className="relative z-[1]">
+                <MapPreview
+                  latitude={offsetCoords.latitude}
+                  longitude={offsetCoords.longitude}
+                  markers={nearbyMarkers}
+                />
 
-              <RNView className="absolute left-0 right-0 top-0 z-[2] flex-row items-center justify-between px-4 pt-3.5">
-                <Text size={14} semibold color={titleColor}>
-                  Bitcoin near you
-                </Text>
-                <Icon name="mdi:chevron-right" size={18} color={titleColor} />
-              </RNView>
-
-              <RNView className="absolute bottom-2.5 left-3 z-[2]">
-                <RNView
-                  className="flex-row items-center gap-1 rounded-full px-2 py-1"
-                  style={{ borderCurve: 'continuous', backgroundColor: opacity(foreground, 0.1) }}>
-                  <Icon name="mdi:map-marker" size={12} color={titleColor} />
-                  <Text size={11} semibold color={titleColor}>
-                    {countLabel}
+                <RNView className="absolute left-0 right-0 top-0 z-[2] flex-row items-center justify-between px-4 pt-3.5">
+                  <Text size={14} semibold color={titleColor}>
+                    Bitcoin near you
                   </Text>
+                  <Icon name="mdi:chevron-right" size={18} color={titleColor} />
+                </RNView>
+
+                <RNView className="absolute bottom-2.5 left-3 z-[2]">
+                  <RNView
+                    className="flex-row items-center gap-1 rounded-full px-2 py-1"
+                    style={{ borderCurve: 'continuous', backgroundColor: opacity(foreground, 0.1) }}>
+                    <Icon name="mdi:map-marker" size={12} color={titleColor} />
+                    <Text size={11} semibold color={titleColor}>
+                      {countLabel}
+                    </Text>
+                  </RNView>
                 </RNView>
               </RNView>
-            </RNView>
-          </BlurCardFrame>
-        </RNView>
-      </TouchableOpacity>
-    </Link>
+            </BlurCardFrame>
+          </RNView>
+        </TouchableOpacity>
+      </Link>
+    </Log>
   );
 });
 

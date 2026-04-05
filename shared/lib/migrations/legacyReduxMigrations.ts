@@ -98,6 +98,12 @@ async function bootstrapProfileStore(
   const existingState = useProfileStore.getState();
   for (const [index, profile] of legacyProfiles.entries()) {
     const accountIndex = typeof profile.id === 'number' ? profile.id : index;
+
+    // Skip expensive key derivation if profile already exists in persisted store
+    if (existingState.profiles.some((p) => p.accountIndex === accountIndex)) {
+      continue;
+    }
+
     const pubkey = deriveLegacyProfilePubkey(profile, rootMnemonic, accountIndex);
     if (!pubkey) continue;
 

@@ -4,6 +4,7 @@ import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import Icon from 'assets/icons';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
+import { Log } from '@/shared/lib/logger';
 
 interface CustomKeyboardProps {
   onKeyPress: (value: string) => void;
@@ -100,15 +101,17 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   ];
 
   return (
-    <View
-      className="items-center justify-center bg-transparent"
-      style={{ opacity: loading ? 0.5 : 1 }}>
-      {buttons.map((row, rowIndex) => (
-        <View key={rowIndex} className="mb-0.25 flex-row justify-between">
-          {row.map(renderButton)}
-        </View>
-      ))}
-    </View>
+    <Log name="CustomKeyboard">
+      <View
+        className="items-center justify-center bg-transparent"
+        style={{ opacity: loading ? 0.5 : 1 }}>
+        {buttons.map((row, rowIndex) => (
+          <View key={rowIndex} className="mb-0.25 flex-row justify-between">
+            {row.map(renderButton)}
+          </View>
+        ))}
+      </View>
+    </Log>
   );
 };
 

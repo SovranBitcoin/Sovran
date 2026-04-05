@@ -11,6 +11,7 @@ import Animated, {
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { OnboardingSlide } from './types';
+import { Log } from '@/shared/lib/logger';
 
 type OnboardingSlideItemProps = {
   item: OnboardingSlide;
@@ -37,6 +38,7 @@ const OnboardingSlideItem: React.FC<OnboardingSlideItemProps> = ({
   }, [scrollOffsetX, index, width]);
 
   return (
+    <Log name="OnboardingSlideItem">
     <Animated.View style={[{ width, paddingHorizontal: 28, paddingVertical: 20 }, cardStyle]}>
       <View
         style={{
@@ -62,6 +64,7 @@ const OnboardingSlideItem: React.FC<OnboardingSlideItemProps> = ({
         </Text>
       </View>
     </Animated.View>
+    </Log>
   );
 };
 

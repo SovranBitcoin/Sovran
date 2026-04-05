@@ -7,7 +7,6 @@ import { popup } from '../engine';
 import { showCustomToast } from '../bridge';
 import { fmt } from '../format';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
-import type { PopupIcon } from '../icons';
 import type { PopupTextSegment } from '../format';
 import { PaymentStatusIcon } from '../PaymentStatusIcon';
 import { PaymentStatusToast } from '../PaymentStatusToast';
@@ -225,22 +224,6 @@ export function nfcEcashSharedPopup(overrides?: BaseOverrides): void {
     icon: 'icon:mdi:nfc',
     type: 'success',
     ...overrides,
-  });
-}
-
-export function nfcPaymentSentPopup(options: {
-  text?: string | PopupTextSegment[];
-  icon?: PopupIcon;
-  duration?: number;
-  onClose?: (data: unknown) => void;
-}): void {
-  popup({
-    message: 'Payment sent',
-    text: options.text,
-    variant: 'sheet',
-    icon: options.icon ?? 'icon:mdi:send-check',
-    duration: options.duration ?? 2600,
-    onClose: options.onClose,
   });
 }
 

@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
   MIGRATIONS_COMPLETE_LEGACY: 'migrations_complete',
   DERIVED_KEYS_PREFIX: 'derived_keys_',
   CASHU_MNEMONIC_PREFIX: 'cashu_mnemonic_',
+  CASHU_SEED_PREFIX: 'cashu_seed_',
   IMPORTED_NSEC_PREFIX: 'imported_nsec_',
 } as const;
 
@@ -308,6 +309,51 @@ export async function retrieveCashuMnemonic(
     return JSON.parse(raw) as { value: string; mnemonicHash: string };
   } catch (error) {
     log.error('nostr.secure.retrieve_cashu_mnemonic_failed', { error });
+    return null;
+  }
+}
+
+// ── Cashu Seed Cache ────────────────────────────────────────────
+// Caches the 64-byte PBKDF2-derived seed so we skip the ~5s derivation on warm starts.
+
+function cashuSeedKey(accountIndex: number): string {
+  return `${STORAGE_KEYS.CASHU_SEED_PREFIX}${accountIndex}`;
+}
+
+export async function storeCashuSeed(
+  accountIndex: number,
+  seed: Uint8Array,
+  mnemonicHash: string
+): Promise<boolean> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+    const hex = Array.from(seed)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    const payload = JSON.stringify({ hex, mnemonicHash });
+    await SecureStore.setItemAsync(cashuSeedKey(accountIndex), payload, options);
+    return true;
+  } catch (error) {
+    log.error('nostr.secure.store_cashu_seed_failed', { error });
+    return false;
+  }
+}
+
+export async function retrieveCashuSeed(
+  accountIndex: number
+): Promise<{ seed: Uint8Array; mnemonicHash: string } | null> {
+  try {
+    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+    const raw = await SecureStore.getItemAsync(cashuSeedKey(accountIndex), options);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { hex: string; mnemonicHash: string };
+    const bytes = new Uint8Array(parsed.hex.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+      bytes[i] = parseInt(parsed.hex.substring(i * 2, i * 2 + 2), 16);
+    }
+    return { seed: bytes, mnemonicHash: parsed.mnemonicHash };
+  } catch (error) {
+    log.error('nostr.secure.retrieve_cashu_seed_failed', { error });
     return null;
   }
 }

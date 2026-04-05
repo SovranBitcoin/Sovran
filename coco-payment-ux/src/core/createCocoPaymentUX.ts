@@ -51,6 +51,8 @@ export interface CocoPaymentUXConfig {
 
   enrichMintListItem?: (mintUrl: string) => Partial<MintListItem>;
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
+  /** Fire-and-forget: populate profile data for mints with Nostr operator contacts. */
+  fetchMintProfiles?: (mintInfoMap: Map<string, any>) => void;
 
   /** Dev: when true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
@@ -96,6 +98,7 @@ export function createCocoPaymentUX(config: CocoPaymentUXConfig): CocoPaymentUXI
     sendNostrDM,
     enrichMintListItem,
     enrichMintReviewInfo,
+    fetchMintProfiles: config.fetchMintProfiles,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
   });
 

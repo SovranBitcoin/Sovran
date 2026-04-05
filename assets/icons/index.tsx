@@ -180,6 +180,7 @@ export const icons: string[] = [
   'tabler:dots',
   'fluent:clock-12-filled',
   'stash:qr-code',
+  'icon-park-outline:speed-one',
   'ic:round-star',
   'humbleicons:url',
   'lucide:activity',

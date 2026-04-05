@@ -8,7 +8,7 @@
  * The only local state is the selected currency tab.
  */
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { memo, useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useSharedValue } from 'react-native-reanimated';
 import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
 
@@ -48,7 +48,7 @@ function getMintDisabledReasonLabel(reason: MintListItem['reason']): string | nu
   return reason?.message ?? null;
 }
 
-export function MintListScreen({
+export const MintListScreen = memo(function MintListScreen({
   items,
   isExecuting = false,
   showDetailsButton = true,
@@ -64,7 +64,14 @@ export function MintListScreen({
   const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
   const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
 
-  cashuLog.debug('mint.list.render', { itemCount: items.length, isExecuting });
+  const prevRenderKey = useRef('');
+  const renderKey = `${items.length}:${isExecuting}`;
+  useEffect(() => {
+    if (renderKey !== prevRenderKey.current) {
+      prevRenderKey.current = renderKey;
+      cashuLog.debug('mint.list.render', { itemCount: items.length, isExecuting });
+    }
+  });
 
   // Derive available currencies from items (no mint metadata needed — unit is in the item)
   const availableCurrencies = useMemo(() => {
@@ -188,4 +195,4 @@ export function MintListScreen({
       </Screen>
     </ModalLayoutWrapper>
   );
-}
+});

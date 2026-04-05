@@ -30,6 +30,7 @@ import {
 import type { StoryUser } from './StoriesCarousel';
 import { prefetchImages } from '@/shared/lib/imageCache';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 // ============================================================================
 // Gradient Ring
@@ -258,34 +259,36 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}>
-        {storyUsers.map((user, index) => {
-          const name = user.profile?.name || user.pubkey.slice(0, 8) + '…';
-          return (
-            <Pressable
-              key={user.pubkey}
-              style={styles.storyItem}
-              onPress={() => handleStoryPress(index)}>
-              <GradientRing>
-                <Avatar
-                  picture={user.profile?.picture}
-                  seed={user.pubkey}
-                  name={user.profile?.name}
-                  size={AVATAR_SIZE}
-                />
-              </GradientRing>
-              <Text size={11} numberOfLines={1} style={[styles.storyName, nameColor]}>
-                {name}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
+    <Log name="StoriesRow">
+      <View style={styles.container}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}>
+          {storyUsers.map((user, index) => {
+            const name = user.profile?.name || user.pubkey.slice(0, 8) + '…';
+            return (
+              <Pressable
+                key={user.pubkey}
+                style={styles.storyItem}
+                onPress={() => handleStoryPress(index)}>
+                <GradientRing>
+                  <Avatar
+                    picture={user.profile?.picture}
+                    seed={user.pubkey}
+                    name={user.profile?.name}
+                    size={AVATAR_SIZE}
+                  />
+                </GradientRing>
+                <Text size={11} numberOfLines={1} style={[styles.storyName, nameColor]}>
+                  {name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </Log>
   );
 }
 

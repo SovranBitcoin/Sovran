@@ -22,7 +22,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useWalletHealthData } from '../hooks/useWalletHealthData';
 import { computeWalletHealth } from '../lib/walletHealth';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
-import { walletLog } from '@/shared/lib/logger';
+import { walletLog, Log } from '@/shared/lib/logger';
 
 function chipIconName(label: string): string {
   const key = label.toLowerCase();
@@ -87,8 +87,9 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
   }));
 
   return (
-    <GestureDetector gesture={tap}>
-      <Animated.View style={pressAnimStyle}>
+    <Log name="WalletHealthCard">
+      <GestureDetector gesture={tap}>
+        <Animated.View style={pressAnimStyle}>
         <RNView
           ref={cardRef}
           onLayout={() => hero.registerRef('walletHealth', 'source', cardRef.current)}
@@ -181,8 +182,9 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
             </VStack>
           </WalletHealthCardFrame>
         </RNView>
-      </Animated.View>
-    </GestureDetector>
+        </Animated.View>
+      </GestureDetector>
+    </Log>
   );
 }
 

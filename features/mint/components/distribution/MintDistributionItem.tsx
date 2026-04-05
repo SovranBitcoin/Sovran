@@ -15,6 +15,7 @@ import { hexToRgb, useExtractedColors } from './colorUtils';
 import { bpToPercent, TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 import { extractDomain } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 interface MintInfo {
   name?: string;
@@ -150,12 +151,13 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
   const isAtMin = distributionBp === 0;
 
   return (
-    <View
-      className="mx-4 my-1.5 overflow-hidden rounded-2xl border p-4"
-      style={{
-        backgroundColor: surfaceSecondary,
-        borderColor: cardTint?.border || 'rgba(255,255,255,0.05)',
-      }}>
+    <Log name="MintDistributionItem">
+      <View
+        className="mx-4 my-1.5 overflow-hidden rounded-2xl border p-4"
+        style={{
+          backgroundColor: surfaceSecondary,
+          borderColor: cardTint?.border || 'rgba(255,255,255,0.05)',
+        }}>
       {/* Per-mint accent lighting derived from icon colors */}
       {!!accent?.base && (
         <>
@@ -294,7 +296,8 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
             </Text>
           </HStack>
         </TouchableOpacity>
-      </HStack>
-    </View>
+        </HStack>
+      </View>
+    </Log>
   );
 };

@@ -43,6 +43,7 @@ export function buildMintAvailability(args: {
   supportedMintUrls?: string[];
   amount?: number;
   destination?: Destination;
+  scope?: 'npc' | 'selected';
   locale?: string;
 }): MintAvailability {
   const {
@@ -52,10 +53,14 @@ export function buildMintAvailability(args: {
     supportedMintUrls,
     amount,
     destination,
+    scope,
     locale = 'en',
   } = args;
 
-  if (destination === 'mintQuote') {
+  // Balance checks don't apply when:
+  // - mintQuote (receive/mint) flows: user is depositing, not spending
+  // - scope is 'selected' or 'npc': user is just picking a preferred mint
+  if (destination === 'mintQuote' || scope === 'selected' || scope === 'npc') {
     return {
       mintUrl,
       balance,
@@ -122,7 +127,8 @@ export function buildMintAvailability(args: {
 
 export function selectMintContext(
   flowCtx: FlowContext | null,
-  walletCtx: WalletContext
+  walletCtx: WalletContext,
+  opts?: { scope?: 'npc' | 'selected' }
 ): MintResolutionContext | null {
   if (!flowCtx?.destination) {
     return null;
@@ -140,6 +146,7 @@ export function selectMintContext(
         supportedMintUrls,
         amount,
         destination,
+        scope: opts?.scope,
       })
     )
     .sort((a, b) => {

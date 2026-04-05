@@ -9,7 +9,7 @@ import 'intl/locale-data/jsonp/en';
 import 'react-native-reanimated';
 
 import { useFonts } from '@/shared/hooks/useFonts';
-import { initLog, createFetchLogger, log } from '@/shared/lib/logger';
+import { initLog } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Image, LogBox, TouchableOpacity, Platform, View } from 'react-native';
@@ -73,7 +73,7 @@ LogBox.ignoreAllLogs();
 // TODO: Wire createNavigationLogger() when Expo Router exposes onStateChange
 
 const IOS_SPLASH_IMAGE_WIDTH = 390;
-const REINIT_SPLASH_IMAGE = require('../assets/images/dark.png');
+const REINIT_SPLASH_IMAGE = require('../assets/images/light-t.png');
 const REINIT_SPLASH_IMAGE_SIZE = Image.resolveAssetSource(REINIT_SPLASH_IMAGE);
 const PROFILE_SWITCH_SPLASH_BOX_SIZE =
   REINIT_SPLASH_IMAGE_SIZE?.width && REINIT_SPLASH_IMAGE_SIZE?.height

@@ -13,6 +13,7 @@
 
 import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
 
+import { isMintOfflineError } from '../errors';
 import type { Destination, MachineOperations, PaymentMachine } from '../machine/types';
 import type { ScreenActionContext, ScreenActionHandlerMap } from './types';
 
@@ -110,10 +111,12 @@ export function createDefaultScreenActionHandlers(
           console.info('[sendToken.cancel] Cancelled | operationId:', operationId);
           notify('onSendCancelled', { operationId });
         } catch (err) {
-          console.warn('[sendToken.cancel] Failed | operationId:', operationId, err instanceof Error ? err.message : err);
+          const mintUnreachable = isMintOfflineError(err);
+          console.warn('[sendToken.cancel] Failed | operationId:', operationId, mintUnreachable ? '(mint unreachable)' : '', err instanceof Error ? err.message : err);
           notify('onSendCancelFailed', {
             operationId,
             message: err instanceof Error ? err.message : String(err),
+            mintUnreachable,
           });
         }
       },
@@ -272,7 +275,7 @@ export function createDefaultScreenActionHandlers(
             console.warn('[meltCancel] Expected rollback error (already finalized/rolled back):', msg);
             return;
           }
-          notify('onMeltCancelFailed', { operationId: rollbackId, message: msg });
+          notify('onMeltCancelFailed', { operationId: rollbackId, message: msg, mintUnreachable: isMintOfflineError(err) });
         }
       },
     },

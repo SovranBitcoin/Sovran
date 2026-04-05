@@ -5,6 +5,7 @@ import { SharedValue } from 'react-native-reanimated';
 
 import OnboardingPaginationItem from './OnboardingPaginationItem';
 import { OnboardingSlide } from './types';
+import { Log } from '@/shared/lib/logger';
 
 type OnboardingPaginationProps = {
   slides: OnboardingSlide[];
@@ -40,6 +41,7 @@ const OnboardingPagination: React.FC<OnboardingPaginationProps> = ({
   const activeWidth = itemWidth * 3;
 
   return (
+    <Log name="OnboardingPagination">
     <View
       style={{
         flexDirection: 'row',
@@ -66,6 +68,7 @@ const OnboardingPagination: React.FC<OnboardingPaginationProps> = ({
         />
       ))}
     </View>
+    </Log>
   );
 };
 

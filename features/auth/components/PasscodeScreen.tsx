@@ -11,7 +11,7 @@ import AnimatedSpriteBackground from '@/shared/ui/composed/SpriteView';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log } from '@/shared/lib/logger';
+import { log, Log } from '@/shared/lib/logger';
 
 interface Props {
   passcode: string;
@@ -100,43 +100,45 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
   };
 
   return (
-    <BlurView className="bg-background flex-1">
-      <Animated.View
-        className="bg-background flex-1"
-        style={{
-          opacity,
-          transform: [{ translateX: shake }],
-        }}>
-        <VStack align="center" justify="center" flex={1} spacing={SPACING}>
-          <AnimatedSpriteBackground backgroundColor={background} />
+    <Log name="PasscodeScreen">
+      <BlurView className="bg-background flex-1">
+        <Animated.View
+          className="bg-background flex-1"
+          style={{
+            opacity,
+            transform: [{ translateX: shake }],
+          }}>
+          <VStack align="center" justify="center" flex={1} spacing={SPACING}>
+            <AnimatedSpriteBackground backgroundColor={background} />
 
-          <View style={AVATAR_SHADOW}>
-            <Avatar
-              seed={nostrKeys?.pubkey}
-              picture={profileDisplay.picture}
-              name={profileDisplay.displayName}
-              size={AVATAR_SIZE}
-            />
-          </View>
-
-          <Text size={18} weight="bold" className="text-foreground" style={TEXT_SHADOW}>
-            {`Welcome back, ${profileDisplay.displayName}`}
-          </Text>
-
-          <HStack>
-            {Array.from({ length: passcode.length }).map((_, i) => (
-              <View
-                key={i}
-                className={`mx-1.5 h-3 w-3 rounded-full ${value.length > i ? '' : 'border'}`}
-                style={getDotStyle(value.length > i)}
+            <View style={AVATAR_SHADOW}>
+              <Avatar
+                seed={nostrKeys?.pubkey}
+                picture={profileDisplay.picture}
+                name={profileDisplay.displayName}
+                size={AVATAR_SIZE}
               />
-            ))}
-          </HStack>
+            </View>
 
-          <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
-        </VStack>
-      </Animated.View>
-    </BlurView>
+            <Text size={18} weight="bold" className="text-foreground" style={TEXT_SHADOW}>
+              {`Welcome back, ${profileDisplay.displayName}`}
+            </Text>
+
+            <HStack>
+              {Array.from({ length: passcode.length }).map((_, i) => (
+                <View
+                  key={i}
+                  className={`mx-1.5 h-3 w-3 rounded-full ${value.length > i ? '' : 'border'}`}
+                  style={getDotStyle(value.length > i)}
+                />
+              ))}
+            </HStack>
+
+            <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
+          </VStack>
+        </Animated.View>
+      </BlurView>
+    </Log>
   );
 };
 

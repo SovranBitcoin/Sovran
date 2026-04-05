@@ -4,6 +4,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { scanBoxSize, type CameraScreenShared } from './types';
+import { Log } from '@/shared/lib/logger';
 
 interface CameraLayoutProps extends CameraScreenShared {
   children: React.ReactNode;
@@ -25,6 +26,7 @@ export function CameraLayout({
   }
 
   return (
+    <Log name="CameraLayout">
     <View className="relative flex-1 bg-black">
       <CameraView
         mute
@@ -128,5 +130,6 @@ export function CameraLayout({
         {children}
       </HStack>
     </View>
+    </Log>
   );
 }

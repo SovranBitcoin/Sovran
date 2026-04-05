@@ -9,6 +9,7 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 interface MintBalanceDisplayProps {
   unit: string;
@@ -37,6 +38,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
   const innerWidth = contentWidth;
 
   return (
+    <Log name="MintBalanceDisplay">
     <HStack
       align="center"
       justify="space-between"
@@ -80,6 +82,7 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         <Icon name="fluent:chevron-down-12-filled" size={12} color={foreground} />
       </View>
     </HStack>
+    </Log>
   );
 };
 

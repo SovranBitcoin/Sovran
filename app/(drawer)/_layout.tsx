@@ -30,7 +30,7 @@ import {
   createAndSwitchProfile,
   switchToImportedProfile,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
-import { keyImportFailedPopup, profileSwitcherPopup } from '@/shared/lib/popup';
+import { keyImportFailedPopup, profileSwitcherPopup, walletStillLoadingPopup } from '@/shared/lib/popup';
 import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
 import type { ProfileSwitcherAction } from '@/shared/lib/popup/actionSheetTypes';
 
@@ -85,20 +85,34 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
   ] as const);
   const profiles = useProfileStore((s) => s.profiles);
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
+  const switchingRef = useRef(false);
 
   const executeProfileAction = useCallback(
     async (action: ProfileSwitcherAction) => {
+      if (switchingRef.current) return;
+      switchingRef.current = true;
+
       closeDrawer();
       await waitForDrawerClose();
 
       switch (action.type) {
-        case 'switch':
-          if (action.accountIndex === activeAccountIndex) return;
-          void switchToExistingProfile({ accountIndex: action.accountIndex });
+        case 'switch': {
+          if (action.accountIndex === activeAccountIndex) {
+            switchingRef.current = false;
+            return;
+          }
+          const switched = await switchToExistingProfile({ accountIndex: action.accountIndex });
+          if (!switched) {
+            switchingRef.current = false;
+            walletStillLoadingPopup();
+          }
           break;
-        case 'create':
-          void createAndSwitchProfile();
+        }
+        case 'create': {
+          const created = await createAndSwitchProfile();
+          if (!created) switchingRef.current = false;
           break;
+        }
         case 'import': {
           if (useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
             keyImportFailedPopup({ text: 'This identity already exists as a profile.' });
@@ -117,7 +131,11 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
               .addProfile(action.accountIndex, action.pubkeyHex, 'imported');
           }
 
-          void switchToImportedProfile({ accountIndex: action.accountIndex });
+          const imported = await switchToImportedProfile({ accountIndex: action.accountIndex });
+          if (!imported) {
+            switchingRef.current = false;
+            walletStillLoadingPopup();
+          }
           break;
         }
       }

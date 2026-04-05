@@ -54,7 +54,7 @@ import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from '@/shared/lib/
 import { useShallow } from 'zustand/react/shallow';
 import { getOrBuildBTCMapClusterManager } from '@/shared/lib/map/btcMapClusterCache';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
-import { Screen, log } from '@/shared/lib/logger';
+import { Screen, log, deferWork } from '@/shared/lib/logger';
 
 // ============================================================================
 // Types & Constants
@@ -470,6 +470,8 @@ export function MapScreen() {
   // Performance: on category switches, keep old markers visible while rebuilding.
   // Only show loading overlay on initial load (no markers yet).
   useEffect(() => {
+    if (!isMapReady) return; // Let map render before starting heavy clustering work
+
     if (filteredPoints.length === 0) {
       clusterManagerRef.current = null;
       setMarkers([]);
@@ -484,8 +486,9 @@ export function MapScreen() {
       setIsClusteringReady(false);
     }
 
-    // Defer clustering work until after interactions complete
-    const task = InteractionManager.runAfterInteractions(() => {
+    // Yield to the event loop so the map + loading overlay paint before
+    // Supercluster's synchronous k-d tree build blocks the JS thread.
+    const handle = deferWork('map.cluster_build', () => {
       const manager = getOrBuildBTCMapClusterManager(clusterCacheKey, filteredPoints, {
         radius: 50,
         maxZoom: 17,
@@ -497,10 +500,10 @@ export function MapScreen() {
       const { lat, lon, zoom } = cameraRef.current;
       updateMarkersForCamera(lat, lon, zoom);
       setIsClusteringReady(true);
-    });
+    }, 100);
 
-    return () => task.cancel();
-  }, [filteredPoints, clusterCacheKey, updateMarkersForCamera]);
+    return () => handle.cancel();
+  }, [isMapReady, filteredPoints, clusterCacheKey, updateMarkersForCamera]);
 
   // Fetch places on mount - DEFERRED
   useEffect(() => {

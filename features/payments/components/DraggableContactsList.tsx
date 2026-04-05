@@ -6,6 +6,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 const SKELETON_DATA = Array.from({ length: 4 }, (_, i) => ({
   type: 'contact' as const,
@@ -78,32 +79,34 @@ export const DraggableContactsList: FC<DraggableContactsListProps> = ({
   }
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      showsVerticalScrollIndicator={false}
-      nestedScrollEnabled
-      contentContainerStyle={styles.scrollContent}>
-      <RNView style={[styles.card, { borderColor }]}>
-        <BlurCardFrame accentColor={muted}>
-          <View style={styles.content}>
-            {displayData.map((item, index) => {
-              const key = item.pubkey || item.mint?.mintUrl || `item-${index}`;
-              const { profile, isLoadingProfile } = getItemProps(item);
-              return (
-                <RenderItem
-                  index={index}
-                  length={displayData.length}
-                  key={key}
-                  item={item}
-                  profile={profile}
-                  isLoadingProfile={isLoadingProfile}
-                />
-              );
-            })}
-          </View>
-        </BlurCardFrame>
-      </RNView>
-    </ScrollView>
+    <Log name="DraggableContactsList">
+      <ScrollView
+        style={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+        contentContainerStyle={styles.scrollContent}>
+        <RNView style={[styles.card, { borderColor }]}>
+          <BlurCardFrame accentColor={muted}>
+            <View style={styles.content}>
+              {displayData.map((item, index) => {
+                const key = item.pubkey || item.mint?.mintUrl || `item-${index}`;
+                const { profile, isLoadingProfile } = getItemProps(item);
+                return (
+                  <RenderItem
+                    index={index}
+                    length={displayData.length}
+                    key={key}
+                    item={item}
+                    profile={profile}
+                    isLoadingProfile={isLoadingProfile}
+                  />
+                );
+              })}
+            </View>
+          </BlurCardFrame>
+        </RNView>
+      </ScrollView>
+    </Log>
   );
 };
 

@@ -4,6 +4,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 interface TransactionIconProps {
   historyEntry: HistoryEntry;
@@ -41,12 +42,14 @@ export default function TransactionIcon({
   };
 
   return (
-    <View className="relative h-7 w-7 items-center justify-center bg-transparent">
-      {isLoading ? (
-        <ActivityIndicator size="small" color={foreground} />
-      ) : (
-        <Icon name={getIconName()} color={foreground} size={28} />
-      )}
-    </View>
+    <Log name="TransactionIcon">
+      <View className="relative h-7 w-7 items-center justify-center bg-transparent">
+        {isLoading ? (
+          <ActivityIndicator size="small" color={foreground} />
+        ) : (
+          <Icon name={getIconName()} color={foreground} size={28} />
+        )}
+      </View>
+    </Log>
   );
 }

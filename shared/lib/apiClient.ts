@@ -159,6 +159,7 @@ export const fetchMintInfo = async (mintUrl: string): Promise<Result<GetInfoResp
     }
 
     const data = await res.json();
+    apiLog.debug('api.mint_info.ok', { mintUrl, name: data?.name, hasIcon: !!data?.icon_url });
     return ok(data as GetInfoResponse);
   } catch (e) {
     apiLog.error('api.mint_info_failed', { mintUrl, error: e });

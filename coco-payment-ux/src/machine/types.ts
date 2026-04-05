@@ -411,7 +411,7 @@ export type NotificationHandlerMap = {
   onSendCancelled?: (data: { operationId: string }) => MaybeAsync;
 
   /** Called when a send token cancellation fails. */
-  onSendCancelFailed?: (data: { operationId: string; message: string }) => MaybeAsync;
+  onSendCancelFailed?: (data: { operationId: string; message: string; mintUnreachable?: boolean }) => MaybeAsync;
 
   /**
    * Called when an ecash receive starts processing.
@@ -453,7 +453,7 @@ export type NotificationHandlerMap = {
   onMeltCancelled?: (data: { operationId: string }) => MaybeAsync;
 
   /** Called when a melt cancellation fails. */
-  onMeltCancelFailed?: (data: { operationId: string; message: string }) => MaybeAsync;
+  onMeltCancelFailed?: (data: { operationId: string; message: string; mintUnreachable?: boolean }) => MaybeAsync;
 
   /** Called when a received token has an unsupported unit (not 'sat'). */
   onUnsupportedTokenUnit?: (data: { unit: string }) => MaybeAsync;

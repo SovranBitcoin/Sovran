@@ -15,7 +15,7 @@
     "@react-native-async-storage/async-storage": "2.2.0"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "expo start 2>&1 | tee log.txt",
     "dev": "EXPO_PUBLIC_DEBUG_MNEMONIC=\"leader monkey parrot ring guide accident before fence cannon height naive bean\" EXPO_PUBLIC_ENV=development expo start --clear",
     "start:emulator:ios": "expo run:ios",
     "start:emulator:android": "expo run:android",
@@ -25,6 +25,7 @@
     "build:android:apk": "EAS_NO_VCS=1 eas build -p android --profile preview",
     "submit:ios": "eas submit -p ios",
     "submit:android": "eas submit -p android",
+    "log-doctor": "npx ts-node scripts/log-doctor.ts",
     "lint": "expo lint",
     "type-check": "tsc --noEmit",
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",

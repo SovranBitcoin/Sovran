@@ -26,7 +26,7 @@ import { useWalletHealthData } from '../hooks/useWalletHealthData';
 import type { HealthCta } from '../lib/walletHealth';
 import { formatPctFromBp, normalizeBpLargestRemainder } from '../lib/walletHealth';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
-import { walletLog } from '@/shared/lib/logger';
+import { walletLog, Log } from '@/shared/lib/logger';
 
 const HERO_PADDING = 18;
 const HEART_RING_SIZE = 72;
@@ -418,11 +418,13 @@ export function WalletHealthModalContent({
 
   // Fallback: original inline layout
   return (
-    <VStack gap={10}>
-      {heroContent}
-      {tabsContent}
-      {bodyContent}
-    </VStack>
+    <Log name="WalletHealthModalContent">
+      <VStack gap={10}>
+        {heroContent}
+        {tabsContent}
+        {bodyContent}
+      </VStack>
+    </Log>
   );
 }
 

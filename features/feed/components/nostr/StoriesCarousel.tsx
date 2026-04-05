@@ -36,6 +36,7 @@ import { StoriesContainer } from './StoriesContainer';
 import { StoryProgressBar } from './StoryProgressBar';
 import { easeGradient } from './easeGradient';
 import type { ProfileInfo, VideoPostRecord } from './shared';
+import { Log } from '@/shared/lib/logger';
 
 // ============================================================================
 // Types
@@ -125,39 +126,41 @@ export const StoriesCarousel: FC<CarouselProps> = ({
   );
 
   return (
-    <Animated.FlatList
-      ref={scrollRef as any}
-      data={storyUsers}
-      keyExtractor={(item) => item.pubkey}
-      renderItem={({ item, index }) => (
-        <UserStoriesItem
-          user={item}
-          userIndex={index}
-          totalUsers={storyUsers.length}
-          listAnimatedIndex={listAnimatedIndex}
-          listCurrentIndex={listCurrentIndex}
-          isDragging={isDragging}
-          scrollRef={scrollRef}
-          onClose={onClose}
-          isClosing={isClosing}
-        />
-      )}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      onScroll={scrollHandler}
-      scrollEventThrottle={16}
-      pagingEnabled
-      viewabilityConfig={VIEWABILITY_CONFIG}
-      onViewableItemsChanged={onViewableItemsChanged}
-      decelerationRate="fast"
-      style={rContainerStyle}
-      getItemLayout={(_, index) => ({
-        length: width,
-        offset: width * index,
-        index,
-      })}
-      initialScrollIndex={startIndex}
-    />
+    <Log name="StoriesCarousel">
+      <Animated.FlatList
+        ref={scrollRef as any}
+        data={storyUsers}
+        keyExtractor={(item) => item.pubkey}
+        renderItem={({ item, index }) => (
+          <UserStoriesItem
+            user={item}
+            userIndex={index}
+            totalUsers={storyUsers.length}
+            listAnimatedIndex={listAnimatedIndex}
+            listCurrentIndex={listCurrentIndex}
+            isDragging={isDragging}
+            scrollRef={scrollRef}
+            onClose={onClose}
+            isClosing={isClosing}
+          />
+        )}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        pagingEnabled
+        viewabilityConfig={VIEWABILITY_CONFIG}
+        onViewableItemsChanged={onViewableItemsChanged}
+        decelerationRate="fast"
+        style={rContainerStyle}
+        getItemLayout={(_, index) => ({
+          length: width,
+          offset: width * index,
+          index,
+        })}
+        initialScrollIndex={startIndex}
+      />
+    </Log>
   );
 };
 

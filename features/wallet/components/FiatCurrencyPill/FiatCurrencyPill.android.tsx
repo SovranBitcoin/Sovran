@@ -5,12 +5,14 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
+import { Log } from '@/shared/lib/logger';
 
 export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactElement {
   const { text, success, green400, green500, iosHeight, onPress, textSize } =
     useFiatCurrencyPill(props);
 
   return (
+    <Log name="FiatCurrencyPill">
     <TouchableOpacity disabled={!onPress} onPress={onPress}>
       <HStack
         align="center"
@@ -30,5 +32,6 @@ export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactEleme
         </Text>
       </HStack>
     </TouchableOpacity>
+    </Log>
   );
 }

@@ -4,7 +4,7 @@ import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 import { fetchMintInfo } from '@/shared/lib/apiClient';
 import { cashuLog } from '@/shared/lib/logger';
-import { normalizeMintUrlKey } from '@/shared/lib/url';
+import { normalizeMintUrlKey, normalizeUrlForApi } from '@/shared/lib/url';
 
 import { useMintManagement } from './useMintManagement';
 
@@ -74,13 +74,16 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
 
         const knownMintUrls = new Set(knownMints.map((mint) => normalizeMintUrlKey(mint.mintUrl)));
 
-        const urlsToProcess = mintUrls
-          .map((url) => normalizeMintUrlKey(url))
-          .filter((url) => {
-            if (knownMintUrls.has(url) || processedUrls.current.has(url)) return false;
-            processedUrls.current.add(url);
-            return true;
-          });
+        // Deduplicate by normalized key but keep full URLs for fetching
+        const seenKeys = new Set<string>();
+        const urlsToProcess: string[] = [];
+        for (const rawUrl of mintUrls) {
+          const key = normalizeMintUrlKey(rawUrl);
+          if (knownMintUrls.has(key) || processedUrls.current.has(key) || seenKeys.has(key)) continue;
+          seenKeys.add(key);
+          processedUrls.current.add(key);
+          urlsToProcess.push(normalizeUrlForApi(rawUrl));
+        }
 
         if (urlsToProcess.length === 0) {
           cashuLog.debug('mint.sovran.noop', { reason: 'all mints already known or processed' });
@@ -91,6 +94,8 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
 
         cashuLog.info('mint.sovran.discovered', { newUrls: urlsToProcess.length });
 
+        let resolved = 0;
+        const total = urlsToProcess.length;
         urlsToProcess.forEach(async (url) => {
           const base: Omit<SovranDiscoveredMintData, 'mintInfo'> = {
             url,
@@ -100,12 +105,14 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
 
           try {
             const mintInfoResult = await fetchMintInfo(url);
+            const info = mintInfoResult.isOk() ? mintInfoResult.value : null;
+            cashuLog.debug('mint.sovran.info.resolved', { url, hasInfo: !!info, hasIcon: !!info?.icon_url, name: info?.name, progress: `${++resolved}/${total}` });
             appendMintIfNew(setMints, {
               ...base,
-              mintInfo: mintInfoResult.isOk() ? mintInfoResult.value : null,
+              mintInfo: info,
             });
           } catch (err) {
-            cashuLog.warn('mint.sovran.info.error', { url, error: err instanceof Error ? err : new Error(String(err)) });
+            cashuLog.warn('mint.sovran.info.error', { url, error: err instanceof Error ? err : new Error(String(err)), progress: `${++resolved}/${total}` });
             appendMintIfNew(setMints, { ...base, mintInfo: null });
           }
         });

@@ -13,6 +13,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../shared';
 import { useImageOverlay } from './provider';
 import type { ImageOverlayPost, MediaType } from './types';
+import { Log } from '@/shared/lib/logger';
 
 const AnimatedBlurView = Reanimated.createAnimatedComponent(BlurView);
 
@@ -216,6 +217,7 @@ export const ImageBlock = React.memo(function ImageBlock({
 
   const isOverlayActive = imageOverlay?.activeUrl === url;
   return (
+    <Log name="ImageBlock">
     <View style={styles.imageBlockOuter}>
       <View
         ref={containerRef}
@@ -243,6 +245,7 @@ export const ImageBlock = React.memo(function ImageBlock({
         )}
       </View>
     </View>
+    </Log>
   );
 });
 

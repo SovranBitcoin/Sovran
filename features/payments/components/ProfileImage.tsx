@@ -1,5 +1,6 @@
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { UserProfile } from '@/shared/lib/apiClient';
+import { Log } from '@/shared/lib/logger';
 
 interface ProfileImageProps {
   profile: UserProfile | undefined;
@@ -8,12 +9,14 @@ interface ProfileImageProps {
 
 export function ProfileImage({ profile, loading }: ProfileImageProps) {
   return (
-    <Avatar
-      picture={profile?.picture}
-      size={48}
-      alt={profile?.name || 'User'}
-      name={profile?.name}
-      loading={loading}
-    />
+    <Log name="ProfileImage">
+      <Avatar
+        picture={profile?.picture}
+        size={48}
+        alt={profile?.name || 'User'}
+        name={profile?.name}
+        loading={loading}
+      />
+    </Log>
   );
 }

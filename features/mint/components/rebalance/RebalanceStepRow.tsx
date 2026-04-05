@@ -30,6 +30,7 @@ import {
 import Icon from 'assets/icons';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 export type StepStatus =
   | 'pending'
@@ -132,6 +133,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   const totalHops = chainInfo ? chainInfo.chainPath.length - 1 : 0;
 
   return (
+    <Log name="RebalanceStepRow">
     <View className="mx-4 my-1.5" style={isDone ? { opacity: 0.85 } : undefined}>
       <TransferCard>
         {chainInfo ? (
@@ -288,5 +290,6 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
         )}
       </TransferCard>
     </View>
+    </Log>
   );
 };

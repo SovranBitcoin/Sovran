@@ -7,7 +7,7 @@
  * usePaymentFlowMachine after entry is available).
  */
 
-import React, { useState } from 'react';
+import React, { memo, useState } from 'react';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { router } from 'expo-router';
@@ -52,7 +52,7 @@ interface ReceiveLightningTabProps {
   muted: string;
 }
 
-function ReceiveLightningTab({
+const ReceiveLightningTab = memo(function ReceiveLightningTab({
   data,
   unit,
   mintInfo,
@@ -119,7 +119,7 @@ function ReceiveLightningTab({
       )}
     </>
   );
-}
+});
 
 interface ReceiveP2pkTabProps {
   data: ReceiveHubEntry;
@@ -127,7 +127,7 @@ interface ReceiveP2pkTabProps {
   muted: string;
 }
 
-function ReceiveP2pkTab({ data, actions, muted }: ReceiveP2pkTabProps) {
+const ReceiveP2pkTab = memo(function ReceiveP2pkTab({ data, actions, muted }: ReceiveP2pkTabProps) {
   if (!data.p2pkKey) {
     return (
       <View className="mx-4 mt-8">
@@ -173,7 +173,7 @@ function ReceiveP2pkTab({ data, actions, muted }: ReceiveP2pkTabProps) {
       </View>
     </>
   );
-}
+});
 
 interface ReceiveScreenProps {
   receiveEntry?: string | Record<string, unknown>;
@@ -205,7 +205,6 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   if (!receiveEntryData) {
     return <ScreenLoadingState message="Loading..." />;
   }
-  log.debug('receive.screen.render', { unit, selectedTab, hasNpcAddress: Boolean(receiveEntryData.npcAddress), mintUrl });
 
   return (
     <ModalScreenLayout
@@ -251,7 +250,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
             <Tabs
               tabs={tabs}
               selectedTab={selectedTab}
-              handleTabPress={(tab) => setSelectedTab(tab)}
+              handleTabPress={setSelectedTab}
             />
           </View>
         )}

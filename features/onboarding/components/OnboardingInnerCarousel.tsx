@@ -15,7 +15,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import OnboardingSlideItem from './OnboardingSlideItem';
 import OnboardingPagination from './OnboardingPagination';
 import { OnboardingCarouselProps, OnboardingSlide } from './types';
-import { log } from '@/shared/lib/logger';
+import { log, Log } from '@/shared/lib/logger';
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<OnboardingSlide>);
 
@@ -94,6 +94,7 @@ const OnboardingInnerCarousel: React.FC<OnboardingCarouselProps> = ({
   );
 
   return (
+    <Log name="OnboardingInnerCarousel">
     <Animated.View
       style={[
         {
@@ -151,6 +152,7 @@ const OnboardingInnerCarousel: React.FC<OnboardingCarouselProps> = ({
         />
       </Animated.View>
     </Animated.View>
+    </Log>
   );
 };
 

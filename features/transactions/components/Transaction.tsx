@@ -15,7 +15,7 @@ import { formatAmount } from '@/shared/lib/currency';
 import { convertTime } from '@/shared/lib/time';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log } from '@/shared/lib/logger';
+import { log, Log } from '@/shared/lib/logger';
 import { useScanHistoryStore, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 
 /**
@@ -135,6 +135,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
   const bip321Options = useBip321Options(historyEntry.id);
 
   return (
+    <Log name="Transaction">
     <TouchableOpacity
       key={historyEntry?.id}
       className="flex-row items-center justify-between bg-transparent px-4 py-5"
@@ -220,6 +221,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
         </VStack>
       </HStack>
     </TouchableOpacity>
+    </Log>
   );
 });
 

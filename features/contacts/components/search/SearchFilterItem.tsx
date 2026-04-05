@@ -6,6 +6,7 @@ import type { FlatList } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
+import { Log } from '@/shared/lib/logger';
 
 type FilterItemProps = {
   item: string;
@@ -37,23 +38,25 @@ const FilterItem = ({
   });
 
   return (
-    <Pressable
-      onPressIn={() => isPressed.set(true)}
-      onPressOut={() => isPressed.set(false)}
-      onPress={() => {
-        setActiveFilterItem(item);
-        flatListRef.current?.scrollToIndex({
-          index,
-          animated: true,
-          viewPosition: 0.5,
-        });
-      }}
-      style={[styles.pressable, isActive && { backgroundColor: activeBg }]}>
-      <Animated.View style={[styles.inner, rStyle]}>
-        {item === 'All filters' ? <Feather name="sliders" size={18} color={foreground} /> : null}
-        <Text style={[styles.label, { color: foreground }]}>{item}</Text>
-      </Animated.View>
-    </Pressable>
+    <Log name="FilterItem">
+      <Pressable
+        onPressIn={() => isPressed.set(true)}
+        onPressOut={() => isPressed.set(false)}
+        onPress={() => {
+          setActiveFilterItem(item);
+          flatListRef.current?.scrollToIndex({
+            index,
+            animated: true,
+            viewPosition: 0.5,
+          });
+        }}
+        style={[styles.pressable, isActive && { backgroundColor: activeBg }]}>
+        <Animated.View style={[styles.inner, rStyle]}>
+          {item === 'All filters' ? <Feather name="sliders" size={18} color={foreground} /> : null}
+          <Text style={[styles.label, { color: foreground }]}>{item}</Text>
+        </Animated.View>
+      </Pressable>
+    </Log>
   );
 };
 

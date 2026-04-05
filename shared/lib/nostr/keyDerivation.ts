@@ -6,6 +6,20 @@ import { wordlist } from '@scure/bip39/wordlists/english';
 
 import { log } from '../logger';
 
+// ── Memoized root seed ──────────────────────────────────────────
+// PBKDF2 (mnemonicToSeedSync) is ~3s on Hermes. Both deriveNostrKeys and
+// deriveCashuMnemonic need the same root seed for the same mnemonic, so we
+// cache it in-memory to avoid running PBKDF2 twice during a single profile switch.
+let _cachedMnemonic: string | null = null;
+let _cachedRootSeed: Uint8Array | null = null;
+
+function getRootSeed(mnemonic: string): Uint8Array {
+  if (_cachedMnemonic === mnemonic && _cachedRootSeed) return _cachedRootSeed;
+  _cachedRootSeed = bip39.mnemonicToSeedSync(mnemonic);
+  _cachedMnemonic = mnemonic;
+  return _cachedRootSeed;
+}
+
 export interface DerivedNostrKeys {
   npub: string;
   nsec: string;
@@ -44,7 +58,7 @@ const CASHU_DERIVATION_PREFIX = `m/44'/129372'`;
  */
 export function deriveCashuMnemonic(mnemonic: string, accountIndex: number = 0): string {
   log.info('nostr.key_derivation.derive_cashu_mnemonic.start', { accountIndex });
-  const seed = bip39.mnemonicToSeedSync(mnemonic);
+  const seed = getRootSeed(mnemonic);
   const root = HDKey.fromMasterSeed(seed);
   const path = `${CASHU_DERIVATION_PREFIX}/0'/${accountIndex}'/0/0`;
   const child = root.derive(path);
@@ -102,7 +116,7 @@ export function pubkeyToAccountNumber(pubkeyHex: string): number {
  */
 export function deriveCashuMnemonicForImported(mnemonic: string, npubNumber: number): string {
   log.info('nostr.key_derivation.derive_cashu_mnemonic_imported.start', { npubNumber });
-  const seed = bip39.mnemonicToSeedSync(mnemonic);
+  const seed = getRootSeed(mnemonic);
   const root = HDKey.fromMasterSeed(seed);
   const path = `${CASHU_DERIVATION_PREFIX}/0'/${npubNumber}'/1/0`;
   const child = root.derive(path);

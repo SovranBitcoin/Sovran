@@ -5,7 +5,7 @@
  * Audit and KYM scores are passed in directly from the item.
  */
 
-import React, { useMemo } from 'react';
+import React, { memo, useMemo } from 'react';
 
 import type { MintListItem } from 'coco-payment-ux';
 
@@ -13,18 +13,41 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Badge } from '@/shared/ui/primitives/Badge';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import opacity from 'hex-color-opacity';
 import { Checkbox } from '@/shared/ui/primitives/Checkbox';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { cashuLog } from '@/shared/lib/logger';
+import { cashuLog, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+
+// ── Stat cell for the 2-column grid ─────────────────────────────────────────
+
+interface StatCellProps {
+  icon: string;
+  value: string;
+  color: string;
+}
+
+const StatCell = memo(function StatCell({ icon, value, color }: StatCellProps) {
+  return (
+    <HStack align="center" justify="center" gap={5} style={{ flex: 1, paddingVertical: 10 }}>
+      <Icon name={icon} size={14} color={color} />
+      <Text size={13} bold color={color}>{value}</Text>
+    </HStack>
+  );
+});
+
+const StatDividerV = memo(function StatDividerV({ color }: { color: string }) {
+  return <View style={{ width: 1, backgroundColor: opacity(color, 0.08), marginVertical: 6 }} />;
+});
+
+const StatDividerH = memo(function StatDividerH({ color }: { color: string }) {
+  return <View style={{ height: 1, backgroundColor: opacity(color, 0.08), marginHorizontal: 8 }} />;
+});
 
 interface MintItemProps {
   item: MintListItem;
@@ -83,19 +106,20 @@ const MintItem: React.FC<MintItemProps> = ({
   const activityBadgeVariant = item.auditState === 'ERROR' ? 'error' : 'success';
 
   const hasBadges =
-    displayScore !== undefined || successRate !== undefined || item.worksOffline === true;
+    displayScore !== undefined || successRate !== undefined || item.worksOffline === true || (item.contactFollowers ?? 0) > 0 || (item.contactReputation ?? 0) > 0;
 
   return (
-    <TouchableOpacity
-      key={item.mintUrl}
-      className="bg-surface mb-1 rounded-2xl p-4"
-      style={{ opacity: itemOpacity }}
-      onPress={() => {
-        cashuLog.debug('mint_item.press', { mintUrl: item.mintUrl, displayName: item.displayName, status: item.status });
-        onPress();
-      }}
-      disabled={isDisabled}>
-      <VStack gap={0}>
+    <Log name="MintItem">
+      <TouchableOpacity
+        key={item.mintUrl}
+        className="bg-surface mb-1 rounded-2xl p-4"
+        style={{ opacity: itemOpacity }}
+        onPress={() => {
+          cashuLog.debug('mint_item.press', { mintUrl: item.mintUrl, displayName: item.displayName, status: item.status });
+          onPress();
+        }}
+        disabled={isDisabled}>
+        <VStack gap={0}>
         <HStack align="center" gap={12}>
           <View className="relative">
             <Avatar
@@ -152,44 +176,59 @@ const MintItem: React.FC<MintItemProps> = ({
 
         {hasBadges && (
           <>
-            <Spacer size={12} />
-            <HStack gap={8}>
-              {displayScore ? (
-                <Badge className="h-[24px] w-[56px]" variant="star" icon="ic:round-star" size={14}>
-                  {displayScore}
-                </Badge>
-              ) : (
-                <Skeleton
-                  className="h-[24px] w-[56px] rounded-full"
-                  style={{ backgroundColor: opacity(warning, 0.2) }}
-                />
-              )}
+            <Spacer size={8} />
+            <View
+              className="bg-surface-secondary overflow-hidden"
+              style={{ borderRadius: 16, borderCurve: 'continuous' }}>
+              {/* Row 1 */}
+              <HStack>
+                {displayScore !== undefined ? (
+                  <StatCell icon="ic:round-star" value={displayScore} color={warning} />
+                ) : null}
+                {displayScore !== undefined && successRate !== undefined ? (
+                  <StatDividerV color={foreground} />
+                ) : null}
+                {successRate !== undefined ? (
+                  <StatCell
+                    icon="lucide:activity"
+                    value={`${successRate}%`}
+                    color={item.auditState === 'ERROR' ? '#EF4444' : success}
+                  />
+                ) : null}
+              </HStack>
 
-              {successRate !== undefined ? (
-                <Badge
-                  className="h-[24px] w-[60px]"
-                  variant={activityBadgeVariant}
-                  icon="lucide:activity"
-                  size={14}>
-                  {`${successRate}%`}
-                </Badge>
-              ) : (
-                <Skeleton
-                  className="h-[24px] w-[60px] rounded-full"
-                  style={{ backgroundColor: opacity(success, 0.2) }}
-                />
-              )}
+              {/* Row divider — only if there's a second row */}
+              {((item.contactReputation ?? 0) > 0 || (item.contactFollowers ?? 0) > 0 || item.worksOffline) &&
+               (displayScore !== undefined || successRate !== undefined) ? (
+                <StatDividerH color={foreground} />
+              ) : null}
 
-              {item.worksOffline === true && (
-                <Badge className="h-[24px]" variant="success" icon="mdi:airplane" size={14}>
-                  Offline
-                </Badge>
+              {/* Row 2 */}
+              {((item.contactReputation ?? 0) > 0 || (item.contactFollowers ?? 0) > 0 || item.worksOffline) && (
+                <HStack>
+                  {(item.contactReputation ?? 0) > 0 ? (
+                    <StatCell icon="mdi:shield-check" value={`${item.contactReputation} / 100`} color="#3B82F6" />
+                  ) : null}
+                  {(item.contactReputation ?? 0) > 0 && (item.contactFollowers ?? 0) > 0 ? (
+                    <StatDividerV color={foreground} />
+                  ) : null}
+                  {(item.contactFollowers ?? 0) > 0 ? (
+                    <StatCell icon="mdi:account-group" value={item.contactFollowers!.toLocaleString()} color="#3B82F6" />
+                  ) : null}
+                  {item.worksOffline === true && ((item.contactReputation ?? 0) > 0 || (item.contactFollowers ?? 0) > 0) ? (
+                    <StatDividerV color={foreground} />
+                  ) : null}
+                  {item.worksOffline === true ? (
+                    <StatCell icon="mdi:airplane" value="Offline" color={success} />
+                  ) : null}
+                </HStack>
               )}
-            </HStack>
+            </View>
           </>
         )}
-      </VStack>
-    </TouchableOpacity>
+        </VStack>
+      </TouchableOpacity>
+    </Log>
   );
 };
 

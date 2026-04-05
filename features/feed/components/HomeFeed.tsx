@@ -15,8 +15,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
-import { log } from '@/shared/lib/logger';
-import { npubToPubkeySafe } from '@/shared/lib/nostr/client';
+import { log, Log } from '@/shared/lib/logger';
 import { LegendList, type LegendListRenderItemProps, type LegendListRef } from '@legendapp/list';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
@@ -47,7 +46,7 @@ import {
   computeFeedIndicesWithVideo,
   enrichFeedPage,
 } from './nostr/shared';
-import { CATEGORY_NPUBS } from './nostr/categoryNpubs';
+import { CATEGORY_PUBKEYS } from './nostr/categoryNpubs';
 
 import { PostCard } from './nostr/PostCard';
 import { RepostCard } from './UserFeed';
@@ -126,6 +125,7 @@ function getCategoryPubkeysFromSpec(spec: string): string[] {
 }
 
 function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): FeedParseResult {
+  const t0 = performance.now();
   const eventMap = new Map<string, FeedEvent>();
   const notes: FeedEvent[] = [];
   const reposts: FeedEvent[] = [];
@@ -279,6 +279,13 @@ function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): FeedParseResult
     }
   }
 
+  const duration = Math.round((performance.now() - t0) * 100) / 100;
+  if (duration > 50) {
+    log.warn('feed.parse.slow', { duration_ms: duration, rawEvents: feedRawEvents.length, feedItems: orderedFeedItems.length, profiles: profilesMap.size });
+  } else {
+    log.debug('feed.parse.done', { duration_ms: duration, rawEvents: feedRawEvents.length, feedItems: orderedFeedItems.length });
+  }
+
   return {
     orderedFeedItems,
     metricsMap,
@@ -359,21 +366,15 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
   const scrollOffsetRef = useRef(0);
 
   const categoryFeedSpecs = useMemo<FeedSpec[]>(() => {
-    return Object.entries(CATEGORY_NPUBS).map(([category, npubs]) => {
-      const pubkeys = npubs
-        .map((npub) => npubToPubkeySafe(npub))
-        .filter((pubkey): pubkey is string => !!pubkey);
-
-      return {
-        name: categoryToLabel(category),
-        spec: JSON.stringify({
-          id: 'feed',
-          kind: 'notes',
-          notes: 'authored',
-          pubkeys,
-        }),
-      };
-    });
+    return Object.entries(CATEGORY_PUBKEYS).map(([category, pubkeys]) => ({
+      name: categoryToLabel(category),
+      spec: JSON.stringify({
+        id: 'feed',
+        kind: 'notes',
+        notes: 'authored',
+        pubkeys,
+      }),
+    }));
   }, []);
 
   // ── Phase 0: Fetch available feed specs ──
@@ -915,40 +916,42 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
   );
 
   return (
-    <ImageOverlayProvider
-      getDisplayMetrics={getDisplayMetrics}
-      getEngagementState={getEngagementState}
-      onSwipeUpToNextPost={onSwipeUpToNextPost}
-      getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
-      <View style={styles.flex1}>
-        <LegendList
-          ref={listRef}
-          data={listData}
-          keyExtractor={listKeyExtractor}
-          getItemType={listGetItemType}
-          estimatedItemSize={300}
-          drawDistance={400}
-          renderItem={renderItem}
-          extraData={`${dataVersion}:${engagementRevision}`}
-          recycleItems
-          ListEmptyComponent={
-            isLoading ? <ActivityIndicator style={styles.loader} /> : <EmptyFeed />
-          }
-          ListFooterComponent={
-            isLoadingMore ? <ActivityIndicator style={styles.loadMoreSpinner} /> : null
-          }
-          onEndReached={handleEndReached}
-          onEndReachedThreshold={0.4}
-          style={styles.flex1}
-          contentContainerStyle={LIST_CONTENT_STYLE}
-          showsVerticalScrollIndicator={false}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-          refreshControl={refreshControl}
-        />
-      </View>
-      <AnimatedImageOverlay />
-    </ImageOverlayProvider>
+    <Log name="HomeFeed">
+      <ImageOverlayProvider
+        getDisplayMetrics={getDisplayMetrics}
+        getEngagementState={getEngagementState}
+        onSwipeUpToNextPost={onSwipeUpToNextPost}
+        getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
+        <View style={styles.flex1}>
+          <LegendList
+            ref={listRef}
+            data={listData}
+            keyExtractor={listKeyExtractor}
+            getItemType={listGetItemType}
+            estimatedItemSize={300}
+            drawDistance={400}
+            renderItem={renderItem}
+            extraData={`${dataVersion}:${engagementRevision}`}
+            recycleItems
+            ListEmptyComponent={
+              isLoading ? <ActivityIndicator style={styles.loader} /> : <EmptyFeed />
+            }
+            ListFooterComponent={
+              isLoadingMore ? <ActivityIndicator style={styles.loadMoreSpinner} /> : null
+            }
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.4}
+            style={styles.flex1}
+            contentContainerStyle={LIST_CONTENT_STYLE}
+            showsVerticalScrollIndicator={false}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            refreshControl={refreshControl}
+          />
+        </View>
+        <AnimatedImageOverlay />
+      </ImageOverlayProvider>
+    </Log>
   );
 }
 

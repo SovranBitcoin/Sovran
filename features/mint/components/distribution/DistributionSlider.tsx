@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import opacity from 'hex-color-opacity';
 import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 const SLIDER_HEIGHT = 40;
 const TOTAL_STEPS = 101;
@@ -228,6 +229,7 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
   }, [width, surfaceTertiary, customBorderColor, isLoadingColors]);
 
   return (
+    <Log name="DistributionSlider">
     <View style={{ width, height: SLIDER_HEIGHT }}>
       <GestureDetector gesture={gesture}>
         <Animated.View
@@ -285,6 +287,7 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
         </Animated.View>
       </GestureDetector>
     </View>
+    </Log>
   );
 };
 

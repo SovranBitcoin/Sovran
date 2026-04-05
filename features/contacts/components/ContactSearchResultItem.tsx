@@ -6,7 +6,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { paymentLog } from '@/shared/lib/logger';
+import { paymentLog, Log } from '@/shared/lib/logger';
 
 type Props = {
   result: DisplayResult;
@@ -30,18 +30,19 @@ export const ContactSearchResultItem = ({ result, loading, onPress }: Props) => 
   const hasNip05 = Boolean(profile?.nip05);
 
   return (
-    <Pressable
-      onPress={() => {
-        if (!isLoading) {
-          paymentLog.info('contact.search.result.press', { pubkey: result.pubkey });
-          onPress(result);
-        }
-      }}
-      style={({ pressed }) => [
-        styles.container,
-        pressed && !isLoading && { backgroundColor: surfaceSecondary },
-      ]}>
-      {isLoading ? (
+    <Log name="ContactSearchResultItem">
+      <Pressable
+        onPress={() => {
+          if (!isLoading) {
+            paymentLog.info('contact.search.result.press', { pubkey: result.pubkey });
+            onPress(result);
+          }
+        }}
+        style={({ pressed }) => [
+          styles.container,
+          pressed && !isLoading && { backgroundColor: surfaceSecondary },
+        ]}>
+        {isLoading ? (
         <Avatar seed={pubkey} size={44} loading />
       ) : profile?.picture ? (
         <Image source={{ uri: profile.picture }} style={styles.avatar} />
@@ -80,8 +81,9 @@ export const ContactSearchResultItem = ({ result, loading, onPress }: Props) => 
             {pubkey.slice(0, 16)}...
           </Text>
         )}
-      </View>
-    </Pressable>
+        </View>
+      </Pressable>
+    </Log>
   );
 };
 

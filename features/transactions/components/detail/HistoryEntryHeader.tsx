@@ -14,6 +14,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { formatAmount } from '@/shared/lib/currency';
 import { isOutgoingTransaction } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 import TransactionIcon from '../TransactionIcon';
 
@@ -119,37 +120,39 @@ export function HistoryEntryHeader({
   };
 
   return (
-    <HStack align="center" justify="space-between" className="p-5 pb-0 pt-0">
-      <VStack>
-        <HStack align="center">
-          <Spacer size={8} />
-          <Text
-            overpass
-            size={isSend ? 32 : 24}
-            color={isSend ? danger : success}
-            style={{ opacity: 0.9 }}>
-            {isSend ? '-' : '+'}
+    <Log name="HistoryEntryHeader">
+      <HStack align="center" justify="space-between" className="p-5 pb-0 pt-0">
+        <VStack>
+          <HStack align="center">
+            <Spacer size={8} />
+            <Text
+              overpass
+              size={isSend ? 32 : 24}
+              color={isSend ? danger : success}
+              style={{ opacity: 0.9 }}>
+              {isSend ? '-' : '+'}
+            </Text>
+            <Spacer size={8} />
+            <AmountFormatter
+              amount={amount}
+              unit={unit}
+              size={28}
+              weight="heavy"
+              color={isReceive ? success : danger}
+            />
+          </HStack>
+          <Text overpass size={18} color={opacity(foreground, 0.9)} bold>
+            {formatAmount(
+              { amount: Math.abs(amount), unit },
+              {
+                displayAs: unit === 'usd' ? 'sats' : 'usd',
+                currencyDisplay: unit === 'usd' ? 'name' : 'symbol',
+              }
+            )}
           </Text>
-          <Spacer size={8} />
-          <AmountFormatter
-            amount={amount}
-            unit={unit}
-            size={28}
-            weight="heavy"
-            color={isReceive ? success : danger}
-          />
-        </HStack>
-        <Text overpass size={18} color={opacity(foreground, 0.9)} bold>
-          {formatAmount(
-            { amount: Math.abs(amount), unit },
-            {
-              displayAs: unit === 'usd' ? 'sats' : 'usd',
-              currencyDisplay: unit === 'usd' ? 'name' : 'symbol',
-            }
-          )}
-        </Text>
-      </VStack>
-      {renderIcon()}
-    </HStack>
+        </VStack>
+        {renderIcon()}
+      </HStack>
+    </Log>
   );
 }

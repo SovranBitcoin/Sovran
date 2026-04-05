@@ -8,13 +8,14 @@
  * Must be a descendant of CocoProvider (CocoCashuProvider).
  */
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
 import type { WalletContext } from 'coco-payment-ux';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
 import { walletLog } from '@/shared/lib/logger';
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
@@ -42,8 +43,8 @@ export function useWalletContextWithOverride(preferredMintUrl?: string): WalletC
 }
 
 export function WalletContextProvider({ children }: { children: React.ReactNode }) {
-  const { trustedMints } = useMints();
-  const { balance: mintBalances } = useBalanceContext();
+  const { trustedMints: rawTrustedMints } = useMints();
+  const { balance: rawMintBalances } = useBalanceContext();
   const manager = useManager();
   const { keys } = useNostrKeysContext();
   const pubkey = keys?.pubkey;
@@ -53,28 +54,41 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
 
   const [proofAmounts, setProofAmounts] = useState<Record<string, number[]>>({});
 
-  const trustedMintUrls = useMemo(() => trustedMints.map((m) => m.mintUrl), [trustedMints]);
+  // Stabilise coco-react references — they return new objects every render
+  const mintBalances = useShallowMemo(rawMintBalances);
+
+  // Stabilise trustedMintUrls by comparing the serialised URL list
+  const trustedMintUrls = useMemo(() => rawTrustedMints.map((m) => m.mintUrl), [rawTrustedMints]);
+  const prevMintUrlsRef = useRef<string[]>(trustedMintUrls);
+  const stableMintUrls = useMemo(() => {
+    const prev = prevMintUrlsRef.current;
+    if (prev.length === trustedMintUrls.length && prev.every((u, i) => u === trustedMintUrls[i])) {
+      return prev;
+    }
+    prevMintUrlsRef.current = trustedMintUrls;
+    return trustedMintUrls;
+  }, [trustedMintUrls]);
 
   const fetchProofAmounts = useCallback(async () => {
-    walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', { mintCount: trustedMints.length });
+    walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', { mintCount: stableMintUrls.length });
     const proofService = (
       manager as unknown as {
         proofService: { getReadyProofs: (url: string) => Promise<Array<{ amount: number }>> };
       }
     ).proofService;
     const next: Record<string, number[]> = {};
-    for (const mint of trustedMints) {
+    for (const url of stableMintUrls) {
       try {
-        const proofs = await proofService.getReadyProofs(mint.mintUrl);
-        next[mint.mintUrl] = proofs.map((p) => p.amount).sort((a, b) => a - b);
+        const proofs = await proofService.getReadyProofs(url);
+        next[url] = proofs.map((p) => p.amount).sort((a, b) => a - b);
       } catch (err) {
-        walletLog.warn('provider.wallet_context.proof_fetch_failed', { mintUrl: mint.mintUrl, error: err instanceof Error ? err : new Error(String(err)) });
-        next[mint.mintUrl] = [];
+        walletLog.warn('provider.wallet_context.proof_fetch_failed', { mintUrl: url, error: err instanceof Error ? err : new Error(String(err)) });
+        next[url] = [];
       }
     }
-    walletLog.debug('provider.wallet_context.fetch_proof_amounts_done', { mintCount: trustedMints.length });
+    walletLog.debug('provider.wallet_context.fetch_proof_amounts_done', { mintCount: stableMintUrls.length });
     setProofAmounts(next);
-  }, [manager, trustedMints]);
+  }, [manager, stableMintUrls]);
 
   useEffect(() => {
     fetchProofAmounts();
@@ -87,17 +101,17 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
 
   const value = useMemo<WalletContext>(() => {
     walletLog.info('provider.wallet_context.value_updated', {
-      trustedMintCount: trustedMintUrls.length,
+      trustedMintCount: stableMintUrls.length,
       totalBalance: Object.values(mintBalancesOnly).reduce((sum, b) => sum + b, 0),
       preferredMintUrl,
     });
     return {
-      trustedMintUrls,
+      trustedMintUrls: stableMintUrls,
       mintBalances: mintBalancesOnly,
       preferredMintUrl,
       proofAmounts,
     };
-  }, [trustedMintUrls, mintBalancesOnly, preferredMintUrl, proofAmounts]);
+  }, [stableMintUrls, mintBalancesOnly, preferredMintUrl, proofAmounts]);
 
   return <WalletContextCtx.Provider value={value}>{children}</WalletContextCtx.Provider>;
 }

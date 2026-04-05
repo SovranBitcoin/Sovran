@@ -9,6 +9,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Account } from '../Account';
 import { BUTTON_H, QR_SIZE, type AccountPagerViewShared } from './useAccountPagerView';
+import { Log } from '@/shared/lib/logger';
 
 const RECEIVE_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.down.left' : undefined;
 const SEND_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.up.right' : undefined;
@@ -29,7 +30,7 @@ export function AccountPagerViewLayout({
   } = shared;
 
   return (
-    <>
+    <Log name="AccountPagerViewLayout">
       <View className="w-full" style={{ height: pagerHeight }}>
         <Swiper
           containerStyle={{ height: pagerHeight }}
@@ -75,6 +76,6 @@ export function AccountPagerViewLayout({
           <QRButton onPress={handleScanQR} />
         </View>
       </View>
-    </>
+    </Log>
   );
 }

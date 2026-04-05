@@ -10,7 +10,8 @@ export async function decryptNip04Events<
 >(items: T[], privateKey: Uint8Array): Promise<T[]> {
   nostrLog.info('nostr.nip04.decrypt.start', { itemCount: items.length });
   const start = performance.now();
-  const signer = new NDKPrivateKeySigner(privateKey);
+  // Defer signer creation until we actually need to decrypt
+  let signer: NDKPrivateKeySigner | null = null;
   const results: T[] = [];
   let decryptedCount = 0;
   let nip17Count = 0;
@@ -30,6 +31,7 @@ export async function decryptNip04Events<
         continue;
       }
       if (item.dmEvent instanceof NDKEvent) {
+        if (!signer) signer = new NDKPrivateKeySigner(privateKey);
         const counterparty = new NDKUser({ pubkey: item.pubkey });
         await item.dmEvent.decrypt(counterparty, signer);
         results.push({ ...item, dmEvent: { ...item.dmEvent, content: item.dmEvent.content } });

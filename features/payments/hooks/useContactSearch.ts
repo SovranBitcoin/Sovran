@@ -74,7 +74,8 @@ export function useContactSearch(searchQuery: string) {
   );
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    const trimmed = searchQuery.trim();
+    if (!trimmed || trimmed.length < 2) {
       setHasSearched(false);
       setSearchResults([]);
       setSearchLoading(false);

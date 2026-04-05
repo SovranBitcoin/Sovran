@@ -14,6 +14,7 @@ import Animated, {
   useDerivedValue,
   useAnimatedStyle,
 } from 'react-native-reanimated';
+import { Log } from '@/shared/lib/logger';
 
 const ANGLE = Platform.OS === 'android' ? 80 : 90;
 
@@ -83,6 +84,8 @@ export const StoriesContainer: FC<PropsWithChildren<Props>> = ({
   });
 
   return (
-    <Animated.View style={[{ width: screenWidth }, rContainerStyle]}>{children}</Animated.View>
+    <Log name="StoriesContainer">
+      <Animated.View style={[{ width: screenWidth }, rContainerStyle]}>{children}</Animated.View>
+    </Log>
   );
 };

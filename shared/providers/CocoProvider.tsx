@@ -5,7 +5,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { log, initLog } from '@/shared/lib/logger';
+import { log, initLog, deferWork } from '@/shared/lib/logger';
 
 interface CocoContextValue {
   manager: Manager | null;
@@ -187,7 +187,10 @@ export function CocoProvider({ children }: CocoProviderProps) {
       }
     };
 
-    runBackground();
+    // Give the user a responsive window before starting heavy background work.
+    // deferWork logs drift (intended vs actual delay) which reveals JS thread freezes.
+    const handle = deferWork('coco.phase2', runBackground, 2000);
+    return () => handle.cancel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bgStage.canStart, manager, keys?.pubkey]);
 

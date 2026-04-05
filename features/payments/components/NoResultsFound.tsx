@@ -4,10 +4,12 @@ import opacity from 'hex-color-opacity';
 import Icon from '@/assets/icons';
 import { SearchTip } from './SearchTip';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 export function NoResultsFound() {
   const foreground = useThemeColor('foreground');
   return (
+    <Log name="NoResultsFound">
     <VStack spacing={24} align="center" className="mt-3 px-4">
       <VStack
         justify="center"
@@ -37,5 +39,6 @@ export function NoResultsFound() {
         </VStack>
       </VStack>
     </VStack>
+    </Log>
   );
 }

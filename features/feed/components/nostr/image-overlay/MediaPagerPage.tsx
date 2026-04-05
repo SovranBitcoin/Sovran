@@ -10,6 +10,7 @@ import type { SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type { MediaType } from './types';
+import { Log } from '@/shared/lib/logger';
 
 function MediaPageAnimated({
   url,
@@ -82,14 +83,16 @@ function MediaPageAnimated({
   }
 
   return (
-    <Animated.View style={animatedStyle} pointerEvents="none">
-      <Image
-        source={{ uri: url }}
-        style={StyleSheet.absoluteFill}
-        contentFit="contain"
-        cachePolicy="disk"
-      />
-    </Animated.View>
+    <Log name="MediaPageAnimated">
+      <Animated.View style={animatedStyle} pointerEvents="none">
+        <Image
+          source={{ uri: url }}
+          style={StyleSheet.absoluteFill}
+          contentFit="contain"
+          cachePolicy="disk"
+        />
+      </Animated.View>
+    </Log>
   );
 }
 

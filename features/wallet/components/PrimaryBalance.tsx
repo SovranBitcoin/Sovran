@@ -29,7 +29,7 @@ import { usePaginatedHistory } from '@cashu/coco-react';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
-import { walletLog } from '@/shared/lib/logger';
+import { walletLog, Log } from '@/shared/lib/logger';
 
 interface Account {
   unit: CurrencyUnit;
@@ -218,26 +218,28 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
   }, []);
 
   return (
-    <VStack align="center" gap={8} className="z-9">
-      <FiatCurrencyPill displayText={displayText} textSize={12} />
-      <TouchableOpacity onPress={toggleUnit} className="flex-col items-center">
-        <AmountFormatter weight="heavy" amount={balance} unit={account.unit} />
-      </TouchableOpacity>
-      <EcashStatusPill
-        label="PENDING"
-        totalAmount={pendingTotal}
-        unit={pendingUnit}
-        sfSymbol="clock.arrow.trianglehead.counterclockwise.rotate.90"
-        onPress={handlePendingPress}
-      />
-      <EcashStatusPill
-        label="RESERVED"
-        totalAmount={reservedTotal}
-        unit="sat"
-        sfSymbol="lock.fill"
-        tintColor={warning}
-        onPress={handleReservedPress}
-      />
-    </VStack>
+    <Log name="PrimaryBalance">
+      <VStack align="center" gap={8} className="z-9">
+        <FiatCurrencyPill displayText={displayText} textSize={12} />
+        <TouchableOpacity onPress={toggleUnit} className="flex-col items-center">
+          <AmountFormatter weight="heavy" amount={balance} unit={account.unit} />
+        </TouchableOpacity>
+        <EcashStatusPill
+          label="PENDING"
+          totalAmount={pendingTotal}
+          unit={pendingUnit}
+          sfSymbol="clock.arrow.trianglehead.counterclockwise.rotate.90"
+          onPress={handlePendingPress}
+        />
+        <EcashStatusPill
+          label="RESERVED"
+          totalAmount={reservedTotal}
+          unit="sat"
+          sfSymbol="lock.fill"
+          tintColor={warning}
+          onPress={handleReservedPress}
+        />
+      </VStack>
+    </Log>
   );
 }

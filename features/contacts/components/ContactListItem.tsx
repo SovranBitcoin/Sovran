@@ -5,7 +5,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
-import { paymentLog } from '@/shared/lib/logger';
+import { paymentLog, Log } from '@/shared/lib/logger';
 
 type ContactListItemProps = {
   pubkey: string | null;
@@ -59,33 +59,35 @@ export const ContactListItem = ({
   };
 
   return (
-    <Pressable
-      onPress={handlePress}
-      style={({ pressed }) => [styles.container, pressed && { backgroundColor: surfaceSecondary }]}>
-      <Avatar
-        picture={avatarUrl}
-        name={displayName}
-        seed={pubkeyStr}
-        size={44}
-        loading={isLoadingProfile}
-      />
-      <View style={styles.info}>
-        <Text
+    <Log name="ContactListItem">
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed }) => [styles.container, pressed && { backgroundColor: surfaceSecondary }]}>
+        <Avatar
+          picture={avatarUrl}
+          name={displayName}
+          seed={pubkeyStr}
+          size={44}
           loading={isLoadingProfile}
-          placeholder="Display Name"
-          style={[styles.name, { color: foreground }]}
-          numberOfLines={1}>
-          {displayName}
-        </Text>
-        <Text
-          loading={isLoadingProfile}
-          placeholder="user@relay.example"
-          style={[styles.handle, { color: opacity(foreground, 0.5) }]}
-          numberOfLines={1}>
-          {displaySubtitle}
-        </Text>
-      </View>
-    </Pressable>
+        />
+        <View style={styles.info}>
+          <Text
+            loading={isLoadingProfile}
+            placeholder="Display Name"
+            style={[styles.name, { color: foreground }]}
+            numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Text
+            loading={isLoadingProfile}
+            placeholder="user@relay.example"
+            style={[styles.handle, { color: opacity(foreground, 0.5) }]}
+            numberOfLines={1}>
+            {displaySubtitle}
+          </Text>
+        </View>
+      </Pressable>
+    </Log>
   );
 };
 

@@ -3,6 +3,7 @@ import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 import { useScanHistoryStore, ScanSource } from '@/shared/stores/profile/scanHistoryStore';
 
 const SOURCE_LABELS: Record<ScanSource, string> = {
@@ -86,15 +87,17 @@ export function Bip321MethodIcons({
   items.sort((a, b) => (a.used === b.used ? 0 : a.used ? -1 : 1));
 
   return (
-    <HStack align="center" gap={6}>
-      {items.map((item) => (
-        <Icon
-          key={item.name}
-          name={item.name}
-          size={16}
-          color={opacity(foreground, item.used ? 0.8 : 0.4)}
-        />
-      ))}
-    </HStack>
+    <Log name="Bip321MethodIcons">
+      <HStack align="center" gap={6}>
+        {items.map((item) => (
+          <Icon
+            key={item.name}
+            name={item.name}
+            size={16}
+            color={opacity(foreground, item.used ? 0.8 : 0.4)}
+          />
+        ))}
+      </HStack>
+    </Log>
   );
 }

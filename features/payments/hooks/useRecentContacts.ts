@@ -2,17 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { NDKEvent, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { paymentLog } from '@/shared/lib/logger';
 import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
-import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { decryptNip04Events } from '../lib/decryptNip04Events';
 
+/** Pre-computed hex pubkeys — avoids runtime nip19.decode() on every mount */
 const DEFAULT_CONTACTS = [
   {
-    npub: 'npub1ref7jqxrh0z74554y900ufajer2lh52lk0wczrdrqcm8fjmjzweqll64x3',
+    pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
     label: 'Sovran',
   },
   {
-    npub: 'npub1ceel7z6ly287kz4mzqqcsgtc6nzc30zw2ru9w9e4gj64gw69f7qscyf0p8',
+    pubkey: 'c673ff0b5f228feb0abb1001882178d4c588bc4e50f857173544b5543b454f81',
     label: 'kelbie',
   },
 ];
@@ -26,7 +26,7 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
   const defaultContactPubkeys = useMemo(
     () =>
       DEFAULT_CONTACTS.map((contact) => ({
-        pubkey: npubToPubkey(contact.npub),
+        pubkey: contact.pubkey,
         label: contact.label,
       })),
     []
@@ -154,7 +154,13 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       }
 
       try {
-        const results = await decryptNip04Events(contactsWithDefaults, nostrKeys.privateKey);
+        // Split into items that actually need decryption vs passthrough
+        const needsDecrypt = contactsWithDefaults.filter((c) => c.dmEvent || c.nip17Content !== undefined);
+        const passthrough = contactsWithDefaults.filter((c) => !c.dmEvent && c.nip17Content === undefined);
+        const decrypted = needsDecrypt.length > 0
+          ? await decryptNip04Events(needsDecrypt, nostrKeys.privateKey)
+          : [];
+        const results = [...decrypted, ...passthrough];
         paymentLog.debug('payment.contacts.decrypt', { decryptedCount: results.length });
         if (!cancelled) setDecryptedContacts(results);
       } catch (err) {

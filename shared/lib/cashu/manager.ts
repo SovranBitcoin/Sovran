@@ -1,7 +1,13 @@
-import { Manager, ConsoleLogger } from '@cashu/coco-core';
+import { Manager } from '@cashu/coco-core';
+import { CocoLogger } from './cocoLogger';
 import { ExpoSqliteRepositories } from '@cashu/coco-expo-sqlite';
 import * as SQLite from 'expo-sqlite';
-import { retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
+import {
+  retrieveMnemonic,
+  retrieveCashuSeed,
+  storeCashuSeed,
+  hashMnemonic,
+} from '@/shared/lib/nostr/secureStorage';
 import { NPCPlugin } from 'coco-cashu-plugin-npc';
 import {
   deriveNostrKeys,
@@ -40,12 +46,16 @@ export class CocoManager {
   private static instance: Manager | null = null;
   private static db: SQLite.SQLiteDatabase | null = null;
   private static isInitializing = false;
+  /** True while enableWatchersAndSync / recovery / default mint init are running. */
+  private static isBackgroundRunning = false;
   /** Tracks an in-flight cleanup() call so initialize() can await it before proceeding. */
   private static pendingCleanup: Promise<void> | null = null;
   private static cashuMnemonic: string | null = null;
   private static signerKey: Uint8Array | null = null;
   private static npcPlugin: NPCPlugin | null = null;
   private static isFreeingReservedProofs = false;
+  /** Stored reference to seed getter for pre-warming during background init */
+  private static seedGetter: (() => Promise<Uint8Array>) | null = null;
   /** Current account index — controls which DB file and NPC signer to use */
   private static accountIndex = 0;
   /** True when the active profile is an imported nsec (affects signer/seed fallback paths) */
@@ -56,6 +66,7 @@ export class CocoManager {
     this.signerKey = null;
     this.cashuMnemonic = null;
     this.npcPlugin = null;
+    this.seedGetter = null;
     this.isImportedProfile = false;
   }
 
@@ -135,20 +146,52 @@ export class CocoManager {
       await repositories.init();
       initLog('CocoManager', 'DB + repos initialized');
 
-      // 2. Seed getter (lazy — no crypto work until first call)
+      // 2. Seed getter (lazy — no crypto work until first call, cached after)
+      // Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s).
       const accountIndex = this.accountIndex;
       const isImported = this.isImportedProfile;
+      let cachedSeed: Uint8Array | null = null;
       const seedGetter = async (): Promise<Uint8Array> => {
+        if (cachedSeed) return cachedSeed;
+
+        // Fast path: check SecureStore for a previously derived seed
+        const mnemonicForHash = this.cashuMnemonic ?? (await retrieveMnemonic());
+        const mHash = mnemonicForHash ? hashMnemonic(mnemonicForHash) : null;
+        if (mHash) {
+          const cached = await retrieveCashuSeed(accountIndex);
+          if (cached && cached.mnemonicHash === mHash) {
+            initLog('CocoManager', 'seed loaded from SecureStore cache (skipped PBKDF2)');
+            cachedSeed = cached.seed;
+            return cached.seed;
+          }
+        }
+
+        // Slow path: derive via PBKDF2
+        let seed: Uint8Array;
         if (this.cashuMnemonic) {
-          return deriveCashuWalletSeed(this.cashuMnemonic);
+          seed = deriveCashuWalletSeed(this.cashuMnemonic);
+        } else {
+          const mnemonic = mnemonicForHash ?? (await retrieveMnemonic());
+          if (!mnemonic) throw new Error('No mnemonic found in secure storage');
+          if (isImported) {
+            seed = deriveCashuWalletSeedForImported(mnemonic, accountIndex);
+          } else {
+            seed = deriveCashuWalletSeedFromRoot(mnemonic, accountIndex);
+          }
         }
-        const mnemonic = await retrieveMnemonic();
-        if (!mnemonic) throw new Error('No mnemonic found in secure storage');
-        if (isImported) {
-          return deriveCashuWalletSeedForImported(mnemonic, accountIndex);
+        cachedSeed = seed;
+
+        // Persist for next cold start (fire-and-forget)
+        if (mHash) {
+          storeCashuSeed(accountIndex, seed, mHash).catch((e) =>
+            cashuLog.warn('cashu.manager.seed_cache_store_failed', { error: e })
+          );
         }
-        return deriveCashuWalletSeedFromRoot(mnemonic, accountIndex);
+
+        return seed;
       };
+
+      this.seedGetter = seedGetter;
 
       // 3. NPC plugin (constructor only — no network call)
       const plugins: any[] = [];
@@ -173,7 +216,7 @@ export class CocoManager {
       this.instance = new Manager(
         repositories,
         seedGetter,
-        new ConsoleLogger('CocoManager', { level: 'debug' }),
+        new CocoLogger('manager'),
         undefined,
         plugins
       );
@@ -198,19 +241,28 @@ export class CocoManager {
     if (!this.instance) {
       throw new Error('Manager not initialized. Call initialize() first.');
     }
+    this.isBackgroundRunning = true;
     const syncStart = performance.now();
     cashuLog.info('cashu.manager.watchers_sync.start');
 
-    // NPC initial sync
-    if (this.npcPlugin) {
-      try {
-        initLog('CocoManager', 'NPC sync starting...');
-        await this.npcPlugin.sync();
-        initLog('CocoManager', 'NPC sync done');
-      } catch (error) {
-        cashuLog.warn('cashu.manager.npc_sync_failed', { error });
-      }
+    // Start NPC sync first (dispatches native HTTP), then pre-warm seed.
+    // The synchronous PBKDF2 (~2.5s) runs while the native layer handles NPC HTTP I/O,
+    // so the seed is cached before recovery needs it — no JS thread freeze during usage.
+    const npcPromise = this.npcPlugin
+      ? this.npcPlugin.sync().then(
+          () => initLog('CocoManager', 'NPC sync done'),
+          (error) => cashuLog.warn('cashu.manager.npc_sync_failed', { error })
+        )
+      : Promise.resolve();
+    initLog('CocoManager', 'NPC sync starting...');
+
+    if (this.seedGetter) {
+      initLog('CocoManager', 'pre-warming seed cache...');
+      await this.seedGetter();
+      initLog('CocoManager', 'seed cache warmed');
     }
+
+    await npcPromise;
 
     // Mint quote watcher
     try {
@@ -251,6 +303,7 @@ export class CocoManager {
       }
     }
 
+    this.isBackgroundRunning = false;
     cashuLog.info('cashu.manager.watchers_sync.done', { duration_ms: Math.round((performance.now() - syncStart) * 100) / 100 });
   }
 
@@ -270,6 +323,14 @@ export class CocoManager {
    */
   static isInitialized(): boolean {
     return this.instance !== null;
+  }
+
+  /**
+   * True when the manager exists, is not mid-initialization, and has no pending cleanup.
+   * Used by profile switching to determine if it's safe to tear down.
+   */
+  static isReadyForCleanup(): boolean {
+    return this.instance !== null && !this.isInitializing && !this.pendingCleanup;
   }
 
   /**
@@ -313,13 +374,14 @@ export class CocoManager {
 
         // Close the SQLite connection to prevent "database is locked" on revisit
         if (this.db) {
-          try {
-            await this.db.closeAsync();
-            cashuLog.debug('cashu.manager.sqlite_closed');
-          } catch (dbError) {
-            cashuLog.warn('cashu.manager.sqlite_close_failed', { error: dbError });
-          }
+          const db = this.db;
           this.db = null;
+          try {
+            await db.closeAsync();
+            cashuLog.debug('cashu.manager.sqlite_closed');
+          } catch {
+            // Already closed (e.g. hot reload or rapid profile switch) — safe to ignore
+          }
         }
 
         // Clear the instance

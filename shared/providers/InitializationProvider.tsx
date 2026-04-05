@@ -154,6 +154,11 @@ export function useInitializationState() {
   return { isInitializing };
 }
 
+export function useIsStageComplete(stageId: string): boolean {
+  const { stages } = useInitializationContext();
+  return stages.get(stageId)?.status === 'complete';
+}
+
 interface InitializationProviderProps {
   children: ReactNode;
   forceVisible?: boolean;
@@ -372,12 +377,16 @@ export function InitializationProvider({
     prevInitializing.current = isInitializing;
   }
 
-  // Clear forceReinitialize once real stages have registered (they'll keep isInitializing true)
+  // Clear forceReinitialize / holdSplashVisible once real stages have registered
+  // (they'll keep isInitializing true via their own blocking status).
+  // This ensures the splash is released after a profile switch even if
+  // cancelResetStages() was never called (e.g. DevSettings.reload() in dev).
   useEffect(() => {
-    if (forceReinitialize && stages.size > 0) {
+    if ((forceReinitialize || holdSplashVisible) && stages.size > 0) {
       setForceReinitialize(false);
+      setHoldSplashVisible(false);
     }
-  }, [forceReinitialize, stages.size]);
+  }, [forceReinitialize, holdSplashVisible, stages.size]);
 
   const resetStages = useCallback((options?: { holdUntilCancel?: boolean }) => {
     log.info('init.provider.reset_stages');

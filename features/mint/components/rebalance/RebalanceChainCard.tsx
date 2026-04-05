@@ -23,6 +23,7 @@ import Icon from 'assets/icons';
 
 import { getMintDisplayName } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 import type { TransferStep } from './rebalancePlanner';
 import type { StepStatus } from './RebalanceStepRow';
@@ -64,8 +65,9 @@ export const RebalanceChainCard: React.FC<RebalanceChainCardProps> = ({
   const failedState = failedStep ? stepStates[failedStep.id] : undefined;
 
   return (
-    <View className="mx-4 my-1.5" style={allDone ? { opacity: 0.85 } : undefined}>
-      <TransferCard>
+    <Log name="RebalanceChainCard">
+      <View className="mx-4 my-1.5" style={allDone ? { opacity: 0.85 } : undefined}>
+        <TransferCard>
         {/* ── Hop rows — each hop shows send → progress → receive ── */}
         {steps.map((step) => {
           const state = stepStates[step.id] || { status: 'pending' as StepStatus };
@@ -149,7 +151,8 @@ export const RebalanceChainCard: React.FC<RebalanceChainCardProps> = ({
             </HStack>
           </VStack>
         )}
-      </TransferCard>
-    </View>
+        </TransferCard>
+      </View>
+    </Log>
   );
 };

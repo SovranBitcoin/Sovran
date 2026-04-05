@@ -155,6 +155,10 @@ export interface MintListItem {
   auditState?: string;
   /** Whether this mint can send the requested amount offline (exact proof composition). */
   worksOffline?: boolean;
+  /** Follower count of the mint operator's Nostr identity (from NUT-06 contact info). */
+  contactFollowers?: number;
+  /** Reputation score (0-100) of the mint operator's Nostr identity. */
+  contactReputation?: number;
 }
 
 /**

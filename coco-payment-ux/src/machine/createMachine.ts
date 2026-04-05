@@ -1,5 +1,5 @@
-import { NetworkError, HttpResponseError } from '@cashu/coco-core';
 import { defaultDetectors } from '../detectors';
+import { isMintOfflineError } from '../errors';
 import { t } from '../formatting/locales';
 import { composeSatoshis } from '../offline';
 import { transition } from './transitions';
@@ -16,16 +16,6 @@ import type {
   ScanSourceResult,
   StepDataMap,
 } from './types';
-
-// ---------------------------------------------------------------------------
-// Mint-offline error detection
-// ---------------------------------------------------------------------------
-
-function isMintOfflineError(err: unknown): boolean {
-  if (err instanceof NetworkError) return true;
-  if (err instanceof HttpResponseError && err.status >= 500) return true;
-  return false;
-}
 
 // ---------------------------------------------------------------------------
 // Derive ExecutionState from step
@@ -234,7 +224,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     data: { mintUrl: string; amount: number; unit: string },
     opts?: { rolledBack?: boolean }
   ): void {
-    const message = err instanceof Error ? err.message : `${variant === 'melt' ? 'Melt' : 'Payment request'} failed`;
+    const message = isMintOfflineError(err)
+      ? t('MINT_UNREACHABLE', getLocale?.() ?? 'en')
+      : err instanceof Error ? err.message : `${variant === 'melt' ? 'Melt' : 'Payment request'} failed`;
 
     // Always notify failure so the processing notification is dismissed.
     void notifications?.onPaymentFailed?.({
@@ -809,10 +801,14 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
 
           // Phase 3: Error
           if (!handled) {
+            const mintUnreachable = isMintOfflineError(err);
             step = 'error';
             stepData = {
               code: 'SEND_FAILED',
-              message: err instanceof Error ? err.message : t('SEND_FAILED', getLocale?.() ?? 'en'),
+              message: mintUnreachable
+                ? t('MINT_UNREACHABLE', getLocale?.() ?? 'en')
+                : err instanceof Error ? err.message : t('SEND_FAILED', getLocale?.() ?? 'en'),
+              ...(mintUnreachable ? { data: { mintUnreachable: true } } : {}),
             } as any;
           }
         }
@@ -845,11 +841,14 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           } catch (e) { console.warn('[PaymentMachine] JSON parse failed:', e instanceof Error ? e.message : e); }
         } catch (err) {
           console.warn('[PaymentMachine] Mint quote failed:', err instanceof Error ? err.message : err);
+          const mintUnreachable = isMintOfflineError(err);
           step = 'error';
           stepData = {
             code: 'MINT_QUOTE_FAILED',
-            message:
-              err instanceof Error ? err.message : t('MINT_QUOTE_FAILED', getLocale?.() ?? 'en'),
+            message: mintUnreachable
+              ? t('MINT_UNREACHABLE', getLocale?.() ?? 'en')
+              : err instanceof Error ? err.message : t('MINT_QUOTE_FAILED', getLocale?.() ?? 'en'),
+            ...(mintUnreachable ? { data: { mintUnreachable: true } } : {}),
           } as any;
         }
         handlerExecuting = false;

@@ -6,6 +6,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { getContrastColors, FALLBACK_COLORS, useDominantColor } from './colorUtils';
+import { Log } from '@/shared/lib/logger';
 
 const MIN_PERCENTAGE_FOR_AVATAR = 12;
 const AVATAR_SIZE = 20;
@@ -154,6 +155,7 @@ export const DistributionBar: React.FC<DistributionBarProps> = ({
   const isEmpty = activeCount === 0;
 
   return (
+    <Log name="DistributionBar">
     <View className="mx-4 mb-2 h-8 overflow-visible" onLayout={handleLayout}>
       {containerWidth > 0 && !isEmpty && (
         <View className="flex-1 flex-row">
@@ -180,6 +182,7 @@ export const DistributionBar: React.FC<DistributionBarProps> = ({
         </View>
       )}
     </View>
+    </Log>
   );
 };
 

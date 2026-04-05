@@ -19,7 +19,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/time';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
-import { log } from '@/shared/lib/logger';
+import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   useSwapTransactionsStore,
@@ -121,8 +121,9 @@ export const Transactions = React.memo(
     const ITEM_HEIGHT = 69;
 
     const filteredHistory = useMemo(
-      () =>
-        _.filter(history, (historyEntry: HistoryEntry) => {
+      () => {
+        const t0 = performance.now();
+        const result = _.filter(history, (historyEntry: HistoryEntry) => {
           if (account.unit !== 'all' && historyEntry.unit !== account.unit) return false;
           if (mintUrlFilter !== 'all' && historyEntry.mintUrl !== mintUrlFilter) return false;
 
@@ -170,7 +171,13 @@ export const Transactions = React.memo(
           }
 
           return true;
-        }),
+        });
+        const duration = Math.round((performance.now() - t0) * 100) / 100;
+        if (duration > 20) {
+          log.warn('transactions.filter.slow', { duration_ms: duration, input: history.length, output: result.length });
+        }
+        return result;
+      },
       [
         history,
         account.unit,
@@ -241,6 +248,7 @@ export const Transactions = React.memo(
     );
 
     const sections = useMemo(() => {
+      const t0 = performance.now();
       const createSections = (items: TimelineItem[], prefix: string) => {
         // Group by date string for display, but keep track of the original date for sorting
         const groupedByDate = _.groupBy(items, (item) => formatDate(getTimelineCreatedAt(item)));
@@ -274,12 +282,17 @@ export const Transactions = React.memo(
       const confirmedSections = createSections(confirmed || [], 'confirmed');
       const expiredSections = createSections(expired || [], 'expired');
 
-      return {
+      const result = {
         pending: pendingSections,
         confirmed: confirmedSections,
         expired: expiredSections,
         all: [...pendingSections, ...confirmedSections, ...expiredSections],
       };
+      const duration = Math.round((performance.now() - t0) * 100) / 100;
+      if (duration > 20) {
+        log.warn('transactions.sections.slow', { duration_ms: duration, pending: pendingSections.length, confirmed: confirmedSections.length, expired: expiredSections.length });
+      }
+      return result;
     }, [pending, confirmed, expired, showMore, days]);
 
     const sectionsToDisplay = useMemo(() => {
@@ -463,37 +476,39 @@ export const Transactions = React.memo(
       HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16; // 16 for spacing
 
     return (
-      <LegendList
-        waitForInitialLayout={false}
-        key={listKey}
-        style={{ flex: 1 }}
-        data={sectionsToDisplay}
-        keyExtractor={(section) => section.index!}
-        estimatedItemSize={estimateSectionHeight(sectionsToDisplay[0] || { data: [] })}
-        maintainVisibleContentPosition
-        contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
-        ListHeaderComponent={<View>{typeof header === 'function' ? header() : header}</View>}
-        ListEmptyComponent={emptyComponent}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        renderItem={({ item: section }) => (
-          <VStack spacing={4} className="mb-4">
-            <Text
-              size={14}
-              heavy
-              color={opacity(foreground, 0.33)}
-              style={{ height: HEADER_HEIGHT }}>
-              {section.title}
-            </Text>
-            <View style={[styles.card, { borderColor }]}>
-              <BlurCardFrame accentColor={muted}>
-                <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
-              </BlurCardFrame>
-            </View>
-          </VStack>
-        )}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
-      />
+      <Log name="Transactions">
+        <LegendList
+          waitForInitialLayout={false}
+          key={listKey}
+          style={{ flex: 1 }}
+          data={sectionsToDisplay}
+          keyExtractor={(section) => section.index!}
+          estimatedItemSize={estimateSectionHeight(sectionsToDisplay[0] || { data: [] })}
+          maintainVisibleContentPosition
+          contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
+          ListHeaderComponent={<View>{typeof header === 'function' ? header() : header}</View>}
+          ListEmptyComponent={emptyComponent}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          renderItem={({ item: section }) => (
+            <VStack spacing={4} className="mb-4">
+              <Text
+                size={14}
+                heavy
+                color={opacity(foreground, 0.33)}
+                style={{ height: HEADER_HEIGHT }}>
+                {section.title}
+              </Text>
+              <View style={[styles.card, { borderColor }]}>
+                <BlurCardFrame accentColor={muted}>
+                  <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
+                </BlurCardFrame>
+              </View>
+            </VStack>
+          )}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
+        />
+      </Log>
     );
   }
 );

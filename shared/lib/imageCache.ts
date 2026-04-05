@@ -23,5 +23,12 @@ export async function prefetchImages(
   urls: Array<string | null | undefined> | undefined
 ): Promise<void> {
   if (!urls || urls.length === 0) return;
+  const newUrls = urls.filter((u) => u && !prefetchedUrls.has(u.trim()));
+  if (newUrls.length === 0) return;
+  const t0 = performance.now();
   await Promise.all(urls.map((url) => prefetchImage(url)));
+  const duration = Math.round((performance.now() - t0) * 100) / 100;
+  if (duration > 200) {
+    console.warn(`[perf] prefetchImages(${newUrls.length} new) took ${duration}ms`);
+  }
 }

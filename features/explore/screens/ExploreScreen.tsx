@@ -23,7 +23,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
-  InteractionManager,
   Linking,
   ScrollView,
   StyleSheet,
@@ -462,34 +461,6 @@ const MapTeaserCard = () => {
     });
   }, [fetchPlaces]);
 
-  // Prewarm the clustering index off the critical path so opening the modal is faster.
-  useEffect(() => {
-    if (!placesCache?.data?.length || !placesCache.timestamp) return;
-
-    let task: { cancel: () => void } | null = null;
-    const timer = setTimeout(() => {
-      task = InteractionManager.runAfterInteractions(async () => {
-        // Lazy import to avoid pulling clustering code into initial Explore render
-        const { prewarmBTCMapClusterManager } = await import('@/shared/lib/map/btcMapClusterCache');
-        const points = placesCache.data.map((p) => ({
-          id: p.id,
-          lat: p.lat,
-          lon: p.lon,
-          icon: p.icon,
-        }));
-        prewarmBTCMapClusterManager(`btcmap:${placesCache.timestamp}:all`, points, {
-          radius: 50,
-          maxZoom: 17,
-          minPoints: 2,
-        });
-      });
-    }, 800);
-
-    return () => {
-      clearTimeout(timer);
-      task?.cancel();
-    };
-  }, [placesCache?.timestamp, placesCache?.data]);
 
   const placesCount = placesCache?.data.length ?? 0;
   const displayCount =

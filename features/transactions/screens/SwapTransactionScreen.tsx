@@ -313,12 +313,13 @@ export function SwapTransactionScreen({ groupId }: Props) {
   }, [group]);
 
   // ── Compute totals for the header and footer ──
-  const { totalReceived, totalSent, totalFees, stepCount } = useMemo(() => {
-    if (!group) return { totalReceived: 0, totalSent: 0, totalFees: 0, stepCount: 0 };
+  const { totalReceived, totalSent, totalFees, stepCount, historyReady } = useMemo(() => {
+    if (!group) return { totalReceived: 0, totalSent: 0, totalFees: 0, stepCount: 0, historyReady: false };
 
     let received = 0;
     let sent = 0;
     let steps = 0;
+    let hasMintHistory = false;
 
     for (const lg of legGroups) {
       steps += lg.legs.length;
@@ -331,17 +332,22 @@ export function SwapTransactionScreen({ groupId }: Props) {
           ? (historyByQuoteId.get(leg.meltQuoteId) as MeltHistoryEntry | undefined)
           : undefined;
 
-        if (mintEntry) received += Math.abs(mintEntry.amount);
+        if (mintEntry) { received += Math.abs(mintEntry.amount); hasMintHistory = true; }
         if (meltEntry) sent += Math.abs(meltEntry.amount);
         else if (leg.amount > 0) sent += leg.amount; // fallback for synthetic melts
       }
     }
 
+    // Don't compute fees until mint history is loaded — otherwise received=0
+    // makes it look like everything was lost to fees.
+    const ready = hasMintHistory || group.state === 'cancelled';
+
     return {
       totalReceived: received,
       totalSent: sent,
-      totalFees: Math.max(0, sent - received),
+      totalFees: ready ? Math.max(0, sent - received) : 0,
       stepCount: steps,
+      historyReady: ready,
     };
   }, [group, legGroups, historyByQuoteId]);
 

@@ -8,7 +8,7 @@ import opacity from 'hex-color-opacity';
 import { PUBLIC_KEYS } from '@/shared/lib/constants';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { prefetchImage } from '@/shared/lib/imageCache';
-import { paymentLog } from '@/shared/lib/logger';
+import { paymentLog, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { PressableFeedback } from 'heroui-native';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -130,27 +130,29 @@ export const ContactItem = React.memo(function ContactItem({
   );
 
   return (
-    <PressableFeedback
-      animation={false}
-      onPress={() => {
-        if (!item.pubkey) return;
-        paymentLog.debug('contact_item.press', { type: item.type, pubkey: item.pubkey.slice(0, 16) });
-        router.navigate({
-          pathname: '/(user-flow)/profile' as const,
-          params: { pubkey: item.pubkey },
-        });
-      }}>
-      <PressableFeedback.Ripple />
-      <View
-        pointerEvents="none"
-        style={{
-          paddingHorizontal: 16,
-          paddingVertical: 8,
-          paddingTop: index === 0 ? 16 : 8,
-          paddingBottom: index === length - 1 ? 16 : 8,
+    <Log name="ContactItem">
+      <PressableFeedback
+        animation={false}
+        onPress={() => {
+          if (!item.pubkey) return;
+          paymentLog.debug('contact_item.press', { type: item.type, pubkey: item.pubkey.slice(0, 16) });
+          router.navigate({
+            pathname: '/(user-flow)/profile' as const,
+            params: { pubkey: item.pubkey },
+          });
         }}>
-        {content}
-      </View>
-    </PressableFeedback>
+        <PressableFeedback.Ripple />
+        <View
+          pointerEvents="none"
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            paddingTop: index === 0 ? 16 : 8,
+            paddingBottom: index === length - 1 ? 16 : 8,
+          }}>
+          {content}
+        </View>
+      </PressableFeedback>
+    </Log>
   );
 });

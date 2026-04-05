@@ -7,7 +7,7 @@ import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log } from '@/shared/lib/logger';
+import { log, Log } from '@/shared/lib/logger';
 
 interface MonthItem {
   key: string;
@@ -144,6 +144,7 @@ export function MonthSelector({
   if (months.length === 0) return null;
 
   return (
+    <Log name="MonthSelector">
     <View className="bg-transparent px-4 py-2">
       <ScrollView
         ref={scrollViewRef}
@@ -164,5 +165,6 @@ export function MonthSelector({
         </HStack>
       </ScrollView>
     </View>
+    </Log>
   );
 }
