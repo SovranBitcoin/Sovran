@@ -168,7 +168,7 @@ export interface RoutstrModel {
   };
   enabled: boolean;
   upstream_provider_id: string | null;
-  canonical_slug: string;
+  canonical_slug: string | null;
   alias_ids: string[] | null;
 }
 
