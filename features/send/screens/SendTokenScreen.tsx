@@ -142,12 +142,12 @@ export function SendTokenScreen({ sendHistoryEntry, mintWasOffline, onNavigateBa
             </Alert>
           )}
 
-          {entry.state === 'pending' && (
+          {entry.state !== 'finalized' && entry.state !== 'rolledBack' && entry.tokenString && (
             <PaymentInfo
               copyTarget="token"
               unit={entry.unit}
-              data={entry.tokenString?.toString() ?? ''}
-              animated={(entry.tokenString?.length ?? 0) >= 500}
+              data={entry.tokenString.toString()}
+              animated={(entry.tokenString.length ?? 0) >= 500}
             />
           )}
 

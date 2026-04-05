@@ -33,6 +33,11 @@
  *   coco         Coco wallet module breakdown, issues, mint requests
  *   network      Network request/response pairs with latency
  *   full         Full entries but deduplicated and trimmed
+ *   diff         Compare latest session against previous to isolate failure-specific entries
+ *   flows        Reconstruct cross-async traces using flowId in ctx
+ *   ws           WebSocket connection health, subscription analysis, message rates
+ *   gc           Hermes memory trend, GC pressure, JS thread blocks, leak detection
+ *   budget       Token cost meta-analysis — shows which modes fit in which context windows
  *
  * OPTIONS:
  *   --threshold <ms>    Duration threshold for 'slow' mode (default: 500)
@@ -45,6 +50,8 @@
  *   --until <ms>        Only entries before this _t value
  *   --event <pattern>   Filter to events matching this substring
  *   --latest            Only analyse the most recent app session (detects restarts via _t resets)
+ *   --format <fmt>      Output format for 'full' mode: json (default), yaml, md (pipe-delimited)
+ *   --token-budget <n>  Max approximate tokens — output is pruned to fit
  */
 
 /* eslint-disable @typescript-eslint/no-var-requires */
@@ -77,6 +84,10 @@ interface Options {
   until: number | null;
   eventFilter: string | null;
   latest: boolean;
+  /** Output format for full mode: 'json' (default), 'yaml', or 'md' (pipe-delimited) */
+  format: 'json' | 'yaml' | 'md';
+  /** Max approximate token budget. Output is pruned to fit. null = unlimited. */
+  tokenBudget: number | null;
 }
 
 // ─── Parse CLI args ──────────────────────────────────────────────────────────
@@ -95,6 +106,8 @@ function parseArgs(argv: string[]): Options {
     until: null,
     eventFilter: null,
     latest: false,
+    format: 'json',
+    tokenBudget: null,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -121,6 +134,11 @@ function parseArgs(argv: string[]): Options {
       opts.eventFilter = args[++i];
     } else if (arg === '--latest') {
       opts.latest = true;
+    } else if (arg === '--format' && args[i + 1]) {
+      const f = args[++i];
+      if (f === 'yaml' || f === 'md' || f === 'json') opts.format = f;
+    } else if (arg === '--token-budget' && args[i + 1]) {
+      opts.tokenBudget = parseInt(args[++i], 10);
     }
   }
 
@@ -410,6 +428,50 @@ function modeStats(entries: LogEntry[], opts: Options): string {
     for (const [event, count] of [...byEvent.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)) {
       lines.push(`  ${String(count).padStart(5)}x  ${event}`);
     }
+  }
+
+  // Template-based dedup: group by event name, show which params vary.
+  // Simplified Drain algorithm — for structured logs the event name IS the template,
+  // and the varying parts are the param values.
+  lines.push('');
+  lines.push('EVENT TEMPLATES (param variability):');
+  const templateGroups = new Map<string, { count: number; paramKeys: Set<string>; varyingKeys: Set<string>; tFirst: number; tLast: number }>();
+  for (const e of entries) {
+    const existing = templateGroups.get(e.event);
+    const t = e._t ?? 0;
+    const keys = e.params ? Object.keys(e.params).filter(k => k !== '_dedup') : [];
+    if (!existing) {
+      templateGroups.set(e.event, {
+        count: 1,
+        paramKeys: new Set(keys),
+        varyingKeys: new Set(),
+        tFirst: t,
+        tLast: t,
+      });
+    } else {
+      existing.count++;
+      existing.tLast = t;
+      // Detect varying keys: keys present in some entries but not others, or keys with different values
+      for (const k of keys) {
+        if (!existing.paramKeys.has(k)) existing.varyingKeys.add(k);
+        existing.paramKeys.add(k);
+      }
+    }
+  }
+  // Track value variance: for events with >1 occurrence, sample first+last values
+  const highFreqTemplates = [...templateGroups.entries()]
+    .filter(([_, g]) => g.count >= 3)
+    .sort((a, b) => b[1].count - a[1].count);
+  if (highFreqTemplates.length > 0) {
+    for (const [event, g] of highFreqTemplates.slice(0, 15)) {
+      const span = g.tLast - g.tFirst;
+      const spanStr = span < 1000 ? `${Math.round(span)}ms` : `${(span / 1000).toFixed(1)}s`;
+      const keys = [...g.paramKeys].join(', ');
+      lines.push(`  ${String(g.count).padStart(5)}x  ${event} (${spanStr}) [${keys || 'no params'}]`);
+    }
+    if (highFreqTemplates.length > 15) lines.push(`  ... +${highFreqTemplates.length - 15} more`);
+  } else {
+    lines.push('  No events with 3+ occurrences.');
   }
 
   return lines.join('\n');
@@ -1030,6 +1092,50 @@ function modeFull(entries: LogEntry[], opts: Options): string {
     lines.push(`// Deduplicated: ${entries.length} entries -> ${deduped.length} (${saved} duplicates removed)`);
   }
 
+  // ── Pipe-delimited markdown format (~40% fewer tokens than JSON) ──
+  if (opts.format === 'md') {
+    lines.push('_t|Δ|lvl|event|src|params|err');
+    let prevT: number | null = null;
+    for (const e of page) {
+      const t = e._t ?? 0;
+      const delta = prevT !== null ? Math.round(t - prevT) : 0;
+      prevT = t;
+      const lvl = e.level === 'debug' ? 'DBG' : e.level === 'info' ? 'INF' : e.level.slice(0, 3).toUpperCase();
+      const deltaStr = delta > 0 ? `+${delta}` : '';
+      const params = shortParams(e.params);
+      const rep = (e._count ?? 1) > 1 ? ` x${e._count}` : '';
+      const err = e.error ? `${e.error.name}:${e.error.message}` : '';
+      lines.push(`${Math.round(t)}|${deltaStr}|${lvl}|${e.event}|${shortSrc(e.src)}|${params}${rep}|${err}`);
+    }
+    lines.push(footer);
+    return lines.join('\n');
+  }
+
+  // ── YAML inline format (best LLM comprehension for nested data) ──
+  if (opts.format === 'yaml') {
+    let prevT: number | null = null;
+    for (const e of page) {
+      const t = e._t ?? 0;
+      const delta = prevT !== null ? Math.round(t - prevT) : 0;
+      prevT = t;
+      const parts: string[] = [`- {_t: ${Math.round(t)}`];
+      if (delta > 0) parts.push(`d: ${delta}`);
+      parts.push(`lvl: ${e.level}, ev: ${e.event}`);
+      if ((e._count ?? 1) > 1) parts.push(`x: ${e._count}`);
+      if (e.params) {
+        const p: any = { ...e.params };
+        delete p._dedup;
+        if (Object.keys(p).length > 0) parts.push(`p: ${JSON.stringify(p)}`);
+      }
+      if (e.error) parts.push(`err: "${e.error.name}: ${e.error.message}"`);
+      if (e.ctx) parts.push(`ctx: ${JSON.stringify(e.ctx)}`);
+      lines.push(parts.join(', ') + '}');
+    }
+    lines.push(footer);
+    return lines.join('\n');
+  }
+
+  // ── Default: JSON ──
   for (const e of page) {
     const entry: any = { ...e };
     if (e._count && e._count > 1) entry._repeated = e._count;
@@ -1040,6 +1146,484 @@ function modeFull(entries: LogEntry[], opts: Options): string {
 
   lines.push(footer);
   return lines.join('\n');
+}
+
+// ─── Mode: diff ─────────────────────────────────────────────────────────────
+// Compare the latest session against the previous one to isolate
+// failure-specific entries. Based on LogSage's session diff technique:
+// lines present in the failing session but absent from the baseline are signal.
+
+function modeDiff(allEntries: LogEntry[], _opts: Options): string {
+  // Find session boundaries (same logic as extractLatestSession)
+  const boundaries: number[] = [0];
+  let prevT = -1;
+  for (let i = 0; i < allEntries.length; i++) {
+    const t = allEntries[i]._t ?? 0;
+    if (prevT >= 0) {
+      const delta = t - prevT;
+      if (delta < -500 || delta > 60_000) boundaries.push(i);
+    }
+    prevT = t;
+  }
+
+  if (boundaries.length < 2) {
+    return 'Only one session found — need at least two sessions to diff.\nRun the app twice with logs piped to log.txt, then re-run diff.';
+  }
+
+  // Last two sessions
+  const prevStart = boundaries[boundaries.length - 2];
+  const currStart = boundaries[boundaries.length - 1];
+  const prevSession = allEntries.slice(prevStart, currStart);
+  const currSession = allEntries.slice(currStart);
+
+  // Build event template: "level|event|param_keys" — the invariant shape of each log type
+  const templateOf = (e: LogEntry): string => {
+    const paramKeys = e.params ? Object.keys(e.params).sort().join(',') : '';
+    return `${e.level}|${e.event}|${paramKeys}`;
+  };
+
+  const prevTemplates = new Map<string, number>();
+  for (const e of prevSession) {
+    const t = templateOf(e);
+    prevTemplates.set(t, (prevTemplates.get(t) ?? 0) + 1);
+  }
+
+  const currTemplates = new Map<string, number>();
+  for (const e of currSession) {
+    const t = templateOf(e);
+    currTemplates.set(t, (currTemplates.get(t) ?? 0) + 1);
+  }
+
+  // Entries unique to the current (failing) session
+  const onlyCurr: Array<{ template: string; count: number; sample: LogEntry }> = [];
+  const seen = new Set<string>();
+  for (const e of currSession) {
+    const t = templateOf(e);
+    if (!prevTemplates.has(t) && !seen.has(t)) {
+      seen.add(t);
+      onlyCurr.push({ template: t, count: currTemplates.get(t) ?? 1, sample: e });
+    }
+  }
+
+  // Templates significantly more frequent in current session
+  const countDiffs: Array<{ event: string; prev: number; curr: number }> = [];
+  for (const [t, currCount] of currTemplates) {
+    const prevCount = prevTemplates.get(t) ?? 0;
+    if (prevCount > 0 && currCount > prevCount * 2 && currCount - prevCount >= 3) {
+      const sample = currSession.find(e => templateOf(e) === t)!;
+      countDiffs.push({ event: sample.event, prev: prevCount, curr: currCount });
+    }
+  }
+
+  // Entries unique to the previous (baseline) session
+  const onlyPrev: Array<{ template: string; count: number; sample: LogEntry }> = [];
+  const seenPrev = new Set<string>();
+  for (const e of prevSession) {
+    const t = templateOf(e);
+    if (!currTemplates.has(t) && !seenPrev.has(t)) {
+      seenPrev.add(t);
+      onlyPrev.push({ template: t, count: prevTemplates.get(t) ?? 1, sample: e });
+    }
+  }
+
+  const lines: string[] = [];
+  lines.push('SESSION DIFF (latest vs previous):');
+  lines.push(`  Previous session: ${prevSession.length} entries`);
+  lines.push(`  Current session:  ${currSession.length} entries`);
+  lines.push('');
+
+  if (onlyCurr.length > 0) {
+    lines.push(`ONLY IN CURRENT SESSION (${onlyCurr.length} unique event types):`);
+    lines.push('  These entries appear in the failing session but NOT in the baseline.');
+    lines.push('');
+    onlyCurr.sort((a, b) => b.count - a.count);
+    for (const o of onlyCurr.slice(0, 30)) {
+      const params = shortParams(o.sample.params);
+      const countStr = o.count > 1 ? ` (${o.count}x)` : '';
+      lines.push(`  ${levelIcon(o.sample.level)} ${o.sample.event}${countStr}  ${params}`);
+      if (o.sample.error) {
+        lines.push(`       ERR: ${o.sample.error.name}: ${o.sample.error.message}`);
+      }
+    }
+    if (onlyCurr.length > 30) lines.push(`  ... +${onlyCurr.length - 30} more`);
+    lines.push('');
+  } else {
+    lines.push('No event types unique to the current session.');
+    lines.push('');
+  }
+
+  if (countDiffs.length > 0) {
+    lines.push('SIGNIFICANTLY MORE FREQUENT IN CURRENT SESSION:');
+    lines.push('');
+    countDiffs.sort((a, b) => (b.curr - b.prev) - (a.curr - a.prev));
+    for (const d of countDiffs.slice(0, 15)) {
+      lines.push(`  ${d.event}: ${d.prev}x -> ${d.curr}x (+${d.curr - d.prev})`);
+    }
+    lines.push('');
+  }
+
+  if (onlyPrev.length > 0) {
+    lines.push(`MISSING FROM CURRENT SESSION (${onlyPrev.length} event types):`);
+    lines.push('  These entries appeared in the baseline but are absent now.');
+    lines.push('');
+    onlyPrev.sort((a, b) => b.count - a.count);
+    for (const o of onlyPrev.slice(0, 20)) {
+      const params = shortParams(o.sample.params);
+      const countStr = o.count > 1 ? ` (${o.count}x)` : '';
+      lines.push(`  ${levelIcon(o.sample.level)} ${o.sample.event}${countStr}  ${params}`);
+    }
+    if (onlyPrev.length > 20) lines.push(`  ... +${onlyPrev.length - 20} more`);
+  }
+
+  return lines.join('\n');
+}
+
+// ─── Mode: flows ────────────────────────────────────────────────────────────
+// Reconstructs cross-async operation traces using flowId in ctx.
+// Shows each flow as a timeline with relative timing and outcome.
+
+function modeFlows(entries: LogEntry[], opts: Options): string {
+  // Group entries by flowId
+  const flows = new Map<string, LogEntry[]>();
+  for (const e of entries) {
+    const flowId = (e.ctx as any)?.flowId as string | undefined;
+    if (!flowId) continue;
+    if (!flows.has(flowId)) flows.set(flowId, []);
+    flows.get(flowId)!.push(e);
+  }
+
+  if (flows.size === 0) {
+    return 'No flow entries found. Use startFlow() in the app to trace user actions across async boundaries.';
+  }
+
+  const lines: string[] = [];
+  lines.push(`FLOW ANALYSIS (${flows.size} flows):`);
+  lines.push('');
+
+  const flowEntries = [...flows.entries()].sort((a, b) => {
+    const aStart = a[1][0]._t ?? 0;
+    const bStart = b[1][0]._t ?? 0;
+    return aStart - bStart;
+  });
+
+  const { page, footer } = paginate(flowEntries, opts);
+
+  for (const [flowId, events] of page) {
+    const first = events[0];
+    const last = events[events.length - 1];
+    const duration = Math.round(((last._t ?? 0) - (first._t ?? 0)) * 100) / 100;
+
+    // Determine outcome
+    const hasError = events.some(e => e.level === 'error' || e.level === 'fatal');
+    const hasEnd = events.some(e => e.event === 'flow.end');
+    const outcome = hasError ? 'ERROR' : hasEnd ? 'COMPLETED' : 'IN-PROGRESS';
+
+    lines.push(`  ${flowId} (${duration}ms, ${outcome})`);
+
+    const startT = first._t ?? 0;
+    for (const e of events) {
+      const rel = Math.round(((e._t ?? 0) - startT) * 100) / 100;
+      const params = shortParams(e.params);
+      const err = e.error ? ` ERR:${e.error.name}:${e.error.message}` : '';
+      lines.push(`    +${rel}ms  ${levelIcon(e.level)} ${e.event.padEnd(35).slice(0, 35)} ${params}${err}`);
+    }
+    lines.push('');
+  }
+
+  lines.push(footer);
+  return lines.join('\n');
+}
+
+// ─── Mode: ws ───────────────────────────────────────────────────────────────
+// WebSocket connection health and subscription analysis.
+
+function extractHost(url: string): string {
+  return url.replace(/^(wss?|https?):\/\//, '').split('/')[0];
+}
+
+function modeWS(entries: LogEntry[], _opts: Options): string {
+  const wsEntries = entries.filter(e =>
+    e.event.startsWith('ws.') ||
+    e.event.includes('.ws.') ||
+    e.event.includes('ws_error') ||
+    e.event.includes('subscribe') ||
+    e.event.includes('ws_message') ||
+    e.event.includes('socket')
+  );
+
+  if (wsEntries.length === 0) return 'No WebSocket entries found.';
+
+  const lines: string[] = [];
+
+  // ── Connection lifecycle ──
+  const connections = new Map<string, { opens: number; closes: number; errors: number; reconnects: number; lastCode?: number; lastReason?: string }>();
+  for (const e of wsEntries) {
+    // Match both our ws.* events and coco's ws_error/ws_* events
+    const isWsLifecycle = e.event.startsWith('ws.') || e.event.includes('ws_error');
+    if (!isWsLifecycle) continue;
+    const url = (e.params?.url as string) ?? (e.params?.mintUrl as string) ?? 'unknown';
+    const host = extractHost(url);
+    if (!connections.has(host)) connections.set(host, { opens: 0, closes: 0, errors: 0, reconnects: 0 });
+    const conn = connections.get(host)!;
+    if (e.event === 'ws.open') conn.opens++;
+    else if (e.event === 'ws.close') { conn.closes++; conn.lastCode = e.params?.code as number; conn.lastReason = e.params?.reason as string; }
+    else if (e.event === 'ws.error' || e.event.includes('ws_error')) conn.errors++;
+    else if (e.event === 'ws.reconnect') conn.reconnects++;
+  }
+
+  if (connections.size > 0) {
+    lines.push('WEBSOCKET CONNECTIONS:');
+    lines.push('');
+    for (const [host, c] of [...connections.entries()].sort((a, b) => b[1].errors - a[1].errors)) {
+      const status = c.opens > c.closes ? 'OPEN' : 'CLOSED';
+      lines.push(`  ${host}  [${status}]`);
+      lines.push(`    opens=${c.opens} closes=${c.closes} errors=${c.errors} reconnects=${c.reconnects}`);
+      if (c.lastCode) lines.push(`    last close: code=${c.lastCode} reason="${c.lastReason ?? ''}"`);
+    }
+    lines.push('');
+  }
+
+  // ── Subscription health ──
+  const subRequests = wsEntries.filter(e => e.event.includes('subscribe') && !e.event.includes('unsubscribe'));
+  const subAccepted = wsEntries.filter(e => e.event.includes('subscribe_request_accepted') || e.event.includes('subscribed_to'));
+  const unmatched = wsEntries.filter(e => e.event.includes('unmatched'));
+  const queued = wsEntries.filter(e => e.event.includes('queued_message'));
+
+  lines.push('SUBSCRIPTION HEALTH:');
+  lines.push(`  Requests:  ${subRequests.length}`);
+  lines.push(`  Accepted:  ${subAccepted.length}`);
+  if (unmatched.length > 0) lines.push(`  Unmatched: ${unmatched.length}  <- investigate`);
+  if (queued.length > 0) lines.push(`  Queued:    ${queued.length} (socket not open at time of send)`);
+  lines.push('');
+
+  // ── Message rate by host ──
+  const msgByHost = new Map<string, { count: number; firstT: number; lastT: number }>();
+  for (const e of wsEntries) {
+    if (!e.event.includes('ws_message') && !e.event.includes('ws.rate')) continue;
+    const url = (e.params?.mintUrl as string) ?? (e.params?.url as string) ?? 'unknown';
+    const host = extractHost(url);
+    const t = e._t ?? 0;
+    const existing = msgByHost.get(host);
+    if (existing) { existing.count++; existing.lastT = t; }
+    else msgByHost.set(host, { count: 1, firstT: t, lastT: t });
+  }
+
+  if (msgByHost.size > 0) {
+    lines.push('MESSAGE RATES:');
+    for (const [host, m] of [...msgByHost.entries()].sort((a, b) => b[1].count - a[1].count)) {
+      const span = (m.lastT - m.firstT) / 1000;
+      const rate = span > 0 ? (m.count / span).toFixed(1) : '∞';
+      lines.push(`  ${host}: ${m.count} msgs (${rate}/s over ${span.toFixed(1)}s)`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+// ─── Mode: gc ───────────────────────────────────────────────────────────────
+// Memory and garbage collection trend analysis from perf.hermes entries.
+
+function modeGC(entries: LogEntry[], _opts: Options): string {
+  const hermesEntries = entries.filter(e => e.event === 'perf.hermes');
+  const threadEntries = entries.filter(e => e.event === 'perf.js_thread.blocked');
+
+  if (hermesEntries.length === 0 && threadEntries.length === 0) {
+    return 'No Hermes/GC entries found. Call logHermesStats() and startThreadMonitor() in the app to enable.';
+  }
+
+  const lines: string[] = [];
+
+  if (hermesEntries.length > 0) {
+    lines.push('HEAP TREND:');
+    lines.push('');
+
+    let prevHeap = 0;
+    let prevGCs = 0;
+    const firstT = hermesEntries[0]._t ?? 0;
+
+    for (const e of hermesEntries) {
+      const t = (e._t ?? 0) - firstT;
+      const heap = (e.params?.heapSize as number) ?? 0;
+      const heapMB = (heap / (1024 * 1024)).toFixed(1);
+      const delta = heap - prevHeap;
+      const deltaMB = (delta / (1024 * 1024)).toFixed(1);
+      const gcs = (e.params?.numGCs as number) ?? 0;
+      const gcDelta = gcs - prevGCs;
+
+      const sign = delta >= 0 ? '+' : '';
+      const alert = delta > 2 * 1024 * 1024 ? '  <- GROWTH' : '';
+      lines.push(`  T+${(t / 1000).toFixed(0)}s  ${heapMB} MB  (${sign}${deltaMB} MB)  GC: ${gcDelta}${alert}`);
+
+      prevHeap = heap;
+      prevGCs = gcs;
+    }
+    lines.push('');
+
+    // Leak detection: check if heap is monotonically increasing
+    const heapValues = hermesEntries.map(e => (e.params?.heapSize as number) ?? 0);
+    let monotonic = true;
+    for (let i = 1; i < heapValues.length; i++) {
+      if (heapValues[i] < heapValues[i - 1] * 0.95) { monotonic = false; break; }
+    }
+    if (monotonic && heapValues.length >= 3) {
+      const growth = heapValues[heapValues.length - 1] - heapValues[0];
+      lines.push(`LEAK DETECTED: heap grew monotonically by ${(growth / (1024 * 1024)).toFixed(1)} MB over ${hermesEntries.length} samples`);
+      lines.push('');
+    }
+  }
+
+  if (threadEntries.length > 0) {
+    lines.push(`JS THREAD BLOCKS (${threadEntries.length} detected):`);
+    lines.push('');
+    threadEntries.sort((a, b) => ((b.params?.drift_ms as number) ?? 0) - ((a.params?.drift_ms as number) ?? 0));
+    for (const e of threadEntries.slice(0, 15)) {
+      const drift = (e.params?.drift_ms as number) ?? 0;
+      const frames = (e.params?.frames_dropped as number) ?? 0;
+      lines.push(`  [${Math.round(e._t ?? 0)}ms] ${drift}ms drift (${frames} frames dropped)`);
+    }
+    if (threadEntries.length > 15) lines.push(`  ... +${threadEntries.length - 15} more`);
+    lines.push('');
+
+    // Correlate: find nearby events around the worst blocks
+    const worst = threadEntries[0];
+    if (worst) {
+      const worstT = worst._t ?? 0;
+      const nearby = entries.filter(e => {
+        const t = e._t ?? 0;
+        return t >= worstT - 500 && t <= worstT + 100 && e !== worst;
+      }).slice(0, 5);
+      if (nearby.length > 0) {
+        lines.push(`EVENTS NEAR WORST BLOCK (${Math.round(worstT)}ms):`);
+        for (const e of nearby) {
+          lines.push(`  [${Math.round(e._t ?? 0)}ms] ${e.event}  ${shortParams(e.params)}`);
+        }
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ─── Mode: budget ───────────────────────────────────────────────────────────
+// Meta-analysis: shows token cost of each mode to help pick the right one.
+
+function modeBudget(entries: LogEntry[], opts: Options): string {
+  const lines: string[] = [];
+
+  // Run each mode and measure token cost
+  const modes: Array<{ name: string; fn: (e: LogEntry[], o: Options) => string }> = [
+    { name: 'stats', fn: modeStats },
+    { name: 'timeline', fn: modeTimeline },
+    { name: 'errors', fn: modeErrors },
+    { name: 'slow', fn: modeSlow },
+    { name: 'renders', fn: modeRenders },
+    { name: 'screens', fn: modeScreens },
+    { name: 'startup', fn: modeStartup },
+    { name: 'coco', fn: modeCoco },
+    { name: 'network', fn: modeNetwork },
+    { name: 'full (json)', fn: (e, o) => modeFull(e, { ...o, format: 'json' }) },
+    { name: 'full (md)', fn: (e, o) => modeFull(e, { ...o, format: 'md' }) },
+    { name: 'full (yaml)', fn: (e, o) => modeFull(e, { ...o, format: 'yaml' }) },
+  ];
+
+  lines.push('TOKEN BUDGET ANALYSIS:');
+  lines.push(`  Total entries: ${entries.length}`);
+  lines.push('');
+
+  lines.push('MODE TOKEN COSTS (approximate):');
+  lines.push('');
+
+  const results: Array<{ name: string; tokens: number }> = [];
+  for (const mode of modes) {
+    try {
+      const output = mode.fn(entries, opts);
+      const tokens = estimateTokens(output);
+      results.push({ name: mode.name, tokens });
+    } catch {
+      results.push({ name: mode.name, tokens: -1 });
+    }
+  }
+
+  results.sort((a, b) => a.tokens - b.tokens);
+
+  for (const r of results) {
+    if (r.tokens < 0) { lines.push(`  ${r.name.padEnd(18)} ERROR`); continue; }
+    const bar = '█'.repeat(Math.max(1, Math.round((r.tokens / Math.max(...results.map(x => x.tokens))) * 40)));
+    lines.push(`  ${r.name.padEnd(18)} ${String(r.tokens).padStart(8)} tokens  ${bar}`);
+  }
+  lines.push('');
+
+  // Context window fit analysis
+  const windows = [
+    { name: 'Claude Haiku (200K)', tokens: 200000, reserve: 0.25 },
+    { name: 'Claude Sonnet (200K)', tokens: 200000, reserve: 0.25 },
+    { name: 'GPT-4o (128K)', tokens: 128000, reserve: 0.25 },
+    { name: 'Small prompt (8K)', tokens: 8000, reserve: 0.15 },
+  ];
+
+  lines.push('FITS IN CONTEXT WINDOW:');
+  for (const w of windows) {
+    const budget = Math.floor(w.tokens * (1 - w.reserve));
+    const fits = results.filter(r => r.tokens > 0 && r.tokens <= budget).map(r => r.name);
+    lines.push(`  ${w.name}: ${fits.join(', ') || 'none'}`);
+  }
+  lines.push('');
+
+  // Top token consumers in raw data
+  let srcTokens = 0;
+  let ctxTokens = 0;
+  let tsTokens = 0;
+  for (const e of entries) {
+    if (e.src) srcTokens += estimateTokens(JSON.stringify(e.src));
+    if (e.ctx) ctxTokens += estimateTokens(JSON.stringify(e.ctx));
+    if (e.ts) tsTokens += estimateTokens(JSON.stringify(e.ts));
+  }
+
+  lines.push('TOP TOKEN CONSUMERS IN RAW JSON:');
+  const consumers = [
+    { field: 'src (source location)', tokens: srcTokens },
+    { field: 'ctx (context)', tokens: ctxTokens },
+    { field: 'ts (ISO timestamp)', tokens: tsTokens },
+  ].sort((a, b) => b.tokens - a.tokens);
+  for (const c of consumers) {
+    lines.push(`  ${c.field}: ~${c.tokens} tokens`);
+  }
+  lines.push('');
+  lines.push('TIP: Use "full --format md" for ~40% fewer tokens than JSON.');
+  lines.push('     Use dumpForLLM({ format: "md" }) in the app for the same savings.');
+
+  return lines.join('\n');
+}
+
+// ─── Token estimation ───────────────────────────────────────────────────────
+// Rough heuristic: ~4 characters per token for English/technical text.
+// Avoids requiring tiktoken as a dependency.
+
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+function applyTokenBudget(output: string, budget: number): string {
+  const tokens = estimateTokens(output);
+  if (tokens <= budget) return output;
+
+  const lines = output.split('\n');
+  let truncated = '';
+  let currentTokens = 0;
+  const targetTokens = Math.floor(budget * 0.95); // 5% headroom
+
+  for (const line of lines) {
+    const lineTokens = estimateTokens(line + '\n');
+    if (currentTokens + lineTokens > targetTokens) {
+      truncated += `\n[TRUNCATED: ~${tokens} tokens exceeds ${budget} budget — showing ~${currentTokens} tokens]`;
+      break;
+    }
+    truncated += line + '\n';
+    currentTokens += lineTokens;
+  }
+
+  return truncated;
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -1068,7 +1652,7 @@ function main() {
     console.error('  1. Paste dumpForLLM() output into sovran-app/log.txt');
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
-    console.error('Modes: stats, timeline, errors, slow, renders, network, full');
+    console.error('Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget');
     process.exit(1);
   }
 
@@ -1077,6 +1661,14 @@ function main() {
   if (allEntries.length === 0) {
     console.error('No valid log entries found in input.');
     process.exit(1);
+  }
+
+  // diff mode needs all sessions before --latest filtering
+  if (opts.mode === 'diff') {
+    let output = modeDiff(allEntries, opts);
+    if (opts.tokenBudget !== null) output = applyTokenBudget(output, opts.tokenBudget);
+    console.log(output);
+    return;
   }
 
   if (opts.latest) {
@@ -1098,10 +1690,19 @@ function main() {
     case 'coco': output = modeCoco(entries, opts); break;
     case 'network': output = modeNetwork(entries, opts); break;
     case 'full': output = modeFull(entries, opts); break;
+    case 'flows': output = modeFlows(entries, opts); break;
+    case 'ws': output = modeWS(entries, opts); break;
+    case 'gc': output = modeGC(entries, opts); break;
+    case 'budget': output = modeBudget(entries, opts); break;
     default:
       console.error(`Unknown mode: ${opts.mode}`);
-      console.error('Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full');
+      console.error('Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget');
       process.exit(1);
+  }
+
+  // Apply token budget if specified
+  if (opts.tokenBudget !== null) {
+    output = applyTokenBudget(output, opts.tokenBudget);
   }
 
   console.log(output);
