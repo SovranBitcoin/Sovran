@@ -65,6 +65,8 @@ export interface QuickSendSuggestion {
   inputMode: AmountInputMode;
   /** Exact sat amount this resolves to (offline-composable) */
   satoshis: number;
+  /** When true, this suggestion represents the full wallet balance. */
+  sendAll?: boolean;
 }
 
 /**

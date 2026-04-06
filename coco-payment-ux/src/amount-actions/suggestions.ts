@@ -23,6 +23,8 @@ export interface QuickSendSuggestion {
   inputMode: AmountInputMode;
   /** Exact sat amount this resolves to (offline-composable) */
   satoshis: number;
+  /** When true, this suggestion represents the full wallet balance. */
+  sendAll?: boolean;
 }
 
 export interface QuickSendConfig {
@@ -155,5 +157,18 @@ export function computeQuickSendSuggestions(
   const pickedFiat = pickDistributed(allFiat, limit);
   const pickedSat = pickDistributed(allSat, limit);
 
-  return [...pickedFiat, ...pickedSat].sort((a, b) => a.satoshis - b.satoshis);
+  const sorted = [...pickedFiat, ...pickedSat].sort((a, b) => a.satoshis - b.satoshis);
+
+  // Append "Send all" as the last suggestion (always composable — uses all proofs)
+  if (totalBalance > 0) {
+    sorted.push({
+      label: `Send all ${satFormatter.format(totalBalance)}`,
+      inputValue: String(totalBalance),
+      inputMode: 'sat',
+      satoshis: totalBalance,
+      sendAll: true,
+    });
+  }
+
+  return sorted;
 }

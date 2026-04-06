@@ -721,13 +721,16 @@ export function createLogger(options: LoggerOptions = {}): Logger {
       const fmt = dumpOpts?.format ?? 'json';
       const errFirst = dumpOpts?.errorsFirst ?? false;
 
-      // Compress src to "func:line" when file is a useless bundle path
+      // Compress src to "parent/file:func:line" — three anchor points so any
+      // two survive a refactor (per ReLog: line-level precision matters most).
       const compSrc = (src: LogEntry['src']): string => {
         if (!src) return '';
         const f = src.file;
+        const fn = src.func !== 'unknown' ? src.func : '';
         if (!f || f === 'unknown' || f.includes('index.bundle') || f.includes('bundle/'))
-          return src.func !== 'unknown' ? `${src.func}:${src.line}` : String(src.line);
-        return `${f.split('/').slice(-2).join('/')}:${src.line}`;
+          return fn ? `${fn}:${src.line}` : String(src.line);
+        const short = f.split('/').slice(-2).join('/');
+        return fn ? `${short}:${fn}:${src.line}` : `${short}:${src.line}`;
       };
 
       // Key-value params as compact "k=v k2=v2" string

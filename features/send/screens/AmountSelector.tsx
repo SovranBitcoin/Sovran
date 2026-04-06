@@ -267,9 +267,10 @@ export function AmountSelector({
             }}>
             {suggestions.map((s) => {
               const isPrimary = s.inputMode === 'fiat';
+              const isSendAll = !!s.sendAll;
               return (
                 <Pressable
-                  key={s.satoshis}
+                  key={isSendAll ? 'send-all' : s.satoshis}
                   onPress={() => handleSuggestionTap(s)}
                   style={({ pressed }) => ({
                     paddingHorizontal: 14,
@@ -282,6 +283,19 @@ export function AmountSelector({
                     <Text size={13} weight="bold" style={{ color: background }}>
                       {s.label}
                     </Text>
+                  ) : isSendAll ? (
+                    <HStack align="center" spacing={4}>
+                      <Text size={13} weight="heavy" style={{ color: foreground }}>
+                        Send all
+                      </Text>
+                      <AmountFormatter
+                        amount={s.satoshis}
+                        unit="sat"
+                        size={13}
+                        weight="heavy"
+                        color={foreground}
+                      />
+                    </HStack>
                   ) : (
                     <AmountFormatter
                       amount={s.satoshis}
