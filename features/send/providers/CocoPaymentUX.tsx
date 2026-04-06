@@ -291,6 +291,52 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           unsubscribes.push(useKYMMintStore.subscribe(pushEnrichment));
           unsubscribes.push(useMintProfileStore.subscribe(pushEnrichment));
 
+          if (screenType === 'mintSelector') {
+            // When a mint is added while the selector is open, build a
+            // new item and push it so the list updates live.
+            unsubscribes.push(
+              manager.on('mint:added', ({ mint }: { mint: { mintUrl: string } }) => {
+                const mintUrl = mint.mintUrl;
+                (async () => {
+                  try {
+                    const [info, balances] = await Promise.all([
+                      manager.mint.getMintInfo(mintUrl).catch(() => null),
+                      manager.wallet.getBalances().catch(() => ({} as Record<string, number>)),
+                    ]);
+                    const enrichment = getMintEnrichment(mintUrl);
+                    callback({
+                      _mintItemAdded: true,
+                      _newMintItem: {
+                        mintUrl,
+                        displayName: (info as any)?.name ?? mintUrl,
+                        iconUrl: (info as any)?.icon_url ?? undefined,
+                        balance: (balances as Record<string, number>)[mintUrl] ?? 0,
+                        unit: 'sat',
+                        status: 'available',
+                        reason: null,
+                        isPreferred: false,
+                        ...enrichment,
+                      },
+                    } as EntryRecord);
+                  } catch {
+                    callback({
+                      _mintItemAdded: true,
+                      _newMintItem: {
+                        mintUrl,
+                        displayName: mintUrl,
+                        balance: 0,
+                        unit: 'sat',
+                        status: 'available',
+                        reason: null,
+                        isPreferred: false,
+                      },
+                    } as EntryRecord);
+                  }
+                })();
+              })
+            );
+          }
+
           if (screenType === 'mintInfo') {
             mintInfoCallback = callback;
             unsubscribes.push(() => { mintInfoCallback = null; mintInfoFetchingUrl = null; });
@@ -310,6 +356,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         if (updated?._mintEnrichment && typeof current.mintUrl === 'string') return true;
         if (updated?._mintInfoFetched && typeof current.mintUrl === 'string') return true;
         if (updated?._mintItemsEnrichment && Array.isArray(current.items)) return true;
+        if (updated?._mintItemAdded && Array.isArray(current.items)) return true;
         return defaultShouldApply(current, updated);
       },
       mergeEntryUpdate: (current, updated) => {
@@ -364,6 +411,28 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         if (updated._mintInfoFetched && typeof current?.mintUrl === 'string') {
           const { _mintInfoFetched, ...rest } = updated;
           return { ...current, ...rest, _mintInfoFetched: true };
+        }
+        if (updated._mintItemAdded && updated._newMintItem && Array.isArray(current.items)) {
+          const newItem = updated._newMintItem as EntryRecord;
+          const exists = (current.items as EntryRecord[]).some(
+            (item) => item.mintUrl === newItem.mintUrl
+          );
+          if (exists) return current;
+
+          // Determine status based on the flow's destination/scope
+          const destination = current.destination as string | undefined;
+          const scope = current.scope as string | undefined;
+          const needsBalance =
+            destination === 'paymentRequest' ||
+            destination === 'meltQuote' ||
+            destination === 'sendEcash';
+          const skipBalance = !needsBalance || scope === 'selected' || scope === 'npc';
+          if (!skipBalance && ((newItem.balance as number) ?? 0) <= 0) {
+            newItem.status = 'disabled';
+            newItem.reason = { code: 'NO_BALANCE', message: 'No balance' };
+          }
+
+          return { ...current, items: [...(current.items as EntryRecord[]), newItem] };
         }
         if (updated._mintItemsEnrichment && Array.isArray(current.items)) {
           const items = (current.items as EntryRecord[]).map((item) => {
