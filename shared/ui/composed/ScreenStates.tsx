@@ -1,4 +1,5 @@
 import React from 'react';
+import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -19,6 +20,7 @@ export function ScreenErrorState({ message, title, onGoBack }: ScreenErrorStateP
   const foreground = useThemeColor('foreground');
 
   return (
+    <Log name="ScreenErrorState">
     <ModalLayoutWrapper>
       <View style={{ flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center' }}>
         {title ? (
@@ -58,6 +60,7 @@ export function ScreenErrorState({ message, title, onGoBack }: ScreenErrorStateP
         />
       </View>
     </ModalLayoutWrapper>
+    </Log>
   );
 }
 
@@ -69,6 +72,7 @@ export function ScreenLoadingState({ message }: ScreenLoadingStateProps) {
   const foreground = useThemeColor('foreground');
 
   return (
+    <Log name="ScreenLoadingState">
     <ModalLayoutWrapper>
       <VStack style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <Spinner size={32} />
@@ -77,5 +81,6 @@ export function ScreenLoadingState({ message }: ScreenLoadingStateProps) {
         </Text>
       </VStack>
     </ModalLayoutWrapper>
+    </Log>
   );
 }

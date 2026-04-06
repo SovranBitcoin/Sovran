@@ -41,7 +41,7 @@ function mapMeltOperationState(state: string): string {
   return 'UNPAID';
 }
 
-function hasP2PKProofs(proofs: ReadonlyArray<{ secret: string }>): boolean {
+function hasP2PKProofs(proofs: readonly { secret: string }[]): boolean {
   return proofs.some((proof) => {
     try {
       const parsed = JSON.parse(proof.secret);
@@ -63,16 +63,30 @@ async function attemptRollback(mgr: Manager, operationId: string): Promise<boole
       console.info('[attemptRollback] Cancelling prepared operation | operationId:', operationId);
       await mgr.ops.send.cancel(operationId);
     } else if (operation && ['executing', 'pending'].includes(operation.state)) {
-      console.info('[attemptRollback] Reclaiming', operation.state, 'operation | operationId:', operationId);
+      console.info(
+        '[attemptRollback] Reclaiming',
+        operation.state,
+        'operation | operationId:',
+        operationId
+      );
       await mgr.ops.send.reclaim(operationId);
     } else {
-      console.warn('[attemptRollback] Operation in unexpected state:', operation?.state, '| operationId:', operationId);
+      console.warn(
+        '[attemptRollback] Operation in unexpected state:',
+        operation?.state,
+        '| operationId:',
+        operationId
+      );
       return false;
     }
     console.info('[attemptRollback] Rollback successful | operationId:', operationId);
     return true;
   } catch (e) {
-    console.warn('[attemptRollback] Rollback failed | operationId:', operationId, e instanceof Error ? e.message : e);
+    console.warn(
+      '[attemptRollback] Rollback failed | operationId:',
+      operationId,
+      e instanceof Error ? e.message : e
+    );
     return false;
   }
 }
@@ -84,7 +98,7 @@ function buildRolledBackResult(
   unit: string,
   paymentRequest: string,
   transportType: 'nostr' | 'http',
-  errorMessage: string,
+  errorMessage: string
 ): { historyEntry: string; rolledBack: true; errorMessage: string } {
   const entry = {
     id: operationId,
@@ -103,7 +117,12 @@ function buildRolledBackResult(
       errorMessage,
     },
   };
-  console.info('[executePaymentRequest] Rolled back | operationId:', operationId, '| error:', errorMessage);
+  console.info(
+    '[executePaymentRequest] Rolled back | operationId:',
+    operationId,
+    '| error:',
+    errorMessage
+  );
   return { historyEntry: JSON.stringify(entry), rolledBack: true, errorMessage };
 }
 
@@ -135,7 +154,9 @@ export interface DefaultOperationsConfig {
 // Factory
 // ---------------------------------------------------------------------------
 
-export function createDefaultOperations(config: DefaultOperationsConfig): Partial<MachineOperations> {
+export function createDefaultOperations(
+  config: DefaultOperationsConfig
+): Partial<MachineOperations> {
   const { getManager, getProofAmounts } = config;
 
   function requireManager(): Manager {
@@ -153,15 +174,31 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
       console.info('[executeSend] Preparing | mintUrl:', mintUrl, '| amount:', amount);
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
       console.info('[executeSend] Executing | operationId:', prepared.id);
-      const { operation } = await mgr.ops.send.execute(prepared.id);
-      console.info('[executeSend] Complete | operationId:', operation.id, '| state:', (operation as any).state);
+      const { operation, token } = await mgr.ops.send.execute(prepared.id);
+      console.info(
+        '[executeSend] Complete | operationId:',
+        operation.id,
+        '| state:',
+        (operation as any).state
+      );
 
       // Try history first (should be there after execute), fall back to
       // constructing from the operation result to avoid a race.
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
-      if (historyEntry) return { historyEntry };
+      if (historyEntry) {
+        // Ensure the token is present — the DB row may not have it yet due to a race.
+        const parsed = JSON.parse(historyEntry);
+        if (!parsed.token && token) {
+          parsed.token = token;
+          return { historyEntry: JSON.stringify(parsed) };
+        }
+        return { historyEntry };
+      }
 
-      console.warn('[executeSend] History entry not found, building from operation | operationId:', operation.id);
+      console.warn(
+        '[executeSend] History entry not found, building from operation | operationId:',
+        operation.id
+      );
       const entry = {
         id: operation.id,
         type: 'send' as const,
@@ -170,6 +207,7 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
         unit: 'sat',
         state: 'pending',
         amount: (operation as any).amount ?? amount,
+        token,
         metadata: { operationId: operation.id },
       };
       return { historyEntry: JSON.stringify(entry) };
@@ -180,17 +218,34 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
 
       if (prepared.needsSwap) {
-        console.warn('[executeOfflineSend] Needs swap, cancelling | operationId:', prepared.id, '| mintUrl:', mintUrl, '| amount:', amount);
+        console.warn(
+          '[executeOfflineSend] Needs swap, cancelling | operationId:',
+          prepared.id,
+          '| mintUrl:',
+          mintUrl,
+          '| amount:',
+          amount
+        );
         await mgr.ops.send.cancel(prepared.id);
         throw new Error('Offline send requires exact proof match');
       }
 
-      const { operation } = await mgr.ops.send.execute(prepared.id);
+      const { operation, token } = await mgr.ops.send.execute(prepared.id);
 
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
-      if (historyEntry) return { historyEntry };
+      if (historyEntry) {
+        const parsed = JSON.parse(historyEntry);
+        if (!parsed.token && token) {
+          parsed.token = token;
+          return { historyEntry: JSON.stringify(parsed) };
+        }
+        return { historyEntry };
+      }
 
-      console.warn('[executeOfflineSend] History entry not found, building from operation | operationId:', operation.id);
+      console.warn(
+        '[executeOfflineSend] History entry not found, building from operation | operationId:',
+        operation.id
+      );
       const entry = {
         id: operation.id,
         type: 'send' as const,
@@ -199,6 +254,7 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
         unit: 'sat',
         state: 'pending',
         amount: (operation as any).amount ?? amount,
+        token,
         metadata: { operationId: operation.id },
       };
       return { historyEntry: JSON.stringify(entry) };
@@ -206,9 +262,19 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
     executeMintQuote: async (mintUrl, amount, _unit) => {
       const mgr = requireManager();
-      console.info('[executeMintQuote] Preparing mint quote | mintUrl:', mintUrl, '| amount:', amount);
+      console.info(
+        '[executeMintQuote] Preparing mint quote | mintUrl:',
+        mintUrl,
+        '| amount:',
+        amount
+      );
       const mintOp = await mgr.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' });
-      console.info('[executeMintQuote] Quote created | operationId:', mintOp.id, '| quoteId:', mintOp.quoteId);
+      console.info(
+        '[executeMintQuote] Quote created | operationId:',
+        mintOp.id,
+        '| quoteId:',
+        mintOp.quoteId
+      );
 
       // Build entry directly from the operation result to avoid a race
       // where getPaginatedHistory runs before HistoryService persists the row.
@@ -230,7 +296,14 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
     buildMintListItems: async (data: StepDataMap['selectMint']): Promise<MintListItem[]> => {
       const mgr = requireManager();
       const t0 = performance.now();
-      console.info('[buildMintListItems] Building mint list | unit:', data.unit, '| scope:', data.scope, '| destination:', data.destination);
+      console.info(
+        '[buildMintListItems] Building mint list | unit:',
+        data.unit,
+        '| scope:',
+        data.scope,
+        '| destination:',
+        data.destination
+      );
       const [allTrustedMints, balances] = await Promise.all([
         mgr.mint.getAllTrustedMints(),
         mgr.wallet.getBalances(),
@@ -246,23 +319,40 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
             const info = await mgr.mint.getMintInfo(mint.mintUrl);
             if (info) {
               mintInfoMap.set(mint.mintUrl, info);
-              console.info('[buildMintListItems] getMintInfo OK', mint.mintUrl, '| name:', info.name, '| icon:', !!info.icon_url);
+              console.info(
+                '[buildMintListItems] getMintInfo OK',
+                mint.mintUrl,
+                '| name:',
+                info.name,
+                '| icon:',
+                !!info.icon_url
+              );
             } else {
               console.warn('[buildMintListItems] getMintInfo returned null for', mint.mintUrl);
             }
           } catch (e) {
-            console.warn('[buildMintListItems] getMintInfo failed for', mint.mintUrl, e instanceof Error ? e.message : e);
+            console.warn(
+              '[buildMintListItems] getMintInfo failed for',
+              mint.mintUrl,
+              e instanceof Error ? e.message : e
+            );
           }
         })
       );
-      console.info('[buildMintListItems] info resolved:', mintInfoMap.size, '/', allTrustedMints.length, '| duration:', Math.round(performance.now() - t0), 'ms');
+      console.info(
+        '[buildMintListItems] info resolved:',
+        mintInfoMap.size,
+        '/',
+        allTrustedMints.length,
+        '| duration:',
+        Math.round(performance.now() - t0),
+        'ms'
+      );
 
       // Trigger background profile fetch for mints with Nostr operator contacts
       config.fetchMintProfiles?.(mintInfoMap);
 
-      const supportedSet = data.supportedMintUrls
-        ? new Set(data.supportedMintUrls)
-        : null;
+      const supportedSet = data.supportedMintUrls ? new Set(data.supportedMintUrls) : null;
 
       const proofAmounts = getProofAmounts?.() ?? {};
 
@@ -278,8 +368,11 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
         // Balance checks only apply in send-type flows (melt/send/payment request).
         // All other cases (no destination, mintQuote, scope override) allow every mint.
         const needsBalanceCheck =
-          data.destination === 'paymentRequest' || data.destination === 'meltQuote' || data.destination === 'sendEcash';
-        const skipBalanceCheck = !needsBalanceCheck || data.scope === 'selected' || data.scope === 'npc';
+          data.destination === 'paymentRequest' ||
+          data.destination === 'meltQuote' ||
+          data.destination === 'sendEcash';
+        const skipBalanceCheck =
+          !needsBalanceCheck || data.scope === 'selected' || data.scope === 'npc';
 
         if (supportedSet && !supportedSet.has(mintUrl)) {
           status = 'disabled';
@@ -328,7 +421,14 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
       console.info('[executeNfcSend] NFC token created | operationId:', operation.id);
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
       if (!historyEntry) {
-        console.warn('[executeNfcSend] History entry not found | operationId:', operation.id, '| mintUrl:', mintUrl, '| amount:', amount);
+        console.warn(
+          '[executeNfcSend] History entry not found | operationId:',
+          operation.id,
+          '| mintUrl:',
+          mintUrl,
+          '| amount:',
+          amount
+        );
         throw new Error('Send history entry not found after creation');
       }
       return {
@@ -348,11 +448,20 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
           console.info('[rollbackSend] Cancelling prepared operation | operationId:', operationId);
           await mgr.ops.send.cancel(operationId);
         } else if (operation && ['executing', 'pending'].includes(operation.state)) {
-          console.info('[rollbackSend] Reclaiming', operation.state, 'operation | operationId:', operationId);
+          console.info(
+            '[rollbackSend] Reclaiming',
+            operation.state,
+            'operation | operationId:',
+            operationId
+          );
           await mgr.ops.send.reclaim(operationId);
         }
       } catch (e) {
-        console.warn('[rollbackSend] Best-effort rollback failed | operationId:', operationId, e instanceof Error ? e.message : e);
+        console.warn(
+          '[rollbackSend] Best-effort rollback failed | operationId:',
+          operationId,
+          e instanceof Error ? e.message : e
+        );
       }
     },
 
@@ -374,7 +483,12 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
     executeReceive: async (tokenString, mintUrl, _amount) => {
       const mgr = requireManager();
-      console.info('[executeReceive] Receiving token | mintUrl:', mintUrl, '| token:', tokenString.slice(0, 20) + '…');
+      console.info(
+        '[executeReceive] Receiving token | mintUrl:',
+        mintUrl,
+        '| token:',
+        tokenString.slice(0, 20) + '…'
+      );
       await mgr.wallet.receive(tokenString);
       console.info('[executeReceive] Token received');
 
@@ -393,7 +507,10 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
       const historyEntry = await findReceiveHistoryEntry(mgr, tokenString, mintUrl);
       if (historyEntry) return { historyEntry, hadP2PKProofs: hadP2PK };
 
-      console.warn('[executeReceive] History entry not found, building from token data | mintUrl:', mintUrl);
+      console.warn(
+        '[executeReceive] History entry not found, building from token data | mintUrl:',
+        mintUrl
+      );
       const entry = {
         id: `redeemed-${Date.now()}`,
         type: 'receive' as const,
@@ -413,13 +530,24 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
     executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
       const mgr = requireManager();
-      console.info('[executeMelt] Starting | mintUrl:', mintUrl, '| amount:', amount, '| target:', meltTarget.slice(0, 30) + '…');
+      console.info(
+        '[executeMelt] Starting | mintUrl:',
+        mintUrl,
+        '| amount:',
+        amount,
+        '| target:',
+        meltTarget.slice(0, 30) + '…'
+      );
 
       const bolt11 = isLightningInvoiceBolt11(meltTarget)
         ? meltTarget
         : await requestInvoiceFromLnurl(meltTarget, amount);
 
-      const operation = await mgr.ops.melt.prepare({ mintUrl, method: 'bolt11', methodData: { invoice: bolt11 } });
+      const operation = await mgr.ops.melt.prepare({
+        mintUrl,
+        method: 'bolt11',
+        methodData: { invoice: bolt11 },
+      });
       console.info('[executeMelt] Executing | operationId:', operation.id);
       const result = await mgr.ops.melt.execute(operation.id);
       console.info('[executeMelt] Complete | operationId:', result.id, '| state:', result.state);
@@ -448,7 +576,14 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
     buildMintReviewInfo: async (mintUrl): Promise<MintReviewInfo> => {
       const mgr = requireManager();
       const [mintInfo, balances, isTrusted] = await Promise.all([
-        mgr.mint.getMintInfo(mintUrl).catch((e) => { console.warn('[buildMintReviewInfo] getMintInfo failed for', mintUrl, e instanceof Error ? e.message : e); return undefined; }),
+        mgr.mint.getMintInfo(mintUrl).catch((e) => {
+          console.warn(
+            '[buildMintReviewInfo] getMintInfo failed for',
+            mintUrl,
+            e instanceof Error ? e.message : e
+          );
+          return undefined;
+        }),
         mgr.wallet.getBalances(),
         mgr.mint.isTrustedMint(mintUrl),
       ]);
@@ -480,7 +615,10 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 
       const info = defaultDetectors.getPaymentRequestInfo(paymentRequest);
       if (!info) {
-        console.warn('[executePaymentRequest] Failed to parse payment request:', paymentRequest.slice(0, 60));
+        console.warn(
+          '[executePaymentRequest] Failed to parse payment request:',
+          paymentRequest.slice(0, 60)
+        );
         throw new Error('Invalid payment request');
       }
 
@@ -494,7 +632,9 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
         // Nostr transport: use ops.send directly since PaymentRequestsApi doesn't support Nostr
         const sendNostrDM = config.sendNostrDM;
         if (!sendNostrDM) {
-          console.warn('[executePaymentRequest] sendNostrDM not configured for Nostr payment request');
+          console.warn(
+            '[executePaymentRequest] sendNostrDM not configured for Nostr payment request'
+          );
           throw new Error('sendNostrDM operation is required for Nostr payment requests');
         }
 
@@ -521,11 +661,24 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
           await sendNostrDM(nostrTransport.target, JSON.stringify(payload));
           console.info('[executePaymentRequest] Nostr DM sent | operationId:', operationId);
         } catch (deliveryErr) {
-          console.warn('[executePaymentRequest] Nostr delivery failed | operationId:', operationId, deliveryErr instanceof Error ? deliveryErr.message : deliveryErr);
+          console.warn(
+            '[executePaymentRequest] Nostr delivery failed | operationId:',
+            operationId,
+            deliveryErr instanceof Error ? deliveryErr.message : deliveryErr
+          );
           const rollbackResult = await attemptRollback(mgr, operationId);
           if (rollbackResult) {
-            const errorMessage = deliveryErr instanceof Error ? deliveryErr.message : 'Nostr delivery failed';
-            return buildRolledBackResult(operationId, mintUrl, effectiveAmount, unit, paymentRequest, 'nostr', errorMessage);
+            const errorMessage =
+              deliveryErr instanceof Error ? deliveryErr.message : 'Nostr delivery failed';
+            return buildRolledBackResult(
+              operationId,
+              mintUrl,
+              effectiveAmount,
+              unit,
+              paymentRequest,
+              'nostr',
+              errorMessage
+            );
           }
           throw deliveryErr;
         }
@@ -540,13 +693,29 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
             throw new Error('Mock delivery failure (dev)');
           }
           await mgr.paymentRequests.execute(transaction);
-          console.info('[executePaymentRequest] HTTP payment request executed | operationId:', operationId);
+          console.info(
+            '[executePaymentRequest] HTTP payment request executed | operationId:',
+            operationId
+          );
         } catch (deliveryErr) {
-          console.warn('[executePaymentRequest] HTTP delivery failed | operationId:', operationId, deliveryErr instanceof Error ? deliveryErr.message : deliveryErr);
+          console.warn(
+            '[executePaymentRequest] HTTP delivery failed | operationId:',
+            operationId,
+            deliveryErr instanceof Error ? deliveryErr.message : deliveryErr
+          );
           const rollbackResult = await attemptRollback(mgr, operationId);
           if (rollbackResult) {
-            const errorMessage = deliveryErr instanceof Error ? deliveryErr.message : 'HTTP delivery failed';
-            return buildRolledBackResult(operationId, mintUrl, amount, unit, paymentRequest, 'http', errorMessage);
+            const errorMessage =
+              deliveryErr instanceof Error ? deliveryErr.message : 'HTTP delivery failed';
+            return buildRolledBackResult(
+              operationId,
+              mintUrl,
+              amount,
+              unit,
+              paymentRequest,
+              'http',
+              errorMessage
+            );
           }
           throw deliveryErr;
         }
@@ -571,10 +740,17 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
         paymentRequest,
         phase: 'delivered',
         tokenCreated: 'true',
-        ...(nostrTransport ? { nostrSent: 'true', transportType: 'nostr' } : { transportType: 'http' }),
+        ...(nostrTransport
+          ? { nostrSent: 'true', transportType: 'nostr' }
+          : { transportType: 'http' }),
       };
       entry.operationId = entry.operationId ?? operationId;
-      console.info('[executePaymentRequest] Done | operationId:', operationId, '| transport:', nostrTransport ? 'nostr' : 'http');
+      console.info(
+        '[executePaymentRequest] Done | operationId:',
+        operationId,
+        '| transport:',
+        nostrTransport ? 'nostr' : 'http'
+      );
       return { historyEntry: JSON.stringify(entry) };
     },
   };
@@ -584,11 +760,7 @@ export function createDefaultOperations(config: DefaultOperationsConfig): Partia
 // Payment request helpers
 // ---------------------------------------------------------------------------
 
-function buildInbandParsed(
-  encodedRequest: string,
-  info: PaymentRequestInfo,
-  mintUrl: string
-): any {
+function buildInbandParsed(encodedRequest: string, info: PaymentRequestInfo, mintUrl: string): any {
   const requiredMints = info.mints ?? [];
   const matchingMints =
     requiredMints.length > 0
@@ -618,8 +790,7 @@ async function findReceiveHistoryEntry(
     (h: any) =>
       h.type === 'receive' &&
       h.mintUrl === mintUrl &&
-      (h.metadata?.rawToken === tokenString ||
-        h.token === tokenString)
+      (h.metadata?.rawToken === tokenString || h.token === tokenString)
   );
   return entry ? JSON.stringify(entry) : null;
 }

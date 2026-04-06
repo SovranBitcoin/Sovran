@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
+import { Log } from '@/shared/lib/logger';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -34,6 +35,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   };
 
   return (
+    <Log name="QRButton">
     <TouchableOpacity
       style={[styles.touchable, { ...containerStyle, shadowColor: accentColor }]}
       className="items-center justify-center"
@@ -84,6 +86,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
         <Icon name="stash:qr-code" size={24} color={surfaceForeground} />
       </View>
     </TouchableOpacity>
+    </Log>
   );
 }
 

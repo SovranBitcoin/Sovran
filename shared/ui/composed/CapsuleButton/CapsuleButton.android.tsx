@@ -3,6 +3,7 @@ import { LiquidButtonView } from 'expo-liquid-glass-native';
 import { hasAndroidLiquidButtonView } from '@/navigation/nativeTabs';
 
 import Icon from 'assets/icons';
+import { Log } from '@/shared/lib/logger';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -26,6 +27,7 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
 
   if (hasAndroidLiquidButtonView()) {
     return (
+      <Log name="CapsuleButton">
       <View className="w-full" style={{ height }}>
         <LiquidButtonView
           title={INVISIBLE_TITLE}
@@ -45,10 +47,12 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
           </Text>
         </View>
       </View>
+      </Log>
     );
   }
 
   return (
+    <Log name="CapsuleButton">
     <Button
       text={label}
       icon={<Icon name={icon} size={16} color={color} />}
@@ -66,5 +70,6 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
         borderRadius: 24,
       }}
     />
+    </Log>
   );
 }

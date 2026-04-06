@@ -2,6 +2,7 @@ import React, { memo, useCallback, useEffect, useRef } from 'react';
 import { InteractionManager } from 'react-native';
 import { Input, TextField } from 'heroui-native';
 
+import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 import type { GlassSearchBarProps } from './types';
 
@@ -52,6 +53,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   );
 
   return (
+    <Log name="GlassSearchBar">
     <View style={{ alignItems: 'center', ...(width != null ? { width } : { flex: 1 }) }}>
       <TextField key={clearKey} className="w-full">
         <Input
@@ -65,5 +67,6 @@ export const GlassSearchBar = memo(function GlassSearchBar({
         />
       </TextField>
     </View>
+    </Log>
   );
 });

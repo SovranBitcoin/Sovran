@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Rect } from 'react-native-svg';
 
 import { AnimatedBackgroundView } from '@/shared/ui/composed/BackgroundView';
+import { Log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 
 // iOS native tab bar heights (Apple HIG):
@@ -212,27 +213,31 @@ export function LayoutDebugWrapper({
 
   if (!scrollable) {
     return (
-      <AnimatedBackgroundView>
-        {renderDebugOverlays()}
-        <View className="flex-1">{children}</View>
-      </AnimatedBackgroundView>
+      <Log name="LayoutDebugWrapper">
+        <AnimatedBackgroundView>
+          {renderDebugOverlays()}
+          <View className="flex-1">{children}</View>
+        </AnimatedBackgroundView>
+      </Log>
     );
   }
 
   return (
-    <AnimatedBackgroundView>
-      {renderDebugOverlays()}
-      <ScrollView
-        className="flex-1"
-        contentInsetAdjustmentBehavior="automatic"
-        scrollEventThrottle={16}
-        onScroll={debug ? handleScroll : undefined}
-        onContentSizeChange={onContentSizeChange}
-        contentContainerStyle={contentContainerStyle}
-        refreshControl={refreshControl}>
-        {renderDebugInfoCard()}
-        {children}
-      </ScrollView>
-    </AnimatedBackgroundView>
+    <Log name="LayoutDebugWrapper">
+      <AnimatedBackgroundView>
+        {renderDebugOverlays()}
+        <ScrollView
+          className="flex-1"
+          contentInsetAdjustmentBehavior="automatic"
+          scrollEventThrottle={16}
+          onScroll={debug ? handleScroll : undefined}
+          onContentSizeChange={onContentSizeChange}
+          contentContainerStyle={contentContainerStyle}
+          refreshControl={refreshControl}>
+          {renderDebugInfoCard()}
+          {children}
+        </ScrollView>
+      </AnimatedBackgroundView>
+    </Log>
   );
 }

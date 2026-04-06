@@ -4,6 +4,7 @@ import { PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
+import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
@@ -28,10 +29,15 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
   const { label, icon, onPress, color = foreground, height = DEFAULT_HEIGHT } = props;
 
   if (supportsLiquidGlass()) {
-    return <CapsuleButtonLiquid {...props} color={color} />;
+    return (
+      <Log name="CapsuleButton">
+        <CapsuleButtonLiquid {...props} color={color} />
+      </Log>
+    );
   }
 
   return (
+    <Log name="CapsuleButton">
     <View
       style={[
         styles.card,
@@ -61,6 +67,7 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
         </PressableFeedback>
       </BlurCardFrame>
     </View>
+    </Log>
   );
 }
 

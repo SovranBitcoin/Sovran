@@ -1,5 +1,6 @@
 import React from 'react';
 import { ViewStyle } from 'react-native';
+import { Log } from '@/shared/lib/logger';
 import { StyledText, Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -36,39 +37,41 @@ export function Section({ items, style, camera = false, special }: SectionProps)
   const ContainerView = camera ? BlurView : View;
 
   return (
-    <ContainerView
-      className="overflow-hidden rounded-lg"
-      style={{
-        marginHorizontal: 16,
-        ...style,
-      }}>
-      <VStack
-        // blur
-        className={`bg-surface-secondary${camera ? '/75' : ''}`}
+    <Log name="Section">
+      <ContainerView
+        className="overflow-hidden rounded-lg"
         style={{
-          borderRadius: 8,
-          padding: 8,
+          marginHorizontal: 16,
+          ...style,
         }}>
-        {items.map((item, index) => {
-          // Extract title information safely
-          const titleObj = typeof item.title === 'object' ? item.title : null;
-          const titleId = titleObj?.id;
-          const titleText =
-            typeof item.title === 'string' ? item.title : (titleObj?.children ?? '');
+        <VStack
+          // blur
+          className={`bg-surface-secondary${camera ? '/75' : ''}`}
+          style={{
+            borderRadius: 8,
+            padding: 8,
+          }}>
+          {items.map((item, index) => {
+            // Extract title information safely
+            const titleObj = typeof item.title === 'object' ? item.title : null;
+            const titleId = titleObj?.id;
+            const titleText =
+              typeof item.title === 'string' ? item.title : (titleObj?.children ?? '');
 
-          return (
-            <HStack key={index} justify="space-between" className="p-2">
-              <Text id={titleId} heavy size={16} color={opacity(foreground, 0.9)}>
-                {titleText}
-              </Text>
-              {titleText !== '' && <Spacer size={8} />}
+            return (
+              <HStack key={index} justify="space-between" className="p-2">
+                <Text id={titleId} heavy size={16} color={opacity(foreground, 0.9)}>
+                  {titleText}
+                </Text>
+                {titleText !== '' && <Spacer size={8} />}
 
-              {renderValueContent(item, titleText, special)}
-            </HStack>
-          );
-        })}
-      </VStack>
-    </ContainerView>
+                {renderValueContent(item, titleText, special)}
+              </HStack>
+            );
+          })}
+        </VStack>
+      </ContainerView>
+    </Log>
   );
 
   // Helper function to render the appropriate value content based on the item type

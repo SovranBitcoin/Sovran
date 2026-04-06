@@ -16,6 +16,7 @@ import { StyleSheet } from 'react-native';
 
 import opacity from 'hex-color-opacity';
 
+import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -303,6 +304,7 @@ export const TransferStepChain = React.memo(
     const isRouting = status === 'routing';
 
     return (
+      <Log name="TransferStepChain">
       <View style={styles.container}>
         <View style={styles.chainRow}>
           {chain.map((node, idx) => {
@@ -355,6 +357,7 @@ export const TransferStepChain = React.memo(
           </View>
         ) : null}
       </View>
+      </Log>
     );
   }
 );

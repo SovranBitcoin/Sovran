@@ -12,6 +12,7 @@ import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import Svg, { Circle } from 'react-native-svg';
 
+import { Log } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import Animated, {
   cancelAnimation,
@@ -178,6 +179,7 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
   const clockColor = useMemo(() => opacity('#FFFFFF', 0.7), []);
 
   return (
+    <Log name="AnimatedCheckpointDot">
     <Animated.View style={[styles.dotWrapper, scaleStyle]}>
       <Animated.View
         style={[
@@ -278,6 +280,7 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
         <Icon name="mdi:alert-circle" color={orangeColor} size={ICON_SIZE} />
       </Animated.View>
     </Animated.View>
+    </Log>
   );
 });
 

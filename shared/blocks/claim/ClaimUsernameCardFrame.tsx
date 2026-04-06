@@ -1,5 +1,6 @@
 import React from 'react';
 import { GradientCardFrame } from '@/shared/ui/composed/GradientCardFrame';
+import { Log } from '@/shared/lib/logger';
 
 const LEFT_ICON = {
   name: 'mingcute:lightning-fill',
@@ -25,13 +26,15 @@ export function ClaimUsernameCardFrame({
   children?: React.ReactNode;
 }) {
   return (
-    <GradientCardFrame
-      accentColor={accentColor}
-      backgroundColor={backgroundColor}
-      highlightColor={highlightColor}
-      leftIcon={LEFT_ICON}
-      rightIcon={RIGHT_ICON}>
-      {children}
-    </GradientCardFrame>
+    <Log name="ClaimUsernameCardFrame">
+      <GradientCardFrame
+        accentColor={accentColor}
+        backgroundColor={backgroundColor}
+        highlightColor={highlightColor}
+        leftIcon={LEFT_ICON}
+        rightIcon={RIGHT_ICON}>
+        {children}
+      </GradientCardFrame>
+    </Log>
   );
 }

@@ -8,6 +8,7 @@ import {
 } from '@expo/ui/swift-ui';
 import { buttonStyle, font, foregroundStyle, frame, padding } from '@expo/ui/swift-ui/modifiers';
 
+import { Log } from '@/shared/lib/logger';
 import type { CapsuleButtonProps } from './CapsuleButton';
 
 const DEFAULT_HEIGHT = 48;
@@ -20,6 +21,7 @@ export function CapsuleButtonLiquid({
   height = DEFAULT_HEIGHT,
 }: CapsuleButtonProps): React.ReactElement {
   return (
+    <Log name="CapsuleButton">
     <Host style={{ height, width: '100%' }} matchContents={false}>
       <SwiftUIButton
         modifiers={[
@@ -43,5 +45,6 @@ export function CapsuleButtonLiquid({
         </SwiftUIHStack>
       </SwiftUIButton>
     </Host>
+    </Log>
   );
 }

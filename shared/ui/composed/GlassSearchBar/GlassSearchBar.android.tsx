@@ -2,6 +2,7 @@ import React, { memo, useCallback, useEffect, useRef } from 'react';
 import { TextInput, InteractionManager } from 'react-native';
 import opacity from 'hex-color-opacity';
 
+import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import type { GlassSearchBarProps } from './types';
@@ -51,6 +52,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   );
 
   return (
+    <Log name="GlassSearchBar">
     <View
       style={{
         flex: 1,
@@ -80,5 +82,6 @@ export const GlassSearchBar = memo(function GlassSearchBar({
         autoFocus={autoFocus}
       />
     </View>
+    </Log>
   );
 });

@@ -54,7 +54,7 @@ import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from '@/shared/lib/
 import { useShallow } from 'zustand/react/shallow';
 import { getOrBuildBTCMapClusterManager } from '@/shared/lib/map/btcMapClusterCache';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
-import { Screen, log, deferWork } from '@/shared/lib/logger';
+import { Screen, log, deferWork, useLifecycleLogger } from '@/shared/lib/logger';
 
 // ============================================================================
 // Types & Constants
@@ -296,6 +296,7 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
 // ============================================================================
 
 export function MapScreen() {
+  useLifecycleLogger('MapScreen');
   const [foreground, accent, background] = useThemeColor([
     'foreground',
     'accent',

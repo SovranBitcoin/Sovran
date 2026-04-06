@@ -4,7 +4,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { TermsAndConditionsScreen } from '@/features/onboarding/screens/TermsAndConditionsScreen';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import OnboardingScreen from '@/features/onboarding/components/OnboardingScreen';
-import { log } from '@/shared/lib/logger';
+import { log, Log, useLifecycleLogger } from '@/shared/lib/logger';
 
 interface AppGateProps {
   children: React.ReactNode;
@@ -15,6 +15,7 @@ interface AppGateProps {
  * Order: Terms → Onboarding carousel → Keys loading → App
  */
 const AppGate: React.FC<AppGateProps> = ({ children }) => {
+  useLifecycleLogger('AppGate');
   const { isReady, isLoading } = useNostrKeysContext();
   const isTermsAccepted = useSettingsStore((state) => state.isTermsAccepted());
   const acceptTerms = useSettingsStore((state) => state.acceptTerms);
@@ -24,21 +25,27 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
   if (!isTermsAccepted) {
     log.debug('gate.app.blocked', { reason: 'terms_not_accepted' });
     return (
-      <TermsAndConditionsScreen
-        onClose={() => {
-          log.info('gate.app.terms_accepted');
-          acceptTerms(new Date().toISOString());
-        }}
-      />
+      <Log name="AppGate">
+        <TermsAndConditionsScreen
+          onClose={() => {
+            log.info('gate.app.terms_accepted');
+            acceptTerms(new Date().toISOString());
+          }}
+        />
+      </Log>
     );
   }
 
   if (!hasSeenOnboarding) {
     log.debug('gate.app.blocked', { reason: 'onboarding_not_seen' });
-    return <OnboardingScreen onComplete={() => {
-      log.info('gate.app.onboarding_complete');
-      completeOnboarding();
-    }} />;
+    return (
+      <Log name="AppGate">
+        <OnboardingScreen onComplete={() => {
+          log.info('gate.app.onboarding_complete');
+          completeOnboarding();
+        }} />
+      </Log>
+    );
   }
 
   if (isLoading || !isReady) {
@@ -47,7 +54,7 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
   }
 
   log.debug('gate.app.ready');
-  return <>{children}</>;
+  return <Log name="AppGate">{children}</Log>;
 };
 
 export default AppGate;

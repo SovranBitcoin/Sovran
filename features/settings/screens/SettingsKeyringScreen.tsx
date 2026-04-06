@@ -14,7 +14,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import Icon from 'assets/icons';
 import { useManager } from '@cashu/coco-react';
-import { log, Screen } from '@/shared/lib/logger';
+import { log, Screen, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   keysLoadFailedPopup,
   keyGenerateFailedPopup,
@@ -206,6 +206,7 @@ const KeyItem: React.FC<{
  * KeyringSettings - P2PK key management page
  */
 export const SettingsKeyringScreen: React.FC = () => {
+  useLifecycleLogger('SettingsKeyringScreen');
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
   const manager = useManager();
 

@@ -3,6 +3,7 @@ import { StyleSheet, type ViewStyle } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'assets/icons';
+import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 
 export type DecorationIcon = {
@@ -27,7 +28,7 @@ export function GradientCardFrame({
   children?: React.ReactNode;
 }) {
   return (
-    <>
+    <Log name="GradientCardFrame">
       <View className="absolute inset-0" style={{ backgroundColor }} />
       <View className="absolute inset-0" style={{ backgroundColor: opacity(accentColor, 0.06) }} />
       <LinearGradient
@@ -60,6 +61,6 @@ export function GradientCardFrame({
       </View>
 
       {children}
-    </>
+    </Log>
   );
 }

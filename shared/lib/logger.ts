@@ -43,7 +43,7 @@ import { Platform } from 'react-native';
 // ─── Master switch ──────────────────────────────────────────────────────────
 // Set to false to silence ALL log output (console + ring buffer).
 // Useful when profiling to eliminate logging overhead.
-const SHOW_LOGS = true;
+const SHOW_LOGS = false;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -753,8 +753,7 @@ export function createLogger(options: LoggerOptions = {}): Logger {
       type DumpEntry = LogEntry & { delta_ms: number };
       const withDeltas: DumpEntry[] = logs.map((e, i) => ({
         ...e,
-        delta_ms:
-          i > 0 ? Math.round((e._t - (logs[i - 1]._t ?? 0)) * 100) / 100 : 0,
+        delta_ms: i > 0 ? Math.round((e._t - (logs[i - 1]._t ?? 0)) * 100) / 100 : 0,
       }));
 
       // Find the default ctx (most common) — emit once in header, strip from entries
@@ -779,7 +778,11 @@ export function createLogger(options: LoggerOptions = {}): Logger {
         `Entries: ${logs.length} | Span: ${span}s`,
         `Time: ${logs[0].ts} → ${logs[logs.length - 1].ts}`,
         `Device: ${JSON.stringify(getExpoDeviceInfo())}`,
-        ...(defaultCtxKey ? [`Context: ${defaultCtxKey} (on ${defaultCtxCount}/${logs.length} entries, omitted below)`] : []),
+        ...(defaultCtxKey
+          ? [
+              `Context: ${defaultCtxKey} (on ${defaultCtxCount}/${logs.length} entries, omitted below)`,
+            ]
+          : []),
         '_t=monotonic ms | delta=ms since prev | duration_ms=span duration',
         '===========================',
       ];
@@ -955,10 +958,7 @@ export const storeLog = log.child({ module: 'store' });
 
 let _flowSeq = 0;
 
-export function startFlow(
-  name: string,
-  logger: Logger = log
-): Flow {
+export function startFlow(name: string, logger: Logger = log): Flow {
   const flowId = `${name}:${++_flowSeq}`;
   const flowLogger = logger.child({ flowId });
   const t0 = _perfNow();
@@ -1613,8 +1613,7 @@ export function createWSLogger(logger: Logger = cashuLog) {
     onClose: (url: string, code: number, reason: string) =>
       logger.info('ws.close', { url, code, reason }),
     onError: (url: string, error: Error) => logger.error('ws.error', { url, error }),
-    onReconnect: (url: string, attempt: number) =>
-      logger.warn('ws.reconnect', { url, attempt }),
+    onReconnect: (url: string, attempt: number) => logger.warn('ws.reconnect', { url, attempt }),
     onMessage: (url: string) => {
       messageCount++;
       const t = _perfNow();

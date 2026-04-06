@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
+import { Log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -90,6 +91,7 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
   );
 
   return (
+    <Log name="Tabs">
     <ScrollView
       className="w-full"
       style={{
@@ -139,5 +141,6 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
         </BlurCardFrame>
       </View>
     </ScrollView>
+    </Log>
   );
 }

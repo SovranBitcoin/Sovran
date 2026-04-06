@@ -5,7 +5,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import Image from '@/shared/ui/primitives/Image';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
 import { useTheme } from '@/shared/providers/ThemeProvider';
-import { log } from '@/shared/lib/logger';
+import { Log, log } from '@/shared/lib/logger';
 
 const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string }) => {
   const motion = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -39,24 +39,30 @@ const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string
 
   if (!backgroundImageSource) {
     log.debug('bg.sprite.render', { theme: theme.currentTheme, hasImage: false });
-    return <View style={[StyleSheet.absoluteFillObject, { backgroundColor }]}></View>;
+    return (
+      <Log name="SpriteView">
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor }]}></View>
+      </Log>
+    );
   }
 
   log.debug('bg.sprite.render', { theme: theme.currentTheme, hasImage: true });
 
   return (
-    <Animated.View
-      style={[
-        StyleSheet.absoluteFillObject,
-        {
-          transform: motion.getTranslateTransform(),
-        },
-      ]}>
-      <Image
-        source={backgroundImageSource}
-        style={[StyleSheet.absoluteFillObject, { transform: [{ scale: 1.18 }] }]}
-      />
-    </Animated.View>
+    <Log name="SpriteView">
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            transform: motion.getTranslateTransform(),
+          },
+        ]}>
+        <Image
+          source={backgroundImageSource}
+          style={[StyleSheet.absoluteFillObject, { transform: [{ scale: 1.18 }] }]}
+        />
+      </Animated.View>
+    </Log>
   );
 };
 

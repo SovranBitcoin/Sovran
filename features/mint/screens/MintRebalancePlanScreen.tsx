@@ -44,11 +44,12 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import Icon from 'assets/icons';
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
 import { extractDomain } from '@/shared/lib/url';
-import { log, Screen } from '@/shared/lib/logger';
+import { log, Screen, useLifecycleLogger } from '@/shared/lib/logger';
 
 // StepState is imported from components/blocks/rebalance (groupSteps.ts)
 
 export function MintRebalancePlanScreen() {
+  useLifecycleLogger('MintRebalancePlanScreen');
   const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor([
     'foreground',
     'surface-tertiary',

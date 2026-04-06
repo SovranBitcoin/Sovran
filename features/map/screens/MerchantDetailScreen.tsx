@@ -21,7 +21,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBTCMapStore, BTCMapPlaceDetails } from '@/shared/stores/global/btcMapStore';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
-import { Screen, log } from '@/shared/lib/logger';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 const CATEGORIES: Record<string, { icons: string[] }> = {
   food: { icons: ['local_cafe', 'lunch_dining', 'restaurant', 'bakery_dining'] },
@@ -50,6 +50,7 @@ function getMarkerColor(icon: string): string {
 }
 
 export function MerchantDetailScreen() {
+  useLifecycleLogger('MerchantDetailScreen');
   const navigation = useNavigation();
   const [foreground, defaultColor, surfaceSecondary, background] = useThemeColor([
     'foreground',

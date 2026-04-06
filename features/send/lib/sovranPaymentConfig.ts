@@ -78,6 +78,13 @@ import {
   unsupportedTokenUnitPopup,
 } from '@/shared/lib/popup';
 import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
+import { executeRoutstrTopUp, formatRoutstrBalance } from '@/shared/lib/routstr/topUp';
+import {
+  routstrTopUpSuccessPopup,
+  routstrWalletCreatedPopup,
+  routstrTransactionFailedPopup,
+} from '@/shared/lib/popup/popups/routstr';
+import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
@@ -476,8 +483,38 @@ export function createSovranHandlers({
       });
     },
 
-    sendComplete: ({ historyEntry, mintWasOffline }) => {
+    sendComplete: async ({ historyEntry, mintWasOffline }) => {
       paymentLog.info('payment.step.send_complete', { mintWasOffline: !!mintWasOffline });
+
+      // Routstr top-up: intercept the token and send it to the Routstr API
+      const topUpState = useRoutstrTopUpStore.getState();
+      if (topUpState.active) {
+        try {
+          const entry = JSON.parse(historyEntry);
+          const encodedToken = getEncodedTokenV4(entry.token);
+          const result = await executeRoutstrTopUp(encodedToken);
+
+          if (result.success) {
+            const balanceStr = formatRoutstrBalance(result.balance);
+            if (result.isNewWallet) {
+              routstrWalletCreatedPopup({ balance: balanceStr });
+            } else {
+              routstrTopUpSuccessPopup({ balance: balanceStr });
+            }
+            useRoutstrTopUpStore.getState().complete('success');
+          } else {
+            routstrTransactionFailedPopup({ text: result.error });
+            useRoutstrTopUpStore.getState().complete('failed');
+          }
+        } catch (e) {
+          paymentLog.error('payment.routstr_topup.error', { error: e instanceof Error ? e.message : String(e) });
+          routstrTransactionFailedPopup({ text: 'Failed to process top-up' });
+          useRoutstrTopUpStore.getState().complete('failed');
+        }
+        router.dismiss();
+        return;
+      }
+
       router.navigate({
         pathname: '/(send-flow)/sendToken',
         params: {

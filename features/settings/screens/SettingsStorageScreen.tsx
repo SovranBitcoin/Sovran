@@ -3,7 +3,7 @@ import { Alert, RefreshControl, ScrollView, Share } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 import * as Clipboard from 'expo-clipboard';
-import { log, Screen } from '@/shared/lib/logger';
+import { log, Screen, useLifecycleLogger } from '@/shared/lib/logger';
 
 import Container from '@/shared/ui/composed/Container';
 import {
@@ -159,6 +159,7 @@ const GroupedInventorySection: React.FC<GroupedSectionProps> = ({
 };
 
 export const SettingsStorageScreen = () => {
+  useLifecycleLogger('SettingsStorageScreen');
   const profiles = useProfileStore((state) => state.profiles);
 
   const [isLoading, setIsLoading] = useState(true);

@@ -10,6 +10,7 @@ import React, { ReactNode } from 'react';
 import { ScrollView, StyleProp, ViewStyle } from 'react-native';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
+import { Log } from '@/shared/lib/logger';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -66,6 +67,7 @@ export function ModalScreenLayout({
   );
 
   return (
+    <Log name="ModalScreenLayout">
     <View style={[{ flex: 1, backgroundColor: background }, style]}>
       {/* Debug: Container outline */}
       {debug && (
@@ -155,5 +157,6 @@ export function ModalScreenLayout({
       {content}
       {bottomButtons && <BottomButtons>{bottomButtons}</BottomButtons>}
     </View>
+    </Log>
   );
 }

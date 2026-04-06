@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 
 import { Text } from '@/shared/ui/primitives/Text';
+import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 const DebugRow = ({
@@ -138,6 +139,7 @@ export function ModalLayoutWrapper({
   };
 
   return (
+    <Log name="ModalLayoutWrapper">
     <View className="flex-1" style={{ backgroundColor: background }}>
       <View
         className="absolute inset-0"
@@ -268,6 +270,7 @@ export function ModalLayoutWrapper({
         </View>
       )}
     </View>
+    </Log>
   );
 }
 

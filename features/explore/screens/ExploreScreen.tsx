@@ -1,4 +1,4 @@
-import { Screen, log } from '@/shared/lib/logger';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
@@ -21,13 +21,13 @@ import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Dimensions,
   Linking,
   ScrollView,
   StyleSheet,
   View as RNView,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -390,11 +390,36 @@ const SectionHeader = ({
   );
 };
 
+// AI Model Skeleton Card — matches AIModelCard dimensions
+const AIModelSkeletonCard = ({ index }: { index: number }) => (
+  <Animated.View entering={FadeInUp.duration(300).delay(index * 60)}>
+    <View style={[styles.aiModelCard, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+      <View style={styles.aiModelContent}>
+        <View style={[styles.aiModelIcon, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
+        <VStack style={{ flex: 1, gap: 6 }}>
+          <View style={{ width: 80, height: 14, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+          <View style={{ width: 48, height: 10, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)' }} />
+        </VStack>
+      </View>
+      <VStack style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 8 }}>
+        <View style={{ width: '100%', height: 10, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)' }} />
+        <View style={{ width: '60%', height: 10, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)' }} />
+        <View style={[styles.aiModelBadge, { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
+          <View style={{ width: 52, height: 10, borderRadius: 4 }} />
+        </View>
+      </VStack>
+    </View>
+  </Animated.View>
+);
+
+const AI_SKELETON_COUNT = 4;
+
 // AI Model Card
-const AIModelCard = ({ model }: { model: RoutstrModel }) => {
+const AIModelCard = ({ model, canAfford }: { model: RoutstrModel; canAfford: boolean }) => {
   const { provider, modelName } = extractModelName(model);
   const icon = getProviderIcon(provider);
   const gradient = getProviderGradient(provider);
+  const maxCostSats = Math.ceil((model.sats_pricing?.max_cost || 0));
 
   return (
     <Link
@@ -403,7 +428,7 @@ const AIModelCard = ({ model }: { model: RoutstrModel }) => {
         params: { pubkey: ROUTSTR_PUBKEY, model: model.id },
       }}
       asChild>
-      <TouchableOpacity activeOpacity={0.9} style={styles.aiModelCard}>
+      <TouchableOpacity activeOpacity={0.9} style={StyleSheet.flatten([styles.aiModelCard, !canAfford && { opacity: 0.45 }])}>
         <LinearGradient
           colors={gradient}
           start={{ x: 0, y: 0 }}
@@ -430,14 +455,11 @@ const AIModelCard = ({ model }: { model: RoutstrModel }) => {
               {model.description}
             </Text>
           )}
-          {model.sats_pricing && (
-            <View style={styles.aiModelBadge}>
-              <Text size={10} heavy style={{ color: '#fff' }}>
-                {model.sats_pricing.prompt < 1 ? '<1' : Math.round(model.sats_pricing.prompt)}
-                {' sats/1M tokens'}
-              </Text>
-            </View>
-          )}
+          <View style={styles.aiModelBadge}>
+            <Text size={10} heavy style={{ color: '#fff' }}>
+              {maxCostSats > 0 ? `~${maxCostSats} sats/msg` : 'Free'}
+            </Text>
+          </View>
         </VStack>
       </TouchableOpacity>
     </Link>
@@ -1037,6 +1059,7 @@ const PendingEcashCard = () => {
 // ============================================================================
 
 const ExploreScreen = () => {
+  useLifecycleLogger('ExploreScreen');
   useBackgroundConfig({ blurMode: 'full' });
   const foreground = useThemeColor('foreground');
   const [contentHeight, setContentHeight] = useState(0);
@@ -1044,51 +1067,61 @@ const ExploreScreen = () => {
   const devMode = useSettingsStore((state) => state.experimental);
 
   // Routstr models state
-  const { getCachedModels, setCachedModels, isCacheStale } = useRoutstrStore();
+  const { getCachedModels, setCachedModels, isCacheStale, balance } = useRoutstrStore();
   const [models, setModels] = useState<RoutstrModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
 
-  // Fetch models from Routstr
-  useEffect(() => {
-    const loadModels = async () => {
-      // Check cache first
-      const cachedModels = getCachedModels();
-      if (cachedModels && cachedModels.length > 0) {
-        setModels(cachedModels);
-        setModelsLoading(false);
+  // Fetch models from Routstr — only when the Explore tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
 
-        // Refresh in background if stale
-        if (isCacheStale()) {
-          try {
-            const freshModels = await getModels();
-            setModels(freshModels);
-            setCachedModels(freshModels);
-          } catch (error) {
-            log.error('explore.models.refresh_failed', { error });
+      const loadModels = async () => {
+        const cachedModels = getCachedModels();
+        if (cachedModels && cachedModels.length > 0) {
+          setModels(cachedModels);
+          setModelsLoading(false);
+
+          // Refresh in background if stale
+          if (isCacheStale()) {
+            try {
+              const freshModels = await getModels();
+              if (!cancelled) {
+                setModels(freshModels);
+                setCachedModels(freshModels);
+              }
+            } catch (error) {
+              log.error('explore.models.refresh_failed', { error });
+            }
           }
+          return;
         }
-        return;
-      }
 
-      try {
-        const fetchedModels = await getModels();
-        setModels(fetchedModels);
-        setCachedModels(fetchedModels);
-      } catch (error) {
-        log.error('explore.models.fetch_failed', { error });
-      }
-      setModelsLoading(false);
-    };
+        try {
+          const fetchedModels = await getModels();
+          if (!cancelled) {
+            setModels(fetchedModels);
+            setCachedModels(fetchedModels);
+          }
+        } catch (error) {
+          log.error('explore.models.fetch_failed', { error });
+        }
+        if (!cancelled) setModelsLoading(false);
+      };
 
-    loadModels();
-  }, [getCachedModels, setCachedModels, isCacheStale]);
+      loadModels();
+      return () => { cancelled = true; };
+    }, [getCachedModels, setCachedModels, isCacheStale])
+  );
 
-  // Filter models to show - one per provider, in specific order, text-only
+  // Budget in msats — use actual balance, or 100 sats (100_000 msats) if none
+  const budgetMsats = balance != null && balance > 0 ? balance : 100_000;
+
+  // Filter models to show - one per provider, sorted by affordability
   const displayModels = useMemo(() => {
     if (models.length === 0) return [];
 
     // Only keep models that accept text input and produce text-only output
-    // (excludes audio, image, video, and embeddings models)
     const textModels = models.filter((m) => {
       const outputs = m.architecture?.output_modalities ?? [];
       const inputs = m.architecture?.input_modalities ?? [];
@@ -1109,22 +1142,38 @@ const ExploreScreen = () => {
       'nvidia',
     ];
 
-    // Find one model for each provider in order
+    // Find the cheapest model for each provider
     const result: RoutstrModel[] = [];
 
     for (const targetProvider of allowedProviders) {
-      const model = textModels.find((m) => {
-        const { provider } = extractModelName(m);
-        return provider.toLowerCase() === targetProvider;
-      });
+      const providerModels = textModels
+        .filter((m) => {
+          const { provider } = extractModelName(m);
+          return provider.toLowerCase() === targetProvider;
+        })
+        .sort((a, b) => (a.sats_pricing?.max_cost || 0) - (b.sats_pricing?.max_cost || 0));
 
-      if (model) {
-        result.push(model);
+      if (providerModels.length > 0) {
+        // Prefer the cheapest affordable model; fall back to cheapest overall
+        const affordable = providerModels.find(
+          (m) => (m.sats_pricing?.max_cost || 0) * 1000 <= budgetMsats
+        );
+        result.push(affordable || providerModels[0]);
       }
     }
 
+    // Sort: affordable first (by cost ascending), then unaffordable (by cost ascending)
+    result.sort((a, b) => {
+      const aCost = (a.sats_pricing?.max_cost || 0) * 1000;
+      const bCost = (b.sats_pricing?.max_cost || 0) * 1000;
+      const aAfford = aCost <= budgetMsats;
+      const bAfford = bCost <= budgetMsats;
+      if (aAfford !== bAfford) return aAfford ? -1 : 1;
+      return aCost - bCost;
+    });
+
     return result;
-  }, [models]);
+  }, [models, budgetMsats]);
 
   const onContentSizeChange = useCallback((_width: number, height: number) => {
     setContentHeight(height);
@@ -1148,14 +1197,17 @@ const ExploreScreen = () => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 20, gap: 12, minHeight: 140 }}>
           {modelsLoading ? (
-            <View style={styles.modelsLoadingContainer}>
-              <ActivityIndicator size="small" color={opacity(foreground, 0.5)} />
-              <Text size={12} style={{ color: opacity(foreground, 0.4), marginTop: 8 }}>
-                Loading models...
-              </Text>
-            </View>
+            Array.from({ length: AI_SKELETON_COUNT }, (_, i) => (
+              <AIModelSkeletonCard key={i} index={i} />
+            ))
           ) : displayModels.length > 0 ? (
-            displayModels.map((model) => <AIModelCard key={model.id} model={model} />)
+            displayModels.map((model) => (
+              <AIModelCard
+                key={model.id}
+                model={model}
+                canAfford={(model.sats_pricing?.max_cost || 0) * 1000 <= budgetMsats}
+              />
+            ))
           ) : (
             <View style={styles.modelsEmptyContainer}>
               <Icon name="mdi:robot" size={32} color={opacity(foreground, 0.33)} />
@@ -1472,14 +1524,6 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modelsLoadingContainer: {
-    width: 200,
-    height: 140,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
   },

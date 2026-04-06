@@ -13,6 +13,10 @@ interface RoutstrMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  /** Seconds from stream open to first content token (locally measured). */
+  thinkingDurationSec?: number;
+  /** Reasoning/thinking text from the model (e.g. DeepSeek R1, o-series). */
+  reasoningContent?: string;
 }
 
 export interface RoutstrSession {
@@ -61,6 +65,7 @@ interface RoutstrActions {
   getConversationHistory: () => RoutstrMessage[];
   clearConversation: () => void;
   updateMessage: (id: string, content: string) => void;
+  removeMessages: (ids: Set<string>) => void;
 
   setSelectedModel: (modelId: string) => void;
   getSelectedModel: () => string;
@@ -151,7 +156,23 @@ export const useRoutstrStore = create<RoutstrStore>()(
         set({ conversationHistory: [] });
       },
 
+      removeMessages: (ids: Set<string>) => {
+        storeLog.debug('store.routstr.remove_messages', { count: ids.size });
+        set((state) => {
+          const filtered = state.conversationHistory.filter((msg) => !ids.has(msg.id));
+          if (state.isAnonymousMode) return { conversationHistory: filtered };
+          if (state.currentSessionId) {
+            const updatedSessions = state.sessions.map((session) =>
+              session.id === state.currentSessionId ? { ...session, messages: filtered } : session
+            );
+            return { conversationHistory: filtered, sessions: updatedSessions };
+          }
+          return { conversationHistory: filtered };
+        });
+      },
+
       updateMessage: (id: string, content: string) => {
+        storeLog.debug('store.routstr.update_message', { id, contentLength: content.length });
         set((state) => {
           const updatedHistory = state.conversationHistory.map((msg) =>
             msg.id === id
@@ -212,6 +233,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       clearModelsCache: () => {
+        storeLog.debug('store.routstr.clear_models_cache');
         set({ modelsCache: null });
       },
 
@@ -268,6 +290,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
               ? firstUserMessage.content.substring(0, 50) + '...'
               : firstUserMessage.content;
 
+          storeLog.debug('store.routstr.update_session_title', { sessionId: state.currentSessionId, title });
           const updatedSessions = state.sessions.map((session) =>
             session.id === state.currentSessionId ? { ...session, title } : session
           );

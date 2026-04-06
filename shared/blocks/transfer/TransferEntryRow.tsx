@@ -24,6 +24,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import Icon from 'assets/icons';
+import { Log } from '@/shared/lib/logger';
 
 interface TransferEntryRowProps {
   /** Whether this row represents a send or receive */
@@ -135,13 +136,15 @@ export const TransferEntryRow = React.memo(
 
     if (onPress) {
       return (
-        <TouchableOpacity style={styles.entryRow} onPress={onPress}>
-          {content}
-        </TouchableOpacity>
+        <Log name="TransferEntryRow">
+          <TouchableOpacity style={styles.entryRow} onPress={onPress}>
+            {content}
+          </TouchableOpacity>
+        </Log>
       );
     }
 
-    return <View style={styles.entryRow}>{content}</View>;
+    return <Log name="TransferEntryRow"><View style={styles.entryRow}>{content}</View></Log>;
   }
 );
 TransferEntryRow.displayName = 'TransferEntryRow';

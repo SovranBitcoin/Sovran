@@ -57,6 +57,7 @@
 
 import React, { useState } from 'react';
 import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
+import { Log } from '@/shared/lib/logger';
 import { Button } from '@/shared/ui/primitives/Button';
 import { buttonHandlerPopup, emojiPickerPopup } from '@/shared/lib/popup';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -223,6 +224,7 @@ export function ButtonHandler({
   };
 
   return (
+    <Log name="ButtonHandler">
     <HStack
       align="center"
       justify="space-between"
@@ -279,5 +281,6 @@ export function ButtonHandler({
         </View>
       )}
     </HStack>
+    </Log>
   );
 }

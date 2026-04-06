@@ -13,6 +13,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 interface TransferErrorBannerProps {
   /** Error message to display */
@@ -23,14 +24,16 @@ export const TransferErrorBanner = React.memo(({ message }: TransferErrorBannerP
   const redColor = useThemeColor('red-400');
 
   return (
-    <View style={[styles.errorBanner, { backgroundColor: opacity(redColor, 0.15) }]}>
-      <HStack spacing={8} align="center">
-        <Icon name="mdi:alert-circle" size={16} color={redColor} />
-        <UntranslatedText size={11} bold color={redColor} style={styles.message}>
-          {message}
-        </UntranslatedText>
-      </HStack>
-    </View>
+    <Log name="TransferErrorBanner">
+      <View style={[styles.errorBanner, { backgroundColor: opacity(redColor, 0.15) }]}>
+        <HStack spacing={8} align="center">
+          <Icon name="mdi:alert-circle" size={16} color={redColor} />
+          <UntranslatedText size={11} bold color={redColor} style={styles.message}>
+            {message}
+          </UntranslatedText>
+        </HStack>
+      </View>
+    </Log>
   );
 });
 TransferErrorBanner.displayName = 'TransferErrorBanner';

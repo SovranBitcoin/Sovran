@@ -1,6 +1,7 @@
 import { Skeleton } from 'heroui-native/skeleton';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image as RNImage, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import Icon from 'assets/icons';
@@ -147,8 +148,9 @@ export const Avatar = ({
   if (hasPicture && showSkeleton) {
     return (
       <VStack style={{ position: 'relative', overflow: 'hidden' }}>
-        <RNImage
+        <ExpoImage
           source={{ uri: picture }}
+          cachePolicy="memory-disk"
           style={[avatarStyle, { opacity: 0 }]}
           accessibilityLabel={imageAlt}
           onLoad={handleImageLoad}
@@ -164,7 +166,7 @@ export const Avatar = ({
   if (hasPicture && imageStatus === 'loaded') {
     return (
       <VStack style={{ position: 'relative', overflow: 'hidden' }}>
-        <RNImage source={{ uri: picture }} style={avatarStyle} accessibilityLabel={imageAlt} />
+        <ExpoImage source={{ uri: picture }} cachePolicy="memory-disk" style={avatarStyle} accessibilityLabel={imageAlt} />
         {StatusBadgeWrapper}
       </VStack>
     );

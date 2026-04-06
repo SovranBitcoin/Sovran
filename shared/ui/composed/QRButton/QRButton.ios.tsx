@@ -5,6 +5,7 @@ import { PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
+import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 export interface QRButtonProps {
@@ -44,6 +45,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
   };
 
   return (
+    <Log name="QRButton">
     <PressableFeedback
       animation={false}
       onPress={onPress}
@@ -72,6 +74,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
         <Icon name="stash:qr-code" size={38} color={surfaceTertiary} />
       </View>
     </PressableFeedback>
+    </Log>
   );
 }
 

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Log } from '@/shared/lib/logger';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { BottomSheetFooter } from '@gorhom/bottom-sheet';
 import { BottomSheet, Button, useToast } from 'heroui-native';
@@ -811,9 +812,9 @@ function SheetPopup() {
 
 export default function PopupHost() {
   return (
-    <>
+    <Log name="PopupHost">
       <ToastRegistrar />
       <SheetPopup />
-    </>
+    </Log>
   );
 }

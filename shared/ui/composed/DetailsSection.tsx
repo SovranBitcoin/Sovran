@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
+import { Log } from '@/shared/lib/logger';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -42,6 +43,7 @@ export function DetailsSection({
   if (items.length === 0) return null;
 
   return (
+    <Log name="DetailsSection">
     <View style={styles.container}>
       <Pressable
         onPress={() => setExpanded((v) => !v)}
@@ -60,6 +62,7 @@ export function DetailsSection({
       </Pressable>
       {expanded ? <Section items={items} camera={camera} style={{ marginHorizontal: 0 }} /> : null}
     </View>
+    </Log>
   );
 }
 

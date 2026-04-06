@@ -12,7 +12,7 @@ import AnimatedSpriteBackground from './SpriteView';
 import { View } from '@/shared/ui/primitives/View/View';
 import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { supportsBlur } from '@/shared/lib/version';
-import { log, useRenderLogger } from '@/shared/lib/logger';
+import { Log, log, useRenderLogger } from '@/shared/lib/logger';
 
 type BlurTint =
   | 'light'
@@ -140,6 +140,7 @@ function ScrollableGradientOverlayComponent({
   const overlayHeight = contentHeight || viewportHeight;
 
   return (
+    <Log name="ScrollableGradientOverlay">
     <View
       style={{
         position: 'absolute',
@@ -176,6 +177,7 @@ function ScrollableGradientOverlayComponent({
         style={StyleSheet.absoluteFillObject}
       />
     </View>
+    </Log>
   );
 }
 
@@ -263,6 +265,7 @@ function AnimatedBackgroundViewComponent({
   }));
 
   return (
+    <Log name="AnimatedBackgroundView">
     <View style={[styles.container, style]}>
       {/* Base background color - configurable, defaults to primary-900 */}
       <Animated.View style={[StyleSheet.absoluteFillObject, backgroundColorAnimatedStyle]} />
@@ -317,6 +320,7 @@ function AnimatedBackgroundViewComponent({
       {/* Content */}
       <View style={[styles.content]}>{children}</View>
     </View>
+    </Log>
   );
 }
 

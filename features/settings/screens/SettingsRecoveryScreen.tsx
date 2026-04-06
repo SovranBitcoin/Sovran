@@ -6,7 +6,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
-import { log, Screen } from '@/shared/lib/logger';
+import { log, Screen, useLifecycleLogger } from '@/shared/lib/logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useMintManagement } from '@/features/mint';
 import { useNavigation, router } from 'expo-router';
@@ -24,6 +24,7 @@ interface RecoveryResult {
 }
 
 export const SettingsRecoveryScreen: React.FC = () => {
+  useLifecycleLogger('SettingsRecoveryScreen');
   const [foreground, green400, red400] = useThemeColor([
     'foreground',
     'green-400',

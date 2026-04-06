@@ -73,7 +73,11 @@
           "image": "./assets/images/light-t.png",
           "backgroundColor": "#000000",
           "resizeMode": "contain",
-          "imageWidth": 390
+          "imageWidth": 390,
+          "dark": {
+            "image": "./assets/images/light-t.png",
+            "backgroundColor": "#000000"
+          }
         }
       ],
       "expo-build-properties",
