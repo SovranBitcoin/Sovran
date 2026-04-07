@@ -14,8 +14,7 @@
  *    { _kind, len, preview } summaries.
  *
  * 3. CAUSAL LINKAGE — Logs explain WHY something happened, not just WHAT.
- *    The useWhyDidUpdate hook shows exactly which prop changed and suggests
- *    the fix. The navigation logger shows the from→to breadcrumb trail.
+ *    Logs explain WHY something happened, not just WHAT.
  *
  * TIMING FEATURES:
  *   - Monotonic _t field on every entry (performance.now based, immune to clock skew)
@@ -32,12 +31,11 @@
  *   - Async emission via requestIdleCallback (no frame drops)
  *   - Production-safe: debug/info suppressed, no console.log bridge overhead
  *   - <Screen> wrapper for automatic UI content logging
- *   - useLoggedQuery for drift-free data-layer instrumentation
  *   - Domain child loggers (cashuLog, nostrLog, walletLog, etc.)
  */
 
 import { useEffect, useRef, useContext, createContext } from 'react';
-import React, { Component, type ReactNode, type ErrorInfo } from 'react';
+import React, { type ReactNode } from 'react';
 import { Platform } from 'react-native';
 
 // ─── Master switch ──────────────────────────────────────────────────────────
@@ -107,27 +105,18 @@ interface LogEntry {
   duration_ms?: number;
 }
 
-export interface Span {
+interface Span {
   /** End the span. Logs `${event}.end` with duration_ms. Auto-escalates to warn if slow. */
   end(params?: Record<string, unknown>): void;
 }
 
-export interface DumpOptions {
+interface DumpOptions {
   /** Output format. 'json' emits NDJSON (default), 'yaml' uses inline YAML,
    *  'md' uses a pipe-delimited table — ~40% fewer tokens than JSON. */
   format?: 'json' | 'yaml' | 'md';
   /** Show errors/warnings before the chronological timeline.
    *  Counteracts the "lost in the middle" effect in LLMs. Default: false */
   errorsFirst?: boolean;
-}
-
-export interface Flow {
-  /** Unique flow identifier — pass to child operations for causal linking */
-  flowId: string;
-  /** Child logger with flowId in context */
-  log: Logger;
-  /** End the flow. Logs flow.end with computed duration_ms. */
-  end(params?: Record<string, unknown>): void;
 }
 
 export interface Logger {
@@ -287,7 +276,7 @@ function summarizeString(s: string, maxLen: number): unknown {
   return { _kind: detectedType ?? 'long_string', len: s.length, preview: preview + '…' };
 }
 
-export function compactValue(
+function compactValue(
   value: unknown,
   opts: { maxStringLength: number; maxArrayItems: number; maxDepth: number; maxObjectKeys: number },
   depth: number = 0
@@ -459,7 +448,7 @@ class RingBuffer<T> {
 // ─── Built-in Transports ─────────────────────────────────────────────────────
 
 /** Console transport (default). Safe — never throws. */
-export function consoleTransport(pretty: boolean) {
+function consoleTransport(pretty: boolean) {
   return (entry: LogEntry): void => {
     const method = LEVEL_CONSOLE_METHOD[entry.level];
     try {
@@ -472,106 +461,9 @@ export function consoleTransport(pretty: boolean) {
   };
 }
 
-/**
- * Sentry breadcrumb transport.
- * Adds each log as a Sentry breadcrumb so errors have full context.
- * Usage: createLogger({ transports: [sentryTransport(Sentry)] })
- */
-export function sentryTransport(Sentry: any) {
-  return (entry: LogEntry): void => {
-    const level =
-      entry.level === 'fatal'
-        ? 'fatal'
-        : entry.level === 'error'
-          ? 'error'
-          : entry.level === 'warn'
-            ? 'warning'
-            : 'info';
-
-    Sentry.addBreadcrumb({
-      category: entry.event,
-      message: entry.params ? JSON.stringify(entry.params) : undefined,
-      level,
-      data: {
-        src: `${entry.src.file}:${entry.src.line}`,
-        ...entry.ctx,
-      },
-    });
-
-    // Also report errors/fatals as Sentry events
-    if (entry.error && (entry.level === 'error' || entry.level === 'fatal')) {
-      Sentry.captureException(new Error(`[${entry.event}] ${entry.error.message}`), {
-        extra: { logEntry: entry },
-      });
-    }
-  };
-}
-
-/**
- * File transport using expo-file-system.
- * Writes logs as newline-delimited JSON to a daily log file.
- * Usage: createLogger({ transports: [fileTransport()] })
- */
-export function fileTransport(options?: { directory?: string; maxFileSizeMB?: number }) {
-  const maxSize = (options?.maxFileSizeMB ?? 5) * 1024 * 1024;
-  let writeQueue: string[] = [];
-  let flushing = false;
-
-  const getFilePath = () => {
-    try {
-      const FileSystem = require('expo-file-system');
-      const dir = options?.directory ?? FileSystem.documentDirectory + 'logs/';
-      const date = new Date().toISOString().split('T')[0];
-      return { FileSystem, dir, path: dir + `sovran_${date}.log` };
-    } catch {
-      return null;
-    }
-  };
-
-  const flush = async () => {
-    if (flushing || writeQueue.length === 0) return;
-    flushing = true;
-    const batch = writeQueue.splice(0);
-    try {
-      const fs = getFilePath();
-      if (!fs) return;
-      const { FileSystem, dir, path } = fs;
-
-      // Ensure directory exists
-      const dirInfo = await FileSystem.getInfoAsync(dir);
-      if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
-
-      // Check file size — rotate if too large
-      const fileInfo = await FileSystem.getInfoAsync(path);
-      if (fileInfo.exists && (fileInfo.size ?? 0) > maxSize) {
-        await FileSystem.moveAsync({ from: path, to: path.replace('.log', '.prev.log') });
-      }
-
-      await FileSystem.writeAsStringAsync(path, batch.join('\n') + '\n', {
-        encoding: 'utf8',
-      });
-    } catch {
-      // Silently fail — logging should never crash the app
-    } finally {
-      flushing = false;
-      if (writeQueue.length > 0) flush();
-    }
-  };
-
-  return (entry: LogEntry): void => {
-    writeQueue.push(JSON.stringify(entry));
-    // Debounce writes: flush every 500ms or when buffer hits 20 entries
-    if (writeQueue.length >= 20) {
-      flush();
-    } else {
-      setTimeout(flush, 500);
-    }
-  };
-}
-
 // ─── Logger Factory ──────────────────────────────────────────────────────────
 
-export function createLogger(options: LoggerOptions = {}): Logger {
+function createLogger(options: LoggerOptions = {}): Logger {
   const {
     level = IS_DEV ? 'debug' : 'warn',
     context = {},
@@ -942,39 +834,8 @@ export const nostrLog = log.child({ module: 'nostr' });
 export const walletLog = log.child({ module: 'wallet' });
 export const paymentLog = log.child({ module: 'payment' });
 export const feedLog = log.child({ module: 'feed' });
-export const navLog = log.child({ module: 'nav' });
 export const apiLog = log.child({ module: 'api' });
 export const storeLog = log.child({ module: 'store' });
-
-// ─── Flow Tracking ──────────────────────────────────────────────────────────
-//
-// A flow traces a user action across async boundaries. All logs emitted via
-// the flow's child logger carry a `flowId` in their context, enabling
-// log-doctor to reconstruct the causal chain.
-//
-// Usage:
-//   const flow = startFlow('payment.send', paymentLog);
-//   flow.log.info('preparing', { amount, mint });
-//   await doSwap();
-//   flow.log.info('broadcasting');
-//   flow.end({ success: true });
-
-let _flowSeq = 0;
-
-export function startFlow(name: string, logger: Logger = log): Flow {
-  const flowId = `${name}:${++_flowSeq}`;
-  const flowLogger = logger.child({ flowId });
-  const t0 = _perfNow();
-  flowLogger.info('flow.start', { name });
-  return {
-    flowId,
-    log: flowLogger,
-    end: (params?: Record<string, unknown>) => {
-      const duration_ms = Math.round((_perfNow() - t0) * 100) / 100;
-      flowLogger.info('flow.end', { name, duration_ms, ...params });
-    },
-  };
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Performance Helpers
@@ -1073,162 +934,12 @@ export function useRenderLogger(
   }, []);
 }
 
-/**
- * Log exactly which props changed and WHY a re-render happened.
- * Includes actionable hints (useCallback, useMemo) for LLM debugging.
- *
- * Usage:
- *   function UserCard({ user, onPress }) {
- *     useWhyDidUpdate('UserCard', { user, onPress });
- *     // ...
- *   }
- */
-export function useWhyDidUpdate(
-  componentName: string,
-  currentProps: Record<string, unknown>,
-  logger: Logger = log
-): void {
-  const prevProps = useRef<Record<string, unknown> | undefined>(undefined);
-  const compactOpts = { maxStringLength: 80, maxArrayItems: 3, maxDepth: 2, maxObjectKeys: 8 };
-
-  useEffect(() => {
-    if (prevProps.current !== undefined) {
-      const changes: Record<string, unknown> = {};
-      const allKeys = new Set([...Object.keys(prevProps.current), ...Object.keys(currentProps)]);
-
-      for (const key of allKeys) {
-        const prev = prevProps.current[key];
-        const curr = currentProps[key];
-        if (!Object.is(prev, curr)) {
-          const change: Record<string, unknown> = {
-            from: compactValue(prev, compactOpts),
-            to: compactValue(curr, compactOpts),
-          };
-          if (typeof prev === typeof curr) {
-            if (typeof prev === 'function')
-              change.hint = 'function reference changed — wrap in useCallback()';
-            else if (typeof prev === 'object' && prev !== null && curr !== null)
-              change.hint = Array.isArray(prev)
-                ? 'array reference changed — wrap in useMemo() or extract outside render'
-                : 'object reference changed — wrap in useMemo() or extract outside component';
-          } else if (prev === undefined) change.hint = 'new prop added';
-          else if (curr === undefined) change.hint = 'prop removed';
-          changes[key] = change;
-        }
-      }
-
-      if (Object.keys(changes).length > 0) {
-        logger.debug('render.why', {
-          component: componentName,
-          changedProps: Object.keys(changes),
-          changes,
-        });
-      }
-    }
-    prevProps.current = { ...currentProps };
-  });
-}
-
-/**
- * Drop-in useState wrapper that logs every state transition.
- *
- * Usage:
- *   const [count, setCount] = useStateLogger('Counter', 'count', 0);
- */
-export function useStateLogger<T>(
-  componentName: string,
-  stateName: string,
-  initialValue: T,
-  logger: Logger = log
-): [T, (value: T | ((prev: T) => T)) => void] {
-  const [state, _setState] = React.useState<T>(initialValue);
-  const compactOpts = { maxStringLength: 80, maxArrayItems: 3, maxDepth: 2, maxObjectKeys: 8 };
-
-  const setState = React.useCallback(
-    (value: T | ((prev: T) => T)) => {
-      _setState((prev) => {
-        const next = typeof value === 'function' ? (value as (prev: T) => T)(prev) : value;
-        if (!Object.is(prev, next)) {
-          logger.debug('state.change', {
-            component: componentName,
-            state: stateName,
-            from: compactValue(prev, compactOpts),
-            to: compactValue(next, compactOpts),
-          });
-        }
-        return next;
-      });
-    },
-    [componentName, stateName]
-  );
-
-  return [state, setState];
-}
-
 /** Logs mount and unmount events for a component. */
 export function useLifecycleLogger(componentName: string, logger: Logger = log): void {
   useEffect(() => {
     logger.info('lifecycle.mount', { component: componentName });
     return () => logger.info('lifecycle.unmount', { component: componentName });
   }, []);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// DATA LAYER INSTRUMENTATION — useLoggedQuery
-// ═══════════════════════════════════════════════════════════════════════════════
-//
-// Instead of manually mirroring UI state in log calls (which drifts from
-// reality), instrument the DATA that drives the screen. The data IS the
-// screen content — the component is just a template over it.
-//
-// This hook wraps the return value of any data hook and logs its shape +
-// key values automatically. It cannot drift because it reads the actual
-// return value of the hook.
-
-/**
- * Wrap any data hook's return value to automatically log its shape and changes.
- *
- * Usage:
- *   const { profile, isLoading, error } = useLoggedQuery('ProfileScreen', useProfile(userId));
- *   // Logs: { event: "query.result", params: { source: "ProfileScreen", data: { ... } } }
- *   // On change: { event: "query.diff", params: { source: "ProfileScreen", changes: { ... } } }
- */
-export function useLoggedQuery<T extends Record<string, unknown>>(
-  source: string,
-  queryResult: T,
-  logger: Logger = log
-): T {
-  const compactOpts = { maxStringLength: 80, maxArrayItems: 3, maxDepth: 2, maxObjectKeys: 10 };
-  const prevSnapshot = useRef<string | undefined>(undefined);
-
-  useEffect(() => {
-    const compacted = compactValue(queryResult, compactOpts) as Record<string, unknown>;
-    const snapshot = JSON.stringify(compacted);
-
-    if (prevSnapshot.current === undefined) {
-      logger.debug('query.result', { source, data: compacted });
-    } else if (snapshot !== prevSnapshot.current) {
-      try {
-        const prev = JSON.parse(prevSnapshot.current) as Record<string, unknown>;
-        const changes: Record<string, unknown> = {};
-        const allKeys = new Set([...Object.keys(prev), ...Object.keys(compacted)]);
-        for (const key of allKeys) {
-          if (JSON.stringify(prev[key]) !== JSON.stringify(compacted[key])) {
-            changes[key] = { from: prev[key], to: compacted[key] };
-          }
-        }
-        if (Object.keys(changes).length > 0) {
-          logger.debug('query.diff', { source, changes });
-        }
-      } catch {
-        logger.debug('query.result', { source, data: compacted });
-      }
-    }
-
-    prevSnapshot.current = snapshot;
-  });
-
-  return queryResult;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1355,298 +1066,3 @@ export function Log({ name, children, logger: _logger, style }: LogProps): React
 
 /** @deprecated Use `Log` instead — same component, better name. */
 export const Screen = Log;
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ERROR BOUNDARY
-// ═══════════════════════════════════════════════════════════════════════════════
-
-interface ErrorBoundaryProps {
-  children: ReactNode;
-  name: string;
-  fallback?: ReactNode;
-  logger?: Logger;
-  onError?: (error: Error, errorInfo: ErrorInfo) => void;
-}
-
-/**
- * Error boundary that logs the crash + ring buffer context.
- *
- * Usage:
- *   <ErrorBoundary name="Root" fallback={<CrashScreen />}>
- *     <App />
- *   </ErrorBoundary>
- */
-export class ErrorBoundary extends Component<ErrorBoundaryProps, { hasError: boolean }> {
-  state = { hasError: false };
-
-  static getDerivedStateFromError(): { hasError: boolean } {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    const logger = this.props.logger ?? log;
-
-    // Dump ring buffer into the fatal log — gives the LLM full context
-    const recentLogs = logger.getRecentLogs();
-
-    logger.fatal('error.boundary', {
-      boundary: this.props.name,
-      error,
-      componentStack: errorInfo.componentStack ?? 'unavailable',
-      recentLogCount: recentLogs.length,
-    });
-
-    this.props.onError?.(error, errorInfo);
-  }
-
-  render(): ReactNode {
-    if (this.state.hasError) return this.props.fallback ?? null;
-    return this.props.children;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// NAVIGATION LOGGER (React Navigation / Expo Router)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Creates an onStateChange handler for React Navigation / Expo Router.
- *
- * Usage:
- *   <NavigationContainer onStateChange={createNavigationLogger(log)}>
- */
-export function createNavigationLogger(logger: Logger = navLog) {
-  let currentRoute: string | undefined;
-  return (state: any) => {
-    if (!state) return;
-    const getActiveRoute = (s: any): any => {
-      if (!s.routes || s.index === undefined) return s;
-      const route = s.routes[s.index];
-      return route.state ? getActiveRoute(route.state) : route;
-    };
-    const route = getActiveRoute(state);
-    const routeName = route.name;
-    if (routeName !== currentRoute) {
-      logger.info('nav.change', {
-        from: currentRoute ?? 'init',
-        to: routeName,
-        params: route.params
-          ? compactValue(route.params, {
-              maxStringLength: 80,
-              maxArrayItems: 3,
-              maxDepth: 2,
-              maxObjectKeys: 8,
-            })
-          : undefined,
-      });
-      currentRoute = routeName;
-    }
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// NETWORK LOGGER
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Wraps global fetch to log every request/response with timing.
- * Uses monotonic performance.now() for duration — immune to clock skew.
- * Auto-escalates slow responses (>3s) to warn level.
- *
- * Usage:
- *   global.fetch = createFetchLogger(log);
- */
-export function createFetchLogger(
-  logger: Logger = apiLog,
-  originalFetch: typeof fetch = global.fetch
-) {
-  return async function loggedFetch(
-    input: RequestInfo | URL,
-    init?: RequestInit
-  ): Promise<Response> {
-    const url =
-      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-    const method = init?.method ?? 'GET';
-    const t0 = _perfNow();
-    logger.debug('net.request', { method, url });
-    try {
-      const response = await originalFetch(input, init);
-      const duration_ms = Math.round((_perfNow() - t0) * 100) / 100;
-      const level = !response.ok ? 'warn' : duration_ms > 3000 ? 'warn' : 'debug';
-      logger[level]('net.response', {
-        method,
-        url,
-        status: response.status,
-        duration_ms,
-        contentType: response.headers.get('content-type'),
-        ...(duration_ms > 3000 ? { _slow: true } : {}),
-      });
-      return response;
-    } catch (error) {
-      const duration_ms = Math.round((_perfNow() - t0) * 100) / 100;
-      logger.error('net.error', {
-        method,
-        url,
-        duration_ms,
-        error: error instanceof Error ? error : new Error(String(error)),
-      });
-      throw error;
-    }
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// RUNTIME DIAGNOSTICS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/**
- * Detect JS thread blocking via periodic heartbeat.
- * Logs a warning when the heartbeat arrives >33ms late (2+ dropped frames),
- * indicating the JS thread was frozen by synchronous work.
- *
- * Usage:
- *   const stop = startThreadMonitor();
- */
-export function startThreadMonitor(logger: Logger = log, intervalMs = 1000): () => void {
-  let lastBeat = _perfNow();
-  const timer = setInterval(() => {
-    const t = _perfNow();
-    const drift = t - lastBeat - intervalMs;
-    if (drift > 33) {
-      logger.warn('perf.js_thread.blocked', {
-        drift_ms: Math.round(drift),
-        expected_ms: intervalMs,
-        frames_dropped: Math.floor(drift / 16.67),
-      });
-    }
-    lastBeat = t;
-  }, intervalMs);
-  return () => clearInterval(timer);
-}
-
-/**
- * Periodically log Hermes VM memory and GC stats.
- * Only works in Hermes environments. No-ops elsewhere.
- *
- * Usage:
- *   const stop = logHermesStats();
- */
-export function logHermesStats(logger: Logger = log, intervalMs = 10000): () => void {
-  const g = globalThis as any;
-  if (!g.HermesInternal?.getInstrumentedStats) return () => {};
-  const timer = setInterval(() => {
-    try {
-      const s = g.HermesInternal.getInstrumentedStats();
-      logger.debug('perf.hermes', {
-        heapSize: s.js_heapSize,
-        allocatedBytes: s.js_allocatedBytes,
-        numGCs: s.js_numGCs,
-        gcCPUTime: s.js_gcCPUTime,
-        mallocSize: s.js_mallocSizeEstimate,
-      });
-    } catch {
-      /* Hermes API may change across versions */
-    }
-  }, intervalMs);
-  return () => clearInterval(timer);
-}
-
-/**
- * Capture unhandled promise rejections as error-level log entries.
- * Installs once — subsequent calls are no-ops.
- *
- * Usage:
- *   captureUnhandledRejections();
- */
-export function captureUnhandledRejections(logger: Logger = log): void {
-  const g = globalThis as any;
-  if (g.__sovranRejectionHandler) return;
-  const handler = (_id: string, error: unknown) => {
-    logger.error('promise.unhandled_rejection', {
-      error: error instanceof Error ? error : new Error(String(error)),
-    });
-  };
-  try {
-    const tracking = require('promise/setimmediate/rejection-tracking');
-    tracking.enable({ allRejections: true, onUnhandled: handler });
-    g.__sovranRejectionHandler = handler;
-  } catch {
-    /* rejection tracking module not available */
-  }
-}
-
-/**
- * Log app state transitions (active/background/inactive).
- * Critical context: timers behave differently, WS connections drop,
- * and state can become stale when backgrounded.
- *
- * Usage:
- *   const unsub = logAppState();
- */
-export function logAppState(logger: Logger = log): () => void {
-  try {
-    const { AppState } = require('react-native');
-    let current: string = AppState.currentState;
-    const sub = AppState.addEventListener('change', (next: string) => {
-      logger.info('app.state', { from: current, to: next });
-      current = next;
-    });
-    return () => sub.remove();
-  } catch {
-    return () => {};
-  }
-}
-
-/**
- * WebSocket lifecycle logger factory.
- * Wraps WS event handlers with structured logging + message rate tracking.
- *
- * Usage:
- *   const wsLog = createWSLogger(cashuLog);
- *   socket.onopen = () => wsLog.onOpen(url);
- *   socket.onclose = (e) => wsLog.onClose(url, e.code, e.reason);
- *   socket.onmessage = () => wsLog.onMessage(url);
- */
-export function createWSLogger(logger: Logger = cashuLog) {
-  let messageCount = 0;
-  let lastRateLog = _perfNow();
-
-  return {
-    onOpen: (url: string) => logger.info('ws.open', { url }),
-    onClose: (url: string, code: number, reason: string) =>
-      logger.info('ws.close', { url, code, reason }),
-    onError: (url: string, error: Error) => logger.error('ws.error', { url, error }),
-    onReconnect: (url: string, attempt: number) => logger.warn('ws.reconnect', { url, attempt }),
-    onMessage: (url: string) => {
-      messageCount++;
-      const t = _perfNow();
-      if (t - lastRateLog > 5000) {
-        logger.debug('ws.rate', {
-          url,
-          messages: messageCount,
-          rate_per_sec: Math.round((messageCount / ((t - lastRateLog) / 1000)) * 100) / 100,
-        });
-        messageCount = 0;
-        lastRateLog = t;
-      }
-    },
-  };
-}
-
-/**
- * Log a state machine transition with from→to and trigger.
- * Invalid transitions are automatically escalated to error level.
- *
- * Usage:
- *   logTransition('quote', quoteId, 'UNPAID', 'PAID', 'ws.notification', cashuLog);
- */
-export function logTransition(
-  entity: string,
-  id: string,
-  from: string,
-  to: string,
-  trigger: string,
-  logger: Logger = log
-): void {
-  logger.info('state.transition', { entity, id, from, to, trigger });
-}

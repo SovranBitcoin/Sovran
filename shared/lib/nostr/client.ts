@@ -19,18 +19,6 @@ export function npubToPubkey(npub: string): string {
   return npub;
 }
 
-/** Like npubToPubkey but returns null on invalid input instead of echoing it back. */
-export function npubToPubkeySafe(npub: string): string | null {
-  try {
-    const decoded = nip19.decode(npub);
-    nostrLog.debug('nostr.client.npub_to_pubkey_safe', { type: decoded.type, success: decoded.type === 'npub' });
-    return decoded.type === 'npub' ? decoded.data : null;
-  } catch {
-    nostrLog.warn('nostr.client.npub_to_pubkey_safe.failed', { inputLen: npub?.length });
-    return null;
-  }
-}
-
 /**
  * Nostr event type for recommendation events
  */
@@ -83,6 +71,9 @@ export function isCashuRecommendationEvent(e: NostrEvent): boolean {
 export function extractMintUrlFromEvent(e: NostrEvent): string | null {
   const urlTag = e.tags.find((t) => t[0] === 'u');
   const url = urlTag?.[1] || null;
-  nostrLog.debug('nostr.client.extract_mint_url', { found: url !== null, eventId: e.id?.slice(0, 8) });
+  nostrLog.debug('nostr.client.extract_mint_url', {
+    found: url !== null,
+    eventId: e.id?.slice(0, 8),
+  });
   return url;
 }

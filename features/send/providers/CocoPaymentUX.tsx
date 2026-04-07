@@ -54,7 +54,7 @@ import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 
-export { usePaymentFlowMachine, usePaymentFlowMint } from 'coco-payment-ux/react';
+export { usePaymentFlowMachine } from 'coco-payment-ux/react';
 
 const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' };
 
@@ -134,7 +134,8 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         manager,
         platform: {
           clipboard: { write: (text: string) => Clipboard.setStringAsync(text).then(() => {}) },
-          share: (content) => Share.share({ message: content.message, url: content.url }).then(() => {}),
+          share: (content) =>
+            Share.share({ message: content.message, url: content.url }).then(() => {}),
           nfc: nfcAdapter,
           scanSources: createSovranScanSources(nfcAdapter),
           createURDecoder: () => new URDecoder(),
@@ -162,11 +163,13 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
             if (!nostrContact) continue;
             const store = useMintProfileStore.getState();
             if (!store.isStale(mintUrl)) continue;
-            fetchNostrProfile(nostrContact.info).then((result) => {
-              if (result.isOk()) {
-                store.setCached(mintUrl, result.value.followers, result.value.score);
-              }
-            }).catch(() => {});
+            fetchNostrProfile(nostrContact.info)
+              .then((result) => {
+                if (result.isOk()) {
+                  store.setCached(mintUrl, result.value.followers, result.value.score);
+                }
+              })
+              .catch(() => {});
           }
         },
         shouldMockFailPaymentRequest: () => useSettingsStore.getState().mockFailPaymentRequest,
@@ -223,13 +226,12 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
     [deepLinkUrl, keys?.pubkey]
   );
 
-  const screenActionsBridge = useMemo<ScreenActionsBridge>(
-    () => {
-      // Closure state for async mint-info fetches triggered from mergeEntryUpdate.
-      let mintInfoCallback: ((entry: EntryRecord) => void) | null = null;
-      let mintInfoFetchingUrl: string | null = null;
+  const screenActionsBridge = useMemo<ScreenActionsBridge>(() => {
+    // Closure state for async mint-info fetches triggered from mergeEntryUpdate.
+    let mintInfoCallback: ((entry: EntryRecord) => void) | null = null;
+    let mintInfoFetchingUrl: string | null = null;
 
-      return {
+    return {
       getExtraContext: () => ({
         manager,
         requestCameraPermission: receiveExtras?.requestCameraPermission,
@@ -239,13 +241,16 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
 
         if (screenType !== 'mintSelector' && screenType !== 'mintInfo') {
           unsubscribes.push(
-            manager.on(
-              'history:updated',
-              ({ entry: updated }: { mintUrl: string; entry: any }) => {
-                log.info('send.entry_updated', { screenType, type: updated?.type, id: updated?.id, state: updated?.state, quoteId: updated?.quoteId });
-                callback(updated as unknown as EntryRecord);
-              }
-            )
+            manager.on('history:updated', ({ entry: updated }: { mintUrl: string; entry: any }) => {
+              log.info('send.entry_updated', {
+                screenType,
+                type: updated?.type,
+                id: updated?.id,
+                state: updated?.state,
+                quoteId: updated?.quoteId,
+              });
+              callback(updated as unknown as EntryRecord);
+            })
           );
         }
 
@@ -276,7 +281,9 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           p2pkKeyRefreshedRef.current = (newKey: string | null) => {
             callback({ _p2pkKeyUpdate: true, p2pkKey: newKey } as EntryRecord);
           };
-          unsubscribes.push(() => { p2pkKeyRefreshedRef.current = null; });
+          unsubscribes.push(() => {
+            p2pkKeyRefreshedRef.current = null;
+          });
         }
 
         if (screenType === 'mintInfo' || screenType === 'mintSelector') {
@@ -301,7 +308,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
                   try {
                     const [info, balances] = await Promise.all([
                       manager.mint.getMintInfo(mintUrl).catch(() => null),
-                      manager.wallet.getBalances().catch(() => ({} as Record<string, number>)),
+                      manager.wallet.getBalances().catch(() => ({}) as Record<string, number>),
                     ]);
                     const enrichment = getMintEnrichment(mintUrl);
                     callback({
@@ -339,7 +346,10 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
 
           if (screenType === 'mintInfo') {
             mintInfoCallback = callback;
-            unsubscribes.push(() => { mintInfoCallback = null; mintInfoFetchingUrl = null; });
+            unsubscribes.push(() => {
+              mintInfoCallback = null;
+              mintInfoFetchingUrl = null;
+            });
             // Fire immediately so already-cached data is applied on mount
             pushEnrichment();
           }
@@ -401,7 +411,10 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
                   isTrusted,
                 } as EntryRecord);
               } catch (e) {
-                log.warn('send.mint_info_fetch_failed', { mintUrl, error: e instanceof Error ? e : new Error(String(e)) });
+                log.warn('send.mint_info_fetch_failed', {
+                  mintUrl,
+                  error: e instanceof Error ? e : new Error(String(e)),
+                });
               }
             })();
           }
@@ -469,9 +482,8 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         };
         return labels[scan.source] ?? null;
       },
-    }; },
-    [manager, receiveExtras?.requestCameraPermission]
-  );
+    };
+  }, [manager, receiveExtras?.requestCameraPermission]);
 
   return (
     <PaymentUXProviderBase
@@ -493,8 +505,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
       actions={actions}
       screenActionsBridge={screenActionsBridge}
       deepLinks={deepLinks}
-      navigation={navigation}
-    >
+      navigation={navigation}>
       {children}
     </PaymentUXProviderBase>
   );

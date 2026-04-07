@@ -154,11 +154,6 @@ export function useInitializationState() {
   return { isInitializing };
 }
 
-export function useIsStageComplete(stageId: string): boolean {
-  const { stages } = useInitializationContext();
-  return stages.get(stageId)?.status === 'complete';
-}
-
 interface InitializationProviderProps {
   children: ReactNode;
   forceVisible?: boolean;
@@ -498,7 +493,14 @@ export function InitializationProvider({
 
   useEffect(() => {
     const stagesDebug = Array.from(stages.entries()).map(([id, s]) => ({ id, status: s.status }));
-    log.debug('init.provider.state', { totalStages: stages.size, logHistory: logHistory.length, currentStageId: currentStage?.id, currentStageMessage: currentStage?.message, isInitializing, stages: stagesDebug });
+    log.debug('init.provider.state', {
+      totalStages: stages.size,
+      logHistory: logHistory.length,
+      currentStageId: currentStage?.id,
+      currentStageMessage: currentStage?.message,
+      isInitializing,
+      stages: stagesDebug,
+    });
   }, [stages, logHistory, currentStage, isInitializing]);
 
   const contextValue: InitializationContextValue = {

@@ -174,7 +174,8 @@ describe('mint list enrichment — sorting', () => {
     const items = details.mintListItems!;
 
     const firstDisabledIdx = items.findIndex((i) => i.status === 'disabled');
-    const lastAvailableIdx = items.length - 1 - [...items].reverse().findIndex((i) => i.status === 'available');
+    const lastAvailableIdx =
+      items.length - 1 - [...items].reverse().findIndex((i) => i.status === 'available');
 
     if (firstDisabledIdx !== -1) {
       expect(lastAvailableIdx).toBeLessThan(firstDisabledIdx);
@@ -246,7 +247,10 @@ describe('mint list enrichment — unreachable mints', () => {
         buildMintListItems: async (data: StepDataMap['selectMint']): Promise<MintListItem[]> =>
           data.candidates.map((c) => ({
             mintUrl: c.mintUrl,
-            displayName: c.mintUrl === MINT2 ? c.mintUrl : MINT_METADATA[c.mintUrl]?.displayName ?? c.mintUrl,
+            displayName:
+              c.mintUrl === MINT2
+                ? c.mintUrl
+                : (MINT_METADATA[c.mintUrl]?.displayName ?? c.mintUrl),
             iconUrl: c.mintUrl === MINT2 ? undefined : MINT_METADATA[c.mintUrl]?.iconUrl,
             balance: c.balance,
             unit: data.unit,

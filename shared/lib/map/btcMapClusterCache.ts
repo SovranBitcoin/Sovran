@@ -44,28 +44,9 @@ export function getOrBuildBTCMapClusterManager(
   evictIfNeeded();
   const duration = Math.round((performance.now() - t0) * 100) / 100;
   if (duration > 50) {
-    console.warn(`[perf] cluster.build(${points.length} points) ${duration}ms — cache miss for "${cacheKey}"`);
+    console.warn(
+      `[perf] cluster.build(${points.length} points) ${duration}ms — cache miss for "${cacheKey}"`
+    );
   }
   return manager;
-}
-export function prewarmBTCMapClusterManager(
-  cacheKey: string,
-  points: GeoPoint[],
-  options?: ClusterBuildOptions
-): void {
-  if (!points.length) return;
-  // Build immediately; callers should schedule this off the critical path (InteractionManager / timeout)
-  getOrBuildBTCMapClusterManager(cacheKey, points, options);
-}
-
-function clearBTCMapClusterCache(prefix?: string) {
-  if (!prefix) {
-    CACHE.clear();
-    return;
-  }
-  for (const key of CACHE.keys()) {
-    if (key.startsWith(prefix)) {
-      CACHE.delete(key);
-    }
-  }
 }

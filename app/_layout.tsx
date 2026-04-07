@@ -68,10 +68,6 @@ initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called')
 
 LogBox.ignoreAllLogs();
 
-// global.fetch = createFetchLogger(); // KILL_SWITCH
-
-// TODO: Wire createNavigationLogger() when Expo Router exposes onStateChange
-
 const IOS_SPLASH_IMAGE_WIDTH = 390;
 const REINIT_SPLASH_IMAGE = require('../assets/images/light-t.png');
 const REINIT_SPLASH_IMAGE_SIZE = Image.resolveAssetSource(REINIT_SPLASH_IMAGE);

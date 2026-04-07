@@ -23,8 +23,16 @@ import { describe, it, expect, vi } from 'vitest';
 import { createDefaultScreenActionHandlers } from '../../src/screen-actions/defaultHandlers';
 import { createScreenActionManager } from '../../src/screen-actions/createManager';
 import type { MachineOperations, PaymentMachine } from '../../src/machine/types';
-import type { ScreenActionContext, ScreenActionHandlerMap } from '../../src/screen-actions/types';
-import type { DefaultScreenActionHandlersConfig, NavigationCallbacks } from '../../src/screen-actions/defaultHandlers';
+import type {
+  ScreenActionContext,
+  ScreenActionHandlerMap,
+  ScreenActionManager,
+  ScreenType,
+} from '../../src/screen-actions/types';
+import type {
+  DefaultScreenActionHandlersConfig,
+  NavigationCallbacks,
+} from '../../src/screen-actions/defaultHandlers';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -37,7 +45,7 @@ function createMockConfig(overrides?: {
   machine?: Partial<PaymentMachine>;
   navigation?: Partial<NavigationCallbacks>;
 }) {
-  const notifications: Array<{ event: string; args: unknown[] }> = [];
+  const notifications: { event: string; args: unknown[] }[] = [];
   const ops: Partial<MachineOperations> = {
     checkSendStatus: vi.fn(async () => ({ state: 'pending' })),
     rollbackSend: vi.fn(async () => {}),
@@ -48,8 +56,12 @@ function createMockConfig(overrides?: {
     trustMint: vi.fn(async () => {}),
     rollbackMelt: vi.fn(async () => {}),
     buildMintReviewInfo: vi.fn(async (mintUrl: string) => ({
-      mintUrl, displayName: mintUrl, balance: 0, unit: 'sat',
-      isPreferred: false, isTrusted: true,
+      mintUrl,
+      displayName: mintUrl,
+      balance: 0,
+      unit: 'sat',
+      isPreferred: false,
+      isTrusted: true,
     })) as MachineOperations['buildMintReviewInfo'],
     linkTransaction: vi.fn(() => {}),
     ...overrides?.operations,
@@ -57,7 +69,7 @@ function createMockConfig(overrides?: {
 
   const machine: Partial<PaymentMachine> = {
     confirmMelt: vi.fn(async () => {}),
-    confirmPaymentRequest: vi.fn(async () => {}),
+    confirmPaymentRequest: vi.fn(async () => ({ rolledBack: false })),
     scan: vi.fn(async () => ({ step: 'idle' as const })) as any,
     startReceiveLightning: vi.fn(async () => {}),
     requestMintSelector: vi.fn(async () => {}),
@@ -90,15 +102,15 @@ function createMockConfig(overrides?: {
   return { handlers, ops, machine, navigation, notifications };
 }
 
-function createManager<S extends keyof ScreenActionHandlerMap>(
-  screenType: S,
+function createManager(
+  screenType: ScreenType,
   handlers: ScreenActionHandlerMap,
   entry: Record<string, unknown>,
   extraContext?: Record<string, unknown>
 ) {
   const setEntry = vi.fn();
-  let mgrRef: ReturnType<typeof createScreenActionManager> | null = null;
-  const mgr = createScreenActionManager({
+  let mgrRef: ScreenActionManager<ScreenType> | null = null;
+  const mgr: ScreenActionManager<ScreenType> = createScreenActionManager({
     screenType,
     handlers: {} as any,
     defaultHandlers: handlers[screenType] as any,
@@ -111,7 +123,7 @@ function createManager<S extends keyof ScreenActionHandlerMap>(
       },
       ...extraContext,
     }),
-  });
+  } as any);
   mgrRef = mgr;
   mgr.setEntry(entry);
   return { mgr, setEntry };
@@ -228,12 +240,14 @@ describe('sendToken default handlers', () => {
 describe('receiveToken default handlers', () => {
   const VALID_TOKEN = {
     mint: MINT1,
-    proofs: [{
-      amount: 1,
-      secret: 'test-secret-string',
-      C: '02' + '0'.repeat(64),
-      id: '00' + '0'.repeat(14),
-    }],
+    proofs: [
+      {
+        amount: 1,
+        secret: 'test-secret-string',
+        C: '02' + '0'.repeat(64),
+        id: '00' + '0'.repeat(14),
+      },
+    ],
     unit: 'sat',
   };
 
@@ -268,11 +282,7 @@ describe('receiveToken default handlers', () => {
       await mgr.execute('redeem');
 
       const events = notifications.map((n) => n.event);
-      expect(events).toEqual([
-        'onReceiveProcessing',
-        'onReceiveConfirmed',
-        'onTransactionCreated',
-      ]);
+      expect(events).toEqual(['onReceiveProcessing', 'onReceiveConfirmed', 'onTransactionCreated']);
     });
 
     it('onReceiveProcessing carries id, mintUrl, amount, unit', async () => {
@@ -399,10 +409,7 @@ describe('receiveToken default handlers', () => {
       await expect(mgr.execute('redeem')).rejects.toThrow();
 
       const events = notifications.map((n) => n.event);
-      expect(events).toEqual([
-        'onReceiveProcessing',
-        'onReceiveFailed',
-      ]);
+      expect(events).toEqual(['onReceiveProcessing', 'onReceiveFailed']);
     });
   });
 });
@@ -767,8 +774,8 @@ describe('three-tier fallback', () => {
     const walletHandler = vi.fn();
     const { handlers } = createMockConfig();
 
-    let mgrRef: ReturnType<typeof createScreenActionManager> | null = null;
-    const mgr = createScreenActionManager({
+    let mgrRef: ScreenActionManager<ScreenType> | null = null;
+    const mgr: ScreenActionManager<ScreenType> = createScreenActionManager({
       screenType: 'mintInfo',
       handlers: { trust: walletHandler } as any,
       defaultHandlers: handlers.mintInfo as any,
@@ -777,11 +784,11 @@ describe('three-tier fallback', () => {
         manager: null,
         setEntry: () => {},
       }),
-    });
+    } as any);
     mgrRef = mgr;
     mgr.setEntry({ mintUrl: MINT1 });
 
-    await mgr.execute('trust');
+    await mgr.execute('trust' as any);
 
     expect(walletHandler).toHaveBeenCalled();
   });
@@ -789,8 +796,8 @@ describe('three-tier fallback', () => {
   it('default handler is used when no wallet handler exists', async () => {
     const { handlers, ops } = createMockConfig();
 
-    let mgrRef: ReturnType<typeof createScreenActionManager> | null = null;
-    const mgr = createScreenActionManager({
+    let mgrRef: ScreenActionManager<ScreenType> | null = null;
+    const mgr: ScreenActionManager<ScreenType> = createScreenActionManager({
       screenType: 'mintInfo',
       handlers: {} as any,
       defaultHandlers: handlers.mintInfo as any,
@@ -799,11 +806,11 @@ describe('three-tier fallback', () => {
         manager: null,
         setEntry: () => {},
       }),
-    });
+    } as any);
     mgrRef = mgr;
     mgr.setEntry({ mintUrl: MINT1 });
 
-    await mgr.execute('trust');
+    await mgr.execute('trust' as any);
 
     expect(ops.trustMint).toHaveBeenCalledWith(MINT1);
   });

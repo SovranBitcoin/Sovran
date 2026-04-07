@@ -48,7 +48,10 @@ export function PaymentRequestScreen({
   onRequestMintList,
 }: PaymentRequestScreenProps) {
   useLifecycleLogger('PaymentRequestScreen');
-  const { entry, error, actions, source, mintUrl } = useScreenActions('paymentRequest', paymentRequestEntry);
+  const { entry, error, actions, source, mintUrl } = useScreenActions(
+    'paymentRequest',
+    paymentRequestEntry
+  );
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
@@ -63,8 +66,14 @@ export function PaymentRequestScreen({
 
   const tokenCreated = entry.metadata?.tokenCreated === 'true';
   const nostrSent = entry.metadata?.nostrSent === 'true';
-  const isPreview = isPaymentRequestPreview(entry);
-  log.debug('send.payment_request.render', { isPreview, amount: entry.amount, unit: entry.unit, tokenCreated, nostrSent });
+  const isPreview = isPaymentRequestPreview({ ...entry } as Record<string, unknown>);
+  log.debug('send.payment_request.render', {
+    isPreview,
+    amount: entry.amount,
+    unit: entry.unit,
+    tokenCreated,
+    nostrSent,
+  });
 
   const anyLoading = actions.confirm.loading || actions.cancel.loading;
 
@@ -132,7 +141,12 @@ export function PaymentRequestScreen({
             items={[
               source ? { title: 'Source', value: source } : null,
               bip321.isBip321 ? { title: 'Format', value: 'BIP 321' } : null,
-              bip321.optionKinds ? { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" /> } : null,
+              bip321.optionKinds
+                ? {
+                    title: 'Payment Methods',
+                    value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" />,
+                  }
+                : null,
               { title: 'Date', value: entry.createdAt.datetime },
               { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
               entry.transportLabel ? { title: 'Transport', value: entry.transportLabel } : null,

@@ -31,8 +31,8 @@ export default function App({
         typeof source === 'number'
           ? 'asset'
           : typeof source === 'string'
-            ? source.slice(0, 40)
-            : (source as any)?.uri?.slice(0, 40) ?? 'unknown';
+            ? (source as string).slice(0, 40)
+            : ((source as any)?.uri?.slice(0, 40) ?? 'unknown');
       log.debug('image.loaded', {
         src,
         width: e.source.width,

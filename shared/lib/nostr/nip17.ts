@@ -59,7 +59,11 @@ function createRumor(
   event: { kind: number; content: string; tags?: string[][]; created_at?: number },
   senderPrivateKey: Uint8Array
 ): Rumor {
-  nostrLog.debug('nostr.nip17.create_rumor', { kind: event.kind, contentLen: event.content.length, tagCount: event.tags?.length ?? 0 });
+  nostrLog.debug('nostr.nip17.create_rumor', {
+    kind: event.kind,
+    contentLen: event.content.length,
+    tagCount: event.tags?.length ?? 0,
+  });
   const rumor: Record<string, unknown> = {
     created_at: now(),
     tags: [],
@@ -84,7 +88,10 @@ function createSeal(
   senderPrivateKey: Uint8Array,
   recipientPublicKey: string
 ): VerifiedEvent {
-  nostrLog.debug('nostr.nip17.create_seal', { rumorId: rumor.id?.slice(0, 8), recipientPrefix: recipientPublicKey.slice(0, 8) });
+  nostrLog.debug('nostr.nip17.create_seal', {
+    rumorId: rumor.id?.slice(0, 8),
+    recipientPrefix: recipientPublicKey.slice(0, 8),
+  });
   return finalizeEvent(
     {
       kind: 13,
@@ -123,40 +130,6 @@ function createWrap(seal: VerifiedEvent, recipientPublicKey: string): VerifiedEv
 // ---------------------------------------------------------------------------
 
 /**
- * Build a gift-wrapped NIP-17 direct message (kind 14) for a single
- * recipient.  Returns the kind 1059 event ready to publish.
- *
- * NOTE: If you also need a self-copy, use {@link buildGiftWrappedDMPair}
- * instead so the same rumor is reused for both wraps.
- */
-export function buildGiftWrappedDM(params: {
-  content: string;
-  senderPrivateKey: Uint8Array;
-  recipientPublicKey: string;
-  /** Extra tags on the kind 14 rumor (e.g. reply `e` tags). */
-  extraTags?: string[][];
-}): VerifiedEvent {
-  const { content, senderPrivateKey, recipientPublicKey, extraTags } = params;
-  nostrLog.info('nostr.nip17.build_gift_wrapped_dm', { contentLen: content.length, recipientPrefix: recipientPublicKey.slice(0, 8), extraTagCount: extraTags?.length ?? 0 });
-
-  // 1. Rumor (kind 14 – unsigned)
-  const rumor = createRumor(
-    {
-      kind: 14,
-      content,
-      tags: [['p', recipientPublicKey], ...(extraTags ?? [])],
-    },
-    senderPrivateKey
-  );
-
-  // 2. Seal (kind 13 – signed by sender, encrypted to recipient)
-  const seal = createSeal(rumor, senderPrivateKey, recipientPublicKey);
-
-  // 3. Gift wrap (kind 1059 – signed by random key, encrypted to recipient)
-  return createWrap(seal, recipientPublicKey);
-}
-
-/**
  * Build a pair of gift-wrapped NIP-17 DMs: one for the recipient and one
  * self-copy for the sender.
  *
@@ -173,7 +146,11 @@ export function buildGiftWrappedDMPair(params: {
 }): { recipientWrap: VerifiedEvent; senderWrap: VerifiedEvent } {
   const { content, senderPrivateKey, recipientPublicKey, extraTags } = params;
   const senderPublicKey = getPublicKey(senderPrivateKey);
-  nostrLog.info('nostr.nip17.build_gift_wrapped_dm_pair', { contentLen: content.length, recipientPrefix: recipientPublicKey.slice(0, 8), senderPrefix: senderPublicKey.slice(0, 8) });
+  nostrLog.info('nostr.nip17.build_gift_wrapped_dm_pair', {
+    contentLen: content.length,
+    recipientPrefix: recipientPublicKey.slice(0, 8),
+    senderPrefix: senderPublicKey.slice(0, 8),
+  });
 
   // 1. Rumor (kind 14 – unsigned) – shared across both wraps
   const rumor = createRumor(
@@ -229,7 +206,10 @@ export function unwrapGiftWrap(
   wrapEvent: { content: string; pubkey: string },
   recipientPrivateKey: Uint8Array
 ): UnwrappedDM | null {
-  nostrLog.debug('nostr.nip17.unwrap_gift_wrap.start', { wrapPubkeyPrefix: wrapEvent.pubkey.slice(0, 8), contentLen: wrapEvent.content.length });
+  nostrLog.debug('nostr.nip17.unwrap_gift_wrap.start', {
+    wrapPubkeyPrefix: wrapEvent.pubkey.slice(0, 8),
+    contentLen: wrapEvent.content.length,
+  });
   try {
     // Layer 1: decrypt the gift wrap → seal
     const seal = nip44Decrypt(wrapEvent.content, recipientPrivateKey, wrapEvent.pubkey) as {
@@ -254,11 +234,18 @@ export function unwrapGiftWrap(
 
     // NIP-17: verify that the seal's pubkey matches the rumor's pubkey
     if (seal.pubkey !== rumor.pubkey) {
-      nostrLog.warn('nostr.nip17.unwrap_gift_wrap.pubkey_mismatch', { sealPrefix: seal.pubkey.slice(0, 8), rumorPrefix: rumor.pubkey.slice(0, 8) });
+      nostrLog.warn('nostr.nip17.unwrap_gift_wrap.pubkey_mismatch', {
+        sealPrefix: seal.pubkey.slice(0, 8),
+        rumorPrefix: rumor.pubkey.slice(0, 8),
+      });
       return null;
     }
 
-    nostrLog.info('nostr.nip17.unwrap_gift_wrap.success', { senderPrefix: seal.pubkey.slice(0, 8), rumorKind: rumor.kind, contentLen: rumor.content.length });
+    nostrLog.info('nostr.nip17.unwrap_gift_wrap.success', {
+      senderPrefix: seal.pubkey.slice(0, 8),
+      rumorKind: rumor.kind,
+      contentLen: rumor.content.length,
+    });
     return {
       senderPubkey: seal.pubkey,
       recipientPubkeys: (rumor.tags || []).filter((t) => t[0] === 'p').map((t) => t[1]),
@@ -268,7 +255,9 @@ export function unwrapGiftWrap(
       tags: rumor.tags || [],
     };
   } catch {
-    nostrLog.error('nostr.nip17.unwrap_gift_wrap.decryption_failed', { wrapPubkeyPrefix: wrapEvent.pubkey.slice(0, 8) });
+    nostrLog.error('nostr.nip17.unwrap_gift_wrap.decryption_failed', {
+      wrapPubkeyPrefix: wrapEvent.pubkey.slice(0, 8),
+    });
     return null;
   }
 }

@@ -184,7 +184,14 @@ export function createScreenActionManager<S extends ScreenType>(
   const getEntry = (): Record<string, unknown> | null => getEffectiveEntry();
 
   const setEntry = (newEntry: Record<string, unknown>): void => {
-    console.info(`[ScreenActionManager:${screenType}] setEntry | id:`, newEntry?.id, '| type:', newEntry?.type, '| state:', newEntry?.state);
+    console.info(
+      `[ScreenActionManager:${screenType}] setEntry | id:`,
+      newEntry?.id,
+      '| type:',
+      newEntry?.type,
+      '| state:',
+      newEntry?.state
+    );
     entry = newEntry;
     notify();
   };
@@ -288,10 +295,7 @@ function extractContent(
   return extractor(ctx.entry as EntryLike, ctx as EntryLike);
 }
 
-async function builtinCopyHandler(
-  screenType: ScreenType,
-  ctx: ScreenActionContext
-): Promise<void> {
+async function builtinCopyHandler(screenType: ScreenType, ctx: ScreenActionContext): Promise<void> {
   const writeClipboard = (ctx as EntryLike).writeClipboard as
     | ((text: string) => Promise<void>)
     | undefined;
@@ -364,7 +368,10 @@ function getReceiveTokenString(entry: EntryRecord | null | undefined): string | 
     try {
       return getEncodedTokenV4(token as Parameters<typeof getEncodedTokenV4>[0]);
     } catch (e) {
-      console.warn('[getReceiveTokenString] Token encode failed:', e instanceof Error ? e.message : e);
+      console.warn(
+        '[getReceiveTokenString] Token encode failed:',
+        e instanceof Error ? e.message : e
+      );
     }
   }
   return getStringField(getMetadata(entry), 'rawToken');
@@ -457,7 +464,12 @@ export function shouldApplyEntryUpdate(
 
     const isPreview = currentId?.startsWith('receive-') ?? false;
     if (!isPreview) {
-      console.info('[shouldApplyEntryUpdate] receive: not a preview entry, skipping | currentId:', currentId, '| updatedId:', updatedId);
+      console.info(
+        '[shouldApplyEntryUpdate] receive: not a preview entry, skipping | currentId:',
+        currentId,
+        '| updatedId:',
+        updatedId
+      );
       return false;
     }
 
@@ -466,7 +478,16 @@ export function shouldApplyEntryUpdate(
     const ca = getNumberField(currentEntry, 'amount');
     const ua = getNumberField(updatedEntry, 'amount');
     const matched = !!cm && cm === um && typeof ca === 'number' && ca === ua;
-    console.info('[shouldApplyEntryUpdate] receive preview match:', matched, '| mintUrl:', cm === um, '| amount:', ca, '→', ua);
+    console.info(
+      '[shouldApplyEntryUpdate] receive preview match:',
+      matched,
+      '| mintUrl:',
+      cm === um,
+      '| amount:',
+      ca,
+      '→',
+      ua
+    );
     return matched;
   }
 
@@ -497,7 +518,8 @@ export function mergeEntryUpdate(
   const mergedMeta = getMetadata(merged);
   if (
     mergedMeta?.phase === 'preview' &&
-    (typeof merged.operationId === 'string' || typeof mergedMeta?.operationId === 'string')
+    (typeof (merged as Record<string, unknown>).operationId === 'string' ||
+      typeof mergedMeta?.operationId === 'string')
   ) {
     (mergedMeta as Record<string, unknown>).phase = 'delivered';
   }
@@ -513,7 +535,7 @@ export function mergeEntryUpdate(
 // default by useScreenActions; wallets can override via the bridge.
 // ---------------------------------------------------------------------------
 
-function extractP2PKPubkey(proofs: ReadonlyArray<{ secret: string }>): string | null {
+function extractP2PKPubkey(proofs: readonly { secret: string }[]): string | null {
   for (const proof of proofs) {
     try {
       const parsed = JSON.parse(proof.secret);
@@ -585,9 +607,9 @@ export function decorateEntry(raw: EntryRecord | null, language: string): EntryR
     mintUrlFormatted = new FormattedString(raw.mintUrl, 'middle', language);
   }
 
-  let contact: Array<{ method: string; info: FormattedString }> | undefined;
+  let contact: { method: string; info: FormattedString }[] | undefined;
   if (Array.isArray(raw.contact)) {
-    contact = (raw.contact as Array<{ method: string; info: string }>).map((c) => ({
+    contact = (raw.contact as { method: string; info: string }[]).map((c) => ({
       method: c.method,
       info: new FormattedString(c.info, 'middle', language),
     }));

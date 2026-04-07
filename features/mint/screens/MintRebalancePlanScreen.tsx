@@ -386,8 +386,8 @@ export function MintRebalancePlanScreen() {
         let feeHeadroom = STATIC_FEE_HEADROOM;
         let worstCaseInputFee = 0;
         try {
-          const proofs = await manager.proofService.getReadyProofs(fromMintUrl);
-          const wallet = await manager.walletService.getWallet(fromMintUrl);
+          const proofs = await (manager as any).proofService.getReadyProofs(fromMintUrl);
+          const wallet = await (manager as any).walletService.getWallet(fromMintUrl);
           worstCaseInputFee = wallet.getFeesForProofs(proofs as any);
           // fee_reserve (conservative floor) + worst-case input fee (all proofs selected)
           feeHeadroom = Math.max(STATIC_FEE_HEADROOM, MIN_FEE_RESERVE + worstCaseInputFee);
@@ -469,7 +469,7 @@ export function MintRebalancePlanScreen() {
         // HTTP, no persistence/events) to discover the real fee_reserve, then
         // re-cap the transfer amount if needed — avoiding blind retry loops.
         try {
-          const probeWallet = await manager.walletService.getWallet(fromMintUrl);
+          const probeWallet = await (manager as any).walletService.getWallet(fromMintUrl);
           const probeQuote = await (probeWallet as any).createMeltQuoteBolt11(invoice);
           const actualFeeReserve = Number(probeQuote.fee_reserve ?? 0);
 
@@ -514,7 +514,11 @@ export function MintRebalancePlanScreen() {
         setLegLocalStatus('invoiceReady');
 
         const prepareForInvoice = async (invoiceToPay: string) => {
-          const prepared = await manager.ops.melt.prepare({ mintUrl: fromMintUrl, method: 'bolt11', methodData: { invoice: invoiceToPay } });
+          const prepared = await manager.ops.melt.prepare({
+            mintUrl: fromMintUrl,
+            method: 'bolt11',
+            methodData: { invoice: invoiceToPay },
+          });
           updateStepState(id, { operationId: prepared.id });
           {
             const legId = ensureLegId();
@@ -620,7 +624,7 @@ export function MintRebalancePlanScreen() {
                 const start = Date.now();
 
                 while (Date.now() - start < maxWaitMs) {
-                  const decision = await manager.ops.melt.refresh(opId);
+                  const decision = (await manager.ops.melt.refresh(opId)) as unknown as string;
                   if (decision === 'finalize') return;
                   if (decision === 'rollback') {
                     throw new Error('Melt payment rolled back by mint');
@@ -889,8 +893,8 @@ export function MintRebalancePlanScreen() {
                 // compute the headroom specifically for this hop's source mint.
                 let hopFeeHeadroom = STATIC_FEE_HEADROOM;
                 try {
-                  const hopProofs = await manager.proofService.getReadyProofs(hopFrom);
-                  const hopWallet = await manager.walletService.getWallet(hopFrom);
+                  const hopProofs = await (manager as any).proofService.getReadyProofs(hopFrom);
+                  const hopWallet = await (manager as any).walletService.getWallet(hopFrom);
                   const hopInputFee = hopWallet.getFeesForProofs(hopProofs as any);
                   hopFeeHeadroom = Math.max(STATIC_FEE_HEADROOM, MIN_FEE_RESERVE + hopInputFee);
                 } catch {
@@ -935,7 +939,7 @@ export function MintRebalancePlanScreen() {
 
                 // ── Probe melt quote for this hop's actual fee_reserve ──
                 try {
-                  const hopProbeWallet = await manager.walletService.getWallet(hopFrom);
+                  const hopProbeWallet = await (manager as any).walletService.getWallet(hopFrom);
                   const hopProbeQuote = await (hopProbeWallet as any).createMeltQuoteBolt11(
                     hopInvoice
                   );
@@ -945,8 +949,8 @@ export function MintRebalancePlanScreen() {
                     // Recompute hop fee headroom with probed fee_reserve
                     let hopProbeInputFee = 0;
                     try {
-                      const hpProofs = await manager.proofService.getReadyProofs(hopFrom);
-                      const hpWallet = await manager.walletService.getWallet(hopFrom);
+                      const hpProofs = await (manager as any).proofService.getReadyProofs(hopFrom);
+                      const hpWallet = await (manager as any).walletService.getWallet(hopFrom);
                       hopProbeInputFee = hpWallet.getFeesForProofs(hpProofs as any);
                     } catch {
                       /* use 0 */
@@ -1006,7 +1010,11 @@ export function MintRebalancePlanScreen() {
                 let hopTransferAmt = hopAmount;
                 for (let att = 0; att <= MAX_PREPARE_RETRIES; att++) {
                   try {
-                    hopPrepared = await manager.ops.melt.prepare({ mintUrl: hopFrom, method: 'bolt11', methodData: { invoice: hopInvoice } });
+                    hopPrepared = await manager.ops.melt.prepare({
+                      mintUrl: hopFrom,
+                      method: 'bolt11',
+                      methodData: { invoice: hopInvoice },
+                    });
                     break;
                   } catch (pErr) {
                     const pm = pErr instanceof Error ? pErr.message : String(pErr);
@@ -1034,7 +1042,7 @@ export function MintRebalancePlanScreen() {
                   const maxWait = 15000;
                   const start = Date.now();
                   while (Date.now() - start < maxWait) {
-                    const dec = await manager.ops.melt.refresh(opId);
+                    const dec = (await manager.ops.melt.refresh(opId)) as unknown as string;
                     if (dec === 'finalize') break;
                     if (dec === 'rollback') throw new Error('Hop melt rolled back');
                     await new Promise((r) => setTimeout(r, 2000));
