@@ -1,8 +1,30 @@
 diff --git a/node_modules/@cashu/coco-core/dist/index.cjs b/node_modules/@cashu/coco-core/dist/index.cjs
-index bedc7ad..863e344 100644
+index bedc7ad..4750970 100644
 --- a/node_modules/@cashu/coco-core/dist/index.cjs
 +++ b/node_modules/@cashu/coco-core/dist/index.cjs
-@@ -8639,6 +8639,7 @@ var ConsoleLogger = class ConsoleLogger {
+@@ -1334,9 +1334,18 @@ var MintService = class {
+ 		const now = Math.floor(Date.now() / 1e3);
+ 		if (mint.updatedAt < now - MINT_REFRESH_TTL_S) {
+ 			this.logger?.debug("Refreshing stale mint", { mintUrl });
+-			const updated = await this.updateMint(mint);
+-			await this.eventBus?.emit("mint:updated", updated);
+-			return updated;
++			try {
++				const updated = await this.updateMint(mint);
++				await this.eventBus?.emit("mint:updated", updated);
++				return updated;
++			} catch (err) {
++				const staleKeysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
++				if (staleKeysets.length > 0) {
++					this.logger?.warn("Mint refresh failed, using stale data", { mintUrl, error: err instanceof Error ? err.message : String(err) });
++					return { mint, keysets: staleKeysets };
++				}
++				throw err;
++			}
+ 		}
+ 		const keysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
+ 		return {
+@@ -8639,6 +8648,7 @@ var ConsoleLogger = class ConsoleLogger {
  		info: 2,
  		debug: 3
  	};
@@ -10,7 +32,7 @@ index bedc7ad..863e344 100644
  	constructor(prefix = "coco", options = {}) {
  		this.prefix = prefix;
  		this.level = options.level ?? "info";
-@@ -8646,21 +8647,36 @@ var ConsoleLogger = class ConsoleLogger {
+@@ -8646,21 +8656,36 @@ var ConsoleLogger = class ConsoleLogger {
  	shouldLog(level) {
  		return ConsoleLogger.levelPriority[level] <= ConsoleLogger.levelPriority[this.level];
  	}
@@ -51,11 +73,113 @@ index bedc7ad..863e344 100644
  	}
  	log(level, message, ...meta) {
  		switch (level) {
+diff --git a/node_modules/@cashu/coco-core/dist/index.d.cts b/node_modules/@cashu/coco-core/dist/index.d.cts
+index 6b12972..f8d2fda 100644
+--- a/node_modules/@cashu/coco-core/dist/index.d.cts
++++ b/node_modules/@cashu/coco-core/dist/index.d.cts
+@@ -3528,8 +3528,8 @@ declare class Manager {
+   readonly paymentRequests: PaymentRequestsApi;
+   readonly ext: PluginExtensions;
+   private mintService;
+-  private walletService;
+-  private proofService;
++  walletService: WalletService;
++  proofService: ProofService;
+   private walletRestoreService;
+   private keyRingService;
+   private eventBus;
+@@ -3542,7 +3542,7 @@ declare class Manager {
+   private meltQuoteService;
+   private historyService;
+   private seedService;
+-  private counterService;
++  counterService: CounterService;
+   private tokenService;
+   private transactionService;
+   private paymentRequestService;
+@@ -3550,13 +3550,13 @@ declare class Manager {
+   private authService;
+   private sendOperationService;
+   private sendOperationRepository;
+-  private meltOperationService;
++  meltOperationService: MeltOperationService;
+   private meltOperationRepository;
+   private mintOperationService;
+   private mintOperationRepository;
+   private receiveOperationService;
+   private receiveOperationRepository;
+-  private proofRepository;
++  proofRepository: ProofRepository;
+   private readonly pluginHost;
+   private subscriptionsPaused;
+   private originalWatcherConfig;
+diff --git a/node_modules/@cashu/coco-core/dist/index.d.ts b/node_modules/@cashu/coco-core/dist/index.d.ts
+index c3b6ae3..de4dd84 100644
+--- a/node_modules/@cashu/coco-core/dist/index.d.ts
++++ b/node_modules/@cashu/coco-core/dist/index.d.ts
+@@ -3528,8 +3528,8 @@ declare class Manager {
+   readonly paymentRequests: PaymentRequestsApi;
+   readonly ext: PluginExtensions;
+   private mintService;
+-  private walletService;
+-  private proofService;
++  walletService: WalletService;
++  proofService: ProofService;
+   private walletRestoreService;
+   private keyRingService;
+   private eventBus;
+@@ -3542,7 +3542,7 @@ declare class Manager {
+   private meltQuoteService;
+   private historyService;
+   private seedService;
+-  private counterService;
++  counterService: CounterService;
+   private tokenService;
+   private transactionService;
+   private paymentRequestService;
+@@ -3550,13 +3550,13 @@ declare class Manager {
+   private authService;
+   private sendOperationService;
+   private sendOperationRepository;
+-  private meltOperationService;
++  meltOperationService: MeltOperationService;
+   private meltOperationRepository;
+   private mintOperationService;
+   private mintOperationRepository;
+   private receiveOperationService;
+   private receiveOperationRepository;
+-  private proofRepository;
++  proofRepository: ProofRepository;
+   private readonly pluginHost;
+   private subscriptionsPaused;
+   private originalWatcherConfig;
 diff --git a/node_modules/@cashu/coco-core/dist/index.js b/node_modules/@cashu/coco-core/dist/index.js
-index ac52de1..96a1c87 100644
+index ac52de1..595d665 100644
 --- a/node_modules/@cashu/coco-core/dist/index.js
 +++ b/node_modules/@cashu/coco-core/dist/index.js
-@@ -8639,6 +8639,7 @@ var ConsoleLogger = class ConsoleLogger {
+@@ -1334,9 +1334,18 @@ var MintService = class {
+ 		const now = Math.floor(Date.now() / 1e3);
+ 		if (mint.updatedAt < now - MINT_REFRESH_TTL_S) {
+ 			this.logger?.debug("Refreshing stale mint", { mintUrl });
+-			const updated = await this.updateMint(mint);
+-			await this.eventBus?.emit("mint:updated", updated);
+-			return updated;
++			try {
++				const updated = await this.updateMint(mint);
++				await this.eventBus?.emit("mint:updated", updated);
++				return updated;
++			} catch (err) {
++				const staleKeysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
++				if (staleKeysets.length > 0) {
++					this.logger?.warn("Mint refresh failed, using stale data", { mintUrl, error: err instanceof Error ? err.message : String(err) });
++					return { mint, keysets: staleKeysets };
++				}
++				throw err;
++			}
+ 		}
+ 		const keysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
+ 		return {
+@@ -8639,6 +8648,7 @@ var ConsoleLogger = class ConsoleLogger {
  		info: 2,
  		debug: 3
  	};
@@ -63,7 +187,7 @@ index ac52de1..96a1c87 100644
  	constructor(prefix = "coco", options = {}) {
  		this.prefix = prefix;
  		this.level = options.level ?? "info";
-@@ -8646,21 +8647,36 @@ var ConsoleLogger = class ConsoleLogger {
+@@ -8646,21 +8656,36 @@ var ConsoleLogger = class ConsoleLogger {
  	shouldLog(level) {
  		return ConsoleLogger.levelPriority[level] <= ConsoleLogger.levelPriority[this.level];
  	}

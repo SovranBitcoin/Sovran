@@ -71,11 +71,7 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
 
   const fetchProofAmounts = useCallback(async () => {
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', { mintCount: stableMintUrls.length });
-    const proofService = (
-      manager as unknown as {
-        proofService: { getReadyProofs: (url: string) => Promise<Array<{ amount: number }>> };
-      }
-    ).proofService;
+    const proofService = manager.proofService;
     const next: Record<string, number[]> = {};
     for (const url of stableMintUrls) {
       try {

@@ -129,7 +129,7 @@ export class DataMigration {
           continue;
         }
 
-        const wallet = await (this.manager as any).walletService.getWallet(mintUrl);
+        const wallet = await this.manager.walletService.getWallet(mintUrl);
         const proofStates = await wallet.checkProofsStates(satProofs);
 
         for (let i = 0; i < satProofs.length; i++) {
@@ -146,7 +146,7 @@ export class DataMigration {
             continue;
           }
 
-          await (this.manager as any).proofService.saveProofs(mintUrl, [
+          await this.manager.proofService.saveProofs(mintUrl, [
             { ...proof, mintUrl, state: 'ready' as const },
           ]);
           result.proofsMigrated++;
@@ -181,7 +181,7 @@ export class DataMigration {
     for (const [mintUrl, counters] of Object.entries(profile.counters)) {
       for (const [keysetId, counter] of Object.entries(counters)) {
         try {
-          await (this.manager as any).counterService.overwriteCounter(mintUrl, keysetId, counter);
+          await this.manager.counterService.overwriteCounter(mintUrl, keysetId, counter);
           result.countersMigrated++;
           cashuLog.debug('cashu.migration.counter_migrated', { mintUrl, keysetId, counter });
         } catch (error) {

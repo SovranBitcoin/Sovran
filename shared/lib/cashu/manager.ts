@@ -656,27 +656,9 @@ export class CocoManager {
     this.isFreeingReservedProofs = true;
     const manager = this.getInstance();
 
-    // Access repositories/services that are not currently exposed publicly.
-    // This avoids needing to patch coco just to run a recovery routine.
-    const unsafeManager = manager as unknown as {
-      proofRepository?: {
-        getReservedProofs?: () => Promise<
-          { mintUrl: string; secret: string; usedByOperationId?: string }[]
-        >;
-        releaseProofs?: (mintUrl: string, secrets: string[]) => Promise<void>;
-      };
-      proofService?: {
-        releaseProofs?: (mintUrl: string, secrets: string[]) => Promise<void>;
-      };
-      meltOperationService?: {
-        getOperation?: (operationId: string) => Promise<unknown | null>;
-        rollback?: (operationId: string, reason?: string) => Promise<void>;
-      };
-    };
-
     try {
-      const proofRepository = unsafeManager.proofRepository;
-      const proofService = unsafeManager.proofService;
+      const proofRepository = manager.proofRepository;
+      const proofService = manager.proofService;
 
       if (!proofRepository?.getReservedProofs || !proofRepository?.releaseProofs) {
         throw new Error('Coco proof repository does not expose reserved proof access');
@@ -716,7 +698,7 @@ export class CocoManager {
       let rolledBackMeltOperations = 0;
       let releasedOrphanedReservations = 0;
       const errors: { operationId: string; reason: string }[] = [];
-      const meltOperationService = unsafeManager.meltOperationService;
+      const meltOperationService = manager.meltOperationService;
 
       // Release any “corrupt” reserved rows that somehow lack an operationId.
       if (noOperationId.length > 0) {
@@ -858,17 +840,8 @@ export class CocoManager {
   static async restoreInflightProofsForMint(mintUrl: string): Promise<number> {
     const manager = this.getInstance();
 
-    const unsafeManager = manager as unknown as {
-      proofRepository?: {
-        getInflightProofs: (urls?: string[]) => Promise<{ mintUrl: string; secret: string }[]>;
-      };
-      proofService?: {
-        restoreProofsToReady: (mintUrl: string, secrets: string[]) => Promise<void>;
-      };
-    };
-
-    const repo = unsafeManager.proofRepository;
-    const svc = unsafeManager.proofService;
+    const repo = manager.proofRepository;
+    const svc = manager.proofService;
     if (!repo?.getInflightProofs || !svc?.restoreProofsToReady) return 0;
 
     try {
