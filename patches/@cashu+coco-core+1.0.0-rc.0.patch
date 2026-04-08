@@ -1,5 +1,5 @@
 diff --git a/node_modules/@cashu/coco-core/dist/index.cjs b/node_modules/@cashu/coco-core/dist/index.cjs
-index bedc7ad..4750970 100644
+index bedc7ad..3ba6d38 100644
 --- a/node_modules/@cashu/coco-core/dist/index.cjs
 +++ b/node_modules/@cashu/coco-core/dist/index.cjs
 @@ -1334,9 +1334,18 @@ var MintService = class {
@@ -24,7 +24,18 @@ index bedc7ad..4750970 100644
  		}
  		const keysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
  		return {
-@@ -8639,6 +8648,7 @@ var ConsoleLogger = class ConsoleLogger {
+@@ -7507,7 +7516,9 @@ var MeltBolt11Handler = class {
+ 		});
+ 		const selectedProofs = await ctx.proofService.selectProofsToSend(mintUrl, totalAmount, true);
+ 		const selectedAmount = sumProofs(selectedProofs);
+-		const needsSwap = selectedAmount >= Math.floor(totalAmount * SWAP_THRESHOLD_RATIO);
++		const inputFee = ctx.wallet.getFeesForProofs(selectedProofs);
++		const totalWithInputFee = totalAmount + inputFee;
++		const needsSwap = selectedAmount < totalWithInputFee || selectedAmount >= Math.floor(totalWithInputFee * SWAP_THRESHOLD_RATIO);
+ 		ctx.logger?.debug("Proofs selected for melt", {
+ 			operationId,
+ 			selectedAmount,
+@@ -8639,6 +8650,7 @@ var ConsoleLogger = class ConsoleLogger {
  		info: 2,
  		debug: 3
  	};
@@ -32,7 +43,7 @@ index bedc7ad..4750970 100644
  	constructor(prefix = "coco", options = {}) {
  		this.prefix = prefix;
  		this.level = options.level ?? "info";
-@@ -8646,21 +8656,36 @@ var ConsoleLogger = class ConsoleLogger {
+@@ -8646,21 +8658,36 @@ var ConsoleLogger = class ConsoleLogger {
  	shouldLog(level) {
  		return ConsoleLogger.levelPriority[level] <= ConsoleLogger.levelPriority[this.level];
  	}
@@ -154,7 +165,7 @@ index c3b6ae3..de4dd84 100644
    private subscriptionsPaused;
    private originalWatcherConfig;
 diff --git a/node_modules/@cashu/coco-core/dist/index.js b/node_modules/@cashu/coco-core/dist/index.js
-index ac52de1..595d665 100644
+index ac52de1..bd94605 100644
 --- a/node_modules/@cashu/coco-core/dist/index.js
 +++ b/node_modules/@cashu/coco-core/dist/index.js
 @@ -1334,9 +1334,18 @@ var MintService = class {
@@ -179,7 +190,18 @@ index ac52de1..595d665 100644
  		}
  		const keysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
  		return {
-@@ -8639,6 +8648,7 @@ var ConsoleLogger = class ConsoleLogger {
+@@ -7507,7 +7516,9 @@ var MeltBolt11Handler = class {
+ 		});
+ 		const selectedProofs = await ctx.proofService.selectProofsToSend(mintUrl, totalAmount, true);
+ 		const selectedAmount = sumProofs(selectedProofs);
+-		const needsSwap = selectedAmount >= Math.floor(totalAmount * SWAP_THRESHOLD_RATIO);
++		const inputFee = ctx.wallet.getFeesForProofs(selectedProofs);
++		const totalWithInputFee = totalAmount + inputFee;
++		const needsSwap = selectedAmount < totalWithInputFee || selectedAmount >= Math.floor(totalWithInputFee * SWAP_THRESHOLD_RATIO);
+ 		ctx.logger?.debug("Proofs selected for melt", {
+ 			operationId,
+ 			selectedAmount,
+@@ -8639,6 +8650,7 @@ var ConsoleLogger = class ConsoleLogger {
  		info: 2,
  		debug: 3
  	};
@@ -187,7 +209,7 @@ index ac52de1..595d665 100644
  	constructor(prefix = "coco", options = {}) {
  		this.prefix = prefix;
  		this.level = options.level ?? "info";
-@@ -8646,21 +8656,36 @@ var ConsoleLogger = class ConsoleLogger {
+@@ -8646,21 +8658,36 @@ var ConsoleLogger = class ConsoleLogger {
  	shouldLog(level) {
  		return ConsoleLogger.levelPriority[level] <= ConsoleLogger.levelPriority[this.level];
  	}
