@@ -15,12 +15,10 @@ module.exports = {
     '/node_modules/',
     '/coco/',
     '/eNuts/',
-    '/coco-payment-ux/docs/references/',
-    '/coco-payment-ux/docs/node_modules/',
+    '/coco-payment-ux/',
   ],
   modulePathIgnorePatterns: [
-    '/coco-payment-ux/docs/references/',
-    '/coco-payment-ux/docs/node_modules/',
+    '/coco-payment-ux/',
   ],
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|nostr-tools|@scure|@noble|coco-cashu-core|@cashu/cashu-ts)',
