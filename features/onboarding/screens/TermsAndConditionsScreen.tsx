@@ -159,38 +159,38 @@ export function TermsAndConditionsScreen({
   return (
     <Container className="bg-surface">
       <Screen name="TermsAndConditionsScreen">
-      <VStack spacing={16} flex={1} className="p-4">
-        <Text bold size={32} className="text-foreground py-2 text-center">
-          {title}
-        </Text>
+        <VStack spacing={16} flex={1} className="p-4">
+          <Text bold size={32} className="text-foreground py-2 text-center">
+            {title}
+          </Text>
 
-        <Card variant="secondary" className="flex-1">
-          <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
-            <Text size={14} className="text-foreground leading-[22px]">
-              {TERMS_TEXT}
-            </Text>
-          </ScrollView>
-        </Card>
+          <Card variant="secondary" className="flex-1">
+            <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
+              <Text size={14} className="text-foreground leading-[22px]">
+                {TERMS_TEXT}
+              </Text>
+            </ScrollView>
+          </Card>
 
-        <VStack spacing={16}>
-          {showCheckbox && (
-            <ControlField isSelected={isChecked} onSelectedChange={setIsChecked}>
-              <View className="flex-1">
-                <Label>{checkboxText}</Label>
-              </View>
-              <ControlField.Indicator />
-            </ControlField>
-          )}
+          <VStack spacing={16}>
+            {showCheckbox && (
+              <ControlField isSelected={isChecked} onSelectedChange={setIsChecked}>
+                <View className="flex-1">
+                  <Label>{checkboxText}</Label>
+                </View>
+                <ControlField.Indicator />
+              </ControlField>
+            )}
 
-          <Button
-            variant="primary"
-            className="w-full"
-            onPress={onClose}
-            isDisabled={showCheckbox ? !isChecked : false}>
-            <Button.Label>{buttonText}</Button.Label>
-          </Button>
+            <Button
+              variant="primary"
+              className="w-full"
+              onPress={onClose}
+              isDisabled={showCheckbox ? !isChecked : false}>
+              <Button.Label>{buttonText}</Button.Label>
+            </Button>
+          </VStack>
         </VStack>
-      </VStack>
       </Screen>
     </Container>
   );

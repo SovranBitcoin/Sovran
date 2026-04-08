@@ -47,7 +47,11 @@ export const TransferSeparator = React.memo(({ failed, status }: TransferSeparat
     }
   };
 
-  return <Log name="TransferSeparator"><View style={[styles.separator, { backgroundColor: bgColor }]}>{renderIcon()}</View></Log>;
+  return (
+    <Log name="TransferSeparator">
+      <View style={[styles.separator, { backgroundColor: bgColor }]}>{renderIcon()}</View>
+    </Log>
+  );
 });
 TransferSeparator.displayName = 'TransferSeparator';
 

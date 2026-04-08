@@ -254,7 +254,11 @@ export function TransactionLocationSection({ transactionId }: TransactionLocatio
 
   return (
     <Log name="TransactionLocationSection">
-      <TransactionLocationMap latitude={location.latitude} longitude={location.longitude} grayscale />
+      <TransactionLocationMap
+        latitude={location.latitude}
+        longitude={location.longitude}
+        grayscale
+      />
     </Log>
   );
 }

@@ -112,7 +112,11 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
       }))
       .sort((a, b) => b.timestamp - a.timestamp);
 
-    paymentLog.debug('payment.contacts.recent', { contactCount: contacts.length, nip04Events: dmEvents?.length ?? 0, nip17Events: unwrappedDMs.length });
+    paymentLog.debug('payment.contacts.recent', {
+      contactCount: contacts.length,
+      nip04Events: dmEvents?.length ?? 0,
+      nip17Events: unwrappedDMs.length,
+    });
     return contacts;
   }, [dmEvents, unwrappedDMs, nostrKeys?.pubkey]);
 
@@ -155,16 +159,23 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
 
       try {
         // Split into items that actually need decryption vs passthrough
-        const needsDecrypt = contactsWithDefaults.filter((c) => c.dmEvent || c.nip17Content !== undefined);
-        const passthrough = contactsWithDefaults.filter((c) => !c.dmEvent && c.nip17Content === undefined);
-        const decrypted = needsDecrypt.length > 0
-          ? await decryptNip04Events(needsDecrypt, nostrKeys.privateKey)
-          : [];
+        const needsDecrypt = contactsWithDefaults.filter(
+          (c) => c.dmEvent || c.nip17Content !== undefined
+        );
+        const passthrough = contactsWithDefaults.filter(
+          (c) => !c.dmEvent && c.nip17Content === undefined
+        );
+        const decrypted =
+          needsDecrypt.length > 0
+            ? await decryptNip04Events(needsDecrypt, nostrKeys.privateKey)
+            : [];
         const results = [...decrypted, ...passthrough];
         paymentLog.debug('payment.contacts.decrypt', { decryptedCount: results.length });
         if (!cancelled) setDecryptedContacts(results);
       } catch (err) {
-        paymentLog.error('payment.contacts.decrypt.error', { error: err instanceof Error ? err : new Error(String(err)) });
+        paymentLog.error('payment.contacts.decrypt.error', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
         if (!cancelled) setDecryptedContacts(contactsWithDefaults);
       }
     };

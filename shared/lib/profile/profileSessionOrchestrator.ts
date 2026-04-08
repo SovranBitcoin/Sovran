@@ -130,7 +130,10 @@ export async function switchToExistingProfile(opts: {
   const resetStages = opts.resetStages ?? registeredControls?.resetStages;
   const cancelResetStages = opts.cancelResetStages ?? registeredControls?.cancelResetStages;
 
-  if (!(await beginTransition())) { transitionInFlight = false; return false; }
+  if (!(await beginTransition())) {
+    transitionInFlight = false;
+    return false;
+  }
   try {
     log.info('profile.orchestrator.switch_start', { accountIndex: opts.accountIndex });
     resetStages?.({ holdUntilCancel: true });
@@ -179,7 +182,10 @@ export async function createAndSwitchProfile(opts?: {
     return false;
   }
 
-  if (!(await beginTransition())) { transitionInFlight = false; return false; }
+  if (!(await beginTransition())) {
+    transitionInFlight = false;
+    return false;
+  }
   try {
     resetStages?.({ holdUntilCancel: true });
     usePopupStore.getState().close();
@@ -241,7 +247,10 @@ export async function deleteAllProfiles(opts?: {
   if (transitionInFlight) return false;
   transitionInFlight = true;
 
-  if (!(await beginTransition())) { transitionInFlight = false; return false; }
+  if (!(await beginTransition())) {
+    transitionInFlight = false;
+    return false;
+  }
   try {
     resetStages?.({ holdUntilCancel: true });
     usePopupStore.getState().close();

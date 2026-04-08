@@ -28,7 +28,8 @@ const CASES = {
   receive: {
     message: TOAST_COPY.receive.message,
     submessagePending: TOAST_COPY.receive.processing,
-    submessageConfirmed: (amount: number, unit: string) => fmt`${TOAST_COPY.receive.confirmed} ${{ amount, unit }}`,
+    submessageConfirmed: (amount: number, unit: string) =>
+      fmt`${TOAST_COPY.receive.confirmed} ${{ amount, unit }}`,
     submessageFailed: TOAST_COPY.receive.failed,
     history: { type: 'mint' as const, idField: 'quoteId' as const },
     route: { pathname: '/mintQuote' as const, paramKey: 'mintHistoryEntry' },
@@ -36,7 +37,8 @@ const CASES = {
   send: {
     message: TOAST_COPY.send.message,
     submessagePending: TOAST_COPY.send.processing,
-    submessageConfirmed: (amount: number, unit: string) => fmt`${TOAST_COPY.send.confirmed} ${{ amount, unit }}`,
+    submessageConfirmed: (amount: number, unit: string) =>
+      fmt`${TOAST_COPY.send.confirmed} ${{ amount, unit }}`,
     submessageFailed: TOAST_COPY.send.failed,
     history: { type: 'send' as const, idField: 'operationId' as const },
     route: { pathname: '/sendToken' as const, paramKey: 'sendHistoryEntry' },
@@ -53,7 +55,8 @@ const CASES = {
   melt: {
     message: TOAST_COPY.melt.message,
     submessagePending: TOAST_COPY.melt.processing,
-    submessageConfirmed: (amount: number, unit: string) => fmt`${TOAST_COPY.melt.confirmed} ${{ amount, unit }}`,
+    submessageConfirmed: (amount: number, unit: string) =>
+      fmt`${TOAST_COPY.melt.confirmed} ${{ amount, unit }}`,
     submessageFailed: TOAST_COPY.melt.failed,
     history: { type: 'melt' as const, idField: 'quoteId' as const },
     route: { pathname: '/meltQuote' as const, paramKey: 'meltHistoryEntry' },
@@ -61,7 +64,8 @@ const CASES = {
   'receive-ecash': {
     message: TOAST_COPY['receive-ecash'].message,
     submessagePending: TOAST_COPY['receive-ecash'].processing,
-    submessageConfirmed: (amount: number, unit: string) => fmt`${TOAST_COPY['receive-ecash'].confirmed} ${{ amount, unit }}`,
+    submessageConfirmed: (amount: number, unit: string) =>
+      fmt`${TOAST_COPY['receive-ecash'].confirmed} ${{ amount, unit }}`,
     submessageFailed: TOAST_COPY['receive-ecash'].failed,
     history: { type: 'receive' as const, idField: 'id' as const },
     route: { pathname: '/receiveToken' as const, paramKey: 'receiveHistoryEntry' },

@@ -11,7 +11,6 @@
  * via createCocoPaymentUX in the library.
  */
 
-
 import * as Clipboard from 'expo-clipboard';
 import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -165,7 +164,12 @@ export function createSovranNotifications(
       nfcErrorPopup({ title: 'NFC Read Failed', message });
     },
     onPaymentProcessing: (data) => {
-      paymentLog.info('payment.processing', { variant: data.variant, mintUrl: data.mintUrl, amount: data.amount, unit: data.unit });
+      paymentLog.info('payment.processing', {
+        variant: data.variant,
+        mintUrl: data.mintUrl,
+        amount: data.amount,
+        unit: data.unit,
+      });
       const variant = data.variant === 'paymentRequest' ? 'payment-request' : data.variant;
       const id = `${data.variant}-${Date.now()}`;
       usePaymentStatusStore.getState().setActive({
@@ -194,7 +198,9 @@ export function createSovranNotifications(
           try {
             const parsed = JSON.parse(data.historyEntry);
             if (parsed.state === 'PENDING') return;
-          } catch { /* fall through to confirm */ }
+          } catch {
+            /* fall through to confirm */
+          }
           store.setConfirmed(store.active.id);
         } else {
           store.setConfirmed(store.active.id);
@@ -226,7 +232,10 @@ export function createSovranNotifications(
       copyPopup(target as Parameters<typeof copyPopup>[0]);
     },
     onScanResolved: ({ rawInput, parsedType, intentType, source, container, optionKinds }) => {
-      const typeMap: Record<string, 'ecash' | 'lightning' | 'npub' | 'mint' | 'paymentRequest' | 'unknown'> = {
+      const typeMap: Record<
+        string,
+        'ecash' | 'lightning' | 'npub' | 'mint' | 'paymentRequest' | 'unknown'
+      > = {
         receiveToken: 'ecash',
         meltLightningInvoice: 'lightning',
         meltLightningAddress: 'lightning',
@@ -244,7 +253,9 @@ export function createSovranNotifications(
         deeplink: 'deeplink',
       };
       const scanSource = sourceMap[source ?? ''] ?? 'qr';
-      useScanHistoryStore.getState().addScan(rawInput, rawInput, scanType, scanSource, parsedType, container, optionKinds);
+      useScanHistoryStore
+        .getState()
+        .addScan(rawInput, rawInput, scanType, scanSource, parsedType, container, optionKinds);
     },
     onNfcWriteFailed: ({ message, rolledBack }) => {
       const errorMsg = rolledBack ? `${message} Your funds have been returned.` : message;
@@ -436,7 +447,9 @@ export function createSovranScanSources(nfcAdapter?: NfcIOAdapter): ScanSources 
         paymentLog.info('payment.scan.gallery.found', { dataLen: scannedCodes[0].data.length });
         return { data: scannedCodes[0].data };
       } catch (err) {
-        paymentLog.error('payment.scan.gallery.failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        paymentLog.error('payment.scan.gallery.failed', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
         return { error: err instanceof Error ? err : new Error(String(err)) };
       }
     },
@@ -507,7 +520,9 @@ export function createSovranHandlers({
             useRoutstrTopUpStore.getState().complete('failed');
           }
         } catch (e) {
-          paymentLog.error('payment.routstr_topup.error', { error: e instanceof Error ? e.message : String(e) });
+          paymentLog.error('payment.routstr_topup.error', {
+            error: e instanceof Error ? e.message : String(e),
+          });
           routstrTransactionFailedPopup({ text: 'Failed to process top-up' });
           useRoutstrTopUpStore.getState().complete('failed');
         }
@@ -614,7 +629,9 @@ export function createSovranHandlers({
         try {
           const keypair = await mgr.keyring.getLatestKeyPair();
           p2pkKey = keypair?.publicKeyHex ?? undefined;
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
 
       const entry = {
@@ -747,7 +764,9 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           writeResult.errorCode === 'TAG_LOST' || writeResult.errorCode === 'TRANSCEIVE_FAILED';
 
         if (lostConnection && entry.operationId) {
-          paymentLog.warn('payment.screen_action.nfc.connection_lost', { operationId: entry.operationId });
+          paymentLog.warn('payment.screen_action.nfc.connection_lost', {
+            operationId: entry.operationId,
+          });
           try {
             await manager.ops.send.reclaim(entry.operationId);
             nfcConnectionLostPopup();

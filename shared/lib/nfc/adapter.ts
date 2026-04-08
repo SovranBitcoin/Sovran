@@ -100,10 +100,7 @@ export function createNfcAdapter(): NfcIOAdapter {
       nfcLog.info('nfc.adapter.read_complete', { chars: text.length });
 
       if (!text || text.length === 0) {
-        throw new NfcError(
-          'POS terminal returned empty payment request.',
-          'EMPTY_PAYMENT_REQUEST'
-        );
+        throw new NfcError('POS terminal returned empty payment request.', 'EMPTY_PAYMENT_REQUEST');
       }
 
       return text;
@@ -140,7 +137,11 @@ export function createNfcAdapter(): NfcIOAdapter {
       const totalChunks = Math.ceil(body.length / MAX_CHUNK_SIZE);
       for (let chunkNum = 0; offset - 2 < body.length; chunkNum++) {
         const chunk = body.slice(offset - 2, offset - 2 + MAX_CHUNK_SIZE);
-        nfcLog.debug('nfc.adapter.write_chunk', { chunk: chunkNum + 1, totalChunks, bytes: chunk.length });
+        nfcLog.debug('nfc.adapter.write_chunk', {
+          chunk: chunkNum + 1,
+          totalChunks,
+          bytes: chunk.length,
+        });
         r = await sendApdu(updateBinary(offset, chunk), `WRITE chunk ${chunkNum + 1}`);
         if (!r.ok) {
           throw new NfcError(

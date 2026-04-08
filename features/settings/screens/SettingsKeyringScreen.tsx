@@ -349,107 +349,107 @@ export const SettingsKeyringScreen: React.FC = () => {
 
   return (
     <Screen name="SettingsKeyringScreen">
-    <>
-      <Stack.Screen
-        options={{
-          title: 'P2PK Keys',
-          headerRight: () => (
-            <HStack spacing={4}>
-              <RNTouchableOpacity
-                onPress={handleImportNsec}
-                style={{ padding: 8 }}
-                disabled={isGenerating}>
-                <Icon name="mdi:key-arrow-right" size={22} color={foreground} />
-              </RNTouchableOpacity>
-              <RNTouchableOpacity
-                onPress={handleGenerateKey}
-                style={{ padding: 8 }}
-                disabled={isGenerating}>
-                {isGenerating ? (
-                  <ActivityIndicator size="small" color={foreground} />
-                ) : (
-                  <Icon name="mdi:key-plus" size={22} color={foreground} />
-                )}
-              </RNTouchableOpacity>
-            </HStack>
-          ),
-        }}
-      />
-      <ModalLayoutWrapper>
-        {/* Quick Access Toggle */}
-        <Section title="Preferences">
-          <ListGroup variant="secondary">
-            <ListGroup.Item>
-              <ListGroup.ItemContent>
-                <ListGroup.ItemTitle>Quick Access to Lock</ListGroup.ItemTitle>
-                <ListGroup.ItemDescription>
-                  Show your latest P2PK locking key in the receive ecash menu
-                </ListGroup.ItemDescription>
-              </ListGroup.ItemContent>
-              <ListGroup.ItemSuffix>
-                <HeroSwitch
-                  isSelected={quickAccessP2PK ?? false}
-                  onSelectedChange={setQuickAccessP2PK}
-                />
-              </ListGroup.ItemSuffix>
-            </ListGroup.Item>
-            <Separator className="mx-4" />
-            <ListGroup.Item>
-              <ListGroup.ItemContent>
-                <ListGroup.ItemTitle>Regenerate Key on Receive</ListGroup.ItemTitle>
-                <ListGroup.ItemDescription>
-                  Automatically generate a new P2PK key after redeeming a locked token for improved
-                  privacy
-                </ListGroup.ItemDescription>
-              </ListGroup.ItemContent>
-              <ListGroup.ItemSuffix>
-                <HeroSwitch
-                  isSelected={regenerateP2PKOnReceive ?? true}
-                  onSelectedChange={setRegenerateP2PKOnReceive}
-                />
-              </ListGroup.ItemSuffix>
-            </ListGroup.Item>
-          </ListGroup>
-        </Section>
-
-        {/* Keys List */}
-        <Section title={`Your Keys (${keypairs.length})`}>
-          <ListGroup variant="secondary">
-            {isLoading ? (
-              <VStack align="center" className="p-6">
-                <ActivityIndicator size="small" color={opacity(foreground, 0.4)} />
-                <Text size={14} className="mt-2" style={{ color: opacity(foreground, 0.4) }}>
-                  Loading keys...
-                </Text>
-              </VStack>
-            ) : keypairs.length === 0 ? (
-              <VStack align="center" className="p-6">
-                <Icon name="mdi:key-variant" size={40} color={defaultColor} />
-                <Text
-                  size={14}
-                  className="mt-3 text-center"
-                  style={{ color: opacity(foreground, 0.4) }}>
-                  Generate or import a key to get started with P2PK-locked ecash
-                </Text>
-              </VStack>
-            ) : (
-              [...keypairs].reverse().map((keypair, index) => (
-                <React.Fragment key={keypair.publicKeyHex}>
-                  {index > 0 && <Separator className="mx-4" />}
-                  {index === 0 ? (
-                    <CurrentKeyItem keypair={keypair} onCopy={handleCopyKey} />
+      <>
+        <Stack.Screen
+          options={{
+            title: 'P2PK Keys',
+            headerRight: () => (
+              <HStack spacing={4}>
+                <RNTouchableOpacity
+                  onPress={handleImportNsec}
+                  style={{ padding: 8 }}
+                  disabled={isGenerating}>
+                  <Icon name="mdi:key-arrow-right" size={22} color={foreground} />
+                </RNTouchableOpacity>
+                <RNTouchableOpacity
+                  onPress={handleGenerateKey}
+                  style={{ padding: 8 }}
+                  disabled={isGenerating}>
+                  {isGenerating ? (
+                    <ActivityIndicator size="small" color={foreground} />
                   ) : (
-                    <KeyItem keypair={keypair} onCopy={handleCopyKey} />
+                    <Icon name="mdi:key-plus" size={22} color={foreground} />
                   )}
-                </React.Fragment>
-              ))
-            )}
-          </ListGroup>
-        </Section>
+                </RNTouchableOpacity>
+              </HStack>
+            ),
+          }}
+        />
+        <ModalLayoutWrapper>
+          {/* Quick Access Toggle */}
+          <Section title="Preferences">
+            <ListGroup variant="secondary">
+              <ListGroup.Item>
+                <ListGroup.ItemContent>
+                  <ListGroup.ItemTitle>Quick Access to Lock</ListGroup.ItemTitle>
+                  <ListGroup.ItemDescription>
+                    Show your latest P2PK locking key in the receive ecash menu
+                  </ListGroup.ItemDescription>
+                </ListGroup.ItemContent>
+                <ListGroup.ItemSuffix>
+                  <HeroSwitch
+                    isSelected={quickAccessP2PK ?? false}
+                    onSelectedChange={setQuickAccessP2PK}
+                  />
+                </ListGroup.ItemSuffix>
+              </ListGroup.Item>
+              <Separator className="mx-4" />
+              <ListGroup.Item>
+                <ListGroup.ItemContent>
+                  <ListGroup.ItemTitle>Regenerate Key on Receive</ListGroup.ItemTitle>
+                  <ListGroup.ItemDescription>
+                    Automatically generate a new P2PK key after redeeming a locked token for
+                    improved privacy
+                  </ListGroup.ItemDescription>
+                </ListGroup.ItemContent>
+                <ListGroup.ItemSuffix>
+                  <HeroSwitch
+                    isSelected={regenerateP2PKOnReceive ?? true}
+                    onSelectedChange={setRegenerateP2PKOnReceive}
+                  />
+                </ListGroup.ItemSuffix>
+              </ListGroup.Item>
+            </ListGroup>
+          </Section>
 
-        <Spacer size={32} />
-      </ModalLayoutWrapper>
-    </>
+          {/* Keys List */}
+          <Section title={`Your Keys (${keypairs.length})`}>
+            <ListGroup variant="secondary">
+              {isLoading ? (
+                <VStack align="center" className="p-6">
+                  <ActivityIndicator size="small" color={opacity(foreground, 0.4)} />
+                  <Text size={14} className="mt-2" style={{ color: opacity(foreground, 0.4) }}>
+                    Loading keys...
+                  </Text>
+                </VStack>
+              ) : keypairs.length === 0 ? (
+                <VStack align="center" className="p-6">
+                  <Icon name="mdi:key-variant" size={40} color={defaultColor} />
+                  <Text
+                    size={14}
+                    className="mt-3 text-center"
+                    style={{ color: opacity(foreground, 0.4) }}>
+                    Generate or import a key to get started with P2PK-locked ecash
+                  </Text>
+                </VStack>
+              ) : (
+                [...keypairs].reverse().map((keypair, index) => (
+                  <React.Fragment key={keypair.publicKeyHex}>
+                    {index > 0 && <Separator className="mx-4" />}
+                    {index === 0 ? (
+                      <CurrentKeyItem keypair={keypair} onCopy={handleCopyKey} />
+                    ) : (
+                      <KeyItem keypair={keypair} onCopy={handleCopyKey} />
+                    )}
+                  </React.Fragment>
+                ))
+              )}
+            </ListGroup>
+          </Section>
+
+          <Spacer size={32} />
+        </ModalLayoutWrapper>
+      </>
     </Screen>
   );
 };

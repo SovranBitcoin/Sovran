@@ -1,4 +1,9 @@
-import type { AnnotatedOption, PaymentMachine, ParsedPaymentInput, StepDataMap } from 'coco-payment-ux';
+import type {
+  AnnotatedOption,
+  PaymentMachine,
+  ParsedPaymentInput,
+  StepDataMap,
+} from 'coco-payment-ux';
 import type {
   ButtonHandlerActionButton,
   ButtonHandlerButton,

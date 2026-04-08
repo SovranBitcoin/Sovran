@@ -30,7 +30,10 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
   const foreground = useThemeColor('foreground');
   const background = useThemeColor('background');
 
-  const { entry, error, actions, suggestions, mintUrl } = useScreenActions('amountEntry', amountEntry);
+  const { entry, error, actions, suggestions, mintUrl } = useScreenActions(
+    'amountEntry',
+    amountEntry
+  );
   if (error) {
     log.warn('send.amount_flow.error', { error });
   }

@@ -37,7 +37,10 @@ export const useVersionCheck = () => {
         'version' in payload &&
         semver.gt(payload.version, currentVersion)
       ) {
-        log.info('hook.version_check.update_available', { currentVersion, latestVersion: payload.version });
+        log.info('hook.version_check.update_available', {
+          currentVersion,
+          latestVersion: payload.version,
+        });
         newVersionPopup({ version: payload.version });
       } else {
         log.debug('hook.version_check.up_to_date', { currentVersion });

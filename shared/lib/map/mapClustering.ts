@@ -119,7 +119,9 @@ export class ClusterManager {
     this.loaded = true;
     const duration = Math.round((performance.now() - t0) * 100) / 100;
     if (duration > 100) {
-      console.warn(`[perf] Supercluster.load(${points.length} points) took ${duration}ms — JS thread was blocked`);
+      console.warn(
+        `[perf] Supercluster.load(${points.length} points) took ${duration}ms — JS thread was blocked`
+      );
     }
   }
 

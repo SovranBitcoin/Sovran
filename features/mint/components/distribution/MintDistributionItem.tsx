@@ -158,144 +158,147 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
           backgroundColor: surfaceSecondary,
           borderColor: cardTint?.border || 'rgba(255,255,255,0.05)',
         }}>
-      {/* Per-mint accent lighting derived from icon colors */}
-      {!!accent?.base && (
-        <>
+        {/* Per-mint accent lighting derived from icon colors */}
+        {!!accent?.base && (
+          <>
+            <View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: hexToRgba(accent.base, 0.05) || 'transparent' },
+              ]}
+            />
+            <LinearGradient
+              pointerEvents="none"
+              colors={[hexToRgba(accent.max, 0.28) || 'transparent', 'transparent']}
+              locations={[0, 0.8]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <LinearGradient
+              pointerEvents="none"
+              colors={[
+                hexToRgba(accent.min, 0.2) || 'transparent',
+                'transparent',
+                hexToRgba(accent.max, 0.18) || 'transparent',
+              ]}
+              locations={[0, 0.55, 1]}
+              start={{ x: 1, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <LinearGradient
+              pointerEvents="none"
+              colors={['rgba(255,255,255,0.06)', 'transparent']}
+              locations={[0, 0.7]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </>
+        )}
+        {/* Subtle per-mint tint overlay */}
+        {!!cardTint?.overlay && (
           <View
             pointerEvents="none"
             style={[
               StyleSheet.absoluteFill,
-              { backgroundColor: hexToRgba(accent.base, 0.05) || 'transparent' },
+              { backgroundColor: cardTint.overlay, borderRadius: 16 },
             ]}
-          />
-          <LinearGradient
-            pointerEvents="none"
-            colors={[hexToRgba(accent.max, 0.28) || 'transparent', 'transparent']}
-            locations={[0, 0.8]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            pointerEvents="none"
-            colors={[
-              hexToRgba(accent.min, 0.2) || 'transparent',
-              'transparent',
-              hexToRgba(accent.max, 0.18) || 'transparent',
-            ]}
-            locations={[0, 0.55, 1]}
-            start={{ x: 1, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(255,255,255,0.06)', 'transparent']}
-            locations={[0, 0.7]}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </>
-      )}
-      {/* Subtle per-mint tint overlay */}
-      {!!cardTint?.overlay && (
-        <View
-          pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { backgroundColor: cardTint.overlay, borderRadius: 16 }]}
-        />
-      )}
-
-      <HStack align="center" justify="space-between" className="mb-3">
-        <HStack align="center" gap={12} className="mr-3 flex-1">
-          <Avatar
-            picture={mintInfo?.icon_url}
-            size={40}
-            name={displayName}
-            alt={`${displayName} icon`}
-          />
-          <VStack gap={2} className="flex-1">
-            <Text bold size={14} style={{ color: primaryColor0 }} numberOfLines={1}>
-              {displayName}
-            </Text>
-            <AmountFormatter
-              amount={balance}
-              unit={unit}
-              size={12}
-              weight="medium"
-              color={onAccentSubtleText}
-            />
-          </VStack>
-        </HStack>
-
-        <Text
-          overpass
-          heavy
-          size={24}
-          style={{ color: primaryColor0, minWidth: 60, textAlign: 'right' }}>
-          {percentDisplay}%
-        </Text>
-      </HStack>
-
-      <View className="mb-3 min-h-[40px]" onLayout={handleSliderLayout}>
-        {sliderWidth > 0 && (
-          <DistributionSlider
-            value={sliderValue}
-            onValueChange={handleSliderChange}
-            onValueCommit={handleSliderCommit}
-            disabled={disabled}
-            width={sliderWidth}
-            customGradientColors={sliderColors.gradientColors}
-            customBorderColor={sliderColors.borderColor}
-            isLoadingColors={sliderColors.isLoading}
           />
         )}
-      </View>
 
-      <HStack gap={8} className="justify-start">
-        <TouchableOpacity
-          onPress={handleMax}
-          disabled={disabled || isAtMax}
-          haptics
-          className="flex-1 rounded-[14px] border px-3.5 py-3"
-          style={{
-            backgroundColor: buttonTint?.background || 'rgba(255,255,255,0.06)',
-            borderColor: buttonTint?.border || 'rgba(255,255,255,0.10)',
-            opacity: disabled || isAtMax ? 0.5 : 1,
-          }}>
-          <HStack align="center" gap={8}>
-            <Icon
-              name="mdi:arrow-collapse-up"
-              size={16}
-              color={buttonTint?.icon || primaryColor50}
+        <HStack align="center" justify="space-between" className="mb-3">
+          <HStack align="center" gap={12} className="mr-3 flex-1">
+            <Avatar
+              picture={mintInfo?.icon_url}
+              size={40}
+              name={displayName}
+              alt={`${displayName} icon`}
             />
-            <Text size={12} heavy style={{ color: primaryColor50 }}>
-              Max
-            </Text>
+            <VStack gap={2} className="flex-1">
+              <Text bold size={14} style={{ color: primaryColor0 }} numberOfLines={1}>
+                {displayName}
+              </Text>
+              <AmountFormatter
+                amount={balance}
+                unit={unit}
+                size={12}
+                weight="medium"
+                color={onAccentSubtleText}
+              />
+            </VStack>
           </HStack>
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={handleMin}
-          disabled={disabled || isAtMin}
-          haptics
-          className="flex-1 rounded-[14px] border px-3.5 py-3"
-          style={{
-            backgroundColor: buttonTint?.background || 'rgba(255,255,255,0.06)',
-            borderColor: buttonTint?.border || 'rgba(255,255,255,0.10)',
-            opacity: disabled || isAtMin ? 0.5 : 1,
-          }}>
-          <HStack align="center" gap={8}>
-            <Icon
-              name="mdi:arrow-collapse-down"
-              size={16}
-              color={buttonTint?.icon || primaryColor50}
+          <Text
+            overpass
+            heavy
+            size={24}
+            style={{ color: primaryColor0, minWidth: 60, textAlign: 'right' }}>
+            {percentDisplay}%
+          </Text>
+        </HStack>
+
+        <View className="mb-3 min-h-[40px]" onLayout={handleSliderLayout}>
+          {sliderWidth > 0 && (
+            <DistributionSlider
+              value={sliderValue}
+              onValueChange={handleSliderChange}
+              onValueCommit={handleSliderCommit}
+              disabled={disabled}
+              width={sliderWidth}
+              customGradientColors={sliderColors.gradientColors}
+              customBorderColor={sliderColors.borderColor}
+              isLoadingColors={sliderColors.isLoading}
             />
-            <Text size={12} heavy style={{ color: primaryColor50 }}>
-              Min
-            </Text>
-          </HStack>
-        </TouchableOpacity>
+          )}
+        </View>
+
+        <HStack gap={8} className="justify-start">
+          <TouchableOpacity
+            onPress={handleMax}
+            disabled={disabled || isAtMax}
+            haptics
+            className="flex-1 rounded-[14px] border px-3.5 py-3"
+            style={{
+              backgroundColor: buttonTint?.background || 'rgba(255,255,255,0.06)',
+              borderColor: buttonTint?.border || 'rgba(255,255,255,0.10)',
+              opacity: disabled || isAtMax ? 0.5 : 1,
+            }}>
+            <HStack align="center" gap={8}>
+              <Icon
+                name="mdi:arrow-collapse-up"
+                size={16}
+                color={buttonTint?.icon || primaryColor50}
+              />
+              <Text size={12} heavy style={{ color: primaryColor50 }}>
+                Max
+              </Text>
+            </HStack>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleMin}
+            disabled={disabled || isAtMin}
+            haptics
+            className="flex-1 rounded-[14px] border px-3.5 py-3"
+            style={{
+              backgroundColor: buttonTint?.background || 'rgba(255,255,255,0.06)',
+              borderColor: buttonTint?.border || 'rgba(255,255,255,0.10)',
+              opacity: disabled || isAtMin ? 0.5 : 1,
+            }}>
+            <HStack align="center" gap={8}>
+              <Icon
+                name="mdi:arrow-collapse-down"
+                size={16}
+                color={buttonTint?.icon || primaryColor50}
+              />
+              <Text size={12} heavy style={{ color: primaryColor50 }}>
+                Min
+              </Text>
+            </HStack>
+          </TouchableOpacity>
         </HStack>
       </View>
     </Log>

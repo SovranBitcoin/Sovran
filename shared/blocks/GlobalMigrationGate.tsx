@@ -42,7 +42,9 @@ export default function GlobalMigrationGate({ children }: GlobalMigrationGatePro
       } catch (error) {
         signalMigrationsComplete();
         const msg = error instanceof Error ? error.message : 'Global migrations failed';
-        log.error('gate.global_migration.failed', { error: error instanceof Error ? error : new Error(String(error)) });
+        log.error('gate.global_migration.failed', {
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
         stage.error(msg);
         setIsComplete(true);
         initLog('GlobalMigrationGate', `ERROR: ${error}`);

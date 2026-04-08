@@ -37,7 +37,9 @@ export default function LegacyMigrationGate({ children }: LegacyMigrationGatePro
         initLog('LegacyMigrationGate', 'legacy bootstrap complete');
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Legacy migrations failed';
-        log.error('gate.legacy_migration.failed', { error: error instanceof Error ? error : new Error(String(error)) });
+        log.error('gate.legacy_migration.failed', {
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
         stage.error(msg);
         setIsComplete(true);
         initLog('LegacyMigrationGate', `ERROR: ${error}`);

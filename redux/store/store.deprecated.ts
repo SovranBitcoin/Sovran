@@ -231,7 +231,10 @@ const migrations = {
               }
               // Fallback, just in case there's an unknown transaction type
               else {
-                log.warn('redux.migration.unknown_tx_type', { type: oldTx.type, transactionType: oldTx.transactionType });
+                log.warn('redux.migration.unknown_tx_type', {
+                  type: oldTx.type,
+                  transactionType: oldTx.transactionType,
+                });
                 return baseTx;
               }
             }),
@@ -363,7 +366,12 @@ const migrations = {
     const keysets = rootState.cashu?.keysets || {};
     const info = rootState.cashu?.info || {};
 
-    log.debug('redux.migration.123.raw_data', { mintCount: mints?.length, proofKeys: Object.keys(proofsByMint), keysetKeys: Object.keys(keysets), infoKeys: Object.keys(info) });
+    log.debug('redux.migration.123.raw_data', {
+      mintCount: mints?.length,
+      proofKeys: Object.keys(proofsByMint),
+      keysetKeys: Object.keys(keysets),
+      infoKeys: Object.keys(info),
+    });
 
     // Exact same logic as memoizedGetAllBalancesMultipleCurrencies
     const allMints = mints || [];
@@ -384,7 +392,11 @@ const migrations = {
         // Get all unique units from keysets for this mint
         const mintKeysets = keysets[mint] || [];
         const mintInfo = info[mint] || {};
-        log.debug('redux.migration.123.process_mint', { mint, keysetsCount: mintKeysets.length, mintInfo });
+        log.debug('redux.migration.123.process_mint', {
+          mint,
+          keysetsCount: mintKeysets.length,
+          mintInfo,
+        });
 
         const uniqueUnits = [...new Set(mintKeysets.map((ks: any) => ks.unit))];
 
@@ -393,7 +405,12 @@ const migrations = {
 
         // Get proofs for this mint (or empty array if none)
         const proofs = proofsByMint[mint] || [];
-        log.debug('redux.migration.123.process_mint', { mint, uniqueUnits, units, proofsCount: proofs.length });
+        log.debug('redux.migration.123.process_mint', {
+          mint,
+          uniqueUnits,
+          units,
+          proofsCount: proofs.length,
+        });
 
         // Calculate balance for each unit exactly like selector
         return units.map((unit) => {
@@ -401,7 +418,12 @@ const migrations = {
 
           // If there are no matching keysets for this unit, balance is 0
           if (matchingKeysets.length === 0) {
-            log.debug('redux.migration.123.process_mint', { mint, unit, matchingKeysets: 0, amount: 0 });
+            log.debug('redux.migration.123.process_mint', {
+              mint,
+              unit,
+              matchingKeysets: 0,
+              amount: 0,
+            });
             return {
               mintUrl: mint,
               amount: 0,
@@ -419,7 +441,13 @@ const migrations = {
           // Sum amounts (or 0 if no proofs) - exact same logic
           const amount =
             filteredProofs.reduce((sum: number, proof: any) => sum + (proof.amount || 0), 0) || 0;
-          log.debug('redux.migration.123.process_mint', { mint, unit, keysetIds, filteredProofsCount: filteredProofs.length, amount });
+          log.debug('redux.migration.123.process_mint', {
+            mint,
+            unit,
+            keysetIds,
+            filteredProofsCount: filteredProofs.length,
+            amount,
+          });
 
           return {
             mintUrl: mint,

@@ -135,7 +135,10 @@ export const ContactItem = React.memo(function ContactItem({
         animation={false}
         onPress={() => {
           if (!item.pubkey) return;
-          paymentLog.debug('contact_item.press', { type: item.type, pubkey: item.pubkey.slice(0, 16) });
+          paymentLog.debug('contact_item.press', {
+            type: item.type,
+            pubkey: item.pubkey.slice(0, 16),
+          });
           router.navigate({
             pathname: '/(user-flow)/profile' as const,
             params: { pubkey: item.pubkey },

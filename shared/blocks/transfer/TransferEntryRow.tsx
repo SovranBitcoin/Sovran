@@ -144,7 +144,11 @@ export const TransferEntryRow = React.memo(
       );
     }
 
-    return <Log name="TransferEntryRow"><View style={styles.entryRow}>{content}</View></Log>;
+    return (
+      <Log name="TransferEntryRow">
+        <View style={styles.entryRow}>{content}</View>
+      </Log>
+    );
   }
 );
 TransferEntryRow.displayName = 'TransferEntryRow';

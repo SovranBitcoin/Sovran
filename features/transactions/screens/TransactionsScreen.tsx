@@ -149,23 +149,23 @@ export function TransactionsScreen({
       useCustomScrollView
       onHeaderHeightChange={setTotalHeaderHeight}>
       <Screen name="TransactionsScreen">
-      {/* Transaction list with proper header spacer */}
-      <Transactions
-        listKey={listKey}
-        account={{ ...parsedAccount, unit: selectedCurrency }}
-        showMore={false}
-        history={history}
-        isFetching={isFetching}
-        filter={direction}
-        type={paymentType}
-        mintUrlFilter={filterMintUrl}
-        at="all"
-        tab={tab}
-        selectedMonth={selectedMonth}
-        onTransactionPress={onTransactionPress}
-        header={listHeader}
-        disableContentInsetAdjustment
-      />
+        {/* Transaction list with proper header spacer */}
+        <Transactions
+          listKey={listKey}
+          account={{ ...parsedAccount, unit: selectedCurrency }}
+          showMore={false}
+          history={history}
+          isFetching={isFetching}
+          filter={direction}
+          type={paymentType}
+          mintUrlFilter={filterMintUrl}
+          at="all"
+          tab={tab}
+          selectedMonth={selectedMonth}
+          onTransactionPress={onTransactionPress}
+          header={listHeader}
+          disableContentInsetAdjustment
+        />
       </Screen>
     </ModalLayoutWrapper>
   );

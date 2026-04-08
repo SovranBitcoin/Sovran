@@ -105,7 +105,10 @@ export default function MigrationGate({ children }: MigrationGateProps) {
         }
 
         if (attempts >= maxAttempts) {
-          log.warn('gate.migration.timeout', { attempts: maxAttempts, pollIntervalMs: pollInterval });
+          log.warn('gate.migration.timeout', {
+            attempts: maxAttempts,
+            pollIntervalMs: pollInterval,
+          });
           initLog('MigrationGate', 'TIMEOUT — proceeding anyway');
         }
 
@@ -118,7 +121,9 @@ export default function MigrationGate({ children }: MigrationGateProps) {
         log.info('gate.migration.complete', { accountIndex, pollAttempts: attempts });
         initLog('MigrationGate', 'stage complete — rendering children');
       } catch (error) {
-        log.error('gate.migration.failed', { error: error instanceof Error ? error : new Error(String(error)) });
+        log.error('gate.migration.failed', {
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
         initLog('MigrationGate', `ERROR: ${error}`);
         const errorMessage = error instanceof Error ? error.message : 'Migration check failed';
         stage.error(errorMessage);

@@ -110,14 +110,20 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
       if (data.data === lastScanRef.current.data && now - lastScanRef.current.t < 500) return;
       lastScanRef.current = { data: data.data, t: now };
 
-      log.info('camera.scan.detected', { type: data.type ?? 'qr', isUr, dataLength: data.data.length });
+      log.info('camera.scan.detected', {
+        type: data.type ?? 'qr',
+        isUr,
+        dataLength: data.data.length,
+      });
       isProcessingRef.current = true;
       setLoading(true);
       try {
         const result = await machine.scan?.(data.data, { source: data.type ?? 'qr' });
         applyScanResult(result, setProgress, setLoading, isProcessingRef);
       } catch (err) {
-        log.error('camera.scan.failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        log.error('camera.scan.failed', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
         setLoading(false);
         setProgress(0);
         isProcessingRef.current = false;
@@ -142,7 +148,9 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
       const result = await machine.scan?.();
       applyScanResult(result, setProgress, setLoading, isProcessingRef);
     } catch (err) {
-      log.error('camera.scan.clipboard_failed', { error: err instanceof Error ? err : new Error(String(err)) });
+      log.error('camera.scan.clipboard_failed', {
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
       setLoading(false);
       setProgress(0);
       isProcessingRef.current = false;
@@ -158,7 +166,9 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
       const result = await machine.scan?.(undefined, { source: 'gallery' });
       applyScanResult(result, setProgress, setLoading, isProcessingRef);
     } catch (err) {
-      log.error('camera.scan.gallery_failed', { error: err instanceof Error ? err : new Error(String(err)) });
+      log.error('camera.scan.gallery_failed', {
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
       setLoading(false);
       setProgress(0);
       isProcessingRef.current = false;

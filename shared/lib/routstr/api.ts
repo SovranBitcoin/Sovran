@@ -125,7 +125,12 @@ function getUserFriendlyErrorMessage(status: number, errorData: ParsedErrorData)
 async function throwResponseError(response: Response): Promise<never> {
   const errorData = await parseErrorResponse(response);
   const status = response.status;
-  apiLog.warn('api.routstr.http_error', { status, type: errorData.type, message: errorData.message, details: errorData.details });
+  apiLog.warn('api.routstr.http_error', {
+    status,
+    type: errorData.type,
+    message: errorData.message,
+    details: errorData.details,
+  });
 
   // 401 with expired/spent key — clear stored API key so user can re-authenticate
   if (status === 401) {
@@ -229,10 +234,16 @@ export async function getModels(): Promise<RoutstrModel[]> {
 
     const data: ModelsResponse = await response.json();
     const enabled = data.data.filter((model) => model.enabled);
-    apiLog.info('api.routstr.models.success', { count: enabled.length, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
+    apiLog.info('api.routstr.models.success', {
+      count: enabled.length,
+      duration_ms: Math.round((performance.now() - start) * 100) / 100,
+    });
     return enabled;
   } catch (error) {
-    apiLog.error('api.routstr.models.failed', { error, duration_ms: Math.round((performance.now() - start) * 100) / 100 });
+    apiLog.error('api.routstr.models.failed', {
+      error,
+      duration_ms: Math.round((performance.now() - start) * 100) / 100,
+    });
     toRoutstrError(error);
   }
 }
@@ -247,7 +258,10 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
         Authorization: `Bearer ${apiKey}`,
       },
     });
-    apiLog.debug('api.routstr.balance.response', { status: response.status, duration_ms: Math.round(performance.now() - start) });
+    apiLog.debug('api.routstr.balance.response', {
+      status: response.status,
+      duration_ms: Math.round(performance.now() - start),
+    });
     if (!response.ok) await throwResponseError(response);
 
     const data = await response.json();
@@ -257,10 +271,19 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
       api_key: data.api_key,
       reserved: data.reserved || 0,
     };
-    apiLog.info('api.routstr.balance.success', { balance: result.balance, totalSpent: result.total_spent, reserved: result.reserved, hasServerKey: !!result.api_key, duration_ms: Math.round(performance.now() - start) });
+    apiLog.info('api.routstr.balance.success', {
+      balance: result.balance,
+      totalSpent: result.total_spent,
+      reserved: result.reserved,
+      hasServerKey: !!result.api_key,
+      duration_ms: Math.round(performance.now() - start),
+    });
     return result;
   } catch (error) {
-    apiLog.error('api.routstr.balance.failed', { error, duration_ms: Math.round(performance.now() - start) });
+    apiLog.error('api.routstr.balance.failed', {
+      error,
+      duration_ms: Math.round(performance.now() - start),
+    });
     toRoutstrError(error);
   }
 }
@@ -269,22 +292,34 @@ export async function topUpBalance(apiKey: string, cashuToken: string): Promise<
   apiLog.info('api.routstr.wallet.topup.start', { tokenLength: cashuToken?.length });
   const start = performance.now();
   try {
-    const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/topup?cashu_token=${encodeURIComponent(cashuToken)}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+    const response = await fetch(
+      `${ROUTSTR_BASE_URL}/wallet/topup?cashu_token=${encodeURIComponent(cashuToken)}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    apiLog.debug('api.routstr.wallet.topup.response', {
+      status: response.status,
+      duration_ms: Math.round(performance.now() - start),
     });
-    apiLog.debug('api.routstr.wallet.topup.response', { status: response.status, duration_ms: Math.round(performance.now() - start) });
     if (!response.ok) await throwResponseError(response);
 
     const data = await response.json();
     const result = { added_amount: data.msats || 0 };
-    apiLog.info('api.routstr.wallet.topup.success', { addedAmount: result.added_amount, duration_ms: Math.round(performance.now() - start) });
+    apiLog.info('api.routstr.wallet.topup.success', {
+      addedAmount: result.added_amount,
+      duration_ms: Math.round(performance.now() - start),
+    });
     return result;
   } catch (error) {
-    apiLog.error('api.routstr.wallet.topup.failed', { error, duration_ms: Math.round(performance.now() - start) });
+    apiLog.error('api.routstr.wallet.topup.failed', {
+      error,
+      duration_ms: Math.round(performance.now() - start),
+    });
     toRoutstrError(error);
   }
 }
@@ -297,7 +332,10 @@ async function* parseSSEStream(
   response: Response
 ): AsyncGenerator<OpenAI.Chat.Completions.ChatCompletionChunk> {
   const hasReadableStream = response.body && typeof response.body.getReader === 'function';
-  apiLog.debug('routstr.sse.start', { hasReadableStream, contentType: response.headers.get('content-type') });
+  apiLog.debug('routstr.sse.start', {
+    hasReadableStream,
+    contentType: response.headers.get('content-type'),
+  });
   if (hasReadableStream) {
     yield* parseSSEFromReadableStream(response.body!);
     return;
@@ -340,9 +378,15 @@ async function* parseSSEFromReadableStream(
         for (const line of buffer.split('\n')) {
           const result = tryParseSSELine(line);
           if (result === 'done') break;
-          if (result) { chunkCount++; yield result; }
+          if (result) {
+            chunkCount++;
+            yield result;
+          }
         }
-        apiLog.info('routstr.sse.stream_end', { chunks: chunkCount, duration_ms: Math.round(performance.now() - streamStart) });
+        apiLog.info('routstr.sse.stream_end', {
+          chunks: chunkCount,
+          duration_ms: Math.round(performance.now() - streamStart),
+        });
         return;
       }
 
@@ -353,14 +397,24 @@ async function* parseSSEFromReadableStream(
       for (const line of lines) {
         const result = tryParseSSELine(line);
         if (result === 'done') {
-          apiLog.info('routstr.sse.stream_end', { chunks: chunkCount, duration_ms: Math.round(performance.now() - streamStart) });
+          apiLog.info('routstr.sse.stream_end', {
+            chunks: chunkCount,
+            duration_ms: Math.round(performance.now() - streamStart),
+          });
           return;
         }
-        if (result) { chunkCount++; yield result; }
+        if (result) {
+          chunkCount++;
+          yield result;
+        }
       }
     }
   } catch (error) {
-    apiLog.error('routstr.sse.stream_error', { chunks: chunkCount, duration_ms: Math.round(performance.now() - streamStart), error });
+    apiLog.error('routstr.sse.stream_error', {
+      chunks: chunkCount,
+      duration_ms: Math.round(performance.now() - streamStart),
+      error,
+    });
     throw new Error(
       'Failed to stream response: ' + (error instanceof Error ? error.message : String(error))
     );
@@ -392,7 +446,14 @@ export async function sendMessage(
 }> {
   const { model = 'gpt-3.5-turbo', temperature = 0.7, max_tokens, stream = false } = options;
   const totalTokens = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0);
-  apiLog.info('api.routstr.chat.start', { model, stream, messageCount: messages.length, totalInputChars: totalTokens, temperature, max_tokens });
+  apiLog.info('api.routstr.chat.start', {
+    model,
+    stream,
+    messageCount: messages.length,
+    totalInputChars: totalTokens,
+    temperature,
+    max_tokens,
+  });
   const start = performance.now();
 
   try {
@@ -403,13 +464,27 @@ export async function sendMessage(
           Authorization: `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ model, messages, temperature, ...(max_tokens != null && { max_tokens }), stream: true }),
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature,
+          ...(max_tokens != null && { max_tokens }),
+          stream: true,
+        }),
       });
       const requestId = response.headers.get('x-routstr-request-id') || undefined;
-      apiLog.debug('api.routstr.chat.response_received', { status: response.status, requestId, duration_ms: Math.round(performance.now() - start) });
+      apiLog.debug('api.routstr.chat.response_received', {
+        status: response.status,
+        requestId,
+        duration_ms: Math.round(performance.now() - start),
+      });
       if (!response.ok) await throwResponseError(response);
 
-      apiLog.info('api.routstr.chat.stream_started', { model, requestId, ttfb_ms: Math.round(performance.now() - start) });
+      apiLog.info('api.routstr.chat.stream_started', {
+        model,
+        requestId,
+        ttfb_ms: Math.round(performance.now() - start),
+      });
       return { stream: parseSSEStream(response) };
     }
 
@@ -421,10 +496,17 @@ export async function sendMessage(
       ...(max_tokens != null && { max_tokens }),
       stream: false,
     });
-    apiLog.info('api.routstr.chat.success', { model, duration_ms: Math.round(performance.now() - start) });
+    apiLog.info('api.routstr.chat.success', {
+      model,
+      duration_ms: Math.round(performance.now() - start),
+    });
     return { response };
   } catch (error: unknown) {
-    apiLog.error('api.routstr.chat.failed', { model, error, duration_ms: Math.round(performance.now() - start) });
+    apiLog.error('api.routstr.chat.failed', {
+      model,
+      error,
+      duration_ms: Math.round(performance.now() - start),
+    });
     toRoutstrError(error);
   }
 }

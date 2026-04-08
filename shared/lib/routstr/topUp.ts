@@ -39,7 +39,9 @@ export async function executeRoutstrTopUp(
       apiLog.debug('routstr.topup.path', { strategy: 'existing_wallet' });
       const topUpStart = performance.now();
       await topUpBalance(apiKey, encodedToken);
-      apiLog.debug('routstr.topup.topup_call_done', { duration_ms: Math.round(performance.now() - topUpStart) });
+      apiLog.debug('routstr.topup.topup_call_done', {
+        duration_ms: Math.round(performance.now() - topUpStart),
+      });
     } else {
       apiKey = encodedToken;
       isNewWallet = true;
@@ -51,7 +53,10 @@ export async function executeRoutstrTopUp(
     apiLog.debug('routstr.topup.verify_balance_start');
     const balanceStart = performance.now();
     const balanceResult = await checkBalance(apiKey);
-    apiLog.debug('routstr.topup.verify_balance_done', { balance: balanceResult.balance, duration_ms: Math.round(performance.now() - balanceStart) });
+    apiLog.debug('routstr.topup.verify_balance_done', {
+      balance: balanceResult.balance,
+      duration_ms: Math.round(performance.now() - balanceStart),
+    });
 
     // Server may return a persistent api_key — prefer it
     if (balanceResult.api_key && balanceResult.api_key !== apiKey) {
@@ -61,7 +66,11 @@ export async function executeRoutstrTopUp(
     }
 
     store.setBalance(balanceResult.balance);
-    apiLog.info('routstr.topup.success', { balance: balanceResult.balance, isNewWallet, total_ms: Math.round(performance.now() - start) });
+    apiLog.info('routstr.topup.success', {
+      balance: balanceResult.balance,
+      isNewWallet,
+      total_ms: Math.round(performance.now() - start),
+    });
 
     return { success: true, balance: balanceResult.balance, isNewWallet };
   } catch (error: unknown) {
@@ -71,7 +80,10 @@ export async function executeRoutstrTopUp(
         : error instanceof Error
           ? error.message
           : 'Top-up failed';
-    apiLog.error('routstr.topup.failed', { error: message, duration_ms: Math.round(performance.now() - start) });
+    apiLog.error('routstr.topup.failed', {
+      error: message,
+      duration_ms: Math.round(performance.now() - start),
+    });
 
     // Still store the apiKey if we managed to set one (partial success)
     if (apiKey && !currentApiKey) {

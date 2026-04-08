@@ -39,7 +39,10 @@ export function deriveNostrKeys(mnemonic: string, accountIndex: number = 0): Der
     accountIndex
   );
 
-  log.info('nostr.key_derivation.derive_nostr_keys.complete', { accountIndex, pubkeyPrefix: pk.slice(0, 8) });
+  log.info('nostr.key_derivation.derive_nostr_keys.complete', {
+    accountIndex,
+    pubkeyPrefix: pk.slice(0, 8),
+  });
   return {
     npub: nip19.npubEncode(pk),
     nsec: nip19.nsecEncode(sk),
@@ -72,7 +75,9 @@ export function deriveCashuMnemonic(mnemonic: string, accountIndex: number = 0):
 export function deriveCashuWalletSeed(cashuMnemonic: string): Uint8Array {
   log.debug('nostr.key_derivation.derive_cashu_wallet_seed.start');
   const seed = bip39.mnemonicToSeedSync(cashuMnemonic, '');
-  log.debug('nostr.key_derivation.derive_cashu_wallet_seed.complete', { seedBytes: seed.byteLength });
+  log.debug('nostr.key_derivation.derive_cashu_wallet_seed.complete', {
+    seedBytes: seed.byteLength,
+  });
   return seed;
 }
 
@@ -86,7 +91,10 @@ export function deriveCashuWalletSeedFromRoot(
 ): Uint8Array {
   log.info('nostr.key_derivation.derive_seed_from_root.start', { accountIndex });
   const seed = deriveCashuWalletSeed(deriveCashuMnemonic(mnemonic, accountIndex));
-  log.info('nostr.key_derivation.derive_seed_from_root.complete', { accountIndex, seedBytes: seed.byteLength });
+  log.info('nostr.key_derivation.derive_seed_from_root.complete', {
+    accountIndex,
+    seedBytes: seed.byteLength,
+  });
   return seed;
 }
 
@@ -101,7 +109,9 @@ export function deriveCashuWalletSeedFromRoot(
  * custom deterministic mapping. Changing this breaks existing imported profiles.
  */
 export function pubkeyToAccountNumber(pubkeyHex: string): number {
-  log.debug('nostr.key_derivation.pubkey_to_account_number', { pubkeyPrefix: pubkeyHex.slice(0, 8) });
+  log.debug('nostr.key_derivation.pubkey_to_account_number', {
+    pubkeyPrefix: pubkeyHex.slice(0, 8),
+  });
   const full = BigInt('0x' + pubkeyHex);
   return Number(full % 0x80000000n) & 0x7fffffff;
 }
@@ -130,6 +140,9 @@ export function deriveCashuMnemonicForImported(mnemonic: string, npubNumber: num
 export function deriveCashuWalletSeedForImported(mnemonic: string, npubNumber: number): Uint8Array {
   log.info('nostr.key_derivation.derive_seed_imported.start', { npubNumber });
   const seed = deriveCashuWalletSeed(deriveCashuMnemonicForImported(mnemonic, npubNumber));
-  log.info('nostr.key_derivation.derive_seed_imported.complete', { npubNumber, seedBytes: seed.byteLength });
+  log.info('nostr.key_derivation.derive_seed_imported.complete', {
+    npubNumber,
+    seedBytes: seed.byteLength,
+  });
   return seed;
 }

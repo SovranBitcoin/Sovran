@@ -19,25 +19,23 @@ interface RoutstrTopUpActions {
   reset: () => void;
 }
 
-export const useRoutstrTopUpStore = create<RoutstrTopUpState & RoutstrTopUpActions>()(
-  (set) => ({
-    active: false,
-    pendingMessage: null,
-    lastResult: null,
+export const useRoutstrTopUpStore = create<RoutstrTopUpState & RoutstrTopUpActions>()((set) => ({
+  active: false,
+  pendingMessage: null,
+  lastResult: null,
 
-    start: (pendingMessage) => {
-      storeLog.info('store.routstr_topup.start', { hasPendingMessage: !!pendingMessage });
-      set({ active: true, pendingMessage: pendingMessage ?? null, lastResult: null });
-    },
+  start: (pendingMessage) => {
+    storeLog.info('store.routstr_topup.start', { hasPendingMessage: !!pendingMessage });
+    set({ active: true, pendingMessage: pendingMessage ?? null, lastResult: null });
+  },
 
-    complete: (result) => {
-      storeLog.info('store.routstr_topup.complete', { result });
-      set({ active: false, lastResult: result });
-    },
+  complete: (result) => {
+    storeLog.info('store.routstr_topup.complete', { result });
+    set({ active: false, lastResult: result });
+  },
 
-    reset: () => {
-      storeLog.debug('store.routstr_topup.reset');
-      set({ active: false, pendingMessage: null, lastResult: null });
-    },
-  })
-);
+  reset: () => {
+    storeLog.debug('store.routstr_topup.reset');
+    set({ active: false, pendingMessage: null, lastResult: null });
+  },
+}));

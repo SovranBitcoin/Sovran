@@ -284,100 +284,100 @@ const MonthlyChart = React.memo(function MonthlyChart({
 
   return (
     <Log name="MonthlyChart">
-    <RNView style={[styles.card, { borderColor }]}>
-      <BlurCardFrame accentColor={muted}>
-        <RNView style={styles.container}>
-          {/* Header */}
-          <RNView style={styles.header}>
-            <RNView style={styles.headerLeft}>
-              <Text size={14} semibold color={opacity(foreground, 0.66)}>
-                {config.title}
-              </Text>
-              <RNView style={styles.amountRow}>
-                <AmountFormatter
-                  amount={hasData ? totalAmount : 0}
-                  unit={unit}
-                  size={28}
-                  weight="heavy"
-                />
-                {dailyChange > 0 ? (
-                  <RNView
-                    style={[
-                      styles.changeChip,
-                      { backgroundColor: opacity(actualLineColor, 0.12) },
-                    ]}>
-                    <Icon name={changeIcon} size={14} color={actualLineColor} />
-                    <Text overpass size={13} semibold color={actualLineColor}>
-                      {fmt(dailyChange, unit)}
-                    </Text>
-                  </RNView>
-                ) : null}
+      <RNView style={[styles.card, { borderColor }]}>
+        <BlurCardFrame accentColor={muted}>
+          <RNView style={styles.container}>
+            {/* Header */}
+            <RNView style={styles.header}>
+              <RNView style={styles.headerLeft}>
+                <Text size={14} semibold color={opacity(foreground, 0.66)}>
+                  {config.title}
+                </Text>
+                <RNView style={styles.amountRow}>
+                  <AmountFormatter
+                    amount={hasData ? totalAmount : 0}
+                    unit={unit}
+                    size={28}
+                    weight="heavy"
+                  />
+                  {dailyChange > 0 ? (
+                    <RNView
+                      style={[
+                        styles.changeChip,
+                        { backgroundColor: opacity(actualLineColor, 0.12) },
+                      ]}>
+                      <Icon name={changeIcon} size={14} color={actualLineColor} />
+                      <Text overpass size={13} semibold color={actualLineColor}>
+                        {fmt(dailyChange, unit)}
+                      </Text>
+                    </RNView>
+                  ) : null}
+                </RNView>
               </RNView>
+              {hasData && todayDay < daysInMonth ? (
+                <RNView style={styles.headerRight}>
+                  <AmountFormatter
+                    amount={projectedTotal}
+                    unit={unit}
+                    size={14}
+                    weight="medium"
+                    color={opacity(foreground, 0.66)}
+                  />
+                </RNView>
+              ) : null}
             </RNView>
-            {hasData && todayDay < daysInMonth ? (
-              <RNView style={styles.headerRight}>
-                <AmountFormatter
-                  amount={projectedTotal}
-                  unit={unit}
-                  size={14}
-                  weight="medium"
-                  color={opacity(foreground, 0.66)}
+
+            {/* Chart */}
+            <Svg
+              width={chartWidth}
+              height={totalSvgHeight}
+              viewBox={`0 0 ${chartWidth} ${totalSvgHeight}`}>
+              <Defs>
+                <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0" stopColor={foreground} stopOpacity="0.08" />
+                  <Stop offset="1" stopColor={foreground} stopOpacity="0" />
+                </LinearGradient>
+              </Defs>
+
+              {hasData ? <Path d={projectedAreaPath} fill={`url(#${gradientId})`} /> : null}
+
+              {hasData && projectedPoints.length > 1 ? (
+                <Path
+                  d={projectedPath}
+                  stroke={projectedLineColor}
+                  strokeWidth={PROJECTED_LINE_WIDTH}
+                  strokeDasharray={[6, 4]}
+                  strokeLinecap="round"
+                  fill="none"
                 />
-              </RNView>
-            ) : null}
+              ) : null}
+
+              {hasData ? (
+                <Path
+                  d={actualPath}
+                  stroke={actualLineColor}
+                  strokeWidth={ACTUAL_LINE_WIDTH}
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              ) : null}
+
+              {xTickPositions.map(({ day, x }) => (
+                <SvgText
+                  key={day}
+                  x={x}
+                  y={totalSvgHeight - 4}
+                  fontSize={11}
+                  fontFamily="OxygenBold"
+                  fill={labelColor}
+                  textAnchor="middle">
+                  {day}
+                </SvgText>
+              ))}
+            </Svg>
           </RNView>
-
-          {/* Chart */}
-          <Svg
-            width={chartWidth}
-            height={totalSvgHeight}
-            viewBox={`0 0 ${chartWidth} ${totalSvgHeight}`}>
-            <Defs>
-              <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor={foreground} stopOpacity="0.08" />
-                <Stop offset="1" stopColor={foreground} stopOpacity="0" />
-              </LinearGradient>
-            </Defs>
-
-            {hasData ? <Path d={projectedAreaPath} fill={`url(#${gradientId})`} /> : null}
-
-            {hasData && projectedPoints.length > 1 ? (
-              <Path
-                d={projectedPath}
-                stroke={projectedLineColor}
-                strokeWidth={PROJECTED_LINE_WIDTH}
-                strokeDasharray={[6, 4]}
-                strokeLinecap="round"
-                fill="none"
-              />
-            ) : null}
-
-            {hasData ? (
-              <Path
-                d={actualPath}
-                stroke={actualLineColor}
-                strokeWidth={ACTUAL_LINE_WIDTH}
-                strokeLinecap="round"
-                fill="none"
-              />
-            ) : null}
-
-            {xTickPositions.map(({ day, x }) => (
-              <SvgText
-                key={day}
-                x={x}
-                y={totalSvgHeight - 4}
-                fontSize={11}
-                fontFamily="OxygenBold"
-                fill={labelColor}
-                textAnchor="middle">
-                {day}
-              </SvgText>
-            ))}
-          </Svg>
-        </RNView>
-      </BlurCardFrame>
-    </RNView>
+        </BlurCardFrame>
+      </RNView>
     </Log>
   );
 });

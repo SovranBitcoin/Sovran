@@ -20,13 +20,7 @@ import opacity from 'hex-color-opacity';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Dimensions,
-  Linking,
-  ScrollView,
-  StyleSheet,
-  View as RNView,
-} from 'react-native';
+import { Dimensions, Linking, ScrollView, StyleSheet, View as RNView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -397,13 +391,41 @@ const AIModelSkeletonCard = ({ index }: { index: number }) => (
       <View style={styles.aiModelContent}>
         <View style={[styles.aiModelIcon, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
         <VStack style={{ flex: 1, gap: 6 }}>
-          <View style={{ width: 80, height: 14, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' }} />
-          <View style={{ width: 48, height: 10, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)' }} />
+          <View
+            style={{
+              width: 80,
+              height: 14,
+              borderRadius: 4,
+              backgroundColor: 'rgba(255,255,255,0.08)',
+            }}
+          />
+          <View
+            style={{
+              width: 48,
+              height: 10,
+              borderRadius: 4,
+              backgroundColor: 'rgba(255,255,255,0.05)',
+            }}
+          />
         </VStack>
       </View>
       <VStack style={{ paddingHorizontal: 16, paddingBottom: 16, gap: 8 }}>
-        <View style={{ width: '100%', height: 10, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)' }} />
-        <View style={{ width: '60%', height: 10, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.05)' }} />
+        <View
+          style={{
+            width: '100%',
+            height: 10,
+            borderRadius: 4,
+            backgroundColor: 'rgba(255,255,255,0.05)',
+          }}
+        />
+        <View
+          style={{
+            width: '60%',
+            height: 10,
+            borderRadius: 4,
+            backgroundColor: 'rgba(255,255,255,0.05)',
+          }}
+        />
         <View style={[styles.aiModelBadge, { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
           <View style={{ width: 52, height: 10, borderRadius: 4 }} />
         </View>
@@ -419,7 +441,7 @@ const AIModelCard = ({ model, canAfford }: { model: RoutstrModel; canAfford: boo
   const { provider, modelName } = extractModelName(model);
   const icon = getProviderIcon(provider);
   const gradient = getProviderGradient(provider);
-  const maxCostSats = Math.ceil((model.sats_pricing?.max_cost || 0));
+  const maxCostSats = Math.ceil(model.sats_pricing?.max_cost || 0);
 
   return (
     <Link
@@ -428,7 +450,9 @@ const AIModelCard = ({ model, canAfford }: { model: RoutstrModel; canAfford: boo
         params: { pubkey: ROUTSTR_PUBKEY, model: model.id },
       }}
       asChild>
-      <TouchableOpacity activeOpacity={0.9} style={StyleSheet.flatten([styles.aiModelCard, !canAfford && { opacity: 0.45 }])}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={StyleSheet.flatten([styles.aiModelCard, !canAfford && { opacity: 0.45 }])}>
         <LinearGradient
           colors={gradient}
           start={{ x: 0, y: 0 }}
@@ -482,7 +506,6 @@ const MapTeaserCard = () => {
       // Silently fail - we'll show fallback count
     });
   }, [fetchPlaces]);
-
 
   const placesCount = placesCache?.data.length ?? 0;
   const displayCount =
@@ -1110,7 +1133,9 @@ const ExploreScreen = () => {
       };
 
       loadModels();
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+      };
     }, [getCachedModels, setCachedModels, isCacheStale])
   );
 
@@ -1184,190 +1209,190 @@ const ExploreScreen = () => {
       onContentSizeChange={onContentSizeChange}
       contentContainerStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}>
       <Screen name="ExploreScreen">
-      <ScrollableGradientOverlay contentHeight={contentHeight} />
+        <ScrollableGradientOverlay contentHeight={contentHeight} />
 
-      <VStack style={{ paddingBottom: 96 }}>
-        {/* AI Chat Section */}
-        <SectionHeader
-          title="AI Assistants"
-          subtitle="Chat with leading AI models, pay with sats"
-        />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 12, minHeight: 140 }}>
-          {modelsLoading ? (
-            Array.from({ length: AI_SKELETON_COUNT }, (_, i) => (
-              <AIModelSkeletonCard key={i} index={i} />
-            ))
-          ) : displayModels.length > 0 ? (
-            displayModels.map((model) => (
-              <AIModelCard
-                key={model.id}
-                model={model}
-                canAfford={(model.sats_pricing?.max_cost || 0) * 1000 <= budgetMsats}
+        <VStack style={{ paddingBottom: 96 }}>
+          {/* AI Chat Section */}
+          <SectionHeader
+            title="AI Assistants"
+            subtitle="Chat with leading AI models, pay with sats"
+          />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20, gap: 12, minHeight: 140 }}>
+            {modelsLoading ? (
+              Array.from({ length: AI_SKELETON_COUNT }, (_, i) => (
+                <AIModelSkeletonCard key={i} index={i} />
+              ))
+            ) : displayModels.length > 0 ? (
+              displayModels.map((model) => (
+                <AIModelCard
+                  key={model.id}
+                  model={model}
+                  canAfford={(model.sats_pricing?.max_cost || 0) * 1000 <= budgetMsats}
+                />
+              ))
+            ) : (
+              <View style={styles.modelsEmptyContainer}>
+                <Icon name="mdi:robot" size={32} color={opacity(foreground, 0.33)} />
+                <Text size={13} style={{ color: opacity(foreground, 0.4), marginTop: 8 }}>
+                  No models available
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+
+          <Spacer size={32} />
+
+          {/* Pending Ecash Section - only shows when there are pending transactions */}
+          <Animated.View
+            entering={FadeInUp.duration(380).delay(80)}
+            style={{ paddingHorizontal: 20 }}>
+            <PendingEcashCard />
+          </Animated.View>
+
+          <Spacer size={32} />
+
+          {/* Lightning Address Section - hidden unless dev mode */}
+          {devMode ? (
+            <>
+              <SectionHeader
+                title="Your Lightning Address"
+                subtitle="Receive Bitcoin with a memorable URL"
               />
-            ))
-          ) : (
-            <View style={styles.modelsEmptyContainer}>
-              <Icon name="mdi:robot" size={32} color={opacity(foreground, 0.33)} />
-              <Text size={13} style={{ color: opacity(foreground, 0.4), marginTop: 8 }}>
-                No models available
-              </Text>
-            </View>
-          )}
-        </ScrollView>
+              <Animated.View
+                entering={FadeInUp.duration(380).delay(160)}
+                style={{ paddingHorizontal: 20 }}>
+                <LightningAddressCard />
+              </Animated.View>
 
-        <Spacer size={32} />
+              <Spacer size={32} />
+            </>
+          ) : null}
 
-        {/* Pending Ecash Section - only shows when there are pending transactions */}
-        <Animated.View
-          entering={FadeInUp.duration(380).delay(80)}
-          style={{ paddingHorizontal: 20 }}>
-          <PendingEcashCard />
-        </Animated.View>
+          {/* Wallet Health - hidden unless dev mode */}
+          {devMode ? (
+            <>
+              <SectionHeader
+                title="Wallet Health"
+                subtitle="Check distribution drift, pending outgoing ecash, and more"
+              />
+              <Animated.View
+                entering={FadeInUp.duration(380).delay(240)}
+                style={{ paddingHorizontal: 20 }}>
+                <WalletHealthCard defaultUnit="sat" />
+              </Animated.View>
 
-        <Spacer size={32} />
+              <Spacer size={32} />
+            </>
+          ) : null}
 
-        {/* Lightning Address Section - hidden unless dev mode */}
-        {devMode ? (
-          <>
-            <SectionHeader
-              title="Your Lightning Address"
-              subtitle="Receive Bitcoin with a memorable URL"
-            />
-            <Animated.View
-              entering={FadeInUp.duration(380).delay(160)}
-              style={{ paddingHorizontal: 20 }}>
-              <LightningAddressCard />
-            </Animated.View>
+          {/* Map Section */}
+          <SectionHeader title="Discover" subtitle="Find places that accept Bitcoin" />
+          <View style={{ paddingHorizontal: 20 }}>
+            <MapTeaserCard />
+          </View>
 
-            <Spacer size={32} />
-          </>
-        ) : null}
+          <Spacer size={32} />
 
-        {/* Wallet Health - hidden unless dev mode */}
-        {devMode ? (
-          <>
-            <SectionHeader
-              title="Wallet Health"
-              subtitle="Check distribution drift, pending outgoing ecash, and more"
-            />
-            <Animated.View
-              entering={FadeInUp.duration(380).delay(240)}
-              style={{ paddingHorizontal: 20 }}>
-              <WalletHealthCard defaultUnit="sat" />
-            </Animated.View>
+          {/* Shop with Bitcoin - hidden unless dev mode */}
+          {devMode ? (
+            <>
+              <SectionHeader
+                title="Shop with Bitcoin"
+                subtitle="Gift cards & vouchers"
+                action="See all"
+                onAction={() => notImplementedPopup()}
+              />
 
-            <Spacer size={32} />
-          </>
-        ) : null}
+              {/* Category Pills */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
+                {PRODUCT_CATEGORIES.map((cat) => (
+                  <CategoryPill
+                    key={cat.id}
+                    name={cat.name}
+                    icon={cat.icon}
+                    isActive={activeCategory === cat.name}
+                    onPress={() => setActiveCategory(cat.name)}
+                  />
+                ))}
+              </ScrollView>
 
-        {/* Map Section */}
-        <SectionHeader title="Discover" subtitle="Find places that accept Bitcoin" />
-        <View style={{ paddingHorizontal: 20 }}>
-          <MapTeaserCard />
-        </View>
+              {/* Product Cards - 2 column grid */}
+              <View style={styles.productGrid}>
+                {BITREFILL_PRODUCTS.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </View>
 
-        <Spacer size={32} />
+              <Spacer size={32} />
+            </>
+          ) : null}
 
-        {/* Shop with Bitcoin - hidden unless dev mode */}
-        {devMode ? (
-          <>
-            <SectionHeader
-              title="Shop with Bitcoin"
-              subtitle="Gift cards & vouchers"
-              action="See all"
-              onAction={() => notImplementedPopup()}
-            />
+          {/* Bitcoin Conferences - hidden unless dev mode */}
+          {devMode ? (
+            <>
+              <SectionHeader
+                title="Bitcoin Events"
+                subtitle="Upcoming conferences & meetups"
+                action="View all"
+                onAction={() => notImplementedPopup()}
+              />
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}>
+                {BITCOIN_CONFERENCES.map((conf) => (
+                  <ConferenceCard key={conf.id} conference={conf} />
+                ))}
+              </ScrollView>
 
-            {/* Category Pills */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
-              {PRODUCT_CATEGORIES.map((cat) => (
-                <CategoryPill
-                  key={cat.id}
-                  name={cat.name}
-                  icon={cat.icon}
-                  isActive={activeCategory === cat.name}
-                  onPress={() => setActiveCategory(cat.name)}
-                />
-              ))}
-            </ScrollView>
+              <Spacer size={32} />
+            </>
+          ) : null}
 
-            {/* Product Cards - 2 column grid */}
-            <View style={styles.productGrid}>
-              {BITREFILL_PRODUCTS.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </View>
+          {/* eSIM Promo - hidden unless dev mode */}
+          {devMode ? (
+            <>
+              <View style={{ paddingHorizontal: 20 }}>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  style={styles.esimPromo}
+                  onPress={() => Linking.openURL('https://sovran.money/esims')}>
+                  <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+                  <LinearGradient
+                    colors={['rgba(99,102,241,0.3)', 'rgba(139,92,246,0.3)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <HStack align="center" style={{ padding: 20 }}>
+                    <View style={styles.esimPromoIcon}>
+                      <Icon name="mdi:sim" size={28} color="#fff" />
+                    </View>
+                    <VStack style={{ flex: 1, marginLeft: 16 }}>
+                      <Text size={16} heavy style={{ color: '#fff' }}>
+                        Travel with Bitcoin
+                      </Text>
+                      <Text size={13} style={{ color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+                        Get eSIMs for 190+ countries, pay with sats
+                      </Text>
+                    </VStack>
+                    <View style={styles.esimPromoArrow}>
+                      <Icon name="mdi:arrow-right" size={20} color="#fff" />
+                    </View>
+                  </HStack>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : null}
 
-            <Spacer size={32} />
-          </>
-        ) : null}
-
-        {/* Bitcoin Conferences - hidden unless dev mode */}
-        {devMode ? (
-          <>
-            <SectionHeader
-              title="Bitcoin Events"
-              subtitle="Upcoming conferences & meetups"
-              action="View all"
-              onAction={() => notImplementedPopup()}
-            />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}>
-              {BITCOIN_CONFERENCES.map((conf) => (
-                <ConferenceCard key={conf.id} conference={conf} />
-              ))}
-            </ScrollView>
-
-            <Spacer size={32} />
-          </>
-        ) : null}
-
-        {/* eSIM Promo - hidden unless dev mode */}
-        {devMode ? (
-          <>
-            <View style={{ paddingHorizontal: 20 }}>
-              <TouchableOpacity
-                activeOpacity={0.9}
-                style={styles.esimPromo}
-                onPress={() => Linking.openURL('https://sovran.money/esims')}>
-                <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
-                <LinearGradient
-                  colors={['rgba(99,102,241,0.3)', 'rgba(139,92,246,0.3)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFillObject}
-                />
-                <HStack align="center" style={{ padding: 20 }}>
-                  <View style={styles.esimPromoIcon}>
-                    <Icon name="mdi:sim" size={28} color="#fff" />
-                  </View>
-                  <VStack style={{ flex: 1, marginLeft: 16 }}>
-                    <Text size={16} heavy style={{ color: '#fff' }}>
-                      Travel with Bitcoin
-                    </Text>
-                    <Text size={13} style={{ color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
-                      Get eSIMs for 190+ countries, pay with sats
-                    </Text>
-                  </VStack>
-                  <View style={styles.esimPromoArrow}>
-                    <Icon name="mdi:arrow-right" size={20} color="#fff" />
-                  </View>
-                </HStack>
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : null}
-
-        <Spacer size={20} />
-      </VStack>
+          <Spacer size={20} />
+        </VStack>
       </Screen>
     </LayoutDebugWrapper>
   );

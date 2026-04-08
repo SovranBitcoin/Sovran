@@ -62,7 +62,10 @@ export const ContactListItem = ({
     <Log name="ContactListItem">
       <Pressable
         onPress={handlePress}
-        style={({ pressed }) => [styles.container, pressed && { backgroundColor: surfaceSecondary }]}>
+        style={({ pressed }) => [
+          styles.container,
+          pressed && { backgroundColor: surfaceSecondary },
+        ]}>
         <Avatar
           picture={avatarUrl}
           name={displayName}

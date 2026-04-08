@@ -489,19 +489,23 @@ export function MapScreen() {
 
     // Yield to the event loop so the map + loading overlay paint before
     // Supercluster's synchronous k-d tree build blocks the JS thread.
-    const handle = deferWork('map.cluster_build', () => {
-      const manager = getOrBuildBTCMapClusterManager(clusterCacheKey, filteredPoints, {
-        radius: 50,
-        maxZoom: 17,
-        minPoints: 2,
-      });
-      clusterManagerRef.current = manager;
+    const handle = deferWork(
+      'map.cluster_build',
+      () => {
+        const manager = getOrBuildBTCMapClusterManager(clusterCacheKey, filteredPoints, {
+          radius: 50,
+          maxZoom: 17,
+          minPoints: 2,
+        });
+        clusterManagerRef.current = manager;
 
-      // Update markers with current camera
-      const { lat, lon, zoom } = cameraRef.current;
-      updateMarkersForCamera(lat, lon, zoom);
-      setIsClusteringReady(true);
-    }, 100);
+        // Update markers with current camera
+        const { lat, lon, zoom } = cameraRef.current;
+        updateMarkersForCamera(lat, lon, zoom);
+        setIsClusteringReady(true);
+      },
+      100
+    );
 
     return () => handle.cancel();
   }, [isMapReady, filteredPoints, clusterCacheKey, updateMarkersForCamera]);

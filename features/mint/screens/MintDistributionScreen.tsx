@@ -134,7 +134,11 @@ export function MintDistributionScreen() {
 
   const handleDistributionChange = useCallback(
     (mintUrl: string, bp: number) => {
-      log.debug('mint.distribution.change', { mintUrl, basisPoints: bp, currency: selectedCurrency });
+      log.debug('mint.distribution.change', {
+        mintUrl,
+        basisPoints: bp,
+        currency: selectedCurrency,
+      });
       setMintDistribution(selectedCurrency, mintUrl, bp, mintUrls);
     },
     [selectedCurrency, mintUrls, setMintDistribution]
@@ -155,7 +159,10 @@ export function MintDistributionScreen() {
   );
 
   const handleEqualize = useCallback(() => {
-    log.info('mint.distribution.equalize', { currency: selectedCurrency, mintCount: mintUrls.length });
+    log.info('mint.distribution.equalize', {
+      currency: selectedCurrency,
+      mintCount: mintUrls.length,
+    });
     equalizeMints(selectedCurrency, mintUrls);
   }, [selectedCurrency, mintUrls, equalizeMints]);
 
@@ -219,85 +226,85 @@ export function MintDistributionScreen() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: background }}>
       <Screen name="MintDistributionScreen">
-      <Stack.Screen
-        options={{
-          title: 'Balance split',
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => {
-                Alert.alert(
-                  'Balance Split',
-                  'Set how new funds should be distributed across your mints. ' +
-                    'When you receive ecash, it will follow this split.\n\n' +
-                    '• Max: Set a mint to 100%\n' +
-                    '• Min: Set a mint to 0%\n' +
-                    '• Equalize: Distribute evenly among active mints',
-                  [{ text: 'Got it' }]
-                );
-              }}
-              className="p-2">
-              <Icon name="mdi:help-circle" size={24} color={foreground} />
-            </TouchableOpacity>
-          ),
-        }}
-      />
+        <Stack.Screen
+          options={{
+            title: 'Balance split',
+            headerRight: () => (
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert(
+                    'Balance Split',
+                    'Set how new funds should be distributed across your mints. ' +
+                      'When you receive ecash, it will follow this split.\n\n' +
+                      '• Max: Set a mint to 100%\n' +
+                      '• Min: Set a mint to 0%\n' +
+                      '• Equalize: Distribute evenly among active mints',
+                    [{ text: 'Got it' }]
+                  );
+                }}
+                className="p-2">
+                <Icon name="mdi:help-circle" size={24} color={foreground} />
+              </TouchableOpacity>
+            ),
+          }}
+        />
 
-      <ModalLayoutWrapper
-        headerGradient
-        stickyContent={stickyHeader}
-        stickyContentHeight={STICKY_CONTENT_HEIGHT}
-        useAnimatedScroll
-        scrollY={scrollY}
-        bottomContent={bottomButtons}
-        contentPadding={0}>
-        <View className="mb-1 py-1.5">
-          <HStack justify="space-between" align="center" className="px-4">
-            <Text size={14} style={{ color: opacity(foreground, 0.5) }}>
-              Total distribution
-            </Text>
-            <Text
-              bold
-              size={14}
-              style={{
-                color: totalBp === TOTAL_BASIS_POINTS ? foreground : danger,
-              }}>
-              {(totalBp / 100).toFixed(1)}%{totalBp !== TOTAL_BASIS_POINTS && ' ⚠️'}
-            </Text>
-          </HStack>
-        </View>
+        <ModalLayoutWrapper
+          headerGradient
+          stickyContent={stickyHeader}
+          stickyContentHeight={STICKY_CONTENT_HEIGHT}
+          useAnimatedScroll
+          scrollY={scrollY}
+          bottomContent={bottomButtons}
+          contentPadding={0}>
+          <View className="mb-1 py-1.5">
+            <HStack justify="space-between" align="center" className="px-4">
+              <Text size={14} style={{ color: opacity(foreground, 0.5) }}>
+                Total distribution
+              </Text>
+              <Text
+                bold
+                size={14}
+                style={{
+                  color: totalBp === TOTAL_BASIS_POINTS ? foreground : danger,
+                }}>
+                {(totalBp / 100).toFixed(1)}%{totalBp !== TOTAL_BASIS_POINTS && ' ⚠️'}
+              </Text>
+            </HStack>
+          </View>
 
-        {mintsForCurrency.length === 0 ? (
-          <View className="items-center p-10">
-            <Text style={{ color: foreground, textAlign: 'center' }}>
-              No mints available for {selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}
+          {mintsForCurrency.length === 0 ? (
+            <View className="items-center p-10">
+              <Text style={{ color: foreground, textAlign: 'center' }}>
+                No mints available for {selectedCurrency === 'SAT' ? 'BTC' : selectedCurrency}
+              </Text>
+            </View>
+          ) : (
+            <VStack gap={4}>
+              {mintsForCurrency.map((mint) => (
+                <MintDistributionItem
+                  key={mint.mintUrl}
+                  mintUrl={mint.mintUrl}
+                  mintInfo={mintInfoMap[mint.mintUrl]}
+                  balance={liveBalances[mint.mintUrl] || 0}
+                  unit={selectedCurrency.toLowerCase()}
+                  distributionBp={distribution[mint.mintUrl] || 0}
+                  onDistributionChange={handleDistributionChange}
+                  onMax={handleMax}
+                  onMin={handleMin}
+                />
+              ))}
+            </VStack>
+          )}
+
+          <View className="mt-2 p-4">
+            <Text size={12} style={{ color: opacity(foreground, 0.4), textAlign: 'center' }}>
+              {hasActiveMints
+                ? 'Adjusting one mint redistributes among active mints only'
+                : 'Tap Equalize to distribute evenly across all mints'}
             </Text>
           </View>
-        ) : (
-          <VStack gap={4}>
-            {mintsForCurrency.map((mint) => (
-              <MintDistributionItem
-                key={mint.mintUrl}
-                mintUrl={mint.mintUrl}
-                mintInfo={mintInfoMap[mint.mintUrl]}
-                balance={liveBalances[mint.mintUrl] || 0}
-                unit={selectedCurrency.toLowerCase()}
-                distributionBp={distribution[mint.mintUrl] || 0}
-                onDistributionChange={handleDistributionChange}
-                onMax={handleMax}
-                onMin={handleMin}
-              />
-            ))}
-          </VStack>
-        )}
-
-        <View className="mt-2 p-4">
-          <Text size={12} style={{ color: opacity(foreground, 0.4), textAlign: 'center' }}>
-            {hasActiveMints
-              ? 'Adjusting one mint redistributes among active mints only'
-              : 'Tap Equalize to distribute evenly across all mints'}
-          </Text>
-        </View>
-      </ModalLayoutWrapper>
+        </ModalLayoutWrapper>
       </Screen>
     </GestureHandlerRootView>
   );

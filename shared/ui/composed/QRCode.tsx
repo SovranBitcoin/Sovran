@@ -281,7 +281,15 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
 
 const POINTER_ROTATION = [0, -45, -90] as const; // Fast, Medium, Slow
 
-function SpeedGaugeIcon({ size, color, speedIndex }: { size: number; color: string; speedIndex: number }) {
+function SpeedGaugeIcon({
+  size,
+  color,
+  speedIndex,
+}: {
+  size: number;
+  color: string;
+  speedIndex: number;
+}) {
   const rotation = useSharedValue(POINTER_ROTATION[speedIndex] ?? 0);
 
   useEffect(() => {

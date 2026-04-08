@@ -170,7 +170,10 @@ async function migrateReduxCashuProfiles(
       if (needsMigration) {
         const result = await migration.migrateFromRedux();
         if (result.errors.length > 0) {
-          log.warn('migrations.legacy.completed_with_errors', { accountIndex, errors: result.errors });
+          log.warn('migrations.legacy.completed_with_errors', {
+            accountIndex,
+            errors: result.errors,
+          });
         }
       }
 

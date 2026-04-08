@@ -79,7 +79,8 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
         const urlsToProcess: string[] = [];
         for (const rawUrl of mintUrls) {
           const key = normalizeMintUrlKey(rawUrl);
-          if (knownMintUrls.has(key) || processedUrls.current.has(key) || seenKeys.has(key)) continue;
+          if (knownMintUrls.has(key) || processedUrls.current.has(key) || seenKeys.has(key))
+            continue;
           seenKeys.add(key);
           processedUrls.current.add(key);
           urlsToProcess.push(normalizeUrlForApi(rawUrl));
@@ -106,20 +107,32 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
           try {
             const mintInfoResult = await fetchMintInfo(url);
             const info = mintInfoResult.isOk() ? mintInfoResult.value : null;
-            cashuLog.debug('mint.sovran.info.resolved', { url, hasInfo: !!info, hasIcon: !!info?.icon_url, name: info?.name, progress: `${++resolved}/${total}` });
+            cashuLog.debug('mint.sovran.info.resolved', {
+              url,
+              hasInfo: !!info,
+              hasIcon: !!info?.icon_url,
+              name: info?.name,
+              progress: `${++resolved}/${total}`,
+            });
             appendMintIfNew(setMints, {
               ...base,
               mintInfo: info,
             });
           } catch (err) {
-            cashuLog.warn('mint.sovran.info.error', { url, error: err instanceof Error ? err : new Error(String(err)), progress: `${++resolved}/${total}` });
+            cashuLog.warn('mint.sovran.info.error', {
+              url,
+              error: err instanceof Error ? err : new Error(String(err)),
+              progress: `${++resolved}/${total}`,
+            });
             appendMintIfNew(setMints, { ...base, mintInfo: null });
           }
         });
 
         setLoading(false);
       } catch (err) {
-        cashuLog.error('mint.sovran.error', { error: err instanceof Error ? err : new Error(String(err)) });
+        cashuLog.error('mint.sovran.error', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
         setError(err instanceof Error ? err.message : 'Failed to fetch mints from Sovran API');
         setLoading(false);
       }

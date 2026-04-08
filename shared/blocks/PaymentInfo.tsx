@@ -76,7 +76,11 @@ export function PaymentInfo({
   }, []);
 
   const handleCopyPress = useCallback(async () => {
-    log.info('ui.payment_info.copy', { copyTarget, hasLink: Boolean(link), valueLength: selectedValue.length });
+    log.info('ui.payment_info.copy', {
+      copyTarget,
+      hasLink: Boolean(link),
+      valueLength: selectedValue.length,
+    });
     await EnhancedHaptics.copyHaptic();
     await Clipboard.setStringAsync(link || selectedValue);
     copyPopup(copyTarget);

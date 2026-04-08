@@ -20,9 +20,10 @@ export function useMintInfo(mintUrl: string | String | undefined | null): MintIn
   const cachedInfo = useMemo(() => {
     if (!normalizedUrl) return null;
     const match = mints.find((m) => m.mintUrl === normalizedUrl);
-    const hit = match?.mintInfo && Object.keys(match.mintInfo).length > 0
-      ? (match.mintInfo as MintInfo)
-      : null;
+    const hit =
+      match?.mintInfo && Object.keys(match.mintInfo).length > 0
+        ? (match.mintInfo as MintInfo)
+        : null;
     if (normalizedUrl) cashuLog.debug('mintInfo.cache', { mintUrl: normalizedUrl, hit: !!hit });
     return hit;
   }, [normalizedUrl, mints]);

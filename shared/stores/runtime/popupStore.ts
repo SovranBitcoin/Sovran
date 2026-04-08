@@ -54,7 +54,12 @@ export const usePopupStore = create<PopupStore>((set, get) => ({
   isOpen: false,
   destroyed: false,
   open: (payload) => {
-    storeLog.info('store.popup.open', isCustomSheetPayload(payload) ? { sheetId: payload.sheetId } : { message: (payload as StandardSheetPayload).message });
+    storeLog.info(
+      'store.popup.open',
+      isCustomSheetPayload(payload)
+        ? { sheetId: payload.sheetId }
+        : { message: (payload as StandardSheetPayload).message }
+    );
     set({ current: payload, isOpen: true, destroyed: false });
   },
   update: (partial) => {

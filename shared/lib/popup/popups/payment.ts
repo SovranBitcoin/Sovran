@@ -62,7 +62,8 @@ const PAYMENT_STATUS_CASES: Record<PaymentStatusVariant, PaymentStatusCase> = {
   'receive-ecash': {
     message: TOAST_COPY['receive-ecash'].message,
     submessagePending: TOAST_COPY['receive-ecash'].processing,
-    submessageConfirmed: (amount, unit) => fmt`${TOAST_COPY['receive-ecash'].confirmed} ${{ amount, unit }}`,
+    submessageConfirmed: (amount, unit) =>
+      fmt`${TOAST_COPY['receive-ecash'].confirmed} ${{ amount, unit }}`,
     submessageFailed: TOAST_COPY['receive-ecash'].failed,
     history: { type: 'receive', idField: 'id' },
     route: { pathname: '/receiveToken', paramKey: 'receiveHistoryEntry' },

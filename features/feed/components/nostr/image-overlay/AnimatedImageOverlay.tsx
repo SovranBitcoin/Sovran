@@ -1316,7 +1316,11 @@ export function AnimatedImageOverlay() {
   if (!ctx) return null;
   const content = <AnimatedImageOverlayContent ctx={ctx} />;
   if (Platform.OS === 'web') return content;
-  return <Log name="AnimatedImageOverlay"><FullWindowOverlay>{content}</FullWindowOverlay></Log>;
+  return (
+    <Log name="AnimatedImageOverlay">
+      <FullWindowOverlay>{content}</FullWindowOverlay>
+    </Log>
+  );
 }
 
 const overlayStyles = StyleSheet.create({

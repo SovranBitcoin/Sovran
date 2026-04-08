@@ -45,10 +45,15 @@ export function useMintContacts(
           const nostrContact = mintInfo.contact.find((c: any) => c.method === 'nostr');
           return nostrContact?.info?.startsWith('npub1');
         });
-        paymentLog.info('payment.mint.contacts.loaded', { totalMints: mints.length, withNostr: withNostr.length });
+        paymentLog.info('payment.mint.contacts.loaded', {
+          totalMints: mints.length,
+          withNostr: withNostr.length,
+        });
         setMintsWithInfo(withNostr);
       } catch (err) {
-        paymentLog.error('payment.mint.contacts.error', { error: err instanceof Error ? err : new Error(String(err)) });
+        paymentLog.error('payment.mint.contacts.error', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
       } finally {
         if (!cancelled) setMintInfoLoading(false);
       }
@@ -117,7 +122,9 @@ export function useMintContacts(
         paymentLog.debug('payment.mint.contacts.decrypt', { decryptedCount: results.length });
         if (!cancelled) setDecryptedMints(results);
       } catch (err) {
-        paymentLog.error('payment.mint.contacts.decrypt.error', { error: err instanceof Error ? err : new Error(String(err)) });
+        paymentLog.error('payment.mint.contacts.decrypt.error', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
         if (!cancelled) setDecryptedMints(mintsWithMetadata);
       }
     };

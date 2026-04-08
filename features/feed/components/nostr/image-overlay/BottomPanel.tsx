@@ -389,88 +389,88 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
 
   return (
     <Log name="ImageOverlayAbsoluteBar">
-    <View style={[styles.wrap, absoluteBarStyles.bar]}>
-      <Pressable
-        onPress={() => {
-          router.navigate({
-            pathname: '/(user-flow)/profile' as any,
-            params: { pubkey: event.pubkey },
-          });
-        }}
-        style={styles.authorRow}>
-        <Avatar picture={profile?.picture} seed={event.pubkey} size={28} name={displayName} />
-        <View style={styles.authorTextWrap}>
-          <Text bold size={13} style={{ color: PANEL_TEXT }} numberOfLines={1}>
-            {displayName}
-          </Text>
-          <Text size={12} style={{ color: PANEL_TEXT_MUTED }}>
-            {shortTime}
-          </Text>
-        </View>
-      </Pressable>
-      {fullContent.length > 0 ? (
-        <View style={absoluteBarStyles.contentRow}>
-          <Text
-            size={13}
-            style={[styles.contentText, { color: PANEL_TEXT_MUTED }]}
-            numberOfLines={1}>
-            {contentPreview}
-            {contentTruncated ? '…' : ''}
-          </Text>
-          {contentTruncated && (
+      <View style={[styles.wrap, absoluteBarStyles.bar]}>
+        <Pressable
+          onPress={() => {
+            router.navigate({
+              pathname: '/(user-flow)/profile' as any,
+              params: { pubkey: event.pubkey },
+            });
+          }}
+          style={styles.authorRow}>
+          <Avatar picture={profile?.picture} seed={event.pubkey} size={28} name={displayName} />
+          <View style={styles.authorTextWrap}>
+            <Text bold size={13} style={{ color: PANEL_TEXT }} numberOfLines={1}>
+              {displayName}
+            </Text>
+            <Text size={12} style={{ color: PANEL_TEXT_MUTED }}>
+              {shortTime}
+            </Text>
+          </View>
+        </Pressable>
+        {fullContent.length > 0 ? (
+          <View style={absoluteBarStyles.contentRow}>
             <Text
               size={13}
-              style={[styles.contentText, absoluteBarStyles.showMore]}
-              onPress={handleShowMorePress}>
-              show more
+              style={[styles.contentText, { color: PANEL_TEXT_MUTED }]}
+              numberOfLines={1}>
+              {contentPreview}
+              {contentTruncated ? '…' : ''}
             </Text>
-          )}
-        </View>
-      ) : null}
-      <View style={styles.metricsRow}>
-        <Pressable
-          onPress={handleCommentPress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.metricBtn}>
-          <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
-          <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
-            {formatCount(metrics.replyCount)}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={onRepostPress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.metricBtn}>
-          <Icon
-            name="garden:arrow-retweet-fill-16"
-            size={17}
-            color={reposted ? repostedColor : PANEL_TEXT_MUTED}
-          />
-          <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
-            {formatCount(metrics.repostCount)}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={onLikePress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.metricBtn}>
-          <Icon
-            name="iconamoon:heart-fill"
-            size={16}
-            color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
-          />
-          <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
-            {formatCount(metrics.likeCount)}
-          </Text>
-        </Pressable>
-        <View style={styles.metricBtn}>
-          <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
-          <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
-            {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
-          </Text>
+            {contentTruncated && (
+              <Text
+                size={13}
+                style={[styles.contentText, absoluteBarStyles.showMore]}
+                onPress={handleShowMorePress}>
+                show more
+              </Text>
+            )}
+          </View>
+        ) : null}
+        <View style={styles.metricsRow}>
+          <Pressable
+            onPress={handleCommentPress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.metricBtn}>
+            <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
+            <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+              {formatCount(metrics.replyCount)}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onRepostPress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.metricBtn}>
+            <Icon
+              name="garden:arrow-retweet-fill-16"
+              size={17}
+              color={reposted ? repostedColor : PANEL_TEXT_MUTED}
+            />
+            <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
+              {formatCount(metrics.repostCount)}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onLikePress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.metricBtn}>
+            <Icon
+              name="iconamoon:heart-fill"
+              size={16}
+              color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
+            />
+            <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
+              {formatCount(metrics.likeCount)}
+            </Text>
+          </Pressable>
+          <View style={styles.metricBtn}>
+            <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
+            <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
+              {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
+            </Text>
+          </View>
         </View>
       </View>
-    </View>
     </Log>
   );
 });

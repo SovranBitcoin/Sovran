@@ -52,7 +52,15 @@ interface ScanHistoryState {
 
 interface ScanHistoryActions {
   /** Add a scan to history */
-  addScan: (raw: string, processed: string, type: ScanType, source: ScanSource, inputType?: string, container?: string, optionKinds?: string[]) => void;
+  addScan: (
+    raw: string,
+    processed: string,
+    type: ScanType,
+    source: ScanSource,
+    inputType?: string,
+    container?: string,
+    optionKinds?: string[]
+  ) => void;
   /** Get all scan history entries */
   getEntries: () => ScanHistoryEntry[];
   /** Get entries filtered by type */
@@ -92,7 +100,15 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       entries: [],
 
       // Add a scan to history
-      addScan: (raw: string, processed: string, type: ScanType, source: ScanSource, inputType?: string, container?: string, optionKinds?: string[]) => {
+      addScan: (
+        raw: string,
+        processed: string,
+        type: ScanType,
+        source: ScanSource,
+        inputType?: string,
+        container?: string,
+        optionKinds?: string[]
+      ) => {
         storeLog.info('store.scan_history.add', { type, source, inputType, container });
         const { entries } = get();
         const now = Date.now();

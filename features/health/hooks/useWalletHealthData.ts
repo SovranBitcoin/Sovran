@@ -25,10 +25,7 @@ export function useWalletHealthData(unit: string) {
 
   // Only subscribe to this unit's distribution, not all distributions
   const desiredDistributionBp = useMintDistributionStore(
-    useCallback(
-      (s) => s.distributions[normalizedUnit] || EMPTY_DISTRIBUTION,
-      [normalizedUnit]
-    )
+    useCallback((s) => s.distributions[normalizedUnit] || EMPTY_DISTRIBUTION, [normalizedUnit])
   );
 
   // Stabilise balance reference from coco-react

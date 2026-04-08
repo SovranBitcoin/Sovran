@@ -42,32 +42,32 @@ const OnboardingPagination: React.FC<OnboardingPaginationProps> = ({
 
   return (
     <Log name="OnboardingPagination">
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingBottom: 16,
-        paddingHorizontal: HORIZONTAL_PADDING / 2,
-        gap: GAP,
-      }}>
-      {slides.map((slide, index) => (
-        <OnboardingPaginationItem
-          key={index}
-          index={index}
-          currentSlideIndex={currentSlideIndex}
-          animatedSlideIndex={animatedSlideIndex}
-          inactiveWidth={inactiveWidth}
-          activeWidth={activeWidth}
-          totalSlides={slides.length}
-          isDragging={isDragging}
-          slideDuration={slide.duration}
-          handleScrollToIndex={handleScrollToIndex}
-          translateY={translateY}
-          topCarouselOffset={topCarouselOffset}
-        />
-      ))}
-    </View>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingBottom: 16,
+          paddingHorizontal: HORIZONTAL_PADDING / 2,
+          gap: GAP,
+        }}>
+        {slides.map((slide, index) => (
+          <OnboardingPaginationItem
+            key={index}
+            index={index}
+            currentSlideIndex={currentSlideIndex}
+            animatedSlideIndex={animatedSlideIndex}
+            inactiveWidth={inactiveWidth}
+            activeWidth={activeWidth}
+            totalSlides={slides.length}
+            isDragging={isDragging}
+            slideDuration={slide.duration}
+            handleScrollToIndex={handleScrollToIndex}
+            translateY={translateY}
+            topCarouselOffset={topCarouselOffset}
+          />
+        ))}
+      </View>
     </Log>
   );
 };

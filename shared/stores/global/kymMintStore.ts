@@ -42,7 +42,11 @@ export const useKYMMintStore = create<KYMMintStore>()(
 
       setCached: (mintUrl: string, score: number, recommendations: MintRecommendation[]) => {
         const normalized = normalizeMintUrlKey(mintUrl);
-        storeLog.debug('store.kym_mint.set_cached', { mintUrl: normalized, score, recommendationCount: recommendations.length });
+        storeLog.debug('store.kym_mint.set_cached', {
+          mintUrl: normalized,
+          score,
+          recommendationCount: recommendations.length,
+        });
         set((state) => ({
           cache: {
             ...state.cache,

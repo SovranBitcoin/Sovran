@@ -28,7 +28,12 @@ interface Logger {
 /** Extract the first plain object from variadic meta args. */
 function flattenMeta(meta: unknown[]): Record<string, unknown> | undefined {
   if (meta.length === 0) return undefined;
-  if (meta.length === 1 && typeof meta[0] === 'object' && meta[0] !== null && !Array.isArray(meta[0])) {
+  if (
+    meta.length === 1 &&
+    typeof meta[0] === 'object' &&
+    meta[0] !== null &&
+    !Array.isArray(meta[0])
+  ) {
     return meta[0] as Record<string, unknown>;
   }
   return { args: meta };
@@ -66,10 +71,18 @@ export class CocoLogger implements Logger {
     cashuLog[level](event, params);
   }
 
-  error(message: string, ...meta: unknown[]): void { this._emit('error', message, meta); }
-  warn(message: string, ...meta: unknown[]): void { this._emit('warn', message, meta); }
-  info(message: string, ...meta: unknown[]): void { this._emit('info', message, meta); }
-  debug(message: string, ...meta: unknown[]): void { this._emit('debug', message, meta); }
+  error(message: string, ...meta: unknown[]): void {
+    this._emit('error', message, meta);
+  }
+  warn(message: string, ...meta: unknown[]): void {
+    this._emit('warn', message, meta);
+  }
+  info(message: string, ...meta: unknown[]): void {
+    this._emit('info', message, meta);
+  }
+  debug(message: string, ...meta: unknown[]): void {
+    this._emit('debug', message, meta);
+  }
 
   log(level: LogLevel, message: string, ...meta: unknown[]): void {
     this._emit(level, message, meta);

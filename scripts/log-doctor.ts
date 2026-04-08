@@ -153,7 +153,14 @@ function parseLogInput(raw: string): LogEntry[] {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('===') || trimmed.startsWith('Entries:') || trimmed.startsWith('Time range:') || trimmed.startsWith('Device:')) continue;
+    if (
+      !trimmed ||
+      trimmed.startsWith('===') ||
+      trimmed.startsWith('Entries:') ||
+      trimmed.startsWith('Time range:') ||
+      trimmed.startsWith('Device:')
+    )
+      continue;
     try {
       const parsed = JSON.parse(trimmed);
       if (parsed.event && parsed.level) entries.push(parsed);
@@ -170,7 +177,9 @@ function parseLogInput(raw: string): LogEntry[] {
         try {
           const parsed = JSON.parse(block);
           if (parsed.event && parsed.level) entries.push(parsed);
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
     }
   }
@@ -202,7 +211,9 @@ function extractLatestSession(entries: LogEntry[]): LogEntry[] {
   if (lastBoundary > 0) {
     const dropped = lastBoundary;
     const total = entries.length;
-    console.error(`[--latest] Skipped ${dropped} entries from older sessions (keeping ${session.length} of ${total})`);
+    console.error(
+      `[--latest] Skipped ${dropped} entries from older sessions (keeping ${session.length} of ${total})`
+    );
   }
   return session;
 }
@@ -227,10 +238,17 @@ function paginate<T>(items: T[], opts: Options): { page: T[]; footer: string } {
 // High-volume events from React debug hooks. Stats groups these into categories;
 // timeline/slow/errors can exclude them via --no-inst.
 const INSTRUMENTATION_EVENTS = new Set([
-  'render.count', 'render.why', 'component.mount', 'component.unmount',
-  'state.change', 'query.result', 'query.diff',
-  'ui.screen', 'ui.screen.diff',
-  'lifecycle.mount', 'lifecycle.unmount',
+  'render.count',
+  'render.why',
+  'component.mount',
+  'component.unmount',
+  'state.change',
+  'query.result',
+  'query.diff',
+  'ui.screen',
+  'ui.screen.diff',
+  'lifecycle.mount',
+  'lifecycle.unmount',
 ]);
 
 // ─── Filter entries ──────────────────────────────────────────────────────────
@@ -276,12 +294,18 @@ function shortParams(params: Record<string, unknown> | undefined, maxKeys = 6): 
 
 function levelIcon(level: string): string {
   switch (level) {
-    case 'fatal': return 'FATAL';
-    case 'error': return 'ERROR';
-    case 'warn': return 'WARN ';
-    case 'info': return 'INFO ';
-    case 'debug': return 'DEBUG';
-    default: return '     ';
+    case 'fatal':
+      return 'FATAL';
+    case 'error':
+      return 'ERROR';
+    case 'warn':
+      return 'WARN ';
+    case 'info':
+      return 'INFO ';
+    case 'debug':
+      return 'DEBUG';
+    default:
+      return '     ';
   }
 }
 
@@ -298,7 +322,8 @@ function formatDelta(deltaMs: number): string {
 function modeStats(entries: LogEntry[], opts: Options): string {
   const eventCounts: Map<string, number> = new Map();
   const levelCounts: Map<string, number> = new Map();
-  let minT = Infinity, maxT = -Infinity;
+  let minT = Infinity,
+    maxT = -Infinity;
   const gaps: number[] = [];
 
   for (let i = 0; i < entries.length; i++) {
@@ -325,7 +350,9 @@ function modeStats(entries: LogEntry[], opts: Options): string {
   lines.push('');
   if (device?.device && !opts.noDevice) lines.push(`Device: ${JSON.stringify(device.device)}`);
   lines.push(`Entries: ${entries.length}`);
-  lines.push(`Time span: ${((maxT - minT) / 1000).toFixed(1)}s (${minT.toFixed(0)}ms -> ${maxT.toFixed(0)}ms)`);
+  lines.push(
+    `Time span: ${((maxT - minT) / 1000).toFixed(1)}s (${minT.toFixed(0)}ms -> ${maxT.toFixed(0)}ms)`
+  );
   lines.push('');
 
   lines.push('BY LEVEL:');
@@ -344,10 +371,12 @@ function modeStats(entries: LogEntry[], opts: Options): string {
       instrumentationTotal += count;
       // Group into categories
       let category: string;
-      if (event.startsWith('render.') || event.startsWith('component.')) category = 'render tracking';
+      if (event.startsWith('render.') || event.startsWith('component.'))
+        category = 'render tracking';
       else if (event.startsWith('state.')) category = 'state tracking';
       else if (event.startsWith('query.')) category = 'data hook tracking';
-      else if (event.startsWith('ui.screen') || event.startsWith('lifecycle.')) category = 'screen tracking';
+      else if (event.startsWith('ui.screen') || event.startsWith('lifecycle.'))
+        category = 'screen tracking';
       else category = event;
       instrumentationBreakdown.set(category, (instrumentationBreakdown.get(category) ?? 0) + count);
     } else {
@@ -357,8 +386,12 @@ function modeStats(entries: LogEntry[], opts: Options): string {
 
   if (instrumentationTotal > 0) {
     const pct = ((instrumentationTotal / entries.length) * 100).toFixed(0);
-    lines.push(`INSTRUMENTATION: ${instrumentationTotal} entries (${pct}% of total) — use "renders" or "screens" mode for details`);
-    for (const [cat, count] of [...instrumentationBreakdown.entries()].sort((a, b) => b[1] - a[1])) {
+    lines.push(
+      `INSTRUMENTATION: ${instrumentationTotal} entries (${pct}% of total) — use "renders" or "screens" mode for details`
+    );
+    for (const [cat, count] of [...instrumentationBreakdown.entries()].sort(
+      (a, b) => b[1] - a[1]
+    )) {
       lines.push(`  ${String(count).padStart(5)}x  ${cat}`);
     }
     lines.push('');
@@ -374,7 +407,12 @@ function modeStats(entries: LogEntry[], opts: Options): string {
   if (gaps.length > 0) {
     lines.push('TIMING:');
     lines.push(`  Largest gap: ${Math.round(gaps[0])}ms`);
-    lines.push(`  Top 5 gaps: ${gaps.slice(0, 5).map((g) => Math.round(g) + 'ms').join(', ')}`);
+    lines.push(
+      `  Top 5 gaps: ${gaps
+        .slice(0, 5)
+        .map((g) => Math.round(g) + 'ms')
+        .join(', ')}`
+    );
     lines.push(`  Median gap: ${Math.round(gaps[Math.floor(gaps.length / 2)])}ms`);
     lines.push('');
   }
@@ -419,12 +457,20 @@ function modeStats(entries: LogEntry[], opts: Options): string {
   }
 
   // Report entries that were collapsed by the logger's dedup mechanism
-  const dedupedEntries = entries.filter((e) => e.params && typeof (e.params as any)._dedup === 'number' && (e.params as any)._dedup > 1);
+  const dedupedEntries = entries.filter(
+    (e) => e.params && typeof (e.params as any)._dedup === 'number' && (e.params as any)._dedup > 1
+  );
   if (dedupedEntries.length > 0) {
-    const totalSuppressed = dedupedEntries.reduce((s, e) => s + ((e.params as any)._dedup as number) - 1, 0);
-    lines.push(`DEDUPED BY LOGGER: ${totalSuppressed} entries collapsed into ${dedupedEntries.length} (${totalSuppressed} suppressed)`);
+    const totalSuppressed = dedupedEntries.reduce(
+      (s, e) => s + ((e.params as any)._dedup as number) - 1,
+      0
+    );
+    lines.push(
+      `DEDUPED BY LOGGER: ${totalSuppressed} entries collapsed into ${dedupedEntries.length} (${totalSuppressed} suppressed)`
+    );
     const byEvent = new Map<string, number>();
-    for (const e of dedupedEntries) byEvent.set(e.event, (byEvent.get(e.event) ?? 0) + ((e.params as any)._dedup as number) - 1);
+    for (const e of dedupedEntries)
+      byEvent.set(e.event, (byEvent.get(e.event) ?? 0) + ((e.params as any)._dedup as number) - 1);
     for (const [event, count] of [...byEvent.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)) {
       lines.push(`  ${String(count).padStart(5)}x  ${event}`);
     }
@@ -435,11 +481,20 @@ function modeStats(entries: LogEntry[], opts: Options): string {
   // and the varying parts are the param values.
   lines.push('');
   lines.push('EVENT TEMPLATES (param variability):');
-  const templateGroups = new Map<string, { count: number; paramKeys: Set<string>; varyingKeys: Set<string>; tFirst: number; tLast: number }>();
+  const templateGroups = new Map<
+    string,
+    {
+      count: number;
+      paramKeys: Set<string>;
+      varyingKeys: Set<string>;
+      tFirst: number;
+      tLast: number;
+    }
+  >();
   for (const e of entries) {
     const existing = templateGroups.get(e.event);
     const t = e._t ?? 0;
-    const keys = e.params ? Object.keys(e.params).filter(k => k !== '_dedup') : [];
+    const keys = e.params ? Object.keys(e.params).filter((k) => k !== '_dedup') : [];
     if (!existing) {
       templateGroups.set(e.event, {
         count: 1,
@@ -467,7 +522,9 @@ function modeStats(entries: LogEntry[], opts: Options): string {
       const span = g.tLast - g.tFirst;
       const spanStr = span < 1000 ? `${Math.round(span)}ms` : `${(span / 1000).toFixed(1)}s`;
       const keys = [...g.paramKeys].join(', ');
-      lines.push(`  ${String(g.count).padStart(5)}x  ${event} (${spanStr}) [${keys || 'no params'}]`);
+      lines.push(
+        `  ${String(g.count).padStart(5)}x  ${event} (${spanStr}) [${keys || 'no params'}]`
+      );
     }
     if (highFreqTemplates.length > 15) lines.push(`  ... +${highFreqTemplates.length - 15} more`);
   } else {
@@ -484,9 +541,8 @@ function modeTimeline(entries: LogEntry[], opts: Options): string {
   const lines: string[] = [];
 
   // For delta computation, get the entry just before the page
-  let prevT: number | null = opts.offset > 0 && entries[opts.offset - 1]
-    ? (entries[opts.offset - 1]._t ?? null)
-    : null;
+  let prevT: number | null =
+    opts.offset > 0 && entries[opts.offset - 1] ? (entries[opts.offset - 1]._t ?? null) : null;
 
   lines.push('DELTA      LVL    EVENT                              PARAMS');
   lines.push('-'.repeat(100));
@@ -528,7 +584,11 @@ function modeErrors(entries: LogEntry[], opts: Options): string {
 
   const included = new Set<number>();
   for (const idx of errorIndices) {
-    for (let i = Math.max(0, idx - opts.context); i <= Math.min(entries.length - 1, idx + opts.context); i++) {
+    for (
+      let i = Math.max(0, idx - opts.context);
+      i <= Math.min(entries.length - 1, idx + opts.context);
+      i++
+    ) {
       included.add(i);
     }
   }
@@ -568,7 +628,8 @@ function modeErrors(entries: LogEntry[], opts: Options): string {
 // ─── Mode: slow ──────────────────────────────────────────────────────────────
 
 function modeSlow(entries: LogEntry[], opts: Options): string {
-  const gaps: Array<{ from: LogEntry; to: LogEntry; gap: number; fromIdx: number; toIdx: number }> = [];
+  const gaps: Array<{ from: LogEntry; to: LogEntry; gap: number; fromIdx: number; toIdx: number }> =
+    [];
 
   for (let i = 1; i < entries.length; i++) {
     const prevT = entries[i - 1]._t ?? 0;
@@ -600,9 +661,12 @@ function modeSlow(entries: LogEntry[], opts: Options): string {
 // ─── Mode: renders ───────────────────────────────────────────────────────────
 
 function modeRenders(entries: LogEntry[], _opts: Options): string {
-  const renderEvents = entries.filter((e) =>
-    INSTRUMENTATION_EVENTS.has(e.event) || e.event.includes('render') || e.event.includes('.mount') ||
-    e.event.includes('scroll.offset.init')
+  const renderEvents = entries.filter(
+    (e) =>
+      INSTRUMENTATION_EVENTS.has(e.event) ||
+      e.event.includes('render') ||
+      e.event.includes('.mount') ||
+      e.event.includes('scroll.offset.init')
   );
 
   if (renderEvents.length === 0) return 'No render-related entries found.';
@@ -635,18 +699,25 @@ function modeRenders(entries: LogEntry[], _opts: Options): string {
   if (componentRenders.size > 0) {
     lines.push('COMPONENT RENDER COUNTS:');
     lines.push('');
-    const sorted = [...componentRenders.entries()].sort((a, b) => b[1].maxRenders - a[1].maxRenders);
+    const sorted = [...componentRenders.entries()].sort(
+      (a, b) => b[1].maxRenders - a[1].maxRenders
+    );
     for (const [name, stats] of sorted) {
       const flag = stats.warned ? 'EXCESSIVE' : stats.maxRenders > 10 ? 'HIGH' : 'ok';
       const rps = stats.maxRendersPerSec > 0 ? ` ${stats.maxRendersPerSec.toFixed(1)}/s` : '';
-      lines.push(`  [${flag.padEnd(9)}] ${name}: ${stats.maxRenders} renders${rps} (alive ${formatDelta(stats.aliveMs).trim()})`);
+      lines.push(
+        `  [${flag.padEnd(9)}] ${name}: ${stats.maxRenders} renders${rps} (alive ${formatDelta(stats.aliveMs).trim()})`
+      );
     }
     lines.push('');
   }
 
   // ── Section 2: Why-did-update summary (from render.why) ──
   // Aggregate by component → prop → hint, showing only unique causes
-  interface PropChangeInfo { hint: string; count: number }
+  interface PropChangeInfo {
+    hint: string;
+    count: number;
+  }
   const whyUpdates = new Map<string, Map<string, PropChangeInfo>>();
   for (const e of renderEvents) {
     if (e.event !== 'render.why') continue;
@@ -728,8 +799,10 @@ function modeRenders(entries: LogEntry[], _opts: Options): string {
   }
 
   // ── Section 5: Legacy event-based render counts (fallback for manual .render logs) ──
-  const legacyEvents = renderEvents.filter((e) =>
-    !INSTRUMENTATION_EVENTS.has(e.event) && (e.event.includes('render') || e.event.includes('scroll.offset.init'))
+  const legacyEvents = renderEvents.filter(
+    (e) =>
+      !INSTRUMENTATION_EVENTS.has(e.event) &&
+      (e.event.includes('render') || e.event.includes('scroll.offset.init'))
   );
   if (legacyEvents.length > 0) {
     const eventCounts = new Map<string, { count: number; timestamps: number[] }>();
@@ -741,11 +814,14 @@ function modeRenders(entries: LogEntry[], _opts: Options): string {
     }
     lines.push('MANUAL RENDER LOGS:');
     lines.push('');
-    for (const [event, data] of [...eventCounts.entries()].sort((a, b) => b[1].count - a[1].count)) {
+    for (const [event, data] of [...eventCounts.entries()].sort(
+      (a, b) => b[1].count - a[1].count
+    )) {
       const flag = data.count > 10 ? 'EXCESSIVE' : data.count > 5 ? 'HIGH' : 'ok';
-      const span = data.timestamps.length > 1
-        ? ` (${Math.round(data.timestamps[data.timestamps.length - 1] - data.timestamps[0])}ms span)`
-        : '';
+      const span =
+        data.timestamps.length > 1
+          ? ` (${Math.round(data.timestamps[data.timestamps.length - 1] - data.timestamps[0])}ms span)`
+          : '';
       lines.push(`  [${flag.padEnd(9)}] ${event}: ${data.count}x${span}`);
     }
     lines.push('');
@@ -758,12 +834,16 @@ function modeRenders(entries: LogEntry[], _opts: Options): string {
 
 function modeScreens(entries: LogEntry[], opts: Options): string {
   // Collect screen lifecycle events: ui.screen, ui.screen.diff, lifecycle.mount/unmount
-  const screenEvents = entries.filter((e) =>
-    e.event === 'ui.screen' || e.event === 'ui.screen.diff' ||
-    e.event === 'lifecycle.mount' || e.event === 'lifecycle.unmount'
+  const screenEvents = entries.filter(
+    (e) =>
+      e.event === 'ui.screen' ||
+      e.event === 'ui.screen.diff' ||
+      e.event === 'lifecycle.mount' ||
+      e.event === 'lifecycle.unmount'
   );
 
-  if (screenEvents.length === 0) return 'No screen events found. Ensure <Screen> and useLifecycleLogger kill switches are removed.';
+  if (screenEvents.length === 0)
+    return 'No screen events found. Ensure <Screen> and useLifecycleLogger kill switches are removed.';
 
   const lines: string[] = [];
 
@@ -798,9 +878,13 @@ function modeScreens(entries: LogEntry[], opts: Options): string {
       const delta = prevT !== null ? m.t - prevT : 0;
       prevT = m.t;
       const icon = m.action === 'mount' ? '→' : '←';
-      const dur = m.action === 'unmount'
-        ? (() => { const d = durations.find((d) => d.component === m.component); return d ? ` (visible ${formatDelta(d.duration).trim()})` : ''; })()
-        : '';
+      const dur =
+        m.action === 'unmount'
+          ? (() => {
+              const d = durations.find((d) => d.component === m.component);
+              return d ? ` (visible ${formatDelta(d.duration).trim()})` : '';
+            })()
+          : '';
       lines.push(`${formatDelta(delta)} ${icon} ${m.component}${dur}`);
     }
     lines.push(mountFooter);
@@ -808,7 +892,9 @@ function modeScreens(entries: LogEntry[], opts: Options): string {
   }
 
   // ── Section 2: Screen content snapshots ──
-  const contentEvents = screenEvents.filter((e) => e.event === 'ui.screen' || e.event === 'ui.screen.diff');
+  const contentEvents = screenEvents.filter(
+    (e) => e.event === 'ui.screen' || e.event === 'ui.screen.diff'
+  );
   if (contentEvents.length > 0) {
     lines.push('SCREEN CONTENT:');
     lines.push('');
@@ -916,8 +1002,16 @@ function modeStartup(entries: LogEntry[], _opts: Options): string {
   for (const stage of sorted) {
     const duration = (stage.endMs ?? stage.startMs) - stage.startMs;
     const start = Math.round(stage.startMs);
-    const durStr = duration < 1 ? '<1ms' : duration < 1000 ? `${Math.round(duration)}ms` : `${(duration / 1000).toFixed(1)}s`;
-    const bar = duration > 0 ? '█'.repeat(Math.max(1, Math.round((duration / (maxEnd - minStart)) * 40))) : '·';
+    const durStr =
+      duration < 1
+        ? '<1ms'
+        : duration < 1000
+          ? `${Math.round(duration)}ms`
+          : `${(duration / 1000).toFixed(1)}s`;
+    const bar =
+      duration > 0
+        ? '█'.repeat(Math.max(1, Math.round((duration / (maxEnd - minStart)) * 40)))
+        : '·';
     lines.push(`  ${String(start).padStart(7)}ms  ${bar} ${stage.id} (${durStr})`);
   }
   lines.push('');
@@ -947,12 +1041,16 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
   // Coco events come from CocoLogger: event starts with "coco."
   const cocoEntries = entries.filter((e) => e.event.startsWith('coco.'));
 
-  if (cocoEntries.length === 0) return 'No coco events found. Ensure CocoLogger is wired into Manager (replaces ConsoleLogger).';
+  if (cocoEntries.length === 0)
+    return 'No coco events found. Ensure CocoLogger is wired into Manager (replaces ConsoleLogger).';
 
   const lines: string[] = [];
 
   // ── Section 1: Module breakdown ──
-  const moduleCounts = new Map<string, { debug: number; info: number; warn: number; error: number }>();
+  const moduleCounts = new Map<
+    string,
+    { debug: number; info: number; warn: number; error: number }
+  >();
   for (const e of cocoEntries) {
     // event format: coco.<module>.<event_key>
     const parts = e.event.split('.');
@@ -985,7 +1083,10 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
     lines.push(`COCO ISSUES (${issues.length} warnings/errors):`);
     lines.push('');
     // Deduplicate by message
-    const byMsg = new Map<string, { count: number; level: string; event: string; params: Record<string, unknown> | undefined }>();
+    const byMsg = new Map<
+      string,
+      { count: number; level: string; event: string; params: Record<string, unknown> | undefined }
+    >();
     for (const e of issues) {
       const msg = (e.params?.msg as string) ?? e.event;
       const existing = byMsg.get(msg);
@@ -1019,7 +1120,9 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
     }
     lines.push('MINT REQUESTS:');
     lines.push('');
-    for (const [endpoint, count] of [...byEndpoint.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15)) {
+    for (const [endpoint, count] of [...byEndpoint.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)) {
       lines.push(`  ${String(count).padStart(4)}x  ${endpoint}`);
     }
     lines.push('');
@@ -1038,7 +1141,9 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
       prevT = t;
       const msg = (e.params?.msg as string) ?? '';
       const shortMsg = msg.length > 60 ? msg.slice(0, 57) + '...' : msg;
-      lines.push(`${formatDelta(delta)} ${levelIcon(e.level)} ${e.event.padEnd(40).slice(0, 40)} ${shortMsg}`);
+      lines.push(
+        `${formatDelta(delta)} ${levelIcon(e.level)} ${e.event.padEnd(40).slice(0, 40)} ${shortMsg}`
+      );
     }
     lines.push(footer);
   }
@@ -1049,9 +1154,12 @@ function modeCoco(entries: LogEntry[], opts: Options): string {
 // ─── Mode: network ───────────────────────────────────────────────────────────
 
 function modeNetwork(entries: LogEntry[], opts: Options): string {
-  const netEntries = entries.filter((e) =>
-    e.event.startsWith('net.') || e.event.startsWith('api.') ||
-    e.event.includes('fetch') || e.event.includes('.ws.')
+  const netEntries = entries.filter(
+    (e) =>
+      e.event.startsWith('net.') ||
+      e.event.startsWith('api.') ||
+      e.event.includes('fetch') ||
+      e.event.includes('.ws.')
   );
 
   if (netEntries.length === 0) return 'No network entries found.';
@@ -1077,7 +1185,12 @@ function modeFull(entries: LogEntry[], opts: Options): string {
 
   for (const e of entries) {
     const prev = deduped[deduped.length - 1];
-    if (prev && prev.event === e.event && JSON.stringify(prev.params) === JSON.stringify(e.params) && prev.level === e.level) {
+    if (
+      prev &&
+      prev.event === e.event &&
+      JSON.stringify(prev.params) === JSON.stringify(e.params) &&
+      prev.level === e.level
+    ) {
       prev._count = (prev._count ?? 1) + 1;
     } else {
       deduped.push({ ...e, _count: 1 });
@@ -1089,7 +1202,9 @@ function modeFull(entries: LogEntry[], opts: Options): string {
 
   const lines: string[] = [];
   if (saved > 0) {
-    lines.push(`// Deduplicated: ${entries.length} entries -> ${deduped.length} (${saved} duplicates removed)`);
+    lines.push(
+      `// Deduplicated: ${entries.length} entries -> ${deduped.length} (${saved} duplicates removed)`
+    );
   }
 
   // ── Pipe-delimited markdown format (~40% fewer tokens than JSON) ──
@@ -1100,12 +1215,19 @@ function modeFull(entries: LogEntry[], opts: Options): string {
       const t = e._t ?? 0;
       const delta = prevT !== null ? Math.round(t - prevT) : 0;
       prevT = t;
-      const lvl = e.level === 'debug' ? 'DBG' : e.level === 'info' ? 'INF' : e.level.slice(0, 3).toUpperCase();
+      const lvl =
+        e.level === 'debug'
+          ? 'DBG'
+          : e.level === 'info'
+            ? 'INF'
+            : e.level.slice(0, 3).toUpperCase();
       const deltaStr = delta > 0 ? `+${delta}` : '';
       const params = shortParams(e.params);
       const rep = (e._count ?? 1) > 1 ? ` x${e._count}` : '';
       const err = e.error ? `${e.error.name}:${e.error.message}` : '';
-      lines.push(`${Math.round(t)}|${deltaStr}|${lvl}|${e.event}|${shortSrc(e.src)}|${params}${rep}|${err}`);
+      lines.push(
+        `${Math.round(t)}|${deltaStr}|${lvl}|${e.event}|${shortSrc(e.src)}|${params}${rep}|${err}`
+      );
     }
     lines.push(footer);
     return lines.join('\n');
@@ -1210,7 +1332,7 @@ function modeDiff(allEntries: LogEntry[], _opts: Options): string {
   for (const [t, currCount] of currTemplates) {
     const prevCount = prevTemplates.get(t) ?? 0;
     if (prevCount > 0 && currCount > prevCount * 2 && currCount - prevCount >= 3) {
-      const sample = currSession.find(e => templateOf(e) === t)!;
+      const sample = currSession.find((e) => templateOf(e) === t)!;
       countDiffs.push({ event: sample.event, prev: prevCount, curr: currCount });
     }
   }
@@ -1255,7 +1377,7 @@ function modeDiff(allEntries: LogEntry[], _opts: Options): string {
   if (countDiffs.length > 0) {
     lines.push('SIGNIFICANTLY MORE FREQUENT IN CURRENT SESSION:');
     lines.push('');
-    countDiffs.sort((a, b) => (b.curr - b.prev) - (a.curr - a.prev));
+    countDiffs.sort((a, b) => b.curr - b.prev - (a.curr - a.prev));
     for (const d of countDiffs.slice(0, 15)) {
       lines.push(`  ${d.event}: ${d.prev}x -> ${d.curr}x (+${d.curr - d.prev})`);
     }
@@ -1314,8 +1436,8 @@ function modeFlows(entries: LogEntry[], opts: Options): string {
     const duration = Math.round(((last._t ?? 0) - (first._t ?? 0)) * 100) / 100;
 
     // Determine outcome
-    const hasError = events.some(e => e.level === 'error' || e.level === 'fatal');
-    const hasEnd = events.some(e => e.event === 'flow.end');
+    const hasError = events.some((e) => e.level === 'error' || e.level === 'fatal');
+    const hasEnd = events.some((e) => e.event === 'flow.end');
     const outcome = hasError ? 'ERROR' : hasEnd ? 'COMPLETED' : 'IN-PROGRESS';
 
     lines.push(`  ${flowId} (${duration}ms, ${outcome})`);
@@ -1325,7 +1447,9 @@ function modeFlows(entries: LogEntry[], opts: Options): string {
       const rel = Math.round(((e._t ?? 0) - startT) * 100) / 100;
       const params = shortParams(e.params);
       const err = e.error ? ` ERR:${e.error.name}:${e.error.message}` : '';
-      lines.push(`    +${rel}ms  ${levelIcon(e.level)} ${e.event.padEnd(35).slice(0, 35)} ${params}${err}`);
+      lines.push(
+        `    +${rel}ms  ${levelIcon(e.level)} ${e.event.padEnd(35).slice(0, 35)} ${params}${err}`
+      );
     }
     lines.push('');
   }
@@ -1342,13 +1466,14 @@ function extractHost(url: string): string {
 }
 
 function modeWS(entries: LogEntry[], _opts: Options): string {
-  const wsEntries = entries.filter(e =>
-    e.event.startsWith('ws.') ||
-    e.event.includes('.ws.') ||
-    e.event.includes('ws_error') ||
-    e.event.includes('subscribe') ||
-    e.event.includes('ws_message') ||
-    e.event.includes('socket')
+  const wsEntries = entries.filter(
+    (e) =>
+      e.event.startsWith('ws.') ||
+      e.event.includes('.ws.') ||
+      e.event.includes('ws_error') ||
+      e.event.includes('subscribe') ||
+      e.event.includes('ws_message') ||
+      e.event.includes('socket')
   );
 
   if (wsEntries.length === 0) return 'No WebSocket entries found.';
@@ -1356,18 +1481,32 @@ function modeWS(entries: LogEntry[], _opts: Options): string {
   const lines: string[] = [];
 
   // ── Connection lifecycle ──
-  const connections = new Map<string, { opens: number; closes: number; errors: number; reconnects: number; lastCode?: number; lastReason?: string }>();
+  const connections = new Map<
+    string,
+    {
+      opens: number;
+      closes: number;
+      errors: number;
+      reconnects: number;
+      lastCode?: number;
+      lastReason?: string;
+    }
+  >();
   for (const e of wsEntries) {
     // Match both our ws.* events and coco's ws_error/ws_* events
     const isWsLifecycle = e.event.startsWith('ws.') || e.event.includes('ws_error');
     if (!isWsLifecycle) continue;
     const url = (e.params?.url as string) ?? (e.params?.mintUrl as string) ?? 'unknown';
     const host = extractHost(url);
-    if (!connections.has(host)) connections.set(host, { opens: 0, closes: 0, errors: 0, reconnects: 0 });
+    if (!connections.has(host))
+      connections.set(host, { opens: 0, closes: 0, errors: 0, reconnects: 0 });
     const conn = connections.get(host)!;
     if (e.event === 'ws.open') conn.opens++;
-    else if (e.event === 'ws.close') { conn.closes++; conn.lastCode = e.params?.code as number; conn.lastReason = e.params?.reason as string; }
-    else if (e.event === 'ws.error' || e.event.includes('ws_error')) conn.errors++;
+    else if (e.event === 'ws.close') {
+      conn.closes++;
+      conn.lastCode = e.params?.code as number;
+      conn.lastReason = e.params?.reason as string;
+    } else if (e.event === 'ws.error' || e.event.includes('ws_error')) conn.errors++;
     else if (e.event === 'ws.reconnect') conn.reconnects++;
   }
 
@@ -1377,23 +1516,31 @@ function modeWS(entries: LogEntry[], _opts: Options): string {
     for (const [host, c] of [...connections.entries()].sort((a, b) => b[1].errors - a[1].errors)) {
       const status = c.opens > c.closes ? 'OPEN' : 'CLOSED';
       lines.push(`  ${host}  [${status}]`);
-      lines.push(`    opens=${c.opens} closes=${c.closes} errors=${c.errors} reconnects=${c.reconnects}`);
-      if (c.lastCode) lines.push(`    last close: code=${c.lastCode} reason="${c.lastReason ?? ''}"`);
+      lines.push(
+        `    opens=${c.opens} closes=${c.closes} errors=${c.errors} reconnects=${c.reconnects}`
+      );
+      if (c.lastCode)
+        lines.push(`    last close: code=${c.lastCode} reason="${c.lastReason ?? ''}"`);
     }
     lines.push('');
   }
 
   // ── Subscription health ──
-  const subRequests = wsEntries.filter(e => e.event.includes('subscribe') && !e.event.includes('unsubscribe'));
-  const subAccepted = wsEntries.filter(e => e.event.includes('subscribe_request_accepted') || e.event.includes('subscribed_to'));
-  const unmatched = wsEntries.filter(e => e.event.includes('unmatched'));
-  const queued = wsEntries.filter(e => e.event.includes('queued_message'));
+  const subRequests = wsEntries.filter(
+    (e) => e.event.includes('subscribe') && !e.event.includes('unsubscribe')
+  );
+  const subAccepted = wsEntries.filter(
+    (e) => e.event.includes('subscribe_request_accepted') || e.event.includes('subscribed_to')
+  );
+  const unmatched = wsEntries.filter((e) => e.event.includes('unmatched'));
+  const queued = wsEntries.filter((e) => e.event.includes('queued_message'));
 
   lines.push('SUBSCRIPTION HEALTH:');
   lines.push(`  Requests:  ${subRequests.length}`);
   lines.push(`  Accepted:  ${subAccepted.length}`);
   if (unmatched.length > 0) lines.push(`  Unmatched: ${unmatched.length}  <- investigate`);
-  if (queued.length > 0) lines.push(`  Queued:    ${queued.length} (socket not open at time of send)`);
+  if (queued.length > 0)
+    lines.push(`  Queued:    ${queued.length} (socket not open at time of send)`);
   lines.push('');
 
   // ── Message rate by host ──
@@ -1404,8 +1551,10 @@ function modeWS(entries: LogEntry[], _opts: Options): string {
     const host = extractHost(url);
     const t = e._t ?? 0;
     const existing = msgByHost.get(host);
-    if (existing) { existing.count++; existing.lastT = t; }
-    else msgByHost.set(host, { count: 1, firstT: t, lastT: t });
+    if (existing) {
+      existing.count++;
+      existing.lastT = t;
+    } else msgByHost.set(host, { count: 1, firstT: t, lastT: t });
   }
 
   if (msgByHost.size > 0) {
@@ -1425,8 +1574,8 @@ function modeWS(entries: LogEntry[], _opts: Options): string {
 // Memory and garbage collection trend analysis from perf.hermes entries.
 
 function modeGC(entries: LogEntry[], _opts: Options): string {
-  const hermesEntries = entries.filter(e => e.event === 'perf.hermes');
-  const threadEntries = entries.filter(e => e.event === 'perf.js_thread.blocked');
+  const hermesEntries = entries.filter((e) => e.event === 'perf.hermes');
+  const threadEntries = entries.filter((e) => e.event === 'perf.js_thread.blocked');
 
   if (hermesEntries.length === 0 && threadEntries.length === 0) {
     return 'No Hermes/GC entries found. Call logHermesStats() and startThreadMonitor() in the app to enable.';
@@ -1453,7 +1602,9 @@ function modeGC(entries: LogEntry[], _opts: Options): string {
 
       const sign = delta >= 0 ? '+' : '';
       const alert = delta > 2 * 1024 * 1024 ? '  <- GROWTH' : '';
-      lines.push(`  T+${(t / 1000).toFixed(0)}s  ${heapMB} MB  (${sign}${deltaMB} MB)  GC: ${gcDelta}${alert}`);
+      lines.push(
+        `  T+${(t / 1000).toFixed(0)}s  ${heapMB} MB  (${sign}${deltaMB} MB)  GC: ${gcDelta}${alert}`
+      );
 
       prevHeap = heap;
       prevGCs = gcs;
@@ -1461,14 +1612,19 @@ function modeGC(entries: LogEntry[], _opts: Options): string {
     lines.push('');
 
     // Leak detection: check if heap is monotonically increasing
-    const heapValues = hermesEntries.map(e => (e.params?.heapSize as number) ?? 0);
+    const heapValues = hermesEntries.map((e) => (e.params?.heapSize as number) ?? 0);
     let monotonic = true;
     for (let i = 1; i < heapValues.length; i++) {
-      if (heapValues[i] < heapValues[i - 1] * 0.95) { monotonic = false; break; }
+      if (heapValues[i] < heapValues[i - 1] * 0.95) {
+        monotonic = false;
+        break;
+      }
     }
     if (monotonic && heapValues.length >= 3) {
       const growth = heapValues[heapValues.length - 1] - heapValues[0];
-      lines.push(`LEAK DETECTED: heap grew monotonically by ${(growth / (1024 * 1024)).toFixed(1)} MB over ${hermesEntries.length} samples`);
+      lines.push(
+        `LEAK DETECTED: heap grew monotonically by ${(growth / (1024 * 1024)).toFixed(1)} MB over ${hermesEntries.length} samples`
+      );
       lines.push('');
     }
   }
@@ -1476,7 +1632,9 @@ function modeGC(entries: LogEntry[], _opts: Options): string {
   if (threadEntries.length > 0) {
     lines.push(`JS THREAD BLOCKS (${threadEntries.length} detected):`);
     lines.push('');
-    threadEntries.sort((a, b) => ((b.params?.drift_ms as number) ?? 0) - ((a.params?.drift_ms as number) ?? 0));
+    threadEntries.sort(
+      (a, b) => ((b.params?.drift_ms as number) ?? 0) - ((a.params?.drift_ms as number) ?? 0)
+    );
     for (const e of threadEntries.slice(0, 15)) {
       const drift = (e.params?.drift_ms as number) ?? 0;
       const frames = (e.params?.frames_dropped as number) ?? 0;
@@ -1489,10 +1647,12 @@ function modeGC(entries: LogEntry[], _opts: Options): string {
     const worst = threadEntries[0];
     if (worst) {
       const worstT = worst._t ?? 0;
-      const nearby = entries.filter(e => {
-        const t = e._t ?? 0;
-        return t >= worstT - 500 && t <= worstT + 100 && e !== worst;
-      }).slice(0, 5);
+      const nearby = entries
+        .filter((e) => {
+          const t = e._t ?? 0;
+          return t >= worstT - 500 && t <= worstT + 100 && e !== worst;
+        })
+        .slice(0, 5);
       if (nearby.length > 0) {
         lines.push(`EVENTS NEAR WORST BLOCK (${Math.round(worstT)}ms):`);
         for (const e of nearby) {
@@ -1548,8 +1708,13 @@ function modeBudget(entries: LogEntry[], opts: Options): string {
   results.sort((a, b) => a.tokens - b.tokens);
 
   for (const r of results) {
-    if (r.tokens < 0) { lines.push(`  ${r.name.padEnd(18)} ERROR`); continue; }
-    const bar = '█'.repeat(Math.max(1, Math.round((r.tokens / Math.max(...results.map(x => x.tokens))) * 40)));
+    if (r.tokens < 0) {
+      lines.push(`  ${r.name.padEnd(18)} ERROR`);
+      continue;
+    }
+    const bar = '█'.repeat(
+      Math.max(1, Math.round((r.tokens / Math.max(...results.map((x) => x.tokens))) * 40))
+    );
     lines.push(`  ${r.name.padEnd(18)} ${String(r.tokens).padStart(8)} tokens  ${bar}`);
   }
   lines.push('');
@@ -1565,7 +1730,7 @@ function modeBudget(entries: LogEntry[], opts: Options): string {
   lines.push('FITS IN CONTEXT WINDOW:');
   for (const w of windows) {
     const budget = Math.floor(w.tokens * (1 - w.reserve));
-    const fits = results.filter(r => r.tokens > 0 && r.tokens <= budget).map(r => r.name);
+    const fits = results.filter((r) => r.tokens > 0 && r.tokens <= budget).map((r) => r.name);
     lines.push(`  ${w.name}: ${fits.join(', ') || 'none'}`);
   }
   lines.push('');
@@ -1652,7 +1817,9 @@ function main() {
     console.error('  1. Paste dumpForLLM() output into sovran-app/log.txt');
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
-    console.error('Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget');
+    console.error(
+      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget'
+    );
     process.exit(1);
   }
 
@@ -1680,23 +1847,53 @@ function main() {
   let output: string;
 
   switch (opts.mode) {
-    case 'stats': output = modeStats(entries, opts); break;
-    case 'timeline': output = modeTimeline(entries, opts); break;
-    case 'errors': output = modeErrors(entries, opts); break;
-    case 'slow': output = modeSlow(entries, opts); break;
-    case 'renders': output = modeRenders(entries, opts); break;
-    case 'screens': output = modeScreens(entries, opts); break;
-    case 'startup': output = modeStartup(entries, opts); break;
-    case 'coco': output = modeCoco(entries, opts); break;
-    case 'network': output = modeNetwork(entries, opts); break;
-    case 'full': output = modeFull(entries, opts); break;
-    case 'flows': output = modeFlows(entries, opts); break;
-    case 'ws': output = modeWS(entries, opts); break;
-    case 'gc': output = modeGC(entries, opts); break;
-    case 'budget': output = modeBudget(entries, opts); break;
+    case 'stats':
+      output = modeStats(entries, opts);
+      break;
+    case 'timeline':
+      output = modeTimeline(entries, opts);
+      break;
+    case 'errors':
+      output = modeErrors(entries, opts);
+      break;
+    case 'slow':
+      output = modeSlow(entries, opts);
+      break;
+    case 'renders':
+      output = modeRenders(entries, opts);
+      break;
+    case 'screens':
+      output = modeScreens(entries, opts);
+      break;
+    case 'startup':
+      output = modeStartup(entries, opts);
+      break;
+    case 'coco':
+      output = modeCoco(entries, opts);
+      break;
+    case 'network':
+      output = modeNetwork(entries, opts);
+      break;
+    case 'full':
+      output = modeFull(entries, opts);
+      break;
+    case 'flows':
+      output = modeFlows(entries, opts);
+      break;
+    case 'ws':
+      output = modeWS(entries, opts);
+      break;
+    case 'gc':
+      output = modeGC(entries, opts);
+      break;
+    case 'budget':
+      output = modeBudget(entries, opts);
+      break;
     default:
       console.error(`Unknown mode: ${opts.mode}`);
-      console.error('Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget');
+      console.error(
+        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget'
+      );
       process.exit(1);
   }
 

@@ -146,7 +146,13 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
 
       addLeg: (groupId, leg) => {
         const legId = generateLegId();
-        storeLog.info('store.swap_tx.add_leg', { groupId, legId, fromMint: leg.fromMintUrl, toMint: leg.toMintUrl, amount: leg.amount });
+        storeLog.info('store.swap_tx.add_leg', {
+          groupId,
+          legId,
+          fromMint: leg.fromMintUrl,
+          toMint: leg.toMintUrl,
+          amount: leg.amount,
+        });
 
         set((state) => {
           const group = state.groups[groupId];
@@ -218,7 +224,12 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
       },
 
       setLegStatus: (groupId, legId, { localStatus, errorMessage }) => {
-        storeLog.debug('store.swap_tx.set_leg_status', { groupId, legId, localStatus, errorMessage });
+        storeLog.debug('store.swap_tx.set_leg_status', {
+          groupId,
+          legId,
+          localStatus,
+          errorMessage,
+        });
         set((state) => {
           const group = state.groups[groupId];
           if (!group) return state;

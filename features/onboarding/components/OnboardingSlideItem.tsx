@@ -39,31 +39,31 @@ const OnboardingSlideItem: React.FC<OnboardingSlideItemProps> = ({
 
   return (
     <Log name="OnboardingSlideItem">
-    <Animated.View style={[{ width, paddingHorizontal: 28, paddingVertical: 20 }, cardStyle]}>
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingHorizontal: 24,
-          borderRadius: 24,
-          backgroundColor: item.bgColor,
-          shadowColor: 'black',
-          shadowOffset: { width: 0, height: 12 },
-          shadowOpacity: 0.25,
-          shadowRadius: 3.84,
-          elevation: 3,
-          gap: 16,
-        }}>
-        <Icon name={item.icon} size={64} color="rgba(255,255,255,0.9)" />
-        <Text bold size={28} style={{ color: 'white', textAlign: 'center' }}>
-          {item.title}
-        </Text>
-        <Text size={15} style={{ color: 'rgba(255,255,255,0.8)', textAlign: 'center' }}>
-          {item.description}
-        </Text>
-      </View>
-    </Animated.View>
+      <Animated.View style={[{ width, paddingHorizontal: 28, paddingVertical: 20 }, cardStyle]}>
+        <View
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 24,
+            borderRadius: 24,
+            backgroundColor: item.bgColor,
+            shadowColor: 'black',
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: 0.25,
+            shadowRadius: 3.84,
+            elevation: 3,
+            gap: 16,
+          }}>
+          <Icon name={item.icon} size={64} color="rgba(255,255,255,0.9)" />
+          <Text bold size={28} style={{ color: 'white', textAlign: 'center' }}>
+            {item.title}
+          </Text>
+          <Text size={15} style={{ color: 'rgba(255,255,255,0.8)', textAlign: 'center' }}>
+            {item.description}
+          </Text>
+        </View>
+      </Animated.View>
     </Log>
   );
 };

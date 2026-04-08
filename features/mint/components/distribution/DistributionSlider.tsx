@@ -230,63 +230,63 @@ export const DistributionSlider: FC<DistributionSliderProps> = ({
 
   return (
     <Log name="DistributionSlider">
-    <View style={{ width, height: SLIDER_HEIGHT }}>
-      <GestureDetector gesture={gesture}>
-        <Animated.View
-          style={[
-            styles.innerWrapper,
-            { width, height: SLIDER_HEIGHT, opacity: disabled ? 0.5 : 1 },
-            containerScaleStyle,
-          ]}>
-          <View
+      <View style={{ width, height: SLIDER_HEIGHT }}>
+        <GestureDetector gesture={gesture}>
+          <Animated.View
             style={[
-              styles.container,
-              {
-                backgroundColor: Platform.OS === 'android' ? surfaceSecondary : 'transparent',
-                borderColor: isLoadingColors
-                  ? 'rgba(255,255,255,0.10)'
-                  : opacity(customBorderColor || surfaceTertiary, BORDER_ALPHA),
-              },
+              styles.innerWrapper,
+              { width, height: SLIDER_HEIGHT, opacity: disabled ? 0.5 : 1 },
+              containerScaleStyle,
             ]}>
-            {Platform.OS === 'ios' && (
-              <BlurView style={StyleSheet.absoluteFill} tint="dark" intensity={40} />
-            )}
-
-            <View style={styles.markersContainer}>{stepMarkers}</View>
-
-            <Animated.View
+            <View
               style={[
-                styles.progressFill,
-                progressStyle,
+                styles.container,
                 {
-                  borderWidth: StyleSheet.hairlineWidth,
-                  borderColor: progressBorderColor,
+                  backgroundColor: Platform.OS === 'android' ? surfaceSecondary : 'transparent',
+                  borderColor: isLoadingColors
+                    ? 'rgba(255,255,255,0.10)'
+                    : opacity(customBorderColor || surfaceTertiary, BORDER_ALPHA),
                 },
               ]}>
-              <LinearGradient
-                colors={gradientColors}
-                locations={customGradientColors ? [0, 1] : [0, 0.5, 1]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[styles.fullWidthGradient, { width }]}
-              />
-              <LinearGradient
-                colors={INNER_SHADOW_TOP}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={[styles.innerShadowTop, { width }]}
-              />
-              <LinearGradient
-                colors={INNER_HIGHLIGHT_BOTTOM}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={[styles.innerHighlightBottom, { width }]}
-              />
-            </Animated.View>
-          </View>
-        </Animated.View>
-      </GestureDetector>
-    </View>
+              {Platform.OS === 'ios' && (
+                <BlurView style={StyleSheet.absoluteFill} tint="dark" intensity={40} />
+              )}
+
+              <View style={styles.markersContainer}>{stepMarkers}</View>
+
+              <Animated.View
+                style={[
+                  styles.progressFill,
+                  progressStyle,
+                  {
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: progressBorderColor,
+                  },
+                ]}>
+                <LinearGradient
+                  colors={gradientColors}
+                  locations={customGradientColors ? [0, 1] : [0, 0.5, 1]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.fullWidthGradient, { width }]}
+                />
+                <LinearGradient
+                  colors={INNER_SHADOW_TOP}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={[styles.innerShadowTop, { width }]}
+                />
+                <LinearGradient
+                  colors={INNER_HIGHLIGHT_BOTTOM}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={[styles.innerHighlightBottom, { width }]}
+                />
+              </Animated.View>
+            </View>
+          </Animated.View>
+        </GestureDetector>
+      </View>
     </Log>
   );
 };

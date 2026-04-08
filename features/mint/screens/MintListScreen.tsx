@@ -93,7 +93,11 @@ export const MintListScreen = memo(function MintListScreen({
   const handleMintPress = useCallback(
     (item: MintListItem) => {
       if (isExecuting || item.status !== 'available') {
-        cashuLog.debug('mint.list.select.blocked', { mintUrl: item.mintUrl, isExecuting, status: item.status });
+        cashuLog.debug('mint.list.select.blocked', {
+          mintUrl: item.mintUrl,
+          isExecuting,
+          status: item.status,
+        });
         return;
       }
       cashuLog.info('mint.list.select', { mintUrl: item.mintUrl, unit: item.unit });

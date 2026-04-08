@@ -49,8 +49,14 @@ function getOptionAmount(option: {
 export function PaymentFallbackContent({ payload, close }: PaymentFallbackContentProps) {
   const [foreground, muted, danger] = useThemeColor(['foreground', 'muted', 'danger'] as const);
 
-  const { options, machine, unit: payloadUnit, onDismiss, lastFailedMessage, failedOptionValues } =
-    payload;
+  const {
+    options,
+    machine,
+    unit: payloadUnit,
+    onDismiss,
+    lastFailedMessage,
+    failedOptionValues,
+  } = payload;
   const { isExecuting } = useExecutionState(machine);
   const selectedRef = useRef(false);
 

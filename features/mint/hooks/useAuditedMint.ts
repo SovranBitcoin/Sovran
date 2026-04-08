@@ -134,14 +134,20 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
 
           // Cache both audit data and mint info if both succeeded
           if (auditResult.isOk()) {
-            cashuLog.info('mint.audit.complete', { mintUrl, score: transformAuditData(auditResult.value).score });
+            cashuLog.info('mint.audit.complete', {
+              mintUrl,
+              score: transformAuditData(auditResult.value).score,
+            });
             setCached(mintUrl, auditResult.value, mintInfoData);
           }
         } else {
           setMintInfo(undefined);
         }
       } catch (err) {
-        cashuLog.error('mint.audit.error', { mintUrl, error: err instanceof Error ? err : new Error(String(err)) });
+        cashuLog.error('mint.audit.error', {
+          mintUrl,
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
         setError('Failed to load mint information');
         setAuditInfo(undefined);
         setMintInfo(undefined);

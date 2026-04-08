@@ -66,7 +66,10 @@ export function HealthModalScreen() {
   );
 
   const handleAction = useCallback((action: HealthCta) => {
-    log.info('health.action', { type: action.type, unit: 'unit' in action ? action.unit : undefined });
+    log.info('health.action', {
+      type: action.type,
+      unit: 'unit' in action ? action.unit : undefined,
+    });
     if (action.type === 'openPendingEcash') {
       router.navigate('/pendingEcash');
       return;
@@ -87,81 +90,81 @@ export function HealthModalScreen() {
 
   return (
     <Screen name="HealthModalScreen">
-    <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          headerTransparent: true,
-          headerShadowVisible: false,
-          headerTitle: '',
-          headerBackVisible: false,
-          headerTintColor: foreground,
-          headerBlurEffect: 'none',
-          headerBackground: () => null,
-          headerLeft: () => (
-            <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
-              <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-            </TouchableOpacity>
-          ),
-        }}
-      />
+      <>
+        <Stack.Screen
+          options={{
+            headerShown: true,
+            headerTransparent: true,
+            headerShadowVisible: false,
+            headerTitle: '',
+            headerBackVisible: false,
+            headerTintColor: foreground,
+            headerBlurEffect: 'none',
+            headerBackground: () => null,
+            headerLeft: () => (
+              <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
+                <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
+              </TouchableOpacity>
+            ),
+          }}
+        />
 
-      <WalletHealthModalContent
-        unit={unit}
-        onAction={handleAction}
-        topOffset={topOffset}
-        currencies={availableCurrencies}
-        selectedCurrency={selectedCurrency}
-        onCurrencyChange={setSelectedCurrency}
-        scrollY={scrollY}>
-        {({ heroContent, tabsContent, bodyContent }) => (
-          <RNView style={{ flex: 1 }}>
-            <ModalLayoutWrapper
-              contentPadding={0}
-              useAnimatedScroll
-              scrollY={scrollY}
-              bottomPadding={32}
-              disableHeaderSpacer
-              scrollIndicatorInsets={{
-                top: Math.max(0, stickyHeaderHeight - nativeHeaderHeight),
-              }}>
-              <RNView style={{ height: stickyHeaderHeight }} />
+        <WalletHealthModalContent
+          unit={unit}
+          onAction={handleAction}
+          topOffset={topOffset}
+          currencies={availableCurrencies}
+          selectedCurrency={selectedCurrency}
+          onCurrencyChange={setSelectedCurrency}
+          scrollY={scrollY}>
+          {({ heroContent, tabsContent, bodyContent }) => (
+            <RNView style={{ flex: 1 }}>
+              <ModalLayoutWrapper
+                contentPadding={0}
+                useAnimatedScroll
+                scrollY={scrollY}
+                bottomPadding={32}
+                disableHeaderSpacer
+                scrollIndicatorInsets={{
+                  top: Math.max(0, stickyHeaderHeight - nativeHeaderHeight),
+                }}>
+                <RNView style={{ height: stickyHeaderHeight }} />
+
+                <RNView
+                  style={{
+                    marginTop: -HEADER_OVERLAP,
+                    paddingTop: HEADER_OVERLAP,
+                  }}>
+                  {bodyContent}
+                </RNView>
+              </ModalLayoutWrapper>
 
               <RNView
-                style={{
-                  marginTop: -HEADER_OVERLAP,
-                  paddingTop: HEADER_OVERLAP,
-                }}>
-                {bodyContent}
-              </RNView>
-            </ModalLayoutWrapper>
+                style={styles.stickyHeader}
+                pointerEvents="box-none"
+                onLayout={handleStickyLayout}>
+                <RNView>
+                  <RNView
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { backgroundColor: background, bottom: HEADER_OVERLAP },
+                    ]}
+                  />
+                  <LinearGradient
+                    colors={[background, opacity(background, 0)]}
+                    style={styles.headerGradient}
+                    pointerEvents="none"
+                  />
 
-            <RNView
-              style={styles.stickyHeader}
-              pointerEvents="box-none"
-              onLayout={handleStickyLayout}>
-              <RNView>
-                <RNView
-                  style={[
-                    StyleSheet.absoluteFill,
-                    { backgroundColor: background, bottom: HEADER_OVERLAP },
-                  ]}
-                />
-                <LinearGradient
-                  colors={[background, opacity(background, 0)]}
-                  style={styles.headerGradient}
-                  pointerEvents="none"
-                />
+                  {heroContent}
 
-                {heroContent}
-
-                <RNView style={{ marginTop: 10 }}>{tabsContent}</RNView>
+                  <RNView style={{ marginTop: 10 }}>{tabsContent}</RNView>
+                </RNView>
               </RNView>
             </RNView>
-          </RNView>
-        )}
-      </WalletHealthModalContent>
-    </>
+          )}
+        </WalletHealthModalContent>
+      </>
     </Screen>
   );
 }

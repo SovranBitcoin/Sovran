@@ -103,7 +103,10 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
       }
       setNetworkOffline((prev) => {
         if (prev !== nowOffline) {
-          log.info('provider.offline.transition', { from: prev ? 'offline' : 'online', to: nowOffline ? 'offline' : 'online' });
+          log.info('provider.offline.transition', {
+            from: prev ? 'offline' : 'online',
+            to: nowOffline ? 'offline' : 'online',
+          });
         }
         return nowOffline;
       });
@@ -116,7 +119,9 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
         const state = await Network.getNetworkStateAsync();
         applyState(state);
       } catch (err) {
-        log.warn('provider.offline.check_failed', { error: err instanceof Error ? err : new Error(String(err)) });
+        log.warn('provider.offline.check_failed', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
       } finally {
         isCheckingRef.current = false;
       }

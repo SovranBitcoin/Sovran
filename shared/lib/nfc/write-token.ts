@@ -50,7 +50,10 @@ export async function writeTokenToNFC(token: string): Promise<NfcTokenWriteResul
     }
 
     const ndef = buildTextNdef(token);
-    nfcLog.debug('nfc.write.ndef_message', { nlen: (ndef[0] << 8) | ndef[1], totalBytes: ndef.length });
+    nfcLog.debug('nfc.write.ndef_message', {
+      nlen: (ndef[0] << 8) | ndef[1],
+      totalBytes: ndef.length,
+    });
 
     r = await sendApdu(updateBinary(0, [ndef[0], ndef[1]]), 'WRITE NLEN');
     if (!r.ok) {

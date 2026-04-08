@@ -363,7 +363,11 @@ export const PostCard = React.memo(function PostCard({
   }
 
   if (isThread) {
-    return <Log name="PostCard"><Pressable onPress={handleThreadPress}>{gutterContent}</Pressable></Log>;
+    return (
+      <Log name="PostCard">
+        <Pressable onPress={handleThreadPress}>{gutterContent}</Pressable>
+      </Log>
+    );
   }
 
   return <Log name="PostCard">{gutterContent}</Log>;

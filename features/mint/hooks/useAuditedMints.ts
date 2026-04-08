@@ -125,7 +125,11 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
         urlsToFetch.push({ normalized, original: url });
       }
     });
-    log.debug('mint.audit.batch.init', { total: mintUrls.length, cacheHits, toFetch: urlsToFetch.length });
+    log.debug('mint.audit.batch.init', {
+      total: mintUrls.length,
+      cacheHits,
+      toFetch: urlsToFetch.length,
+    });
 
     setData(initialData);
 
@@ -175,7 +179,11 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
           setCached(normalized, auditResult.value, mintInfo);
         }
 
-        log.debug('mint.audit.fetch.success', { mintUrl: normalized, hasAudit: !!auditInfo, hasMintInfo: !!mintInfo });
+        log.debug('mint.audit.fetch.success', {
+          mintUrl: normalized,
+          hasAudit: !!auditInfo,
+          hasMintInfo: !!mintInfo,
+        });
 
         if (mountedRef.current) {
           setData((prev) => ({

@@ -11,7 +11,11 @@ export function useProfileDisplay(pubkey: string): { displayName: string; pictur
   const source = profile?.cachedDisplayName ? 'nostr' : 'fallback';
   const displayName = profile?.cachedDisplayName || getUsername(pubkey);
 
-  log.debug('profile.resolve', { pubkey: pubkey.slice(0, 8), source, hasPicture: !!profile?.cachedPicture });
+  log.debug('profile.resolve', {
+    pubkey: pubkey.slice(0, 8),
+    source,
+    hasPicture: !!profile?.cachedPicture,
+  });
 
   return { displayName, picture: profile?.cachedPicture };
 }

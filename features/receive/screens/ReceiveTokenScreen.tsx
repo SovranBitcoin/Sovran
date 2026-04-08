@@ -39,7 +39,10 @@ export function ReceiveTokenScreen({
   onNavigateBack,
 }: ReceiveTokenScreenProps) {
   useLifecycleLogger('ReceiveTokenScreen');
-  const { entry, error, actions, source, mintUrl } = useScreenActions('receiveToken', receiveHistoryEntry);
+  const { entry, error, actions, source, mintUrl } = useScreenActions(
+    'receiveToken',
+    receiveHistoryEntry
+  );
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
@@ -106,7 +109,10 @@ export function ReceiveTokenScreen({
             items={[
               source && { title: 'Source', value: source },
               bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-              bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" /> },
+              bip321.optionKinds && {
+                title: 'Payment Methods',
+                value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" />,
+              },
               { title: 'Date', value: entry.createdAt.datetime },
               { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
               mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },

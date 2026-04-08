@@ -78,7 +78,11 @@ export const usePricelistStore = create<PricelistStore>()(
       },
 
       setBtcPrices: (prices: BitcoinPrices) => {
-        storeLog.debug('store.pricelist.set_btc_prices', { usd: prices.USD, eur: prices.EUR, gbp: prices.GBP });
+        storeLog.debug('store.pricelist.set_btc_prices', {
+          usd: prices.USD,
+          eur: prices.EUR,
+          gbp: prices.GBP,
+        });
         set({
           pricelist: {
             usd: { btc: prices.USD },

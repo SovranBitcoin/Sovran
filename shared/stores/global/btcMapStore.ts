@@ -136,7 +136,10 @@ export const useBTCMapStore = create<BTCMapStore>()(
           }
 
           const data: BTCMapPlace[] = await response.json();
-          storeLog.info('store.btc_map.fetch_places.success', { count: data.length, duration_ms: Math.round((performance.now() - startTime) * 100) / 100 });
+          storeLog.info('store.btc_map.fetch_places.success', {
+            count: data.length,
+            duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+          });
 
           set({
             placesCache: { data, timestamp: Date.now() },
@@ -147,7 +150,10 @@ export const useBTCMapStore = create<BTCMapStore>()(
           return data;
         } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to load merchants';
-          storeLog.error('store.btc_map.fetch_places.failed', { error: errorMessage, duration_ms: Math.round((performance.now() - startTime) * 100) / 100 });
+          storeLog.error('store.btc_map.fetch_places.failed', {
+            error: errorMessage,
+            duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+          });
           set({ isLoading: false, error: errorMessage });
 
           const cache = get().placesCache;
@@ -179,15 +185,16 @@ export const useBTCMapStore = create<BTCMapStore>()(
         set({ isLoadingDetails: true });
 
         try {
-          const response = await fetch(
-            `${SOVRAN_API_BASE}/places/${id}`
-          );
+          const response = await fetch(`${SOVRAN_API_BASE}/places/${id}`);
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
 
           const data: BTCMapPlaceDetails = await response.json();
-          storeLog.info('store.btc_map.fetch_details.success', { id, duration_ms: Math.round((performance.now() - startTime) * 100) / 100 });
+          storeLog.info('store.btc_map.fetch_details.success', {
+            id,
+            duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+          });
 
           set((s) => ({
             placeDetailsCache: {

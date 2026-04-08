@@ -221,7 +221,9 @@ export class CocoManager {
         plugins
       );
       initLog('CocoManager', 'Manager created');
-      cashuLog.info('cashu.manager.initialized', { duration_ms: Math.round((performance.now() - initStart) * 100) / 100 });
+      cashuLog.info('cashu.manager.initialized', {
+        duration_ms: Math.round((performance.now() - initStart) * 100) / 100,
+      });
 
       return this.instance;
     } catch (error) {
@@ -304,7 +306,9 @@ export class CocoManager {
     }
 
     this.isBackgroundRunning = false;
-    cashuLog.info('cashu.manager.watchers_sync.done', { duration_ms: Math.round((performance.now() - syncStart) * 100) / 100 });
+    cashuLog.info('cashu.manager.watchers_sync.done', {
+      duration_ms: Math.round((performance.now() - syncStart) * 100) / 100,
+    });
   }
 
   /**

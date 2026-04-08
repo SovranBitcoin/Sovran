@@ -419,30 +419,27 @@ export function MintInfoScreen() {
 
   log.debug('mint.info.display', { mintUrl, displayName, hasEntry: !!entry });
 
-  const handleContactPress = useCallback(
-    async (method: string, info: string) => {
-      log.info('mint.info.contact.press', { method });
-      try {
-        switch (method.toLowerCase()) {
-          case 'email':
-            await Linking.openURL(`mailto:${info}`);
-            break;
-          case 'twitter':
-          case 'x':
-            await Linking.openURL(`https://x.com/${info.replace('@', '')}`);
-            break;
-          case 'nostr':
-            router.navigate({ pathname: '/userMessages', params: { pubkey: npubToPubkey(info) } });
-            break;
-          default:
-            await Clipboard.setStringAsync(info);
-        }
-      } catch {
-        await Clipboard.setStringAsync(info);
+  const handleContactPress = useCallback(async (method: string, info: string) => {
+    log.info('mint.info.contact.press', { method });
+    try {
+      switch (method.toLowerCase()) {
+        case 'email':
+          await Linking.openURL(`mailto:${info}`);
+          break;
+        case 'twitter':
+        case 'x':
+          await Linking.openURL(`https://x.com/${info.replace('@', '')}`);
+          break;
+        case 'nostr':
+          router.navigate({ pathname: '/userMessages', params: { pubkey: npubToPubkey(info) } });
+          break;
+        default:
+          await Clipboard.setStringAsync(info);
       }
-    },
-    []
-  );
+    } catch {
+      await Clipboard.setStringAsync(info);
+    }
+  }, []);
 
   const contact = entry?.contact as
     | Array<{ method: string; info: import('coco-payment-ux').FormattedString }>
@@ -453,20 +450,21 @@ export function MintInfoScreen() {
       <Stack.Screen
         options={{
           title: entry?.fromAccepter ? 'Verify Mint' : displayName || 'Mint Details',
-          headerRight: entry?.fromAccepter || !(typeof entry?.kymScore === 'number' && entry.kymScore >= 0)
-            ? undefined
-            : () => (
-                <Link
-                  href={{
-                    pathname: '/reviews',
-                    params: { mintUrl },
-                  }}
-                  asChild>
-                  <TouchableOpacity style={{ padding: 8 }}>
-                    <Icon name="ic:round-star" size={24} color={warning} />
-                  </TouchableOpacity>
-                </Link>
-              ),
+          headerRight:
+            entry?.fromAccepter || !(typeof entry?.kymScore === 'number' && entry.kymScore >= 0)
+              ? undefined
+              : () => (
+                  <Link
+                    href={{
+                      pathname: '/reviews',
+                      params: { mintUrl },
+                    }}
+                    asChild>
+                    <TouchableOpacity style={{ padding: 8 }}>
+                      <Icon name="ic:round-star" size={24} color={warning} />
+                    </TouchableOpacity>
+                  </Link>
+                ),
         }}
       />
 
@@ -580,9 +578,7 @@ export function MintInfoScreen() {
         {entry?.isTrusted === true && !entry?.fromAccepter && (
           <Section title="Settings">
             <ListGroup variant="secondary">
-              <PressableFeedback
-                animation={false}
-                onPress={() => router.navigate('/distribution')}>
+              <PressableFeedback animation={false} onPress={() => router.navigate('/distribution')}>
                 <PressableFeedback.Scale>
                   <ListGroup.Item disabled>
                     <ListGroup.ItemPrefix>

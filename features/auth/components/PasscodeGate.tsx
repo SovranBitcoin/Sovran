@@ -16,10 +16,15 @@ const PasscodeGate: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   if (passcode && !unlocked) {
     log.info('auth.gate.locked', { reason: 'passcode_required' });
-    return <PasscodeScreen passcode={passcode} onSuccess={() => {
-      log.info('auth.gate.unlocked');
-      setUnlocked(true);
-    }} />;
+    return (
+      <PasscodeScreen
+        passcode={passcode}
+        onSuccess={() => {
+          log.info('auth.gate.unlocked');
+          setUnlocked(true);
+        }}
+      />
+    );
   }
 
   return <>{children}</>;

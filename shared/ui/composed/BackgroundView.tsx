@@ -141,42 +141,46 @@ function ScrollableGradientOverlayComponent({
 
   return (
     <Log name="ScrollableGradientOverlay">
-    <View
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: overlayHeight,
-      }}
-      pointerEvents="none">
-      <MaskedView
-        style={StyleSheet.absoluteFillObject}
-        maskElement={
-          <LinearGradient
-            colors={['transparent', 'transparent', 'black', 'black']}
-            locations={gradientLocations.maskLocations}
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: overlayHeight,
+        }}
+        pointerEvents="none">
+        <MaskedView
+          style={StyleSheet.absoluteFillObject}
+          maskElement={
+            <LinearGradient
+              colors={['transparent', 'transparent', 'black', 'black']}
+              locations={gradientLocations.maskLocations}
+              style={StyleSheet.absoluteFillObject}
+            />
+          }>
+          <BlurView
+            intensity={blurIntensity}
+            tint={blurTint}
             style={StyleSheet.absoluteFillObject}
           />
-        }>
-        <BlurView intensity={blurIntensity} tint={blurTint} style={StyleSheet.absoluteFillObject} />
-      </MaskedView>
-      {showGradientOverlay && gradientColors && (
+        </MaskedView>
+        {showGradientOverlay && gradientColors && (
+          <LinearGradient
+            colors={[
+              opacity(gradientColors?.['300'], 0),
+              opacity(gradientColors?.['300'], gradientOverlayOpacity),
+            ]}
+            locations={gradientLocations.overlayLocations}
+            style={StyleSheet.absoluteFillObject}
+          />
+        )}
         <LinearGradient
-          colors={[
-            opacity(gradientColors?.['300'], 0),
-            opacity(gradientColors?.['300'], gradientOverlayOpacity),
-          ]}
+          colors={[opacity(primaryColor950, 0), opacity(primaryColor950, gradientOverlayOpacity)]}
           locations={gradientLocations.overlayLocations}
           style={StyleSheet.absoluteFillObject}
         />
-      )}
-      <LinearGradient
-        colors={[opacity(primaryColor950, 0), opacity(primaryColor950, gradientOverlayOpacity)]}
-        locations={gradientLocations.overlayLocations}
-        style={StyleSheet.absoluteFillObject}
-      />
-    </View>
+      </View>
     </Log>
   );
 }
@@ -266,60 +270,60 @@ function AnimatedBackgroundViewComponent({
 
   return (
     <Log name="AnimatedBackgroundView">
-    <View style={[styles.container, style]}>
-      {/* Base background color - configurable, defaults to primary-900 */}
-      <Animated.View style={[StyleSheet.absoluteFillObject, backgroundColorAnimatedStyle]} />
+      <View style={[styles.container, style]}>
+        {/* Base background color - configurable, defaults to primary-900 */}
+        <Animated.View style={[StyleSheet.absoluteFillObject, backgroundColorAnimatedStyle]} />
 
-      {/* Animated background image or solid color - with configurable opacity */}
-      <Animated.View style={[StyleSheet.absoluteFillObject, backgroundAnimatedStyle]}>
-        <AnimatedSpriteBackground backgroundColor={surface} />
+        {/* Animated background image or solid color - with configurable opacity */}
+        <Animated.View style={[StyleSheet.absoluteFillObject, backgroundAnimatedStyle]}>
+          <AnimatedSpriteBackground backgroundColor={surface} />
 
-        {/* Gradient overlay for image themes */}
-        {gradientColors && (
-          <LinearGradient
-            colors={[opacity(gradientColors['300'], 0), opacity(gradientColors['300'], 1)]}
-            locations={[0, 1]}
-            style={StyleSheet.absoluteFillObject}
-            pointerEvents="none"
-          />
+          {/* Gradient overlay for image themes */}
+          {gradientColors && (
+            <LinearGradient
+              colors={[opacity(gradientColors['300'], 0), opacity(gradientColors['300'], 1)]}
+              locations={[0, 1]}
+              style={StyleSheet.absoluteFillObject}
+              pointerEvents="none"
+            />
+          )}
+        </Animated.View>
+
+        {/* Partial blur overlay (bottom half) - animated opacity */}
+        {blurSupported && (
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFillObject,
+              { top: 'auto', height: '50%' },
+              partialBlurAnimatedStyle,
+            ]}
+            pointerEvents="none">
+            <MaskedView
+              style={StyleSheet.absoluteFillObject}
+              maskElement={
+                <LinearGradient
+                  colors={['transparent', 'rgba(0, 0, 0, 0.95)']}
+                  locations={[0, 1]}
+                  style={StyleSheet.absoluteFillObject}
+                />
+              }>
+              <BlurView intensity={200} tint={blurTint} style={StyleSheet.absoluteFillObject} />
+            </MaskedView>
+          </Animated.View>
         )}
-      </Animated.View>
 
-      {/* Partial blur overlay (bottom half) - animated opacity */}
-      {blurSupported && (
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFillObject,
-            { top: 'auto', height: '50%' },
-            partialBlurAnimatedStyle,
-          ]}
-          pointerEvents="none">
-          <MaskedView
-            style={StyleSheet.absoluteFillObject}
-            maskElement={
-              <LinearGradient
-                colors={['transparent', 'rgba(0, 0, 0, 0.95)']}
-                locations={[0, 1]}
-                style={StyleSheet.absoluteFillObject}
-              />
-            }>
+        {/* Full blur overlay - animated opacity */}
+        {blurSupported && (
+          <Animated.View
+            style={[StyleSheet.absoluteFillObject, fullBlurAnimatedStyle]}
+            pointerEvents="none">
             <BlurView intensity={200} tint={blurTint} style={StyleSheet.absoluteFillObject} />
-          </MaskedView>
-        </Animated.View>
-      )}
+          </Animated.View>
+        )}
 
-      {/* Full blur overlay - animated opacity */}
-      {blurSupported && (
-        <Animated.View
-          style={[StyleSheet.absoluteFillObject, fullBlurAnimatedStyle]}
-          pointerEvents="none">
-          <BlurView intensity={200} tint={blurTint} style={StyleSheet.absoluteFillObject} />
-        </Animated.View>
-      )}
-
-      {/* Content */}
-      <View style={[styles.content]}>{children}</View>
-    </View>
+        {/* Content */}
+        <View style={[styles.content]}>{children}</View>
+      </View>
     </Log>
   );
 }

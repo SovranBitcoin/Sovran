@@ -37,9 +37,16 @@ interface SendTokenScreenProps {
   onNavigateBack: () => void;
 }
 
-export function SendTokenScreen({ sendHistoryEntry, mintWasOffline, onNavigateBack }: SendTokenScreenProps) {
+export function SendTokenScreen({
+  sendHistoryEntry,
+  mintWasOffline,
+  onNavigateBack,
+}: SendTokenScreenProps) {
   useLifecycleLogger('SendTokenScreen');
-  const { entry, error, actions, source, mintUrl } = useScreenActions('sendToken', sendHistoryEntry);
+  const { entry, error, actions, source, mintUrl } = useScreenActions(
+    'sendToken',
+    sendHistoryEntry
+  );
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
@@ -51,7 +58,12 @@ export function SendTokenScreen({ sendHistoryEntry, mintWasOffline, onNavigateBa
   if (!entry) {
     return <ScreenLoadingState message="Loading transaction..." />;
   }
-  log.debug('send.token.render', { state: entry.state, amount: entry.amount, unit: entry.unit, mintWasOffline });
+  log.debug('send.token.render', {
+    state: entry.state,
+    amount: entry.amount,
+    unit: entry.unit,
+    mintWasOffline,
+  });
 
   const bottomButtons = (
     <BottomButtons>
@@ -135,8 +147,8 @@ export function SendTokenScreen({ sendHistoryEntry, mintWasOffline, onNavigateBa
               <Alert.Content>
                 <Alert.Title>Mint was offline</Alert.Title>
                 <Alert.Description>
-                  This token was created offline. The recipient may have trouble
-                  redeeming it until the mint is back online.
+                  This token was created offline. The recipient may have trouble redeeming it until
+                  the mint is back online.
                 </Alert.Description>
               </Alert.Content>
             </Alert>
@@ -159,11 +171,17 @@ export function SendTokenScreen({ sendHistoryEntry, mintWasOffline, onNavigateBa
             items={[
               source && { title: 'Source', value: source },
               bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-              bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" /> },
+              bip321.optionKinds && {
+                title: 'Payment Methods',
+                value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="ecash" />,
+              },
               { title: 'Date', value: entry.createdAt.datetime },
               { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
               { title: 'State', value: entry.state },
-              entry.operationId && { title: 'Operation ID', value: truncateMiddle(entry.operationId, 7) },
+              entry.operationId && {
+                title: 'Operation ID',
+                value: truncateMiddle(entry.operationId, 7),
+              },
               mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
               entry.tokenString && {
                 title: 'Token',

@@ -32,13 +32,28 @@ type PaymentStatusStore = {
 export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
   active: null,
   setActive: (payment) => {
-    log.info('payment.status.set_active', payment ? { variant: payment.variant, id: payment.id, state: payment.state, amount: payment.amount, unit: payment.unit } : { cleared: true });
+    log.info(
+      'payment.status.set_active',
+      payment
+        ? {
+            variant: payment.variant,
+            id: payment.id,
+            state: payment.state,
+            amount: payment.amount,
+            unit: payment.unit,
+          }
+        : { cleared: true }
+    );
     set({ active: payment });
   },
   setDelivered: (id) =>
     set((s) => {
       if (s.active?.id === id) {
-        log.info('payment.status.delivered', { id, variant: s.active.variant, from: s.active.state });
+        log.info('payment.status.delivered', {
+          id,
+          variant: s.active.variant,
+          from: s.active.state,
+        });
         return { active: { ...s.active!, state: 'delivered' as const } };
       }
       return s;
@@ -55,7 +70,13 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
         log.debug('payment.status.confirmed.skip_failed', { id });
         return s;
       }
-      log.info('payment.status.confirmed', { id, variant: s.active.variant, from: s.active.state, hasOperationId: !!extra?.operationId, hasReceiveEntryId: !!extra?.receiveEntryId });
+      log.info('payment.status.confirmed', {
+        id,
+        variant: s.active.variant,
+        from: s.active.state,
+        hasOperationId: !!extra?.operationId,
+        hasReceiveEntryId: !!extra?.receiveEntryId,
+      });
       return { active: { ...s.active!, state: 'confirmed' as const, ...extra } };
     }),
   setFailed: (id, error) =>
@@ -63,7 +84,12 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
       if (s.active?.id !== id || s.active.state === 'failed' || s.active.state === 'confirmed')
         return s;
       const errorMessage = error !== undefined ? parsePaymentError(error) : undefined;
-      log.error('payment.status.failed', { id, variant: s.active.variant, from: s.active.state, errorMessage });
+      log.error('payment.status.failed', {
+        id,
+        variant: s.active.variant,
+        from: s.active.state,
+        errorMessage,
+      });
       return {
         active: { ...s.active!, state: 'failed' as const, errorMessage },
       };

@@ -109,67 +109,67 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
   return (
     <LayoutDebugWrapper scrollable={false}>
       <Screen name="PaymentsScreen">
-      <ScrollableGradientOverlay contentHeight={windowHeight * 1.5} />
+        <ScrollableGradientOverlay contentHeight={windowHeight * 1.5} />
 
-      <SafeAreaView style={styles.flex1} edges={['bottom']}>
-        <View style={[styles.flex1, { paddingTop: headerHeight }]}>
-          {isSearching ? (
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.searchContainer}>
-              <View style={[styles.card, { borderColor }]}>
-                <BlurCardFrame accentColor={muted}>
-                  <View style={styles.searchSectionHeader}>
-                    <Text bold size={14} style={{ color: opacity(foreground, 0.4) }}>
-                      Search results
-                    </Text>
-                  </View>
-                  {showNoResults ? (
-                    <NoResultsFound />
-                  ) : (
-                    displayResults.map((item) => (
-                      <SearchResultItem
-                        key={item.pubkey}
-                        result={item}
-                        loading={searchLoading || !hasSearched}
-                        onPress={handleSearchResultPress}
-                      />
-                    ))
-                  )}
-                </BlurCardFrame>
+        <SafeAreaView style={styles.flex1} edges={['bottom']}>
+          <View style={[styles.flex1, { paddingTop: headerHeight }]}>
+            {isSearching ? (
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.searchContainer}>
+                <View style={[styles.card, { borderColor }]}>
+                  <BlurCardFrame accentColor={muted}>
+                    <View style={styles.searchSectionHeader}>
+                      <Text bold size={14} style={{ color: opacity(foreground, 0.4) }}>
+                        Search results
+                      </Text>
+                    </View>
+                    {showNoResults ? (
+                      <NoResultsFound />
+                    ) : (
+                      displayResults.map((item) => (
+                        <SearchResultItem
+                          key={item.pubkey}
+                          result={item}
+                          loading={searchLoading || !hasSearched}
+                          onPress={handleSearchResultPress}
+                        />
+                      ))
+                    )}
+                  </BlurCardFrame>
+                </View>
+              </ScrollView>
+            ) : null}
+            <View style={[styles.flex1, isSearching && styles.hidden]}>
+              <View style={styles.tabsContainer}>
+                <Tabs
+                  tabs={TABS}
+                  selectedTab={selectedTab}
+                  handleTabPress={handleTabPress}
+                  amounts={[String(displayContacts.length), String(displayMints.length)]}
+                />
               </View>
-            </ScrollView>
-          ) : null}
-          <View style={[styles.flex1, isSearching && styles.hidden]}>
-            <View style={styles.tabsContainer}>
-              <Tabs
-                tabs={TABS}
-                selectedTab={selectedTab}
-                handleTabPress={handleTabPress}
-                amounts={[String(displayContacts.length), String(displayMints.length)]}
-              />
+              {selectedTab === 'Recent activity' ? (
+                <DraggableContactsList
+                  data={displayContacts}
+                  profilesMap={profilesMap}
+                  isLoadingProfiles={isLoadingProfiles}
+                  emptyMessage="No recent conversations found"
+                />
+              ) : (
+                <DraggableContactsList
+                  data={displayMints}
+                  profilesMap={profilesMap}
+                  loading={mintInfoLoading}
+                  isLoadingProfiles={isLoadingProfiles}
+                  emptyMessage="No mints with nostr contacts found"
+                />
+              )}
             </View>
-            {selectedTab === 'Recent activity' ? (
-              <DraggableContactsList
-                data={displayContacts}
-                profilesMap={profilesMap}
-                isLoadingProfiles={isLoadingProfiles}
-                emptyMessage="No recent conversations found"
-              />
-            ) : (
-              <DraggableContactsList
-                data={displayMints}
-                profilesMap={profilesMap}
-                loading={mintInfoLoading}
-                isLoadingProfiles={isLoadingProfiles}
-                emptyMessage="No mints with nostr contacts found"
-              />
-            )}
           </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
       </Screen>
     </LayoutDebugWrapper>
   );

@@ -313,15 +313,15 @@ export const SettingsRecoveryScreen: React.FC = () => {
   return (
     <Container>
       <Screen name="SettingsRecoveryScreen">
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ flexGrow: 1 }}
-        scrollEnabled={recoveryState !== 'recovering'}>
-        {recoveryState === 'idle' && renderIdleState()}
-        {recoveryState === 'recovering' && renderRecoveringState()}
-        {recoveryState === 'complete' && renderCompleteState()}
-        {recoveryState === 'error' && renderErrorState()}
-      </ScrollView>
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ flexGrow: 1 }}
+          scrollEnabled={recoveryState !== 'recovering'}>
+          {recoveryState === 'idle' && renderIdleState()}
+          {recoveryState === 'recovering' && renderRecoveringState()}
+          {recoveryState === 'complete' && renderCompleteState()}
+          {recoveryState === 'error' && renderErrorState()}
+        </ScrollView>
       </Screen>
     </Container>
   );

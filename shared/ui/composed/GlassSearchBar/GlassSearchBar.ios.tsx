@@ -54,19 +54,19 @@ export const GlassSearchBar = memo(function GlassSearchBar({
 
   return (
     <Log name="GlassSearchBar">
-    <View style={{ alignItems: 'center', ...(width != null ? { width } : { flex: 1 }) }}>
-      <TextField key={clearKey} className="w-full">
-        <Input
-          defaultValue=""
-          placeholder={placeholder}
-          onChangeText={handleTextChange}
-          keyboardType={keyboardType}
-          autoCorrect={false}
-          autoFocus={autoFocus}
-          className="bg-surface-secondary text-foreground h-11 w-full rounded-xl border-0 px-3"
-        />
-      </TextField>
-    </View>
+      <View style={{ alignItems: 'center', ...(width != null ? { width } : { flex: 1 }) }}>
+        <TextField key={clearKey} className="w-full">
+          <Input
+            defaultValue=""
+            placeholder={placeholder}
+            onChangeText={handleTextChange}
+            keyboardType={keyboardType}
+            autoCorrect={false}
+            autoFocus={autoFocus}
+            className="bg-surface-secondary text-foreground h-11 w-full rounded-xl border-0 px-3"
+          />
+        </TextField>
+      </View>
     </Log>
   );
 });

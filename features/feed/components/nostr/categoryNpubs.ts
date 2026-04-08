@@ -135,8 +135,6 @@ export const CATEGORY_PUBKEYS: Record<string, string[]> = {
     'a3c1a5ceda8b86b7cb64d5d6af58fc787ba400f2912b907969d27547f96545d0',
     'd1bd33333733dcc411f0ee893b38b8522fc0de227fff459d99044ced9e65581b',
   ],
-  science: [
-    '99c31c5745565d627684dcf231378b77bb509606f550cfd77bc9ac8fe2bc26f6',
-  ],
+  science: ['99c31c5745565d627684dcf231378b77bb509606f550cfd77bc9ac8fe2bc26f6'],
   sports: [],
 };

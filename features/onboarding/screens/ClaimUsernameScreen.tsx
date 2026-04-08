@@ -445,163 +445,168 @@ export function ClaimUsernameScreen() {
 
   return (
     <Screen name="ClaimUsernameScreen">
-    <>
-      <Stack.Screen
-        options={{
-          presentation: 'card',
-          animation: 'fade',
-          headerShown: true,
-          headerTitle: '',
-          headerTintColor: foreground,
-          headerLeft: CloseButton,
-          headerTransparent: true,
-          headerBlurEffect: 'none',
-          headerBackground: () => null,
-          headerShadowVisible: false,
-        }}
-      />
-      <ModalLayoutWrapper
-        contentPadding={0}
-        bottomPadding={120}
-        bottomContent={bottomButtons}
-        useAnimatedScroll
-        scrollY={scrollY}
-        disableHeaderSpacer>
-        <VStack style={{ paddingBottom: 24 }}>
-          <RNView
-            ref={heroRef}
-            onLayout={handleHeroLayout}
-            collapsable={false}
-            shouldRasterizeIOS
-            renderToHardwareTextureAndroid
-            style={[
-              styles.heroCard,
-              {
-                borderColor: opacity(accentColor, 0.3),
-                opacity: hero.isHidden('claimUsername', 'destination') ? 0 : 1,
-                marginTop: -topOffset,
-                paddingTop: 52 + topOffset * 2,
-              },
-            ]}>
-            <ClaimUsernameCardFrame
-              accentColor={accentColor}
-              backgroundColor={background}
-              highlightColor={surfaceForeground}>
-              <VStack style={{ paddingHorizontal: 20, paddingBottom: 20, zIndex: 1 }}>
-                <HStack align="center" style={{ marginBottom: 14 }}>
-                  <View
-                    style={[styles.heroSmallIcon, { backgroundColor: opacity(accentColor, 0.15) }]}>
-                    <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
-                  </View>
-                  <VStack style={{ flex: 1, marginLeft: 12 }}>
-                    <Text size={18} heavy style={{ color: opacity(foreground, 0.9) }}>
-                      Claim Your Address
-                    </Text>
-                    <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
-                      Get a memorable Lightning URL
-                    </Text>
-                  </VStack>
-                </HStack>
+      <>
+        <Stack.Screen
+          options={{
+            presentation: 'card',
+            animation: 'fade',
+            headerShown: true,
+            headerTitle: '',
+            headerTintColor: foreground,
+            headerLeft: CloseButton,
+            headerTransparent: true,
+            headerBlurEffect: 'none',
+            headerBackground: () => null,
+            headerShadowVisible: false,
+          }}
+        />
+        <ModalLayoutWrapper
+          contentPadding={0}
+          bottomPadding={120}
+          bottomContent={bottomButtons}
+          useAnimatedScroll
+          scrollY={scrollY}
+          disableHeaderSpacer>
+          <VStack style={{ paddingBottom: 24 }}>
+            <RNView
+              ref={heroRef}
+              onLayout={handleHeroLayout}
+              collapsable={false}
+              shouldRasterizeIOS
+              renderToHardwareTextureAndroid
+              style={[
+                styles.heroCard,
+                {
+                  borderColor: opacity(accentColor, 0.3),
+                  opacity: hero.isHidden('claimUsername', 'destination') ? 0 : 1,
+                  marginTop: -topOffset,
+                  paddingTop: 52 + topOffset * 2,
+                },
+              ]}>
+              <ClaimUsernameCardFrame
+                accentColor={accentColor}
+                backgroundColor={background}
+                highlightColor={surfaceForeground}>
+                <VStack style={{ paddingHorizontal: 20, paddingBottom: 20, zIndex: 1 }}>
+                  <HStack align="center" style={{ marginBottom: 14 }}>
+                    <View
+                      style={[
+                        styles.heroSmallIcon,
+                        { backgroundColor: opacity(accentColor, 0.15) },
+                      ]}>
+                      <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
+                    </View>
+                    <VStack style={{ flex: 1, marginLeft: 12 }}>
+                      <Text size={18} heavy style={{ color: opacity(foreground, 0.9) }}>
+                        Claim Your Address
+                      </Text>
+                      <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
+                        Get a memorable Lightning URL
+                      </Text>
+                    </VStack>
+                  </HStack>
 
-                <Text size={14} style={{ color: opacity(foreground, 0.5), marginBottom: 14 }}>
-                  Choose a memorable username for receiving Bitcoin.
-                </Text>
-
-                <UsernameInput
-                  value={username}
-                  onChangeText={setUsername}
-                  selectedDomain={selectedDomainLabel}
-                  isChecking={isChecking}
-                  accentColor={accentColor}
-                />
-              </VStack>
-            </ClaimUsernameCardFrame>
-          </RNView>
-
-          <Animated.View style={contentAnimStyle}>
-            <View style={{ paddingHorizontal: 16 }}>
-              <VStack style={{ gap: 8, marginTop: 18 }}>
-                <Text
-                  size={12}
-                  heavy
-                  style={{
-                    color: opacity(foreground, 0.33),
-                    marginLeft: 4,
-                    marginBottom: 4,
-                  }}>
-                  SELECT DOMAIN
-                </Text>
-                {DOMAINS.map((domain) => (
-                  <DomainOption
-                    key={domain.id}
-                    domain={domain}
-                    isSelected={selectedDomain === domain.id}
-                    onSelect={() => setSelectedDomain(domain.id)}
-                    availabilityResult={
-                      username.length >= 1 ? getAvailabilityForDomain(domain.value) : undefined
-                    }
-                  />
-                ))}
-              </VStack>
-
-              {username.length === 0 && (
-                <View style={[styles.guidelinesBox, { backgroundColor: surface }]}>
-                  <Text
-                    size={13}
-                    heavy
-                    style={{ color: opacity(foreground, 0.5), marginBottom: 12 }}>
-                    Username Guidelines
+                  <Text size={14} style={{ color: opacity(foreground, 0.5), marginBottom: 14 }}>
+                    Choose a memorable username for receiving Bitcoin.
                   </Text>
-                  <VStack style={{ gap: 10 }}>
-                    {[
-                      { text: 'At least 3 characters', icon: 'mdi:check' },
-                      { text: 'Lowercase letters, numbers, underscores', icon: 'mdi:check' },
-                      { text: 'No spaces or special characters', icon: 'mdi:check' },
-                    ].map((item, index) => (
-                      <HStack key={index} align="center">
-                        <Icon name={item.icon} size={16} color={opacity(foreground, 0.33)} />
-                        <Text size={13} style={{ color: opacity(foreground, 0.4), marginLeft: 10 }}>
-                          {item.text}
-                        </Text>
-                      </HStack>
-                    ))}
-                  </VStack>
-                </View>
-              )}
 
-              {/* Preview - show when valid username */}
-              {username.length >= 3 && selectedDomainAvailable && (
-                <View
-                  style={[
-                    styles.previewBox,
-                    {
-                      backgroundColor: opacity(accent, 0.08),
-                      borderColor: opacity(accent, 0.2),
-                    },
-                  ]}>
+                  <UsernameInput
+                    value={username}
+                    onChangeText={setUsername}
+                    selectedDomain={selectedDomainLabel}
+                    isChecking={isChecking}
+                    accentColor={accentColor}
+                  />
+                </VStack>
+              </ClaimUsernameCardFrame>
+            </RNView>
+
+            <Animated.View style={contentAnimStyle}>
+              <View style={{ paddingHorizontal: 16 }}>
+                <VStack style={{ gap: 8, marginTop: 18 }}>
                   <Text
-                    size={11}
+                    size={12}
                     heavy
                     style={{
                       color: opacity(foreground, 0.33),
-                      marginBottom: 8,
-                      letterSpacing: 1,
+                      marginLeft: 4,
+                      marginBottom: 4,
                     }}>
-                    YOUR NEW ADDRESS
+                    SELECT DOMAIN
                   </Text>
-                  <Text
-                    size={18}
-                    heavy
-                    style={{ color: opacity(foreground, 0.9), fontFamily: 'monospace' }}>
-                    {username}@{selectedDomainLabel}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </Animated.View>
-        </VStack>
-      </ModalLayoutWrapper>
-    </>
+                  {DOMAINS.map((domain) => (
+                    <DomainOption
+                      key={domain.id}
+                      domain={domain}
+                      isSelected={selectedDomain === domain.id}
+                      onSelect={() => setSelectedDomain(domain.id)}
+                      availabilityResult={
+                        username.length >= 1 ? getAvailabilityForDomain(domain.value) : undefined
+                      }
+                    />
+                  ))}
+                </VStack>
+
+                {username.length === 0 && (
+                  <View style={[styles.guidelinesBox, { backgroundColor: surface }]}>
+                    <Text
+                      size={13}
+                      heavy
+                      style={{ color: opacity(foreground, 0.5), marginBottom: 12 }}>
+                      Username Guidelines
+                    </Text>
+                    <VStack style={{ gap: 10 }}>
+                      {[
+                        { text: 'At least 3 characters', icon: 'mdi:check' },
+                        { text: 'Lowercase letters, numbers, underscores', icon: 'mdi:check' },
+                        { text: 'No spaces or special characters', icon: 'mdi:check' },
+                      ].map((item, index) => (
+                        <HStack key={index} align="center">
+                          <Icon name={item.icon} size={16} color={opacity(foreground, 0.33)} />
+                          <Text
+                            size={13}
+                            style={{ color: opacity(foreground, 0.4), marginLeft: 10 }}>
+                            {item.text}
+                          </Text>
+                        </HStack>
+                      ))}
+                    </VStack>
+                  </View>
+                )}
+
+                {/* Preview - show when valid username */}
+                {username.length >= 3 && selectedDomainAvailable && (
+                  <View
+                    style={[
+                      styles.previewBox,
+                      {
+                        backgroundColor: opacity(accent, 0.08),
+                        borderColor: opacity(accent, 0.2),
+                      },
+                    ]}>
+                    <Text
+                      size={11}
+                      heavy
+                      style={{
+                        color: opacity(foreground, 0.33),
+                        marginBottom: 8,
+                        letterSpacing: 1,
+                      }}>
+                      YOUR NEW ADDRESS
+                    </Text>
+                    <Text
+                      size={18}
+                      heavy
+                      style={{ color: opacity(foreground, 0.9), fontFamily: 'monospace' }}>
+                      {username}@{selectedDomainLabel}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </Animated.View>
+          </VStack>
+        </ModalLayoutWrapper>
+      </>
     </Screen>
   );
 }

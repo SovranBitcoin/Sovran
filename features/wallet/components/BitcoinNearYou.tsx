@@ -159,7 +159,9 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
 
   useEffect(() => {
     fetchPlaces().catch((err) => {
-      log.warn('bitcoin.nearby.fetch.error', { error: err instanceof Error ? err : new Error(String(err)) });
+      log.warn('bitcoin.nearby.fetch.error', {
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
     });
   }, [fetchPlaces]);
 
@@ -259,7 +261,10 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
                 <RNView className="absolute bottom-2.5 left-3 z-[2]">
                   <RNView
                     className="flex-row items-center gap-1 rounded-full px-2 py-1"
-                    style={{ borderCurve: 'continuous', backgroundColor: opacity(foreground, 0.1) }}>
+                    style={{
+                      borderCurve: 'continuous',
+                      backgroundColor: opacity(foreground, 0.1),
+                    }}>
                     <Icon name="mdi:map-marker" size={12} color={titleColor} />
                     <Text size={11} semibold color={titleColor}>
                       {countLabel}

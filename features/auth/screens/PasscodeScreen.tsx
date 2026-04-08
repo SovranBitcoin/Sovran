@@ -45,63 +45,63 @@ export function PasscodeScreen() {
   return (
     <Container>
       <Screen name="PasscodeScreen">
-      <ScrollView className={'px-4'}>
-        <Card
-          message="Forgetting your passcode will prevent you from accessing your wallet."
-          variant="warning"
-        />
-        <VStack justify="space-between" align="center" className="flex-1 py-8">
-          <VStack align="center" justify="center" className="flex-1">
-            <Text size={20} weight="bold" className="text-foreground mb-5 text-center">
-              {step === 'create' ? 'Enter new passcode' : 'Confirm passcode'}
-            </Text>
-            <HStack className="mb-5">
-              {Array.from({ length: PASSCODE_LENGTH }).map((_, i) => (
-                <View
-                  key={i}
-                  className={`mx-1.5 h-3 w-3 rounded-full ${
-                    currentValue.length > i ? 'bg-foreground' : 'border-foreground border'
-                  }`}
-                />
-              ))}
-            </HStack>
+        <ScrollView className={'px-4'}>
+          <Card
+            message="Forgetting your passcode will prevent you from accessing your wallet."
+            variant="warning"
+          />
+          <VStack justify="space-between" align="center" className="flex-1 py-8">
+            <VStack align="center" justify="center" className="flex-1">
+              <Text size={20} weight="bold" className="text-foreground mb-5 text-center">
+                {step === 'create' ? 'Enter new passcode' : 'Confirm passcode'}
+              </Text>
+              <HStack className="mb-5">
+                {Array.from({ length: PASSCODE_LENGTH }).map((_, i) => (
+                  <View
+                    key={i}
+                    className={`mx-1.5 h-3 w-3 rounded-full ${
+                      currentValue.length > i ? 'bg-foreground' : 'border-foreground border'
+                    }`}
+                  />
+                ))}
+              </HStack>
+            </VStack>
+            <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
           </VStack>
-          <NumericKeyboard key={keyIdx} onKeyPress={handlePress} />
-        </VStack>
-        <ButtonHandler
-          buttons={[
-            {
-              text: 'Reset',
-              icon: 'reset',
-              variant: 'secondary',
-              onPress: async () => {
-                log.info('auth.passcode.reset', { step });
-                setPasscode('');
-                setStep('create');
-                setCode('');
-                setConfirm('');
-                setKeyIdx(0);
+          <ButtonHandler
+            buttons={[
+              {
+                text: 'Reset',
+                icon: 'reset',
+                variant: 'secondary',
+                onPress: async () => {
+                  log.info('auth.passcode.reset', { step });
+                  setPasscode('');
+                  setStep('create');
+                  setCode('');
+                  setConfirm('');
+                  setKeyIdx(0);
+                },
               },
-            },
-            {
-              text: 'Confirm',
-              icon: 'check',
-              variant: 'primary',
-              disabled: confirm.length !== PASSCODE_LENGTH,
-              onPress: async () => {
-                if (code === confirm && code.length === PASSCODE_LENGTH) {
-                  log.info('auth.passcode.set_success');
-                  setPasscode(code);
-                  router.back();
-                } else {
-                  log.warn('auth.passcode.mismatch');
-                  passcodeNotMatchPopup();
-                }
+              {
+                text: 'Confirm',
+                icon: 'check',
+                variant: 'primary',
+                disabled: confirm.length !== PASSCODE_LENGTH,
+                onPress: async () => {
+                  if (code === confirm && code.length === PASSCODE_LENGTH) {
+                    log.info('auth.passcode.set_success');
+                    setPasscode(code);
+                    router.back();
+                  } else {
+                    log.warn('auth.passcode.mismatch');
+                    passcodeNotMatchPopup();
+                  }
+                },
               },
-            },
-          ]}
-        />
-      </ScrollView>
+            ]}
+          />
+        </ScrollView>
       </Screen>
     </Container>
   );

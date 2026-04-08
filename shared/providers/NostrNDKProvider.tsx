@@ -54,7 +54,11 @@ export function NostrNDKProvider({
 
     hasInitialized.current = true;
     initLog('NDK', 'starting NDK initialization...');
-    nostrLog.info('provider.ndk.init_start', { relayCount: relays.length, relays, accountIndex: activeAccountIndex });
+    nostrLog.info('provider.ndk.init_start', {
+      relayCount: relays.length,
+      relays,
+      accountIndex: activeAccountIndex,
+    });
 
     stage.log('Initializing NDK with signer...');
 
@@ -74,7 +78,9 @@ export function NostrNDKProvider({
       stage.complete();
       initLog('NDK', 'stage complete');
     } catch (err) {
-      nostrLog.error('provider.ndk.init_failed', { error: err instanceof Error ? err : new Error(String(err)) });
+      nostrLog.error('provider.ndk.init_failed', {
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
       stage.error(err instanceof Error ? err.message : 'NDK initialization failed');
     }
   }, [stage.canStart, initializeNDK, nostrKeys?.privateKey, stage]);

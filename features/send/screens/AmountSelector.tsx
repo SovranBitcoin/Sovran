@@ -167,7 +167,11 @@ export function AmountSelector({
 
   const handleSuggestionTap = useCallback(
     (suggestion: QuickSendSuggestion) => {
-      walletLog.info('amount.suggestion.tap', { satoshis: suggestion.satoshis, label: suggestion.label, mode: suggestion.inputMode });
+      walletLog.info('amount.suggestion.tap', {
+        satoshis: suggestion.satoshis,
+        label: suggestion.label,
+        mode: suggestion.inputMode,
+      });
       void actions.setInput.execute({
         input: suggestion.inputValue,
         mode: suggestion.inputMode,

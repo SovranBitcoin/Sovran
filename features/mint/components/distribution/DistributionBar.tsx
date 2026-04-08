@@ -156,32 +156,32 @@ export const DistributionBar: React.FC<DistributionBarProps> = ({
 
   return (
     <Log name="DistributionBar">
-    <View className="mx-4 mb-2 h-8 overflow-visible" onLayout={handleLayout}>
-      {containerWidth > 0 && !isEmpty && (
-        <View className="flex-1 flex-row">
-          {mintUrls.map((mintUrl, index) => {
-            const bp = distribution[mintUrl] || 0;
-            if (bp === 0) return null;
+      <View className="mx-4 mb-2 h-8 overflow-visible" onLayout={handleLayout}>
+        {containerWidth > 0 && !isEmpty && (
+          <View className="flex-1 flex-row">
+            {mintUrls.map((mintUrl, index) => {
+              const bp = distribution[mintUrl] || 0;
+              if (bp === 0) return null;
 
-            const activeIndexBeforeThis = mintUrls
-              .slice(0, index)
-              .filter((url) => (distribution[url] || 0) > 0).length;
+              const activeIndexBeforeThis = mintUrls
+                .slice(0, index)
+                .filter((url) => (distribution[url] || 0) > 0).length;
 
-            return (
-              <AnimatedSegment
-                key={mintUrl}
-                mintInfo={mintInfoMap[mintUrl]}
-                bp={bp}
-                totalWidth={containerWidth}
-                colorIndex={index}
-                isFirst={activeIndexBeforeThis === 0}
-                activeCount={activeCount}
-              />
-            );
-          })}
-        </View>
-      )}
-    </View>
+              return (
+                <AnimatedSegment
+                  key={mintUrl}
+                  mintInfo={mintInfoMap[mintUrl]}
+                  bp={bp}
+                  totalWidth={containerWidth}
+                  colorIndex={index}
+                  isFirst={activeIndexBeforeThis === 0}
+                  activeCount={activeCount}
+                />
+              );
+            })}
+          </View>
+        )}
+      </View>
     </Log>
   );
 };

@@ -180,106 +180,106 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
 
   return (
     <Log name="AnimatedCheckpointDot">
-    <Animated.View style={[styles.dotWrapper, scaleStyle]}>
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          { borderRadius: DOT_CONTAINER, backgroundColor: greyColor },
-          futureStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: greyBg, borderColor: greyBorder },
-          pendingStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: greenBg, borderColor: greenBorder },
-          completeStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: greenBg, borderColor: greenBorder },
-          currentStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: redBg, borderColor: redBorder },
-          failedStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: orangeBg, borderColor: orangeBorder },
-          rolledBackStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: orangeBg, borderColor: orangeBorder },
-          alreadySpentStyle,
-        ]}
-      />
+      <Animated.View style={[styles.dotWrapper, scaleStyle]}>
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            { borderRadius: DOT_CONTAINER, backgroundColor: greyColor },
+            futureStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: greyBg, borderColor: greyBorder },
+            pendingStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: greenBg, borderColor: greenBorder },
+            completeStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: greenBg, borderColor: greenBorder },
+            currentStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: redBg, borderColor: redBorder },
+            failedStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: orangeBg, borderColor: orangeBorder },
+            rolledBackStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: orangeBg, borderColor: orangeBorder },
+            alreadySpentStyle,
+          ]}
+        />
 
-      <Animated.View style={[styles.iconLayer, pendingSpinnerStyle]}>
-        <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 14 14">
-          <AnimatedCircle
-            cx={7}
-            cy={7}
-            r={5}
-            fill="none"
-            stroke={clockColor}
-            strokeWidth={1.5}
-            strokeLinecap="round"
-            strokeDasharray={SPINNER_CIRCUMFERENCE}
-            animatedProps={spinnerCircleProps}
-          />
-        </Svg>
+        <Animated.View style={[styles.iconLayer, pendingSpinnerStyle]}>
+          <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 14 14">
+            <AnimatedCircle
+              cx={7}
+              cy={7}
+              r={5}
+              fill="none"
+              stroke={clockColor}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeDasharray={SPINNER_CIRCUMFERENCE}
+              animatedProps={spinnerCircleProps}
+            />
+          </Svg>
+        </Animated.View>
+        <Animated.View style={[styles.iconLayer, completeStyle]}>
+          <Icon name="fluent:checkmark-16-filled" color={greenColor} size={ICON_SIZE} />
+        </Animated.View>
+        <Animated.View style={[styles.iconLayer, spinnerStyle]}>
+          <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 14 14">
+            <AnimatedCircle
+              cx={7}
+              cy={7}
+              r={5}
+              fill="none"
+              stroke={greenColor}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeDasharray={SPINNER_CIRCUMFERENCE}
+              animatedProps={spinnerCircleProps}
+            />
+          </Svg>
+        </Animated.View>
+        <Animated.View style={[styles.iconLayer, failedStyle]}>
+          <Icon name="material-symbols:close-rounded" color={redColor} size={ICON_SIZE} />
+        </Animated.View>
+        <Animated.View style={[styles.iconLayer, rolledBackStyle]}>
+          <Icon name="ic:round-refresh" color={orangeColor} size={ICON_SIZE} />
+        </Animated.View>
+        <Animated.View style={[styles.iconLayer, alreadySpentStyle]}>
+          <Icon name="mdi:alert-circle" color={orangeColor} size={ICON_SIZE} />
+        </Animated.View>
       </Animated.View>
-      <Animated.View style={[styles.iconLayer, completeStyle]}>
-        <Icon name="fluent:checkmark-16-filled" color={greenColor} size={ICON_SIZE} />
-      </Animated.View>
-      <Animated.View style={[styles.iconLayer, spinnerStyle]}>
-        <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 14 14">
-          <AnimatedCircle
-            cx={7}
-            cy={7}
-            r={5}
-            fill="none"
-            stroke={greenColor}
-            strokeWidth={1.5}
-            strokeLinecap="round"
-            strokeDasharray={SPINNER_CIRCUMFERENCE}
-            animatedProps={spinnerCircleProps}
-          />
-        </Svg>
-      </Animated.View>
-      <Animated.View style={[styles.iconLayer, failedStyle]}>
-        <Icon name="material-symbols:close-rounded" color={redColor} size={ICON_SIZE} />
-      </Animated.View>
-      <Animated.View style={[styles.iconLayer, rolledBackStyle]}>
-        <Icon name="ic:round-refresh" color={orangeColor} size={ICON_SIZE} />
-      </Animated.View>
-      <Animated.View style={[styles.iconLayer, alreadySpentStyle]}>
-        <Icon name="mdi:alert-circle" color={orangeColor} size={ICON_SIZE} />
-      </Animated.View>
-    </Animated.View>
     </Log>
   );
 });

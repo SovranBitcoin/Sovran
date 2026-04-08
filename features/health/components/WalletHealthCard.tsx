@@ -63,7 +63,10 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
   }, [normalizedUnit, mintUrlsForUnit, balance, desiredDistributionBp, pendingOutgoingCount]);
 
   const handlePress = useCallback(() => {
-    walletLog.info('wallet.health.card.press', { unit: normalizedUnit, chips: health.chips.map(c => c.label) });
+    walletLog.info('wallet.health.card.press', {
+      unit: normalizedUnit,
+      chips: health.chips.map((c) => c.label),
+    });
     hero.registerRef('walletHealth', 'source', cardRef.current);
     hero.startWalletHealth(normalizedUnit);
   }, [hero, normalizedUnit, health.chips]);
@@ -90,98 +93,98 @@ export function WalletHealthCard({ defaultUnit = 'sat' }: { defaultUnit?: string
     <Log name="WalletHealthCard">
       <GestureDetector gesture={tap}>
         <Animated.View style={pressAnimStyle}>
-        <RNView
-          ref={cardRef}
-          onLayout={() => hero.registerRef('walletHealth', 'source', cardRef.current)}
-          collapsable={false}
-          shouldRasterizeIOS
-          renderToHardwareTextureAndroid
-          style={[
-            styles.card,
-            {
-              borderColor: opacity(accentColor, 0.25),
-              opacity: hero.isHidden('walletHealth', 'source') ? 0 : 1,
-            },
-          ]}>
-          <WalletHealthCardFrame
-            accentColor={accentColor}
-            backgroundColor={primary950}
-            highlightColor={primary50}>
-            <VStack className="p-4.5">
-              <HStack align="center" justify="space-between">
-                <HStack align="center" gap={10}>
-                  <View style={[styles.iconBox, { backgroundColor: opacity(accentColor, 0.16) }]}>
-                    <Icon name="garden:heart-fill-16" size={22} color={accentColor} />
-                  </View>
-                  <VStack>
-                    <Text size={16} heavy style={{ color: primary50 }}>
-                      Wallet health
-                    </Text>
-                    <HStack align="center" gap={8} className="mt-1.5">
-                      <View
-                        style={[
-                          styles.unitPill,
-                          {
-                            backgroundColor: opacity(accentColor, 0.14),
-                            borderColor: opacity(accentColor, 0.22),
-                          },
-                        ]}>
-                        <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
-                          {normalizedUnit.toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
-                        Tap for details
-                      </Text>
-                    </HStack>
-                  </VStack>
-                </HStack>
-                <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
-              </HStack>
-
-              <HStack align="center" className="mt-3.5 flex-wrap gap-4">
-                {health.chips.map((chip) => {
-                  const iconName = chipIconName(chip.label);
-                  const isBalanced = chip.label.toLowerCase().includes('balanced');
-                  const displayColor = isBalanced
-                    ? opacity(primary50, 0.85)
-                    : opacity(accentColor, 0.8);
-                  return (
-                    <HStack key={chip.label} align="center" gap={6}>
-                      <Icon name={iconName} size={14} color={displayColor} />
-                      <Text size={11} style={{ color: displayColor }}>
-                        {chip.label}
-                      </Text>
-                    </HStack>
-                  );
-                })}
-              </HStack>
-
-              <View
-                style={[
-                  styles.cta,
-                  {
-                    backgroundColor: opacity(accentColor, 0.12),
-                    borderColor: opacity(accentColor, 0.22),
-                  },
-                ]}>
+          <RNView
+            ref={cardRef}
+            onLayout={() => hero.registerRef('walletHealth', 'source', cardRef.current)}
+            collapsable={false}
+            shouldRasterizeIOS
+            renderToHardwareTextureAndroid
+            style={[
+              styles.card,
+              {
+                borderColor: opacity(accentColor, 0.25),
+                opacity: hero.isHidden('walletHealth', 'source') ? 0 : 1,
+              },
+            ]}>
+            <WalletHealthCardFrame
+              accentColor={accentColor}
+              backgroundColor={primary950}
+              highlightColor={primary50}>
+              <VStack className="p-4.5">
                 <HStack align="center" justify="space-between">
-                  <HStack align="center" gap={8}>
-                    <Icon
-                      name="material-symbols:info-rounded"
-                      size={16}
-                      color={opacity(accentColor, 0.9)}
-                    />
-                    <Text size={12} heavy style={{ color: primary50 }}>
-                      View health details
-                    </Text>
+                  <HStack align="center" gap={10}>
+                    <View style={[styles.iconBox, { backgroundColor: opacity(accentColor, 0.16) }]}>
+                      <Icon name="garden:heart-fill-16" size={22} color={accentColor} />
+                    </View>
+                    <VStack>
+                      <Text size={16} heavy style={{ color: primary50 }}>
+                        Wallet health
+                      </Text>
+                      <HStack align="center" gap={8} className="mt-1.5">
+                        <View
+                          style={[
+                            styles.unitPill,
+                            {
+                              backgroundColor: opacity(accentColor, 0.14),
+                              borderColor: opacity(accentColor, 0.22),
+                            },
+                          ]}>
+                          <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
+                            {normalizedUnit.toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
+                          Tap for details
+                        </Text>
+                      </HStack>
+                    </VStack>
                   </HStack>
-                  <Icon name="mdi:arrow-right" size={18} color={primary50} />
+                  <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
                 </HStack>
-              </View>
-            </VStack>
-          </WalletHealthCardFrame>
-        </RNView>
+
+                <HStack align="center" className="mt-3.5 flex-wrap gap-4">
+                  {health.chips.map((chip) => {
+                    const iconName = chipIconName(chip.label);
+                    const isBalanced = chip.label.toLowerCase().includes('balanced');
+                    const displayColor = isBalanced
+                      ? opacity(primary50, 0.85)
+                      : opacity(accentColor, 0.8);
+                    return (
+                      <HStack key={chip.label} align="center" gap={6}>
+                        <Icon name={iconName} size={14} color={displayColor} />
+                        <Text size={11} style={{ color: displayColor }}>
+                          {chip.label}
+                        </Text>
+                      </HStack>
+                    );
+                  })}
+                </HStack>
+
+                <View
+                  style={[
+                    styles.cta,
+                    {
+                      backgroundColor: opacity(accentColor, 0.12),
+                      borderColor: opacity(accentColor, 0.22),
+                    },
+                  ]}>
+                  <HStack align="center" justify="space-between">
+                    <HStack align="center" gap={8}>
+                      <Icon
+                        name="material-symbols:info-rounded"
+                        size={16}
+                        color={opacity(accentColor, 0.9)}
+                      />
+                      <Text size={12} heavy style={{ color: primary50 }}>
+                        View health details
+                      </Text>
+                    </HStack>
+                    <Icon name="mdi:arrow-right" size={18} color={primary50} />
+                  </HStack>
+                </View>
+              </VStack>
+            </WalletHealthCardFrame>
+          </RNView>
         </Animated.View>
       </GestureDetector>
     </Log>

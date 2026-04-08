@@ -103,7 +103,10 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
     });
 
     if (hasCachedData) {
-      cashuLog.debug('mint.kyms.cache.hit', { cachedCount: Object.keys(cachedScores).length, totalRequested: normalizedMintUrls.size });
+      cashuLog.debug('mint.kyms.cache.hit', {
+        cachedCount: Object.keys(cachedScores).length,
+        totalRequested: normalizedMintUrls.size,
+      });
       setScores(cachedScores);
     } else {
       cashuLog.debug('mint.kyms.cache.miss', { totalRequested: normalizedMintUrls.size });
@@ -192,11 +195,16 @@ export const useKYMMints = (mintUrls: string[]): UseKYMMintsResult => {
         setCached(normalizedUrl, avgScore, recommendations);
       });
 
-      cashuLog.info('mint.kyms.fetch', { scoredCount: Object.keys(newScores).length, totalRequested: normalizedMintUrls.size });
+      cashuLog.info('mint.kyms.fetch', {
+        scoredCount: Object.keys(newScores).length,
+        totalRequested: normalizedMintUrls.size,
+      });
       // Merge with existing cached scores for mints that didn't get new events
       setScores((prevScores) => ({ ...prevScores, ...newScores }));
     } catch (err) {
-      cashuLog.error('mint.kyms.error', { error: err instanceof Error ? err : new Error(String(err)) });
+      cashuLog.error('mint.kyms.error', {
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
       setError('Failed to process mint recommendations. Please try again.');
     } finally {
       if (eose) {

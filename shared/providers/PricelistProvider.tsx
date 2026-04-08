@@ -92,7 +92,10 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
           // Attempt to reconnect if we haven't exceeded max attempts
           if (reconnectAttempts < maxReconnectAttempts) {
             reconnectAttempts++;
-            log.info('pricelist.ws.reconnecting', { attempt: reconnectAttempts, max: maxReconnectAttempts });
+            log.info('pricelist.ws.reconnecting', {
+              attempt: reconnectAttempts,
+              max: maxReconnectAttempts,
+            });
 
             reconnectTimeout = setTimeout(
               () => {

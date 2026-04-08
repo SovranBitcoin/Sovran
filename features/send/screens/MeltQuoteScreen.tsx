@@ -49,7 +49,10 @@ export function MeltQuoteScreen({
   onRequestMintList,
 }: MeltQuoteScreenProps) {
   useLifecycleLogger('MeltQuoteScreen');
-  const { entry, error, actions, source, mintUrl } = useScreenActions('meltQuote', meltHistoryEntry);
+  const { entry, error, actions, source, mintUrl } = useScreenActions(
+    'meltQuote',
+    meltHistoryEntry
+  );
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
@@ -64,7 +67,12 @@ export function MeltQuoteScreen({
 
   const isPreview = !entry.quoteId;
   const anyLoading = actions.pay.loading || actions.cancel.loading;
-  log.debug('send.melt_quote.render', { state: entry.state, isPreview, amount: entry.amount, unit: entry.unit });
+  log.debug('send.melt_quote.render', {
+    state: entry.state,
+    isPreview,
+    amount: entry.amount,
+    unit: entry.unit,
+  });
 
   const bottomButtons = (
     <BottomButtons>
@@ -131,7 +139,10 @@ export function MeltQuoteScreen({
             items={[
               source && { title: 'Source', value: source },
               bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-              bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" /> },
+              bip321.optionKinds && {
+                title: 'Payment Methods',
+                value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />,
+              },
               { title: 'Date', value: entry.createdAt.datetime },
               { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
               { title: 'State', value: entry.state },

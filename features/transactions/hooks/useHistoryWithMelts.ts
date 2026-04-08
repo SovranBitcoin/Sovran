@@ -140,12 +140,17 @@ export function useHistoryWithMelts(pageSize = 100) {
     }
 
     const newMelts = meltEntries.filter((m) => !existingQuoteIds.has(m.quoteId));
-    const merged = newMelts.length === 0
-      ? paginatedResult.history
-      : [...paginatedResult.history, ...newMelts].sort((a, b) => b.createdAt - a.createdAt);
+    const merged =
+      newMelts.length === 0
+        ? paginatedResult.history
+        : [...paginatedResult.history, ...newMelts].sort((a, b) => b.createdAt - a.createdAt);
 
     if (newMelts.length > 0) {
-      log.debug('tx.history.merged', { paginatedCount: paginatedResult.history.length, supplementedMelts: newMelts.length, totalCount: merged.length });
+      log.debug('tx.history.merged', {
+        paginatedCount: paginatedResult.history.length,
+        supplementedMelts: newMelts.length,
+        totalCount: merged.length,
+      });
     }
 
     // Reference stability: if length and first/last entry IDs match, keep the old ref

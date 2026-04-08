@@ -123,21 +123,63 @@ function buildTimeline({
       switch (mintTx.state) {
         case MintQuoteState.UNPAID:
           return [
-            { state: MintQuoteState.UNPAID, displayLabel: MINT_COPY.UNPAID.label, stepType: 'next-pending' as TimelineStepType, info: MINT_COPY.UNPAID.info },
-            { state: MintQuoteState.PAID, displayLabel: MINT_COPY.PAID.label, stepType: 'future-small' as TimelineStepType },
-            { state: MintQuoteState.ISSUED, displayLabel: MINT_COPY.ISSUED.label, stepType: 'future-small' as TimelineStepType },
+            {
+              state: MintQuoteState.UNPAID,
+              displayLabel: MINT_COPY.UNPAID.label,
+              stepType: 'next-pending' as TimelineStepType,
+              info: MINT_COPY.UNPAID.info,
+            },
+            {
+              state: MintQuoteState.PAID,
+              displayLabel: MINT_COPY.PAID.label,
+              stepType: 'future-small' as TimelineStepType,
+            },
+            {
+              state: MintQuoteState.ISSUED,
+              displayLabel: MINT_COPY.ISSUED.label,
+              stepType: 'future-small' as TimelineStepType,
+            },
           ];
         case MintQuoteState.PAID:
           return [
-            { state: MintQuoteState.UNPAID, displayLabel: MINT_COPY.UNPAID.label, stepType: 'complete' as TimelineStepType, timestamp: mintTx.createdAt },
-            { state: MintQuoteState.PAID, displayLabel: MINT_COPY.PAID.label, stepType: 'next-pending' as TimelineStepType, info: MINT_COPY.PAID.info },
-            { state: MintQuoteState.ISSUED, displayLabel: MINT_COPY.ISSUED.label, stepType: 'future-small' as TimelineStepType },
+            {
+              state: MintQuoteState.UNPAID,
+              displayLabel: MINT_COPY.UNPAID.label,
+              stepType: 'complete' as TimelineStepType,
+              timestamp: mintTx.createdAt,
+            },
+            {
+              state: MintQuoteState.PAID,
+              displayLabel: MINT_COPY.PAID.label,
+              stepType: 'next-pending' as TimelineStepType,
+              info: MINT_COPY.PAID.info,
+            },
+            {
+              state: MintQuoteState.ISSUED,
+              displayLabel: MINT_COPY.ISSUED.label,
+              stepType: 'future-small' as TimelineStepType,
+            },
           ];
         case MintQuoteState.ISSUED:
           return [
-            { state: MintQuoteState.UNPAID, displayLabel: MINT_COPY.UNPAID.label, stepType: 'complete' as TimelineStepType, timestamp: mintTx.createdAt },
-            { state: MintQuoteState.PAID, displayLabel: MINT_COPY.PAID.label, stepType: 'complete' as TimelineStepType, timestamp: mintTx.createdAt },
-            { state: MintQuoteState.ISSUED, displayLabel: MINT_COPY.ISSUED.label, stepType: 'success' as TimelineStepType, info: MINT_COPY.ISSUED.info(mintTx.amount) },
+            {
+              state: MintQuoteState.UNPAID,
+              displayLabel: MINT_COPY.UNPAID.label,
+              stepType: 'complete' as TimelineStepType,
+              timestamp: mintTx.createdAt,
+            },
+            {
+              state: MintQuoteState.PAID,
+              displayLabel: MINT_COPY.PAID.label,
+              stepType: 'complete' as TimelineStepType,
+              timestamp: mintTx.createdAt,
+            },
+            {
+              state: MintQuoteState.ISSUED,
+              displayLabel: MINT_COPY.ISSUED.label,
+              stepType: 'success' as TimelineStepType,
+              info: MINT_COPY.ISSUED.info(mintTx.amount),
+            },
           ];
         default:
           return [];
@@ -172,21 +214,63 @@ function buildTimeline({
       switch (meltTx.state) {
         case MeltQuoteState.UNPAID:
           return [
-            { state: MeltQuoteState.UNPAID, displayLabel: MELT_COPY.UNPAID.label, stepType: 'next-pending' as TimelineStepType, info: MELT_COPY.UNPAID.info },
-            { state: MeltQuoteState.PENDING, displayLabel: MELT_COPY.PENDING.label, stepType: 'future-small' as TimelineStepType },
-            { state: MeltQuoteState.PAID, displayLabel: MELT_COPY.PAID.label, stepType: 'future-small' as TimelineStepType },
+            {
+              state: MeltQuoteState.UNPAID,
+              displayLabel: MELT_COPY.UNPAID.label,
+              stepType: 'next-pending' as TimelineStepType,
+              info: MELT_COPY.UNPAID.info,
+            },
+            {
+              state: MeltQuoteState.PENDING,
+              displayLabel: MELT_COPY.PENDING.label,
+              stepType: 'future-small' as TimelineStepType,
+            },
+            {
+              state: MeltQuoteState.PAID,
+              displayLabel: MELT_COPY.PAID.label,
+              stepType: 'future-small' as TimelineStepType,
+            },
           ];
         case MeltQuoteState.PENDING:
           return [
-            { state: MeltQuoteState.UNPAID, displayLabel: MELT_COPY.UNPAID.label, stepType: 'complete' as TimelineStepType, timestamp: meltTx.createdAt },
-            { state: MeltQuoteState.PENDING, displayLabel: MELT_COPY.PENDING.label, stepType: 'current' as TimelineStepType, info: MELT_COPY.PENDING.info },
-            { state: MeltQuoteState.PAID, displayLabel: MELT_COPY.PAID.label, stepType: 'future-small' as TimelineStepType },
+            {
+              state: MeltQuoteState.UNPAID,
+              displayLabel: MELT_COPY.UNPAID.label,
+              stepType: 'complete' as TimelineStepType,
+              timestamp: meltTx.createdAt,
+            },
+            {
+              state: MeltQuoteState.PENDING,
+              displayLabel: MELT_COPY.PENDING.label,
+              stepType: 'current' as TimelineStepType,
+              info: MELT_COPY.PENDING.info,
+            },
+            {
+              state: MeltQuoteState.PAID,
+              displayLabel: MELT_COPY.PAID.label,
+              stepType: 'future-small' as TimelineStepType,
+            },
           ];
         case MeltQuoteState.PAID:
           return [
-            { state: MeltQuoteState.UNPAID, displayLabel: MELT_COPY.UNPAID.label, stepType: 'complete' as TimelineStepType, timestamp: meltTx.createdAt },
-            { state: MeltQuoteState.PENDING, displayLabel: MELT_COPY.PENDING.label, stepType: 'complete' as TimelineStepType, timestamp: meltTx.createdAt },
-            { state: MeltQuoteState.PAID, displayLabel: MELT_COPY.PAID.label, stepType: 'success' as TimelineStepType, info: MELT_COPY.PAID.info },
+            {
+              state: MeltQuoteState.UNPAID,
+              displayLabel: MELT_COPY.UNPAID.label,
+              stepType: 'complete' as TimelineStepType,
+              timestamp: meltTx.createdAt,
+            },
+            {
+              state: MeltQuoteState.PENDING,
+              displayLabel: MELT_COPY.PENDING.label,
+              stepType: 'complete' as TimelineStepType,
+              timestamp: meltTx.createdAt,
+            },
+            {
+              state: MeltQuoteState.PAID,
+              displayLabel: MELT_COPY.PAID.label,
+              stepType: 'success' as TimelineStepType,
+              info: MELT_COPY.PAID.info,
+            },
           ];
         default:
           return [];
@@ -236,28 +320,88 @@ function buildTimeline({
         switch (txState) {
           case 'prepared':
             return [
-              { state: 'prepared', displayLabel: PAYMENT_REQUEST_COPY.prepared.label, stepType: (tokenCreated ? 'complete' : 'next-pending') as TimelineStepType, info: PAYMENT_REQUEST_COPY.prepared.info, ...(tokenCreated ? { timestamp: sendTx.createdAt } : {}) },
-              { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'future-small' as TimelineStepType },
-              { state: 'finalized', displayLabel: PAYMENT_REQUEST_COPY.finalized.label, stepType: 'future-small' as TimelineStepType },
+              {
+                state: 'prepared',
+                displayLabel: PAYMENT_REQUEST_COPY.prepared.label,
+                stepType: (tokenCreated ? 'complete' : 'next-pending') as TimelineStepType,
+                info: PAYMENT_REQUEST_COPY.prepared.info,
+                ...(tokenCreated ? { timestamp: sendTx.createdAt } : {}),
+              },
+              {
+                state: 'nostrSent',
+                displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label,
+                stepType: 'future-small' as TimelineStepType,
+              },
+              {
+                state: 'finalized',
+                displayLabel: PAYMENT_REQUEST_COPY.finalized.label,
+                stepType: 'future-small' as TimelineStepType,
+              },
             ];
           case 'pending':
             if (nostrSent) {
               return [
-                { state: 'prepared', displayLabel: PAYMENT_REQUEST_COPY.prepared.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
-                { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt, info: PAYMENT_REQUEST_COPY.nostrSent.infoSent },
-                { state: 'finalized', displayLabel: PAYMENT_REQUEST_COPY.finalized.label, stepType: 'next-pending' as TimelineStepType, info: SEND_COPY.pending.info },
+                {
+                  state: 'prepared',
+                  displayLabel: PAYMENT_REQUEST_COPY.prepared.label,
+                  stepType: 'complete' as TimelineStepType,
+                  timestamp: sendTx.createdAt,
+                },
+                {
+                  state: 'nostrSent',
+                  displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label,
+                  stepType: 'complete' as TimelineStepType,
+                  timestamp: sendTx.createdAt,
+                  info: PAYMENT_REQUEST_COPY.nostrSent.infoSent,
+                },
+                {
+                  state: 'finalized',
+                  displayLabel: PAYMENT_REQUEST_COPY.finalized.label,
+                  stepType: 'next-pending' as TimelineStepType,
+                  info: SEND_COPY.pending.info,
+                },
               ];
             }
             return [
-              { state: 'prepared', displayLabel: PAYMENT_REQUEST_COPY.prepared.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
-              { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'next-pending' as TimelineStepType, info: PAYMENT_REQUEST_COPY.nostrSent.infoSending },
-              { state: 'finalized', displayLabel: PAYMENT_REQUEST_COPY.finalized.label, stepType: 'future-small' as TimelineStepType },
+              {
+                state: 'prepared',
+                displayLabel: PAYMENT_REQUEST_COPY.prepared.label,
+                stepType: 'complete' as TimelineStepType,
+                timestamp: sendTx.createdAt,
+              },
+              {
+                state: 'nostrSent',
+                displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label,
+                stepType: 'next-pending' as TimelineStepType,
+                info: PAYMENT_REQUEST_COPY.nostrSent.infoSending,
+              },
+              {
+                state: 'finalized',
+                displayLabel: PAYMENT_REQUEST_COPY.finalized.label,
+                stepType: 'future-small' as TimelineStepType,
+              },
             ];
           case 'finalized':
             return [
-              { state: 'prepared', displayLabel: PAYMENT_REQUEST_COPY.prepared.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
-              { state: 'nostrSent', displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt, info: PAYMENT_REQUEST_COPY.nostrSent.infoSent },
-              { state: 'finalized', displayLabel: PAYMENT_REQUEST_COPY.finalized.label, stepType: 'success' as TimelineStepType, info: PAYMENT_REQUEST_COPY.finalized.info },
+              {
+                state: 'prepared',
+                displayLabel: PAYMENT_REQUEST_COPY.prepared.label,
+                stepType: 'complete' as TimelineStepType,
+                timestamp: sendTx.createdAt,
+              },
+              {
+                state: 'nostrSent',
+                displayLabel: PAYMENT_REQUEST_COPY.nostrSent.label,
+                stepType: 'complete' as TimelineStepType,
+                timestamp: sendTx.createdAt,
+                info: PAYMENT_REQUEST_COPY.nostrSent.infoSent,
+              },
+              {
+                state: 'finalized',
+                displayLabel: PAYMENT_REQUEST_COPY.finalized.label,
+                stepType: 'success' as TimelineStepType,
+                info: PAYMENT_REQUEST_COPY.finalized.info,
+              },
             ];
           default:
             return [];
@@ -270,21 +414,63 @@ function buildTimeline({
       switch (txState) {
         case 'prepared':
           return [
-            { state: 'prepared', displayLabel: SEND_COPY.prepared.label, stepType: 'current' as TimelineStepType, info: SEND_COPY.prepared.info },
-            { state: 'pending', displayLabel: SEND_COPY.pending.label, stepType: 'next-pending' as TimelineStepType },
-            { state: 'finalized', displayLabel: SEND_COPY.finalized.label, stepType: 'future-small' as TimelineStepType },
+            {
+              state: 'prepared',
+              displayLabel: SEND_COPY.prepared.label,
+              stepType: 'current' as TimelineStepType,
+              info: SEND_COPY.prepared.info,
+            },
+            {
+              state: 'pending',
+              displayLabel: SEND_COPY.pending.label,
+              stepType: 'next-pending' as TimelineStepType,
+            },
+            {
+              state: 'finalized',
+              displayLabel: SEND_COPY.finalized.label,
+              stepType: 'future-small' as TimelineStepType,
+            },
           ];
         case 'pending':
           return [
-            { state: 'prepared', displayLabel: SEND_COPY.prepared.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
-            { state: 'pending', displayLabel: SEND_COPY.pending.label, stepType: 'next-pending' as TimelineStepType, info: SEND_COPY.pending.info },
-            { state: 'finalized', displayLabel: SEND_COPY.finalized.label, stepType: 'future-small' as TimelineStepType },
+            {
+              state: 'prepared',
+              displayLabel: SEND_COPY.prepared.label,
+              stepType: 'complete' as TimelineStepType,
+              timestamp: sendTx.createdAt,
+            },
+            {
+              state: 'pending',
+              displayLabel: SEND_COPY.pending.label,
+              stepType: 'next-pending' as TimelineStepType,
+              info: SEND_COPY.pending.info,
+            },
+            {
+              state: 'finalized',
+              displayLabel: SEND_COPY.finalized.label,
+              stepType: 'future-small' as TimelineStepType,
+            },
           ];
         case 'finalized':
           return [
-            { state: 'prepared', displayLabel: SEND_COPY.prepared.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
-            { state: 'pending', displayLabel: SEND_COPY.pending.label, stepType: 'complete' as TimelineStepType, timestamp: sendTx.createdAt },
-            { state: 'finalized', displayLabel: SEND_COPY.finalized.label, stepType: 'success' as TimelineStepType, info: SEND_COPY.finalized.info },
+            {
+              state: 'prepared',
+              displayLabel: SEND_COPY.prepared.label,
+              stepType: 'complete' as TimelineStepType,
+              timestamp: sendTx.createdAt,
+            },
+            {
+              state: 'pending',
+              displayLabel: SEND_COPY.pending.label,
+              stepType: 'complete' as TimelineStepType,
+              timestamp: sendTx.createdAt,
+            },
+            {
+              state: 'finalized',
+              displayLabel: SEND_COPY.finalized.label,
+              stepType: 'success' as TimelineStepType,
+              info: SEND_COPY.finalized.info,
+            },
           ];
         default:
           return [];
@@ -316,14 +502,33 @@ function buildTimeline({
       // 'pending' is a waiting state — token received, needs user action to redeem
       if (txState === 'pending') {
         return [
-          { state: 'pending', displayLabel: RECEIVE_COPY.pending.label, stepType: 'next-pending' as TimelineStepType, info: RECEIVE_COPY.pending.info },
-          { state: 'redeemed', displayLabel: RECEIVE_COPY.redeemed.label, stepType: 'future-small' as TimelineStepType },
+          {
+            state: 'pending',
+            displayLabel: RECEIVE_COPY.pending.label,
+            stepType: 'next-pending' as TimelineStepType,
+            info: RECEIVE_COPY.pending.info,
+          },
+          {
+            state: 'redeemed',
+            displayLabel: RECEIVE_COPY.redeemed.label,
+            stepType: 'future-small' as TimelineStepType,
+          },
         ];
       }
 
       return [
-        { state: 'pending', displayLabel: RECEIVE_COPY.pending.label, stepType: 'complete' as TimelineStepType, timestamp: receiveTx.createdAt },
-        { state: 'redeemed', displayLabel: RECEIVE_COPY.redeemed.label, stepType: 'success' as TimelineStepType, info: RECEIVE_COPY.redeemed.info(receiveTx.amount) },
+        {
+          state: 'pending',
+          displayLabel: RECEIVE_COPY.pending.label,
+          stepType: 'complete' as TimelineStepType,
+          timestamp: receiveTx.createdAt,
+        },
+        {
+          state: 'redeemed',
+          displayLabel: RECEIVE_COPY.redeemed.label,
+          stepType: 'success' as TimelineStepType,
+          info: RECEIVE_COPY.redeemed.info(receiveTx.amount),
+        },
       ];
     }
 
@@ -652,108 +857,108 @@ export function HistoryEntryTimeline({
 
   return (
     <Log name="HistoryEntryTimeline">
-    <View className="bg-surface-secondary mx-4 rounded-2xl p-5">
-      {/* Card Label */}
-      <Text size={11} bold style={[styles.cardLabel, { color: foreground50 }]}>
-        {cardLabel}
-      </Text>
-
-      {/* Status Header */}
-      <HStack style={{ marginBottom: 16 }} align="center">
-        <Text
-          size={14}
-          heavy
-          style={{
-            color: getStatusHeaderColor(),
-          }}>
-          {statusHeader}
+      <View className="bg-surface-secondary mx-4 rounded-2xl p-5">
+        {/* Card Label */}
+        <Text size={11} bold style={[styles.cardLabel, { color: foreground50 }]}>
+          {cardLabel}
         </Text>
-        {expiryBadge && (
+
+        {/* Status Header */}
+        <HStack style={{ marginBottom: 16 }} align="center">
           <Text
-            size={12}
+            size={14}
+            heavy
             style={{
               color: getStatusHeaderColor(),
-              marginLeft: 4,
             }}>
-            •{'  '}
-            {expiryBadge}
+            {statusHeader}
           </Text>
-        )}
-      </HStack>
+          {expiryBadge && (
+            <Text
+              size={12}
+              style={{
+                color: getStatusHeaderColor(),
+                marginLeft: 4,
+              }}>
+              •{'  '}
+              {expiryBadge}
+            </Text>
+          )}
+        </HStack>
 
-      {/* Timeline */}
-      <View>
-        {timeline.map((item, index) => {
-          const isLast = index === timeline.length - 1;
-          const nextItem = !isLast ? timeline[index + 1] : null;
-          const lineType = nextItem ? getLineType(item, nextItem) : null;
-          const isFutureState =
-            item.stepType === 'next-pending' || item.stepType === 'future-small';
+        {/* Timeline */}
+        <View>
+          {timeline.map((item, index) => {
+            const isLast = index === timeline.length - 1;
+            const nextItem = !isLast ? timeline[index + 1] : null;
+            const lineType = nextItem ? getLineType(item, nextItem) : null;
+            const isFutureState =
+              item.stepType === 'next-pending' || item.stepType === 'future-small';
 
-          // Stagger: dot animates, then line fills, then next dot
-          const dotDelay = index * 300;
-          const lineDelay = dotDelay + 150;
+            // Stagger: dot animates, then line fills, then next dot
+            const dotDelay = index * 300;
+            const lineDelay = dotDelay + 150;
 
-          const contentMarginTop = item.stepType === 'future-small' ? -7 : -3;
+            const contentMarginTop = item.stepType === 'future-small' ? -7 : -3;
 
-          return (
-            <Animated.View key={item.state} entering={FadeInDown.delay(index * 60).duration(250)}>
-              <HStack align="flex-start">
-                {/* Timeline Indicator Column */}
-                <VStack align="center" style={{ marginRight: 14 }}>
-                  <AnimatedCheckpointDot
-                    type={timelineStepTypeToCheckpointDotType(item.stepType)}
-                    delayMs={dotDelay}
-                    greenColor={greenColor}
-                    redColor={redColor}
-                    orangeColor={orangeColor}
-                    greyColor={greyColor}
-                  />
-                  {lineType && (
-                    <AnimatedTimelineLine
-                      lineType={lineType}
-                      delayMs={lineDelay}
+            return (
+              <Animated.View key={item.state} entering={FadeInDown.delay(index * 60).duration(250)}>
+                <HStack align="flex-start">
+                  {/* Timeline Indicator Column */}
+                  <VStack align="center" style={{ marginRight: 14 }}>
+                    <AnimatedCheckpointDot
+                      type={timelineStepTypeToCheckpointDotType(item.stepType)}
+                      delayMs={dotDelay}
                       greenColor={greenColor}
                       redColor={redColor}
                       orangeColor={orangeColor}
                       greyColor={greyColor}
                     />
-                  )}
-                </VStack>
+                    {lineType && (
+                      <AnimatedTimelineLine
+                        lineType={lineType}
+                        delayMs={lineDelay}
+                        greenColor={greenColor}
+                        redColor={redColor}
+                        orangeColor={orangeColor}
+                        greyColor={greyColor}
+                      />
+                    )}
+                  </VStack>
 
-                {/* Content Column */}
-                <VStack
-                  style={{
-                    flex: 1,
-                    paddingBottom: isLast ? 0 : 16,
-                    marginTop: contentMarginTop,
-                  }}>
-                  <Text
-                    size={15}
-                    bold
+                  {/* Content Column */}
+                  <VStack
                     style={{
-                      color: getStateTextColor(item.stepType, isFutureState),
-                      marginBottom: 2,
+                      flex: 1,
+                      paddingBottom: isLast ? 0 : 16,
+                      marginTop: contentMarginTop,
                     }}>
-                    {item.displayLabel}
-                  </Text>
-                  {item.timestamp && (
-                    <Text size={13} style={{ color: foreground66 }}>
-                      {convertTime(new Date(item.timestamp))}
+                    <Text
+                      size={15}
+                      bold
+                      style={{
+                        color: getStateTextColor(item.stepType, isFutureState),
+                        marginBottom: 2,
+                      }}>
+                      {item.displayLabel}
                     </Text>
-                  )}
-                  {item.info && (
-                    <Text size={12} style={{ color: foreground66, marginTop: 2 }}>
-                      {item.info}
-                    </Text>
-                  )}
-                </VStack>
-              </HStack>
-            </Animated.View>
-          );
-        })}
+                    {item.timestamp && (
+                      <Text size={13} style={{ color: foreground66 }}>
+                        {convertTime(new Date(item.timestamp))}
+                      </Text>
+                    )}
+                    {item.info && (
+                      <Text size={12} style={{ color: foreground66, marginTop: 2 }}>
+                        {item.info}
+                      </Text>
+                    )}
+                  </VStack>
+                </HStack>
+              </Animated.View>
+            );
+          })}
+        </View>
       </View>
-    </View>
     </Log>
   );
 }

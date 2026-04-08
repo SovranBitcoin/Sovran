@@ -43,44 +43,44 @@ export const ContactSearchResultItem = ({ result, loading, onPress }: Props) => 
           pressed && !isLoading && { backgroundColor: surfaceSecondary },
         ]}>
         {isLoading ? (
-        <Avatar seed={pubkey} size={44} loading />
-      ) : profile?.picture ? (
-        <Image source={{ uri: profile.picture }} style={styles.avatar} />
-      ) : (
-        <View style={[styles.avatar, { backgroundColor: surfaceTertiary }]}>
-          <Feather name="user" size={20} color={opacity(foreground, 0.5)} />
-        </View>
-      )}
-      <View style={styles.info}>
-        <Text
-          loading={isLoading}
-          placeholder="Display Name"
-          style={[styles.name, { color: foreground }]}
-          numberOfLines={1}>
-          {displayName}
-        </Text>
-        {hasNip05 ? (
-          <View style={styles.nip05Row}>
-            {profile!.nip05Valid && (
-              <Feather name="check-circle" size={12} color={opacity(foreground, 0.4)} />
-            )}
-            <Text
-              loading={isLoading}
-              placeholder="user@relay.example"
-              style={[styles.handle, { color: opacity(foreground, 0.5) }]}
-              numberOfLines={1}>
-              {profile!.nip05}
-            </Text>
-          </View>
+          <Avatar seed={pubkey} size={44} loading />
+        ) : profile?.picture ? (
+          <Image source={{ uri: profile.picture }} style={styles.avatar} />
         ) : (
+          <View style={[styles.avatar, { backgroundColor: surfaceTertiary }]}>
+            <Feather name="user" size={20} color={opacity(foreground, 0.5)} />
+          </View>
+        )}
+        <View style={styles.info}>
           <Text
             loading={isLoading}
-            placeholder="npub1..."
-            style={[styles.handle, { color: opacity(foreground, 0.5) }]}
+            placeholder="Display Name"
+            style={[styles.name, { color: foreground }]}
             numberOfLines={1}>
-            {pubkey.slice(0, 16)}...
+            {displayName}
           </Text>
-        )}
+          {hasNip05 ? (
+            <View style={styles.nip05Row}>
+              {profile!.nip05Valid && (
+                <Feather name="check-circle" size={12} color={opacity(foreground, 0.4)} />
+              )}
+              <Text
+                loading={isLoading}
+                placeholder="user@relay.example"
+                style={[styles.handle, { color: opacity(foreground, 0.5) }]}
+                numberOfLines={1}>
+                {profile!.nip05}
+              </Text>
+            </View>
+          ) : (
+            <Text
+              loading={isLoading}
+              placeholder="npub1..."
+              style={[styles.handle, { color: opacity(foreground, 0.5) }]}
+              numberOfLines={1}>
+              {pubkey.slice(0, 16)}...
+            </Text>
+          )}
         </View>
       </Pressable>
     </Log>

@@ -154,11 +154,18 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
       setContactsFromRelay: ({ tags, content, createdAt }) => {
         set((state) => {
           if (createdAt < state.contactsUpdatedAt) {
-            storeLog.debug('social.contacts.stale', { createdAt, current: state.contactsUpdatedAt });
+            storeLog.debug('social.contacts.stale', {
+              createdAt,
+              current: state.contactsUpdatedAt,
+            });
             return state;
           }
           const following = extractFollowingFromTags(tags);
-          storeLog.info('social.contacts.set', { tagCount: tags.length, followingCount: Object.keys(following).length, createdAt });
+          storeLog.info('social.contacts.set', {
+            tagCount: tags.length,
+            followingCount: Object.keys(following).length,
+            createdAt,
+          });
           return {
             contactsTags: tags,
             contactsContent: content,
@@ -195,8 +202,13 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
               next[pubkey] = opt;
             }
           }
-          const cleared = Object.keys(state.optimisticFollowsByPubkey).length - Object.keys(next).length;
-          if (cleared > 0) storeLog.debug('social.follow.settled.clear', { cleared, remaining: Object.keys(next).length });
+          const cleared =
+            Object.keys(state.optimisticFollowsByPubkey).length - Object.keys(next).length;
+          if (cleared > 0)
+            storeLog.debug('social.follow.settled.clear', {
+              cleared,
+              remaining: Object.keys(next).length,
+            });
           return { optimisticFollowsByPubkey: next };
         });
       },
@@ -204,7 +216,9 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
       // ---- repost deletion tracking ----
 
       markRepostDeleted: (originalEventId) => {
-        storeLog.debug('social.repost.markDeleted', { originalEventId: originalEventId.slice(0, 8) });
+        storeLog.debug('social.repost.markDeleted', {
+          originalEventId: originalEventId.slice(0, 8),
+        });
         set((state) => ({
           deletedRepostOriginalIds: {
             ...state.deletedRepostOriginalIds,
@@ -214,7 +228,9 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
       },
 
       unmarkRepostDeleted: (originalEventId) => {
-        storeLog.debug('social.repost.unmarkDeleted', { originalEventId: originalEventId.slice(0, 8) });
+        storeLog.debug('social.repost.unmarkDeleted', {
+          originalEventId: originalEventId.slice(0, 8),
+        });
         set((state) => ({
           deletedRepostOriginalIds: omitKey(state.deletedRepostOriginalIds, originalEventId),
         }));
@@ -223,7 +239,10 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
       // ---- sync from relay ----
 
       syncLikesFromRelay: (targetEventIds, likes) => {
-        storeLog.info('social.likes.sync', { targetCount: targetEventIds.length, likeCount: likes.length });
+        storeLog.info('social.likes.sync', {
+          targetCount: targetEventIds.length,
+          likeCount: likes.length,
+        });
         const byTarget: Record<string, NostrReactionState> = {};
         for (const like of likes) {
           const existing = byTarget[like.targetEventId];
@@ -247,7 +266,10 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
       },
 
       syncRepostsFromRelay: (targetEventIds, reposts) => {
-        storeLog.info('social.reposts.sync', { targetCount: targetEventIds.length, repostCount: reposts.length });
+        storeLog.info('social.reposts.sync', {
+          targetCount: targetEventIds.length,
+          repostCount: reposts.length,
+        });
         const byTarget: Record<string, NostrRepostState> = {};
         for (const repost of reposts) {
           const existing = byTarget[repost.targetEventId];
@@ -278,7 +300,11 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
       // ---- engagement optimistic ----
 
       setLikeOptimistic: (eventId, params) => {
-        storeLog.debug('social.like.optimistic', { eventId: eventId.slice(0, 8), value: params.value, pending: params.pending });
+        storeLog.debug('social.like.optimistic', {
+          eventId: eventId.slice(0, 8),
+          value: params.value,
+          pending: params.pending,
+        });
         set((state) => ({
           optimisticLikesByEventId: withOptimisticEntry(
             state.optimisticLikesByEventId,
@@ -289,7 +315,11 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
       },
 
       setRepostOptimistic: (eventId, params) => {
-        storeLog.debug('social.repost.optimistic', { eventId: eventId.slice(0, 8), value: params.value, pending: params.pending });
+        storeLog.debug('social.repost.optimistic', {
+          eventId: eventId.slice(0, 8),
+          value: params.value,
+          pending: params.pending,
+        });
         set((state) => ({
           optimisticRepostsByEventId: withOptimisticEntry(
             state.optimisticRepostsByEventId,
@@ -327,9 +357,14 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
           };
 
           const nextLikes = filterSettled(state.optimisticLikesByEventId, state.likesByEventId);
-          const nextReposts = filterSettled(state.optimisticRepostsByEventId, state.repostsByEventId);
-          const clearedLikes = Object.keys(state.optimisticLikesByEventId).length - Object.keys(nextLikes).length;
-          const clearedReposts = Object.keys(state.optimisticRepostsByEventId).length - Object.keys(nextReposts).length;
+          const nextReposts = filterSettled(
+            state.optimisticRepostsByEventId,
+            state.repostsByEventId
+          );
+          const clearedLikes =
+            Object.keys(state.optimisticLikesByEventId).length - Object.keys(nextLikes).length;
+          const clearedReposts =
+            Object.keys(state.optimisticRepostsByEventId).length - Object.keys(nextReposts).length;
           if (clearedLikes > 0 || clearedReposts > 0) {
             storeLog.debug('social.engagement.settled.clear', { clearedLikes, clearedReposts });
           }

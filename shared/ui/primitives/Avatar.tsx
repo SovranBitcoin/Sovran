@@ -166,7 +166,12 @@ export const Avatar = ({
   if (hasPicture && imageStatus === 'loaded') {
     return (
       <VStack style={{ position: 'relative', overflow: 'hidden' }}>
-        <ExpoImage source={{ uri: picture }} cachePolicy="memory-disk" style={avatarStyle} accessibilityLabel={imageAlt} />
+        <ExpoImage
+          source={{ uri: picture }}
+          cachePolicy="memory-disk"
+          style={avatarStyle}
+          accessibilityLabel={imageAlt}
+        />
         {StatusBadgeWrapper}
       </VStack>
     );

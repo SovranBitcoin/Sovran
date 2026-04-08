@@ -13,25 +13,25 @@ export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactEleme
 
   return (
     <Log name="FiatCurrencyPill">
-    <TouchableOpacity disabled={!onPress} onPress={onPress}>
-      <HStack
-        align="center"
-        justify="center"
-        gap={6}
-        className="overflow-hidden rounded-full"
-        style={{
-          backgroundColor: opacity(green500, 0.15),
-          borderWidth: 1,
-          borderColor: opacity(green400, 0.2),
-          paddingHorizontal: 14,
-          paddingVertical: 6,
-          minHeight: iosHeight,
-        }}>
-        <Text overpass size={textSize} bold color={success} style={{ letterSpacing: 0.3 }}>
-          {text}
-        </Text>
-      </HStack>
-    </TouchableOpacity>
+      <TouchableOpacity disabled={!onPress} onPress={onPress}>
+        <HStack
+          align="center"
+          justify="center"
+          gap={6}
+          className="overflow-hidden rounded-full"
+          style={{
+            backgroundColor: opacity(green500, 0.15),
+            borderWidth: 1,
+            borderColor: opacity(green400, 0.2),
+            paddingHorizontal: 14,
+            paddingVertical: 6,
+            minHeight: iosHeight,
+          }}>
+          <Text overpass size={textSize} bold color={success} style={{ letterSpacing: 0.3 }}>
+            {text}
+          </Text>
+        </HStack>
+      </TouchableOpacity>
     </Log>
   );
 }

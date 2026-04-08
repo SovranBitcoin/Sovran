@@ -56,7 +56,12 @@ export function useMintProfiles(mints: MintWithInfo[]): void {
           inflightRef.current.delete(key);
           if (result.isOk()) {
             const { followers, score } = result.value;
-            cashuLog.debug('mint.profile.resolved', { mintUrl: key, pubkey, followers, reputation: Math.round(score) });
+            cashuLog.debug('mint.profile.resolved', {
+              mintUrl: key,
+              pubkey,
+              followers,
+              reputation: Math.round(score),
+            });
             setCached(mint.url, followers, score);
           }
         },

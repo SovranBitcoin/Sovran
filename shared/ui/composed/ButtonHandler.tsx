@@ -225,62 +225,62 @@ export function ButtonHandler({
 
   return (
     <Log name="ButtonHandler">
-    <HStack
-      align="center"
-      justify="space-between"
-      spacing={0}
-      className={`flex-row pb-6 ${className || ''}`}
-      style={[style]}>
-      <LinearGradient
-        colors={[
-          opacity(gradientColor || background, 0.75),
-          opacity(gradientColor || background, 0),
-        ]}
-        start={{ x: 0, y: 1 }}
-        end={{ x: 0, y: 0 }}
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100%',
-          height: '100%',
-        }}
-      />
+      <HStack
+        align="center"
+        justify="space-between"
+        spacing={0}
+        className={`flex-row pb-6 ${className || ''}`}
+        style={[style]}>
+        <LinearGradient
+          colors={[
+            opacity(gradientColor || background, 0.75),
+            opacity(gradientColor || background, 0),
+          ]}
+          start={{ x: 0, y: 1 }}
+          end={{ x: 0, y: 0 }}
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100%',
+            height: '100%',
+          }}
+        />
 
-      {visibleButtons.slice(0, 2).map((button, index) => (
-        <View key={index} className="flex-1">
-          <Button
-            testID={button.testID}
-            onPress={() => handleButtonPress(button)}
-            text={button.text}
-            variant={button.variant}
-            loading={loading || button.loading}
-            disabled={button.disabled}
-          />
-        </View>
-      ))}
+        {visibleButtons.slice(0, 2).map((button, index) => (
+          <View key={index} className="flex-1">
+            <Button
+              testID={button.testID}
+              onPress={() => handleButtonPress(button)}
+              text={button.text}
+              variant={button.variant}
+              loading={loading || button.loading}
+              disabled={button.disabled}
+            />
+          </View>
+        ))}
 
-      {/* More button (if more than 2 buttons) */}
-      {visibleButtons.length > 2 && (
-        <View>
-          <Button
-            testID="more-button"
-            icon={
-              visibleButtons.length === 3 && visibleButtons[2].icon ? (
-                <Icon name={visibleButtons[2].icon} />
-              ) : (
-                <Icon name="tabler:dots" />
-              )
-            }
-            onPress={handleMorePress}
-            variant="secondary"
-            loading={loading}
-            disabled={visibleButtons.length === 3 && visibleButtons[2].disabled}
-          />
-        </View>
-      )}
-    </HStack>
+        {/* More button (if more than 2 buttons) */}
+        {visibleButtons.length > 2 && (
+          <View>
+            <Button
+              testID="more-button"
+              icon={
+                visibleButtons.length === 3 && visibleButtons[2].icon ? (
+                  <Icon name={visibleButtons[2].icon} />
+                ) : (
+                  <Icon name="tabler:dots" />
+                )
+              }
+              onPress={handleMorePress}
+              variant="secondary"
+              loading={loading}
+              disabled={visibleButtons.length === 3 && visibleButtons[2].disabled}
+            />
+          </View>
+        )}
+      </HStack>
     </Log>
   );
 }

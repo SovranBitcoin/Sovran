@@ -83,7 +83,10 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
       const knownMintUrls = new Set(knownMints.map((mint) => normalizeMintUrlKey(mint.mintUrl)));
 
       // Map normalized key → { fullUrl, recommendations }
-      const recommendationsByKey = new Map<string, { fullUrl: string; recs: MintRecommendation[] }>();
+      const recommendationsByKey = new Map<
+        string,
+        { fullUrl: string; recs: MintRecommendation[] }
+      >();
 
       events.forEach((event: any) => {
         if (!isCashuRecommendationEvent(event as NostrEvent)) return;
@@ -96,7 +99,10 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
         const recommendation = parseRecommendation(event.content);
         if (!recommendation) return;
 
-        const entry = recommendationsByKey.get(key) ?? { fullUrl: normalizeUrlForApi(mintUrl), recs: [] };
+        const entry = recommendationsByKey.get(key) ?? {
+          fullUrl: normalizeUrlForApi(mintUrl),
+          recs: [],
+        };
         entry.recs.push({
           score: recommendation.score,
           comment: recommendation.comment,
@@ -116,14 +122,22 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
 
       if (urlsToProcess.length === 0) return;
 
-      cashuLog.info('mint.nostr.discovered', { newUrls: urlsToProcess.length, totalProcessed: processedUrls.current.size });
+      cashuLog.info('mint.nostr.discovered', {
+        newUrls: urlsToProcess.length,
+        totalProcessed: processedUrls.current.size,
+      });
       urlsToProcess.forEach(async ({ fullUrl: url, recs: recommendations }) => {
         const score = averageScore(recommendations);
 
         try {
           const mintInfoResult = await fetchMintInfo(url);
           const info = mintInfoResult.isOk() ? mintInfoResult.value : null;
-          cashuLog.debug('mint.nostr.info.resolved', { url, hasInfo: !!info, hasIcon: !!info?.icon_url, name: info?.name });
+          cashuLog.debug('mint.nostr.info.resolved', {
+            url,
+            hasInfo: !!info,
+            hasIcon: !!info?.icon_url,
+            name: info?.name,
+          });
           appendMintIfNew(setMints, {
             url,
             score,
@@ -131,12 +145,17 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
             mintInfo: info,
           });
         } catch (err) {
-          cashuLog.warn('mint.nostr.info.error', { url, error: err instanceof Error ? err : new Error(String(err)) });
+          cashuLog.warn('mint.nostr.info.error', {
+            url,
+            error: err instanceof Error ? err : new Error(String(err)),
+          });
           appendMintIfNew(setMints, { url, score, recommendations, mintInfo: null });
         }
       });
     } catch (err) {
-      cashuLog.error('mint.nostr.error', { error: err instanceof Error ? err : new Error(String(err)) });
+      cashuLog.error('mint.nostr.error', {
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
       setError('Failed to process mint recommendations. Please try again.');
     }
   }, [events, knownMints, eose]);

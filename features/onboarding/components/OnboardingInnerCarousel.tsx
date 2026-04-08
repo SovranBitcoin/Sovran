@@ -95,63 +95,63 @@ const OnboardingInnerCarousel: React.FC<OnboardingCarouselProps> = ({
 
   return (
     <Log name="OnboardingInnerCarousel">
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          width: '100%',
-          top: insets.top,
-          height: screenHeight - insets.top - insets.bottom - 60,
-        },
-        containerStyle,
-      ]}>
-      <AnimatedFlatList
-        ref={horizontalListRef}
-        data={data}
-        renderItem={({ item, index }) => (
-          <OnboardingSlideItem
-            item={item}
-            index={index}
-            width={screenWidth}
-            scrollOffsetX={scrollOffsetX}
-          />
-        )}
-        horizontal
-        pagingEnabled
-        initialScrollIndex={0}
-        getItemLayout={(_, index) => ({
-          length: screenWidth,
-          offset: screenWidth * index,
-          index,
-        })}
-        scrollEventThrottle={16}
-        onScroll={scrollHandler}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        onEndReached={() => {
-          if (Platform.OS === 'android') {
-            setTimeout(() => {
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            width: '100%',
+            top: insets.top,
+            height: screenHeight - insets.top - insets.bottom - 60,
+          },
+          containerStyle,
+        ]}>
+        <AnimatedFlatList
+          ref={horizontalListRef}
+          data={data}
+          renderItem={({ item, index }) => (
+            <OnboardingSlideItem
+              item={item}
+              index={index}
+              width={screenWidth}
+              scrollOffsetX={scrollOffsetX}
+            />
+          )}
+          horizontal
+          pagingEnabled
+          initialScrollIndex={0}
+          getItemLayout={(_, index) => ({
+            length: screenWidth,
+            offset: screenWidth * index,
+            index,
+          })}
+          scrollEventThrottle={16}
+          onScroll={scrollHandler}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          onEndReached={() => {
+            if (Platform.OS === 'android') {
+              setTimeout(() => {
+                horizontalListRef?.current?.scrollToIndex({ index: 0, animated: false });
+              }, 100);
+            } else {
               horizontalListRef?.current?.scrollToIndex({ index: 0, animated: false });
-            }, 100);
-          } else {
-            horizontalListRef?.current?.scrollToIndex({ index: 0, animated: false });
-          }
-        }}
-        showsHorizontalScrollIndicator={false}
-        scrollEnabled={isHorizontalScrollEnabled}
-      />
-      <Animated.View style={paginationStyle}>
-        <OnboardingPagination
-          slides={slides}
-          currentSlideIndex={currentSlideIndex}
-          animatedSlideIndex={animatedSlideIndex}
-          isDragging={isDragging}
-          handleScrollToIndex={handleScrollToIndex}
-          translateY={translateY}
-          topCarouselOffset={topCarouselOffset}
+            }
+          }}
+          showsHorizontalScrollIndicator={false}
+          scrollEnabled={isHorizontalScrollEnabled}
         />
+        <Animated.View style={paginationStyle}>
+          <OnboardingPagination
+            slides={slides}
+            currentSlideIndex={currentSlideIndex}
+            animatedSlideIndex={animatedSlideIndex}
+            isDragging={isDragging}
+            handleScrollToIndex={handleScrollToIndex}
+            translateY={translateY}
+            topCarouselOffset={topCarouselOffset}
+          />
+        </Animated.View>
       </Animated.View>
-    </Animated.View>
     </Log>
   );
 };

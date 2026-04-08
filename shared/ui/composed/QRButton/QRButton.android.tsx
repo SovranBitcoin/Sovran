@@ -36,56 +36,59 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
 
   return (
     <Log name="QRButton">
-    <TouchableOpacity
-      style={[styles.touchable, { ...containerStyle, shadowColor: accentColor }]}
-      className="items-center justify-center"
-      haptics={{ type: 'impact', impactStyle: 'light' }}
-      activeOpacity={0.75}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      onPress={onPress}>
-      <View style={[styles.container, containerStyle]} pointerEvents="none">
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: background }]} />
+      <TouchableOpacity
+        style={[styles.touchable, { ...containerStyle, shadowColor: accentColor }]}
+        className="items-center justify-center"
+        haptics={{ type: 'impact', impactStyle: 'light' }}
+        activeOpacity={0.75}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        onPress={onPress}>
+        <View style={[styles.container, containerStyle]} pointerEvents="none">
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: background }]} />
+          <View
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(BUTTON_COLOR, 0.3) }]}
+          />
+          <LinearGradient
+            colors={[
+              opacity(BUTTON_COLOR, 0.7),
+              opacity(BUTTON_COLOR, 0.4),
+              opacity(BUTTON_COLOR, 0.15),
+              'transparent',
+            ]}
+            locations={[0, 0.25, 0.6, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <LinearGradient
+            colors={[
+              opacity(BUTTON_COLOR, 0.5),
+              opacity(BUTTON_COLOR, 0.2),
+              'transparent',
+              opacity(BUTTON_COLOR, 0.25),
+            ]}
+            locations={[0, 0.3, 0.65, 1]}
+            start={{ x: 1, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <LinearGradient
+            colors={[opacity(surfaceForeground, 0.08), 'transparent']}
+            locations={[0, 0.65]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+        </View>
         <View
-          style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(BUTTON_COLOR, 0.3) }]}
-        />
-        <LinearGradient
-          colors={[
-            opacity(BUTTON_COLOR, 0.7),
-            opacity(BUTTON_COLOR, 0.4),
-            opacity(BUTTON_COLOR, 0.15),
-            'transparent',
+          style={[
+            StyleSheet.absoluteFillObject,
+            { justifyContent: 'center', alignItems: 'center' },
           ]}
-          locations={[0, 0.25, 0.6, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-        <LinearGradient
-          colors={[
-            opacity(BUTTON_COLOR, 0.5),
-            opacity(BUTTON_COLOR, 0.2),
-            'transparent',
-            opacity(BUTTON_COLOR, 0.25),
-          ]}
-          locations={[0, 0.3, 0.65, 1]}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-        <LinearGradient
-          colors={[opacity(surfaceForeground, 0.08), 'transparent']}
-          locations={[0, 0.65]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-      </View>
-      <View
-        style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center' }]}
-        pointerEvents="none">
-        <Icon name="stash:qr-code" size={24} color={surfaceForeground} />
-      </View>
-    </TouchableOpacity>
+          pointerEvents="none">
+          <Icon name="stash:qr-code" size={24} color={surfaceForeground} />
+        </View>
+      </TouchableOpacity>
     </Log>
   );
 }

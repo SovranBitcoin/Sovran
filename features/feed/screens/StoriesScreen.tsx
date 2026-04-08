@@ -25,12 +25,17 @@ export function StoriesScreen() {
     try {
       return JSON.parse(storyUsersJson);
     } catch (e) {
-      feedLog.error('feed.stories.parse_failed', { error: e instanceof Error ? e : new Error(String(e)) });
+      feedLog.error('feed.stories.parse_failed', {
+        error: e instanceof Error ? e : new Error(String(e)),
+      });
       return [];
     }
   }, [storyUsersJson]);
 
-  feedLog.debug('feed.stories.open', { startIndex: Number(startIndex) || 0, userCount: storyUsers.length });
+  feedLog.debug('feed.stories.open', {
+    startIndex: Number(startIndex) || 0,
+    userCount: storyUsers.length,
+  });
 
   const handleClose = () => {
     if (closeRequestedRef.current) return;
@@ -57,7 +62,14 @@ export function StoriesScreen() {
   }
 
   return (
-    <Screen name="StoriesScreen" style={{ flex: 1, backgroundColor: 'black', paddingTop: insets.top + 6, paddingBottom: insets.bottom + 6 }}>
+    <Screen
+      name="StoriesScreen"
+      style={{
+        flex: 1,
+        backgroundColor: 'black',
+        paddingTop: insets.top + 6,
+        paddingBottom: insets.bottom + 6,
+      }}>
       <StoriesCarousel
         storyUsers={storyUsers}
         startIndex={Number(startIndex) || 0}

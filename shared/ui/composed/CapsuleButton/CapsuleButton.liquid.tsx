@@ -22,29 +22,29 @@ export function CapsuleButtonLiquid({
 }: CapsuleButtonProps): React.ReactElement {
   return (
     <Log name="CapsuleButton">
-    <Host style={{ height, width: '100%' }} matchContents={false}>
-      <SwiftUIButton
-        modifiers={[
-          buttonStyle('glass'),
-          frame({ height, maxWidth: Infinity, alignment: 'center' }),
-        ]}
-        onPress={onPress}>
-        <SwiftUIHStack
-          alignment="center"
-          spacing={8}
-          modifiers={[frame({ maxWidth: Infinity, alignment: 'center' })]}>
-          {systemIcon && <SwiftUIImage systemName={systemIcon as any} size={18} color={color} />}
-          <SwiftUIText
-            modifiers={[
-              font({ size: 14, weight: 'bold' }),
-              foregroundStyle(color),
-              padding({ vertical: 8 }),
-            ]}>
-            {label}
-          </SwiftUIText>
-        </SwiftUIHStack>
-      </SwiftUIButton>
-    </Host>
+      <Host style={{ height, width: '100%' }} matchContents={false}>
+        <SwiftUIButton
+          modifiers={[
+            buttonStyle('glass'),
+            frame({ height, maxWidth: Infinity, alignment: 'center' }),
+          ]}
+          onPress={onPress}>
+          <SwiftUIHStack
+            alignment="center"
+            spacing={8}
+            modifiers={[frame({ maxWidth: Infinity, alignment: 'center' })]}>
+            {systemIcon && <SwiftUIImage systemName={systemIcon as any} size={18} color={color} />}
+            <SwiftUIText
+              modifiers={[
+                font({ size: 14, weight: 'bold' }),
+                foregroundStyle(color),
+                padding({ vertical: 8 }),
+              ]}>
+              {label}
+            </SwiftUIText>
+          </SwiftUIHStack>
+        </SwiftUIButton>
+      </Host>
     </Log>
   );
 }

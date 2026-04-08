@@ -281,9 +281,18 @@ function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): FeedParseResult
 
   const duration = Math.round((performance.now() - t0) * 100) / 100;
   if (duration > 50) {
-    log.warn('feed.parse.slow', { duration_ms: duration, rawEvents: feedRawEvents.length, feedItems: orderedFeedItems.length, profiles: profilesMap.size });
+    log.warn('feed.parse.slow', {
+      duration_ms: duration,
+      rawEvents: feedRawEvents.length,
+      feedItems: orderedFeedItems.length,
+      profiles: profilesMap.size,
+    });
   } else {
-    log.debug('feed.parse.done', { duration_ms: duration, rawEvents: feedRawEvents.length, feedItems: orderedFeedItems.length });
+    log.debug('feed.parse.done', {
+      duration_ms: duration,
+      rawEvents: feedRawEvents.length,
+      feedItems: orderedFeedItems.length,
+    });
   }
 
   return {

@@ -53,35 +53,35 @@ export const GlassSearchBar = memo(function GlassSearchBar({
 
   return (
     <Log name="GlassSearchBar">
-    <View
-      style={{
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: surfaceSecondary,
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        marginRight: 8,
-      }}>
-      <TextInput
-        key={clearKey}
-        ref={inputRef}
-        defaultValue=""
-        onChangeText={handleTextChange}
-        placeholder={placeholder}
-        placeholderTextColor={opacity(foreground, 0.33)}
+      <View
         style={{
           flex: 1,
-          color: foreground,
-          fontSize: 16,
-          fontFamily: 'OxygenRegular',
-        }}
-        keyboardType={keyboardType}
-        autoCorrect={false}
-        autoFocus={autoFocus}
-      />
-    </View>
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: surfaceSecondary,
+          borderRadius: 12,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          marginRight: 8,
+        }}>
+        <TextInput
+          key={clearKey}
+          ref={inputRef}
+          defaultValue=""
+          onChangeText={handleTextChange}
+          placeholder={placeholder}
+          placeholderTextColor={opacity(foreground, 0.33)}
+          style={{
+            flex: 1,
+            color: foreground,
+            fontSize: 16,
+            fontFamily: 'OxygenRegular',
+          }}
+          keyboardType={keyboardType}
+          autoCorrect={false}
+          autoFocus={autoFocus}
+        />
+      </View>
     </Log>
   );
 });

@@ -34,7 +34,11 @@ export const useMintProfileStore = create<MintProfileStore>()(
 
       setCached: (mintUrl: string, followers: number, reputation: number) => {
         const normalized = normalizeMintUrlKey(mintUrl);
-        storeLog.debug('store.mint_profile.set_cached', { mintUrl: normalized, followers, reputation });
+        storeLog.debug('store.mint_profile.set_cached', {
+          mintUrl: normalized,
+          followers,
+          reputation,
+        });
         set((state) => ({
           cache: {
             ...state.cache,

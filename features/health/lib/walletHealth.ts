@@ -116,7 +116,11 @@ export function computeWalletHealth({
   desiredDistributionBp: Record<string, number> | undefined;
   pendingOutgoingCount: number;
 }): WalletHealthResult {
-  walletLog.debug('health.compute.start', { unit, mintCount: mintUrlsForUnit.length, pendingOutgoingCount });
+  walletLog.debug('health.compute.start', {
+    unit,
+    mintCount: mintUrlsForUnit.length,
+    pendingOutgoingCount,
+  });
   const normalizedUnit = unit.toLowerCase();
   const desired = desiredDistributionBp || {};
 

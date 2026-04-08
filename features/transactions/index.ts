@@ -14,7 +14,11 @@ export { TransactionLocationSection } from './components/TransactionLocationSect
 export { HistoryEntryHeader } from './components/detail/HistoryEntryHeader';
 export { HistoryEntryRefresh } from './components/detail/HistoryEntryRefresh';
 export { HistoryEntryTimeline } from './components/detail/HistoryEntryTimeline';
-export { useTransactionSource, useBip321Info, Bip321MethodIcons } from './components/detail/TransactionSourceSection';
+export {
+  useTransactionSource,
+  useBip321Info,
+  Bip321MethodIcons,
+} from './components/detail/TransactionSourceSection';
 export {
   TransactionsFilterProvider,
   useTransactionsFilter,

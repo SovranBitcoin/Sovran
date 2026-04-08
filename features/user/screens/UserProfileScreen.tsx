@@ -783,7 +783,10 @@ export function UserProfileScreen() {
       await Clipboard.setStringAsync(text);
       copyPopup(target);
     } catch (e) {
-      nostrLog.error('user.profile.copy.failed', { target, error: e instanceof Error ? e : new Error(String(e)) });
+      nostrLog.error('user.profile.copy.failed', {
+        target,
+        error: e instanceof Error ? e : new Error(String(e)),
+      });
       copyFailedPopup();
     }
   }, []);
@@ -794,14 +797,21 @@ export function UserProfileScreen() {
       const fullUrl = url.startsWith('http') ? url : `https://${url}`;
       await Linking.openURL(fullUrl);
     } catch (e) {
-      nostrLog.error('user.profile.open_link.failed', { url, error: e instanceof Error ? e : new Error(String(e)) });
+      nostrLog.error('user.profile.open_link.failed', {
+        url,
+        error: e instanceof Error ? e : new Error(String(e)),
+      });
       openLinkFailedPopup();
     }
   }, []);
 
   const handleToggleFollow = useCallback(async () => {
     if (!pubkey || !nostrKeys?.pubkey || !ndk) {
-      nostrLog.warn('user.profile.follow.precondition_failed', { hasPubkey: !!pubkey, hasNostrKeys: !!nostrKeys?.pubkey, hasNdk: !!ndk });
+      nostrLog.warn('user.profile.follow.precondition_failed', {
+        hasPubkey: !!pubkey,
+        hasNostrKeys: !!nostrKeys?.pubkey,
+        hasNdk: !!ndk,
+      });
       engagementUpdateFailedPopup('follow');
       return;
     }
@@ -829,7 +839,10 @@ export function UserProfileScreen() {
       setContactsFromRelay({ tags: nextTags, content: contactsContent, createdAt });
       clearFollowOptimistic(pubkey);
     } catch (e) {
-      nostrLog.error('user.profile.follow.failed', { pubkey, error: e instanceof Error ? e : new Error(String(e)) });
+      nostrLog.error('user.profile.follow.failed', {
+        pubkey,
+        error: e instanceof Error ? e : new Error(String(e)),
+      });
       clearFollowOptimistic(pubkey);
       engagementUpdateFailedPopup('follow');
     }

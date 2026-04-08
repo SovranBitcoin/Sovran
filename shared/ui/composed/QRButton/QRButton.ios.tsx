@@ -46,34 +46,39 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
 
   return (
     <Log name="QRButton">
-    <PressableFeedback
-      animation={false}
-      onPress={onPress}
-      style={[styles.pressable, pressableStyle]}>
-      <PressableFeedback.Ripple />
-      <View style={[styles.container, containerStyle]} pointerEvents="none">
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0f0f12' }]} />
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(WHITE, 0.35) }]} />
-        <LinearGradient
-          colors={[WHITE, opacity(WHITE, 0.8), opacity(WHITE, 0.7), opacity(WHITE, 0.6)]}
-          locations={[0, 0.35, 0.6, 1]}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
+      <PressableFeedback
+        animation={false}
+        onPress={onPress}
+        style={[styles.pressable, pressableStyle]}>
+        <PressableFeedback.Ripple />
+        <View style={[styles.container, containerStyle]} pointerEvents="none">
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0f0f12' }]} />
+          <View
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(WHITE, 0.35) }]}
+          />
+          <LinearGradient
+            colors={[WHITE, opacity(WHITE, 0.8), opacity(WHITE, 0.7), opacity(WHITE, 0.6)]}
+            locations={[0, 0.35, 0.6, 1]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View
+            style={[
+              StyleSheet.absoluteFillObject,
+              { borderWidth: 1, borderColor: opacity(WHITE, 0.4) },
+            ]}
+          />
+        </View>
         <View
           style={[
             StyleSheet.absoluteFillObject,
-            { borderWidth: 1, borderColor: opacity(WHITE, 0.4) },
+            { justifyContent: 'center', alignItems: 'center' },
           ]}
-        />
-      </View>
-      <View
-        style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center' }]}
-        pointerEvents="none">
-        <Icon name="stash:qr-code" size={38} color={surfaceTertiary} />
-      </View>
-    </PressableFeedback>
+          pointerEvents="none">
+          <Icon name="stash:qr-code" size={38} color={surfaceTertiary} />
+        </View>
+      </PressableFeedback>
     </Log>
   );
 }

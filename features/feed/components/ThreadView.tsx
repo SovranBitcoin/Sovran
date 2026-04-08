@@ -405,7 +405,10 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         setIsLoading(false);
       } catch (err) {
         if (!cancelled) {
-          feedLog.error('thread.load.error', { eventId, error: err instanceof Error ? err : new Error(String(err)) });
+          feedLog.error('thread.load.error', {
+            eventId,
+            error: err instanceof Error ? err : new Error(String(err)),
+          });
           setError('Failed to load thread');
           setIsLoading(false);
         }
@@ -507,7 +510,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
               hiddenReplyCount > 0 ? (
                 <View style={styles.hiddenReplyFooter}>
                   <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
-                    {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not loaded
+                    {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not
+                    loaded
                   </Text>
                 </View>
               ) : null

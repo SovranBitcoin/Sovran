@@ -56,7 +56,11 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
     const cached = getCached(normalizedMintUrl);
     if (cached) {
       const stale = isStale(normalizedMintUrl);
-      cashuLog.debug(stale ? 'mint.kym.cache.stale' : 'mint.kym.cache.hit', { mintUrl: normalizedMintUrl, score: cached.score, recommendations: cached.recommendations.length });
+      cashuLog.debug(stale ? 'mint.kym.cache.stale' : 'mint.kym.cache.hit', {
+        mintUrl: normalizedMintUrl,
+        score: cached.score,
+        recommendations: cached.recommendations.length,
+      });
       setScore(cached.score);
       setRecommendations(cached.recommendations);
     } else {
@@ -117,12 +121,19 @@ export const useKYMMint = (mintUrl?: string): UseKYMMintResult => {
       const totalScore = validRecommendations.reduce((sum, rec) => sum + rec.score, 0);
       const avgScore = Number((totalScore / validRecommendations.length).toFixed(2));
 
-      cashuLog.info('mint.kym.fetch', { mintUrl: normalizedMintUrl, score: avgScore, recommendationCount: validRecommendations.length });
+      cashuLog.info('mint.kym.fetch', {
+        mintUrl: normalizedMintUrl,
+        score: avgScore,
+        recommendationCount: validRecommendations.length,
+      });
       setScore(avgScore);
       setRecommendations(validRecommendations);
       setCached(normalizedMintUrl, avgScore, validRecommendations);
     } catch (err) {
-      cashuLog.error('mint.kym.error', { mintUrl: normalizedMintUrl, error: err instanceof Error ? err : new Error(String(err)) });
+      cashuLog.error('mint.kym.error', {
+        mintUrl: normalizedMintUrl,
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
       setError('Failed to process mint recommendations. Please try again.');
       // Keep whatever was loaded from cache rather than clearing on error.
     } finally {

@@ -290,7 +290,10 @@ export const useRoutstrStore = create<RoutstrStore>()(
               ? firstUserMessage.content.substring(0, 50) + '...'
               : firstUserMessage.content;
 
-          storeLog.debug('store.routstr.update_session_title', { sessionId: state.currentSessionId, title });
+          storeLog.debug('store.routstr.update_session_title', {
+            sessionId: state.currentSessionId,
+            title,
+          });
           const updatedSessions = state.sessions.map((session) =>
             session.id === state.currentSessionId ? { ...session, title } : session
           );

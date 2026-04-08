@@ -384,7 +384,10 @@ export function PendingEcashScreen() {
   const handleSweep = useCallback(async () => {
     if (isSweeping || displayedTransactions.length === 0) return;
 
-    log.info('transactions.pending.sweep.start', { count: displayedTransactions.length, mintUrl: effectiveSelectedMint });
+    log.info('transactions.pending.sweep.start', {
+      count: displayedTransactions.length,
+      mintUrl: effectiveSelectedMint,
+    });
     setIsSweeping(true);
     let successCount = 0;
     let failCount = 0;
@@ -483,151 +486,158 @@ export function PendingEcashScreen() {
           }}
         />
         <RNView style={{ flex: 1 }}>
-        {/* Scrollable content underneath the sticky header */}
-        <ModalLayoutWrapper
-          contentPadding={0}
-          bottomContent={sweepButton}
-          bottomPadding={displayedTransactions.length > 0 ? 160 : 120}
-          useAnimatedScroll
-          scrollY={scrollY}
-          disableHeaderSpacer
-          scrollIndicatorInsets={{ top: Math.max(0, stickyHeaderHeight - nativeHeaderHeight) }}>
-          {/* Spacer matching the sticky header height */}
-          <RNView style={{ height: stickyHeaderHeight }} />
+          {/* Scrollable content underneath the sticky header */}
+          <ModalLayoutWrapper
+            contentPadding={0}
+            bottomContent={sweepButton}
+            bottomPadding={displayedTransactions.length > 0 ? 160 : 120}
+            useAnimatedScroll
+            scrollY={scrollY}
+            disableHeaderSpacer
+            scrollIndicatorInsets={{ top: Math.max(0, stickyHeaderHeight - nativeHeaderHeight) }}>
+            {/* Spacer matching the sticky header height */}
+            <RNView style={{ height: stickyHeaderHeight }} />
 
-          {/* Transaction pages (swipeable PagerView) */}
-          {mintsWithPending.length > 0 && (
-            <Animated.View style={[contentAnimStyle, { marginTop: -HEADER_OVERLAP }]}>
-              <PagerView
-                ref={pagerRef}
-                style={{ height: pagerHeight }}
-                initialPage={0}
-                onPageSelected={onPageSelected}>
-                {mintsWithPending.map((mint) => {
-                  const transactions = pendingByMint[mint.mintUrl] || [];
-                  return (
-                    <View
-                      key={mint.mintUrl}
-                      style={{ flex: 1, paddingHorizontal: 16, paddingTop: HEADER_OVERLAP }}>
-                      <View style={[styles.transactionList, { borderColor: cardBorderColor }]}>
-                        <BlurCardFrame accentColor={cardAccentColor}>
-                          <View style={{ zIndex: 1 }}>
-                            {transactions.map((tx) => (
-                              <Transaction
-                                key={tx.id}
-                                historyEntry={tx as HistoryEntry}
-                                isLoading={rollingBackIds.has(tx.operationId)}
-                              />
-                            ))}
-                          </View>
-                        </BlurCardFrame>
+            {/* Transaction pages (swipeable PagerView) */}
+            {mintsWithPending.length > 0 && (
+              <Animated.View style={[contentAnimStyle, { marginTop: -HEADER_OVERLAP }]}>
+                <PagerView
+                  ref={pagerRef}
+                  style={{ height: pagerHeight }}
+                  initialPage={0}
+                  onPageSelected={onPageSelected}>
+                  {mintsWithPending.map((mint) => {
+                    const transactions = pendingByMint[mint.mintUrl] || [];
+                    return (
+                      <View
+                        key={mint.mintUrl}
+                        style={{ flex: 1, paddingHorizontal: 16, paddingTop: HEADER_OVERLAP }}>
+                        <View style={[styles.transactionList, { borderColor: cardBorderColor }]}>
+                          <BlurCardFrame accentColor={cardAccentColor}>
+                            <View style={{ zIndex: 1 }}>
+                              {transactions.map((tx) => (
+                                <Transaction
+                                  key={tx.id}
+                                  historyEntry={tx as HistoryEntry}
+                                  isLoading={rollingBackIds.has(tx.operationId)}
+                                />
+                              ))}
+                            </View>
+                          </BlurCardFrame>
+                        </View>
                       </View>
-                    </View>
-                  );
-                })}
-              </PagerView>
-            </Animated.View>
-          )}
+                    );
+                  })}
+                </PagerView>
+              </Animated.View>
+            )}
 
-          {/* Empty state (no pending ecash at all) */}
-          {mintsWithPending.length === 0 && (
-            <Animated.View
-              style={[
-                contentAnimStyle,
-                {
-                  paddingHorizontal: 16,
-                  marginTop: -HEADER_OVERLAP,
-                  paddingTop: HEADER_OVERLAP,
-                },
-              ]}>
-              <View style={styles.emptyState}>
-                <Icon name="mdi:check-circle-outline" size={48} color={opacity(foreground, 0.33)} />
-                <Spacer size={12} />
-                <Text size={18} heavy style={{ color: opacity(foreground, 0.8) }}>
-                  No Pending Ecash
-                </Text>
-                <Text
-                  size={14}
-                  style={{
-                    color: opacity(foreground, 0.4),
-                    textAlign: 'center',
-                    marginTop: 4,
-                  }}>
-                  All your sent ecash has been claimed
-                </Text>
-              </View>
-            </Animated.View>
-          )}
-        </ModalLayoutWrapper>
+            {/* Empty state (no pending ecash at all) */}
+            {mintsWithPending.length === 0 && (
+              <Animated.View
+                style={[
+                  contentAnimStyle,
+                  {
+                    paddingHorizontal: 16,
+                    marginTop: -HEADER_OVERLAP,
+                    paddingTop: HEADER_OVERLAP,
+                  },
+                ]}>
+                <View style={styles.emptyState}>
+                  <Icon
+                    name="mdi:check-circle-outline"
+                    size={48}
+                    color={opacity(foreground, 0.33)}
+                  />
+                  <Spacer size={12} />
+                  <Text size={18} heavy style={{ color: opacity(foreground, 0.8) }}>
+                    No Pending Ecash
+                  </Text>
+                  <Text
+                    size={14}
+                    style={{
+                      color: opacity(foreground, 0.4),
+                      textAlign: 'center',
+                      marginTop: 4,
+                    }}>
+                    All your sent ecash has been claimed
+                  </Text>
+                </View>
+              </Animated.View>
+            )}
+          </ModalLayoutWrapper>
 
-        {/* Sticky header — always pinned at top, content scrolls behind it */}
-        <RNView style={styles.stickyHeader} pointerEvents="box-none" onLayout={handleStickyLayout}>
-          <RNView>
-            {/* Background layers: solid covers top, gradient fades at bottom */}
-            <RNView
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: background, bottom: HEADER_OVERLAP },
-              ]}
-            />
-            <LinearGradient
-              colors={[background, 'transparent']}
-              style={styles.headerGradient}
-              pointerEvents="none"
-            />
-
-            {/* Hero card */}
-            <RNView
-              ref={heroRef}
-              onLayout={handleHeroLayout}
-              collapsable={false}
-              shouldRasterizeIOS
-              renderToHardwareTextureAndroid
-              style={[
-                styles.heroCard,
-                {
-                  borderColor: opacity(accentColor, 0.25),
-                  opacity: hero.isHidden('pendingEcash', 'destination') ? 0 : 1,
-                  marginTop: -topOffset,
-                  paddingTop: topOffset,
-                },
-              ]}>
-              <PendingEcashCardFrame
-                accentColor={accentColor}
-                backgroundColor={background}
-                highlightColor={surfaceForeground}>
-                <VStack style={{ padding: 18, paddingTop: 52 + topOffset, zIndex: 1 }}>
-                  <HStack align="center" gap={10}>
-                    <View
-                      style={[styles.heroIcon, { backgroundColor: opacity(accentColor, 0.16) }]}>
-                      <Icon name="mdi:clock-alert-outline" size={22} color={accentColor} />
-                    </View>
-                    <VStack>
-                      <Text size={18} heavy style={{ color: opacity(foreground, 0.9) }}>
-                        Pending Ecash
-                      </Text>
-                      <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
-                        {pendingSends.length} unclaimed{' '}
-                        {pendingSends.length === 1 ? 'token' : 'tokens'}
-                      </Text>
-                    </VStack>
-                  </HStack>
-                </VStack>
-              </PendingEcashCardFrame>
-            </RNView>
-
-            {/* Mint tabs */}
-            <Animated.View style={[tabsAnimStyle, { marginTop: 10 }]}>
-              <MintTabs
-                mints={mints}
-                selectedMintUrl={effectiveSelectedMint}
-                onMintChange={handleMintChange}
-                pendingByMint={pendingByMint}
-                scrollY={scrollY}
+          {/* Sticky header — always pinned at top, content scrolls behind it */}
+          <RNView
+            style={styles.stickyHeader}
+            pointerEvents="box-none"
+            onLayout={handleStickyLayout}>
+            <RNView>
+              {/* Background layers: solid covers top, gradient fades at bottom */}
+              <RNView
+                style={[
+                  StyleSheet.absoluteFill,
+                  { backgroundColor: background, bottom: HEADER_OVERLAP },
+                ]}
               />
-            </Animated.View>
+              <LinearGradient
+                colors={[background, 'transparent']}
+                style={styles.headerGradient}
+                pointerEvents="none"
+              />
+
+              {/* Hero card */}
+              <RNView
+                ref={heroRef}
+                onLayout={handleHeroLayout}
+                collapsable={false}
+                shouldRasterizeIOS
+                renderToHardwareTextureAndroid
+                style={[
+                  styles.heroCard,
+                  {
+                    borderColor: opacity(accentColor, 0.25),
+                    opacity: hero.isHidden('pendingEcash', 'destination') ? 0 : 1,
+                    marginTop: -topOffset,
+                    paddingTop: topOffset,
+                  },
+                ]}>
+                <PendingEcashCardFrame
+                  accentColor={accentColor}
+                  backgroundColor={background}
+                  highlightColor={surfaceForeground}>
+                  <VStack style={{ padding: 18, paddingTop: 52 + topOffset, zIndex: 1 }}>
+                    <HStack align="center" gap={10}>
+                      <View
+                        style={[styles.heroIcon, { backgroundColor: opacity(accentColor, 0.16) }]}>
+                        <Icon name="mdi:clock-alert-outline" size={22} color={accentColor} />
+                      </View>
+                      <VStack>
+                        <Text size={18} heavy style={{ color: opacity(foreground, 0.9) }}>
+                          Pending Ecash
+                        </Text>
+                        <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
+                          {pendingSends.length} unclaimed{' '}
+                          {pendingSends.length === 1 ? 'token' : 'tokens'}
+                        </Text>
+                      </VStack>
+                    </HStack>
+                  </VStack>
+                </PendingEcashCardFrame>
+              </RNView>
+
+              {/* Mint tabs */}
+              <Animated.View style={[tabsAnimStyle, { marginTop: 10 }]}>
+                <MintTabs
+                  mints={mints}
+                  selectedMintUrl={effectiveSelectedMint}
+                  onMintChange={handleMintChange}
+                  pendingByMint={pendingByMint}
+                  scrollY={scrollY}
+                />
+              </Animated.View>
+            </RNView>
           </RNView>
-        </RNView>
         </RNView>
       </>
     </Screen>

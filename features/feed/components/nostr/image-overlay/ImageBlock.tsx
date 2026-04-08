@@ -218,33 +218,33 @@ export const ImageBlock = React.memo(function ImageBlock({
   const isOverlayActive = imageOverlay?.activeUrl === url;
   return (
     <Log name="ImageBlock">
-    <View style={styles.imageBlockOuter}>
-      <View
-        ref={containerRef}
-        collapsable={false}
-        style={{ aspectRatio }}
-        onLayout={registerLayout}>
-        {imageOverlay?.open ? (
-          <Pressable
-            onPressIn={onPressIn}
-            onPressOut={onPressOut}
-            onPress={handlePress}
-            style={StyleSheet.absoluteFill}>
-            {image}
-          </Pressable>
-        ) : (
-          image
-        )}
-        {isOverlayActive && (
-          <AnimatedBlurView
-            tint="dark"
-            style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
-            pointerEvents="none"
-            animatedProps={thumbnailBlurAnimatedProps}
-          />
-        )}
+      <View style={styles.imageBlockOuter}>
+        <View
+          ref={containerRef}
+          collapsable={false}
+          style={{ aspectRatio }}
+          onLayout={registerLayout}>
+          {imageOverlay?.open ? (
+            <Pressable
+              onPressIn={onPressIn}
+              onPressOut={onPressOut}
+              onPress={handlePress}
+              style={StyleSheet.absoluteFill}>
+              {image}
+            </Pressable>
+          ) : (
+            image
+          )}
+          {isOverlayActive && (
+            <AnimatedBlurView
+              tint="dark"
+              style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
+              pointerEvents="none"
+              animatedProps={thumbnailBlurAnimatedProps}
+            />
+          )}
+        </View>
       </View>
-    </View>
     </Log>
   );
 });

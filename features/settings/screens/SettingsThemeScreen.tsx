@@ -290,57 +290,57 @@ export function SettingsThemeScreen() {
   return (
     <Container>
       <Screen name="SettingsThemeScreen">
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
-        showsVerticalScrollIndicator={false}>
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <SearchField value={searchText} onChange={setSearchText}>
-            <SearchField.Group>
-              <SearchField.SearchIcon />
-              <SearchField.Input placeholder="Search themes..." />
-              <SearchField.ClearButton />
-            </SearchField.Group>
-          </SearchField>
-        </View>
-
-        {!hasResults && (
-          <VStack style={styles.emptyState} spacing={8}>
-            <Icon name="mingcute:search-3-line" size={48} color={opacity(foreground, 0.33)} />
-            <Text size={16} style={{ color: opacity(foreground, 0.4) }}>
-              No themes found
-            </Text>
-          </VStack>
-        )}
-
-        {/* Background Image Themes */}
-        {filteredBackgroundThemes.length > 0 && (
-          <View style={styles.section}>
-            <Text
-              size={13}
-              medium
-              style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
-              WALLPAPERS
-            </Text>
-            <Spacer size={12} />
-            {renderThemeGrid(filteredBackgroundThemes, true)}
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 20 }]}
+          showsVerticalScrollIndicator={false}>
+          {/* Search */}
+          <View style={styles.searchContainer}>
+            <SearchField value={searchText} onChange={setSearchText}>
+              <SearchField.Group>
+                <SearchField.SearchIcon />
+                <SearchField.Input placeholder="Search themes..." />
+                <SearchField.ClearButton />
+              </SearchField.Group>
+            </SearchField>
           </View>
-        )}
 
-        {/* Color Themes */}
-        {filteredBaseThemes.length > 0 && (
-          <View style={styles.section}>
-            <Text
-              size={13}
-              medium
-              style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
-              COLOR THEMES
-            </Text>
-            <Spacer size={12} />
-            {renderThemeGrid(filteredBaseThemes, false)}
-          </View>
-        )}
-      </ScrollView>
+          {!hasResults && (
+            <VStack style={styles.emptyState} spacing={8}>
+              <Icon name="mingcute:search-3-line" size={48} color={opacity(foreground, 0.33)} />
+              <Text size={16} style={{ color: opacity(foreground, 0.4) }}>
+                No themes found
+              </Text>
+            </VStack>
+          )}
+
+          {/* Background Image Themes */}
+          {filteredBackgroundThemes.length > 0 && (
+            <View style={styles.section}>
+              <Text
+                size={13}
+                medium
+                style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
+                WALLPAPERS
+              </Text>
+              <Spacer size={12} />
+              {renderThemeGrid(filteredBackgroundThemes, true)}
+            </View>
+          )}
+
+          {/* Color Themes */}
+          {filteredBaseThemes.length > 0 && (
+            <View style={styles.section}>
+              <Text
+                size={13}
+                medium
+                style={[styles.sectionTitle, { color: opacity(foreground, 0.5) }]}>
+                COLOR THEMES
+              </Text>
+              <Spacer size={12} />
+              {renderThemeGrid(filteredBaseThemes, false)}
+            </View>
+          )}
+        </ScrollView>
       </Screen>
     </Container>
   );

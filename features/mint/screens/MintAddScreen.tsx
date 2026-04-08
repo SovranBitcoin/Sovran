@@ -53,11 +53,21 @@ import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 // Height constant for currency tabs (same as MintListScreen)
 const CURRENCY_TABS_HEIGHT = 48;
 
-const MintStatCell = memo(function MintStatCell({ icon, value, color }: { icon: string; value: string; color: string }) {
+const MintStatCell = memo(function MintStatCell({
+  icon,
+  value,
+  color,
+}: {
+  icon: string;
+  value: string;
+  color: string;
+}) {
   return (
     <HStack align="center" justify="center" gap={5} style={{ flex: 1, paddingVertical: 10 }}>
       <Icon name={icon} size={14} color={color} />
-      <Text size={13} bold color={color}>{value}</Text>
+      <Text size={13} bold color={color}>
+        {value}
+      </Text>
     </HStack>
   );
 });
@@ -299,7 +309,10 @@ const MintItem = memo(function MintItem({
         </HStack>
 
         {/* Stats grid */}
-        {(displayScore || successRate !== undefined || ('contactReputation' in mint && mint.contactReputation) || ('contactFollowers' in mint && mint.contactFollowers)) && (
+        {(displayScore ||
+          successRate !== undefined ||
+          ('contactReputation' in mint && mint.contactReputation) ||
+          ('contactFollowers' in mint && mint.contactFollowers)) && (
           <View
             className="bg-surface-secondary overflow-hidden"
             style={{ borderRadius: 16, borderCurve: 'continuous' }}>
@@ -310,7 +323,13 @@ const MintItem = memo(function MintItem({
                   <MintStatCell icon="ic:round-star" value={displayScore} color={warning} />
                 ) : null}
                 {displayScore && successRate !== undefined ? (
-                  <View style={{ width: 1, backgroundColor: opacity(foreground, 0.08), marginVertical: 6 }} />
+                  <View
+                    style={{
+                      width: 1,
+                      backgroundColor: opacity(foreground, 0.08),
+                      marginVertical: 6,
+                    }}
+                  />
                 ) : null}
                 {successRate !== undefined ? (
                   <MintStatCell
@@ -324,21 +343,46 @@ const MintItem = memo(function MintItem({
 
             {/* Row divider */}
             {(displayScore || successRate !== undefined) &&
-             (('contactReputation' in mint && mint.contactReputation) || ('contactFollowers' in mint && mint.contactFollowers)) ? (
-              <View style={{ height: 1, backgroundColor: opacity(foreground, 0.08), marginHorizontal: 8 }} />
+            (('contactReputation' in mint && mint.contactReputation) ||
+              ('contactFollowers' in mint && mint.contactFollowers)) ? (
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: opacity(foreground, 0.08),
+                  marginHorizontal: 8,
+                }}
+              />
             ) : null}
 
             {/* Row 2: Reputation + Followers */}
-            {(('contactReputation' in mint && mint.contactReputation) || ('contactFollowers' in mint && mint.contactFollowers)) && (
+            {(('contactReputation' in mint && mint.contactReputation) ||
+              ('contactFollowers' in mint && mint.contactFollowers)) && (
               <HStack>
                 {'contactReputation' in mint && mint.contactReputation ? (
-                  <MintStatCell icon="mdi:shield-check" value={`${mint.contactReputation} / 100`} color="#3B82F6" />
+                  <MintStatCell
+                    icon="mdi:shield-check"
+                    value={`${mint.contactReputation} / 100`}
+                    color="#3B82F6"
+                  />
                 ) : null}
-                {'contactReputation' in mint && mint.contactReputation && 'contactFollowers' in mint && mint.contactFollowers ? (
-                  <View style={{ width: 1, backgroundColor: opacity(foreground, 0.08), marginVertical: 6 }} />
+                {'contactReputation' in mint &&
+                mint.contactReputation &&
+                'contactFollowers' in mint &&
+                mint.contactFollowers ? (
+                  <View
+                    style={{
+                      width: 1,
+                      backgroundColor: opacity(foreground, 0.08),
+                      marginVertical: 6,
+                    }}
+                  />
                 ) : null}
                 {'contactFollowers' in mint && mint.contactFollowers ? (
-                  <MintStatCell icon="mdi:account-group" value={mint.contactFollowers.toLocaleString()} color="#3B82F6" />
+                  <MintStatCell
+                    icon="mdi:account-group"
+                    value={mint.contactFollowers.toLocaleString()}
+                    color="#3B82F6"
+                  />
                 ) : null}
               </HStack>
             )}

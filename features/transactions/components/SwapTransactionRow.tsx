@@ -27,7 +27,11 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
   }, [group.legs, group.state, foreground, danger, success]);
 
   const handlePress = useCallback(() => {
-    log.info('transaction.swap.press', { groupId: group.id, state: group.state, legs: group.legs.length });
+    log.info('transaction.swap.press', {
+      groupId: group.id,
+      state: group.state,
+      legs: group.legs.length,
+    });
     router.navigate({
       pathname: '/swap' as any,
       params: { groupId: group.id },

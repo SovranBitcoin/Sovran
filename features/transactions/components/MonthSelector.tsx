@@ -145,26 +145,26 @@ export function MonthSelector({
 
   return (
     <Log name="MonthSelector">
-    <View className="bg-transparent px-4 py-2">
-      <ScrollView
-        ref={scrollViewRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingRight: 16 }}>
-        <HStack align="center">
-          {months.map((item) => (
-            <View key={item.key} onLayout={handleItemLayout(item.key)}>
-              <MonthTab
-                item={item}
-                isSelected={selectedMonth === item.key}
-                onPress={onMonthChange}
-                showYear={showYear}
-              />
-            </View>
-          ))}
-        </HStack>
-      </ScrollView>
-    </View>
+      <View className="bg-transparent px-4 py-2">
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingRight: 16 }}>
+          <HStack align="center">
+            {months.map((item) => (
+              <View key={item.key} onLayout={handleItemLayout(item.key)}>
+                <MonthTab
+                  item={item}
+                  isSelected={selectedMonth === item.key}
+                  onPress={onMonthChange}
+                  showYear={showYear}
+                />
+              </View>
+            ))}
+          </HStack>
+        </ScrollView>
+      </View>
     </Log>
   );
 }

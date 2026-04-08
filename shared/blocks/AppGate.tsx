@@ -40,10 +40,12 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
     log.debug('gate.app.blocked', { reason: 'onboarding_not_seen' });
     return (
       <Log name="AppGate">
-        <OnboardingScreen onComplete={() => {
-          log.info('gate.app.onboarding_complete');
-          completeOnboarding();
-        }} />
+        <OnboardingScreen
+          onComplete={() => {
+            log.info('gate.app.onboarding_complete');
+            completeOnboarding();
+          }}
+        />
       </Log>
     );
   }

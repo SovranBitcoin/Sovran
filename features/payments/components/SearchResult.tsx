@@ -30,10 +30,12 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
   }
   return (
     <Log name="SearchResult">
-      <PressableFeedback animation={false} onPress={() => {
-        paymentLog.info('payment.search.result.press', { pubkey: result.pubkey });
-        onPress();
-      }}>
+      <PressableFeedback
+        animation={false}
+        onPress={() => {
+          paymentLog.info('payment.search.result.press', { pubkey: result.pubkey });
+          onPress();
+        }}>
         <PressableFeedback.Ripple />
         <HStack spacing={8} align="center" style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
           <ProfileImage loading={loading} profile={result.profile} />

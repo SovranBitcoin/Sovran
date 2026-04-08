@@ -50,7 +50,10 @@ export function MintQuoteScreen({
   onRequestMintList,
 }: MintQuoteScreenProps) {
   useLifecycleLogger('MintQuoteScreen');
-  const { entry, error, actions, source, mintUrl } = useScreenActions('mintQuote', mintHistoryEntry);
+  const { entry, error, actions, source, mintUrl } = useScreenActions(
+    'mintQuote',
+    mintHistoryEntry
+  );
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
@@ -64,7 +67,12 @@ export function MintQuoteScreen({
   }
 
   const isPaid = entry.state === 'ISSUED' || entry.state === 'PAID';
-  log.debug('receive.mint_quote.render', { state: entry.state, isPaid, amount: entry.amount, unit: entry.unit });
+  log.debug('receive.mint_quote.render', {
+    state: entry.state,
+    isPaid,
+    amount: entry.amount,
+    unit: entry.unit,
+  });
 
   const bottomButtons = (
     <BottomButtons>
@@ -133,7 +141,10 @@ export function MintQuoteScreen({
             items={[
               source && { title: 'Source', value: source },
               bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-              bip321.optionKinds && { title: 'Payment Methods', value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" /> },
+              bip321.optionKinds && {
+                title: 'Payment Methods',
+                value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />,
+              },
               { title: 'Date', value: entry.createdAt.datetime },
               { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
               { title: 'State', value: entry.state },

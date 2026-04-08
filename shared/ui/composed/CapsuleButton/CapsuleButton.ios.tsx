@@ -38,35 +38,35 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
 
   return (
     <Log name="CapsuleButton">
-    <View
-      style={[
-        styles.card,
-        {
-          borderColor: opacity(muted, 0.3),
-          minHeight: height,
-          maxWidth: 140,
-          alignSelf: 'center',
-        },
-      ]}>
-      <BlurCardFrame accentColor={muted}>
-        <PressableFeedback
-          animation={false}
-          onPress={onPress}
-          style={[styles.pressable, { minHeight: height }]}>
-          <HStack
-            align="center"
-            justify="center"
-            spacing={8}
-            style={[styles.content, { minHeight: height }]}>
-            <Icon name={icon} size={16} color={color} />
-            <Text size={14} bold style={{ color }}>
-              {label}
-            </Text>
-          </HStack>
-          <PressableFeedback.Ripple />
-        </PressableFeedback>
-      </BlurCardFrame>
-    </View>
+      <View
+        style={[
+          styles.card,
+          {
+            borderColor: opacity(muted, 0.3),
+            minHeight: height,
+            maxWidth: 140,
+            alignSelf: 'center',
+          },
+        ]}>
+        <BlurCardFrame accentColor={muted}>
+          <PressableFeedback
+            animation={false}
+            onPress={onPress}
+            style={[styles.pressable, { minHeight: height }]}>
+            <HStack
+              align="center"
+              justify="center"
+              spacing={8}
+              style={[styles.content, { minHeight: height }]}>
+              <Icon name={icon} size={16} color={color} />
+              <Text size={14} bold style={{ color }}>
+                {label}
+              </Text>
+            </HStack>
+            <PressableFeedback.Ripple />
+          </PressableFeedback>
+        </BlurCardFrame>
+      </View>
     </Log>
   );
 }

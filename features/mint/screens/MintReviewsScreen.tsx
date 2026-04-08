@@ -74,7 +74,8 @@ const ReviewItem = React.memo(function ReviewItem({
         </View>
 
         <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text
               size={14}
               bold

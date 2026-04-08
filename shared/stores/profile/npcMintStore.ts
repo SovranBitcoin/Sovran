@@ -90,7 +90,10 @@ export const useNpcMintStore = create<NpcMintStore>()(
           const mintUrl = npcInfo?.mintUrl ?? npcInfo?.mint_url;
 
           if (mintUrl) {
-            storeLog.info('store.npc_mint.sync.success', { mintUrl, duration_ms: Math.round((performance.now() - startTime) * 100) / 100 });
+            storeLog.info('store.npc_mint.sync.success', {
+              mintUrl,
+              duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+            });
             set((state) => ({
               mintUrls: { ...state.mintUrls, [pubkey]: mintUrl },
               lastSyncedAt: { ...state.lastSyncedAt, [pubkey]: Date.now() },
@@ -119,7 +122,10 @@ export const useNpcMintStore = create<NpcMintStore>()(
           const client = createNpcClient(privateKey);
           await client.settings.setMintUrl(newMintUrl);
 
-          storeLog.info('store.npc_mint.update.success', { newMintUrl, duration_ms: Math.round((performance.now() - startTime) * 100) / 100 });
+          storeLog.info('store.npc_mint.update.success', {
+            newMintUrl,
+            duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+          });
           set((state) => ({
             mintUrls: { ...state.mintUrls, [pubkey]: newMintUrl },
             lastSyncedAt: { ...state.lastSyncedAt, [pubkey]: Date.now() },

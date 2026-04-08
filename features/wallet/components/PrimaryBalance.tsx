@@ -204,7 +204,9 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
             'If reserved balance is still stuck, use force cleanup.',
         });
       } catch (error) {
-        walletLog.error('wallet.reserved.recovery_failed', { error: error instanceof Error ? error : new Error(String(error)) });
+        walletLog.error('wallet.reserved.recovery_failed', {
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
         reservedProofsFailedPopup({
           text: error instanceof Error ? error.message : 'Unknown error',
         });

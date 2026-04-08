@@ -8,7 +8,15 @@
  * Must be a descendant of CocoProvider (CocoCashuProvider).
  */
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
 import type { WalletContext } from 'coco-payment-ux';
@@ -70,7 +78,9 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
   }, [trustedMintUrls]);
 
   const fetchProofAmounts = useCallback(async () => {
-    walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', { mintCount: stableMintUrls.length });
+    walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', {
+      mintCount: stableMintUrls.length,
+    });
     const proofService = manager.proofService;
     const next: Record<string, number[]> = {};
     for (const url of stableMintUrls) {
@@ -78,11 +88,16 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
         const proofs = await proofService.getReadyProofs(url);
         next[url] = proofs.map((p) => p.amount).sort((a, b) => a - b);
       } catch (err) {
-        walletLog.warn('provider.wallet_context.proof_fetch_failed', { mintUrl: url, error: err instanceof Error ? err : new Error(String(err)) });
+        walletLog.warn('provider.wallet_context.proof_fetch_failed', {
+          mintUrl: url,
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
         next[url] = [];
       }
     }
-    walletLog.debug('provider.wallet_context.fetch_proof_amounts_done', { mintCount: stableMintUrls.length });
+    walletLog.debug('provider.wallet_context.fetch_proof_amounts_done', {
+      mintCount: stableMintUrls.length,
+    });
     setProofAmounts(next);
   }, [manager, stableMintUrls]);
 

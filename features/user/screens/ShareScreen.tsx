@@ -147,43 +147,43 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
   return (
     <ModalLayoutWrapper>
       <Screen name="ShareScreen">
-      {/* Tab bar - only show if npub is available for p2pk type */}
-      {showTabs && (
-        <View style={{ marginBottom: 16 }}>
-          <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
-        </View>
-      )}
+        {/* Tab bar - only show if npub is available for p2pk type */}
+        {showTabs && (
+          <View style={{ marginBottom: 16 }}>
+            <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={handleTabPress} />
+          </View>
+        )}
 
-      <PaymentInfo copyTarget={config.copyTarget} data={activeData} unit={config.unit} />
+        <PaymentInfo copyTarget={config.copyTarget} data={activeData} unit={config.unit} />
 
-      <Section title={config.sectionTitle}>
-        <ListGroup variant="secondary">
-          <PressableFeedback animation={false} onPress={handleCopy}>
-            <PressableFeedback.Scale>
-              <ListGroup.Item disabled>
-                <ListGroup.ItemPrefix>
-                  {config.iconCurrency ? (
-                    <CurrencyIcon
-                      colors={[opacity(foreground, 0.4)]}
-                      width={20}
-                      currency={config.iconCurrency}
-                    />
-                  ) : config.iconName ? (
-                    <Icon name={config.iconName} size={20} color={opacity(foreground, 0.4)} />
-                  ) : undefined}
-                </ListGroup.ItemPrefix>
-                <ListGroup.ItemContent>
-                  <ListGroup.ItemTitle>{truncateMiddle(activeData, 10)}</ListGroup.ItemTitle>
-                </ListGroup.ItemContent>
-                <ListGroup.ItemSuffix>
-                  <Icon name="lets-icons:copy" size={20} color={opacity(foreground, 0.4)} />
-                </ListGroup.ItemSuffix>
-              </ListGroup.Item>
-            </PressableFeedback.Scale>
-            <PressableFeedback.Ripple />
-          </PressableFeedback>
-        </ListGroup>
-      </Section>
+        <Section title={config.sectionTitle}>
+          <ListGroup variant="secondary">
+            <PressableFeedback animation={false} onPress={handleCopy}>
+              <PressableFeedback.Scale>
+                <ListGroup.Item disabled>
+                  <ListGroup.ItemPrefix>
+                    {config.iconCurrency ? (
+                      <CurrencyIcon
+                        colors={[opacity(foreground, 0.4)]}
+                        width={20}
+                        currency={config.iconCurrency}
+                      />
+                    ) : config.iconName ? (
+                      <Icon name={config.iconName} size={20} color={opacity(foreground, 0.4)} />
+                    ) : undefined}
+                  </ListGroup.ItemPrefix>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>{truncateMiddle(activeData, 10)}</ListGroup.ItemTitle>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix>
+                    <Icon name="lets-icons:copy" size={20} color={opacity(foreground, 0.4)} />
+                  </ListGroup.ItemSuffix>
+                </ListGroup.Item>
+              </PressableFeedback.Scale>
+              <PressableFeedback.Ripple />
+            </PressableFeedback>
+          </ListGroup>
+        </Section>
       </Screen>
     </ModalLayoutWrapper>
   );

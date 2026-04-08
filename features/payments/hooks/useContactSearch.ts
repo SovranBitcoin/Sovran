@@ -54,7 +54,10 @@ export function useContactSearch(searchQuery: string) {
                 profile: { ...res, pubkey: profileEventPubkey },
               };
             });
-            paymentLog.info('payment.contacts.search.results', { query, resultCount: formatted.length });
+            paymentLog.info('payment.contacts.search.results', {
+              query,
+              resultCount: formatted.length,
+            });
             setSearchResults(formatted);
             if (formatted.length > 0) addSearchToHistory(query, 'payments');
           } else {
@@ -64,7 +67,10 @@ export function useContactSearch(searchQuery: string) {
           setSearchResults([]);
         }
       } catch (err) {
-        paymentLog.error('payment.contacts.search.error', { query, error: err instanceof Error ? err : new Error(String(err)) });
+        paymentLog.error('payment.contacts.search.error', {
+          query,
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
         setSearchResults([]);
       } finally {
         setSearchLoading(false);

@@ -56,7 +56,10 @@ export class DataMigration {
       await this.migrateProofs(profile, result);
       await this.migrateCounters(profile, result);
 
-      cashuLog.info('cashu.migration.completed', { result, duration_ms: Math.round((performance.now() - migrationStart) * 100) / 100 });
+      cashuLog.info('cashu.migration.completed', {
+        result,
+        duration_ms: Math.round((performance.now() - migrationStart) * 100) / 100,
+      });
       return result;
     } catch (error) {
       cashuLog.error('cashu.migration.failed', { error });
