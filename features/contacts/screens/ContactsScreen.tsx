@@ -217,7 +217,7 @@ export const ContactsScreen = () => {
         ) : (
           <FlatList
             data={currentListData}
-            keyExtractor={(item) => item.pubkey || item.mint?.mintUrl || Math.random().toString()}
+            keyExtractor={(item, index) => item.pubkey || item.mint?.mintUrl || `contact-${index}`}
             renderItem={renderContactItem}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"

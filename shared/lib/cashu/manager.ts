@@ -334,7 +334,12 @@ export class CocoManager {
    * Used by profile switching to determine if it's safe to tear down.
    */
   static isReadyForCleanup(): boolean {
-    return this.instance !== null && !this.isInitializing && !this.pendingCleanup;
+    return (
+      this.instance !== null &&
+      !this.isInitializing &&
+      !this.pendingCleanup &&
+      !this.isBackgroundRunning
+    );
   }
 
   /**

@@ -292,16 +292,14 @@ export async function topUpBalance(apiKey: string, cashuToken: string): Promise<
   apiLog.info('api.routstr.wallet.topup.start', { tokenLength: cashuToken?.length });
   const start = performance.now();
   try {
-    const response = await fetch(
-      `${ROUTSTR_BASE_URL}/wallet/topup?cashu_token=${encodeURIComponent(cashuToken)}`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const response = await fetch(`${ROUTSTR_BASE_URL}/wallet/topup`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ cashu_token: cashuToken }),
+    });
     apiLog.debug('api.routstr.wallet.topup.response', {
       status: response.status,
       duration_ms: Math.round(performance.now() - start),

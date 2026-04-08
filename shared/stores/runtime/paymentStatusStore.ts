@@ -48,15 +48,14 @@ export const usePaymentStatusStore = create<PaymentStatusStore>((set) => ({
   },
   setDelivered: (id) =>
     set((s) => {
-      if (s.active?.id === id) {
-        log.info('payment.status.delivered', {
-          id,
-          variant: s.active.variant,
-          from: s.active.state,
-        });
-        return { active: { ...s.active!, state: 'delivered' as const } };
-      }
-      return s;
+      if (s.active?.id !== id) return s;
+      if (s.active.state === 'confirmed' || s.active.state === 'failed') return s;
+      log.info('payment.status.delivered', {
+        id,
+        variant: s.active.variant,
+        from: s.active.state,
+      });
+      return { active: { ...s.active, state: 'delivered' as const } };
     }),
   setConfirmed: (id, extra) =>
     set((s) => {

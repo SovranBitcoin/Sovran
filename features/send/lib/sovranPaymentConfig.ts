@@ -485,8 +485,6 @@ export function createSovranHandlers({
 }: CreateSovranHandlersConfig): StepHandlerMap {
   paymentLog.debug('payment.handlers.created');
 
-  const mgr = getManager();
-
   return {
     receiveToken: ({ token }) => {
       paymentLog.info('payment.step.receive_token');
@@ -625,9 +623,10 @@ export function createSovranHandlers({
       const selectedMintUrl = useNpcMintStore.getState().getActiveMintUrl();
 
       let p2pkKey: string | undefined;
-      if (mgr) {
+      const currentMgr = getManager();
+      if (currentMgr) {
         try {
-          const keypair = await mgr.keyring.getLatestKeyPair();
+          const keypair = await currentMgr.keyring.getLatestKeyPair();
           p2pkKey = keypair?.publicKeyHex ?? undefined;
         } catch {
           /* ignore */

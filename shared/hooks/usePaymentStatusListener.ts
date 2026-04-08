@@ -153,9 +153,10 @@ export function usePaymentStatusListener(): void {
 
     const offRedeemed = manager.on(
       'mint-op:finalized',
-      ({ operationId }: { mintUrl: string; operationId: string; operation: any }) => {
-        paymentLog.info('hook.payment_status.mint_quote_redeemed', { operationId });
-        usePaymentStatusStore.getState().setConfirmed(operationId);
+      ({ operationId, operation }: { mintUrl: string; operationId: string; operation: any }) => {
+        const quoteId = (operation as any)?.quote?.quoteId ?? operationId;
+        paymentLog.info('hook.payment_status.mint_quote_redeemed', { operationId, quoteId });
+        usePaymentStatusStore.getState().setConfirmed(quoteId);
       }
     );
 

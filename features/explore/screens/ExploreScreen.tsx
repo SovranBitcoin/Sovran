@@ -1090,7 +1090,7 @@ const ExploreScreen = () => {
   const devMode = useSettingsStore((state) => state.experimental);
 
   // Routstr models state
-  const { getCachedModels, setCachedModels, isCacheStale, balance } = useRoutstrStore();
+  const balance = useRoutstrStore((s) => s.balance);
   const [models, setModels] = useState<RoutstrModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(true);
 
@@ -1100,6 +1100,7 @@ const ExploreScreen = () => {
       let cancelled = false;
 
       const loadModels = async () => {
+        const { getCachedModels, setCachedModels, isCacheStale } = useRoutstrStore.getState();
         const cachedModels = getCachedModels();
         if (cachedModels && cachedModels.length > 0) {
           setModels(cachedModels);
@@ -1111,7 +1112,7 @@ const ExploreScreen = () => {
               const freshModels = await getModels();
               if (!cancelled) {
                 setModels(freshModels);
-                setCachedModels(freshModels);
+                useRoutstrStore.getState().setCachedModels(freshModels);
               }
             } catch (error) {
               log.error('explore.models.refresh_failed', { error });
@@ -1124,7 +1125,7 @@ const ExploreScreen = () => {
           const fetchedModels = await getModels();
           if (!cancelled) {
             setModels(fetchedModels);
-            setCachedModels(fetchedModels);
+            useRoutstrStore.getState().setCachedModels(fetchedModels);
           }
         } catch (error) {
           log.error('explore.models.fetch_failed', { error });
@@ -1136,7 +1137,7 @@ const ExploreScreen = () => {
       return () => {
         cancelled = true;
       };
-    }, [getCachedModels, setCachedModels, isCacheStale])
+    }, [])
   );
 
   // Budget in msats — use actual balance, or 100 sats (100_000 msats) if none

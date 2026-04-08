@@ -39,10 +39,10 @@ interface MintWithInfo {
  * useMintProfileStore so the data is available to enrichment callbacks.
  */
 export function useMintProfiles(mints: MintWithInfo[]): void {
-  const { getCached, setCached, isStale } = useMintProfileStore();
   const inflightRef = useRef(new Set<string>());
 
   useEffect(() => {
+    const { getCached, setCached, isStale } = useMintProfileStore.getState();
     for (const mint of mints) {
       const pubkey = extractNostrPubkey(mint.mintInfo);
       if (!pubkey) continue;
@@ -62,7 +62,7 @@ export function useMintProfiles(mints: MintWithInfo[]): void {
               followers,
               reputation: Math.round(score),
             });
-            setCached(mint.url, followers, score);
+            useMintProfileStore.getState().setCached(mint.url, followers, score);
           }
         },
         () => {
@@ -70,5 +70,5 @@ export function useMintProfiles(mints: MintWithInfo[]): void {
         }
       );
     }
-  }, [mints, getCached, setCached, isStale]);
+  }, [mints]);
 }
