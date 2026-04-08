@@ -4,6 +4,4 @@ coco/**
 dist/**
 ios/**
 node_modules/**
-coco-payment-ux/docs/references/**
-coco-payment-ux/docs/node_modules/**
-coco-payment-ux/docs/.vitepress/cache/**
+coco-payment-ux/**
