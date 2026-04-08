@@ -49,7 +49,9 @@ function ReceiveMintSelectRoute() {
       disabled,
       withIcon,
       withReputation,
-      disabledReasons: items.filter((i) => i.reason).map((i) => ({ mint: i.displayName, reason: i.reason?.code })),
+      disabledReasons: items
+        .filter((i) => i.reason)
+        .map((i) => ({ mint: i.displayName, reason: i.reason?.code })),
     });
   }, [items, entry?.scope, entry?.destination]);
 
@@ -72,9 +74,7 @@ function ReceiveMintSelectRoute() {
         closeButtonLabel="Cancel"
         onMintSelect={(item) => actions.select.execute({ mintUrl: item.mintUrl })}
         onInspectMint={
-          actions.getInfo.available
-            ? (url) => actions.getInfo.execute({ mintUrl: url })
-            : undefined
+          actions.getInfo.available ? (url) => actions.getInfo.execute({ mintUrl: url }) : undefined
         }
         onClose={() => router.back()}
       />

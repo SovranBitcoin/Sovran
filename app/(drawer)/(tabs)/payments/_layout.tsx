@@ -1,10 +1,9 @@
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Stack } from 'expo-router';
-import { Keyboard, Pressable } from 'react-native';
+import { Keyboard, Pressable, useWindowDimensions } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { createContext, useContext, useState, useCallback, useMemo } from 'react';
-import { useWindowDimensions } from 'react-native';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';

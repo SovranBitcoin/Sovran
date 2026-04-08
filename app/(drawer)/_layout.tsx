@@ -30,7 +30,11 @@ import {
   createAndSwitchProfile,
   switchToImportedProfile,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
-import { keyImportFailedPopup, profileSwitcherPopup, walletStillLoadingPopup } from '@/shared/lib/popup';
+import {
+  keyImportFailedPopup,
+  profileSwitcherPopup,
+  walletStillLoadingPopup,
+} from '@/shared/lib/popup';
 import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
 import type { ProfileSwitcherAction } from '@/shared/lib/popup/actionSheetTypes';
 
