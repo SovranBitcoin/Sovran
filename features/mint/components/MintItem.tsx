@@ -16,40 +16,12 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import opacity from 'hex-color-opacity';
 import { Checkbox } from '@/shared/ui/primitives/Checkbox';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { cashuLog, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-
-// ── Stat cell for the 2-column grid ─────────────────────────────────────────
-
-interface StatCellProps {
-  icon: string;
-  value: string;
-  color: string;
-}
-
-const StatCell = memo(function StatCell({ icon, value, color }: StatCellProps) {
-  return (
-    <HStack align="center" justify="center" gap={5} style={{ flex: 1, paddingVertical: 10 }}>
-      <Icon name={icon} size={14} color={color} />
-      <Text size={13} bold color={color}>
-        {value}
-      </Text>
-    </HStack>
-  );
-});
-
-const StatDividerV = memo(function StatDividerV({ color }: { color: string }) {
-  return <View style={{ width: 1, backgroundColor: opacity(color, 0.08), marginVertical: 6 }} />;
-});
-
-const StatDividerH = memo(function StatDividerH({ color }: { color: string }) {
-  return <View style={{ height: 1, backgroundColor: opacity(color, 0.08), marginHorizontal: 8 }} />;
-});
 
 interface MintItemProps {
   item: MintListItem;
@@ -107,19 +79,31 @@ const MintItem: React.FC<MintItemProps> = ({
 
   const activityBadgeVariant = item.auditState === 'ERROR' ? 'error' : 'success';
 
-  const hasBadges =
-    displayScore !== undefined ||
-    successRate !== undefined ||
-    item.worksOffline === true ||
-    (item.contactFollowers ?? 0) > 0 ||
-    (item.contactReputation ?? 0) > 0;
+  // Build inline stats: "<icon> value • <icon> value • ..."
+  const statItems = useMemo(() => {
+    const items: { icon: string; value: string; color: string }[] = [];
+    if (displayScore !== undefined)
+      items.push({ icon: 'ic:round-star', value: displayScore, color: warning });
+    if (successRate !== undefined)
+      items.push({
+        icon: 'lucide:activity',
+        value: `${successRate}%`,
+        color: item.auditState === 'ERROR' ? '#EF4444' : success,
+      });
+    if ((item.contactReputation ?? 0) > 0)
+      items.push({ icon: 'mdi:shield-check', value: `${item.contactReputation}`, color: '#3B82F6' });
+    if ((item.contactFollowers ?? 0) > 0)
+      items.push({ icon: 'mdi:account-group', value: item.contactFollowers!.toLocaleString(), color: '#3B82F6' });
+    if (item.worksOffline === true)
+      items.push({ icon: 'mdi:airplane', value: 'Offline', color: success });
+    return items;
+  }, [displayScore, successRate, item, warning, success]);
 
   return (
     <Log name="MintItem">
       <TouchableOpacity
         key={item.mintUrl}
-        className="bg-surface mb-1 rounded-2xl p-4"
-        style={{ opacity: itemOpacity }}
+        style={{ paddingHorizontal: 20, paddingVertical: 12, opacity: itemOpacity }}
         onPress={() => {
           cashuLog.debug('mint_item.press', {
             mintUrl: item.mintUrl,
@@ -129,127 +113,74 @@ const MintItem: React.FC<MintItemProps> = ({
           onPress();
         }}
         disabled={isDisabled}>
-        <VStack gap={0}>
-          <HStack align="center" gap={12}>
-            <View className="relative">
-              <Avatar
-                key={item.mintUrl}
-                picture={item.iconUrl}
-                size={42}
-                name={item.displayName}
-                alt={`${item.displayName} mint`}
-              />
-            </View>
+        <HStack align="center" gap={12}>
+          <Avatar
+            key={item.mintUrl}
+            picture={item.iconUrl}
+            size={44}
+            name={item.displayName}
+            alt={`${item.displayName} mint`}
+          />
 
-            <VStack flex={1}>
-              <Text className="text-foreground" size={16} bold>
-                {item.displayName}
-              </Text>
+          <VStack flex={1} style={{ gap: 2 }}>
+            <Text className="text-foreground" size={16} bold>
+              {item.displayName}
+            </Text>
 
-              <View className="self-start">
-                <AmountFormatter
-                  amount={item.balance}
-                  unit={item.unit}
-                  size={14}
-                  weight="heavy"
-                  color={foreground}
-                  className="ml-[2px]"
-                />
-              </View>
+            <AmountFormatter
+              amount={item.balance}
+              unit={item.unit}
+              size={14}
+              weight="heavy"
+              color={foreground}
+            />
 
-              {disabledReason ? (
-                <Text size={12} color={opacity(foreground, 0.6)}>
-                  {disabledReason}
-                </Text>
-              ) : null}
-            </VStack>
-
-            {isLoading ? (
-              <View className="rounded-full bg-transparent p-2">
-                <Spinner size={20} />
-              </View>
-            ) : showCheckbox ? (
-              <Checkbox
-                checked={selected}
-                onCheckedChange={() => onToggle?.()}
-                size={24}
-                variant="success"
-              />
-            ) : (
-              showDetailsButton && (
-                <TouchableOpacity onPress={() => onInspectPress?.()}>
-                  <Icon className="bg-default rounded-full p-2" name="bx:dots-vertical-rounded" />
-                </TouchableOpacity>
-              )
+            {statItems.length > 0 && (
+              <HStack align="center" style={{ gap: 4, marginTop: 2 }}>
+                {statItems.map((stat, i) => (
+                  <React.Fragment key={stat.icon}>
+                    {i > 0 && (
+                      <Text size={9} color={opacity(foreground, 0.15)}>
+                        {'•'}
+                      </Text>
+                    )}
+                    <HStack align="center" style={{ gap: 3 }}>
+                      <Icon name={stat.icon} size={12} color={stat.color} />
+                      <Text size={12} bold color={stat.color}>
+                        {stat.value}
+                      </Text>
+                    </HStack>
+                  </React.Fragment>
+                ))}
+              </HStack>
             )}
-          </HStack>
 
-          {hasBadges && (
-            <>
-              <Spacer size={8} />
-              <View
-                className="bg-surface-secondary overflow-hidden"
-                style={{ borderRadius: 16, borderCurve: 'continuous' }}>
-                {/* Row 1 */}
-                <HStack>
-                  {displayScore !== undefined ? (
-                    <StatCell icon="ic:round-star" value={displayScore} color={warning} />
-                  ) : null}
-                  {displayScore !== undefined && successRate !== undefined ? (
-                    <StatDividerV color={foreground} />
-                  ) : null}
-                  {successRate !== undefined ? (
-                    <StatCell
-                      icon="lucide:activity"
-                      value={`${successRate}%`}
-                      color={item.auditState === 'ERROR' ? '#EF4444' : success}
-                    />
-                  ) : null}
-                </HStack>
+            {disabledReason ? (
+              <Text size={12} color={opacity(foreground, 0.6)}>
+                {disabledReason}
+              </Text>
+            ) : null}
+          </VStack>
 
-                {/* Row divider — only if there's a second row */}
-                {((item.contactReputation ?? 0) > 0 ||
-                  (item.contactFollowers ?? 0) > 0 ||
-                  item.worksOffline) &&
-                (displayScore !== undefined || successRate !== undefined) ? (
-                  <StatDividerH color={foreground} />
-                ) : null}
-
-                {/* Row 2 */}
-                {((item.contactReputation ?? 0) > 0 ||
-                  (item.contactFollowers ?? 0) > 0 ||
-                  item.worksOffline) && (
-                  <HStack>
-                    {(item.contactReputation ?? 0) > 0 ? (
-                      <StatCell
-                        icon="mdi:shield-check"
-                        value={`${item.contactReputation} / 100`}
-                        color="#3B82F6"
-                      />
-                    ) : null}
-                    {(item.contactReputation ?? 0) > 0 && (item.contactFollowers ?? 0) > 0 ? (
-                      <StatDividerV color={foreground} />
-                    ) : null}
-                    {(item.contactFollowers ?? 0) > 0 ? (
-                      <StatCell
-                        icon="mdi:account-group"
-                        value={item.contactFollowers!.toLocaleString()}
-                        color="#3B82F6"
-                      />
-                    ) : null}
-                    {item.worksOffline === true &&
-                    ((item.contactReputation ?? 0) > 0 || (item.contactFollowers ?? 0) > 0) ? (
-                      <StatDividerV color={foreground} />
-                    ) : null}
-                    {item.worksOffline === true ? (
-                      <StatCell icon="mdi:airplane" value="Offline" color={success} />
-                    ) : null}
-                  </HStack>
-                )}
-              </View>
-            </>
+          {isLoading ? (
+            <View className="rounded-full bg-transparent p-2">
+              <Spinner size={20} />
+            </View>
+          ) : showCheckbox ? (
+            <Checkbox
+              checked={selected}
+              onCheckedChange={() => onToggle?.()}
+              size={24}
+              variant="success"
+            />
+          ) : (
+            showDetailsButton && (
+              <TouchableOpacity onPress={() => onInspectPress?.()}>
+                <Icon className="bg-default rounded-full p-2" name="bx:dots-vertical-rounded" />
+              </TouchableOpacity>
+            )
           )}
-        </VStack>
+        </HStack>
       </TouchableOpacity>
     </Log>
   );

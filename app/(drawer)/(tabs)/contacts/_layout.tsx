@@ -1,9 +1,10 @@
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { Stack } from 'expo-router';
-import { Keyboard, Pressable, useWindowDimensions } from 'react-native';
+import { Pressable, useWindowDimensions } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
-import { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useCallback, useMemo } from 'react';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
@@ -31,28 +32,18 @@ export default function ContactsLayout() {
   const { width: windowWidth } = useWindowDimensions();
   const searchBarWidth = getHeaderTitleWidthFromWidth(windowWidth);
 
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [clearKey, setClearKey] = useState(0);
+  const {
+    isSearching,
+    searchQuery,
+    clearKey,
+    onOpenSearch: handleOpenSearch,
+    onCloseSearch: handleCloseSearch,
+    onSearchChange: handleSearchChange,
+  } = useHeaderSearch();
 
   const openDrawer = useCallback(() => {
     navigation.dispatch(DrawerActions.openDrawer());
   }, [navigation]);
-
-  const handleOpenSearch = useCallback(() => {
-    setIsSearching(true);
-  }, []);
-
-  const handleCloseSearch = useCallback(() => {
-    setIsSearching(false);
-    setSearchQuery('');
-    setClearKey((prev) => prev + 1);
-    Keyboard.dismiss();
-  }, []);
-
-  const handleSearchChange = useCallback((query: string) => {
-    setSearchQuery(query);
-  }, []);
 
   // Stable headerTitle callback — must not depend on isSearching to avoid
   // re-mounting and losing keyboard focus once search is open.

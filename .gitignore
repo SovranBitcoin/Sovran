@@ -7,7 +7,7 @@ log.txt
 node_modules/
 
 # build
-android/
+/android/
 
 # Expo
 .expo/
@@ -47,7 +47,7 @@ expo-env.d.ts
 # @end expo-cli
 .env.local
 
-android/
+/android/
 
 .vscode
 .env
@@ -60,8 +60,8 @@ android/
 # *.png
 # *.mp4
 
-ios
-android
+/ios
+/android
 # Expo
 .expo
 dist/

@@ -39,9 +39,10 @@ import React, { type ReactNode } from 'react';
 import { Platform } from 'react-native';
 
 // ─── Master switch ──────────────────────────────────────────────────────────
-// Set to false to silence ALL log output (console + ring buffer).
-// Useful when profiling to eliminate logging overhead.
-const SHOW_LOGS = false;
+// When true, all log output (console + ring buffer) is active.
+// Tied to __DEV__ by default so dev builds always have logging.
+// Set to false manually to silence ALL output (useful when profiling overhead).
+const SHOW_LOGS = typeof __DEV__ !== 'undefined' ? __DEV__ : true;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -836,6 +837,66 @@ export const paymentLog = log.child({ module: 'payment' });
 export const feedLog = log.child({ module: 'feed' });
 export const apiLog = log.child({ module: 'api' });
 export const storeLog = log.child({ module: 'store' });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JS Thread Blocking Detector
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Fires a setTimeout heartbeat every `intervalMs`. If the callback fires later
+// than `thresholdMs` past its scheduled time, the JS thread was blocked for that
+// duration. Logs a warning with the block length so you can correlate it with
+// whatever operation was running (recovery, crypto derivation, etc.).
+//
+// Only active in __DEV__ and when SHOW_LOGS is on, to avoid overhead in prod.
+
+let _heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Start the JS thread heartbeat monitor.
+ * Call once at app startup (e.g. in your root layout or entry point).
+ *
+ * @param intervalMs How often to check (default 200ms — low overhead)
+ * @param thresholdMs Block duration that triggers a warning (default 100ms)
+ * @returns A stop function to disable the monitor
+ */
+export function startJSThreadMonitor(intervalMs = 200, thresholdMs = 100): () => void {
+  if (_heartbeatTimer !== null) return () => {}; // already running
+
+  let lastTick = _perfNow();
+
+  function tick() {
+    const now = _perfNow();
+    const elapsed = now - lastTick;
+    const blocked = elapsed - intervalMs;
+
+    if (blocked > thresholdMs) {
+      // The JS thread was unresponsive for `blocked` ms
+      log.warn('perf.js_thread_blocked', {
+        blocked_ms: Math.round(blocked * 100) / 100,
+        expected_ms: intervalMs,
+        actual_ms: Math.round(elapsed * 100) / 100,
+      });
+    }
+
+    lastTick = now;
+    _heartbeatTimer = setTimeout(tick, intervalMs);
+  }
+
+  _heartbeatTimer = setTimeout(tick, intervalMs);
+
+  return () => {
+    if (_heartbeatTimer !== null) {
+      clearTimeout(_heartbeatTimer);
+      _heartbeatTimer = null;
+    }
+  };
+}
+
+// Auto-start in dev builds
+if (SHOW_LOGS) {
+  // Delay start slightly so it doesn't fire during module evaluation
+  setTimeout(() => startJSThreadMonitor(), 1000);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Performance Helpers

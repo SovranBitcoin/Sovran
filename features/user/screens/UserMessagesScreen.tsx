@@ -155,7 +155,7 @@ function getProviderIcon(provider: string): string {
   const iconMap: Record<string, string> = {
     openai: 'ri:openai-fill',
     anthropic: 'ri:anthropic-fill',
-    'anthracite-org': 'ri:robot',
+    'anthracite-org': 'ri:robot-fill',
     google: 'ri:google-fill',
     meta: 'ri:meta-fill',
     mistralai: 'simple-icons:mistralai',

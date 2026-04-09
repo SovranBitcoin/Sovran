@@ -123,6 +123,63 @@ export interface AuditMintResponse {
 export const auditMint = ({ mintUrl }: { mintUrl: string }) =>
   safeFetch<AuditMintResponse>(`${BASE_URL}/cashu/mint/audit?mintUrl=${mintUrl}`);
 
+export interface MintRecommendation {
+  score: number;
+  comment: string;
+  pubkey: string;
+  eventId: string;
+  created_at: number;
+}
+
+export interface MintReviewsResponse {
+  mintUrl: string;
+  score: number | null;
+  recommendations: MintRecommendation[];
+  lastUpdated: number | null;
+  fromCache: boolean;
+}
+
+export const reviewMint = ({ mintUrl }: { mintUrl: string }) =>
+  safeFetch<MintReviewsResponse>(`${BASE_URL}/cashu/mint/reviews?mintUrl=${mintUrl}`);
+
+export interface MintSearchResult {
+  url: string;
+  /** Mint name (always present, derived from /v1/info or audit fallback) */
+  name: string;
+  supported_units: string[];
+  state: string;
+  n_mints: number;
+  n_melts: number;
+  n_errors: number;
+  /** KYM review score (0-5 average), null if no reviews */
+  review_score: number | null;
+  /** Number of KYM reviews */
+  review_count: number;
+  /** Projected /v1/info fields — shape depends on `fields` param */
+  info?: any;
+}
+
+export interface MintSearchResponse {
+  results: MintSearchResult[];
+  total: number;
+}
+
+export const searchMints = ({ query, currency, limit, fields }: {
+  query?: string;
+  currency?: string;
+  limit?: number;
+  /** Comma-separated dot paths for /v1/info projection, e.g. "nuts.4,contact" or "*" */
+  fields?: string;
+}) =>
+  safeFetch<MintSearchResponse>(
+    `${BASE_URL}/cashu/mints/search?${new URLSearchParams({
+      ...(query && { q: query }),
+      ...(currency && currency !== 'ALL' && { currency }),
+      ...(limit && { limit: String(limit) }),
+      ...(fields && { fields }),
+    })}`
+  );
+
 export const getLatestVersion = ({
   storage,
 }: {

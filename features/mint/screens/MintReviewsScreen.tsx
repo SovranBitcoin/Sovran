@@ -9,7 +9,8 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { useKYMMint } from '@/features/mint/hooks/useKYMMint';
+import { reviewMint } from '@/shared/lib/apiClient';
+import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { getUsername } from '@/shared/lib/username';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -282,26 +283,29 @@ export function MintReviewsScreen() {
   const insets = useSafeAreaInsets();
   const { mintUrl } = useLocalSearchParams<{ mintUrl: string }>();
 
-  const {
-    score: kymScore,
-    recommendations: kymRecommendations,
-    loading: kymLoading,
-  } = useKYMMint(mintUrl || '');
+  const [kymLoading, setKymLoading] = useState(true);
+  const cached = useKYMMintStore((s) => (mintUrl ? s.getCached(mintUrl) : undefined));
+  const kymScore = cached?.score;
+  const kymRecommendations = cached?.recommendations;
+
+  useEffect(() => {
+    if (!mintUrl) { setKymLoading(false); return; }
+    // Show cached data immediately if available
+    if (cached) setKymLoading(false);
+    // Always fetch fresh from server
+    reviewMint({ mintUrl })
+      .then((result) => {
+        if (result.isOk() && result.value.score !== null) {
+          useKYMMintStore.getState().setCached(mintUrl, result.value.score, result.value.recommendations);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setKymLoading(false));
+  }, [mintUrl]);
 
   log.debug('mint.reviews.load', { mintUrl, kymLoading, score: kymScore });
 
-  const [timedOut, setTimedOut] = useState(false);
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (kymLoading) {
-        setTimedOut(true);
-        log.warn('mint.reviews.timeout', { mintUrl });
-      }
-    }, 5000);
-    return () => clearTimeout(timeout);
-  }, [kymLoading]);
-
-  const isLoading = kymLoading && !timedOut;
+  const isLoading = kymLoading;
   const reviews = useMemo(() => {
     const all = kymRecommendations || [];
     const withContent = all.filter((r) => r.comment?.trim());

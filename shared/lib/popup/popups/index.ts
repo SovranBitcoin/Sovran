@@ -59,6 +59,9 @@ export {
   noValidMintPopup,
   mintsAddFailedPopup,
   managerNotInitializedPopup,
+  recoverySuccessPopup,
+  recoveryPartialPopup,
+  recoveryFailedPopup,
 } from './mint';
 export {
   notImplementedPopup,

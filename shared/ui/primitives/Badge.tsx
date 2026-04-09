@@ -25,7 +25,7 @@
  * <Badge variant="success">Active</Badge>
  *
  * // Icon-only badge
- * <Badge variant="error" icon="fluent:error-16-filled" size={16} />
+ * <Badge variant="error" icon="fluent:error-circle-16-filled" size={16} />
  *
  * // Text with icon
  * <Badge variant="warning" icon="humbleicons:url" size={12}>
@@ -122,7 +122,7 @@ interface BadgeProps extends VariantProps<typeof badgeVariants> {
  * <Badge variant="success">Active</Badge>
  *
  * // Icon-only badge for status indicators
- * <Badge variant="error" icon="fluent:error-16-filled" size={16} />
+ * <Badge variant="error" icon="fluent:error-circle-16-filled" size={16} />
  *
  * // Text with icon (common in mint lists)
  * <Badge variant="warning" icon="humbleicons:url" size={12}>

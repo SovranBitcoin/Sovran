@@ -1,0 +1,225 @@
+diff --git a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
+index 6480cbd..7ca54b2 100644
+--- a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
++++ b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
+@@ -615,12 +615,52 @@ function hs(s, t, e) {
+   throw new Error(`Unknown simple or float value: ${e}`);
+ }
+ const ls = De("Secp256k1_HashToCurve_Cashu_");
++/* --- sovran perf: global timing accumulator --- */
++if (typeof globalThis !== "undefined" && !globalThis.__CASHU_PERF) {
++  globalThis.__CASHU_PERF = { enabled: false, log: [], _seq: 0,
++    enable() { this.enabled = true; this.log = []; this._seq = 0; },
++    disable() { this.enabled = false; },
++    push(e) { if (this.enabled) { e._seq = ++this._seq; e._t = performance.now(); this.log.push(e); } },
++    dump() { return this.log; },
++    summary() {
++      var m = {}; this.log.forEach(function(e) {
++        if (!m[e.op]) m[e.op] = { count: 0, totalMs: 0, min: Infinity, max: 0 };
++        if (e.ms !== undefined) { m[e.op].count++; m[e.op].totalMs += e.ms; m[e.op].min = Math.min(m[e.op].min, e.ms); m[e.op].max = Math.max(m[e.op].max, e.ms); }
++      }); return m;
++    },
++    report() {
++      var s = this.summary(), lines = ["=== cashu-ts perf report ==="];
++      Object.keys(s).forEach(function(k) { var v = s[k]; lines.push(k + ": " + v.count + " calls, " + v.totalMs.toFixed(1) + "ms total, " + (v.totalMs/v.count).toFixed(2) + " ms/op, min=" + v.min.toFixed(2) + " max=" + v.max.toFixed(2)); });
++      return lines.join("\n");
++    }
++  };
++}
++/* --- sovran perf: native crypto bridge (nutpatch) --- */
++if (typeof globalThis !== "undefined" && !globalThis.__CASHU_NATIVE) {
++  globalThis.__CASHU_NATIVE = {
++    crypto: null,
++    active: false,
++    init: function(cryptoInstance) { this.crypto = cryptoInstance; this.active = true; },
++    _toBuffer: function(u8) { return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength); },
++    _bigintToBuf: function(n) { var buf = new Uint8Array(32); for (var i = 31; i >= 0; i--) { buf[i] = Number(n & 0xffn); n >>= 8n; } return buf.buffer; },
++    _toPoint: function(buf) { return k.Point.fromHex(I(new Uint8Array(buf))); }
++  };
++}
+ function pt(s) {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var _cn = globalThis.__CASHU_NATIVE;
++  if (_cn && _cn.active) {
++    var result = _cn._toPoint(_cn.crypto.hashToCurve(_cn._toBuffer(s)));
++    if (_p && _p.enabled) _p.push({ op: "hashToCurve", ms: performance.now() - _t0, native: true });
++    return result;
++  }
+   const t = B(w.concat(ls, s)), e = new Uint32Array(1), n = 2 ** 16;
+   for (let r = 0; r < n; r++) {
+     const i = new Uint8Array(e.buffer), o = B(w.concat(t, i));
+     try {
+-      return Y(I(w.concat(new Uint8Array([2]), o)));
++      var result = Y(I(w.concat(new Uint8Array([2]), o)));
++      if (_p && _p.enabled) _p.push({ op: "hashToCurve", ms: performance.now() - _t0, native: false });
++      return result;
+     } catch {
+       e[0]++;
+     }
+@@ -656,10 +696,21 @@ function fs() {
+   return yt(t);
+ }
+ function yt(s, t) {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var _cn = globalThis.__CASHU_NATIVE;
++  if (_cn && _cn.active) {
++    t || (t = k.Point.Fn.fromBytes(ne()));
++    var B_ = _cn._toPoint(_cn.crypto.blind(_cn._toBuffer(s), _cn._bigintToBuf(t)));
++    if (_p && _p.enabled) _p.push({ op: "blindMessage", ms: performance.now() - _t0, native: true });
++    return { B_: B_, r: t, secret: s };
++  }
+   const e = pt(s);
++  var _t1 = _p && _p.enabled ? performance.now() : 0;
+   t || (t = k.Point.Fn.fromBytes(ne()));
+   const n = k.Point.BASE.multiply(t);
+-  return { B_: e.add(n), r: t, secret: s };
++  var result = { B_: e.add(n), r: t, secret: s };
++  if (_p && _p.enabled) _p.push({ op: "blindMessage", ms: performance.now() - _t0, hashToCurveMs: _t1 - _t0, native: false });
++  return result;
+ }
+ function ps(s, t, e) {
+   return s.subtract(e.multiply(t));
+@@ -1145,11 +1196,34 @@ const Bs = (s, t, e, n) => {
+     return i;
+   }
+   return i;
+-}, St = (s, t, e, n) => {
+-  const r = Ne.fromMasterSeed(s), i = ds(t), o = `${Ks}/${i}'/${e}'/${n}`, a = r.derive(o);
++},
++_masterCache = new WeakMap(),
++_keysetCache = new Map(),
++St = (s, t, e, n) => {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var mk = _masterCache.get(s);
++  if (!mk) { mk = Ne.fromMasterSeed(s); _masterCache.set(s, mk); }
++  var ki = ds(t), ck = I(s) + ":" + t, pk = _keysetCache.get(ck);
++  if (!pk) { pk = mk.derive(Ks + "/" + ki + "'"); _keysetCache.set(ck, pk); }
++  var a = pk.deriveChild(e + 0x80000000).deriveChild(n);
+   if (a.privateKey === null)
+     throw new Error("Could not derive private key");
++  if (_p && _p.enabled) _p.push({ op: "derive_deprecated", ms: performance.now() - _t0, counter: e });
+   return a.privateKey;
++},
++_deriveBoth = (s, t, e) => {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var mk = _masterCache.get(s);
++  if (!mk) { mk = Ne.fromMasterSeed(s); _masterCache.set(s, mk); }
++  var ki = ds(t), ck = I(s) + ":" + t, pk = _keysetCache.get(ck);
++  if (!pk) { pk = mk.derive(Ks + "/" + ki + "'"); _keysetCache.set(ck, pk); }
++  var counterKey = pk.deriveChild(e + 0x80000000);
++  var sec = counterKey.deriveChild(0);
++  var bf = counterKey.deriveChild(1);
++  if (sec.privateKey === null || bf.privateKey === null)
++    throw new Error("Could not derive private key");
++  if (_p && _p.enabled) _p.push({ op: "deriveBoth", ms: performance.now() - _t0, counter: e });
++  return { secret: sec.privateKey, blinding: bf.privateKey };
+ };
+ function ei(s, t) {
+   return je("HTLC", s, t);
+@@ -3587,9 +3661,44 @@ class D {
+     );
+   }
+   static createDeterministicData(t, e, n, r, i) {
+-    return Q(t, r.keys, i).map(
+-      (a, c) => this.createSingleDeterministicData(a, e, n + c, r.id)
+-    );
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++    var amounts = Q(t, r.keys, i);
++    var rid = r.id;
++    var isLegacy = /^[a-fA-F0-9]+$/.test(rid) ? rid.startsWith("00") : true;
++    var results;
++    var _cn = globalThis.__CASHU_NATIVE;
++    /* --- sovran perf: native batch derive for legacy keysets --- */
++    if (isLegacy && _cn && _cn.active && typeof _cn.crypto.batchDeriveLegacy === "function") {
++      var kidInt = Number(ds(rid));
++      var seedBuf = e.buffer.slice(e.byteOffset, e.byteOffset + e.byteLength);
++      var raw = new Uint8Array(_cn.crypto.batchDeriveLegacy(seedBuf, kidInt, n, amounts.length));
++      results = amounts.map(function(a, c) {
++        var off = c * 64;
++        var secBytes = raw.subarray(off, off + 32);
++        var bfBytes = raw.subarray(off + 32, off + 64);
++        var secHex = W(secBytes);
++        var secUtf8 = new TextEncoder().encode(secHex);
++        var rVal = w.toBigInt(bfBytes);
++        var bm = yt(secUtf8, rVal);
++        return new D(new Ut(a, bm.B_, rid).getSerializedBlindedMessage(), bm.r, secUtf8);
++      });
++    } else if (isLegacy && typeof _deriveBoth === "function") {
++      results = amounts.map(function(a, c) {
++        var ctr = n + c;
++        var both = _deriveBoth(e, rid, ctr);
++        var secHex = W(both.secret);
++        var secUtf8 = new TextEncoder().encode(secHex);
++        var rVal = w.toBigInt(both.blinding);
++        var bm = yt(secUtf8, rVal);
++        return new D(new Ut(a, bm.B_, rid).getSerializedBlindedMessage(), bm.r, secUtf8);
++      });
++    } else {
++      results = amounts.map(
++        (a, c) => this.createSingleDeterministicData(a, e, n + c, rid)
++      );
++    }
++    if (_p && _p.enabled) _p.push({ op: "createDeterministicData_batch", count: amounts.length, ms: performance.now() - _t0, keysetId: rid, startCounter: n, isLegacy: isLegacy, native: !!(isLegacy && _cn && _cn.active && typeof _cn.crypto.batchDeriveLegacy === "function") });
++    return results;
+   }
+   /**
+    * @throws May throw if blinding factor is out of range. Caller should catch, increment counter,
+@@ -5838,12 +5947,20 @@ class me {
+    *   default one will be used.
+    */
+   async batchRestore(t = 300, e = 100, n = 0, r) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++    if (_p && _p.enabled) _p.push({ op: "batchRestore.start", gapLimit: t, batchSize: e, startCounter: n, keysetId: r });
+     const i = Math.ceil(t / e), o = [];
+     let a, c = 0;
++    var _batchNum = 0;
+     for (; c < i; ) {
++      _batchNum++;
++      if (_batchNum > 1) await new Promise(function(res) { setTimeout(res, 0); });
++      var _bt0 = _p && _p.enabled ? performance.now() : 0;
+       const h = await this.restore(n, e, { keysetId: r });
++      if (_p && _p.enabled) _p.push({ op: "batchRestore.batch", batchNum: _batchNum, counter: n, batchSize: e, proofsFound: h.proofs.length, ms: performance.now() - _bt0 });
+       h.proofs.length > 0 ? (c = 0, o.push(...h.proofs), a = h.lastCounterWithSignature) : c++, n += e;
+     }
++    if (_p && _p.enabled) _p.push({ op: "batchRestore.end", totalBatches: _batchNum, totalProofs: o.length, ms: performance.now() - _t0 });
+     return { proofs: o, lastCounterWithSignature: a };
+   }
+   /**
+@@ -5854,12 +5971,27 @@ class me {
+    * @param options.keysetId Set a custom keysetId to restore from. @see `keyChain)`
+    */
+   async restore(t, e, n) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     this.failIfNullish(this._seed, "Cashu Wallet must be initialized with a seed to use restore");
+     const { keysetId: r } = n || {};
+     await this._keyChain.ensureKeysetKeys(r ?? this.keysetId);
+-    const i = this.getKeyset(r), o = Array(e).fill(0), a = D.createDeterministicData(0, this._seed, t, i, o), { outputs: c, signatures: h } = await this.mint.restore({
++    const i = this.getKeyset(r);
++    var _rcfg = typeof globalThis !== "undefined" && globalThis.__CASHU_RECOVERY_CONFIG || {};
++    var _CHUNK = _rcfg.chunkSize || 8;
++    var a = [];
++    for (var _off = 0; _off < e; _off += _CHUNK) {
++      var _cs = Math.min(_CHUNK, e - _off);
++      var _cz = Array(_cs).fill(0);
++      var _co = D.createDeterministicData(0, this._seed, t + _off, i, _cz);
++      a.push.apply(a, _co);
++      if (_off + _CHUNK < e) await new Promise(function(r) { setTimeout(r, 0); });
++    }
++    var _t_outputs = _p && _p.enabled ? performance.now() : 0;
++    const { outputs: c, signatures: h } = await this.mint.restore({
+       outputs: a.map((f) => f.blindedMessage)
+-    }), u = {};
++    });
++    var _t_network = _p && _p.enabled ? performance.now() : 0;
++    const u = {};
+     c.forEach((f, p) => u[f.B_] = h[p]);
+     const l = [];
+     let d;
+@@ -5867,6 +5999,7 @@ class me {
+       const p = u[a[f].blindedMessage.B_];
+       p && (d = t + f, a[f].blindedMessage.amount = p.amount, l.push(a[f].toProof(p, i)));
+     }
++    if (_p && _p.enabled) _p.push({ op: "restore", start: t, count: e, chunkSize: _CHUNK, keysetId: r || i.id, ms: performance.now() - _t0, outputGenMs: _t_outputs - _t0, networkMs: _t_network - _t_outputs, proofsFound: l.length });
+     return {
+       proofs: l,
+       lastCounterWithSignature: d

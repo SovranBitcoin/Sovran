@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import {
   TouchableOpacity,
   ActivityIndicator,
+  Pressable,
   Platform,
   TextInput,
   useWindowDimensions,
@@ -14,13 +15,11 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useHeaderSearch } from '@/shared/hooks/useHeaderSearch';
 import { useDebouncedMintValidation } from '@/features/mint/hooks/useDebouncedMintValidation';
-import { useNostrDiscoveredMints } from '@/features/mint/hooks/useNostrDiscoveredMints';
-import { useSovranDiscoveredMints } from '@/features/mint/hooks/useSovranDiscoveredMints';
-import { useKYMMints } from '@/features/mint/hooks/useKYMMints';
-import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
+import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
+import type { MintSearchResult } from '@/shared/lib/apiClient';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
-import { filterMints } from '@/shared/lib/fuzzySearch';
 import {
   extractDomain,
   getMintDisplayName,
@@ -45,32 +44,15 @@ import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import Icon from 'assets/icons';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
-import { useAuditedMints, type AuditedMintData } from '@/features/mint/hooks/useAuditedMints';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import opacity from 'hex-color-opacity';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, cashuLog, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
 
 // Height constant for currency tabs (same as MintListScreen)
 const CURRENCY_TABS_HEIGHT = 48;
 
-const MintStatCell = memo(function MintStatCell({
-  icon,
-  value,
-  color,
-}: {
-  icon: string;
-  value: string;
-  color: string;
-}) {
-  return (
-    <HStack align="center" justify="center" gap={5} style={{ flex: 1, paddingVertical: 10 }}>
-      <Icon name={icon} size={14} color={color} />
-      <Text size={13} bold color={color}>
-        {value}
-      </Text>
-    </HStack>
-  );
-});
+// MintStatCell removed — stats now rendered inline
 
 interface PseudoMint {
   url: string;
@@ -79,25 +61,45 @@ interface PseudoMint {
   name?: string;
 }
 
-interface SearchableDiscoveredMint {
+interface DisplayMint {
   url: string;
-  score: number;
-  recommendations: any[];
-  mintInfo: any | null;
   name: string;
+  mintInfo: { icon_url?: string | null; name?: string; description?: string | null } | null;
   contactFollowers?: number;
   contactReputation?: number;
+  /** Server-provided audit state for sorting badge color */
+  auditState?: string;
+  /** Server-provided total operations for stats display */
+  serverStats?: { n_mints: number; n_melts: number; n_errors: number };
+  /** KYM review score (0-5) */
+  reviewScore?: number | null;
+  /** Number of KYM reviews */
+  reviewCount?: number;
 }
 
-type SearchableMint = SearchableDiscoveredMint | PseudoMint;
+type SearchableMint = DisplayMint | PseudoMint;
 
-function adaptDiscoveredMint(mint: any): SearchableDiscoveredMint {
-  const profile = useMintProfileStore.getState().getCached(mint.url);
+function adaptSearchResult(result: MintSearchResult): DisplayMint {
+  const profile = useMintProfileStore.getState().getCached(result.url);
+  const info = result.info ?? {};
   return {
-    ...mint,
-    name: mint.mintInfo?.name || extractDomain(mint.url),
+    url: result.url,
+    name: info.name || result.name || extractDomain(result.url),
+    mintInfo: {
+      icon_url: info.icon_url ?? null,
+      name: info.name ?? result.name,
+      description: info.description ?? null,
+    },
     contactFollowers: profile?.followers,
     contactReputation: profile ? Math.round(profile.reputation) : undefined,
+    auditState: result.state,
+    serverStats: {
+      n_mints: result.n_mints,
+      n_melts: result.n_melts,
+      n_errors: result.n_errors,
+    },
+    reviewScore: result.review_score,
+    reviewCount: result.review_count,
   };
 }
 
@@ -223,17 +225,11 @@ const MintItem = memo(function MintItem({
   mint,
   selected,
   onToggle,
-  kymScore,
-  kymLoading,
-  auditData,
   globalLoading,
 }: {
   mint: SearchableMint;
   selected: boolean;
   onToggle: (url: string) => void;
-  kymScore?: number;
-  kymLoading: boolean;
-  auditData: AuditedMintData;
   globalLoading: boolean;
 }) {
   const foreground = useThemeColor('foreground');
@@ -248,155 +244,88 @@ const MintItem = memo(function MintItem({
     onToggle(mint.url);
   }, [onToggle, mint.url]);
 
-  const displayScore = kymScore ? kymScore.toString() : undefined;
-
-  // Calculate success rate from audit data
-  const successRate = useMemo(() => {
-    const auditInfo = auditData.auditInfo;
-    if (auditInfo?.score !== undefined) {
-      return Math.round((auditInfo.score / 5) * 100);
+  // Build inline stats: "<icon> value • <icon> value • ..."
+  const statItems = useMemo(() => {
+    const items: { icon: string; value: string; color: string }[] = [];
+    if ('reviewScore' in mint && typeof mint.reviewScore === 'number') {
+      const display = mint.reviewScore % 1 === 0 ? mint.reviewScore.toString() : mint.reviewScore.toFixed(1);
+      items.push({ icon: 'ic:round-star', value: display, color: warning });
     }
-    if (auditInfo?.auditorData) {
-      const { mints, melts, errors } = auditInfo.auditorData;
-      const totalOps = (mints || 0) + (melts || 0);
+    if ('serverStats' in mint && mint.serverStats) {
+      const { n_mints, n_melts, n_errors } = mint.serverStats;
+      const totalOps = n_mints + n_melts;
       if (totalOps > 0) {
-        return Math.round((1 - (errors || 0) / totalOps) * 100);
+        const rate = Math.round((1 - n_errors / totalOps) * 100);
+        const isError = 'auditState' in mint && mint.auditState === 'ERROR';
+        items.push({ icon: 'lucide:activity', value: `${rate}%`, color: isError ? '#EF4444' : success });
       }
     }
-    return undefined;
-  }, [auditData.auditInfo]);
-
-  // Determine badge variant based on audit state
-  const activityBadgeVariant = useMemo(() => {
-    const state = auditData.auditInfo?.auditorData?.state;
-    return state === 'ERROR' ? 'error' : 'success';
-  }, [auditData.auditInfo?.auditorData?.state]);
-
-  const auditLoading = auditData.loading;
+    if ('contactReputation' in mint && mint.contactReputation)
+      items.push({ icon: 'mdi:shield-check', value: `${mint.contactReputation}`, color: '#3B82F6' });
+    if ('contactFollowers' in mint && mint.contactFollowers)
+      items.push({ icon: 'mdi:account-group', value: mint.contactFollowers.toLocaleString(), color: '#3B82F6' });
+    return items;
+  }, [mint, warning, success]);
 
   return (
     <TouchableOpacity
-      className="bg-surface mb-1 rounded-2xl p-4"
+      style={{ paddingHorizontal: 20, paddingVertical: 12 }}
       onPress={onPress}
       disabled={globalLoading}>
-      <VStack gap={12}>
-        <HStack align="center" gap={12}>
-          <Avatar
-            picture={mint.mintInfo?.icon_url || undefined}
-            size={42}
-            name={displayName}
-            alt={`${displayName} mint`}
-          />
+      <HStack align="center" gap={12}>
+        <Avatar
+          picture={mint.mintInfo?.icon_url || undefined}
+          size={44}
+          name={displayName}
+          alt={`${displayName} mint`}
+        />
 
-          <VStack flex={1}>
-            <Text className="text-foreground" size={16} bold>
-              {displayName}
-            </Text>
+        <VStack flex={1} style={{ gap: 2 }}>
+          <Text className="text-foreground" size={16} bold>
+            {displayName}
+          </Text>
 
-            <View className="self-start">
-              <Text heavy size={14} style={{ color: opacity(foreground, 0.5) }}>
-                {extractDomain(mint.url)}
-              </Text>
-            </View>
-          </VStack>
+          <Text heavy size={14} style={{ color: opacity(foreground, 0.5) }}>
+            {extractDomain(mint.url)}
+          </Text>
 
-          <Checkbox
-            checked={selected}
-            onCheckedChange={() => onToggle(mint.url)}
-            size={24}
-            variant="success"
-          />
-        </HStack>
+          {statItems.length > 0 && (
+            <HStack align="center" style={{ gap: 4, marginTop: 2 }}>
+              {statItems.map((stat, i) => (
+                <React.Fragment key={stat.icon}>
+                  {i > 0 && (
+                    <Text size={9} color={opacity(foreground, 0.15)}>
+                      {'•'}
+                    </Text>
+                  )}
+                  <HStack align="center" style={{ gap: 3 }}>
+                    <Icon name={stat.icon} size={12} color={stat.color} />
+                    <Text size={12} bold color={stat.color}>
+                      {stat.value}
+                    </Text>
+                  </HStack>
+                </React.Fragment>
+              ))}
+            </HStack>
+          )}
+        </VStack>
 
-        {/* Stats grid */}
-        {(displayScore ||
-          successRate !== undefined ||
-          ('contactReputation' in mint && mint.contactReputation) ||
-          ('contactFollowers' in mint && mint.contactFollowers)) && (
-          <View
-            className="bg-surface-secondary overflow-hidden"
-            style={{ borderRadius: 16, borderCurve: 'continuous' }}>
-            {/* Row 1: Score + Success */}
-            {(displayScore || successRate !== undefined) && (
-              <HStack>
-                {displayScore ? (
-                  <MintStatCell icon="ic:round-star" value={displayScore} color={warning} />
-                ) : null}
-                {displayScore && successRate !== undefined ? (
-                  <View
-                    style={{
-                      width: 1,
-                      backgroundColor: opacity(foreground, 0.08),
-                      marginVertical: 6,
-                    }}
-                  />
-                ) : null}
-                {successRate !== undefined ? (
-                  <MintStatCell
-                    icon="lucide:activity"
-                    value={`${successRate}%`}
-                    color={activityBadgeVariant === 'error' ? '#EF4444' : success}
-                  />
-                ) : null}
-              </HStack>
-            )}
-
-            {/* Row divider */}
-            {(displayScore || successRate !== undefined) &&
-            (('contactReputation' in mint && mint.contactReputation) ||
-              ('contactFollowers' in mint && mint.contactFollowers)) ? (
-              <View
-                style={{
-                  height: 1,
-                  backgroundColor: opacity(foreground, 0.08),
-                  marginHorizontal: 8,
-                }}
-              />
-            ) : null}
-
-            {/* Row 2: Reputation + Followers */}
-            {(('contactReputation' in mint && mint.contactReputation) ||
-              ('contactFollowers' in mint && mint.contactFollowers)) && (
-              <HStack>
-                {'contactReputation' in mint && mint.contactReputation ? (
-                  <MintStatCell
-                    icon="mdi:shield-check"
-                    value={`${mint.contactReputation} / 100`}
-                    color="#3B82F6"
-                  />
-                ) : null}
-                {'contactReputation' in mint &&
-                mint.contactReputation &&
-                'contactFollowers' in mint &&
-                mint.contactFollowers ? (
-                  <View
-                    style={{
-                      width: 1,
-                      backgroundColor: opacity(foreground, 0.08),
-                      marginVertical: 6,
-                    }}
-                  />
-                ) : null}
-                {'contactFollowers' in mint && mint.contactFollowers ? (
-                  <MintStatCell
-                    icon="mdi:account-group"
-                    value={mint.contactFollowers.toLocaleString()}
-                    color="#3B82F6"
-                  />
-                ) : null}
-              </HStack>
-            )}
-          </View>
-        )}
-      </VStack>
+        <Checkbox
+          checked={selected}
+          onCheckedChange={() => onToggle(mint.url)}
+          size={24}
+          variant="default"
+        />
+      </HStack>
     </TouchableOpacity>
   );
 });
 
 export function MintAddScreen() {
   useLifecycleLogger('MintAddScreen');
-  const foreground = useThemeColor('foreground');
+  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const { width: windowWidth } = useWindowDimensions();
+  const searchBarWidth = getHeaderTitleWidthFromWidth(windowWidth);
 
   // Scroll tracking for animated currency tabs
   const scrollY = useSharedValue(0);
@@ -407,196 +336,142 @@ export function MintAddScreen() {
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
   const [isAdding, setIsAdding] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('ALL');
-  const [clearKey, setClearKey] = useState(0);
-  const [isInputFocused, setIsInputFocused] = useState(false);
 
+  // Search toggle (matches contacts page pattern)
   const {
-    url,
-    setUrl,
+    isSearching,
+    searchQuery,
+    clearKey,
+    onOpenSearch,
+    onCloseSearch,
+    onSearchChange,
+  } = useHeaderSearch();
+
+  // URL validation fallback — only triggers when input looks like a URL
+  const {
+    url: validatedUrl,
+    setUrl: setValidationUrl,
     validationState,
     mintInfo: customMintInfo,
   } = useDebouncedMintValidation(800);
 
-  const { mints: nostrDiscoveredMints, loading: nostrLoading } = useNostrDiscoveredMints();
-  const { mints: sovranDiscoveredMints, loading: sovranLoading } = useSovranDiscoveredMints();
-
-  // Merge and dedupe discovered mints
-  const discoveredMints = useMemo(() => {
-    const allMints = [...nostrDiscoveredMints, ...sovranDiscoveredMints];
-    const seenUrls = new Set<string>();
-    const uniqueMints: any[] = [];
-    for (const mint of allMints) {
-      const norm = normalizeMintUrlKey(mint.url);
-      if (!seenUrls.has(norm)) {
-        seenUrls.add(norm);
-        uniqueMints.push(mint);
-      }
-    }
-    const withInfo = uniqueMints.filter((m) => m.mintInfo);
-    const withIcon = uniqueMints.filter((m) => m.mintInfo?.icon_url);
-    log.debug('mint.add.merged', {
-      nostr: nostrDiscoveredMints.length,
-      sovran: sovranDiscoveredMints.length,
-      unique: uniqueMints.length,
-      withInfo: withInfo.length,
-      withIcon: withIcon.length,
-    });
-    return uniqueMints;
-  }, [nostrDiscoveredMints, sovranDiscoveredMints]);
-
-  // Fetch Nostr profiles (followers/reputation) for mints with operator pubkeys
-  useMintProfiles(discoveredMints);
-
-  const discoveryLoading = nostrLoading || sovranLoading;
-
-  // Hold a skeleton until the discovered list stops changing for 500ms.
-  // Individual fetchMintInfo calls resolve at different times, causing the list
-  // to shift as mints pop in one-by-one. This waits for them to settle.
-  const [settled, setSettled] = useState(false);
+  // Feed search query into URL validation when it looks like a URL
   useEffect(() => {
-    setSettled(false);
-    const timer = setTimeout(() => setSettled(true), 500);
-    return () => clearTimeout(timer);
-  }, [discoveredMints]);
+    const q = searchQuery.trim();
+    if (q.includes('.') || q.startsWith('http')) {
+      cashuLog.debug('mint.add.url_validation.trigger', { query: q });
+      setValidationUrl(q);
+    } else {
+      setValidationUrl('');
+    }
+  }, [searchQuery, setValidationUrl]);
+
+  // Log validation state changes
+  useEffect(() => {
+    if (validationState.isLoading) {
+      cashuLog.debug('mint.add.url_validation.loading');
+    } else if (validationState.isValid === true) {
+      cashuLog.info('mint.add.url_validation.valid', {
+        url: validatedUrl,
+        hasIcon: !!customMintInfo?.icon_url,
+        name: customMintInfo?.name,
+      });
+    } else if (validationState.isValid === false) {
+      cashuLog.debug('mint.add.url_validation.invalid', { url: validatedUrl });
+    }
+  }, [validationState, validatedUrl, customMintInfo]);
+
+  // Server-side mint search
+  const { results: searchResults, loading: searchLoading } = useMintSearch(searchQuery, selectedCurrency);
 
   const { mints: knownMints } = useMintManagement();
 
-  // Filter out known mints and apply search
-  const filteredMints = useMemo((): SearchableMint[] => {
+  // Adapt server results to display format, filter out already-known mints
+  const displayMints = useMemo((): SearchableMint[] => {
+    const t0 = performance.now();
     const knownMintUrls = new Set(knownMints.map((mint) => normalizeMintUrlKey(mint.mintUrl)));
-    const searchable = discoveredMints
-      .filter((mint) => !knownMintUrls.has(normalizeMintUrlKey(mint.url)))
-      .map(adaptDiscoveredMint);
+    const filteredOut = searchResults.filter((r) => knownMintUrls.has(normalizeMintUrlKey(r.url)));
+    const adapted = searchResults
+      .filter((r) => !knownMintUrls.has(normalizeMintUrlKey(r.url)))
+      .map(adaptSearchResult);
 
-    if (!url.trim()) return searchable;
+    let hasPseudo = false;
 
-    const filtered = filterMints(searchable, url);
-    const normalizedUrl = normalizeMintUrlKey(url);
-    const urlExists = filtered.some((mint) => normalizeMintUrlKey(mint.url) === normalizedUrl);
-
-    if (validationState.isValid === true && customMintInfo !== null && !urlExists) {
-      // Use normalized URL with https:// for the mint
-      const apiUrl = normalizeUrlForApi(url);
-      const pseudoMint: PseudoMint = {
-        url: apiUrl,
-        isPseudoMint: true,
-        mintInfo: customMintInfo,
-        name: extractDomain(apiUrl),
-      };
-      return [pseudoMint, ...filtered];
+    // If searching with a URL-like query that validated as a mint, prepend it
+    if (
+      searchQuery.trim() &&
+      validationState.isValid === true &&
+      customMintInfo !== null
+    ) {
+      const apiUrl = normalizeUrlForApi(searchQuery);
+      const normalizedInput = normalizeMintUrlKey(apiUrl);
+      const alreadyInResults = adapted.some(
+        (m) => normalizeMintUrlKey(m.url) === normalizedInput
+      );
+      if (!alreadyInResults && !knownMintUrls.has(normalizedInput)) {
+        const pseudoMint: PseudoMint = {
+          url: apiUrl,
+          isPseudoMint: true,
+          mintInfo: customMintInfo,
+          name: extractDomain(apiUrl),
+        };
+        hasPseudo = true;
+        const result = [pseudoMint, ...adapted];
+        const duration = Math.round((performance.now() - t0) * 100) / 100;
+        cashuLog.debug('mint.add.display_mints.compute', {
+          serverResults: searchResults.length,
+          knownFiltered: filteredOut.length,
+          displayed: result.length,
+          hasPseudoMint: true,
+          withIcons: adapted.filter((m) => m.mintInfo?.icon_url).length,
+          duration_ms: duration,
+        });
+        return result;
+      }
     }
 
-    return filtered;
-  }, [discoveredMints, knownMints, url, customMintInfo, validationState]);
-
-  // Filter by currency
-  const currencyFilteredMints = useMemo(() => {
-    if (selectedCurrency === 'ALL') return filteredMints;
-
-    return filteredMints.filter((mint) => {
-      if (!mint.mintInfo?.nuts?.['4']?.methods) {
-        return selectedCurrency === 'SAT';
-      }
-      return mint.mintInfo.nuts['4'].methods.some(
-        (method: any) => method.unit?.toUpperCase() === selectedCurrency
-      );
+    const duration = Math.round((performance.now() - t0) * 100) / 100;
+    cashuLog.debug('mint.add.display_mints.compute', {
+      serverResults: searchResults.length,
+      knownFiltered: filteredOut.length,
+      displayed: adapted.length,
+      hasPseudoMint: hasPseudo,
+      withIcons: adapted.filter((m) => m.mintInfo?.icon_url).length,
+      duration_ms: duration,
     });
-  }, [filteredMints, selectedCurrency]);
+    return adapted;
+  }, [searchResults, knownMints, searchQuery, validationState, customMintInfo]);
 
-  // Extract available currencies
+  // Extract available currencies from results
   const availableCurrencies = useMemo(() => {
-    const units: Set<string> = new Set(['SAT']);
-    filteredMints.forEach((mint) => {
-      if (mint.mintInfo?.nuts?.['4']?.methods) {
-        mint.mintInfo.nuts['4'].methods.forEach((method: any) => {
-          if (method.unit) {
-            units.add(method.unit.toUpperCase());
-          }
-        });
+    const units = new Set<string>(['SAT']);
+    for (const result of searchResults) {
+      for (const unit of result.supported_units) {
+        units.add(unit.toUpperCase());
       }
-    });
+    }
     const allowed = ['SAT', 'USD', 'EUR', 'GBP'];
-    const filtered = [...units].filter((c) => allowed.includes(c));
-    return ['ALL', ...filtered];
-  }, [filteredMints]);
-
-  // Get all mint URLs for batch loading
-  const mintUrls = useMemo(
-    () => currencyFilteredMints.map((mint) => mint.url),
-    [currencyFilteredMints]
-  );
-
-  // Batch load KYM scores
-  const { scores: kymScores, loading: kymLoading } = useKYMMints(mintUrls);
-
-  // Batch load audit data (the key optimization!)
-  const { getAuditData } = useAuditedMints(mintUrls);
-
-  // Sort mints by success rate and KYM score
-  const sortedMints = useMemo((): SearchableMint[] => {
-    return [...currencyFilteredMints].sort((a, b) => {
-      const auditA = getAuditData(a.url);
-      const auditB = getAuditData(b.url);
-
-      // Calculate success rates
-      const getSuccessRate = (audit: AuditedMintData) => {
-        if (audit.auditInfo?.score !== undefined) {
-          return audit.auditInfo.score / 5;
-        }
-        if (audit.auditInfo?.auditorData) {
-          const { mints, melts, errors } = audit.auditInfo.auditorData;
-          const totalOps = (mints || 0) + (melts || 0);
-          if (totalOps > 0) return 1 - (errors || 0) / totalOps;
-        }
-        return undefined;
-      };
-
-      const successRateA = getSuccessRate(auditA);
-      const successRateB = getSuccessRate(auditB);
-      const kymScoreA = kymScores[normalizeMintUrlKey(a.url)]?.score;
-      const kymScoreB = kymScores[normalizeMintUrlKey(b.url)]?.score;
-
-      if (successRateA !== undefined && successRateB !== undefined && successRateA !== successRateB)
-        return successRateB - successRateA;
-      if (successRateA !== undefined && successRateB === undefined) return -1;
-      if (successRateB !== undefined && successRateA === undefined) return 1;
-      if (kymScoreA !== undefined && kymScoreB !== undefined) return kymScoreB - kymScoreA;
-      if (kymScoreA !== undefined) return -1;
-      if (kymScoreB !== undefined) return 1;
-      return 0;
-    });
-  }, [currencyFilteredMints, kymScores, getAuditData]);
+    const currencies = ['ALL', ...[...units].filter((c) => allowed.includes(c))];
+    cashuLog.debug('mint.add.currencies.extracted', { currencies, resultCount: searchResults.length });
+    return currencies;
+  }, [searchResults]);
 
   const handleToggleMint = useCallback((mintUrl: string) => {
     setSelectedMints((prev) => {
       const next = new Set(prev);
-      if (next.has(mintUrl)) {
+      const wasSelected = next.has(mintUrl);
+      if (wasSelected) {
         next.delete(mintUrl);
       } else {
         next.add(mintUrl);
       }
+      cashuLog.debug('mint.add.item.toggle', {
+        mintUrl: normalizeMintUrlKey(mintUrl),
+        selected: !wasSelected,
+        totalSelected: next.size,
+      });
       return next;
     });
-  }, []);
-
-  const handleSearchChange = useCallback(
-    (text: string) => {
-      setUrl(text);
-    },
-    [setUrl]
-  );
-
-  const handleClearSearch = useCallback(() => {
-    setUrl('');
-    setClearKey((prev) => prev + 1);
-  }, [setUrl]);
-
-  const handleInputFocus = useCallback(() => {
-    setIsInputFocused(true);
-  }, []);
-
-  const handleInputBlur = useCallback(() => {
-    setIsInputFocused(false);
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -627,21 +502,28 @@ export function MintAddScreen() {
 
       for (let i = 0; i < mintUrlsToAdd.length; i++) {
         const mintUrl = mintUrlsToAdd[i];
+        const itemT0 = performance.now();
+        log.debug('mint.add.item.adding', { index: i + 1, total: mintUrlsToAdd.length, mintUrl });
         try {
           await manager.mint.addMint(mintUrl, { trusted: true });
+          const addDuration = Math.round(performance.now() - itemT0);
+          log.info('mint.add.item.added', { mintUrl, duration_ms: addDuration });
           results.push(mintUrl);
 
-          // Pre-fetch mint info (non-critical)
+          // Restore proofs for the newly added mint
           try {
-            await manager.mint.getMintInfo(mintUrl);
-          } catch {
-            // Non-critical
+            const restoreT0 = performance.now();
+            await manager.wallet.restore(mintUrl);
+            log.info('mint.add.restore.success', { mintUrl, duration_ms: Math.round(performance.now() - restoreT0) });
+          } catch (restoreErr) {
+            log.warn('mint.add.restore.failed', { mintUrl, error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr) });
           }
 
           if (i < mintUrlsToAdd.length - 1) {
             await new Promise((r) => setTimeout(r, 100));
           }
         } catch (err) {
+          log.error('mint.add.item.failed', { mintUrl, duration_ms: Math.round(performance.now() - itemT0), error: err instanceof Error ? err.message : String(err) });
           errors.push({ mintUrl, error: err instanceof Error ? err.message : String(err) });
         }
       }
@@ -672,34 +554,92 @@ export function MintAddScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: SearchableMint }) => {
-      const normalizedUrl = normalizeMintUrlKey(item.url);
-      const kymData = kymScores[normalizedUrl];
-
-      return (
-        <MintItem
-          mint={item}
-          selected={selectedMints.has(item.url)}
-          onToggle={handleToggleMint}
-          kymScore={kymData?.score}
-          kymLoading={kymLoading}
-          auditData={getAuditData(item.url)}
-          globalLoading={isAdding}
-        />
-      );
-    },
-    [selectedMints, handleToggleMint, kymScores, kymLoading, getAuditData, isAdding]
+    ({ item }: { item: SearchableMint }) => (
+      <MintItem
+        mint={item}
+        selected={selectedMints.has(item.url)}
+        onToggle={handleToggleMint}
+        globalLoading={isAdding}
+      />
+    ),
+    [selectedMints, handleToggleMint, isAdding]
   );
 
   const keyExtractor = useCallback((item: SearchableMint) => item.url, []);
 
-  const showContent = settled && discoveredMints.length > 0;
-  const isSearching = url.trim().length > 0;
-  const showCancelButton = isInputFocused || isSearching;
+  const showContent = !searchLoading || displayMints.length > 0;
 
-  const headerWidth = windowWidth - 124 - 24;
+  // Log list render state for performance analysis
+  useEffect(() => {
+    cashuLog.debug('mint.add.list.render', {
+      showContent,
+      searchLoading,
+      itemCount: displayMints.length,
+      isSearching,
+      searchQuery: searchQuery.trim() ? searchQuery : undefined,
+      selectedCurrency,
+      selectedCount: selectedMints.size,
+    });
+  }, [showContent, searchLoading, displayMints.length, isSearching, searchQuery, selectedCurrency, selectedMints.size]);
 
-  // Sticky currency tabs
+  // ── Header: search icon toggle (matches contacts pattern) ──────────────
+
+  // Stable header callbacks — must not swap between string title and render function,
+  // otherwise React Navigation caches the old form. Always use render functions.
+  const renderHeaderTitle = useCallback(
+    () =>
+      isSearching ? (
+        Platform.OS === 'ios' ? (
+          <GlassSearchBar
+            width={searchBarWidth}
+            onChangeText={onSearchChange}
+            clearKey={clearKey}
+            placeholder="Search mints or enter URL..."
+            keyboardType="url"
+            debounceMs={300}
+            autoFocus
+          />
+        ) : (
+          <FallbackSearchHeader
+            searchQuery={searchQuery}
+            onSearchChange={onSearchChange}
+            validationState={validationState}
+          />
+        )
+      ) : (
+        <Text className="text-foreground" size={17} bold>
+          Add Mints
+        </Text>
+      ),
+    [isSearching, searchBarWidth, onSearchChange, clearKey, searchQuery, validationState]
+  );
+
+  const renderHeaderRight = useCallback(
+    () =>
+      isSearching ? (
+        <Pressable onPress={onCloseSearch} style={{ padding: 8 }}>
+          <IconSymbol name="xmark" size={20} color={foreground} />
+        </Pressable>
+      ) : (
+        <Pressable onPress={onOpenSearch} style={{ padding: 8 }}>
+          <IconSymbol name="magnifyingglass" size={20} color={foreground} />
+        </Pressable>
+      ),
+    [isSearching, onCloseSearch, onOpenSearch, foreground]
+  );
+
+  const screenOptions = useMemo(
+    () => ({
+      headerTransparent: true as const,
+      headerStyle: { backgroundColor: 'transparent' },
+      headerTitle: renderHeaderTitle,
+      headerRight: renderHeaderRight,
+    }),
+    [renderHeaderTitle, renderHeaderRight]
+  );
+
+  // ── Sticky content & bottom ────────────────────────────────────────────
+
   const currencyTabs = useMemo(
     () => (
       <MintCurrencyTabs
@@ -744,7 +684,7 @@ export function MintAddScreen() {
     () => (
       <View className="items-center pt-5">
         <Text className="text-foreground text-center">
-          {url.trim()
+          {searchQuery.trim()
             ? 'No mints found matching your search'
             : selectedCurrency === 'ALL'
               ? 'No mints available'
@@ -752,64 +692,12 @@ export function MintAddScreen() {
         </Text>
       </View>
     ),
-    [url, selectedCurrency]
+    [searchQuery, selectedCurrency]
   );
-
-  const iosHeaderTitle = useMemo(
-    () => (
-      <GlassSearchBar
-        width={headerWidth}
-        onChangeText={handleSearchChange}
-        clearKey={clearKey}
-        placeholder="Search mints or enter URL..."
-        keyboardType="url"
-        debounceMs={500}
-      />
-    ),
-    [headerWidth, handleSearchChange, clearKey]
-  );
-
-  const androidHeaderTitle = useMemo(
-    () => (
-      <FallbackSearchHeader
-        searchQuery={url}
-        onSearchChange={handleSearchChange}
-        validationState={validationState}
-        onFocus={handleInputFocus}
-        onBlur={handleInputBlur}
-      />
-    ),
-    [url, handleSearchChange, validationState, handleInputFocus, handleInputBlur]
-  );
-
-  const headerRightButton = useMemo(
-    () =>
-      showCancelButton ? (
-        <TouchableOpacity onPress={handleClearSearch} style={{ padding: 8 }}>
-          <IconSymbol name="xmark" size={20} color={foreground} />
-        </TouchableOpacity>
-      ) : null,
-    [showCancelButton, handleClearSearch, foreground]
-  );
-
-  const renderHeaderTitle = useCallback(
-    () => (Platform.OS === 'ios' ? iosHeaderTitle : androidHeaderTitle),
-    [iosHeaderTitle, androidHeaderTitle]
-  );
-
-  const renderHeaderRight = useCallback(() => headerRightButton, [headerRightButton]);
 
   return (
     <Screen name="MintAddScreen">
-      <Stack.Screen
-        options={{
-          title: 'Add Mints',
-          headerTransparent: true,
-          headerStyle: { backgroundColor: 'transparent' },
-          headerTitle: renderHeaderTitle,
-          headerRight: renderHeaderRight,
-        }}
-      />
+      <Stack.Screen options={screenOptions} />
 
       <ModalLayoutWrapper
         headerGradient
@@ -817,7 +705,8 @@ export function MintAddScreen() {
         stickyContentHeight={CURRENCY_TABS_HEIGHT}
         useCustomScrollView
         onHeaderHeightChange={setTotalHeaderHeight}
-        bottomContent={bottomButtons}>
+        bottomContent={bottomButtons}
+        bgColor={surface}>
         <Spacer size={16} />
         {!showContent ? (
           <View className="flex-1 px-4" style={{ paddingTop: totalHeaderHeight }}>
@@ -825,7 +714,7 @@ export function MintAddScreen() {
           </View>
         ) : (
           <LegendList
-            data={sortedMints}
+            data={displayMints}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
             extraData={selectedMints}
@@ -833,7 +722,7 @@ export function MintAddScreen() {
             recycleItems
             drawDistance={300}
             style={{ flex: 1, height: 0 }}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
+            contentContainerStyle={{ paddingBottom: 120 }}
             ListHeaderComponent={listHeader}
             ListEmptyComponent={emptyComponent}
             onScroll={handleScroll}

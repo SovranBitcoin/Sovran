@@ -71,7 +71,7 @@ export const useAuditMintStore = create<AuditMintStore>()(
         });
       },
 
-      isStale: (mintUrl: string, maxAgeMinutes: number = 5) => {
+      isStale: (mintUrl: string, maxAgeMinutes: number = 60) => {
         const normalized = normalizeMintUrlKey(mintUrl);
         const currentState = get();
         const cached = currentState.cache[normalized];

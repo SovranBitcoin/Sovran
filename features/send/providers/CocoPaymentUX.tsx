@@ -49,7 +49,7 @@ import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
-import { fetchNostrProfile } from '@/shared/lib/apiClient';
+import { auditMint, reviewMint, fetchNostrProfile } from '@/shared/lib/apiClient';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -167,6 +167,36 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
               .then((result) => {
                 if (result.isOk()) {
                   store.setCached(mintUrl, result.value.followers, result.value.score);
+                }
+              })
+              .catch(() => {});
+          }
+        },
+        fetchMintAuditData: (mintUrls) => {
+          for (const mintUrl of mintUrls) {
+            const store = useAuditMintStore.getState();
+            if (!store.isStale(mintUrl)) continue;
+            auditMint({ mintUrl })
+              .then((result) => {
+                if (result.isOk()) {
+                  useAuditMintStore.getState().setCached(mintUrl, result.value, result.value.info);
+                }
+              })
+              .catch(() => {});
+          }
+        },
+        fetchMintReviewData: (mintUrls) => {
+          for (const mintUrl of mintUrls) {
+            const store = useKYMMintStore.getState();
+            if (!store.isStale(mintUrl)) continue;
+            reviewMint({ mintUrl })
+              .then((result) => {
+                if (result.isOk() && result.value.score !== null) {
+                  useKYMMintStore.getState().setCached(
+                    mintUrl,
+                    result.value.score,
+                    result.value.recommendations
+                  );
                 }
               })
               .catch(() => {});

@@ -62,3 +62,39 @@ export function managerNotInitializedPopup(): void {
     type: 'error',
   });
 }
+
+export function recoverySuccessPopup(
+  params: { mintCount: number; durationSec: string },
+  overrides?: BaseOverrides
+): void {
+  popup({
+    message: 'Recovery Complete',
+    text: `Recovered from ${params.mintCount} mint${params.mintCount !== 1 ? 's' : ''} in ${params.durationSec}s.`,
+    icon: 'icon:mdi:shield-check',
+    type: 'success',
+    ...overrides,
+  });
+}
+
+export function recoveryPartialPopup(
+  params: { successCount: number; failureCount: number },
+  overrides?: BaseOverrides
+): void {
+  popup({
+    message: 'Recovery Partial',
+    text: `Recovered from ${params.successCount}, failed for ${params.failureCount}.`,
+    icon: 'icon:mdi:shield-alert',
+    type: 'warning',
+    ...overrides,
+  });
+}
+
+export function recoveryFailedPopup(overrides?: TextOverrides): void {
+  popup({
+    message: 'Recovery Failed',
+    text: 'An error occurred during recovery.',
+    icon: 'icon:mdi:shield-remove',
+    type: 'error',
+    ...overrides,
+  });
+}

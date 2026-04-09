@@ -146,6 +146,18 @@ export interface DefaultOperationsConfig {
    * after NUT-06 info is resolved; the wallet stores results for enrichment.
    */
   fetchMintProfiles?: (mintInfoMap: Map<string, any>) => void;
+  /**
+   * Fire-and-forget callback to populate audit data for mints during list build.
+   * Called with all trusted mint URLs; the wallet fetches missing/stale data
+   * and stores results for enrichment via store subscriptions.
+   */
+  fetchMintAuditData?: (mintUrls: string[]) => void;
+  /**
+   * Fire-and-forget callback to populate review/KYM data for mints during list build.
+   * Called with all trusted mint URLs; the wallet fetches missing/stale data
+   * and stores results for enrichment via store subscriptions.
+   */
+  fetchMintReviewData?: (mintUrls: string[]) => void;
   /** When true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
 }
@@ -351,6 +363,12 @@ export function createDefaultOperations(
 
       // Trigger background profile fetch for mints with Nostr operator contacts
       config.fetchMintProfiles?.(mintInfoMap);
+
+      // Trigger background audit data fetch for mints with stale/missing cache
+      config.fetchMintAuditData?.(allTrustedMints.map((m: any) => m.mintUrl));
+
+      // Trigger background review/KYM data fetch for mints with stale/missing cache
+      config.fetchMintReviewData?.(allTrustedMints.map((m: any) => m.mintUrl));
 
       const supportedSet = data.supportedMintUrls ? new Set(data.supportedMintUrls) : null;
 

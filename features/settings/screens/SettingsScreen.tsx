@@ -303,6 +303,12 @@ export const SettingsScreen = () => {
           <Section title="Security">
             <ListGroup variant="secondary">
               <SettingsListLinkItem href="/(settings-flow)/keyring" title="P2PK Keys" />
+              <Separator className="mx-4" />
+              <SettingsListLinkItem
+                href="/(settings-flow)/recovery"
+                title="Recover Wallet"
+                description="Restore ecash from all mints using your seed"
+              />
             </ListGroup>
           </Section>
 

@@ -112,8 +112,8 @@ function buildSemanticVars(palette: ThemePalette): SemanticVars {
     '--default': palette[700],
     '--default-foreground': palette[100],
 
-    '--accent': STATIC_COLOR_VALUES['shade-300'],
-    '--accent-foreground': accentIsDark ? palette[0] : palette[950],
+    '--accent': palette[0],
+    '--accent-foreground': palette[950],
 
     '--skeleton': palette[500],
     '--color-skeleton': palette[500],

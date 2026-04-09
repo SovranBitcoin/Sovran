@@ -23,8 +23,7 @@ export {
 } from './components/rebalance';
 export type { StepStatus, StepState, TransferStep, RebalancePlan } from './components/rebalance';
 export { useMintManagement } from './hooks/useMintManagement';
-export { useKYMMints, type MintRecommendation } from './hooks/useKYMMints';
-export { useKYMMint } from './hooks/useKYMMint';
+export type { MintRecommendation } from '@/shared/lib/apiClient';
 export { useAuditedMint } from './hooks/useAuditedMint';
 export { useAuditedMints, type AuditedMintData } from './hooks/useAuditedMints';
 export { useDebouncedMintValidation } from './hooks/useDebouncedMintValidation';

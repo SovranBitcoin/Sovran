@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { log, storeLog } from '@/shared/lib/logger';
 
-import type { MintRecommendation } from '@/features/mint';
+import type { MintRecommendation } from '@/shared/lib/apiClient';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 
 interface CachedKYMData {
@@ -74,7 +74,7 @@ export const useKYMMintStore = create<KYMMintStore>()(
         });
       },
 
-      isStale: (mintUrl: string, maxAgeMinutes: number = 5) => {
+      isStale: (mintUrl: string, maxAgeMinutes: number = 60) => {
         const normalized = normalizeMintUrlKey(mintUrl);
         const currentState = get();
         const cached = currentState.cache[normalized];
