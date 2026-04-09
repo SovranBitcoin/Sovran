@@ -1,5 +1,5 @@
 diff --git a/node_modules/@cashu/coco-core/dist/index.cjs b/node_modules/@cashu/coco-core/dist/index.cjs
-index bedc7ad..b0e958d 100644
+index bedc7ad..7ff234b 100644
 --- a/node_modules/@cashu/coco-core/dist/index.cjs
 +++ b/node_modules/@cashu/coco-core/dist/index.cjs
 @@ -1334,9 +1334,18 @@ var MintService = class {
@@ -24,7 +24,90 @@ index bedc7ad..b0e958d 100644
  		}
  		const keysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
  		return {
-@@ -2464,7 +2473,7 @@ var WalletRestoreService = class {
+@@ -1777,6 +1786,7 @@ var ProofService = class {
+ 		}
+ 	}
+ 	async createOutputsAndIncrementCounters(mintUrl, amount, options) {
++		var _t0 = performance.now();
+ 		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
+ 		if (!Number.isFinite(amount.keep) || !Number.isFinite(amount.send) || amount.keep < 0 || amount.send < 0) return {
+ 			keep: [],
+@@ -1814,11 +1824,14 @@ var ProofService = class {
+ 			data.send = _cashu_cashu_ts.OutputData.createDeterministicData(sendAmount, seed, currentCounter.counter + data.keep.length, keys);
+ 			if (data.send.length > 0) await this.counterService.incrementCounter(mintUrl, keys.id, data.send.length);
+ 		}
+-		this.logger?.debug("Deterministic outputs created", {
++		this.logger?.debug("coco.proof.createOutputs", {
++			_perf: true,
++			ms: performance.now() - _t0,
+ 			mintUrl,
+ 			keysetId: keys.id,
+-			amount,
+-			outputs: data.keep.length + data.send.length
++			keepAmount,
++			sendAmount,
++			totalOutputs: data.keep.length + data.send.length
+ 		});
+ 		return {
+ 			keep: data.keep,
+@@ -1828,6 +1841,7 @@ var ProofService = class {
+ 		};
+ 	}
+ 	async saveProofs(mintUrl, proofs) {
++		var _t0 = performance.now();
+ 		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
+ 		if (!Array.isArray(proofs) || proofs.length === 0) return;
+ 		const groupedByKeyset = this.groupProofsByKeysetId(proofs);
+@@ -1864,6 +1878,7 @@ var ProofService = class {
+ 			const aggregate = new AggregateError(details.map((d) => d?.error instanceof Error ? d.error : new Error(String(d?.error))), `Failed to persist proofs for ${failed.length} keyset group(s)`);
+ 			throw new ProofOperationError(mintUrl, failedKeysets.length > 0 ? `Failed to persist proofs for ${failed.length} keyset group(s) [${failedKeysets.join(", ")}]` : `Failed to persist proofs for ${failed.length} keyset group(s)`, void 0, aggregate);
+ 		}
++		this.logger?.debug("coco.proof.save", { _perf: true, ms: performance.now() - _t0, mintUrl, proofCount: proofs.length });
+ 	}
+ 	async getReadyProofs(mintUrl) {
+ 		return this.proofRepository.getReadyProofs(mintUrl);
+@@ -1928,6 +1943,7 @@ var ProofService = class {
+ 	* @throws ProofOperationError if any proof is not available for reservation
+ 	*/
+ 	async reserveProofs(mintUrl, secrets, operationId) {
++		var _t0 = performance.now();
+ 		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
+ 		if (!operationId || operationId.trim().length === 0) throw new ProofValidationError("operationId is required");
+ 		if (!secrets || secrets.length === 0) return { amount: 0 };
+@@ -1939,7 +1955,9 @@ var ProofService = class {
+ 			secrets,
+ 			amount
+ 		});
+-		this.logger?.debug("Proofs reserved", {
++		this.logger?.debug("coco.proof.reserve", {
++			_perf: true,
++			ms: performance.now() - _t0,
+ 			mintUrl,
+ 			operationId,
+ 			count: secrets.length,
+@@ -2027,14 +2045,18 @@ var ProofService = class {
+ 	* @throws ProofValidationError if insufficient balance to cover the amount
+ 	*/
+ 	async selectProofsToSend(mintUrl, amount, includeFees = true) {
++		var _t0 = performance.now();
+ 		const proofs = await this.proofRepository.getAvailableProofs(mintUrl);
+ 		if (proofs.reduce((acc, proof) => acc + proof.amount, 0) < amount) throw new ProofValidationError("Not enough proofs to send");
+ 		const selectedProofs = (await this.walletService.getWallet(mintUrl)).selectProofsToSend(proofs, amount, includeFees);
+-		this.logger?.debug("Selected proofs to send", {
++		this.logger?.debug("coco.proof.select", {
++			_perf: true,
++			ms: performance.now() - _t0,
+ 			mintUrl,
+ 			amount,
+-			selectedProofs,
+-			count: selectedProofs.send.length
++			availableCount: proofs.length,
++			selectedCount: selectedProofs.send.length,
++			includeFees
+ 		});
+ 		return selectedProofs.send;
+ 	}
+@@ -2464,7 +2486,7 @@ var WalletRestoreService = class {
  	walletService;
  	requestProvider;
  	logger;
@@ -33,7 +116,7 @@ index bedc7ad..b0e958d 100644
  	restoreGapLimit = 100;
  	restoreStartCounter = 0;
  	constructor(proofService, counterService, walletService, requestProvider, logger) {
-@@ -2596,7 +2605,25 @@ var WalletRestoreService = class {
+@@ -2596,7 +2618,25 @@ var WalletRestoreService = class {
  			keysetId,
  			count: oldProofs.length
  		});
@@ -60,7 +143,29 @@ index bedc7ad..b0e958d 100644
  		if (proofs.length === 0) {
  			this.logger?.warn("No proofs to restore", {
  				mintUrl,
-@@ -7507,7 +7534,9 @@ var MeltBolt11Handler = class {
+@@ -5612,9 +5652,13 @@ var ReceiveOperationService = class {
+ 	* This is the primary entry point used by WalletApi.
+ 	*/
+ 	async receive(token) {
++		var _t0 = performance.now();
+ 		const initOp = await this.init(token);
++		var _tPrepare = performance.now();
+ 		const preparedOp = await this.prepare(initOp);
++		var _tExecute = performance.now();
+ 		await this.execute(preparedOp);
++		this.logger?.info("coco.receive.flow", { _perf: true, ms: performance.now() - _t0, initMs: _tPrepare - _t0, prepareMs: _tExecute - _tPrepare, executeMs: performance.now() - _tExecute, mintUrl: initOp.mintUrl });
+ 	}
+ 	/**
+ 	* Finalize an executing operation (idempotent).
+@@ -7490,6 +7534,7 @@ var MeltBolt11Handler = class {
+ 	* @returns Prepared operation ready for execution
+ 	*/
+ 	async prepare(ctx) {
++		var _t0 = performance.now();
+ 		const { mintUrl, id: operationId } = ctx.operation;
+ 		ctx.logger?.debug("Preparing bolt11 melt operation", {
+ 			operationId,
+@@ -7507,13 +7552,16 @@ var MeltBolt11Handler = class {
  		});
  		const selectedProofs = await ctx.proofService.selectProofsToSend(mintUrl, totalAmount, true);
  		const selectedAmount = sumProofs(selectedProofs);
@@ -71,14 +176,125 @@ index bedc7ad..b0e958d 100644
  		ctx.logger?.debug("Proofs selected for melt", {
  			operationId,
  			selectedAmount,
-@@ -8531,6 +8560,15 @@ var MintBolt11Handler = class {
+ 			proofCount: selectedProofs.length,
+ 			needsSwap
+ 		});
++		ctx.logger?.info("coco.melt.prepare", { _perf: true, ms: performance.now() - _t0, amount, fee_reserve, needsSwap, proofCount: selectedProofs.length });
+ 		if (!needsSwap) return this.prepareDirectMelt(ctx, quote, selectedProofs);
+ 		return this.prepareSwapThenMelt(ctx, quote, totalAmount);
+ 	}
+@@ -7630,6 +7678,7 @@ var MeltBolt11Handler = class {
+ 	* 4. Handles the response (PAID → finalize, PENDING → wait, UNPAID → restore proofs)
+ 	*/
+ 	async execute(ctx) {
++		var _t0 = performance.now();
+ 		const { quoteId, mintUrl, changeOutputData: serializedChangeOutputData, id: operationId } = ctx.operation;
+ 		ctx.logger?.debug("Executing bolt11 melt", {
+ 			operationId,
+@@ -7644,12 +7693,18 @@ var MeltBolt11Handler = class {
+ 			quoteId,
+ 			proofCount: proofsToMelt.length
+ 		});
++		var _tNet = performance.now();
+ 		const changeOutputData = deserializeOutputData(serializedChangeOutputData);
+ 		const res = await ctx.mintAdapter.customMeltBolt11(mintUrl, proofsToMelt, changeOutputData.keep, quoteId);
+-		ctx.logger?.info("Melt execution completed", {
++		ctx.logger?.info("coco.melt.execute", {
++			_perf: true,
++			ms: performance.now() - _t0,
++			networkMs: performance.now() - _tNet,
+ 			operationId,
+ 			quoteId,
+-			state: res.state
++			state: res.state,
++			needsSwap: ctx.operation.needsSwap,
++			proofCount: proofsToMelt.length
+ 		});
+ 		return this.handleMeltResponse(ctx, res, proofsToMelt);
+ 	}
+@@ -7999,6 +8054,7 @@ var DefaultSendHandler = class {
+ 	* Prepare the send operation by selecting proofs and creating outputs.
+ 	*/
+ 	async prepare(ctx) {
++		var _t0 = performance.now();
+ 		const { operation, wallet, proofService, logger } = ctx;
+ 		const { mintUrl, amount } = operation;
+ 		const exactProofs = await proofService.selectProofsToSend(mintUrl, amount, false);
+@@ -8059,7 +8115,9 @@ var DefaultSendHandler = class {
+ 			operationId: operation.id,
+ 			needsSwap,
+ 			fee,
+-			inputProofCount: inputSecrets.length
++			inputProofCount: inputSecrets.length,
++			_perf: true,
++			ms: performance.now() - _t0
+ 		});
+ 		return prepared;
+ 	}
+@@ -8067,6 +8125,7 @@ var DefaultSendHandler = class {
+ 	* Execute the send operation by performing the swap and creating the token.
+ 	*/
+ 	async execute(ctx) {
++		var _t0 = performance.now();
+ 		const { operation, wallet, reservedProofs, proofService, logger } = ctx;
+ 		const { mintUrl, amount, needsSwap, inputProofSecrets } = operation;
+ 		const inputProofs = reservedProofs.filter((p) => inputProofSecrets.includes(p.secret));
+@@ -8121,7 +8180,10 @@ var DefaultSendHandler = class {
+ 		logger?.info("Send operation executed", {
+ 			operationId: operation.id,
+ 			sendProofCount: sendProofs.length,
+-			keepProofCount: keepProofs.length
++			keepProofCount: keepProofs.length,
++			_perf: true,
++			ms: performance.now() - _t0,
++			needsSwap
+ 		});
+ 		return {
+ 			status: "PENDING",
+@@ -8493,6 +8555,7 @@ var MintHandlerProvider = class {
+ //#region infra/handlers/mint/MintBolt11Handler.ts
+ var MintBolt11Handler = class {
+ 	async prepare(ctx) {
++		var _t0 = performance.now();
+ 		const quote = ctx.importedQuote ?? await ctx.wallet.createMintQuoteBolt11(ctx.operation.amount);
+ 		if (!quote.amount || quote.amount <= 0) throw new Error(`Mint quote ${quote.quote} has invalid amount`);
+ 		if (quote.amount !== ctx.operation.amount) throw new Error(`Mint quote ${quote.quote} amount ${quote.amount} does not match requested amount ${ctx.operation.amount}`);
+@@ -8502,6 +8565,7 @@ var MintBolt11Handler = class {
+ 			send: 0
+ 		});
+ 		if (outputData.keep.length === 0) throw new Error("Failed to create deterministic outputs for mint operation");
++		ctx.logger?.info("coco.mint.prepare", { _perf: true, ms: performance.now() - _t0, amount: quote.amount, quoteId: quote.quote, outputCount: outputData.keep.length });
+ 		return {
+ 			...ctx.operation,
+ 			quoteId: quote.quote,
+@@ -8520,17 +8584,30 @@ var MintBolt11Handler = class {
+ 		};
+ 	}
+ 	async execute(ctx) {
++		var _t0 = performance.now();
+ 		const outputData = deserializeOutputData(ctx.operation.outputData);
+ 		try {
++			var _proofs = await ctx.wallet.mintProofsBolt11(ctx.operation.amount, ctx.operation.quoteId, void 0, {
++				type: "custom",
++				data: outputData.keep
++			});
++			ctx.logger?.info("coco.mint.execute", { _perf: true, ms: performance.now() - _t0, status: "ISSUED", proofCount: _proofs.length });
+ 			return {
+ 				status: "ISSUED",
+-				proofs: await ctx.wallet.mintProofsBolt11(ctx.operation.amount, ctx.operation.quoteId, void 0, {
+-					type: "custom",
+-					data: outputData.keep
+-				})
++				proofs: _proofs
  			};
  		} catch (err) {
- 			if (err instanceof MintOperationError && err.code === 20002) return { status: "ALREADY_ISSUED" };
+-			if (err instanceof MintOperationError && err.code === 20002) return { status: "ALREADY_ISSUED" };
++			if (err instanceof MintOperationError && err.code === 20002) { ctx.logger?.info("coco.mint.execute", { _perf: true, ms: performance.now() - _t0, status: "ALREADY_ISSUED" }); return { status: "ALREADY_ISSUED" }; }
 +			if (err instanceof MintOperationError && err.code === 11003) {
 +				try {
 +					const freshOutputs = await ctx.proofService.createOutputsAndIncrementCounters(ctx.operation.mintUrl, { keep: ctx.operation.amount, send: 0 });
 +					const freshProofs = await ctx.wallet.mintProofsBolt11(ctx.operation.amount, ctx.operation.quoteId, void 0, { type: "custom", data: freshOutputs.keep });
++					ctx.logger?.info("coco.mint.execute", { _perf: true, ms: performance.now() - _t0, status: "ISSUED_RETRY", proofCount: freshProofs.length });
 +					return { status: "ISSUED", proofs: freshProofs };
 +				} catch (retryErr) {
 +					throw retryErr;
@@ -87,7 +303,7 @@ index bedc7ad..b0e958d 100644
  			throw err;
  		}
  	}
-@@ -8564,6 +8602,16 @@ var MintBolt11Handler = class {
+@@ -8564,6 +8641,16 @@ var MintBolt11Handler = class {
  					status: "TERMINAL",
  					error: `Recovered: quote ${quoteId} expired while executing mint`
  				};
@@ -104,7 +320,25 @@ index bedc7ad..b0e958d 100644
  				else return {
  					status: "PENDING",
  					error: err.message
-@@ -8639,6 +8687,7 @@ var ConsoleLogger = class ConsoleLogger {
+@@ -8595,13 +8682,16 @@ var MintBolt11Handler = class {
+ 		}
+ 	}
+ 	async checkPending(ctx) {
++		var _t0 = performance.now();
+ 		const { mintUrl, quoteId } = ctx.operation;
+ 		ctx.logger?.info("Checking pending mint operation", {
+ 			mintUrl,
+ 			quoteId
+ 		});
+ 		const quote = await ctx.mintAdapter.checkMintQuoteState(mintUrl, quoteId);
+-		ctx.logger?.info("Pending mint quote state", {
++		ctx.logger?.info("coco.mint.checkPending", {
++			_perf: true,
++			ms: performance.now() - _t0,
+ 			mintUrl,
+ 			quoteId,
+ 			state: quote.state
+@@ -8639,6 +8729,7 @@ var ConsoleLogger = class ConsoleLogger {
  		info: 2,
  		debug: 3
  	};
@@ -112,7 +346,7 @@ index bedc7ad..b0e958d 100644
  	constructor(prefix = "coco", options = {}) {
  		this.prefix = prefix;
  		this.level = options.level ?? "info";
-@@ -8646,21 +8695,36 @@ var ConsoleLogger = class ConsoleLogger {
+@@ -8646,21 +8737,36 @@ var ConsoleLogger = class ConsoleLogger {
  	shouldLog(level) {
  		return ConsoleLogger.levelPriority[level] <= ConsoleLogger.levelPriority[this.level];
  	}
@@ -153,7 +387,7 @@ index bedc7ad..b0e958d 100644
  	}
  	log(level, message, ...meta) {
  		switch (level) {
-@@ -8739,15 +8803,18 @@ var WalletApi = class {
+@@ -8739,15 +8845,18 @@ var WalletApi = class {
  		});
  		const { wallet } = await this.walletService.getWalletWithActiveKeysetId(mintUrl);
  		const failedKeysetIds = {};

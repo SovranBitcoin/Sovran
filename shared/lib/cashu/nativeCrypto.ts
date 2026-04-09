@@ -44,7 +44,7 @@ export function initNativeCrypto(): void {
     if (globalThis.__CASHU_NATIVE) {
       globalThis.__CASHU_NATIVE.init(crypto);
       cashuLog.info('cashu.native_crypto.enabled', {
-        functions: ['hashToCurve', 'blind', 'unblind'],
+        functions: ['hashToCurve', 'blind', 'unblind', 'hashE', 'verifyDleqProof'],
       });
     } else {
       cashuLog.warn('cashu.native_crypto.hook_missing', {
