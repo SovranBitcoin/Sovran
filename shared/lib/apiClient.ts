@@ -1,5 +1,6 @@
 import { GetInfoResponse } from '@cashu/cashu-ts';
 import { ok, err, Result } from 'neverthrow';
+import { apiLog } from './logger';
 const BASE_URL = 'https://api.sovran.money/api';
 
 export const PRICELIST_URL = `wss://ws.sovran.money`;
@@ -50,19 +51,23 @@ interface SearchUsersResponse {
 
 const safeFetch = async <T = any>(url: string): Promise<Result<T, Error>> => {
   try {
+    apiLog.debug('api.fetch', { url });
     const res = await fetch(url);
     if (!res.ok) {
+      apiLog.warn('api.fetch_error', { url, status: res.status });
       return err(new Error(`Fetch error: ${res.status} ${res.statusText}`));
     }
     const data = await res.json();
     return ok(data as T);
   } catch (e) {
+    apiLog.error('api.fetch_failed', { url, error: e });
     return err(e instanceof Error ? e : new Error('Unknown error'));
   }
 };
 
 const safePost = async <T = any>(url: string, body: any): Promise<Result<T, Error>> => {
   try {
+    apiLog.debug('api.post', { url });
     const res = await fetch(url, {
       method: 'POST',
       headers: {
@@ -71,11 +76,13 @@ const safePost = async <T = any>(url: string, body: any): Promise<Result<T, Erro
       body: JSON.stringify(body),
     });
     if (!res.ok) {
+      apiLog.warn('api.post_error', { url, status: res.status });
       return err(new Error(`Post error: ${res.status} ${res.statusText}`));
     }
     const data = await res.json();
     return ok(data as T);
   } catch (e) {
+    apiLog.error('api.post_failed', { url, error: e });
     return err(e instanceof Error ? e : new Error('Unknown error'));
   }
 };
@@ -129,6 +136,7 @@ export const fetchMintInfo = async (mintUrl: string): Promise<Result<GetInfoResp
   const infoUrl = `${normalizedUrl}v1/info`;
 
   try {
+    apiLog.debug('api.mint_info', { mintUrl });
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error(`Request timeout for ${infoUrl}`)), 10000);
     });
@@ -144,14 +152,17 @@ export const fetchMintInfo = async (mintUrl: string): Promise<Result<GetInfoResp
     const res = await Promise.race([fetchPromise, timeoutPromise]);
 
     if (!res.ok) {
+      apiLog.warn('api.mint_info_error', { mintUrl, status: res.status });
       return err(
         new Error(`Mint info fetch error: ${res.status} ${res.statusText} for ${infoUrl}`)
       );
     }
 
     const data = await res.json();
+    apiLog.debug('api.mint_info.ok', { mintUrl, name: data?.name, hasIcon: !!data?.icon_url });
     return ok(data as GetInfoResponse);
   } catch (e) {
+    apiLog.error('api.mint_info_failed', { mintUrl, error: e });
     return err(
       e instanceof Error ? e : new Error(`Unknown error fetching mint info from ${infoUrl}`)
     );

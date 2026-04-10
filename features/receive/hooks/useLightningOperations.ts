@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
-import { useManager } from 'coco-cashu-react';
+import { useManager } from '@cashu/coco-react';
+import { log } from '@/shared/lib/logger';
 
 /**
  * Wraps `manager.quotes.createMintQuote` with loading/error state.
@@ -17,11 +18,15 @@ export function useLightningOperations() {
     async (mintUrl: string, amount: number) => {
       setIsProcessing(true);
       setError(null);
+      log.info('receive.lightning.invoice_request', { mintUrl, amount });
 
       try {
-        return await manager.quotes.createMintQuote(mintUrl, amount);
+        const result = await manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' });
+        log.info('receive.lightning.invoice_created', { mintUrl, amount });
+        return result;
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to create mint quote');
+        log.error('receive.lightning.invoice_failed', { mintUrl, amount, error });
         setError(error);
         throw error;
       } finally {

@@ -28,6 +28,7 @@ import { scheduleOnUI } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Log } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import type { ImageOverlayContextValue } from './types';
@@ -1315,7 +1316,11 @@ export function AnimatedImageOverlay() {
   if (!ctx) return null;
   const content = <AnimatedImageOverlayContent ctx={ctx} />;
   if (Platform.OS === 'web') return content;
-  return <FullWindowOverlay>{content}</FullWindowOverlay>;
+  return (
+    <Log name="AnimatedImageOverlay">
+      <FullWindowOverlay>{content}</FullWindowOverlay>
+    </Log>
+  );
 }
 
 const overlayStyles = StyleSheet.create({

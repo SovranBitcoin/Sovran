@@ -2,11 +2,10 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { useHandleCameraPermission } from '@/features/camera';
-import { useMintManagement } from '@/features/mint';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log } from '@/shared/lib/logger';
 
 export const BUTTON_H = 48;
 export const QR_SIZE = 72;
@@ -30,9 +29,6 @@ export interface AccountPagerViewShared {
   handleReceive: () => void;
   handleScanQR: () => Promise<void>;
   handleSend: () => Promise<void>;
-  foreground: string;
-  shadeColor100: string;
-  shadeColor300: string;
 }
 
 export function useAccountPagerView({
@@ -41,20 +37,11 @@ export function useAccountPagerView({
   account,
 }: AccountPagerViewProps): AccountPagerViewShared {
   const { height: windowHeight } = useWindowDimensions();
-  const [foreground, shadeColor100, shadeColor300] = useThemeColor([
-    'foreground',
-    'shade-100',
-    'shade-300',
-  ] as const);
-
   const pagerHeight = Math.max(windowHeight * 0.3, 250);
 
   const { handlePermission } = useHandleCameraPermission();
-  const { getBalances } = useMintManagement();
-
-  const { keys } = useNostrKeysContext();
-  const selectedMints = useMintStore((state) => state.selectedMints);
-  const selectedMintUrl = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;
+  const walletContext = useWalletContext();
+  const machine = usePaymentFlowMachine({ walletContext, unit: account.unit });
 
   const swiperRef = useRef<any>(null);
 
@@ -72,15 +59,17 @@ export function useAccountPagerView({
   }, [accounts, account]);
 
   const handleReceive = useCallback(() => {
-    router.navigate({
-      pathname: '/(receive-flow)/receive',
-      params: { to: 'sendToken', unit: account.unit },
-    });
-  }, [account.unit]);
+    log.info('wallet.action.receive', { unit: account.unit });
+    void machine.startReceive({ reset: true });
+  }, [machine, account.unit]);
 
   const handleScanQR = useCallback(async () => {
+    log.info('wallet.action.scan_qr', { unit: account.unit });
     const granted = await handlePermission();
-    if (!granted) return;
+    if (!granted) {
+      log.info('wallet.action.scan_qr_denied');
+      return;
+    }
     router.navigate({
       pathname: '/camera',
       params: { to: 'sendToken', unit: account.unit },
@@ -88,27 +77,9 @@ export function useAccountPagerView({
   }, [handlePermission, account.unit]);
 
   const handleSend = useCallback(async () => {
-    let balance = 0;
-    try {
-      const balances = await getBalances();
-      balance = balances[selectedMintUrl || ''] || 0;
-    } catch (error) {
-      if (__DEV__) console.error('Failed to get balance:', error);
-    }
-
-    if (balance <= 0) {
-      router.navigate({
-        pathname: '/(send-flow)/mintSelect',
-        params: { to: 'sendToken', unit: account.unit },
-      });
-      return;
-    }
-
-    router.navigate({
-      pathname: '/(send-flow)/currency',
-      params: { to: 'sendToken', unit: account.unit },
-    });
-  }, [getBalances, selectedMintUrl, account.unit]);
+    log.info('wallet.action.send', { unit: account.unit });
+    await machine.startSendEcash({ reset: true });
+  }, [machine, account.unit]);
 
   return {
     accounts,
@@ -119,8 +90,5 @@ export function useAccountPagerView({
     handleReceive,
     handleScanQR,
     handleSend,
-    foreground,
-    shadeColor100,
-    shadeColor300,
   };
 }

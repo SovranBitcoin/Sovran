@@ -37,6 +37,7 @@ import { PostCard } from './nostr/PostCard';
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { feedLog, Log } from '@/shared/lib/logger';
 
 // ============================================================================
 // Types
@@ -198,6 +199,8 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
     let cancelled = false;
     setIsLoading(true);
     setError(null);
+
+    feedLog.info('thread.load.start', { eventId });
 
     const fetchThread = async () => {
       const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
@@ -386,14 +389,26 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         const expectedReplies = targetMetrics?.replyCount ?? 0;
         setHiddenReplyCount(Math.max(0, expectedReplies - replies.length));
 
+        feedLog.info('thread.load.done', {
+          eventId,
+          parents: parents.length,
+          replies: replies.length,
+          profiles: profiles.size,
+          hiddenReplies: Math.max(0, expectedReplies - replies.length),
+        });
+
         setThreadItems(items);
         setProfilesMap(profiles);
         setMetricsMap(metrics);
         setQuotedEventsMap(quotedEvents);
         setDataVersion((v) => v + 1);
         setIsLoading(false);
-      } catch {
+      } catch (err) {
         if (!cancelled) {
+          feedLog.error('thread.load.error', {
+            eventId,
+            error: err instanceof Error ? err : new Error(String(err)),
+          });
           setError('Failed to load thread');
           setIsLoading(false);
         }
@@ -477,44 +492,47 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   }
 
   return (
-    <ImageOverlayProvider
-      getDisplayMetrics={getDisplayMetrics}
-      getEngagementState={getEngagementState}>
-      <View style={[styles.container, { backgroundColor: background }]}>
-        <LegendList
-          data={threadItems}
-          keyExtractor={threadKeyExtractor}
-          getItemType={threadItemType}
-          estimatedItemSize={200}
-          drawDistance={500}
-          renderItem={renderItem}
-          extraData={`${dataVersion}:${engagementRevision}`}
-          recycleItems
-          ListFooterComponent={
-            hiddenReplyCount > 0 ? (
-              <View style={styles.hiddenReplyFooter}>
-                <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
-                  {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not loaded
-                </Text>
-              </View>
-            ) : null
-          }
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: 120 }}
-          showsVerticalScrollIndicator={false}
-          onScroll={
-            imageOverlay?.scrollOffsetY != null
-              ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-                  imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
-                }
-              : undefined
-          }
-          scrollEventThrottle={16}
-          initialScrollIndex={targetIndex > 0 ? targetIndex : undefined}
-        />
-        <AnimatedImageOverlay />
-      </View>
-    </ImageOverlayProvider>
+    <Log name="ThreadView">
+      <ImageOverlayProvider
+        getDisplayMetrics={getDisplayMetrics}
+        getEngagementState={getEngagementState}>
+        <View style={[styles.container, { backgroundColor: background }]}>
+          <LegendList
+            data={threadItems}
+            keyExtractor={threadKeyExtractor}
+            getItemType={threadItemType}
+            estimatedItemSize={200}
+            drawDistance={500}
+            renderItem={renderItem}
+            extraData={`${dataVersion}:${engagementRevision}`}
+            recycleItems
+            ListFooterComponent={
+              hiddenReplyCount > 0 ? (
+                <View style={styles.hiddenReplyFooter}>
+                  <Text size={13} style={{ color: opacity(foreground, 0.4) }}>
+                    {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'} not
+                    loaded
+                  </Text>
+                </View>
+              ) : null
+            }
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingTop: headerHeight, paddingBottom: 120 }}
+            showsVerticalScrollIndicator={false}
+            onScroll={
+              imageOverlay?.scrollOffsetY != null
+                ? (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+                    imageOverlay.scrollOffsetY.value = e.nativeEvent.contentOffset.y;
+                  }
+                : undefined
+            }
+            scrollEventThrottle={16}
+            initialScrollIndex={targetIndex > 0 ? targetIndex : undefined}
+          />
+          <AnimatedImageOverlay />
+        </View>
+      </ImageOverlayProvider>
+    </Log>
   );
 }
 

@@ -13,6 +13,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import type { FeedEvent, NoteMetrics, ProfileInfo } from '../shared';
 import { useImageOverlay } from './provider';
 import type { ImageOverlayPost, MediaType } from './types';
+import { Log } from '@/shared/lib/logger';
 
 const AnimatedBlurView = Reanimated.createAnimatedComponent(BlurView);
 
@@ -216,33 +217,35 @@ export const ImageBlock = React.memo(function ImageBlock({
 
   const isOverlayActive = imageOverlay?.activeUrl === url;
   return (
-    <View style={styles.imageBlockOuter}>
-      <View
-        ref={containerRef}
-        collapsable={false}
-        style={{ aspectRatio }}
-        onLayout={registerLayout}>
-        {imageOverlay?.open ? (
-          <Pressable
-            onPressIn={onPressIn}
-            onPressOut={onPressOut}
-            onPress={handlePress}
-            style={StyleSheet.absoluteFill}>
-            {image}
-          </Pressable>
-        ) : (
-          image
-        )}
-        {isOverlayActive && (
-          <AnimatedBlurView
-            tint="dark"
-            style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
-            pointerEvents="none"
-            animatedProps={thumbnailBlurAnimatedProps}
-          />
-        )}
+    <Log name="ImageBlock">
+      <View style={styles.imageBlockOuter}>
+        <View
+          ref={containerRef}
+          collapsable={false}
+          style={{ aspectRatio }}
+          onLayout={registerLayout}>
+          {imageOverlay?.open ? (
+            <Pressable
+              onPressIn={onPressIn}
+              onPressOut={onPressOut}
+              onPress={handlePress}
+              style={StyleSheet.absoluteFill}>
+              {image}
+            </Pressable>
+          ) : (
+            image
+          )}
+          {isOverlayActive && (
+            <AnimatedBlurView
+              tint="dark"
+              style={[StyleSheet.absoluteFill, { borderRadius: 12 }]}
+              pointerEvents="none"
+              animatedProps={thumbnailBlurAnimatedProps}
+            />
+          )}
+        </View>
       </View>
-    </View>
+    </Log>
   );
 });
 

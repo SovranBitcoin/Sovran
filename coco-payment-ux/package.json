@@ -1,0 +1,47 @@
+{
+  "name": "coco-payment-ux",
+  "version": "0.1.0",
+  "description": "Standardized payment UX logic for coco-based wallets. Parsing, classification, routing, annotation, offline suggestions — UI and navigation agnostic.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react/index.ts",
+    "./operations": "./src/operations/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@cashu/cashu-ts": "^3.5.0",
+    "@gandlaf21/bolt11-decode": "^3.1.1",
+    "nostr-tools": "^2.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "@cashu/coco-core": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "@cashu/coco-core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "fast-check": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run __tests__/unit",
+    "test:flows": "vitest run __tests__/flows",
+    "test:property": "vitest run __tests__/property"
+  }
+}

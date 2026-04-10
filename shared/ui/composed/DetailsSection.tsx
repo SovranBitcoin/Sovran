@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
+import { Log } from '@/shared/lib/logger';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -42,24 +43,28 @@ export function DetailsSection({
   if (items.length === 0) return null;
 
   return (
-    <View style={styles.container}>
-      <Pressable
-        onPress={() => setExpanded((v) => !v)}
-        style={styles.toggle}
-        hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}>
-        <HStack align="center" gap={6}>
-          <Icon
-            name={expanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-            color={opacity(foreground, 0.5)}
-            size={18}
-          />
-          <Text size={14} bold style={{ color: opacity(foreground, 0.5) }}>
-            {label}
-          </Text>
-        </HStack>
-      </Pressable>
-      {expanded ? <Section items={items} camera={camera} style={{ marginHorizontal: 0 }} /> : null}
-    </View>
+    <Log name="DetailsSection">
+      <View style={styles.container}>
+        <Pressable
+          onPress={() => setExpanded((v) => !v)}
+          style={styles.toggle}
+          hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}>
+          <HStack align="center" gap={6}>
+            <Icon
+              name={expanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+              color={opacity(foreground, 0.5)}
+              size={18}
+            />
+            <Text size={14} bold style={{ color: opacity(foreground, 0.5) }}>
+              {label}
+            </Text>
+          </HStack>
+        </Pressable>
+        {expanded ? (
+          <Section items={items} camera={camera} style={{ marginHorizontal: 0 }} />
+        ) : null}
+      </View>
+    </Log>
   );
 }
 

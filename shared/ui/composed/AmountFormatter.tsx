@@ -5,6 +5,7 @@ import { BtcIcon, LightningUnit } from 'assets/icons';
 import opacity from 'hex-color-opacity';
 
 import { formatAmount } from '@/shared/lib/currency';
+import { Log } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/utils';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -73,13 +74,15 @@ export function AmountFormatter({
 
   if (unit !== 'sat') {
     return (
-      <View className={containerClass} style={style}>
-        <ScaleWrapper animated={animated} scaleAnim={scaleAnim}>
-          <Text overpass size={size} weight={weight} style={textStyle}>
-            {formattedAmount}
-          </Text>
-        </ScaleWrapper>
-      </View>
+      <Log name="AmountFormatter">
+        <View className={containerClass} style={style}>
+          <ScaleWrapper animated={animated} scaleAnim={scaleAnim}>
+            <Text overpass size={size} weight={weight} style={textStyle}>
+              {formattedAmount}
+            </Text>
+          </ScaleWrapper>
+        </View>
+      </Log>
     );
   }
 
@@ -91,32 +94,34 @@ export function AmountFormatter({
   const textMarginLeft = centered ? 0 : Math.round(size * (weight === 'heavy' ? -0.05 : -0.1));
 
   return (
-    <View className={cn(containerClass, className)} style={style}>
-      <ScaleWrapper animated={animated} scaleAnim={scaleAnim}>
-        <HStack align="center" style={style}>
-          {showBtcIcon && (
-            <View style={{ marginLeft: iconMarginLeft, marginRight: centered ? 4 : 0 }}>
-              <BtcIcon weight={weight} size={size} color={currentColor} />
-            </View>
-          )}
-          <TextComponent
-            overpass
-            size={size}
-            weight={weight}
-            style={{
-              ...textStyle,
-              ...(showBtcIcon && { marginLeft: textMarginLeft }),
-            }}>
-            {formattedAmount}
-          </TextComponent>
-          {showLightningIcon && (
-            <View style={{ marginBottom: 4, marginLeft: centered ? 4 : 0 }}>
-              <LightningUnit height={size} width={size} color={currentColor} />
-            </View>
-          )}
-        </HStack>
-      </ScaleWrapper>
-    </View>
+    <Log name="AmountFormatter">
+      <View className={cn(containerClass, className)} style={style}>
+        <ScaleWrapper animated={animated} scaleAnim={scaleAnim}>
+          <HStack align="center" style={style}>
+            {showBtcIcon && (
+              <View style={{ marginLeft: iconMarginLeft, marginRight: centered ? 4 : 0 }}>
+                <BtcIcon weight={weight} size={size} color={currentColor} />
+              </View>
+            )}
+            <TextComponent
+              overpass
+              size={size}
+              weight={weight}
+              style={{
+                ...textStyle,
+                ...(showBtcIcon && { marginLeft: textMarginLeft }),
+              }}>
+              {formattedAmount}
+            </TextComponent>
+            {showLightningIcon && (
+              <View style={{ marginBottom: 4, marginLeft: centered ? 4 : 0 }}>
+                <LightningUnit height={size} width={size} color={currentColor} />
+              </View>
+            )}
+          </HStack>
+        </ScaleWrapper>
+      </View>
+    </Log>
   );
 }
 

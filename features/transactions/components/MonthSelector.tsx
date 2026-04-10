@@ -5,8 +5,9 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
-import { HistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log, Log } from '@/shared/lib/logger';
 
 interface MonthItem {
   key: string;
@@ -45,8 +46,9 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
   ] as const);
 
   const handlePress = useCallback(() => {
+    log.info('transaction.month.select', { monthKey: item.key, label: item.label });
     onPress(item.key);
-  }, [item.key, onPress]);
+  }, [item.key, item.label, onPress]);
 
   return (
     <TouchableOpacity onPress={handlePress}>
@@ -142,25 +144,27 @@ export function MonthSelector({
   if (months.length === 0) return null;
 
   return (
-    <View className="bg-transparent px-4 py-2">
-      <ScrollView
-        ref={scrollViewRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingRight: 16 }}>
-        <HStack align="center">
-          {months.map((item) => (
-            <View key={item.key} onLayout={handleItemLayout(item.key)}>
-              <MonthTab
-                item={item}
-                isSelected={selectedMonth === item.key}
-                onPress={onMonthChange}
-                showYear={showYear}
-              />
-            </View>
-          ))}
-        </HStack>
-      </ScrollView>
-    </View>
+    <Log name="MonthSelector">
+      <View className="bg-transparent px-4 py-2">
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingRight: 16 }}>
+          <HStack align="center">
+            {months.map((item) => (
+              <View key={item.key} onLayout={handleItemLayout(item.key)}>
+                <MonthTab
+                  item={item}
+                  isSelected={selectedMonth === item.key}
+                  onPress={onMonthChange}
+                  showYear={showYear}
+                />
+              </View>
+            ))}
+          </HStack>
+        </ScrollView>
+      </View>
+    </Log>
   );
 }

@@ -14,6 +14,17 @@ export function insufficientBalancePopup(params: {
   });
 }
 
+/** For coco-payment-ux INSUFFICIENT_BALANCE / NO_BALANCE when amount/unit/fee are not available. */
+export function balanceTooLowPopup(overrides?: TextOverrides): void {
+  popup({
+    message: 'Insufficient Balance',
+    text: 'You do not have enough funds to complete this transaction.',
+    icon: 'icon:mdi:wallet-outline',
+    type: 'error',
+    ...overrides,
+  });
+}
+
 export function invalidAddressPopup(params: { address: string }): void {
   popup({
     message: 'Invalid Address',

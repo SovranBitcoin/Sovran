@@ -4759,5 +4759,10 @@ module.exports = {
     "svg": "<svg viewBox=\"0 0 512 512\" width=\"1em\" height=\"1em\" ><mask id=\"SVGuywqVbel\"><circle cx=\"256\" cy=\"256\" r=\"256\" fill=\"#fff\"/></mask><g mask=\"url(#SVGuywqVbel)\"><path fill=\"#6da544\" d=\"M31.4 0H512v512H31.4z\"/><path fill=\"#ffda44\" d=\"M57.8 73.3H512v73.3l-65.1 110l65.1 110v73.3H57.8z\"/><path fill=\"#d80027\" d=\"M132 146.6h380v73.3l-27 36l27 37.3v73.3H132z\"/><path fill=\"#eee\" d=\"M0 0v512l279.8-256z\"/><path fill=\"#d80027\" d=\"m103 189.2l16.5 51h53.6l-43.4 31.6l16.6 51l-43.4-31.5l-43.4 31.5l16.6-51l-43.4-31.6h53.6z\"/><path fill=\"#ffda44\" d=\"m148.5 260.2l-43.2-15.3l-3.4-31a16.7 16.7 0 1 0-32.5 7.6l-12 12.1h21.5c0 22.4-16.7 22.4-16.7 44.7l9.2 22.2h55.7l9.3-22.2a22.2 22.2 0 0 0 1.7-6.6c8-3.2 10.4-11.5 10.4-11.5\"/><path fill=\"#333\" d=\"m31.4 0l220 220H512v73.2H250.2L31.4 512H0l256-256L0 0z\"/></g></svg>",
     "width": 16,
     "height": 16
+  },
+  "icon-park-outline:speed-one": {
+    "svg": "<svg viewBox=\"0 0 48 48\" width=\"1em\" height=\"1em\" ><g fill=\"none\" stroke=\"currentColor\" stroke-linejoin=\"round\" stroke-width=\"4\"><path d=\"M30.297 18.779s-3.23 9.102-4.764 10.691a4 4 0 0 1-5.754-5.557c1.534-1.59 10.518-5.134 10.518-5.134Z\"/><path stroke-linecap=\"round\" d=\"M38.85 38.85A20.94 20.94 0 0 0 45 24c0-11.598-9.402-21-21-21S3 12.402 3 24c0 5.799 2.35 11.049 6.15 14.85M24 4v4m14.845 3.142l-3.108 2.517m6.785 13.574l-3.897-.9m-33.148.9l3.898-.9m-.22-15.191l3.108 2.517\"/></g></svg>",
+    "width": 48,
+    "height": 48
   }
 };

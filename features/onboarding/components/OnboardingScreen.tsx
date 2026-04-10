@@ -19,6 +19,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Text } from '@/shared/ui/primitives/Text';
+import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
 import OnboardingInnerCarousel from './OnboardingInnerCarousel';
 import { OnboardingSlide } from './types';
 
@@ -35,6 +36,7 @@ type OnboardingScreenProps = {
 };
 
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
+  useLifecycleLogger('OnboardingScreen');
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
   const insets = useSafeAreaInsets();
@@ -167,6 +169,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   }));
 
   const onGetStartedPress = () => {
+    log.info('onboarding.completed', { slidesSeen: currentSlideIndex + 1 });
     onComplete();
   };
 
@@ -176,61 +179,63 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: background, paddingBottom: insets.bottom + 10 }}>
-      <Animated.View style={[{ marginTop: 'auto' }, welcomeBlockStyle]}>
-        <Pressable style={{ alignSelf: 'center', marginBottom: 24 }} onPress={onChevronDownPress}>
-          <Icon name="mdi:chevron-down" size={24} color={muted} />
-        </Pressable>
-        <Text bold size={28} style={{ color: foreground, textAlign: 'center' }}>
-          Welcome to Sovran
-        </Text>
-        <Text size={15} style={{ color: muted, textAlign: 'center', marginTop: 12 }}>
-          Your keys, your money, your freedom.
-        </Text>
-      </Animated.View>
+    <Log name="OnboardingScreen">
+      <View style={{ flex: 1, backgroundColor: background, paddingBottom: insets.bottom + 10 }}>
+        <Animated.View style={[{ marginTop: 'auto' }, welcomeBlockStyle]}>
+          <Pressable style={{ alignSelf: 'center', marginBottom: 24 }} onPress={onChevronDownPress}>
+            <Icon name="mdi:chevron-down" size={24} color={muted} />
+          </Pressable>
+          <Text bold size={28} style={{ color: foreground, textAlign: 'center' }}>
+            Welcome to Sovran
+          </Text>
+          <Text size={15} style={{ color: muted, textAlign: 'center', marginTop: 12 }}>
+            Your keys, your money, your freedom.
+          </Text>
+        </Animated.View>
 
-      <PressableFeedback
-        onPress={onGetStartedPress}
-        style={{
-          height: 48,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: 999,
-          marginHorizontal: 80,
-          marginTop: 24,
-          backgroundColor: foreground,
-          overflow: 'hidden',
-        }}>
-        <PressableFeedback.Highlight />
-        <Text bold size={16} style={{ color: background }}>
-          Get Started
-        </Text>
-      </PressableFeedback>
+        <PressableFeedback
+          onPress={onGetStartedPress}
+          style={{
+            height: 48,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 999,
+            marginHorizontal: 80,
+            marginTop: 24,
+            backgroundColor: foreground,
+            overflow: 'hidden',
+          }}>
+          <PressableFeedback.Highlight />
+          <Text bold size={16} style={{ color: background }}>
+            Get Started
+          </Text>
+        </PressableFeedback>
 
-      <GestureDetector gesture={Gesture.Race(panGesture, singleTap)}>
-        <OnboardingInnerCarousel
-          slides={slides}
-          currentSlideIndex={currentSlideIndex}
-          setCurrentSlideIndex={setCurrentSlideIndex}
-          animatedSlideIndex={animatedSlideIndex}
-          horizontalListRef={horizontalListRef}
-          scrollHandler={scrollHandler}
-          translateY={translateY}
-          scrollOffsetX={scrollOffsetX}
-          isDragging={isDragging}
-          topCarouselOffset={TOP_CAROUSEL_OFFSET}
-        />
-      </GestureDetector>
+        <GestureDetector gesture={Gesture.Race(panGesture, singleTap)}>
+          <OnboardingInnerCarousel
+            slides={slides}
+            currentSlideIndex={currentSlideIndex}
+            setCurrentSlideIndex={setCurrentSlideIndex}
+            animatedSlideIndex={animatedSlideIndex}
+            horizontalListRef={horizontalListRef}
+            scrollHandler={scrollHandler}
+            translateY={translateY}
+            scrollOffsetX={scrollOffsetX}
+            isDragging={isDragging}
+            topCarouselOffset={TOP_CAROUSEL_OFFSET}
+          />
+        </GestureDetector>
 
-      <Animated.View
-        pointerEvents="none"
-        style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, gradientStyle]}>
-        <LinearGradient
-          colors={['rgba(0,0,0,0.6)', 'transparent']}
-          style={{ width: '100%', height: '60%' }}
-        />
-      </Animated.View>
-    </View>
+        <Animated.View
+          pointerEvents="none"
+          style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, gradientStyle]}>
+          <LinearGradient
+            colors={['rgba(0,0,0,0.6)', 'transparent']}
+            style={{ width: '100%', height: '60%' }}
+          />
+        </Animated.View>
+      </View>
+    </Log>
   );
 };
 

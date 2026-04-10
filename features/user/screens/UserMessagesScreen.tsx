@@ -17,10 +17,11 @@ import {
   TouchableWithoutFeedback,
   InteractionManager,
   TextInput as RNTextInput,
+  Animated as RNAnimated,
 } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useFocusEffect } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import {
   buttonHandlerPopup,
@@ -75,8 +76,10 @@ import { Button } from '@/shared/ui/primitives/Button';
 import { isValidEcashToken } from '@/shared/lib/cashu/utils';
 import { ROUTSTR_PUBKEY } from '@/shared/lib/constants';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
+import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
+import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { checkBalance, sendMessage, getModels, RoutstrModel } from '@/shared/lib/routstr/api';
-import { getDecodedToken, ReceiveHistoryEntry } from 'coco-cashu-core';
+import { getDecodedToken, ReceiveHistoryEntry } from '@cashu/coco-core';
 import { Proof } from '@cashu/cashu-ts';
 import { formatAmount } from '@/shared/lib/currency';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -98,6 +101,7 @@ import { truncateMiddle } from '@/shared/lib/strings';
 import { getUsername } from '@/shared/lib/username';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 function formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp * 1000);
@@ -121,7 +125,8 @@ function formatBalance(msats: number | null): string {
   return `${msats} msats`;
 }
 
-function extractProviderFromSlug(canonicalSlug: string): string {
+function extractProviderFromSlug(canonicalSlug: string | null | undefined): string {
+  if (!canonicalSlug) return 'Unknown';
   const parts = canonicalSlug.split('/');
   const provider = parts[0] || 'Unknown';
   return provider.charAt(0).toUpperCase() + provider.slice(1);
@@ -129,7 +134,7 @@ function extractProviderFromSlug(canonicalSlug: string): string {
 
 function extractModelName(model: RoutstrModel): { provider: string; modelName: string } {
   const provider = extractProviderFromSlug(model.canonical_slug);
-  const slugParts = model.canonical_slug.split('/');
+  const slugParts = (model.canonical_slug ?? '').split('/');
   let modelName = slugParts[1] || model.name;
   modelName = modelName.replace(/-\d{8}$/, '');
 
@@ -274,7 +279,7 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
     mintUrl = decoded.mint || '';
     isValid = true;
   } catch (error) {
-    console.error('Failed to decode cashu token:', error);
+    log.error('user.messages.cashu_decode_failed', { error });
     isValid = false;
   }
 
@@ -406,6 +411,104 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
   );
 }
 
+// ===========================
+// STREAMING VISUAL COMPONENTS
+// ===========================
+
+const SPINNER_VERBS = [
+  'Thinking',
+  'Pondering',
+  'Considering',
+  'Reasoning',
+  'Composing',
+  'Formulating',
+  'Reflecting',
+  'Analyzing',
+  'Synthesizing',
+  'Drafting',
+  'Contemplating',
+  'Processing',
+  'Deliberating',
+  'Weighing',
+  'Crafting',
+  'Generating',
+  'Assembling',
+  'Piecing together',
+  'Working through',
+  'Mulling over',
+];
+
+/** Animated typing indicator with cycling verb. */
+function TypingIndicator({ color }: { color: string }) {
+  const [verbIndex, setVerbIndex] = useState(() =>
+    Math.floor(Math.random() * SPINNER_VERBS.length)
+  );
+  const fadeAnim = useRef(new RNAnimated.Value(1)).current;
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      RNAnimated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(
+        () => {
+          setVerbIndex((i) => (i + 1) % SPINNER_VERBS.length);
+          RNAnimated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+        }
+      );
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [fadeAnim]);
+
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+      }}>
+      <Icon
+        name="ant-design:loading-outlined"
+        size={14}
+        color={color}
+        spin={{ duration: 1000, outputRange: ['0deg', '360deg'], delay: 0, easing: 'linear' }}
+      />
+      <RNAnimated.View style={{ opacity: fadeAnim, marginLeft: 8 }}>
+        <Text size={14} style={{ color, fontStyle: 'italic' }}>
+          {SPINNER_VERBS[verbIndex]}...
+        </Text>
+      </RNAnimated.View>
+    </View>
+  );
+}
+
+/** Blinking cursor appended to streaming text. */
+function StreamingCursor({ color }: { color: string }) {
+  const opacity = useRef(new RNAnimated.Value(1)).current;
+
+  useEffect(() => {
+    const anim = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+        RNAnimated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [opacity]);
+
+  return (
+    <RNAnimated.View
+      style={{
+        width: 2,
+        height: 16,
+        backgroundColor: color,
+        opacity,
+        marginLeft: 1,
+        borderRadius: 1,
+      }}
+    />
+  );
+}
+
 interface MessageBubbleProps {
   message: any;
   isMe: boolean;
@@ -460,10 +563,17 @@ function MessageBubble({
       ? message.content
       : String(message.content || '');
 
+  const reasoningContent = message.reasoningContent || '';
   const isStreamComplete = message.isStreamComplete !== undefined ? message.isStreamComplete : true;
+  const [reasoningExpanded, setReasoningExpanded] = useState(false);
 
+  const isThinking =
+    isStreaming && !isStreamComplete && reasoningContent.length > 0 && content.length === 0;
   const shouldShowSkeleton =
-    isStreaming && !isStreamComplete && (content.length === 0 || isPlaceholderText(content));
+    isStreaming &&
+    !isStreamComplete &&
+    !isThinking &&
+    (content.length === 0 || isPlaceholderText(content));
 
   const cashuToken = extractCashuToken(content);
 
@@ -480,6 +590,14 @@ function MessageBubble({
   } else {
     displayContent = shouldShowSkeleton ? '' : displayContent;
   }
+
+  const thinkingDuration = message.reasoningDurationSec;
+  const thinkingLabel =
+    thinkingDuration != null && thinkingDuration >= 1
+      ? `Thought for ${thinkingDuration} second${thinkingDuration !== 1 ? 's' : ''}`
+      : 'Thought briefly';
+  const showThinkingHeader =
+    !isMe && ((thinkingDuration != null && thinkingDuration >= 1) || reasoningContent.length > 0);
 
   return (
     <VStack
@@ -509,7 +627,7 @@ function MessageBubble({
           align={isMe ? 'flex-end' : 'flex-start'}
           spacing={4}
           style={{ flex: 1, maxWidth: '85%' }}>
-          {(displayContent || shouldShowSkeleton) && (
+          {(displayContent || shouldShowSkeleton || isThinking) && (
             <View
               style={{
                 backgroundColor: isMe ? defaultColor : surfaceTertiary,
@@ -521,34 +639,98 @@ function MessageBubble({
                 minWidth: shouldShowSkeleton ? 60 : undefined,
               }}>
               {shouldShowSkeleton ? (
-                <View
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    justifyContent: 'center',
-                    alignItems: 'flex-start',
-                  }}>
-                  <View
-                    style={{
-                      width: 60,
-                      height: 16,
-                      backgroundColor: defaultColor,
-                      borderRadius: 8,
-                      opacity: 0.6,
-                    }}
-                  />
+                <TypingIndicator color={shade400} />
+              ) : isThinking ? (
+                <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+                  <HStack align="center" spacing={6}>
+                    <Icon
+                      name="ant-design:loading-outlined"
+                      size={14}
+                      color={shade400}
+                      spin={{
+                        duration: 1000,
+                        outputRange: ['0deg', '360deg'],
+                        delay: 0,
+                        easing: 'linear',
+                      }}
+                    />
+                    <Text size={14} style={{ color: shade400, fontStyle: 'italic' }}>
+                      Thinking...
+                    </Text>
+                  </HStack>
+                  <Text
+                    size={13}
+                    style={{ color: shade400, lineHeight: 18, marginTop: 6 }}
+                    numberOfLines={4}>
+                    {reasoningContent}
+                  </Text>
                 </View>
               ) : (
-                <Text
-                  size={16}
-                  style={{
-                    color: foreground,
-                    lineHeight: 20,
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                  }}>
-                  {displayContent}
-                </Text>
+                <View>
+                  {showThinkingHeader &&
+                    (reasoningContent.length > 0 ? (
+                      <Pressable
+                        onPress={() => setReasoningExpanded((v) => !v)}
+                        style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
+                        <HStack align="center" spacing={4}>
+                          <Icon name="mdi:brain" size={14} color={shade400} />
+                          <Text size={13} style={{ color: shade400, fontStyle: 'italic' }}>
+                            {thinkingLabel}
+                          </Text>
+                          <Icon
+                            name={reasoningExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                            size={14}
+                            color={shade400}
+                          />
+                        </HStack>
+                        {reasoningExpanded && (
+                          <Text size={13} style={{ color: shade400, lineHeight: 18, marginTop: 4 }}>
+                            {reasoningContent}
+                          </Text>
+                        )}
+                      </Pressable>
+                    ) : (
+                      <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
+                        <HStack align="center" spacing={4}>
+                          <Icon name="mdi:brain" size={14} color={shade400} />
+                          <Text size={13} style={{ color: shade400, fontStyle: 'italic' }}>
+                            {thinkingLabel}
+                          </Text>
+                        </HStack>
+                      </View>
+                    ))}
+                  {isStreaming && !isStreamComplete ? (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        alignItems: 'flex-end',
+                        paddingHorizontal: 16,
+                        paddingVertical: showThinkingHeader ? 8 : 12,
+                      }}>
+                      <Text
+                        size={16}
+                        style={{
+                          color: foreground,
+                          lineHeight: 20,
+                        }}>
+                        {displayContent}
+                      </Text>
+                      <StreamingCursor color={foreground} />
+                    </View>
+                  ) : (
+                    <Text
+                      size={16}
+                      style={{
+                        color: foreground,
+                        lineHeight: 20,
+                        paddingHorizontal: 16,
+                        paddingVertical: showThinkingHeader ? 8 : 12,
+                      }}>
+                      {displayContent}
+                    </Text>
+                  )}
+                </View>
               )}
             </View>
           )}
@@ -590,9 +772,10 @@ interface ModelListItemProps {
   model: RoutstrModel;
   isSelected: boolean;
   onSelect: (modelId: string) => void;
+  canAfford?: boolean;
 }
 
-const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
+const ModelListItem = React.memo(({ model, onSelect, canAfford = true }: ModelListItemProps) => {
   const [foreground, shade400] = useThemeColor(['foreground', 'shade-400'] as const);
   const { provider, modelName } = extractModelName(model);
 
@@ -601,7 +784,7 @@ const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
   const tokensPerSat = pricePerToken > 0 ? Math.round(1 / pricePerToken) : 0;
 
   return (
-    <Host matchContents={false} style={{ height: 96 }}>
+    <Host matchContents={false} style={{ height: 96, opacity: canAfford ? 1 : 0.4 }}>
       <SwiftUIButton
         modifiers={[
           buttonStyle('plain'),
@@ -613,7 +796,7 @@ const ModelListItem = React.memo(({ model, onSelect }: ModelListItemProps) => {
           padding({ all: 0 }),
         ]}
         onPress={() => {
-          console.log('Pressed model:', model.id);
+          log.debug('user.messages.model_selected', { modelId: model.id });
           onSelect(model.id);
         }}>
         <SwiftUIHStack
@@ -687,11 +870,11 @@ export function UserMessagesScreen({
   onBack,
   isFlowContext: _isFlowContext = false,
 }: UserMessagesScreenProps) {
+  useLifecycleLogger('UserMessagesScreen');
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const screenWidth = Dimensions.get('window').width;
-  const scrollViewRef = useRef<ScrollView>(null);
-  const pendingMessageRef = useRef<string | null>(null);
+  const listRef = useRef<any>(null);
 
   const [
     foreground,
@@ -757,6 +940,7 @@ export function UserMessagesScreen({
     getConversationHistory,
     updateMessage,
     clearConversation,
+    removeMessages,
     getSelectedModel,
     createSession,
     switchSession,
@@ -879,13 +1063,22 @@ export function UserMessagesScreen({
   }, [availableModels]);
 
   // Filter models by selected provider
+  const balanceMsats = balance ?? 0;
+
   const filteredModels = useMemo(() => {
-    if (!selectedProvider) return availableModels;
-    return availableModels.filter((model) => {
-      const { provider } = extractModelName(model);
-      return provider === selectedProvider;
+    const base = selectedProvider
+      ? availableModels.filter((model) => extractModelName(model).provider === selectedProvider)
+      : availableModels;
+    // Sort: affordable first (ascending cost), then unaffordable (ascending cost)
+    return [...base].sort((a, b) => {
+      const aCost = (a.sats_pricing?.max_cost || 0) * 1000;
+      const bCost = (b.sats_pricing?.max_cost || 0) * 1000;
+      const aAfford = aCost <= balanceMsats;
+      const bAfford = bCost <= balanceMsats;
+      if (aAfford !== bAfford) return aAfford ? -1 : 1;
+      return aCost - bCost;
     });
-  }, [availableModels, selectedProvider]);
+  }, [availableModels, selectedProvider, balanceMsats]);
 
   // Get selected model name - uses selectedModel directly for reactivity when model changes externally
   const selectedModelName = useMemo(() => {
@@ -902,22 +1095,29 @@ export function UserMessagesScreen({
   // ===========================
 
   const loadModels = useCallback(async () => {
+    const t0 = performance.now();
     try {
       const cached = getCachedModels();
       if (cached && cached.length > 0) {
-        console.log('Using cached models:', cached);
+        log.debug('routstr.models.from_cache', { count: cached.length });
         setAvailableModels(cached);
       } else {
-        console.log('Fetching models from API...');
+        log.info('routstr.models.fetching');
         const models = await getModels();
-        console.log('Loaded models:', models.length);
+        log.info('routstr.models.loaded', {
+          count: models.length,
+          duration_ms: Math.round(performance.now() - t0),
+        });
         if (models && models.length > 0) {
           setCachedModels(models);
           setAvailableModels(models);
         }
       }
     } catch (error) {
-      console.error('Failed to load models:', error);
+      log.error('routstr.models.load_failed', {
+        error,
+        duration_ms: Math.round(performance.now() - t0),
+      });
     }
   }, [getCachedModels, setCachedModels]);
 
@@ -930,11 +1130,17 @@ export function UserMessagesScreen({
     if (!isRoutstrMode) return;
 
     // Immediately set up session and messages (sync operations)
+    const initStart = performance.now();
     if (!getCurrentSessionId()) {
       const sessions = getAllSessions();
       if (sessions.length > 0) {
+        log.debug('routstr.init.restore_session', {
+          sessionId: sessions[0].id,
+          sessionCount: sessions.length,
+        });
         switchSession(sessions[0].id);
       } else {
+        log.debug('routstr.init.create_first_session');
         createSession();
       }
     }
@@ -948,27 +1154,37 @@ export function UserMessagesScreen({
       isRead: true,
       created_at: msg.timestamp,
       pubkey: msg.role === 'user' ? nostrKeys?.pubkey || 'me' : ROUTSTR_PUBKEY,
+      ...(msg.thinkingDurationSec != null && { reasoningDurationSec: msg.thinkingDurationSec }),
+      ...(msg.reasoningContent && { reasoningContent: msg.reasoningContent }),
     }));
     setMessages(formattedMessages);
-    setIsLoading(false); // Show UI immediately with cached data
+    setIsLoading(false);
+    log.info('routstr.init.sync_done', {
+      messageCount: formattedMessages.length,
+      duration_ms: Math.round(performance.now() - initStart),
+    });
 
     // Defer expensive API calls until after navigation animation completes
     const interactionHandle = InteractionManager.runAfterInteractions(() => {
-      // Load models (doesn't require API key - public endpoint)
+      log.debug('routstr.init.deferred_start');
       loadModels();
 
-      // Check balance only if API key is available
       if (apiKey) {
+        log.debug('routstr.init.balance_check');
         checkBalance(apiKey)
           .then((balanceData) => {
             if (balanceData.api_key && balanceData.api_key !== apiKey) {
+              log.info('routstr.init.api_key_updated');
               setApiKey(balanceData.api_key);
             }
             setBalance(balanceData.balance);
+            log.info('routstr.init.balance_loaded', { balance: balanceData.balance });
           })
           .catch((error) => {
-            console.error('Failed to check balance:', error);
+            log.error('routstr.init.balance_check_failed', { error });
           });
+      } else {
+        log.debug('routstr.init.no_api_key');
       }
     });
 
@@ -1023,6 +1239,8 @@ export function UserMessagesScreen({
       isRead: true,
       created_at: msg.timestamp,
       pubkey: msg.role === 'user' ? nostrPubkey || 'me' : ROUTSTR_PUBKEY,
+      ...(msg.thinkingDurationSec != null && { reasoningDurationSec: msg.thinkingDurationSec }),
+      ...(msg.reasoningContent && { reasoningContent: msg.reasoningContent }),
     }));
     setMessages(formattedMessages);
   }, [isRoutstrMode, currentSessionId, nostrPubkey, getConversationHistory]);
@@ -1085,7 +1303,7 @@ export function UserMessagesScreen({
                 pubkey: senderPubkey,
               };
             } catch (error) {
-              console.error('Failed to decrypt NIP-04 message:', error);
+              log.error('user.messages.nip04_decrypt_failed', { error });
               processedEventIds.current.add(event.id);
               return null;
             }
@@ -1113,7 +1331,7 @@ export function UserMessagesScreen({
           return merged.sort((a, b) => a.created_at - b.created_at);
         });
       } catch (error) {
-        console.error('Error processing NIP-04 DMs:', error);
+        log.error('user.messages.nip04_process_failed', { error });
       } finally {
         setIsLoading(false);
       }
@@ -1183,24 +1401,30 @@ export function UserMessagesScreen({
       setBalance(balanceData.balance);
       balanceRefreshedPopup({ balance: formatBalance(balanceData.balance) });
     } catch (error: any) {
-      console.error('Failed to refresh balance:', error);
+      log.error('user.messages.balance_refresh_failed', { error });
       balanceRefreshFailedPopup({ text: error.error?.message });
     } finally {
       setIsRefreshingBalance(false);
     }
   };
 
-  const handleTopUp = async () => {
+  const handleTopUp = async (pendingMessage?: string) => {
     if (!nostrKeys?.pubkey) {
       noWalletAvailablePopup();
       return;
     }
 
+    useRoutstrTopUpStore.getState().start(pendingMessage ?? null);
+    const preferredMint = useMintStore.getState().getSelectedMint(nostrKeys.pubkey) ?? '';
+    log.info('routstr.topup.navigate', { hasPendingMessage: !!pendingMessage, preferredMint });
     router.navigate({
-      pathname: '/(send-flow)/currency',
+      pathname: '/(send-flow)/amount',
       params: {
-        to: 'sendToken',
-        routstrTopUp: 'true',
+        amountEntry: JSON.stringify({
+          destination: 'sendEcash',
+          unit: 'sat',
+          selectedMintUrl: preferredMint,
+        }),
       },
     });
   };
@@ -1214,17 +1438,36 @@ export function UserMessagesScreen({
   };
 
   const handleRoutstrSend = async (userMessage: string) => {
+    const sendStart = performance.now();
+
+    if (!userMessage || typeof userMessage !== 'string' || !userMessage.trim()) {
+      log.warn('routstr.send.invalid_message', {
+        type: typeof userMessage,
+        length: (userMessage as any)?.length,
+      });
+      return;
+    }
+
+    log.info('routstr.send.start', {
+      messageLength: userMessage.length,
+      hasApiKey: !!apiKey,
+      balance,
+    });
+
     if (!apiKey) {
+      log.warn('routstr.send.no_api_key');
       noApiKeyPopup();
       return;
     }
 
     const isAnonymous = getAnonymousMode();
+    log.debug('routstr.send.mode', { isAnonymous });
 
     if (!isAnonymous) {
       let currentSessionId = getCurrentSessionId();
       if (!currentSessionId) {
         currentSessionId = createSession();
+        log.info('routstr.send.session_created', { sessionId: currentSessionId });
       }
     }
 
@@ -1260,17 +1503,9 @@ export function UserMessagesScreen({
     };
     setMessages((prev) => [...prev, userMessageDisplay]);
 
-    const assistantMsg = {
-      id: assistantMessageId,
-      role: 'assistant' as const,
-      content: '',
-      timestamp: timestamp + 1,
-    };
-
-    if (!isAnonymous) {
-      addMessage(assistantMsg);
-    }
-
+    // Only add the assistant placeholder to the UI, NOT the persistent store.
+    // The store gets the assistant message once we have real content,
+    // preventing empty assistant messages from corrupting conversation history.
     const assistantMessageDisplay = {
       id: assistantMessageId,
       content: '',
@@ -1279,12 +1514,14 @@ export function UserMessagesScreen({
       isRead: true,
       created_at: timestamp + 1,
       pubkey: ROUTSTR_PUBKEY,
+      isStreamComplete: false,
     };
     setMessages((prev) => [...prev, assistantMessageDisplay]);
 
     setStreamingMessageId(assistantMessageId);
 
-    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 50);
+    // LegendList maintainScrollAtEnd handles this automatically
+    let assistantAddedToStore = false;
 
     try {
       let apiMessages: { role: 'user' | 'assistant' | 'system'; content: string }[];
@@ -1312,7 +1549,7 @@ export function UserMessagesScreen({
       } else {
         const history = getConversationHistory();
         apiMessages = history
-          .filter((msg) => msg.id !== assistantMessageId)
+          .filter((msg) => msg.content)
           .map((msg) => ({
             role: msg.role as 'user' | 'assistant' | 'system',
             content: msg.content,
@@ -1320,21 +1557,30 @@ export function UserMessagesScreen({
       }
 
       const selectedModel = getSelectedModel();
+      log.debug('routstr.send.api_call', {
+        model: selectedModel,
+        historyCount: apiMessages.length,
+      });
       const { stream } = await sendMessage(apiKey, apiMessages, {
         model: selectedModel,
         temperature: 0.7,
-        max_tokens: 200,
         stream: true,
       });
 
       if (!stream) {
+        log.error('routstr.send.no_stream');
         throw new Error('Stream not available');
       }
+      log.debug('routstr.send.stream_opened', {
+        elapsed_ms: Math.round(performance.now() - sendStart),
+      });
 
       let fullContent = '';
+      let fullReasoning = '';
       let chunkCount = 0;
       let hasReceivedAnyContent = false;
       let isStreamComplete = false;
+      let thinkingSec = 0;
 
       for await (const chunk of stream) {
         chunkCount++;
@@ -1347,42 +1593,73 @@ export function UserMessagesScreen({
         const delta = chunk.choices?.[0]?.delta;
         const content =
           delta?.content || (delta as any)?.message?.content || (delta as any)?.text || null;
+        const reasoningContent =
+          (delta as any)?.reasoning_content || (delta as any)?.reasoning || null;
 
         if (chunkCount <= 5) {
-          console.log('Stream chunk:', {
+          log.debug('user.messages.stream_chunk', {
             chunkCount,
             hasContent: !!content,
-            contentLength: content?.length,
-            contentPreview: content?.substring(0, 30),
-            finishReason,
-            isStreamComplete,
-            chunkStructure: {
-              hasChoices: !!chunk.choices,
-              choicesLength: chunk.choices?.length,
-              hasDelta: !!chunk.choices?.[0]?.delta,
-              deltaKeys: chunk.choices?.[0]?.delta ? Object.keys(chunk.choices[0].delta) : [],
-            },
+            hasReasoning: !!reasoningContent,
           });
         }
 
+        if (reasoningContent) {
+          hasReceivedAnyContent = true;
+          fullReasoning += reasoningContent;
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? { ...msg, reasoningContent: fullReasoning, isStreamComplete }
+                : msg
+            )
+          );
+        }
+
         if (content) {
+          // Finalize thinking duration when first content token arrives
+          if (!fullContent) {
+            thinkingSec = Math.round((performance.now() - sendStart) / 1000);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId ? { ...msg, reasoningDurationSec: thinkingSec } : msg
+              )
+            );
+          }
           hasReceivedAnyContent = true;
           fullContent += content;
 
           if (!isAnonymous) {
-            updateMessage(assistantMessageId, fullContent);
+            if (!assistantAddedToStore) {
+              addMessage({
+                id: assistantMessageId,
+                role: 'assistant',
+                content: fullContent,
+                timestamp: timestamp + 1,
+                thinkingDurationSec: thinkingSec,
+                reasoningContent: fullReasoning || undefined,
+              });
+              assistantAddedToStore = true;
+            } else {
+              updateMessage(assistantMessageId, fullContent);
+            }
           }
 
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMessageId
-                ? { ...msg, content: fullContent, isStreamComplete }
+                ? {
+                    ...msg,
+                    content: fullContent,
+                    reasoningContent: fullReasoning || undefined,
+                    isStreamComplete,
+                  }
                 : msg
             )
           );
 
           if (fullContent.length < 100 || fullContent.length % 100 === 0) {
-            scrollViewRef.current?.scrollToEnd({ animated: true });
+            // LegendList maintainScrollAtEnd handles this automatically
           }
         } else if (isStreamComplete) {
           setMessages((prev) =>
@@ -1393,15 +1670,26 @@ export function UserMessagesScreen({
 
       isStreamComplete = true;
 
-      console.log('Streaming completed:', {
+      log.info('routstr.send.stream_complete', {
         totalChunks: chunkCount,
-        finalContentLength: fullContent.length,
-        hasReceivedAnyContent,
-        isStreamComplete,
+        contentLength: fullContent.length,
+        reasoningLength: fullReasoning.length,
+        total_ms: Math.round(performance.now() - sendStart),
       });
 
       if (!isAnonymous && fullContent) {
-        updateMessage(assistantMessageId, fullContent);
+        if (!assistantAddedToStore) {
+          addMessage({
+            id: assistantMessageId,
+            role: 'assistant',
+            content: fullContent,
+            timestamp: timestamp + 1,
+            thinkingDurationSec: thinkingSec,
+            reasoningContent: fullReasoning || undefined,
+          });
+        } else {
+          updateMessage(assistantMessageId, fullContent);
+        }
       }
 
       setMessages((prev) =>
@@ -1415,7 +1703,10 @@ export function UserMessagesScreen({
       setStreamingMessageId(null);
 
       if (!hasReceivedAnyContent && chunkCount > 0) {
-        console.warn('No content received from stream after', chunkCount, 'chunks');
+        log.warn('routstr.send.stream_empty', {
+          chunkCount,
+          total_ms: Math.round(performance.now() - sendStart),
+        });
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessageId
@@ -1425,49 +1716,75 @@ export function UserMessagesScreen({
         );
       }
 
-      scrollViewRef.current?.scrollToEnd({ animated: true });
+      // LegendList maintainScrollAtEnd handles this automatically
 
+      log.debug('routstr.send.balance_refresh_start');
       try {
         const balanceData = await checkBalance(apiKey);
+        const prevBalance = balance;
         setBalance(balanceData.balance);
+        log.info('routstr.send.balance_refreshed', {
+          prevBalance,
+          newBalance: balanceData.balance,
+          spent: prevBalance != null ? prevBalance - balanceData.balance : null,
+        });
       } catch (error) {
-        console.error('Failed to refresh balance:', error);
+        log.error('routstr.send.balance_refresh_failed', { error });
       }
     } catch (error: any) {
       if (error.status === 402) {
-        const required = error.error?.details?.required || 0;
-        const available = error.error?.details?.available || 0;
-        const needed = Math.ceil((required - available) / 1000);
+        const requiredMsats = error.error?.details?.required || 0;
+        const availableMsats = error.error?.details?.available || 0;
+        const requiredSats = Math.ceil(requiredMsats / 1000);
+        const availableSats = Math.floor(availableMsats / 1000);
+        const neededSats = Math.max(requiredSats - availableSats, 1);
+        const modelName = getSelectedModel();
+        log.warn('routstr.send.insufficient_balance', {
+          requiredMsats,
+          availableMsats,
+          neededSats,
+          model: modelName,
+          total_ms: Math.round(performance.now() - sendStart),
+        });
 
         setMessages((prev) =>
           prev.filter((msg) => msg.id !== userMessageId && msg.id !== assistantMessageId)
         );
 
         if (!isAnonymous) {
-          const currentHistory = getConversationHistory();
-          clearConversation();
-          currentHistory
-            .filter((msg: any) => msg.id !== userMessageId && msg.id !== assistantMessageId)
-            .forEach((msg: any) => addMessage(msg));
+          removeMessages(
+            new Set([userMessageId, ...(assistantAddedToStore ? [assistantMessageId] : [])])
+          );
         }
 
         buttonHandlerPopup({
           title: 'Insufficient balance',
-          description: `Need ${needed} sats to continue.`,
+          description:
+            requiredSats > 0
+              ? `${modelName} requires ~${requiredSats} sats per message. You have ${availableSats} sats.`
+              : 'Your Routstr balance is too low for this model.',
           buttons: [
             {
-              text: 'Top Up',
-              icon: 'mdi:cash-plus',
+              text: `Top Up (~${neededSats} sats)`,
+              icon: 'solar:wallet-bold',
               variant: 'primary',
               onPress: async (close: any) => {
                 close({} as any);
-                pendingMessageRef.current = userMessage;
-                await handleTopUp();
+                await handleTopUp(userMessage);
+              },
+            },
+            {
+              text: 'Change Model',
+              icon: 'mdi:swap-horizontal',
+              variant: 'secondary',
+              onPress: async (close: any) => {
+                close({} as any);
+                setIsModelSwitchBottomSheetOpen(true);
               },
             },
             {
               text: 'Cancel',
-              icon: 'mdi:close-circle-outline',
+              icon: 'mdi:close-circle',
               variant: 'secondary',
               onPress: async (close: any) => close({} as any),
             },
@@ -1476,7 +1793,12 @@ export function UserMessagesScreen({
         return;
       }
 
-      console.error('Error sending message:', error);
+      log.error('routstr.send.failed', {
+        status: error.status,
+        message: error.error?.message,
+        type: error.error?.type,
+        total_ms: Math.round(performance.now() - sendStart),
+      });
       sendMessageFailedPopup({ text: error.error?.message });
 
       setStreamingMessageId(null);
@@ -1485,11 +1807,11 @@ export function UserMessagesScreen({
         prev.filter((msg) => msg.id !== userMessageId && msg.id !== assistantMessageId)
       );
 
-      const currentHistory = getConversationHistory();
-      clearConversation();
-      currentHistory
-        .filter((msg: any) => msg.id !== userMessageId && msg.id !== assistantMessageId)
-        .forEach((msg: any) => addMessage(msg));
+      if (!isAnonymous) {
+        removeMessages(
+          new Set([userMessageId, ...(assistantAddedToStore ? [assistantMessageId] : [])])
+        );
+      }
     } finally {
       setIsSending(false);
       setStreamingMessageId(null);
@@ -1509,9 +1831,35 @@ export function UserMessagesScreen({
     }
   };
 
+  // Handle Routstr top-up completion: cleanup on cancel, auto-retry pending message on success
+  useFocusEffect(
+    useCallback(() => {
+      if (!isRoutstrMode) return;
+      const state = useRoutstrTopUpStore.getState();
+      if (state.active) {
+        log.info('routstr.topup_focus.dismissed', { hasPendingMessage: !!state.pendingMessage });
+        state.reset();
+      } else if (state.lastResult === 'success' && state.pendingMessage) {
+        const msg = state.pendingMessage;
+        log.info('routstr.topup_focus.retry_pending', { messageLength: msg.length });
+        state.reset();
+        setTimeout(() => handleRoutstrSend(msg), 300);
+      } else if (state.lastResult !== null) {
+        log.debug('routstr.topup_focus.reset', { lastResult: state.lastResult });
+        state.reset();
+      }
+    }, [isRoutstrMode])
+  );
+
   const handleNostrDMSend = async (text: string) => {
+    const dmStart = performance.now();
+    log.info('dm.send.start', { messageLength: text.length, hasNdk: !!ndk, hasPubkey: !!pubkey });
     if (!ndk || !nostrKeys?.privateKey || !nostrKeys?.pubkey || !pubkey) {
-      console.error('Missing required data for sending DM');
+      log.error('dm.send.missing_data', {
+        hasNdk: !!ndk,
+        hasPrivateKey: !!nostrKeys?.privateKey,
+        hasPubkey: !!pubkey,
+      });
       sendMessageFailedPopup();
       return;
     }
@@ -1532,7 +1880,7 @@ export function UserMessagesScreen({
     };
     setMessages((prev) => [...prev, optimisticMessage]);
 
-    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 50);
+    // LegendList maintainScrollAtEnd handles this automatically
 
     try {
       // Build NIP-17 gift-wrapped DM pair: one for the recipient, one self-copy.
@@ -1561,7 +1909,10 @@ export function UserMessagesScreen({
 
       await wrapEvent.publish();
 
-      console.log('NIP-17 DM sent successfully:', wrapEvent.id);
+      log.info('dm.send.published', {
+        eventId: wrapEvent.id,
+        duration_ms: Math.round(performance.now() - dmStart),
+      });
 
       // Publish the self-copy so we can retrieve our own sent messages later
       const selfWrapEvent = new NDKEvent(ndk);
@@ -1576,7 +1927,12 @@ export function UserMessagesScreen({
       processedEventIds.current.add(selfWrapEvent.id);
 
       await selfWrapEvent.publish().catch((err: unknown) => {
-        console.warn('Failed to publish self-copy of DM:', err);
+        log.warn('dm.send.self_copy_failed', { error: err });
+      });
+
+      log.info('dm.send.complete', {
+        eventId: wrapEvent.id,
+        total_ms: Math.round(performance.now() - dmStart),
       });
 
       setMessages((prev) =>
@@ -1585,7 +1941,7 @@ export function UserMessagesScreen({
         )
       );
     } catch (error) {
-      console.error('Failed to send DM:', error);
+      log.error('dm.send.failed', { error, total_ms: Math.round(performance.now() - dmStart) });
 
       setMessages((prev) => prev.filter((msg) => msg.id !== tempMessageId));
 
@@ -1596,7 +1952,7 @@ export function UserMessagesScreen({
   };
 
   const handleSendMoney = () => {
-    console.log('[LIGHTNING-FLOW] handleSendMoney called', { lud16, userInfo: userInfo?.name });
+    log.debug('user.messages.send_money', { lud16, userName: userInfo?.name });
     if (!lud16 || !userInfo) return;
 
     buttonHandlerPopup({
@@ -1606,10 +1962,17 @@ export function UserMessagesScreen({
           icon: 'ph:coins',
           variant: 'primary' as const,
           onPress: async (close: any) => {
+            const mint = nostrKeys?.pubkey
+              ? (useMintStore.getState().getSelectedMint(nostrKeys.pubkey) ?? '')
+              : '';
             router.navigate({
-              pathname: '/(send-flow)/currency',
+              pathname: '/(send-flow)/amount',
               params: {
-                to: 'sendToken',
+                amountEntry: JSON.stringify({
+                  destination: 'sendEcash',
+                  unit: 'sat',
+                  selectedMintUrl: mint,
+                }),
               },
             });
             close({} as any);
@@ -1620,16 +1983,11 @@ export function UserMessagesScreen({
           icon: 'mingcute:lightning-fill',
           variant: 'primary' as const,
           onPress: async (close: any) => {
-            console.log('[LIGHTNING-FLOW] Send Lightning button pressed', {
-              lnUrlOrAddress: lud16,
-              to: 'meltQuote',
-            });
             router.navigate({
-              pathname: '/(send-flow)/currency',
+              pathname: '/(send-flow)/amount',
               params: {
-                to: 'meltQuote',
-                lnUrlOrAddress: lud16,
-                profile: JSON.stringify(userInfo),
+                destination: 'meltQuote',
+                meltTarget: lud16,
               },
             });
             close({} as any);
@@ -1653,9 +2011,17 @@ export function UserMessagesScreen({
     ({ item }: { item: RoutstrModel }) => {
       const currentSelectedModel = selectedModel || 'gpt-3.5-turbo';
       const isSelected = currentSelectedModel === item.id;
-      return <ModelListItem model={item} isSelected={isSelected} onSelect={handleModelSelect} />;
+      const canAfford = (item.sats_pricing?.max_cost || 0) * 1000 <= balanceMsats;
+      return (
+        <ModelListItem
+          model={item}
+          isSelected={isSelected}
+          onSelect={handleModelSelect}
+          canAfford={canAfford}
+        />
+      );
     },
-    [selectedModel, handleModelSelect]
+    [selectedModel, handleModelSelect, balanceMsats]
   );
 
   const toggleAnonymousMode = () => {
@@ -1723,570 +2089,580 @@ export function UserMessagesScreen({
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior="translate-with-padding"
-      keyboardVerticalOffset={headerHeight + 16}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          headerTransparent: false,
-          headerStyle: { backgroundColor: surfaceSecondary },
-          headerShadowVisible: false,
-          headerBackVisible: false,
-          headerTintColor: foreground,
-          headerLeft: () =>
-            isRoutstrMode ? (
-              <Pressable
-                onPress={
-                  isSessionsPanelOpen
-                    ? handleCloseSessionsPanel
-                    : () => setIsSessionsPanelOpen(true)
-                }
-                style={{ padding: 8 }}>
-                <Icon name={'mdi:menu'} size={24} color={foreground} />
-              </Pressable>
-            ) : (
-              <Pressable onPress={handleBack} style={{ padding: 8 }}>
-                <Icon name="material-symbols:arrow-back-rounded" size={24} color={foreground} />
-              </Pressable>
-            ),
-          headerTitle: () =>
-            isSessionsPanelOpen && isRoutstrMode ? (
-              <GlassSearchBar
-                width={headerTitleWidth}
-                clearKey={sessionClearKey}
-                onChangeText={handleSessionSearchChange}
-                placeholder="Search sessions..."
-                keyboardType="web-search"
-              />
-            ) : Platform.OS === 'ios' && isRoutstrMode ? (
-              <Host matchContents={false} style={{ width: headerTitleWidth, height: 48 }}>
-                <ContextMenu>
-                  <ContextMenu.Items>
-                    <SwiftUIButton
-                      systemImage="arrow.clockwise"
-                      label="Refresh Balance"
-                      onPress={handleRefreshBalance}
-                    />
-                    <SwiftUIButton
-                      systemImage="creditcard"
-                      label="Top Up Balance"
-                      onPress={handleTopUp}
-                    />
-                    <SwiftUIButton
-                      systemImage="cpu"
-                      label="Switch Model"
-                      onPress={() => setIsModelSwitchBottomSheetOpen(true)}
-                    />
-                    <SwiftUIButton
-                      systemImage="square.stack"
-                      label="View Sessions"
-                      onPress={() => setIsSessionsPanelOpen(true)}
-                    />
-                    <SwiftUIButton
-                      systemImage="plus.square"
-                      label="New Session"
-                      onPress={handleNewSession}
-                    />
-                  </ContextMenu.Items>
-                  <ContextMenu.Trigger>
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        width: '100%',
-                        height: '100%',
-                      }}>
-                      <Avatar
-                        size={40}
-                        picture={userPicture}
-                        seed={pubkey}
-                        name={displayName}
-                        loading={shouldShowAvatarLoading}
+      behavior="padding"
+      keyboardVerticalOffset={headerHeight}>
+      <Screen name="UserMessagesScreen">
+        <Stack.Screen
+          options={{
+            headerShown: true,
+            headerTransparent: false,
+            headerStyle: { backgroundColor: surfaceSecondary },
+            headerShadowVisible: false,
+            headerBackVisible: false,
+            headerTintColor: foreground,
+            headerLeft: () =>
+              isRoutstrMode ? (
+                <Pressable
+                  onPress={
+                    isSessionsPanelOpen
+                      ? handleCloseSessionsPanel
+                      : () => setIsSessionsPanelOpen(true)
+                  }
+                  style={{ padding: 8 }}>
+                  <Icon name={'mdi:menu'} size={24} color={foreground} />
+                </Pressable>
+              ) : (
+                <Pressable onPress={handleBack} style={{ padding: 8 }}>
+                  <Icon name="material-symbols:arrow-back-rounded" size={24} color={foreground} />
+                </Pressable>
+              ),
+            headerTitle: () =>
+              isSessionsPanelOpen && isRoutstrMode ? (
+                <GlassSearchBar
+                  width={headerTitleWidth}
+                  clearKey={sessionClearKey}
+                  onChangeText={handleSessionSearchChange}
+                  placeholder="Search sessions..."
+                  keyboardType="web-search"
+                />
+              ) : Platform.OS === 'ios' && isRoutstrMode ? (
+                <Host matchContents={false} style={{ width: headerTitleWidth, height: 48 }}>
+                  <ContextMenu>
+                    <ContextMenu.Items>
+                      <SwiftUIButton
+                        systemImage="arrow.clockwise"
+                        label="Refresh Balance"
+                        onPress={handleRefreshBalance}
                       />
+                      <SwiftUIButton
+                        systemImage="creditcard"
+                        label="Top Up Balance"
+                        onPress={() => handleTopUp()}
+                      />
+                      <SwiftUIButton
+                        systemImage="cpu"
+                        label="Switch Model"
+                        onPress={() => setIsModelSwitchBottomSheetOpen(true)}
+                      />
+                      <SwiftUIButton
+                        systemImage="square.stack"
+                        label="View Sessions"
+                        onPress={() => setIsSessionsPanelOpen(true)}
+                      />
+                      <SwiftUIButton
+                        systemImage="plus.square"
+                        label="New Session"
+                        onPress={handleNewSession}
+                      />
+                    </ContextMenu.Items>
+                    <ContextMenu.Trigger>
                       <View
                         style={{
-                          marginLeft: 8,
-                          flex: 1,
-                          minWidth: 0,
-                          justifyContent: 'flex-start',
-                          alignItems: 'flex-start',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          width: '100%',
+                          height: '100%',
                         }}>
-                        <Text
+                        <Avatar
+                          size={40}
+                          picture={userPicture}
+                          seed={pubkey}
+                          name={displayName}
                           loading={shouldShowAvatarLoading}
-                          placeholder="Display Name"
-                          size={16}
-                          bold
+                        />
+                        <View
                           style={{
-                            color: foreground,
-                            textAlign: 'left',
+                            marginLeft: 8,
+                            flex: 1,
+                            minWidth: 0,
+                            justifyContent: 'flex-start',
+                            alignItems: 'flex-start',
                           }}>
-                          {displayName}
-                        </Text>
-                        <HStack
-                          align="center"
-                          justify="flex-start"
-                          spacing={4}
-                          style={{ marginTop: 2 }}>
-                          {getAnonymousMode() && (
+                          <Text
+                            loading={shouldShowAvatarLoading}
+                            placeholder="Display Name"
+                            size={16}
+                            bold
+                            style={{
+                              color: foreground,
+                              textAlign: 'left',
+                            }}>
+                            {displayName}
+                          </Text>
+                          <HStack
+                            align="center"
+                            justify="flex-start"
+                            spacing={4}
+                            style={{ marginTop: 2 }}>
+                            {getAnonymousMode() && (
+                              <Icon
+                                name="mdi:anonymous"
+                                size={14}
+                                color={shade400}
+                                className="border-r-shade-300 border-r-[1.5px] pr-1"
+                              />
+                            )}
                             <Icon
-                              name="mdi:anonymous"
+                              name="material-symbols:account-balance-wallet"
                               size={14}
                               color={shade400}
-                              className="border-r-shade-300 border-r-[1.5px] pr-1"
                             />
-                          )}
-                          <Icon
-                            name="material-symbols:account-balance-wallet"
-                            size={14}
-                            color={shade400}
-                          />
-                          <Text overpass size={12} style={{ color: shade400 }}>
-                            {formatBalance(balance)}
-                          </Text>
-                          <Spacer size={4} />
-                          <Icon name="mdi:robot" size={14} color={shade400} />
-                          <Text size={12} style={{ color: shade400 }} numberOfLines={1}>
-                            {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
-                          </Text>
-                        </HStack>
+                            <Text overpass size={12} style={{ color: shade400 }}>
+                              {formatBalance(balance)}
+                            </Text>
+                            <Spacer size={4} />
+                            <Icon name="mdi:robot" size={14} color={shade400} />
+                            <Text size={12} style={{ color: shade400 }} numberOfLines={1}>
+                              {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
+                            </Text>
+                          </HStack>
+                        </View>
                       </View>
-                    </View>
-                  </ContextMenu.Trigger>
-                </ContextMenu>
-              </Host>
-            ) : (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  width: headerTitleWidth,
-                  height: 48,
-                }}>
-                <Avatar
-                  size={40}
-                  picture={userPicture}
-                  seed={pubkey}
-                  name={displayName}
-                  loading={shouldShowAvatarLoading}
-                />
-                <VStack
-                  spacing={2}
+                    </ContextMenu.Trigger>
+                  </ContextMenu>
+                </Host>
+              ) : (
+                <View
                   style={{
-                    marginLeft: 8,
-                    flex: 1,
-                    minWidth: 0,
-                    justifyContent: 'flex-start',
-                    alignItems: 'flex-start',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    width: headerTitleWidth,
+                    height: 48,
                   }}>
-                  <Text
+                  <Avatar
+                    size={40}
+                    picture={userPicture}
+                    seed={pubkey}
+                    name={displayName}
                     loading={shouldShowAvatarLoading}
-                    placeholder="Display Name"
-                    size={16}
-                    bold
+                  />
+                  <VStack
+                    spacing={2}
                     style={{
-                      color: foreground,
-                      textAlign: 'left',
-                    }}
-                    numberOfLines={1}>
-                    {displayName}
-                  </Text>
-                  {isRoutstrMode ? (
-                    <HStack align="center" justify="flex-start">
-                      <Icon
-                        name="material-symbols:account-balance-wallet"
-                        size={14}
-                        color={shade400}
-                      />
-                      <Text overpass size={12} style={{ color: shade400 }}>
-                        {formatBalance(balance)}
-                      </Text>
-                      <Icon name="mdi:robot" size={14} color={shade400} />
-                      <Text size={12} style={{ color: shade400 }} numberOfLines={1}>
-                        {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
-                      </Text>
-                    </HStack>
-                  ) : (
+                      marginLeft: 8,
+                      flex: 1,
+                      minWidth: 0,
+                      justifyContent: 'flex-start',
+                      alignItems: 'flex-start',
+                    }}>
                     <Text
-                      size={12}
+                      loading={shouldShowAvatarLoading}
+                      placeholder="Display Name"
+                      size={16}
+                      bold
                       style={{
-                        color: shade400,
-                        marginTop: 2,
+                        color: foreground,
                         textAlign: 'left',
                       }}
                       numberOfLines={1}>
-                      {truncateMiddle(nip19.npubEncode(pubkey), 8)}
+                      {displayName}
                     </Text>
+                    {isRoutstrMode ? (
+                      <HStack align="center" justify="flex-start">
+                        <Icon
+                          name="material-symbols:account-balance-wallet"
+                          size={14}
+                          color={shade400}
+                        />
+                        <Text overpass size={12} style={{ color: shade400 }}>
+                          {formatBalance(balance)}
+                        </Text>
+                        <Icon name="mdi:robot" size={14} color={shade400} />
+                        <Text size={12} style={{ color: shade400 }} numberOfLines={1}>
+                          {selectedModelName || selectedModel || 'gpt-3.5-turbo'}
+                        </Text>
+                      </HStack>
+                    ) : (
+                      <Text
+                        size={12}
+                        style={{
+                          color: shade400,
+                          marginTop: 2,
+                          textAlign: 'left',
+                        }}
+                        numberOfLines={1}>
+                        {truncateMiddle(nip19.npubEncode(pubkey), 8)}
+                      </Text>
+                    )}
+                  </VStack>
+                </View>
+              ),
+            headerRight: () =>
+              isSessionsPanelOpen && isRoutstrMode && isSessionSearchFocused ? (
+                <Pressable onPress={handleDismissSessionSearch} style={{ padding: 8 }}>
+                  <Icon name="material-symbols:close-rounded" size={20} color={foreground} />
+                </Pressable>
+              ) : isRoutstrMode ? (
+                messages.length > 0 && !getAnonymousMode() ? (
+                  <Pressable onPress={handleNewSession} style={{ padding: 8 }}>
+                    <Icon name="lucide:square-pen" size={20} color={foreground} />
+                  </Pressable>
+                ) : (
+                  <Pressable onPress={toggleAnonymousMode} style={{ padding: 8 }}>
+                    <Icon
+                      name={getAnonymousMode() ? 'mdi:anonymous' : 'mdi:anonymous-off'}
+                      size={20}
+                      color={foreground}
+                    />
+                  </Pressable>
+                )
+              ) : (
+                <Pressable
+                  onPress={() =>
+                    router.navigate({
+                      pathname: '/share',
+                      params: {
+                        type: 'profile',
+                        data: nip19.npubEncode(pubkey),
+                      },
+                    })
+                  }
+                  style={{ padding: 8 }}>
+                  <Icon name="stash:qr-code" size={20} color={foreground} />
+                </Pressable>
+              ),
+          }}
+        />
+        <StatusBar barStyle="light-content" backgroundColor={surfaceSecondary} />
+        <View style={{ flex: 1, backgroundColor: surface }}>
+          {/* Attachments Bottom Sheet */}
+          {isRoutstrMode && Platform.OS === 'ios' && (
+            <Host
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: isAttachmentsBottomSheetOpen ? 100 : 1,
+                pointerEvents: isAttachmentsBottomSheetOpen ? 'auto' : 'none',
+              }}>
+              <BottomSheet
+                isPresented={isAttachmentsBottomSheetOpen}
+                onIsPresentedChange={setIsAttachmentsBottomSheetOpen}>
+                <VStack spacing={16} style={{ padding: 20 }}>
+                  <Pressable
+                    onPress={() => {
+                      setIsAttachmentsBottomSheetOpen(false);
+                      router.navigate('/camera');
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: 16,
+                      backgroundColor: surfaceSecondary,
+                      borderRadius: 12,
+                    }}>
+                    <Icon name="proicons:photo" size={24} color={foreground} />
+                    <Text size={16} style={{ color: foreground, marginLeft: 12 }} bold>
+                      Camera
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setIsAttachmentsBottomSheetOpen(false);
+                      photoPickerComingSoonPopup();
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: 16,
+                      backgroundColor: surfaceSecondary,
+                      borderRadius: 12,
+                    }}>
+                    <Icon name="proicons:photo" size={24} color={foreground} />
+                    <Text size={16} style={{ color: foreground, marginLeft: 12 }} bold>
+                      Photos
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setIsAttachmentsBottomSheetOpen(false);
+                      handleNewSession();
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: 16,
+                      backgroundColor: surfaceSecondary,
+                      borderRadius: 12,
+                    }}>
+                    <Icon name="lucide:square-pen" size={24} color={foreground} />
+                    <Text size={16} style={{ color: foreground, marginLeft: 12 }} bold>
+                      New Session
+                    </Text>
+                  </Pressable>
+                </VStack>
+              </BottomSheet>
+            </Host>
+          )}
+
+          {/* Model Switch Bottom Sheet */}
+          {isRoutstrMode && Platform.OS === 'ios' && (
+            <Host
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: isModelSwitchBottomSheetOpen ? 100 : 1,
+                pointerEvents: isModelSwitchBottomSheetOpen ? 'auto' : 'none',
+              }}>
+              <BottomSheet
+                isPresented={isModelSwitchBottomSheetOpen}
+                onIsPresentedChange={setIsModelSwitchBottomSheetOpen}>
+                <VStack spacing={16} style={{ paddingTop: 20, paddingBottom: 40, flex: 1 }}>
+                  <Text size={20} bold style={{ color: foreground, paddingHorizontal: 16 }}>
+                    Select Model
+                  </Text>
+
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <Host matchContents style={{ width: screenWidth }}>
+                      <SwiftUIHStack
+                        spacing={12}
+                        alignment="center"
+                        modifiers={[padding({ leading: 16, trailing: 16, top: 8, bottom: 8 })]}>
+                        {uniqueProviders.map((provider) => (
+                          <SwiftUIButton
+                            key={provider}
+                            label={provider}
+                            onPress={() => setSelectedProvider(provider)}
+                            modifiers={[
+                              buttonStyle('plain'),
+                              padding({ horizontal: 12, vertical: 8 }),
+                              background(selectedProvider === provider ? muted : accent),
+                              cornerRadius(8),
+                              fixedSize({ horizontal: true, vertical: false }),
+                            ]}
+                          />
+                        ))}
+                      </SwiftUIHStack>
+                    </Host>
+                  </ScrollView>
+
+                  {filteredModels.length > 0 ? (
+                    <View style={{ flex: 1, height: 500 }}>
+                      <LegendList
+                        data={filteredModels}
+                        renderItem={renderModelItem}
+                        keyExtractor={(item: RoutstrModel) => item.id}
+                        style={{ flex: 1 }}
+                        contentContainerStyle={{ paddingBottom: 20 }}
+                        waitForInitialLayout={true}
+                        recycleItems
+                        getFixedItemSize={() => 96}
+                        drawDistance={260}
+                      />
+                    </View>
+                  ) : (
+                    <VStack
+                      spacing={12}
+                      align="center"
+                      style={{ padding: 20, justifyContent: 'center', alignItems: 'center' }}>
+                      <Text size={14} style={{ color: shade400 }}>
+                        {apiKey ? 'Loading models...' : 'No API key configured'}
+                      </Text>
+                      <Pressable
+                        onPress={loadModels}
+                        style={{
+                          marginTop: 12,
+                          backgroundColor: defaultColor,
+                          borderRadius: 8,
+                          paddingVertical: 8,
+                          paddingHorizontal: 16,
+                        }}>
+                        <Text size={14} bold style={{ color: foreground }}>
+                          Retry
+                        </Text>
+                      </Pressable>
+                    </VStack>
                   )}
                 </VStack>
-              </View>
-            ),
-          headerRight: () =>
-            isSessionsPanelOpen && isRoutstrMode && isSessionSearchFocused ? (
-              <Pressable onPress={handleDismissSessionSearch} style={{ padding: 8 }}>
-                <Icon name="material-symbols:close-rounded" size={20} color={foreground} />
-              </Pressable>
-            ) : isRoutstrMode ? (
-              messages.length > 0 && !getAnonymousMode() ? (
-                <Pressable onPress={handleNewSession} style={{ padding: 8 }}>
-                  <Icon name="lucide:square-pen" size={20} color={foreground} />
-                </Pressable>
-              ) : (
-                <Pressable onPress={toggleAnonymousMode} style={{ padding: 8 }}>
-                  <Icon
-                    name={getAnonymousMode() ? 'mdi:anonymous' : 'mdi:anonymous-off'}
-                    size={20}
-                    color={foreground}
-                  />
-                </Pressable>
-              )
-            ) : (
-              <Pressable
-                onPress={() =>
-                  router.navigate({
-                    pathname: '/share',
-                    params: {
-                      type: 'profile',
-                      data: nip19.npubEncode(pubkey),
-                    },
-                  })
-                }
-                style={{ padding: 8 }}>
-                <Icon name="stash:qr-code" size={20} color={foreground} />
-              </Pressable>
-            ),
-        }}
-      />
-      <StatusBar barStyle="light-content" backgroundColor={surfaceSecondary} />
-      <View style={{ flex: 1, backgroundColor: surface }}>
-        {/* Attachments Bottom Sheet */}
-        {isRoutstrMode && Platform.OS === 'ios' && (
-          <Host
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              zIndex: isAttachmentsBottomSheetOpen ? 100 : 1,
-              pointerEvents: isAttachmentsBottomSheetOpen ? 'auto' : 'none',
-            }}>
-            <BottomSheet
-              isPresented={isAttachmentsBottomSheetOpen}
-              onIsPresentedChange={setIsAttachmentsBottomSheetOpen}>
-              <VStack spacing={16} style={{ padding: 20 }}>
-                <Pressable
-                  onPress={() => {
-                    setIsAttachmentsBottomSheetOpen(false);
-                    router.navigate('/camera');
-                  }}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    padding: 16,
-                    backgroundColor: surfaceSecondary,
-                    borderRadius: 12,
-                  }}>
-                  <Icon name="proicons:photo" size={24} color={foreground} />
-                  <Text size={16} style={{ color: foreground, marginLeft: 12 }} bold>
-                    Camera
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    setIsAttachmentsBottomSheetOpen(false);
-                    photoPickerComingSoonPopup();
-                  }}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    padding: 16,
-                    backgroundColor: surfaceSecondary,
-                    borderRadius: 12,
-                  }}>
-                  <Icon name="proicons:photo" size={24} color={foreground} />
-                  <Text size={16} style={{ color: foreground, marginLeft: 12 }} bold>
-                    Photos
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    setIsAttachmentsBottomSheetOpen(false);
-                    handleNewSession();
-                  }}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    padding: 16,
-                    backgroundColor: surfaceSecondary,
-                    borderRadius: 12,
-                  }}>
-                  <Icon name="lucide:square-pen" size={24} color={foreground} />
-                  <Text size={16} style={{ color: foreground, marginLeft: 12 }} bold>
-                    New Session
-                  </Text>
-                </Pressable>
-              </VStack>
-            </BottomSheet>
-          </Host>
-        )}
+              </BottomSheet>
+            </Host>
+          )}
 
-        {/* Model Switch Bottom Sheet */}
-        {isRoutstrMode && Platform.OS === 'ios' && (
-          <Host
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              zIndex: isModelSwitchBottomSheetOpen ? 100 : 1,
-              pointerEvents: isModelSwitchBottomSheetOpen ? 'auto' : 'none',
-            }}>
-            <BottomSheet
-              isPresented={isModelSwitchBottomSheetOpen}
-              onIsPresentedChange={setIsModelSwitchBottomSheetOpen}>
-              <VStack spacing={16} style={{ paddingTop: 20, paddingBottom: 40, flex: 1 }}>
-                <Text size={20} bold style={{ color: foreground, paddingHorizontal: 16 }}>
-                  Select Model
-                </Text>
-
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <Host matchContents style={{ width: screenWidth }}>
-                    <SwiftUIHStack
-                      spacing={12}
-                      alignment="center"
-                      modifiers={[padding({ leading: 16, trailing: 16, top: 8, bottom: 8 })]}>
-                      {uniqueProviders.map((provider) => (
-                        <SwiftUIButton
-                          key={provider}
-                          label={provider}
-                          onPress={() => setSelectedProvider(provider)}
-                          modifiers={[
-                            buttonStyle('plain'),
-                            padding({ horizontal: 12, vertical: 8 }),
-                            background(selectedProvider === provider ? muted : accent),
-                            cornerRadius(8),
-                            fixedSize({ horizontal: true, vertical: false }),
-                          ]}
-                        />
-                      ))}
-                    </SwiftUIHStack>
-                  </Host>
-                </ScrollView>
-
-                {filteredModels.length > 0 ? (
-                  <View style={{ flex: 1, height: 500 }}>
-                    <LegendList
-                      data={filteredModels}
-                      renderItem={renderModelItem}
-                      keyExtractor={(item: RoutstrModel) => item.id}
-                      style={{ flex: 1 }}
-                      contentContainerStyle={{ paddingBottom: 20 }}
-                      waitForInitialLayout={true}
-                      recycleItems
-                      getFixedItemSize={() => 96}
-                      drawDistance={260}
-                    />
-                  </View>
-                ) : (
-                  <VStack
-                    spacing={12}
-                    align="center"
-                    style={{ padding: 20, justifyContent: 'center', alignItems: 'center' }}>
-                    <Text size={14} style={{ color: shade400 }}>
-                      {apiKey ? 'Loading models...' : 'No API key configured'}
-                    </Text>
-                    <Pressable
-                      onPress={loadModels}
-                      style={{
-                        marginTop: 12,
-                        backgroundColor: defaultColor,
-                        borderRadius: 8,
-                        paddingVertical: 8,
-                        paddingHorizontal: 16,
-                      }}>
-                      <Text size={14} bold style={{ color: foreground }}>
-                        Retry
-                      </Text>
-                    </Pressable>
-                  </VStack>
-                )}
-              </VStack>
-            </BottomSheet>
-          </Host>
-        )}
-
-        {/* Messages */}
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <ScrollView
-            ref={scrollViewRef}
-            style={{ flex: 1 }}
-            contentContainerStyle={{
-              padding: 16,
-              paddingBottom:
-                (isRoutstrMode && (balance === null || balance < 1000)) || (!isRoutstrMode && lud16)
-                  ? 70
-                  : 16,
-              flexGrow: 1,
-            }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled">
-            {isLoading ? (
-              <View
-                style={{
-                  flex: 1,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  paddingTop: 50,
-                }}>
-                <Text size={16} style={{ color: shade400 }}>
-                  Loading messages...
-                </Text>
-              </View>
-            ) : messages.length === 0 ? (
-              <View
-                style={{
-                  flex: 1,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  paddingTop: 50,
-                }}>
-                <Text size={16} style={{ color: shade400 }}>
-                  No messages yet. Start the conversation!
-                </Text>
-              </View>
-            ) : (
-              messages.map((message) => (
+          {/* Messages */}
+          {isLoading ? (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingTop: 50,
+              }}>
+              <Text size={16} style={{ color: shade400 }}>
+                Loading messages...
+              </Text>
+            </View>
+          ) : (
+            <LegendList
+              ref={listRef}
+              data={messages}
+              renderItem={({ item }: { item: any }) => (
                 <MessageBubble
-                  key={message.id}
-                  message={message}
-                  isMe={message.sender === 'me'}
-                  userPicture={message.sender === 'other' ? userPicture : undefined}
+                  message={item}
+                  isMe={item.sender === 'me'}
+                  userPicture={item.sender === 'other' ? userPicture : undefined}
                   userName={displayName}
                   myName={myName}
                   isLoadingMetadata={shouldShowAvatarLoading}
-                  isStreaming={streamingMessageId === message.id}
+                  isStreaming={streamingMessageId === item.id}
                 />
-              ))
-            )}
-          </ScrollView>
-        </TouchableWithoutFeedback>
-
-        {/* Input Area */}
-        <View
-          style={{
-            backgroundColor: surfaceSecondary,
-            paddingHorizontal: 16,
-            paddingTop: 12,
-            paddingBottom: insets.bottom,
-            borderTopWidth: 1,
-            borderTopColor: surfaceTertiary,
-          }}>
-          <HStack align="center" spacing={12}>
-            {isRoutstrMode ? (
-              <Pressable
-                onPress={() => setIsAttachmentsBottomSheetOpen(true)}
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: surfaceTertiary,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <Icon name="fluent:add-24-filled" size={24} color={foreground} />
-              </Pressable>
-            ) : (
-              <Avatar
-                size={40}
-                seed={nostrKeys?.pubkey}
-                picture={myProfile.picture}
-                name={myName}
-              />
-            )}
-
-            <TextInput
-              value={messageText}
-              onChangeText={setMessageText}
-              placeholder="Type a message..."
-              style={{
-                flex: 1,
-                backgroundColor: surfaceTertiary,
-                borderRadius: 20,
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                borderWidth: 0,
-                margin: 0,
-                shadowOpacity: 0,
+              )}
+              keyExtractor={(item: any) => item.id}
+              initialScrollAtEnd
+              maintainScrollAtEnd
+              maintainScrollAtEndThreshold={0.2}
+              alignItemsAtEnd
+              estimatedItemSize={80}
+              recycleItems={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={{
+                padding: 16,
+                paddingBottom:
+                  (isRoutstrMode && (balance === null || balance < 1000)) ||
+                  (!isRoutstrMode && lud16)
+                    ? 70
+                    : 16,
               }}
-              multiline
-              maxLength={500}
-              returnKeyType="send"
-              onSubmitEditing={handleSendMessage}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              ListEmptyComponent={
+                <View
+                  style={{
+                    flex: 1,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingTop: 50,
+                  }}>
+                  <Text size={16} style={{ color: shade400 }}>
+                    No messages yet. Start the conversation!
+                  </Text>
+                </View>
+              }
             />
+          )}
 
-            <Pressable onPress={handleSendMessage} disabled={!messageText.trim() || isSending}>
-              <Icon
-                name="iconamoon:send-fill"
-                size={24}
-                color={messageText.trim() && !isSending ? foreground : shade500}
+          {/* Input Area */}
+          <View
+            style={{
+              backgroundColor: surfaceSecondary,
+              paddingHorizontal: 16,
+              paddingTop: 12,
+              paddingBottom: insets.bottom,
+              borderTopWidth: 1,
+              borderTopColor: surfaceTertiary,
+            }}>
+            <HStack align="center" spacing={12}>
+              {isRoutstrMode ? (
+                <Pressable
+                  onPress={() => setIsAttachmentsBottomSheetOpen(true)}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: surfaceTertiary,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Icon name="fluent:add-24-filled" size={24} color={foreground} />
+                </Pressable>
+              ) : (
+                <Avatar
+                  size={40}
+                  seed={nostrKeys?.pubkey}
+                  picture={myProfile.picture}
+                  name={myName}
+                />
+              )}
+
+              <TextInput
+                value={messageText}
+                onChangeText={setMessageText}
+                placeholder="Type a message..."
+                style={{
+                  flex: 1,
+                  backgroundColor: surfaceTertiary,
+                  borderRadius: 20,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  borderWidth: 0,
+                  margin: 0,
+                  shadowOpacity: 0,
+                }}
+                multiline
+                maxLength={500}
+                returnKeyType="send"
+                onSubmitEditing={handleSendMessage}
               />
-            </Pressable>
-          </HStack>
+
+              <Pressable onPress={handleSendMessage} disabled={!messageText.trim() || isSending}>
+                <Icon
+                  name="iconamoon:send-fill"
+                  size={24}
+                  color={messageText.trim() && !isSending ? foreground : shade500}
+                />
+              </Pressable>
+            </HStack>
+          </View>
+
+          {/* Action Buttons - Floating above input */}
+          {((isRoutstrMode && (balance === null || balance < 1000)) ||
+            (!isRoutstrMode && lud16)) && (
+            <View
+              pointerEvents="box-none"
+              style={{
+                position: 'absolute',
+                bottom: insets.bottom + 60,
+                left: 0,
+                right: 0,
+              }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 6,
+                  gap: 12,
+                }}>
+                {isRoutstrMode && (balance === null || balance < 1000) && (
+                  <Button
+                    variant="primary"
+                    text="Top Up Balance"
+                    icon={<Icon name="solar:wallet-bold" size={20} color={surface} />}
+                    onPress={() => handleTopUp()}
+                    style={{ paddingHorizontal: 16 }}
+                  />
+                )}
+                {!isRoutstrMode && lud16 && (
+                  <Button
+                    variant="primary"
+                    text="Send Money"
+                    icon={<Icon name="mingcute:lightning-fill" size={20} color={surface} />}
+                    onPress={handleSendMoney}
+                    style={{ paddingHorizontal: 16 }}
+                  />
+                )}
+              </ScrollView>
+            </View>
+          )}
         </View>
 
-        {/* Action Buttons - Floating above input */}
-        {((isRoutstrMode && (balance === null || balance < 1000)) || (!isRoutstrMode && lud16)) && (
-          <View
-            pointerEvents="box-none"
-            style={{
-              position: 'absolute',
-              bottom: insets.bottom + 60,
-              left: 0,
-              right: 0,
-            }}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingHorizontal: 16,
-                paddingVertical: 6,
-                gap: 12,
-              }}>
-              {isRoutstrMode && (balance === null || balance < 1000) && (
-                <Button
-                  variant="primary"
-                  text="Top Up Balance"
-                  icon={<Icon name="solar:wallet-bold" size={20} color={surface} />}
-                  onPress={handleTopUp}
-                  style={{ paddingHorizontal: 16 }}
-                />
-              )}
-              {!isRoutstrMode && lud16 && (
-                <Button
-                  variant="primary"
-                  text="Send Money"
-                  icon={<Icon name="mingcute:lightning-fill" size={20} color={surface} />}
-                  onPress={handleSendMoney}
-                  style={{ paddingHorizontal: 16 }}
-                />
-              )}
-            </ScrollView>
-          </View>
+        {/* Sessions Panel */}
+        {isRoutstrMode && (
+          <SessionsPanel
+            isOpen={isSessionsPanelOpen}
+            onClose={handleCloseSessionsPanel}
+            onSessionSelect={() => {}}
+            onNewSession={handleNewSession}
+            searchQuery={sessionSearchQuery}
+            onRefreshBalance={handleRefreshBalance}
+            onTopUp={() => handleTopUp()}
+            onSwitchModel={() => setIsModelSwitchBottomSheetOpen(true)}
+          />
         )}
-      </View>
-
-      {/* Sessions Panel */}
-      {isRoutstrMode && (
-        <SessionsPanel
-          isOpen={isSessionsPanelOpen}
-          onClose={handleCloseSessionsPanel}
-          onSessionSelect={() => {}}
-          onNewSession={handleNewSession}
-          searchQuery={sessionSearchQuery}
-          onRefreshBalance={handleRefreshBalance}
-          onTopUp={handleTopUp}
-          onSwitchModel={() => setIsModelSwitchBottomSheetOpen(true)}
-        />
-      )}
+      </Screen>
     </KeyboardAvoidingView>
   );
 }

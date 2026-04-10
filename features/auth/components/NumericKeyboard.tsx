@@ -6,6 +6,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Text } from '@/shared/ui/primitives/Text';
+import { Log } from '@/shared/lib/logger';
 
 interface Props {
   onKeyPress: (value: string) => void;
@@ -93,14 +94,16 @@ const NumericKeyboard: React.FC<Props> = ({ onKeyPress }) => {
   ];
 
   return (
-    <VStack align="center" className="bg-transparent">
-      {buttons.map((row, rowIndex) => (
-        <HStack key={rowIndex} justify="space-between" className="w-full bg-transparent">
-          {row.map(renderButton)}
-          {rowIndex < buttons.length - 1 && <Spacer size={1} />}
-        </HStack>
-      ))}
-    </VStack>
+    <Log name="NumericKeyboard">
+      <VStack align="center" className="bg-transparent">
+        {buttons.map((row, rowIndex) => (
+          <HStack key={rowIndex} justify="space-between" className="w-full bg-transparent">
+            {row.map(renderButton)}
+            {rowIndex < buttons.length - 1 && <Spacer size={1} />}
+          </HStack>
+        ))}
+      </VStack>
+    </Log>
   );
 };
 

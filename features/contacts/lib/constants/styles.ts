@@ -1,0 +1,1 @@
+export const SEARCH_FILTERS_HEIGHT = 56;

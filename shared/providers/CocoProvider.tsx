@@ -1,11 +1,11 @@
 import React, { createContext, useEffect, useState, ReactNode, useRef } from 'react';
-import { CocoCashuProvider } from 'coco-cashu-react';
-import { Manager } from 'coco-cashu-core';
+import { CocoCashuProvider } from '@cashu/coco-react';
+import { Manager } from '@cashu/coco-core';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { initLog } from '@/shared/lib/initTiming';
+import { log, initLog, deferWork } from '@/shared/lib/logger';
 
 interface CocoContextValue {
   manager: Manager | null;
@@ -31,7 +31,7 @@ async function initializeDefaultMints(
   setSelectedMint?: (pubkey: string, mintUrl: string) => void
 ): Promise<void> {
   try {
-    console.log('Initializing default mints...');
+    log.info('coco.init_default_mints');
 
     const defaultMints = ['https://mint.sovran.money', 'https://mint.minibits.cash/Bitcoin'];
     const selectedMint = 'https://mint.minibits.cash/Bitcoin';
@@ -40,14 +40,14 @@ async function initializeDefaultMints(
       try {
         const isKnown = await manager.mint.isTrustedMint(mintUrl);
         if (isKnown) {
-          console.log(`Default mint already exists: ${mintUrl}`);
+          log.debug('coco.mint_exists', { mintUrl });
           continue;
         }
 
         await manager.mint.addMint(mintUrl, { trusted: true });
-        console.log(`Added default mint: ${mintUrl}`);
+        log.info('coco.mint_added', { mintUrl });
       } catch (error) {
-        console.warn(`Failed to add default mint ${mintUrl}:`, error);
+        log.warn('coco.mint_add_failed', { mintUrl, error });
       }
     }
 
@@ -60,17 +60,17 @@ async function initializeDefaultMints(
           const isSovranTrusted = await manager.mint.isTrustedMint(selectedMint);
           if (isSovranTrusted) {
             setSelectedMint(pubkey, selectedMint);
-            console.log(`Set Sovran mint as selected for pubkey: ${pubkey}`);
+            log.info('coco.mint_selected', { pubkey });
           }
         }
       } catch (error) {
-        console.warn(`Failed to set default selected mint:`, error);
+        log.warn('coco.mint_select_failed', { error });
       }
     }
 
-    console.log('Default mints initialization completed');
+    log.info('coco.init_default_mints_done');
   } catch (error) {
-    console.error('Failed to initialize default mints:', error);
+    log.error('coco.init_default_mints_failed', { error });
   }
 }
 
@@ -139,7 +139,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
 
     return () => {
       CocoManager.cleanup().catch((error) => {
-        console.error('Failed to cleanup Coco Manager on unmount:', error);
+        log.error('coco.cleanup_failed', { error });
       });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,9 +171,9 @@ export function CocoProvider({ children }: CocoProviderProps) {
         try {
           bgStage.log('Recovering pending operations...');
           initLog('Coco-bg', 'recoverPendingSendOperations...');
-          await manager.recoverPendingSendOperations();
+          await manager.ops.send.recovery.run();
           initLog('Coco-bg', 'recoverPendingMeltOperations...');
-          await manager.recoverPendingMeltOperations();
+          await manager.ops.melt.recovery.run();
           initLog('Coco-bg', 'recovery done');
         } catch (recoveryErr) {
           initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
@@ -187,7 +187,10 @@ export function CocoProvider({ children }: CocoProviderProps) {
       }
     };
 
-    runBackground();
+    // Give the user a responsive window before starting heavy background work.
+    // deferWork logs drift (intended vs actual delay) which reveals JS thread freezes.
+    const handle = deferWork('coco.phase2', runBackground, 2000);
+    return () => handle.cancel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bgStage.canStart, manager, keys?.pubkey]);
 

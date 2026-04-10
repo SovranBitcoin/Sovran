@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 
 import { Text } from '@/shared/ui/primitives/Text';
+import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 const DebugRow = ({
@@ -138,136 +139,143 @@ export function ModalLayoutWrapper({
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: background }}>
-      <View
-        className="absolute inset-0"
-        pointerEvents="none"
-        style={{
-          borderWidth: debug ? 2 : 0,
-          borderColor: debug ? 'blue' : 'transparent',
-        }}
-      />
-
-      {headerGradient && (
+    <Log name="ModalLayoutWrapper">
+      <View className="flex-1" style={{ backgroundColor: background }}>
         <View
-          style={[styles.headerGradientContainer, { height: gradientHeight * 2 }]}
-          pointerEvents="none">
-          <MaskedView
-            style={StyleSheet.absoluteFill}
-            maskElement={
+          className="absolute inset-0"
+          pointerEvents="none"
+          style={{
+            borderWidth: debug ? 2 : 0,
+            borderColor: debug ? 'blue' : 'transparent',
+          }}
+        />
+
+        {headerGradient && (
+          <View
+            style={[styles.headerGradientContainer, { height: gradientHeight * 2 }]}
+            pointerEvents="none">
+            <MaskedView
+              style={StyleSheet.absoluteFill}
+              maskElement={
+                <LinearGradient
+                  colors={['black', 'black', 'transparent']}
+                  locations={[0, 0.5, 1]}
+                  style={StyleSheet.absoluteFill}
+                />
+              }>
+              <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
               <LinearGradient
-                colors={['black', 'black', 'transparent']}
-                locations={[0, 0.5, 1]}
+                colors={[background, 'transparent']}
+                locations={[0.5, 1]}
                 style={StyleSheet.absoluteFill}
               />
-            }>
-            <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-            <LinearGradient
-              colors={[background, 'transparent']}
-              locations={[0.5, 1]}
-              style={StyleSheet.absoluteFill}
-            />
-          </MaskedView>
-        </View>
-      )}
-
-      {stickyContent && (
-        <View style={[styles.stickyContainer, { top: headerHeight }]}>{stickyContent}</View>
-      )}
-
-      <View
-        className="absolute left-0 right-0 top-0 z-[100] items-center justify-end pb-1"
-        style={{
-          height: headerHeight,
-          backgroundColor: debug ? 'rgba(255,0,0,0.2)' : 'transparent',
-        }}
-        pointerEvents="none">
-        {debug && (
-          <Text className="text-[10px] font-bold" style={{ color: 'red' }}>
-            header: {headerHeight}px
-          </Text>
+            </MaskedView>
+          </View>
         )}
-      </View>
 
-      <View
-        className="absolute bottom-0 left-0 right-0 z-[100] items-center justify-center"
-        style={{
-          height: insets.bottom,
-          backgroundColor: debug ? 'rgba(0,255,255,0.3)' : 'transparent',
-        }}
-        pointerEvents="none">
-        {debug && (
-          <Text className="text-[9px] font-bold" style={{ color: 'cyan' }}>
-            safe: {insets.bottom}px
-          </Text>
+        {stickyContent && (
+          <View style={[styles.stickyContainer, { top: headerHeight }]}>{stickyContent}</View>
         )}
-      </View>
 
-      {useCustomScrollView ? (
-        <View style={{ flex: 1 }}>{children}</View>
-      ) : useAnimatedScroll ? (
-        <Animated.ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={scrollContentStyle}
-          onScroll={animatedScrollHandler}
-          scrollEventThrottle={16}
-          scrollIndicatorInsets={scrollIndicatorInsets}>
-          {!disableHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
-          {children}
-        </Animated.ScrollView>
-      ) : (
-        <ScrollView
-          className="flex-1"
-          contentInsetAdjustmentBehavior="automatic"
-          scrollEventThrottle={16}
-          onScroll={handleScroll}
-          contentContainerStyle={scrollContentStyle}>
-          {children}
-        </ScrollView>
-      )}
-
-      {bottomContent}
-
-      {debug && (
         <View
-          className="absolute right-2 rounded-lg border border-white/30 bg-black/90 p-3"
-          style={{ top: headerHeight + stickyContentHeight + 8 }}
+          className="absolute left-0 right-0 top-0 z-[100] items-center justify-end pb-1"
+          style={{
+            height: headerHeight,
+            backgroundColor: debug ? 'rgba(255,0,0,0.2)' : 'transparent',
+          }}
           pointerEvents="none">
-          <Text className="mb-2 text-[10px] font-bold text-white">📐 Debug</Text>
-          <DebugRow label="header" value={`${headerHeight}px`} color="red" fontSize={10} />
-          <DebugRow label="insets.top" value={`${insets.top}px`} color="orange" fontSize={10} />
-          <DebugRow label="insets.bottom" value={`${insets.bottom}px`} color="cyan" fontSize={10} />
-          <DebugRow
-            label="contentInset.top"
-            value={`${adjustedInsets.top}px`}
-            color="lime"
-            fontSize={10}
-          />
-          <DebugRow
-            label="contentInset.bottom"
-            value={`${adjustedInsets.bottom}px`}
-            color="lime"
-            fontSize={10}
-          />
-          {headerGradient && (
-            <DebugRow
-              label="gradientHeight"
-              value={`${gradientHeight}px`}
-              color="magenta"
-              fontSize={10}
-            />
-          )}
-          {stickyContentHeight > 0 && (
-            <DebugRow
-              label="stickyHeight"
-              value={`${stickyContentHeight}px`}
-              color="yellow"
-              fontSize={10}
-            />
+          {debug && (
+            <Text className="text-[10px] font-bold" style={{ color: 'red' }}>
+              header: {headerHeight}px
+            </Text>
           )}
         </View>
-      )}
-    </View>
+
+        <View
+          className="absolute bottom-0 left-0 right-0 z-[100] items-center justify-center"
+          style={{
+            height: insets.bottom,
+            backgroundColor: debug ? 'rgba(0,255,255,0.3)' : 'transparent',
+          }}
+          pointerEvents="none">
+          {debug && (
+            <Text className="text-[9px] font-bold" style={{ color: 'cyan' }}>
+              safe: {insets.bottom}px
+            </Text>
+          )}
+        </View>
+
+        {useCustomScrollView ? (
+          <View style={{ flex: 1 }}>{children}</View>
+        ) : useAnimatedScroll ? (
+          <Animated.ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={scrollContentStyle}
+            onScroll={animatedScrollHandler}
+            scrollEventThrottle={16}
+            scrollIndicatorInsets={scrollIndicatorInsets}>
+            {!disableHeaderSpacer && <View style={{ height: totalHeaderHeight }} />}
+            {children}
+          </Animated.ScrollView>
+        ) : (
+          <ScrollView
+            className="flex-1"
+            contentInsetAdjustmentBehavior="automatic"
+            scrollEventThrottle={16}
+            onScroll={handleScroll}
+            contentContainerStyle={scrollContentStyle}>
+            {children}
+          </ScrollView>
+        )}
+
+        {bottomContent}
+
+        {debug && (
+          <View
+            className="absolute right-2 rounded-lg border border-white/30 bg-black/90 p-3"
+            style={{ top: headerHeight + stickyContentHeight + 8 }}
+            pointerEvents="none">
+            <Text className="mb-2 text-[10px] font-bold text-white">📐 Debug</Text>
+            <DebugRow label="header" value={`${headerHeight}px`} color="red" fontSize={10} />
+            <DebugRow label="insets.top" value={`${insets.top}px`} color="orange" fontSize={10} />
+            <DebugRow
+              label="insets.bottom"
+              value={`${insets.bottom}px`}
+              color="cyan"
+              fontSize={10}
+            />
+            <DebugRow
+              label="contentInset.top"
+              value={`${adjustedInsets.top}px`}
+              color="lime"
+              fontSize={10}
+            />
+            <DebugRow
+              label="contentInset.bottom"
+              value={`${adjustedInsets.bottom}px`}
+              color="lime"
+              fontSize={10}
+            />
+            {headerGradient && (
+              <DebugRow
+                label="gradientHeight"
+                value={`${gradientHeight}px`}
+                color="magenta"
+                fontSize={10}
+              />
+            )}
+            {stickyContentHeight > 0 && (
+              <DebugRow
+                label="stickyHeight"
+                value={`${stickyContentHeight}px`}
+                color="yellow"
+                fontSize={10}
+              />
+            )}
+          </View>
+        )}
+      </View>
+    </Log>
   );
 }
 

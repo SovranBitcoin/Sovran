@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log, storeLog } from '@/shared/lib/logger';
 
 import type { MintRecommendation } from '@/features/mint';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -41,6 +42,11 @@ export const useKYMMintStore = create<KYMMintStore>()(
 
       setCached: (mintUrl: string, score: number, recommendations: MintRecommendation[]) => {
         const normalized = normalizeMintUrlKey(mintUrl);
+        storeLog.debug('store.kym_mint.set_cached', {
+          mintUrl: normalized,
+          score,
+          recommendationCount: recommendations.length,
+        });
         set((state) => ({
           cache: {
             ...state.cache,
@@ -54,11 +60,13 @@ export const useKYMMintStore = create<KYMMintStore>()(
       },
 
       clearCache: () => {
+        storeLog.info('store.kym_mint.clear_cache');
         set({ cache: {} });
       },
 
       clearMintCache: (mintUrl: string) => {
         const normalized = normalizeMintUrlKey(mintUrl);
+        storeLog.debug('store.kym_mint.clear_mint_cache', { mintUrl: normalized });
         set((state) => {
           const newCache = { ...state.cache };
           delete newCache[normalized];
@@ -82,7 +90,7 @@ export const useKYMMintStore = create<KYMMintStore>()(
           await AsyncStorage.removeItem('kym-mint-store');
           set({ cache: {} });
         } catch (error) {
-          console.error('KYMMintStore: Error clearing data:', error);
+          log.error('store.kym_mint.clear_failed', { error });
           throw error;
         }
       },
@@ -94,7 +102,7 @@ export const useKYMMintStore = create<KYMMintStore>()(
       partialize: (state) => ({ cache: state.cache }),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('KYMMintStore: Failed to rehydrate:', error);
+          log.warn('store.kym_mint.rehydrate_failed', { error });
         }
       },
     }

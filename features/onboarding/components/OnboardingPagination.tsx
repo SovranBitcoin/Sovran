@@ -5,6 +5,7 @@ import { SharedValue } from 'react-native-reanimated';
 
 import OnboardingPaginationItem from './OnboardingPaginationItem';
 import { OnboardingSlide } from './types';
+import { Log } from '@/shared/lib/logger';
 
 type OnboardingPaginationProps = {
   slides: OnboardingSlide[];
@@ -40,32 +41,34 @@ const OnboardingPagination: React.FC<OnboardingPaginationProps> = ({
   const activeWidth = itemWidth * 3;
 
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingBottom: 16,
-        paddingHorizontal: HORIZONTAL_PADDING / 2,
-        gap: GAP,
-      }}>
-      {slides.map((slide, index) => (
-        <OnboardingPaginationItem
-          key={index}
-          index={index}
-          currentSlideIndex={currentSlideIndex}
-          animatedSlideIndex={animatedSlideIndex}
-          inactiveWidth={inactiveWidth}
-          activeWidth={activeWidth}
-          totalSlides={slides.length}
-          isDragging={isDragging}
-          slideDuration={slide.duration}
-          handleScrollToIndex={handleScrollToIndex}
-          translateY={translateY}
-          topCarouselOffset={topCarouselOffset}
-        />
-      ))}
-    </View>
+    <Log name="OnboardingPagination">
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingBottom: 16,
+          paddingHorizontal: HORIZONTAL_PADDING / 2,
+          gap: GAP,
+        }}>
+        {slides.map((slide, index) => (
+          <OnboardingPaginationItem
+            key={index}
+            index={index}
+            currentSlideIndex={currentSlideIndex}
+            animatedSlideIndex={animatedSlideIndex}
+            inactiveWidth={inactiveWidth}
+            activeWidth={activeWidth}
+            totalSlides={slides.length}
+            isDragging={isDragging}
+            slideDuration={slide.duration}
+            handleScrollToIndex={handleScrollToIndex}
+            translateY={translateY}
+            topCarouselOffset={topCarouselOffset}
+          />
+        ))}
+      </View>
+    </Log>
   );
 };
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Log } from '@/shared/lib/logger';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
@@ -43,39 +44,41 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
   };
 
   return (
-    <TouchableOpacity onPress={onPress}>
-      <View
-        className="rounded-lg border-l-[5px] shadow-sm"
-        style={{
-          backgroundColor: surfaceSecondary,
-          borderLeftColor: getBorderColor(),
-        }}
-        blur>
-        <VStack>
-          {title && (
-            <Text
-              heavy
-              className="text-base"
-              style={{
-                color: opacity(foreground, 0.5),
-                paddingLeft: 16,
-                paddingRight: 4,
-                paddingTop: 16,
-              }}>
-              {title}
-            </Text>
-          )}
+    <Log name="Card">
+      <TouchableOpacity onPress={onPress}>
+        <View
+          className="rounded-lg border-l-[5px] shadow-sm"
+          style={{
+            backgroundColor: surfaceSecondary,
+            borderLeftColor: getBorderColor(),
+          }}
+          blur>
+          <VStack>
+            {title && (
+              <Text
+                heavy
+                className="text-base"
+                style={{
+                  color: opacity(foreground, 0.5),
+                  paddingLeft: 16,
+                  paddingRight: 4,
+                  paddingTop: 16,
+                }}>
+                {title}
+              </Text>
+            )}
 
-          <HStack className="bg-transparent">
-            <Text
-              className="flex-1 text-base"
-              style={{ color: getTextColor(), padding: 16, paddingRight: 4 }}>
-              {message}
-            </Text>
-            {icon && <View style={{ padding: 16, paddingLeft: 4 }}>{icon}</View>}
-          </HStack>
-        </VStack>
-      </View>
-    </TouchableOpacity>
+            <HStack className="bg-transparent">
+              <Text
+                className="flex-1 text-base"
+                style={{ color: getTextColor(), padding: 16, paddingRight: 4 }}>
+                {message}
+              </Text>
+              {icon && <View style={{ padding: 16, paddingLeft: 4 }}>{icon}</View>}
+            </HStack>
+          </VStack>
+        </View>
+      </TouchableOpacity>
+    </Log>
   );
 };

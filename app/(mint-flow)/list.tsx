@@ -1,48 +1,60 @@
 /**
  * @fileoverview Mint List screen for Mint Flow
  *
- * Entry point for mint management modal.
- * Shows owned mints with balances for selection.
- * Uses native header with liquid glass buttons for iOS feel.
- * Can navigate to add/info screens.
+ * General mint management modal — not driven by a payment flow.
+ * Builds MintListItem[] from live data (useMints + useBalanceContext + cached stores)
+ * via buildMintListItems so MintListScreen stays hook-free.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
+
+import { useBalanceContext, useMints } from '@cashu/coco-react';
+import type { MintAvailability } from 'coco-payment-ux';
+
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { MintListScreen } from '@/features/mint';
+import { buildMintListItems } from '@/features/send';
 import Icon from 'assets/icons';
 
 function MintListRoute() {
   const foreground = useThemeColor('foreground');
   const params = useLocalSearchParams<{
-    requireBalance?: string;
     showAddMintsButton?: string;
     showDetailsButton?: string;
     onSelectAction?: string;
     continuePathname?: string;
     continueParams?: string;
-    // Send flow params for insufficient balance redirect
-    minAmount?: string;
-    amount?: string;
-    to?: string;
-    // Payment request params for filtering mints
-    allowedMints?: string; // JSON array of allowed mint URLs
   }>();
 
-  const requireBalance = params.requireBalance === 'true';
   const showAddMintsButton = params.showAddMintsButton !== 'false';
   const showDetailsButton = params.showDetailsButton !== 'false';
   const onSelectAction = params.onSelectAction || 'goBack';
-  // Parse minAmount for filtering mints with insufficient balance
-  const minAmount = params.minAmount ? parseInt(params.minAmount, 10) : undefined;
-  // Parse allowedMints for payment request filtering
-  const allowedMints = params.allowedMints ? JSON.parse(params.allowedMints) : undefined;
+
+  const { trustedMints } = useMints();
+  const { balance: mintBalances } = useBalanceContext();
+
+  // Build a neutral availability array (all mints available, no flow constraints).
+  const availability = useMemo<MintAvailability[]>(
+    () =>
+      trustedMints.map((m) => ({
+        mintUrl: m.mintUrl,
+        balance: mintBalances[m.mintUrl] ?? 0,
+        status: 'available' as const,
+        reason: null,
+        isPreferred: false,
+      })),
+    [trustedMints, mintBalances]
+  );
+
+  const items = useMemo(
+    () => buildMintListItems(trustedMints, availability),
+    [trustedMints, availability]
+  );
 
   return (
     <>
-      {/* Native header - transparent to match other flows */}
       <Stack.Screen
         options={{
           title: 'Select Mint',
@@ -60,21 +72,17 @@ function MintListRoute() {
       />
 
       <MintListScreen
-        requireBalance={requireBalance || !!minAmount}
-        minAmount={minAmount}
-        allowedMints={allowedMints}
+        items={items}
         showDetailsButton={showDetailsButton}
-        currencyLabel="Currency"
-        mintsLabel="Your mints"
         closeButtonLabel="Close"
-        onMintSelect={(mint) => {
+        onMintSelect={(item) => {
           if (onSelectAction === 'continue' && params.continuePathname) {
             const continueParams = params.continueParams ? JSON.parse(params.continueParams) : {};
             router.navigate({
               pathname: params.continuePathname as any,
               params: {
                 ...continueParams,
-                unit: mint.unit.toLowerCase(),
+                unit: item.unit,
               },
             });
           } else {

@@ -4,6 +4,7 @@ import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'assets/icons';
 import { View } from '@/shared/ui/primitives/View/View';
+import { Log } from '@/shared/lib/logger';
 
 export function WalletHealthCardFrame({
   accentColor,
@@ -17,7 +18,7 @@ export function WalletHealthCardFrame({
   children?: React.ReactNode;
 }) {
   return (
-    <>
+    <Log name="WalletHealthCardFrame">
       {/* Base fill: warm near-black so the card never feels muddy/grey */}
       <View style={[StyleSheet.absoluteFillObject, { backgroundColor }]} />
 
@@ -63,7 +64,7 @@ export function WalletHealthCardFrame({
       </View>
 
       {children}
-    </>
+    </Log>
   );
 }
 

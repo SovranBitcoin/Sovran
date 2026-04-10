@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Log } from '@/shared/lib/logger';
 
 import Animated, {
   cancelAnimation,
@@ -132,23 +133,25 @@ const OnboardingPaginationItem: React.FC<OnboardingPaginationItemProps> = ({
   );
 
   return (
-    <Animated.View
-      style={[
-        {
-          height: 2,
-          borderRadius: 999,
-          backgroundColor: 'rgba(255,255,255,0.2)',
-          overflow: 'hidden',
-        },
-        barWidthStyle,
-      ]}>
+    <Log name="OnboardingPaginationItem">
       <Animated.View
         style={[
-          { backgroundColor: 'white', position: 'absolute', top: 0, bottom: 0, left: 0 },
-          barProgressStyle,
-        ]}
-      />
-    </Animated.View>
+          {
+            height: 2,
+            borderRadius: 999,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            overflow: 'hidden',
+          },
+          barWidthStyle,
+        ]}>
+        <Animated.View
+          style={[
+            { backgroundColor: 'white', position: 'absolute', top: 0, bottom: 0, left: 0 },
+            barProgressStyle,
+          ]}
+        />
+      </Animated.View>
+    </Log>
   );
 };
 

@@ -26,6 +26,7 @@
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
 import { StyleSheet, InteractionManager, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
+import { log, Log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -618,7 +619,7 @@ function UserFeedInner({
           );
         }
       } catch (error) {
-        console.error('UserFeed: Failed to load Primal cached feed', error);
+        log.error('feed.user.load_failed', { error });
         if (!cancelled) {
           setFeedItems([]);
           setMetricsMap(new Map());
@@ -774,7 +775,7 @@ function UserFeedInner({
       );
       return dedupedItems;
     } catch (error) {
-      console.error('UserFeed: loadMore failed', error);
+      log.error('feed.user.load_more_failed', { error });
       return [];
     } finally {
       client.close();
@@ -1005,14 +1006,16 @@ function UserFeedInner({
   );
 
   return (
-    <ImageOverlayProvider
-      getDisplayMetrics={getDisplayMetrics}
-      getEngagementState={getEngagementState}
-      onSwipeUpToNextPost={onSwipeUpToNextPost}
-      getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
-      {feedList}
-      <AnimatedImageOverlay />
-    </ImageOverlayProvider>
+    <Log name="UserFeed">
+      <ImageOverlayProvider
+        getDisplayMetrics={getDisplayMetrics}
+        getEngagementState={getEngagementState}
+        onSwipeUpToNextPost={onSwipeUpToNextPost}
+        getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
+        {feedList}
+        <AnimatedImageOverlay />
+      </ImageOverlayProvider>
+    </Log>
   );
 }
 

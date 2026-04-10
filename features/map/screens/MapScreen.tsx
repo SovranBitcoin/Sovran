@@ -54,6 +54,7 @@ import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from '@/shared/lib/
 import { useShallow } from 'zustand/react/shallow';
 import { getOrBuildBTCMapClusterManager } from '@/shared/lib/map/btcMapClusterCache';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
+import { Screen, log, deferWork, useLifecycleLogger } from '@/shared/lib/logger';
 
 // ============================================================================
 // Types & Constants
@@ -295,6 +296,7 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
 // ============================================================================
 
 export function MapScreen() {
+  useLifecycleLogger('MapScreen');
   const [foreground, accent, background] = useThemeColor([
     'foreground',
     'accent',
@@ -469,6 +471,8 @@ export function MapScreen() {
   // Performance: on category switches, keep old markers visible while rebuilding.
   // Only show loading overlay on initial load (no markers yet).
   useEffect(() => {
+    if (!isMapReady) return; // Let map render before starting heavy clustering work
+
     if (filteredPoints.length === 0) {
       clusterManagerRef.current = null;
       setMarkers([]);
@@ -483,29 +487,34 @@ export function MapScreen() {
       setIsClusteringReady(false);
     }
 
-    // Defer clustering work until after interactions complete
-    const task = InteractionManager.runAfterInteractions(() => {
-      const manager = getOrBuildBTCMapClusterManager(clusterCacheKey, filteredPoints, {
-        radius: 50,
-        maxZoom: 17,
-        minPoints: 2,
-      });
-      clusterManagerRef.current = manager;
+    // Yield to the event loop so the map + loading overlay paint before
+    // Supercluster's synchronous k-d tree build blocks the JS thread.
+    const handle = deferWork(
+      'map.cluster_build',
+      () => {
+        const manager = getOrBuildBTCMapClusterManager(clusterCacheKey, filteredPoints, {
+          radius: 50,
+          maxZoom: 17,
+          minPoints: 2,
+        });
+        clusterManagerRef.current = manager;
 
-      // Update markers with current camera
-      const { lat, lon, zoom } = cameraRef.current;
-      updateMarkersForCamera(lat, lon, zoom);
-      setIsClusteringReady(true);
-    });
+        // Update markers with current camera
+        const { lat, lon, zoom } = cameraRef.current;
+        updateMarkersForCamera(lat, lon, zoom);
+        setIsClusteringReady(true);
+      },
+      100
+    );
 
-    return () => task.cancel();
-  }, [filteredPoints, clusterCacheKey, updateMarkersForCamera]);
+    return () => handle.cancel();
+  }, [isMapReady, filteredPoints, clusterCacheKey, updateMarkersForCamera]);
 
   // Fetch places on mount - DEFERRED
   useEffect(() => {
     // Defer fetch until after modal transition completes
     const task = InteractionManager.runAfterInteractions(() => {
-      fetchPlaces().catch(console.error);
+      fetchPlaces().catch((error) => log.error('map.places.fetch_failed', { error }));
     });
 
     return () => task.cancel();
@@ -558,7 +567,7 @@ export function MapScreen() {
         setMapCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 12 });
         updateMarkersForCamera(safe.latitude, safe.longitude, 12);
       } catch (err) {
-        console.error('Location error:', err);
+        log.error('map.location.error', { error: err });
       }
     });
 
@@ -573,7 +582,7 @@ export function MapScreen() {
       setMapCamera({ lat: safe.latitude, lon: safe.longitude, zoom: 15 });
       updateMarkersForCamera(safe.latitude, safe.longitude, 15);
     } catch (err) {
-      console.error('Location error:', err);
+      log.error('map.location.error', { error: err });
     }
   }, [setMapCamera, updateMarkersForCamera]);
 
@@ -638,7 +647,7 @@ export function MapScreen() {
 
   if (error || mapUnavailableOnAndroid) {
     return (
-      <View style={[styles.container, { backgroundColor: background }]}>
+      <Screen name="MapScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.errorContainer}>
           <Icon name="mdi:alert-circle" size={48} color={opacity(foreground, 0.4)} />
           <Text size={16} style={{ color: opacity(foreground, 0.5), marginTop: 16 }}>
@@ -654,12 +663,12 @@ export function MapScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <Screen name="MapScreen" style={styles.container}>
       {/* Show a placeholder background immediately while map loads */}
       {!isMapReady && (
         <View style={[StyleSheet.absoluteFillObject, styles.mapSkeleton]}>
@@ -715,7 +724,7 @@ export function MapScreen() {
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
       />
-    </View>
+    </Screen>
   );
 }
 

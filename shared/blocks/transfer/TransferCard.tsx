@@ -16,6 +16,7 @@ import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
+import { Log } from '@/shared/lib/logger';
 
 interface TransferCardProps {
   /** Accent color for the BlurCardFrame gradients. Falls back to primary-300. */
@@ -34,11 +35,13 @@ export const TransferCard = React.memo(
     const borderColor = useMemo(() => opacity(accentColor, 0.3), [accentColor]);
 
     return (
-      <View style={[styles.card, { borderColor }]}>
-        <BlurCardFrame accentColor={accentColor}>
-          <View style={styles.content}>{children}</View>
-        </BlurCardFrame>
-      </View>
+      <Log name="TransferCard">
+        <View style={[styles.card, { borderColor }]}>
+          <BlurCardFrame accentColor={accentColor}>
+            <View style={styles.content}>{children}</View>
+          </BlurCardFrame>
+        </View>
+      </Log>
     );
   }
 );

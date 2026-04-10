@@ -6,6 +6,7 @@ import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log } from '@/shared/lib/logger';
 
 type OfflineContextValue = {
   isOffline: boolean;
@@ -57,7 +58,7 @@ function isOfflineFromState(state: Network.NetworkState): boolean {
 
 export function OfflineProvider({ children }: OfflineProviderProps) {
   const [networkOffline, setNetworkOffline] = useState(false);
-  const [foreground, info] = useThemeColor(['foreground', 'blue-300'] as const);
+  const [foreground, info] = useThemeColor(['foreground', 'red-300'] as const);
   const insets = useSafeAreaInsets();
   const frame = useSafeAreaFrame();
   const isCheckingRef = useRef(false);
@@ -85,10 +86,30 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
     let mounted = true;
     let interval: ReturnType<typeof setInterval> | null = null;
     let networkSubscription: { remove: () => void } | null = null;
+    let lastOffline: boolean | null = null;
 
     const applyState = (state: Network.NetworkState) => {
       if (!mounted) return;
-      setNetworkOffline(isOfflineFromState(state));
+      const nowOffline = isOfflineFromState(state);
+      // Only log when state actually changes to reduce noise
+      if (lastOffline !== nowOffline) {
+        log.debug('provider.offline.network_state', {
+          isConnected: state.isConnected,
+          isInternetReachable: state.isInternetReachable,
+          type: state.type,
+          resolvedOffline: nowOffline,
+        });
+        lastOffline = nowOffline;
+      }
+      setNetworkOffline((prev) => {
+        if (prev !== nowOffline) {
+          log.info('provider.offline.transition', {
+            from: prev ? 'offline' : 'online',
+            to: nowOffline ? 'offline' : 'online',
+          });
+        }
+        return nowOffline;
+      });
     };
 
     const runConnectivityCheck = async () => {
@@ -97,29 +118,35 @@ export function OfflineProvider({ children }: OfflineProviderProps) {
       try {
         const state = await Network.getNetworkStateAsync();
         applyState(state);
-      } catch {
-        // Keep previous state if the check fails.
+      } catch (err) {
+        log.warn('provider.offline.check_failed', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
       } finally {
         isCheckingRef.current = false;
       }
     };
 
+    log.debug('provider.offline.init', { pollIntervalMs: CONNECTIVITY_POLL_MS });
     runConnectivityCheck();
     networkSubscription = Network.addNetworkStateListener(applyState);
     interval = setInterval(runConnectivityCheck, CONNECTIVITY_POLL_MS);
 
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
+        log.debug('provider.offline.app_foregrounded', { reason: 'app_state_active' });
         runConnectivityCheck();
       }
     });
 
     const onWebOnline = () => {
+      log.info('provider.offline.web_event', { event: 'online' });
       setNetworkOffline(false);
       runConnectivityCheck();
     };
 
     const onWebOffline = () => {
+      log.info('provider.offline.web_event', { event: 'offline' });
       setNetworkOffline(true);
     };
 

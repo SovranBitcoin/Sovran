@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Log } from '@/shared/lib/logger';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { BottomSheetFooter } from '@gorhom/bottom-sheet';
 import { BottomSheet, Button, useToast } from 'heroui-native';
@@ -37,7 +38,9 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   ButtonHandlerContent,
   EmojiPickerContent,
-  OfflineSendSuggestionsContent,
+  ProofSelectorContent,
+  PaymentOptionsContent,
+  PaymentFallbackContent,
   ProfileSwitcherContent,
 } from '@/shared/lib/popup/sheets';
 import { IMPORT_NSEC_LABEL } from '@/shared/lib/popup/sheets/profile-switcher/constants';
@@ -254,7 +257,7 @@ const CUSTOM_SHEET_CONTENT: Record<
     canPop: boolean;
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
-  'offline-send-suggestions': OfflineSendSuggestionsContent as React.ComponentType<{
+  'proof-selector': ProofSelectorContent as React.ComponentType<{
     payload: unknown;
     close: () => void;
     pushCustomPage: <K extends keyof ActionSheetPayloads>(
@@ -266,6 +269,28 @@ const CUSTOM_SHEET_CONTENT: Record<
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
   'button-handler': ButtonHandlerContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'payment-options': PaymentOptionsContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'payment-fallback': PaymentFallbackContent as React.ComponentType<{
     payload: unknown;
     close: () => void;
     pushCustomPage: <K extends keyof ActionSheetPayloads>(
@@ -787,9 +812,9 @@ function SheetPopup() {
 
 export default function PopupHost() {
   return (
-    <>
+    <Log name="PopupHost">
       <ToastRegistrar />
       <SheetPopup />
-    </>
+    </Log>
   );
 }

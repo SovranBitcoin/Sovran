@@ -12,7 +12,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
-import { useMints, useBalanceContext, useManager } from 'coco-cashu-react';
+import { useMints, useBalanceContext, useManager } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { useLightningOperations } from '@/features/receive/hooks/useLightningOperations';
 import { MIN_FEE_RESERVE } from '@/features/mint/components/rebalance';
@@ -44,10 +44,12 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import Icon from 'assets/icons';
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
 import { extractDomain } from '@/shared/lib/url';
+import { log, Screen, useLifecycleLogger } from '@/shared/lib/logger';
 
 // StepState is imported from components/blocks/rebalance (groupSteps.ts)
 
 export function MintRebalancePlanScreen() {
+  useLifecycleLogger('MintRebalancePlanScreen');
   const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor([
     'foreground',
     'surface-tertiary',
@@ -129,7 +131,7 @@ export function MintRebalancePlanScreen() {
   const swapLegIdByStepIdRef = useRef<Record<string, string>>({});
 
   const appendDebug = useCallback((entry: Record<string, unknown>) => {
-    console.log('[REBALANCE]', JSON.stringify({ ...entry, _ts: new Date().toISOString() }));
+    log.debug('mint.rebalance.step', entry);
   }, []);
 
   const plan = useMemo(() => runPlan ?? computedPlan, [runPlan, computedPlan]);
@@ -296,7 +298,7 @@ export function MintRebalancePlanScreen() {
 
     while (executionLockRef.current) {
       if (Date.now() - startTime > maxWaitMs) {
-        console.warn('Timed out waiting for execution lock');
+        log.warn('mint.rebalance.lock_timeout');
         return false;
       }
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
@@ -314,7 +316,7 @@ export function MintRebalancePlanScreen() {
       // Wait for any existing operation to complete instead of returning early
       const gotLock = await waitForLock();
       if (!gotLock) {
-        console.warn('Failed to acquire execution lock for step:', step.id);
+        log.warn('mint.rebalance.lock_failed', { stepId: step.id });
         return false;
       }
       if (abortRef.current || runIdRef.current !== runId) return false;
@@ -512,7 +514,11 @@ export function MintRebalancePlanScreen() {
         setLegLocalStatus('invoiceReady');
 
         const prepareForInvoice = async (invoiceToPay: string) => {
-          const prepared = await manager.quotes.prepareMeltBolt11(fromMintUrl, invoiceToPay);
+          const prepared = await manager.ops.melt.prepare({
+            mintUrl: fromMintUrl,
+            method: 'bolt11',
+            methodData: { invoice: invoiceToPay },
+          });
           updateStepState(id, { operationId: prepared.id });
           {
             const legId = ensureLegId();
@@ -607,7 +613,7 @@ export function MintRebalancePlanScreen() {
                 preparedMeltOp = await prepareForInvoice(invoice);
               }
 
-              const result = (await manager.quotes.executeMelt(preparedMeltOp.id)) as unknown as
+              const result = (await manager.ops.melt.execute(preparedMeltOp.id)) as unknown as
                 | { state?: string; id?: string }
                 | undefined;
 
@@ -618,7 +624,7 @@ export function MintRebalancePlanScreen() {
                 const start = Date.now();
 
                 while (Date.now() - start < maxWaitMs) {
-                  const decision = await manager.quotes.checkPendingMelt(opId);
+                  const decision = (await manager.ops.melt.refresh(opId)) as unknown as string;
                   if (decision === 'finalize') return;
                   if (decision === 'rollback') {
                     throw new Error('Melt payment rolled back by mint');
@@ -638,7 +644,7 @@ export function MintRebalancePlanScreen() {
               if (msg.includes('Melt operation already in progress')) {
                 await new Promise((resolve) => setTimeout(resolve, 900));
                 preparedMeltOp = await prepareForInvoice(invoice);
-                await manager.quotes.executeMelt(preparedMeltOp.id);
+                await manager.ops.melt.execute(preparedMeltOp.id);
                 return;
               }
 
@@ -807,7 +813,7 @@ export function MintRebalancePlanScreen() {
                   await manager.mint.trustMint(url);
                   temporarilyTrusted.push(url);
                 } catch (trustErr) {
-                  console.warn('Failed to temporarily trust intermediary:', url, trustErr);
+                  log.warn('mint.rebalance.trust_failed', { url, error: trustErr });
                 }
               }
             }
@@ -1004,7 +1010,11 @@ export function MintRebalancePlanScreen() {
                 let hopTransferAmt = hopAmount;
                 for (let att = 0; att <= MAX_PREPARE_RETRIES; att++) {
                   try {
-                    hopPrepared = await manager.quotes.prepareMeltBolt11(hopFrom, hopInvoice);
+                    hopPrepared = await manager.ops.melt.prepare({
+                      mintUrl: hopFrom,
+                      method: 'bolt11',
+                      methodData: { invoice: hopInvoice },
+                    });
                     break;
                   } catch (pErr) {
                     const pm = pErr instanceof Error ? pErr.message : String(pErr);
@@ -1022,7 +1032,7 @@ export function MintRebalancePlanScreen() {
 
                 // Execute melt
                 updateStepState(hopStepId, { status: 'melting' });
-                const hopResult = (await manager.quotes.executeMelt(hopPrepared.id)) as unknown as
+                const hopResult = (await manager.ops.melt.execute(hopPrepared.id)) as unknown as
                   | { state?: string; id?: string }
                   | undefined;
 
@@ -1032,7 +1042,7 @@ export function MintRebalancePlanScreen() {
                   const maxWait = 15000;
                   const start = Date.now();
                   while (Date.now() - start < maxWait) {
-                    const dec = await manager.quotes.checkPendingMelt(opId);
+                    const dec = (await manager.ops.melt.refresh(opId)) as unknown as string;
                     if (dec === 'finalize') break;
                     if (dec === 'rollback') throw new Error('Hop melt rolled back');
                     await new Promise((r) => setTimeout(r, 2000));
@@ -1114,7 +1124,7 @@ export function MintRebalancePlanScreen() {
             for (const url of temporarilyTrusted) {
               const bal = finalBals[url] ?? 0;
               if (bal > 0) {
-                console.warn(`Keeping temp middleman ${url} trusted — ${bal} sats remain`);
+                log.warn('mint.rebalance.middleman_kept', { url, balance: bal });
                 continue;
               }
               try {
@@ -1176,7 +1186,7 @@ export function MintRebalancePlanScreen() {
            *
            * We still mark the step done if the melt succeeded; eventual consistency will catch up.
            */
-          console.warn('Balance did not increase within timeout, but melt succeeded');
+          log.warn('mint.rebalance.balance_timeout');
         }
 
         // Mark as done
@@ -1434,7 +1444,7 @@ export function MintRebalancePlanScreen() {
             await manager.mint.trustMint(url);
             temporarilyTrusted.push(url);
           } catch (err) {
-            console.warn('Failed to temporarily trust intermediary mint:', url, err);
+            log.warn('mint.rebalance.trust_failed', { url, error: err });
           }
         }
       }
@@ -1499,13 +1509,13 @@ export function MintRebalancePlanScreen() {
         for (const url of temporarilyTrusted) {
           const bal = balances[url] ?? 0;
           if (bal > 0) {
-            console.warn(`Keeping temporary middleman ${url} trusted — ${bal} sats still on mint`);
+            log.warn('mint.rebalance.middleman_kept', { url, balance: bal });
             continue;
           }
           try {
             await manager.mint.untrustMint(url);
           } catch (err) {
-            console.warn('Failed to untrust temporary middleman mint:', url, err);
+            log.warn('mint.rebalance.untrust_failed', { url, error: err });
           }
         }
       }
@@ -1619,7 +1629,7 @@ export function MintRebalancePlanScreen() {
   ]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: background }}>
+    <Screen name="MintRebalancePlanScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: 'Rebalance Plan',
@@ -1807,6 +1817,6 @@ export function MintRebalancePlanScreen() {
           </View>
         )}
       </ModalLayoutWrapper>
-    </View>
+    </Screen>
   );
 }

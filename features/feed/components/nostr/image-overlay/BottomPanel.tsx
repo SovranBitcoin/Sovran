@@ -19,6 +19,7 @@ import type { ContentSegment } from '../shared';
 import type { ImageOverlayPost } from './types';
 import { BOTTOM_PANEL_PADDING_HORIZONTAL, BOTTOM_PANEL_PADDING_TOP } from './config';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 const PANEL_BG = 'rgba(0,0,0,0.9)';
 const PANEL_TEXT = 'rgba(255,255,255,0.95)';
 const PANEL_TEXT_MUTED = 'rgba(255,255,255,0.6)';
@@ -235,102 +236,104 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
   const showLessVisible = canExpand && contentExpanded;
 
   return (
-    <View style={styles.wrap}>
-      {/* Author row */}
-      <Pressable
-        onPress={() => {
-          router.navigate({
-            pathname: '/(user-flow)/profile' as any,
-            params: { pubkey: event.pubkey },
-          });
-        }}
-        style={styles.authorRow}>
-        <Avatar picture={profile?.picture} seed={event.pubkey} size={32} name={displayName} />
-        <View style={styles.authorTextWrap}>
-          <Text bold size={14} style={{ color: PANEL_TEXT }} numberOfLines={1}>
-            {displayName}
-          </Text>
-          <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
-            {shortTime}
-          </Text>
-        </View>
-      </Pressable>
-      {/* Post content with inline image blocks only when captioned (text between images); otherwise text only */}
-      {hasContent ? (
-        <View>
-          {blocks.map((block, i) =>
-            block.type === 'text' ? (
+    <Log name="ImageOverlayBottomPanelContent">
+      <View style={styles.wrap}>
+        {/* Author row */}
+        <Pressable
+          onPress={() => {
+            router.navigate({
+              pathname: '/(user-flow)/profile' as any,
+              params: { pubkey: event.pubkey },
+            });
+          }}
+          style={styles.authorRow}>
+          <Avatar picture={profile?.picture} seed={event.pubkey} size={32} name={displayName} />
+          <View style={styles.authorTextWrap}>
+            <Text bold size={14} style={{ color: PANEL_TEXT }} numberOfLines={1}>
+              {displayName}
+            </Text>
+            <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+              {shortTime}
+            </Text>
+          </View>
+        </Pressable>
+        {/* Post content with inline image blocks only when captioned (text between images); otherwise text only */}
+        {hasContent ? (
+          <View>
+            {blocks.map((block, i) =>
+              block.type === 'text' ? (
+                <Text
+                  key={i}
+                  size={14}
+                  style={[styles.contentText, { color: PANEL_TEXT_MUTED }]}
+                  numberOfLines={contentExpanded ? undefined : 2}>
+                  {block.value}
+                </Text>
+              ) : showInlineImages ? (
+                <InlinePanelImage key={i} uri={block.url} />
+              ) : null
+            )}
+            {showMoreVisible && (
               <Text
-                key={i}
                 size={14}
-                style={[styles.contentText, { color: PANEL_TEXT_MUTED }]}
-                numberOfLines={contentExpanded ? undefined : 2}>
-                {block.value}
+                style={[styles.contentText, { color: PANEL_TEXT_MUTED, marginTop: 4 }]}
+                onPress={() => setContentExpanded((e) => !e)}>
+                show more
               </Text>
-            ) : showInlineImages ? (
-              <InlinePanelImage key={i} uri={block.url} />
-            ) : null
-          )}
-          {showMoreVisible && (
-            <Text
-              size={14}
-              style={[styles.contentText, { color: PANEL_TEXT_MUTED, marginTop: 4 }]}
-              onPress={() => setContentExpanded((e) => !e)}>
-              show more
+            )}
+            {showLessVisible && (
+              <Text
+                size={14}
+                style={[styles.contentText, { color: PANEL_TEXT_MUTED, marginTop: 4 }]}
+                onPress={() => setContentExpanded((e) => !e)}>
+                show less
+              </Text>
+            )}
+          </View>
+        ) : null}
+        {/* Stats / actions row */}
+        <View style={styles.metricsRow}>
+          <View style={styles.metricBtn}>
+            <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
+            <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+              {formatCount(metrics.replyCount)}
             </Text>
-          )}
-          {showLessVisible && (
-            <Text
-              size={14}
-              style={[styles.contentText, { color: PANEL_TEXT_MUTED, marginTop: 4 }]}
-              onPress={() => setContentExpanded((e) => !e)}>
-              show less
+          </View>
+          <Pressable
+            onPress={onRepostPress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.metricBtn}>
+            <Icon
+              name="garden:arrow-retweet-fill-16"
+              size={17}
+              color={reposted ? repostedColor : PANEL_TEXT_MUTED}
+            />
+            <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
+              {formatCount(metrics.repostCount)}
             </Text>
-          )}
-        </View>
-      ) : null}
-      {/* Stats / actions row */}
-      <View style={styles.metricsRow}>
-        <View style={styles.metricBtn}>
-          <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
-          <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
-            {formatCount(metrics.replyCount)}
-          </Text>
-        </View>
-        <Pressable
-          onPress={onRepostPress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.metricBtn}>
-          <Icon
-            name="garden:arrow-retweet-fill-16"
-            size={17}
-            color={reposted ? repostedColor : PANEL_TEXT_MUTED}
-          />
-          <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
-            {formatCount(metrics.repostCount)}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={onLikePress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.metricBtn}>
-          <Icon
-            name="iconamoon:heart-fill"
-            size={16}
-            color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
-          />
-          <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
-            {formatCount(metrics.likeCount)}
-          </Text>
-        </Pressable>
-        <View style={styles.metricBtn}>
-          <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
-          <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
-            {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
-          </Text>
+          </Pressable>
+          <Pressable
+            onPress={onLikePress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.metricBtn}>
+            <Icon
+              name="iconamoon:heart-fill"
+              size={16}
+              color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
+            />
+            <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
+              {formatCount(metrics.likeCount)}
+            </Text>
+          </Pressable>
+          <View style={styles.metricBtn}>
+            <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
+            <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
+              {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
+            </Text>
+          </View>
         </View>
       </View>
-    </View>
+    </Log>
   );
 });
 
@@ -343,14 +346,16 @@ export const ImageOverlayBottomPanelReply = React.memo(function ImageOverlayBott
   onReplyPress: () => void;
 }) {
   return (
-    <Pressable onPress={onReplyPress} style={styles.replyRow}>
-      <Avatar seed={currentUserPubkey ?? ''} size={28} name="" />
-      <View style={styles.replyInputWrap}>
-        <Text size={14} style={{ color: PANEL_TEXT_MUTED }}>
-          Post your reply
-        </Text>
-      </View>
-    </Pressable>
+    <Log name="ImageOverlayBottomPanelReply">
+      <Pressable onPress={onReplyPress} style={styles.replyRow}>
+        <Avatar seed={currentUserPubkey ?? ''} size={28} name="" />
+        <View style={styles.replyInputWrap}>
+          <Text size={14} style={{ color: PANEL_TEXT_MUTED }}>
+            Post your reply
+          </Text>
+        </View>
+      </Pressable>
+    </Log>
   );
 });
 
@@ -383,88 +388,90 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
   }, [onOpenSheet]);
 
   return (
-    <View style={[styles.wrap, absoluteBarStyles.bar]}>
-      <Pressable
-        onPress={() => {
-          router.navigate({
-            pathname: '/(user-flow)/profile' as any,
-            params: { pubkey: event.pubkey },
-          });
-        }}
-        style={styles.authorRow}>
-        <Avatar picture={profile?.picture} seed={event.pubkey} size={28} name={displayName} />
-        <View style={styles.authorTextWrap}>
-          <Text bold size={13} style={{ color: PANEL_TEXT }} numberOfLines={1}>
-            {displayName}
-          </Text>
-          <Text size={12} style={{ color: PANEL_TEXT_MUTED }}>
-            {shortTime}
-          </Text>
-        </View>
-      </Pressable>
-      {fullContent.length > 0 ? (
-        <View style={absoluteBarStyles.contentRow}>
-          <Text
-            size={13}
-            style={[styles.contentText, { color: PANEL_TEXT_MUTED }]}
-            numberOfLines={1}>
-            {contentPreview}
-            {contentTruncated ? '…' : ''}
-          </Text>
-          {contentTruncated && (
+    <Log name="ImageOverlayAbsoluteBar">
+      <View style={[styles.wrap, absoluteBarStyles.bar]}>
+        <Pressable
+          onPress={() => {
+            router.navigate({
+              pathname: '/(user-flow)/profile' as any,
+              params: { pubkey: event.pubkey },
+            });
+          }}
+          style={styles.authorRow}>
+          <Avatar picture={profile?.picture} seed={event.pubkey} size={28} name={displayName} />
+          <View style={styles.authorTextWrap}>
+            <Text bold size={13} style={{ color: PANEL_TEXT }} numberOfLines={1}>
+              {displayName}
+            </Text>
+            <Text size={12} style={{ color: PANEL_TEXT_MUTED }}>
+              {shortTime}
+            </Text>
+          </View>
+        </Pressable>
+        {fullContent.length > 0 ? (
+          <View style={absoluteBarStyles.contentRow}>
             <Text
               size={13}
-              style={[styles.contentText, absoluteBarStyles.showMore]}
-              onPress={handleShowMorePress}>
-              show more
+              style={[styles.contentText, { color: PANEL_TEXT_MUTED }]}
+              numberOfLines={1}>
+              {contentPreview}
+              {contentTruncated ? '…' : ''}
             </Text>
-          )}
-        </View>
-      ) : null}
-      <View style={styles.metricsRow}>
-        <Pressable
-          onPress={handleCommentPress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.metricBtn}>
-          <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
-          <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
-            {formatCount(metrics.replyCount)}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={onRepostPress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.metricBtn}>
-          <Icon
-            name="garden:arrow-retweet-fill-16"
-            size={17}
-            color={reposted ? repostedColor : PANEL_TEXT_MUTED}
-          />
-          <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
-            {formatCount(metrics.repostCount)}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={onLikePress}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.metricBtn}>
-          <Icon
-            name="iconamoon:heart-fill"
-            size={16}
-            color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
-          />
-          <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
-            {formatCount(metrics.likeCount)}
-          </Text>
-        </Pressable>
-        <View style={styles.metricBtn}>
-          <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
-          <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
-            {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
-          </Text>
+            {contentTruncated && (
+              <Text
+                size={13}
+                style={[styles.contentText, absoluteBarStyles.showMore]}
+                onPress={handleShowMorePress}>
+                show more
+              </Text>
+            )}
+          </View>
+        ) : null}
+        <View style={styles.metricsRow}>
+          <Pressable
+            onPress={handleCommentPress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.metricBtn}>
+            <Icon name="iconamoon:comment-fill" size={16} color={PANEL_TEXT_MUTED} />
+            <Text size={13} style={{ color: PANEL_TEXT_MUTED }}>
+              {formatCount(metrics.replyCount)}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onRepostPress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.metricBtn}>
+            <Icon
+              name="garden:arrow-retweet-fill-16"
+              size={17}
+              color={reposted ? repostedColor : PANEL_TEXT_MUTED}
+            />
+            <Text size={13} style={{ color: reposted ? repostedColor : PANEL_TEXT_MUTED }}>
+              {formatCount(metrics.repostCount)}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onLikePress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.metricBtn}>
+            <Icon
+              name="iconamoon:heart-fill"
+              size={16}
+              color={liked ? LIKED_COLOR : PANEL_TEXT_MUTED}
+            />
+            <Text size={13} style={{ color: liked ? LIKED_COLOR : PANEL_TEXT_MUTED }}>
+              {formatCount(metrics.likeCount)}
+            </Text>
+          </Pressable>
+          <View style={styles.metricBtn}>
+            <Icon name="mingcute:lightning-fill" size={16} color={PANEL_TEXT_MUTED} />
+            <Text overpass size={13} style={{ color: PANEL_TEXT_MUTED }}>
+              {metrics.satsZapped > 0 ? formatSats(metrics.satsZapped) : '0'}
+            </Text>
+          </View>
         </View>
       </View>
-    </View>
+    </Log>
   );
 });
 

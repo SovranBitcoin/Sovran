@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
+import { Log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -90,54 +91,56 @@ export function Tabs({ tabs, amounts, selectedTab, handleTabPress }: TabsProps) 
   );
 
   return (
-    <ScrollView
-      className="w-full"
-      style={{
-        marginBottom: 0,
-        marginTop: 0,
-        overflow: 'visible',
-      }}
-      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
-      onContentSizeChange={(w) => setContentWidth(w)}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{
-        width: isScrollable ? undefined : '100%',
-      }}>
-      <View
-        style={[
-          {
-            borderWidth: 1,
-            borderColor,
-            marginVertical: 4,
-            width: isScrollable ? undefined : '100%',
-            minWidth: isScrollable ? undefined : '100%',
-            borderRadius: 1000,
-            overflow: 'hidden',
-          },
-        ]}>
-        <BlurCardFrame accentColor={accentColor}>
-          <HStack
-            className="p-1.5"
-            style={{
+    <Log name="Tabs">
+      <ScrollView
+        className="w-full"
+        style={{
+          marginBottom: 0,
+          marginTop: 0,
+          overflow: 'visible',
+        }}
+        onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+        onContentSizeChange={(w) => setContentWidth(w)}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{
+          width: isScrollable ? undefined : '100%',
+        }}>
+        <View
+          style={[
+            {
+              borderWidth: 1,
+              borderColor,
+              marginVertical: 4,
               width: isScrollable ? undefined : '100%',
               minWidth: isScrollable ? undefined : '100%',
-              zIndex: 1,
-            }}>
-            {tabs.map((tab, index) => (
-              <Tab
-                key={tab}
-                tab={tab}
-                index={index}
-                isSelected={selectedTab === tab}
-                amount={amounts?.[index]}
-                onPress={onTabPress}
-                isScrollable={isScrollable}
-              />
-            ))}
-          </HStack>
-        </BlurCardFrame>
-      </View>
-    </ScrollView>
+              borderRadius: 1000,
+              overflow: 'hidden',
+            },
+          ]}>
+          <BlurCardFrame accentColor={accentColor}>
+            <HStack
+              className="p-1.5"
+              style={{
+                width: isScrollable ? undefined : '100%',
+                minWidth: isScrollable ? undefined : '100%',
+                zIndex: 1,
+              }}>
+              {tabs.map((tab, index) => (
+                <Tab
+                  key={tab}
+                  tab={tab}
+                  index={index}
+                  isSelected={selectedTab === tab}
+                  amount={amounts?.[index]}
+                  onPress={onTabPress}
+                  isScrollable={isScrollable}
+                />
+              ))}
+            </HStack>
+          </BlurCardFrame>
+        </View>
+      </ScrollView>
+    </Log>
   );
 }

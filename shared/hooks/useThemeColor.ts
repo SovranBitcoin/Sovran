@@ -13,7 +13,7 @@ import { useCSSVariable } from 'uniwind';
  * const brandGrad = useThemeColor(['shade-200', 'shade-300', 'shade-400']);
  */
 
-type Shade = 100 | 200 | 300 | 400 | 500;
+type Shade = 0 | 50 | 100 | 200 | 300 | 400 | 500;
 
 type StaticScale =
   | `shade-${Shade}`
@@ -23,6 +23,17 @@ type StaticScale =
   | `blue-${Shade}`
   | `purple-${Shade}`
   | `orange-${Shade}`;
+
+/** Wallpaper theme gradient/dominant colors (from backgroundImageThemes) */
+type WallpaperToken =
+  | 'gradient-100'
+  | 'gradient-200'
+  | 'gradient-300'
+  | 'dominant-100'
+  | 'dominant-200'
+  | 'dominant-300'
+  | 'dominant-400'
+  | 'dominant-500';
 
 type SemanticToken =
   | 'background'
@@ -78,7 +89,7 @@ type SemanticToken =
   | 'background-tertiary'
   | 'background-inverse';
 
-export type ColorToken = SemanticToken | StaticScale;
+export type ColorToken = SemanticToken | StaticScale | WallpaperToken;
 
 type StringTuple<N extends number, A extends string[] = []> = A['length'] extends N
   ? A

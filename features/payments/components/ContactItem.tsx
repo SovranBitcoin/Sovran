@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo } from 'react';
-import { Pressable } from 'react-native';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -9,8 +8,10 @@ import opacity from 'hex-color-opacity';
 import { PUBLIC_KEYS } from '@/shared/lib/constants';
 import { getMintDisplayName } from '@/shared/lib/url';
 import { prefetchImage } from '@/shared/lib/imageCache';
+import { paymentLog, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-
+import { PressableFeedback } from 'heroui-native';
+import { View } from '@/shared/ui/primitives/View/View';
 interface ContactItemProps {
   item: {
     type: 'contact' | 'mint';
@@ -28,6 +29,8 @@ interface ContactItemProps {
     nip05?: string;
   };
   isLoadingProfile?: boolean;
+  index?: number;
+  length?: number;
 }
 
 const styles = {
@@ -54,6 +57,8 @@ export const ContactItem = React.memo(function ContactItem({
   item,
   profile,
   isLoadingProfile = false,
+  index = 0,
+  length = 1,
 }: ContactItemProps) {
   const router = useRouter();
   const foreground = useThemeColor('foreground');
@@ -125,17 +130,32 @@ export const ContactItem = React.memo(function ContactItem({
   );
 
   return (
-    <Pressable
-      style={styles.contactItem}
-      disabled={!canNavigateToProfile}
-      onPress={() => {
-        if (!item.pubkey) return;
-        router.navigate({
-          pathname: '/(user-flow)/profile' as const,
-          params: { pubkey: item.pubkey },
-        });
-      }}>
-      {content}
-    </Pressable>
+    <Log name="ContactItem">
+      <PressableFeedback
+        animation={false}
+        onPress={() => {
+          if (!item.pubkey) return;
+          paymentLog.debug('contact_item.press', {
+            type: item.type,
+            pubkey: item.pubkey.slice(0, 16),
+          });
+          router.navigate({
+            pathname: '/(user-flow)/profile' as const,
+            params: { pubkey: item.pubkey },
+          });
+        }}>
+        <PressableFeedback.Ripple />
+        <View
+          pointerEvents="none"
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            paddingTop: index === 0 ? 16 : 8,
+            paddingBottom: index === length - 1 ? 16 : 8,
+          }}>
+          {content}
+        </View>
+      </PressableFeedback>
+    </Log>
   );
 });

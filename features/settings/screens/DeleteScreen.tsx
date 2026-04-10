@@ -14,6 +14,7 @@ import Animated, {
 import Container from '@/shared/ui/composed/Container';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { deleteAllProfiles } from '@/shared/lib/profile/profileSessionOrchestrator';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -129,83 +130,89 @@ const styles = StyleSheet.create({
 });
 
 export function DeleteScreen() {
+  useLifecycleLogger('DeleteScreen');
   const foreground = useThemeColor('foreground');
   const [danger, red400] = useThemeColor(['danger', 'red-400'] as const);
 
   const handleDelete = useCallback(async () => {
+    log.warn('settings.delete.confirmed', { reason: 'user_initiated_slide_to_delete' });
     await deleteAllProfiles();
+    log.info('settings.delete.complete');
   }, []);
 
   return (
     <Container>
-      <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
-        <VStack spacing={24} className="flex-1 items-center justify-center px-6">
-          <View
-            className="h-24 w-24 items-center justify-center self-center rounded-full"
-            style={{ backgroundColor: danger }}>
-            <Icon name="mdi:trash-can-outline" size={48} color={red400} />
-          </View>
+      <Screen name="DeleteScreen">
+        <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
+          <VStack spacing={24} className="flex-1 items-center justify-center px-6">
+            <View
+              className="h-24 w-24 items-center justify-center self-center rounded-full"
+              style={{ backgroundColor: danger }}>
+              <Icon name="mdi:trash-can-outline" size={48} color={red400} />
+            </View>
 
-          <VStack spacing={8} className="items-center">
-            <Text size={24} bold className="text-foreground text-center">
-              Delete Account
-            </Text>
-            <Text
-              size={16}
-              className="text-center leading-6"
-              style={{ color: opacity(foreground, 0.5) }}>
-              This will permanently erase all wallet data, all profiles, and all keys from this
-              device. The app will restart as if freshly installed. This action cannot be reversed.
-            </Text>
+            <VStack spacing={8} className="items-center">
+              <Text size={24} bold className="text-foreground text-center">
+                Delete Account
+              </Text>
+              <Text
+                size={16}
+                className="text-center leading-6"
+                style={{ color: opacity(foreground, 0.5) }}>
+                This will permanently erase all wallet data, all profiles, and all keys from this
+                device. The app will restart as if freshly installed. This action cannot be
+                reversed.
+              </Text>
+            </VStack>
+
+            <Card variant="secondary" className="w-full">
+              <Card.Body className="gap-2">
+                <Card.Title>Save your NIP06</Card.Title>
+                <Card.Description>
+                  Your NIP06 is the recovery phrase for your full Sovran account. Every Cashu
+                  profile in this app is derived from it, so restoring with a different NIP06 will
+                  create different Cashu wallets and will not recover the same ecash. If you were a
+                  TestFlight user, recovery may still not restore all historical funds.
+                </Card.Description>
+              </Card.Body>
+            </Card>
+
+            <Card variant="secondary" className="w-full">
+              <Card.Body className="gap-2">
+                <Card.Title>Imported Nostr accounts</Card.Title>
+                <Card.Description>
+                  Even imported Nostr accounts depend on your current NIP06 for their Cashu profile.
+                  Re-importing the same Nostr key under a different NIP06 will produce a different
+                  Cashu profile, so that ecash will not be recoverable.
+                </Card.Description>
+              </Card.Body>
+            </Card>
+
+            <Card variant="secondary" className="w-full">
+              <Card.Body className="gap-2">
+                <Card.Title>Before deleting, make sure you have:</Card.Title>
+                <Card.Description>
+                  - Backed up your NIP06{'\n'}- Transferred any ecash you do not want to risk
+                  {'\n'}- Exported any important data
+                </Card.Description>
+              </Card.Body>
+            </Card>
+
+            <VStack spacing={12} className="w-full items-center">
+              <SlideToDelete
+                onComplete={handleDelete}
+                trackColor={danger}
+                thumbColor={foreground}
+                textColor={foreground}
+                iconColor={danger}
+              />
+              <Button variant="secondary" className="w-full" onPress={() => router.back()}>
+                <Button.Label>Cancel</Button.Label>
+              </Button>
+            </VStack>
           </VStack>
-
-          <Card variant="secondary" className="w-full">
-            <Card.Body className="gap-2">
-              <Card.Title>Save your NIP06</Card.Title>
-              <Card.Description>
-                Your NIP06 is the recovery phrase for your full Sovran account. Every Cashu profile
-                in this app is derived from it, so restoring with a different NIP06 will create
-                different Cashu wallets and will not recover the same ecash. If you were a
-                TestFlight user, recovery may still not restore all historical funds.
-              </Card.Description>
-            </Card.Body>
-          </Card>
-
-          <Card variant="secondary" className="w-full">
-            <Card.Body className="gap-2">
-              <Card.Title>Imported Nostr accounts</Card.Title>
-              <Card.Description>
-                Even imported Nostr accounts depend on your current NIP06 for their Cashu profile.
-                Re-importing the same Nostr key under a different NIP06 will produce a different
-                Cashu profile, so that ecash will not be recoverable.
-              </Card.Description>
-            </Card.Body>
-          </Card>
-
-          <Card variant="secondary" className="w-full">
-            <Card.Body className="gap-2">
-              <Card.Title>Before deleting, make sure you have:</Card.Title>
-              <Card.Description>
-                - Backed up your NIP06{'\n'}- Transferred any ecash you do not want to risk
-                {'\n'}- Exported any important data
-              </Card.Description>
-            </Card.Body>
-          </Card>
-
-          <VStack spacing={12} className="w-full items-center">
-            <SlideToDelete
-              onComplete={handleDelete}
-              trackColor={danger}
-              thumbColor={foreground}
-              textColor={foreground}
-              iconColor={danger}
-            />
-            <Button variant="secondary" className="w-full" onPress={() => router.back()}>
-              <Button.Label>Cancel</Button.Label>
-            </Button>
-          </VStack>
-        </VStack>
-      </ScrollView>
+        </ScrollView>
+      </Screen>
     </Container>
   );
 }

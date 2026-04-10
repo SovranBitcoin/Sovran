@@ -24,12 +24,17 @@ import { getUsername } from '@/shared/lib/username';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfileStore, ProfileEntry } from '@/shared/stores/global/profileStore';
+import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import {
   switchToExistingProfile,
   createAndSwitchProfile,
   switchToImportedProfile,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
-import { keyImportFailedPopup, profileSwitcherPopup } from '@/shared/lib/popup';
+import {
+  keyImportFailedPopup,
+  profileSwitcherPopup,
+  walletStillLoadingPopup,
+} from '@/shared/lib/popup';
 import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
 import type { ProfileSwitcherAction } from '@/shared/lib/popup/actionSheetTypes';
 
@@ -59,14 +64,14 @@ const MENU_ITEMS: MenuItem[] = [
   {
     icon: 'fluent:wallet-20-filled',
     label: 'Wallet',
-    route: '(drawer)/(tabs)/index',
+    route: '(drawer)/(tabs)',
     drawerLabel: 'wallet',
   },
   {
-    icon: 'fluent:arrow-swap-16-filled',
-    label: 'Payments',
-    route: '(drawer)/(tabs)/payments',
-    drawerLabel: 'payments',
+    icon: 'ph:user-bold',
+    label: 'Contacts',
+    route: '(drawer)/(tabs)/contacts',
+    drawerLabel: 'contacts',
   },
   {
     icon: 'material-symbols:settings-rounded',
@@ -84,20 +89,34 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
   ] as const);
   const profiles = useProfileStore((s) => s.profiles);
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
+  const switchingRef = useRef(false);
 
   const executeProfileAction = useCallback(
     async (action: ProfileSwitcherAction) => {
+      if (switchingRef.current) return;
+      switchingRef.current = true;
+
       closeDrawer();
       await waitForDrawerClose();
 
       switch (action.type) {
-        case 'switch':
-          if (action.accountIndex === activeAccountIndex) return;
-          void switchToExistingProfile({ accountIndex: action.accountIndex });
+        case 'switch': {
+          if (action.accountIndex === activeAccountIndex) {
+            switchingRef.current = false;
+            return;
+          }
+          const switched = await switchToExistingProfile({ accountIndex: action.accountIndex });
+          if (!switched) {
+            switchingRef.current = false;
+            walletStillLoadingPopup();
+          }
           break;
-        case 'create':
-          void createAndSwitchProfile();
+        }
+        case 'create': {
+          const created = await createAndSwitchProfile();
+          if (!created) switchingRef.current = false;
           break;
+        }
         case 'import': {
           if (useProfileStore.getState().hasPubkey(action.pubkeyHex)) {
             keyImportFailedPopup({ text: 'This identity already exists as a profile.' });
@@ -116,7 +135,11 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
               .addProfile(action.accountIndex, action.pubkeyHex, 'imported');
           }
 
-          void switchToImportedProfile({ accountIndex: action.accountIndex });
+          const imported = await switchToImportedProfile({ accountIndex: action.accountIndex });
+          if (!imported) {
+            switchingRef.current = false;
+            walletStillLoadingPopup();
+          }
           break;
         }
       }
@@ -187,6 +210,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const insets = useSafeAreaInsets();
   const { displayName, picture } = useProfileDisplay(nostrKeys?.pubkey || '');
+  const { isOffline } = useOfflineStatus();
 
   const handlePress = useCallback(() => {
     if (nostrKeys?.pubkey) {
@@ -203,7 +227,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
   return (
     <LinearGradient
       colors={[surface, surface, surface, surface, surface, surface, opacity(surface, 0)]}
-      style={[styles.gradientContainer, { paddingTop: insets.top + 16 }]}
+      style={[styles.gradientContainer, { paddingTop: isOffline ? 0 : insets.top }]}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}>
       <View style={styles.headerContent}>
@@ -276,15 +300,15 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
           pathname === '/(drawer)/(tabs)/' ||
           pathname.includes('(tabs)/index') ||
           (pathname.includes('(tabs)') &&
-            !pathname.includes('payments') &&
             !pathname.includes('explore') &&
-            !pathname.includes('feed'))
+            !pathname.includes('feed') &&
+            !pathname.includes('contacts'))
         );
       }
       if (route.includes('(tabs)/feed') && pathname.includes('feed')) {
         return true;
       }
-      if (route.includes('(tabs)/payments') && pathname.includes('payments')) {
+      if (route.includes('(tabs)/contacts') && pathname.includes('contacts')) {
         return true;
       }
       if (route.includes('(tabs)/explore') && pathname.includes('explore')) {

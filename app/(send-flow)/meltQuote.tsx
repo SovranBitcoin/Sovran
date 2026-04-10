@@ -2,43 +2,52 @@
  * @fileoverview Send flow meltQuote route wrapper
  *
  * Part of the (send-flow) modal group - displays with back button.
- * Supports two flows:
- * 1. Creating new quote: invoice or lnUrlOrAddress + amount params
- * 2. Viewing existing: meltHistoryEntry param
+ * The navigateToMeltPreview handler navigates here with a serialized
+ * meltHistoryEntry; actions are handled by the screen-action system.
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
+
 import { MeltQuoteScreen } from '@/features/send';
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 function ModalScreen() {
-  const { meltHistoryEntry, invoice, lnUrlOrAddress, amount } = useLocalSearchParams<{
+  const { meltHistoryEntry } = useLocalSearchParams<{
     meltHistoryEntry?: string;
-    invoice?: string;
-    lnUrlOrAddress?: string;
-    amount?: string;
   }>();
+
+  const walletContext = useWalletContext();
+  const machine = usePaymentFlowMachine({ walletContext });
+
+  const handleMintSelected = useCallback(
+    (mintUrl: string) => {
+      void machine.changeMint(mintUrl);
+    },
+    [machine]
+  );
+
+  const handleRequestMintList = useCallback(() => {
+    void machine.requestMintSelector();
+  }, [machine]);
 
   return (
     <>
       <Stack.Screen
         options={{
           title: 'Send Lightning',
-          // So native-stack back goes through JS and usePreventRemove can run cleanup (free reserved proofs).
           headerBackButtonMenuEnabled: false,
         }}
       />
       <MeltQuoteScreen
+        key={meltHistoryEntry}
         meltHistoryEntry={meltHistoryEntry}
-        invoice={invoice}
-        lnUrlOrAddress={lnUrlOrAddress}
-        amount={amount ? parseInt(amount, 10) : undefined}
         onCancel={() => {
           router.dismissTo('/');
         }}
-        onSendSuccess={() => {
-          router.dismissTo('/');
-        }}
+        onMintSelected={handleMintSelected}
+        onRequestMintList={handleRequestMintList}
       />
     </>
   );

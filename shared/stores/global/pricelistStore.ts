@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log, storeLog } from '@/shared/lib/logger';
 
 interface PricelistData {
   usd: {
@@ -52,6 +53,7 @@ export const usePricelistStore = create<PricelistStore>()(
       error: null,
 
       setPricelist: (data: PricelistData) => {
+        storeLog.debug('store.pricelist.set', { usd: data.usd?.btc });
         set({
           pricelist: data,
           lastUpdated: Date.now(),
@@ -64,6 +66,7 @@ export const usePricelistStore = create<PricelistStore>()(
        * Spread order: existing first, then usd override.
        */
       setBtcPrice: (price: number) => {
+        storeLog.debug('store.pricelist.set_btc_price', { price });
         set((state) => ({
           pricelist: {
             ...state.pricelist,
@@ -75,6 +78,11 @@ export const usePricelistStore = create<PricelistStore>()(
       },
 
       setBtcPrices: (prices: BitcoinPrices) => {
+        storeLog.debug('store.pricelist.set_btc_prices', {
+          usd: prices.USD,
+          eur: prices.EUR,
+          gbp: prices.GBP,
+        });
         set({
           pricelist: {
             usd: { btc: prices.USD },
@@ -91,10 +99,12 @@ export const usePricelistStore = create<PricelistStore>()(
       },
 
       setError: (error: string | null) => {
+        if (error) storeLog.warn('store.pricelist.error', { error });
         set({ error });
       },
 
       clearPricelist: () => {
+        storeLog.info('store.pricelist.clear');
         set({
           pricelist: null,
           lastUpdated: null,
@@ -103,6 +113,7 @@ export const usePricelistStore = create<PricelistStore>()(
       },
 
       clearAllData: async () => {
+        storeLog.info('store.pricelist.clear_all');
         await AsyncStorage.removeItem('pricelist-store');
         set({
           pricelist: null,
@@ -132,7 +143,7 @@ export const usePricelistStore = create<PricelistStore>()(
       }),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('PricelistStore: Failed to rehydrate:', error);
+          log.warn('store.pricelist.rehydrate_failed', { error });
         }
       },
     }

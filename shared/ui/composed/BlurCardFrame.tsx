@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 
 /** Size of the gradient container box (pixels) */
@@ -49,7 +50,7 @@ interface BlurCardFrameProps {
  */
 export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: BlurCardFrameProps) {
   return (
-    <>
+    <Log name="BlurCardFrame">
       {/* Base blur background */}
       <View blur style={StyleSheet.absoluteFillObject} />
 
@@ -99,7 +100,7 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
       )}
 
       {children}
-    </>
+    </Log>
   );
 }
 

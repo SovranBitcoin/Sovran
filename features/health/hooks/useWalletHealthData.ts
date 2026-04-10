@@ -1,11 +1,15 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 
-import type { HistoryEntry, SendHistoryEntry } from 'coco-cashu-core';
-import { useBalanceContext, useMints, usePaginatedHistory } from 'coco-cashu-react';
+import type { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
+import { useBalanceContext, useMints, usePaginatedHistory } from '@cashu/coco-react';
 
 import { useMintDistributionStore } from '@/shared/stores/profile/mintDistributionStore';
+import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
+import { walletLog } from '@/shared/lib/logger';
 
 import { getMintsForUnit } from '../lib/walletHealth';
+
+const EMPTY_DISTRIBUTION: Record<string, number> = {};
 
 /**
  * Shared data inputs for wallet health computation.
@@ -14,11 +18,18 @@ import { getMintsForUnit } from '../lib/walletHealth';
  */
 export function useWalletHealthData(unit: string) {
   const { trustedMints } = useMints();
-  const { balance } = useBalanceContext();
+  const { balance: rawBalance } = useBalanceContext();
   const { history } = usePaginatedHistory();
-  const distributions = useMintDistributionStore((s) => s.distributions);
 
   const normalizedUnit = unit.toLowerCase();
+
+  // Only subscribe to this unit's distribution, not all distributions
+  const desiredDistributionBp = useMintDistributionStore(
+    useCallback((s) => s.distributions[normalizedUnit] || EMPTY_DISTRIBUTION, [normalizedUnit])
+  );
+
+  // Stabilise balance reference from coco-react
+  const balance = useShallowMemo(rawBalance);
 
   const mintsForUnit = useMemo(
     () => getMintsForUnit(trustedMints, normalizedUnit),
@@ -38,7 +49,18 @@ export function useWalletHealthData(unit: string) {
     }).length;
   }, [history, normalizedUnit]);
 
-  const desiredDistributionBp = distributions[normalizedUnit] || {};
+  // Only log when values actually change
+  const prevLogRef = useRef<string>('');
+  const logKey = `${normalizedUnit}:${mintUrlsForUnit.length}:${pendingOutgoingCount}`;
+  if (logKey !== prevLogRef.current) {
+    prevLogRef.current = logKey;
+    walletLog.debug('health.data.computed', {
+      unit: normalizedUnit,
+      mintCount: mintUrlsForUnit.length,
+      pendingOutgoingCount,
+      hasDistribution: Object.values(desiredDistributionBp).some((v) => (v || 0) > 0),
+    });
+  }
 
   return {
     normalizedUnit,

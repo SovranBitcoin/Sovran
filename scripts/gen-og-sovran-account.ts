@@ -31,9 +31,7 @@ if (args.length < 1) {
 
 const mnemonicArg = args[0].trim();
 const mnemonic =
-  mnemonicArg === 'new'
-    ? bip39.entropyToMnemonic(randomBytes(16), wordlist)
-    : mnemonicArg;
+  mnemonicArg === 'new' ? bip39.entropyToMnemonic(randomBytes(16), wordlist) : mnemonicArg;
 const tokenStrings = args.slice(1);
 
 const words = mnemonic.trim().split(/\s+/);
@@ -49,7 +47,11 @@ if (!bip39.validateMnemonic(mnemonic, wordlist)) {
 // ── Nostr key derivation (NIP-06) ──────────────────────────────
 
 const accountIndex = 0;
-const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(mnemonic, undefined, accountIndex);
+const { privateKey: sk, publicKey: pk } = nip06.accountFromSeedWords(
+  mnemonic,
+  undefined,
+  accountIndex
+);
 const nsec = nip19.nsecEncode(sk);
 const npub = nip19.npubEncode(pk);
 
@@ -72,7 +74,10 @@ console.log('cashu mnemonic words:', cashuMnemonic.split(' ').length);
 
 // ── Token decoding ─────────────────────────────────────────────
 
-const decodedTokens: { token: { mint: string; proofs: Proof[]; unit?: string; memo?: string }; raw: string }[] = [];
+const decodedTokens: {
+  token: { mint: string; proofs: Proof[]; unit?: string; memo?: string };
+  raw: string;
+}[] = [];
 
 for (const tokenStr of tokenStrings) {
   try {
@@ -145,7 +150,9 @@ async function loadMintState(
     const missingKeysets = [...tokenKeysetIds].filter((id) => !availableKeysetIds.has(id));
 
     if (missingKeysets.length > 0) {
-      console.error(`Mint ${mintUrl} did not return keysets for proof ids: ${missingKeysets.join(', ')}`);
+      console.error(
+        `Mint ${mintUrl} did not return keysets for proof ids: ${missingKeysets.join(', ')}`
+      );
       process.exit(1);
     }
 

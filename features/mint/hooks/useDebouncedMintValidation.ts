@@ -4,6 +4,7 @@ import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 import { fetchMintInfo } from '@/shared/lib/apiClient';
 import { normalizeUrlForApi } from '@/shared/lib/url';
+import { log } from '@/shared/lib/logger';
 
 interface ValidationState {
   isValid: boolean | null;
@@ -37,16 +38,19 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
     try {
       new URL(normalizedUrl);
     } catch {
+      log.debug('mint.validate.invalid_url', { mintUrl });
       setValidationState({ isValid: false, isLoading: false, error: 'Invalid URL format' });
       setMintInfo(null);
       return;
     }
 
+    log.debug('mint.validate.start', { mintUrl: normalizedUrl });
     setValidationState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     const mintInfoResult = await fetchMintInfo(normalizedUrl);
 
     if (mintInfoResult.isErr()) {
+      log.warn('mint.validate.unreachable', { mintUrl: normalizedUrl });
       setValidationState({
         isValid: false,
         isLoading: false,
@@ -55,6 +59,7 @@ export function useDebouncedMintValidation(debounceMs: number = 800) {
       setMintInfo(null);
     } else {
       const hasValidInfo = mintInfoResult.value !== null;
+      log.info('mint.validate.result', { mintUrl: normalizedUrl, isValid: hasValidInfo });
       setValidationState({
         isValid: hasValidInfo,
         isLoading: false,

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { log, storeLog } from '@/shared/lib/logger';
 import { RoutstrModel } from '@/shared/lib/routstr/api';
 
 const profileStorage = createProfileScopedStorage();
@@ -12,6 +13,10 @@ interface RoutstrMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  /** Seconds from stream open to first content token (locally measured). */
+  thinkingDurationSec?: number;
+  /** Reasoning/thinking text from the model (e.g. DeepSeek R1, o-series). */
+  reasoningContent?: string;
 }
 
 export interface RoutstrSession {
@@ -60,6 +65,7 @@ interface RoutstrActions {
   getConversationHistory: () => RoutstrMessage[];
   clearConversation: () => void;
   updateMessage: (id: string, content: string) => void;
+  removeMessages: (ids: Set<string>) => void;
 
   setSelectedModel: (modelId: string) => void;
   getSelectedModel: () => string;
@@ -98,26 +104,31 @@ export const useRoutstrStore = create<RoutstrStore>()(
       isAnonymousMode: false,
 
       setApiKey: (apiKey: string) => {
+        storeLog.info('store.routstr.set_api_key');
         set({ apiKey });
       },
 
       getApiKey: () => get().apiKey,
 
       clearApiKey: () => {
+        storeLog.info('store.routstr.clear_api_key');
         set({ apiKey: null });
       },
 
       setBalance: (balance: number) => {
+        storeLog.debug('store.routstr.set_balance', { balance });
         set({ balance });
       },
 
       getBalance: () => get().balance,
 
       clearBalance: () => {
+        storeLog.info('store.routstr.clear_balance');
         set({ balance: null });
       },
 
       addMessage: (message: RoutstrMessage) => {
+        storeLog.debug('store.routstr.add_message', { role: message.role });
         set((state) => {
           const newHistory = [...state.conversationHistory, message];
           // Skip saving to sessions if in anonymous mode
@@ -141,10 +152,27 @@ export const useRoutstrStore = create<RoutstrStore>()(
       getConversationHistory: () => get().conversationHistory,
 
       clearConversation: () => {
+        storeLog.info('store.routstr.clear_conversation');
         set({ conversationHistory: [] });
       },
 
+      removeMessages: (ids: Set<string>) => {
+        storeLog.debug('store.routstr.remove_messages', { count: ids.size });
+        set((state) => {
+          const filtered = state.conversationHistory.filter((msg) => !ids.has(msg.id));
+          if (state.isAnonymousMode) return { conversationHistory: filtered };
+          if (state.currentSessionId) {
+            const updatedSessions = state.sessions.map((session) =>
+              session.id === state.currentSessionId ? { ...session, messages: filtered } : session
+            );
+            return { conversationHistory: filtered, sessions: updatedSessions };
+          }
+          return { conversationHistory: filtered };
+        });
+      },
+
       updateMessage: (id: string, content: string) => {
+        storeLog.debug('store.routstr.update_message', { id, contentLength: content.length });
         set((state) => {
           const updatedHistory = state.conversationHistory.map((msg) =>
             msg.id === id
@@ -175,12 +203,14 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       setSelectedModel: (modelId: string) => {
+        storeLog.info('store.routstr.set_model', { modelId });
         set({ selectedModel: modelId });
       },
 
       getSelectedModel: () => get().selectedModel || DEFAULT_MODEL,
 
       clearSelectedModel: () => {
+        storeLog.info('store.routstr.clear_model');
         set({ selectedModel: null });
       },
 
@@ -192,6 +222,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       setCachedModels: (models: RoutstrModel[]) => {
+        storeLog.debug('store.routstr.set_cached_models', { count: models.length });
         set({ modelsCache: { data: models, timestamp: Date.now() } });
       },
 
@@ -202,11 +233,13 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       clearModelsCache: () => {
+        storeLog.debug('store.routstr.clear_models_cache');
         set({ modelsCache: null });
       },
 
       createSession: () => {
         const sessionId = `session-${Date.now()}`;
+        storeLog.info('store.routstr.create_session', { sessionId });
         const newSession: RoutstrSession = {
           id: sessionId,
           title: 'New Session',
@@ -222,6 +255,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       switchSession: (sessionId: string) => {
+        storeLog.info('store.routstr.switch_session', { sessionId });
         const state = get();
         const session = state.sessions.find((s) => s.id === sessionId);
         if (session) {
@@ -230,7 +264,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
             conversationHistory: session.messages,
           });
         } else {
-          console.warn('RoutstrStore: Session not found:', sessionId);
+          log.warn('store.routstr.session_not_found', { sessionId });
         }
       },
 
@@ -256,6 +290,10 @@ export const useRoutstrStore = create<RoutstrStore>()(
               ? firstUserMessage.content.substring(0, 50) + '...'
               : firstUserMessage.content;
 
+          storeLog.debug('store.routstr.update_session_title', {
+            sessionId: state.currentSessionId,
+            title,
+          });
           const updatedSessions = state.sessions.map((session) =>
             session.id === state.currentSessionId ? { ...session, title } : session
           );
@@ -264,6 +302,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       deleteSession: (sessionId: string) => {
+        storeLog.info('store.routstr.delete_session', { sessionId });
         const state = get();
         const updatedSessions = state.sessions.filter((s) => s.id !== sessionId);
         let newCurrentSessionId = state.currentSessionId;
@@ -291,6 +330,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       setAnonymousMode: (isAnonymous: boolean) => {
+        storeLog.info('store.routstr.set_anonymous_mode', { isAnonymous });
         set({ isAnonymousMode: isAnonymous });
         // Clear conversation history when switching modes
         if (isAnonymous) {
@@ -314,7 +354,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
             isAnonymousMode: false,
           });
         } catch (error) {
-          console.error('RoutstrStore: Error clearing data:', error);
+          log.error('store.routstr.clear_failed', { error });
           throw error;
         }
       },
@@ -332,7 +372,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       }),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('RoutstrStore: Failed to rehydrate from storage:', error);
+          log.warn('store.routstr.rehydrate_failed', { error });
         }
       },
     }

@@ -3,13 +3,21 @@ import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 
-export function Spinner({ size = 8, style }: { size?: number; style?: any }) {
+export function Spinner({
+  size = 8,
+  style,
+  color,
+}: {
+  size?: number;
+  style?: any;
+  color?: string;
+}) {
   const foreground = useThemeColor('foreground');
   return (
     <Icon
       name="ant-design:loading-outlined"
       size={size}
-      color={opacity(foreground, 0.9)}
+      color={color || opacity(foreground, 0.9)}
       style={style}
       spin={{
         delay: 0,

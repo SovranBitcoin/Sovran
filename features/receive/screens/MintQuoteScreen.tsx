@@ -1,27 +1,28 @@
 /**
  * @fileoverview Shared MintQuote screen component
  *
- * This module provides the core UI and logic for Lightning mint quotes (receiving).
- * It is used by both standalone and flow-based route wrappers.
+ * Display component for Lightning mint quotes (receiving). Actions (copy, share)
+ * are handled by the screen-action system.
  */
 
-import React, { useState } from 'react';
-import { Share } from 'react-native';
+import React from 'react';
 
-import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 
-import type { MintHistoryEntry } from 'coco-cashu-core';
+import type { MintHistoryEntry } from '@cashu/coco-core';
+import { useScreenActions } from 'coco-payment-ux/react';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
-import { copyPopup } from '@/shared/lib/popup';
+import { MintSelector } from '@/features/wallet';
+import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
   HistoryEntryTimeline,
   TransactionLocationSection,
-  useHistoryEntry,
-  useTransactionSource,
+  useBip321Info,
+  Bip321MethodIcons,
 } from '@/features/transactions';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -36,43 +37,42 @@ import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/Scree
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
 interface MintQuoteScreenProps {
-  /** Either the parsed entry or a JSON string to be parsed internally */
   mintHistoryEntry: MintHistoryEntry | string;
   extraButtons?: ButtonHandlerButton[];
+  onMintSelected?: (mintUrl: string) => void;
+  onRequestMintList?: () => void;
 }
 
 export function MintQuoteScreen({
-  mintHistoryEntry: mintHistoryEntryProp,
+  mintHistoryEntry,
   extraButtons = [],
+  onMintSelected,
+  onRequestMintList,
 }: MintQuoteScreenProps) {
-  const [, setUri] = useState<string | null>(null);
+  useLifecycleLogger('MintQuoteScreen');
+  const { entry, error, actions, source, mintUrl } = useScreenActions(
+    'mintQuote',
+    mintHistoryEntry
+  );
+  const mintInfo = useMintInfo(entry?.mintUrl);
+  const bip321 = useBip321Info(entry?.id);
 
-  const { entry: currentTransaction, error: parseError } =
-    useHistoryEntry<MintHistoryEntry>(mintHistoryEntryProp);
-  const sourceLabel = useTransactionSource(currentTransaction?.id);
-  const mintInfo = useMintInfo(currentTransaction?.mintUrl);
-
-  if (parseError) {
-    return <ScreenErrorState message={parseError} onGoBack={() => router.back()} />;
+  if (error) {
+    log.warn('receive.mint_quote.error', { error });
+    return <ScreenErrorState message={error} onGoBack={() => router.back()} />;
   }
 
-  if (!currentTransaction) {
+  if (!entry) {
     return <ScreenLoadingState message="Loading transaction..." />;
   }
 
-  const handleCopy = async (close: (event: any) => void) => {
-    await Clipboard.setStringAsync(currentTransaction.paymentRequest);
-    copyPopup('lightningAddress', { onClose: () => close({}) });
-  };
-
-  const handleShare = async (close: (event: any) => void) => {
-    await Share.share({ message: currentTransaction.paymentRequest });
-    close({});
-  };
-
-  const isPaid =
-    (currentTransaction as any)?.state === 'ISSUED' ||
-    (currentTransaction as any)?.state === 'PAID';
+  const isPaid = entry.state === 'ISSUED' || entry.state === 'PAID';
+  log.debug('receive.mint_quote.render', {
+    state: entry.state,
+    isPaid,
+    amount: entry.amount,
+    unit: entry.unit,
+  });
 
   const bottomButtons = (
     <BottomButtons>
@@ -83,15 +83,21 @@ export function MintQuoteScreen({
               text: 'Copy',
               icon: 'lets-icons:copy',
               variant: 'primary',
-              onPress: handleCopy,
-              condition: !isPaid,
+              onPress: async (close: any) => {
+                await actions.copy.execute();
+                close({});
+              },
+              condition: actions.copy.available,
             },
             {
               text: 'Share',
               icon: 'ri:share-fill',
               variant: 'secondary',
-              onPress: handleShare,
-              condition: !isPaid,
+              onPress: async (close: any) => {
+                await actions.share.execute();
+                close({});
+              },
+              condition: actions.share.available,
             },
             ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
           ]}
@@ -102,42 +108,56 @@ export function MintQuoteScreen({
 
   return (
     <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
-      <VStack gap={12}>
-        <HistoryEntryHeader historyEntry={currentTransaction} />
-        {!isPaid && (
-          <PaymentInfo
-            setUri={setUri}
-            data={[{ name: 'Lightning', value: currentTransaction.paymentRequest }]}
-            unit={currentTransaction.unit}
-            copyTarget="lightningAddress"
+      <Screen name="MintQuoteScreen">
+        <VStack gap={12}>
+          <HistoryEntryHeader historyEntry={entry} />
+          {!isPaid && (
+            <PaymentInfo
+              data={[{ name: 'Lightning', value: entry.paymentRequest }]}
+              unit={entry.unit}
+              copyTarget="paymentRequest"
+            />
+          )}
+
+          {isPaid && <TransactionLocationSection transactionId={entry.id} />}
+
+          {!isPaid ? (
+            <MintSelector
+              width={280}
+              unit={entry.unit}
+              selectedMintUrl={mintUrl}
+              onMintSelected={onMintSelected ?? (() => {})}
+              onRequestMintList={onRequestMintList ?? (() => {})}
+            />
+          ) : mintInfo ? (
+            <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
+          ) : null}
+
+          {entry.metadata?.memo && <Card message={entry.metadata.memo} variant="info" />}
+
+          <HistoryEntryTimeline historyEntry={entry} />
+
+          <DetailsSection
+            items={[
+              source && { title: 'Source', value: source },
+              bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+              bip321.optionKinds && {
+                title: 'Payment Methods',
+                value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />,
+              },
+              { title: 'Date', value: entry.createdAt.datetime },
+              { title: 'Amount', value: formatAmount({ amount: entry.amount, unit: entry.unit }) },
+              { title: 'State', value: entry.state },
+              entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+              mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+              {
+                title: 'Invoice',
+                value: truncateMiddle(entry.paymentRequest, 10),
+              },
+            ].flatMap((item) => (item ? [item] : []))}
           />
-        )}
-
-        {isPaid && <TransactionLocationSection transactionId={currentTransaction.id} />}
-
-        {currentTransaction.metadata?.memo && (
-          <Card message={currentTransaction.metadata.memo} variant="info" />
-        )}
-
-        {mintInfo && <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={currentTransaction} />}
-
-        <HistoryEntryTimeline historyEntry={currentTransaction} />
-
-        <DetailsSection
-          items={[
-            ...(sourceLabel ? [{ title: 'Source', value: sourceLabel }] : []),
-            {
-              title: 'Invoice',
-              value: truncateMiddle(currentTransaction.paymentRequest, 10),
-            },
-          ]}
-        />
-      </VStack>
+        </VStack>
+      </Screen>
     </ModalLayoutWrapper>
   );
-}
-
-export function getFormattedMintQuoteTitle(unit: string): string {
-  const isBitcoin = unit === 'sat';
-  return `Receive ${isBitcoin ? 'Bitcoin' : unit.toUpperCase()}`;
 }

@@ -1,269 +1,257 @@
 /**
- * @fileoverview ListRoute - Mint selection with balances
+ * @fileoverview MintItem — displays a single mint row in the mint selection list.
  *
- * @module features/mint/components/MintItem
- *
- * @description
- * Displays owned mints with balances, currency filtering, and selection options.
- * Users can select mints for transactions, add new mints, or inspect details.
- *
- * **Navigation:**
- * - From: Initial route (sheet opens here)
- * - To: `router.navigate('add')` or `router.navigate('info', {mintUrl})`
- * - Close: `sheetRef.current?.hide({payload: selectedMint})`
- *
- * **Data:**
- * - Payload: `useSheetPayload('mint-balance')` - Configuration and callbacks
- * - Params: None (initial route)
- *
- * **Flow:** Load mints → display with balances → user selects → callback/navigate → close
- *
- * @see {@link ./add}
- * @see {@link ./info}
+ * Receives a pre-built MintListItem (no data fetching).
+ * Audit and KYM scores are passed in directly from the item.
  */
 
-import React, { useMemo } from 'react';
+import React, { memo, useMemo } from 'react';
+
+import type { MintListItem } from 'coco-payment-ux';
+
 import { Text } from '@/shared/ui/primitives/Text';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Badge } from '@/shared/ui/primitives/Badge';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import { getMintDisplayName, extractDomain } from '@/shared/lib/url';
-import { Mint } from 'coco-cashu-core';
-import { useAuditedMint } from '@/features/mint/hooks/useAuditedMint';
-import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import opacity from 'hex-color-opacity';
 import { Checkbox } from '@/shared/ui/primitives/Checkbox';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { cashuLog, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+
+// ── Stat cell for the 2-column grid ─────────────────────────────────────────
+
+interface StatCellProps {
+  icon: string;
+  value: string;
+  color: string;
+}
+
+const StatCell = memo(function StatCell({ icon, value, color }: StatCellProps) {
+  return (
+    <HStack align="center" justify="center" gap={5} style={{ flex: 1, paddingVertical: 10 }}>
+      <Icon name={icon} size={14} color={color} />
+      <Text size={13} bold color={color}>
+        {value}
+      </Text>
+    </HStack>
+  );
+});
+
+const StatDividerV = memo(function StatDividerV({ color }: { color: string }) {
+  return <View style={{ width: 1, backgroundColor: opacity(color, 0.08), marginVertical: 6 }} />;
+});
+
+const StatDividerH = memo(function StatDividerH({ color }: { color: string }) {
+  return <View style={{ height: 1, backgroundColor: opacity(color, 0.08), marginHorizontal: 8 }} />;
+});
+
 interface MintItemProps {
-  mint: Mint & { amount?: number; unit?: string };
-  balance?: { amount: number; unit: string };
-  mintUrl?: string;
+  item: MintListItem;
   onPress: () => void;
+  /** True when this specific mint's action is loading (e.g. spinner after selection). */
   isLoading?: boolean;
+  /** True when any handler is executing — dims all rows. */
   globalLoading?: boolean;
-  requireBalance?: boolean;
-  /** Minimum balance required - mints below this show at reduced opacity */
-  minAmount?: number;
-  selectedCurrency?: string;
   showDetailsButton?: boolean;
   onInspectPress?: () => void;
-  kymScore?: number;
-  kymLoading?: boolean;
   showCheckbox?: boolean;
   selected?: boolean;
   onToggle?: () => void;
-  /** Whether this mint is in the allowed list (for payment requests with specified mints) */
-  isAllowed?: boolean;
+  /** Human-readable explanation for why this mint is unavailable (pre-computed from item.reason). */
+  disabledReason?: string | null;
 }
 
 const MintItem: React.FC<MintItemProps> = ({
-  mint,
-  balance,
-  mintUrl: mintUrlProp,
+  item,
   onPress,
   isLoading = false,
   globalLoading = false,
-  requireBalance: _requireBalance = false,
-  minAmount,
   showDetailsButton = false,
   onInspectPress,
-  selectedCurrency: _selectedCurrency,
-  kymScore,
-  kymLoading = false,
   showCheckbox = false,
   selected = false,
   onToggle,
-  isAllowed = true,
+  disabledReason = null,
 }) => {
   const [foreground, warning, success] = useThemeColor([
     'foreground',
     'yellow-300',
     'success',
   ] as const);
-  const displayMintUrl = mintUrlProp || mint.mintUrl;
-  const displayName = useMemo(
-    () => getMintDisplayName(displayMintUrl, mint.mintInfo),
-    [displayMintUrl, mint.mintInfo]
-  );
 
-  // Fetch audit data
-  const { auditInfo, loading: auditLoading } = useAuditedMint(displayMintUrl);
+  const isAllowed = item.status === 'available';
 
-  // Calculate success rate percentage
-  const successRate = useMemo(() => {
-    if (auditInfo?.score !== undefined) {
-      // Use auditInfo.score (0-5 scale), normalize to 0-1 then convert to percentage
-      return Math.round((auditInfo.score / 5) * 100);
-    }
-    if (auditInfo?.auditorData) {
-      const { mints, melts, errors } = auditInfo.auditorData;
-      const totalOps = (mints || 0) + (melts || 0);
-      if (totalOps > 0) {
-        return Math.round((1 - (errors || 0) / totalOps) * 100);
-      }
-    }
-    return undefined;
-  }, [auditInfo]);
-
-  // Format score (round to 1 decimal or whole number)
-  // Note: score of 0 is a valid value, so we check typeof === 'number' not just truthiness
-  const displayScore = useMemo(() => {
-    if (typeof kymScore !== 'number') return undefined;
-    return kymScore % 1 === 0 ? kymScore.toString() : kymScore.toFixed(1);
-  }, [kymScore]);
-
-  // Determine badge variant based on audit state
-  const activityBadgeVariant = useMemo(() => {
-    const state = auditInfo?.auditorData?.state;
-    if (state === 'ERROR') {
-      return 'error';
-    }
-    // Default to success for OK state or when state is undefined/loading
-    return 'success';
-  }, [auditInfo?.auditorData?.state]);
-
-  // Determine opacity based on balance and requirements
   const itemOpacity = useMemo(() => {
-    // Not in allowed mints list
     if (!isAllowed) return 0.5;
     if (globalLoading) return 0.5;
-    if (balance && balance.amount === 0 && _requireBalance) return 0.5;
-    // Show at reduced opacity if balance is below minimum required amount
-    if (minAmount !== undefined && minAmount > 0 && balance && balance.amount < minAmount)
-      return 0.5;
     return 1;
-  }, [isAllowed, globalLoading, balance, _requireBalance, minAmount]);
+  }, [isAllowed, globalLoading]);
 
-  // Check if this mint has insufficient balance for selection
-  const hasInsufficientBalance = useMemo(() => {
-    if (minAmount !== undefined && minAmount > 0 && balance) {
-      return balance.amount < minAmount;
-    }
-    return false;
-  }, [minAmount, balance]);
+  const isDisabled = !isAllowed || globalLoading;
 
-  // Check if this mint is disabled (not allowed or insufficient balance)
-  const isDisabled = !isAllowed || globalLoading || hasInsufficientBalance;
+  const displayScore = useMemo(() => {
+    if (typeof item.kymScore !== 'number') return undefined;
+    return item.kymScore % 1 === 0 ? item.kymScore.toString() : item.kymScore.toFixed(1);
+  }, [item.kymScore]);
+
+  const successRate = useMemo(() => {
+    if (item.auditScore === undefined) return undefined;
+    return Math.round((item.auditScore / 5) * 100);
+  }, [item.auditScore]);
+
+  const activityBadgeVariant = item.auditState === 'ERROR' ? 'error' : 'success';
+
+  const hasBadges =
+    displayScore !== undefined ||
+    successRate !== undefined ||
+    item.worksOffline === true ||
+    (item.contactFollowers ?? 0) > 0 ||
+    (item.contactReputation ?? 0) > 0;
 
   return (
-    <TouchableOpacity
-      key={mint.mintUrl}
-      className="bg-surface mb-1 rounded-2xl p-4"
-      style={{ opacity: itemOpacity }}
-      onPress={onPress}
-      disabled={isDisabled}>
-      <VStack gap={0}>
-        {/* Top section: Logo, name, balance/URL, checkbox/dots */}
-        <HStack align="center" gap={12}>
-          <View className="relative">
-            <Avatar
-              key={mint.mintUrl}
-              picture={mint.mintInfo?.icon_url || undefined}
-              size={42}
-              name={displayName}
-              alt={`${displayName} mint`}
-            />
-          </View>
+    <Log name="MintItem">
+      <TouchableOpacity
+        key={item.mintUrl}
+        className="bg-surface mb-1 rounded-2xl p-4"
+        style={{ opacity: itemOpacity }}
+        onPress={() => {
+          cashuLog.debug('mint_item.press', {
+            mintUrl: item.mintUrl,
+            displayName: item.displayName,
+            status: item.status,
+          });
+          onPress();
+        }}
+        disabled={isDisabled}>
+        <VStack gap={0}>
+          <HStack align="center" gap={12}>
+            <View className="relative">
+              <Avatar
+                key={item.mintUrl}
+                picture={item.iconUrl}
+                size={42}
+                name={item.displayName}
+                alt={`${item.displayName} mint`}
+              />
+            </View>
 
-          <VStack flex={1}>
-            <Text className="text-foreground" size={16} bold>
-              {displayName}
-            </Text>
+            <VStack flex={1}>
+              <Text className="text-foreground" size={16} bold>
+                {item.displayName}
+              </Text>
 
-            <View className="self-start">
-              {balance ? (
+              <View className="self-start">
                 <AmountFormatter
-                  amount={balance.amount}
-                  unit={'sat'}
+                  amount={item.balance}
+                  unit={item.unit}
                   size={14}
                   weight="heavy"
                   color={foreground}
                   className="ml-[2px]"
                 />
-              ) : displayMintUrl ? (
-                <Text heavy size={14} color={opacity(foreground, 0.5)}>
-                  {extractDomain(displayMintUrl)}
+              </View>
+
+              {disabledReason ? (
+                <Text size={12} color={opacity(foreground, 0.6)}>
+                  {disabledReason}
                 </Text>
               ) : null}
-            </View>
-          </VStack>
+            </VStack>
 
-          {isLoading ? (
-            <View className="rounded-full bg-transparent p-2">
-              <Spinner size={20} />
-            </View>
-          ) : showCheckbox ? (
-            <Checkbox
-              checked={selected}
-              onCheckedChange={() => {
-                if (onToggle) {
-                  onToggle();
-                }
-              }}
-              size={24}
-              variant="success"
-            />
-          ) : (
-            showDetailsButton && (
-              <TouchableOpacity
-                onPress={() => {
-                  if (onInspectPress) {
-                    onInspectPress();
-                  }
-                }}>
-                <Icon className="bg-default rounded-full p-2" name="bx:dots-vertical-rounded" />
-              </TouchableOpacity>
-            )
+            {isLoading ? (
+              <View className="rounded-full bg-transparent p-2">
+                <Spinner size={20} />
+              </View>
+            ) : showCheckbox ? (
+              <Checkbox
+                checked={selected}
+                onCheckedChange={() => onToggle?.()}
+                size={24}
+                variant="success"
+              />
+            ) : (
+              showDetailsButton && (
+                <TouchableOpacity onPress={() => onInspectPress?.()}>
+                  <Icon className="bg-default rounded-full p-2" name="bx:dots-vertical-rounded" />
+                </TouchableOpacity>
+              )
+            )}
+          </HStack>
+
+          {hasBadges && (
+            <>
+              <Spacer size={8} />
+              <View
+                className="bg-surface-secondary overflow-hidden"
+                style={{ borderRadius: 16, borderCurve: 'continuous' }}>
+                {/* Row 1 */}
+                <HStack>
+                  {displayScore !== undefined ? (
+                    <StatCell icon="ic:round-star" value={displayScore} color={warning} />
+                  ) : null}
+                  {displayScore !== undefined && successRate !== undefined ? (
+                    <StatDividerV color={foreground} />
+                  ) : null}
+                  {successRate !== undefined ? (
+                    <StatCell
+                      icon="lucide:activity"
+                      value={`${successRate}%`}
+                      color={item.auditState === 'ERROR' ? '#EF4444' : success}
+                    />
+                  ) : null}
+                </HStack>
+
+                {/* Row divider — only if there's a second row */}
+                {((item.contactReputation ?? 0) > 0 ||
+                  (item.contactFollowers ?? 0) > 0 ||
+                  item.worksOffline) &&
+                (displayScore !== undefined || successRate !== undefined) ? (
+                  <StatDividerH color={foreground} />
+                ) : null}
+
+                {/* Row 2 */}
+                {((item.contactReputation ?? 0) > 0 ||
+                  (item.contactFollowers ?? 0) > 0 ||
+                  item.worksOffline) && (
+                  <HStack>
+                    {(item.contactReputation ?? 0) > 0 ? (
+                      <StatCell
+                        icon="mdi:shield-check"
+                        value={`${item.contactReputation} / 100`}
+                        color="#3B82F6"
+                      />
+                    ) : null}
+                    {(item.contactReputation ?? 0) > 0 && (item.contactFollowers ?? 0) > 0 ? (
+                      <StatDividerV color={foreground} />
+                    ) : null}
+                    {(item.contactFollowers ?? 0) > 0 ? (
+                      <StatCell
+                        icon="mdi:account-group"
+                        value={item.contactFollowers!.toLocaleString()}
+                        color="#3B82F6"
+                      />
+                    ) : null}
+                    {item.worksOffline === true &&
+                    ((item.contactReputation ?? 0) > 0 || (item.contactFollowers ?? 0) > 0) ? (
+                      <StatDividerV color={foreground} />
+                    ) : null}
+                    {item.worksOffline === true ? (
+                      <StatCell icon="mdi:airplane" value="Offline" color={success} />
+                    ) : null}
+                  </HStack>
+                )}
+              </View>
+            </>
           )}
-        </HStack>
-
-        {(displayScore || kymLoading || successRate !== undefined || auditLoading) && (
-          <>
-            <Spacer size={12} />
-            <HStack gap={8}>
-              {/* Score badge (left) - show badge when score available, skeleton when loading without score */}
-              {displayScore ? (
-                <Badge className="h-[24px] w-[56px]" variant="star" icon="ic:round-star" size={14}>
-                  {displayScore}
-                </Badge>
-              ) : kymLoading ? (
-                <Skeleton
-                  className="h-[24px] w-[56px] rounded-full"
-                  style={{
-                    backgroundColor: opacity(warning, 0.2),
-                  }}
-                />
-              ) : null}
-
-              {/* Success rate badge (right) - show badge when available, skeleton only when loading */}
-              {successRate !== undefined ? (
-                <Badge
-                  className="h-[24px] w-[60px]"
-                  variant={activityBadgeVariant}
-                  icon="lucide:activity"
-                  size={14}>
-                  {`${successRate}%`}
-                </Badge>
-              ) : auditLoading ? (
-                <Skeleton
-                  className="h-[24px] w-[60px] rounded-full"
-                  style={{
-                    backgroundColor: opacity(success, 0.2),
-                  }}
-                />
-              ) : null}
-            </HStack>
-          </>
-        )}
-      </VStack>
-    </TouchableOpacity>
+        </VStack>
+      </TouchableOpacity>
+    </Log>
   );
 };
 

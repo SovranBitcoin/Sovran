@@ -3,7 +3,9 @@ export { copyPopup } from './copy';
 export {
   profileSwitcherPopup,
   emojiPickerPopup,
-  offlineSendSuggestionsPopup,
+  proofSelectorPopup,
+  paymentOptionsPopup,
+  paymentFallbackPopup,
   buttonHandlerPopup,
 } from './actionSheets';
 export {
@@ -13,7 +15,6 @@ export {
   nostrPaymentSentPopup,
   paymentCancelledPopup,
   nfcEcashSharedPopup,
-  nfcPaymentSentPopup,
   nfcConnectionLostPopup,
   nfcSendFailedPopup,
 } from './payment';
@@ -35,6 +36,7 @@ export {
 } from './token';
 export { cameraPermissionPopup, noQrCodeFoundPopup, qrScanFailedPopup } from './camera';
 export {
+  balanceTooLowPopup,
   insufficientBalancePopup,
   invalidAddressPopup,
   noClipboardAddressPopup,
@@ -54,6 +56,7 @@ export {
   mintsAddedPopup,
   noMintSelectedPopup,
   noMintsSelectedPopup,
+  noValidMintPopup,
   mintsAddFailedPopup,
   managerNotInitializedPopup,
 } from './mint';
@@ -64,20 +67,26 @@ export {
   newVersionPopup,
   copyFailedPopup,
   openLinkFailedPopup,
+  walletStillLoadingPopup,
   engagementUpdateFailedPopup,
 } from './general';
 export {
+  allOptionsDisabledPopup,
   invalidPaymentRequestPopup,
+  missingMeltTargetPopup,
+  noAmountPopup,
+  noPaymentRequestPopup,
   sendPaymentFailedPopup,
   cancelTransactionFailedPopup,
   quoteCreationFailedPopup,
   operationNotFoundPopup,
+  mintUnreachablePopup,
   couldNotCancelPopup,
   operationInvalidStatePopup,
   invalidNostrTransportPopup,
   invalidRecipientPopup,
   noLightningAddressPopup,
-  noPaymentRequestPopup,
+  unsupportedInputPopup,
 } from './send';
 export {
   receiveFailedPopup,

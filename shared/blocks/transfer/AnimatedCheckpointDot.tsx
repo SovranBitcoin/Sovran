@@ -3,23 +3,31 @@
  *
  * Used by TransferStepChain (rebalance plan) and HistoryEntryTimeline.
  * Supports opacity/scale transitions for future, pending, complete, failed,
- * rolled-back, and already-spent states.
+ * rolled-back, already-spent, and current (spinning) states.
  */
 
 import React, { useEffect, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 
 import opacity from 'hex-color-opacity';
+import Svg, { Circle } from 'react-native-svg';
 
+import { Log } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import Animated, {
+  cancelAnimation,
+  createAnimatedComponent,
   Easing,
   type EasingFunction,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
+
+const AnimatedCircle = createAnimatedComponent(Circle);
 
 export type CheckpointDotType =
   | 'complete'
@@ -50,6 +58,10 @@ const DOT_ANIM_MS = 300;
 const DOT_TIMING = { duration: DOT_ANIM_MS, easing: Easing.out(Easing.cubic) };
 const FAST_TIMING = { duration: 200, easing: Easing.out(Easing.cubic) };
 
+const SPINNER_RADIUS = 5;
+const SPINNER_CIRCUMFERENCE = 2 * Math.PI * SPINNER_RADIUS;
+const SPINNER_DASH_OFFSET = SPINNER_CIRCUMFERENCE * 0.7;
+
 function timed(
   target: number,
   delayMs: number,
@@ -67,7 +79,8 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
   greyColor,
 }: AnimatedCheckpointDotProps) {
   const isFuture = type === 'future' || type === 'future-small';
-  const isComplete = type === 'complete' || type === 'current' || type === 'success';
+  const isComplete = type === 'complete' || type === 'success';
+  const isCurrent = type === 'current';
   const isPending = type === 'next-pending';
   const isFailed = type === 'failed';
   const isRolledBack = type === 'rolled-back';
@@ -76,35 +89,58 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
   const futureOp = useSharedValue(isFuture ? 1 : 0);
   const pendingOp = useSharedValue(isPending ? 1 : 0);
   const completeOp = useSharedValue(isComplete ? 1 : 0);
+  const currentOp = useSharedValue(isCurrent ? 1 : 0);
   const failedOp = useSharedValue(isFailed ? 1 : 0);
   const rolledBackOp = useSharedValue(isRolledBack ? 1 : 0);
   const alreadySpentOp = useSharedValue(isAlreadySpent ? 1 : 0);
   const dotScale = useSharedValue(isFuture ? SMALL_DOT / DOT_CONTAINER : 1);
+  const spinnerRotation = useSharedValue(0);
 
   useEffect(() => {
     futureOp.set(timed(isFuture ? 1 : 0, delayMs, FAST_TIMING));
     pendingOp.set(timed(isPending ? 1 : 0, delayMs, DOT_TIMING));
     completeOp.set(timed(isComplete ? 1 : 0, delayMs, DOT_TIMING));
+    currentOp.set(timed(isCurrent ? 1 : 0, delayMs, DOT_TIMING));
     failedOp.set(timed(isFailed ? 1 : 0, delayMs, DOT_TIMING));
     rolledBackOp.set(timed(isRolledBack ? 1 : 0, delayMs, DOT_TIMING));
     alreadySpentOp.set(timed(isAlreadySpent ? 1 : 0, delayMs, DOT_TIMING));
     dotScale.set(timed(isFuture ? SMALL_DOT / DOT_CONTAINER : 1, delayMs, DOT_TIMING));
+
+    if (isCurrent || isPending) {
+      spinnerRotation.set(
+        withDelay(
+          delayMs,
+          withRepeat(withTiming(360, { duration: 1500, easing: Easing.linear }), -1)
+        )
+      );
+    } else {
+      cancelAnimation(spinnerRotation);
+      spinnerRotation.set(0);
+    }
+
+    return () => {
+      if (!isCurrent && !isPending) return;
+      cancelAnimation(spinnerRotation);
+    };
   }, [
     type,
     delayMs,
     isFuture,
     isPending,
     isComplete,
+    isCurrent,
     isFailed,
     isRolledBack,
     isAlreadySpent,
     futureOp,
     pendingOp,
     completeOp,
+    currentOp,
     failedOp,
     rolledBackOp,
     alreadySpentOp,
     dotScale,
+    spinnerRotation,
   ]);
 
   const scaleStyle = useAnimatedStyle(() => ({
@@ -113,9 +149,24 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
   const futureStyle = useAnimatedStyle(() => ({ opacity: futureOp.get() }));
   const pendingStyle = useAnimatedStyle(() => ({ opacity: pendingOp.get() }));
   const completeStyle = useAnimatedStyle(() => ({ opacity: completeOp.get() }));
+  const currentStyle = useAnimatedStyle(() => ({ opacity: currentOp.get() }));
   const failedStyle = useAnimatedStyle(() => ({ opacity: failedOp.get() }));
   const rolledBackStyle = useAnimatedStyle(() => ({ opacity: rolledBackOp.get() }));
   const alreadySpentStyle = useAnimatedStyle(() => ({ opacity: alreadySpentOp.get() }));
+
+  const spinnerStyle = useAnimatedStyle(() => ({
+    opacity: currentOp.get(),
+    transform: [{ rotate: `${spinnerRotation.get()}deg` }],
+  }));
+
+  const pendingSpinnerStyle = useAnimatedStyle(() => ({
+    opacity: pendingOp.get(),
+    transform: [{ rotate: `${spinnerRotation.get()}deg` }],
+  }));
+
+  const spinnerCircleProps = useAnimatedProps(() => ({
+    strokeDashoffset: SPINNER_DASH_OFFSET,
+  }));
 
   const greenBg = useMemo(() => opacity(greenColor, 0.18), [greenColor]);
   const greenBorder = useMemo(() => opacity(greenColor, 0.32), [greenColor]);
@@ -128,71 +179,108 @@ export const AnimatedCheckpointDot = React.memo(function AnimatedCheckpointDot({
   const clockColor = useMemo(() => opacity('#FFFFFF', 0.7), []);
 
   return (
-    <Animated.View style={[styles.dotWrapper, scaleStyle]}>
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          { borderRadius: DOT_CONTAINER, backgroundColor: greyColor },
-          futureStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: greyBg, borderColor: greyBorder },
-          pendingStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: greenBg, borderColor: greenBorder },
-          completeStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: redBg, borderColor: redBorder },
-          failedStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: orangeBg, borderColor: orangeBorder },
-          rolledBackStyle,
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.dotLayer,
-          styles.dot,
-          { backgroundColor: orangeBg, borderColor: orangeBorder },
-          alreadySpentStyle,
-        ]}
-      />
+    <Log name="AnimatedCheckpointDot">
+      <Animated.View style={[styles.dotWrapper, scaleStyle]}>
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            { borderRadius: DOT_CONTAINER, backgroundColor: greyColor },
+            futureStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: greyBg, borderColor: greyBorder },
+            pendingStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: greenBg, borderColor: greenBorder },
+            completeStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: greenBg, borderColor: greenBorder },
+            currentStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: redBg, borderColor: redBorder },
+            failedStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: orangeBg, borderColor: orangeBorder },
+            rolledBackStyle,
+          ]}
+        />
+        <Animated.View
+          style={[
+            styles.dotLayer,
+            styles.dot,
+            { backgroundColor: orangeBg, borderColor: orangeBorder },
+            alreadySpentStyle,
+          ]}
+        />
 
-      <Animated.View style={[styles.iconLayer, pendingStyle]}>
-        <Icon name="mdi:clock-outline" color={clockColor} size={ICON_SIZE} />
+        <Animated.View style={[styles.iconLayer, pendingSpinnerStyle]}>
+          <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 14 14">
+            <AnimatedCircle
+              cx={7}
+              cy={7}
+              r={5}
+              fill="none"
+              stroke={clockColor}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeDasharray={SPINNER_CIRCUMFERENCE}
+              animatedProps={spinnerCircleProps}
+            />
+          </Svg>
+        </Animated.View>
+        <Animated.View style={[styles.iconLayer, completeStyle]}>
+          <Icon name="fluent:checkmark-16-filled" color={greenColor} size={ICON_SIZE} />
+        </Animated.View>
+        <Animated.View style={[styles.iconLayer, spinnerStyle]}>
+          <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 14 14">
+            <AnimatedCircle
+              cx={7}
+              cy={7}
+              r={5}
+              fill="none"
+              stroke={greenColor}
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeDasharray={SPINNER_CIRCUMFERENCE}
+              animatedProps={spinnerCircleProps}
+            />
+          </Svg>
+        </Animated.View>
+        <Animated.View style={[styles.iconLayer, failedStyle]}>
+          <Icon name="material-symbols:close-rounded" color={redColor} size={ICON_SIZE} />
+        </Animated.View>
+        <Animated.View style={[styles.iconLayer, rolledBackStyle]}>
+          <Icon name="ic:round-refresh" color={orangeColor} size={ICON_SIZE} />
+        </Animated.View>
+        <Animated.View style={[styles.iconLayer, alreadySpentStyle]}>
+          <Icon name="mdi:alert-circle" color={orangeColor} size={ICON_SIZE} />
+        </Animated.View>
       </Animated.View>
-      <Animated.View style={[styles.iconLayer, completeStyle]}>
-        <Icon name="fluent:checkmark-16-filled" color={greenColor} size={ICON_SIZE} />
-      </Animated.View>
-      <Animated.View style={[styles.iconLayer, failedStyle]}>
-        <Icon name="material-symbols:close-rounded" color={redColor} size={ICON_SIZE} />
-      </Animated.View>
-      <Animated.View style={[styles.iconLayer, rolledBackStyle]}>
-        <Icon name="ic:round-refresh" color={orangeColor} size={ICON_SIZE} />
-      </Animated.View>
-      <Animated.View style={[styles.iconLayer, alreadySpentStyle]}>
-        <Icon name="mdi:alert-circle" color={orangeColor} size={ICON_SIZE} />
-      </Animated.View>
-    </Animated.View>
+    </Log>
   );
 });
 

@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 import { fetchMintInfo } from '@/shared/lib/apiClient';
-import { normalizeMintUrlKey } from '@/shared/lib/url';
+import { cashuLog } from '@/shared/lib/logger';
+import { normalizeMintUrlKey, normalizeUrlForApi } from '@/shared/lib/url';
 
 import { useMintManagement } from './useMintManagement';
 
@@ -63,6 +64,7 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
         }
 
         const mintUrls: string[] = await response.json();
+        cashuLog.info('mint.sovran.fetched', { mintCount: mintUrls?.length ?? 0 });
 
         if (!mintUrls || mintUrls.length === 0) {
           setMints([]);
@@ -72,20 +74,29 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
 
         const knownMintUrls = new Set(knownMints.map((mint) => normalizeMintUrlKey(mint.mintUrl)));
 
-        const urlsToProcess = mintUrls
-          .map((url) => normalizeMintUrlKey(url))
-          .filter((url) => {
-            if (knownMintUrls.has(url) || processedUrls.current.has(url)) return false;
-            processedUrls.current.add(url);
-            return true;
-          });
+        // Deduplicate by normalized key but keep full URLs for fetching
+        const seenKeys = new Set<string>();
+        const urlsToProcess: string[] = [];
+        for (const rawUrl of mintUrls) {
+          const key = normalizeMintUrlKey(rawUrl);
+          if (knownMintUrls.has(key) || processedUrls.current.has(key) || seenKeys.has(key))
+            continue;
+          seenKeys.add(key);
+          processedUrls.current.add(key);
+          urlsToProcess.push(normalizeUrlForApi(rawUrl));
+        }
 
         if (urlsToProcess.length === 0) {
+          cashuLog.debug('mint.sovran.noop', { reason: 'all mints already known or processed' });
           setMints([]);
           setLoading(false);
           return;
         }
 
+        cashuLog.info('mint.sovran.discovered', { newUrls: urlsToProcess.length });
+
+        let resolved = 0;
+        const total = urlsToProcess.length;
         urlsToProcess.forEach(async (url) => {
           const base: Omit<SovranDiscoveredMintData, 'mintInfo'> = {
             url,
@@ -95,17 +106,33 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
 
           try {
             const mintInfoResult = await fetchMintInfo(url);
+            const info = mintInfoResult.isOk() ? mintInfoResult.value : null;
+            cashuLog.debug('mint.sovran.info.resolved', {
+              url,
+              hasInfo: !!info,
+              hasIcon: !!info?.icon_url,
+              name: info?.name,
+              progress: `${++resolved}/${total}`,
+            });
             appendMintIfNew(setMints, {
               ...base,
-              mintInfo: mintInfoResult.isOk() ? mintInfoResult.value : null,
+              mintInfo: info,
             });
-          } catch {
+          } catch (err) {
+            cashuLog.warn('mint.sovran.info.error', {
+              url,
+              error: err instanceof Error ? err : new Error(String(err)),
+              progress: `${++resolved}/${total}`,
+            });
             appendMintIfNew(setMints, { ...base, mintInfo: null });
           }
         });
 
         setLoading(false);
       } catch (err) {
+        cashuLog.error('mint.sovran.error', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
         setError(err instanceof Error ? err.message : 'Failed to fetch mints from Sovran API');
         setLoading(false);
       }

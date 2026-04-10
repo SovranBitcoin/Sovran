@@ -30,6 +30,7 @@ import {
 import Icon from 'assets/icons';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 export type StepStatus =
   | 'pending'
@@ -132,161 +133,168 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
   const totalHops = chainInfo ? chainInfo.chainPath.length - 1 : 0;
 
   return (
-    <View className="mx-4 my-1.5" style={isDone ? { opacity: 0.85 } : undefined}>
-      <TransferCard>
-        {chainInfo ? (
-          <VStack gap={6} className="px-4 pt-4">
-            <Text size={11} bold style={{ color: primaryColor400 }}>
-              Middleman route
-            </Text>
-            <HStack align="center" gap={4} className="flex-wrap gap-y-1">
-              {chainInfo.chainPath.map((url, idx) => {
-                const info = chainInfo.pathMintInfos[idx];
-                const name = getMintDisplayName(url, info);
-                const isActiveNode =
-                  idx === chainInfo.chainHopIndex || idx === chainInfo.chainHopIndex + 1;
-                const isIntermediary = idx > 0 && idx < chainInfo.chainPath.length - 1;
-
-                return (
-                  <React.Fragment key={url + idx}>
-                    {idx > 0 && (
-                      <Icon
-                        name="mdi:chevron-right"
-                        size={14}
-                        color={
-                          idx === chainInfo.chainHopIndex + 1 ? primaryColor0 : primaryColor400
-                        }
-                      />
-                    )}
-                    <HStack
-                      align="center"
-                      gap={3}
-                      className={`min-w-0 shrink ${!isActiveNode ? 'opacity-40' : ''}`}>
-                      <Avatar picture={info?.icon_url} size={20} name={name} alt={`${name} icon`} />
-                      <Text
-                        size={10}
-                        numberOfLines={1}
-                        bold={isIntermediary}
-                        className="flex-1"
-                        style={{ color: primaryColor0 }}>
-                        {name}
-                      </Text>
-                    </HStack>
-                  </React.Fragment>
-                );
-              })}
-            </HStack>
-            <Text size={10} style={{ color: primaryColor400 }}>
-              Leg {chainInfo.chainHopIndex + 1} of {totalHops} — {fromName} → {toName}
-            </Text>
-          </VStack>
-        ) : null}
-
-        <TransferEntryRow
-          type="send"
-          mintIconUrl={fromMintInfo?.icon_url}
-          mintName={fromName}
-          amount={amount}
-          unit={unit}
-        />
-
-        <TransferStepChain
-          status={status}
-          routingDetail={routingDetail}
-          middleLabel={chainInfo ? 'Swap' : 'Send'}
-        />
-
-        <TransferEntryRow
-          type="receive"
-          mintIconUrl={toMintInfo?.icon_url}
-          mintName={toName}
-          amount={amount}
-          unit={unit}
-        />
-
-        {isFailed && errorMessage && (
-          <VStack gap={8} className="pb-3">
-            <TransferErrorBanner message={errorMessage} />
-
-            {String(errorMessage).includes('no_route') &&
-              routeSuggestion?.status === 'searching' && (
-                <HStack align="center" gap={8} className="px-4">
-                  <Spinner size={14} />
-                  <Text size={12} style={{ color: primaryColor300 }}>
-                    Finding a middleman…
-                  </Text>
-                </HStack>
-              )}
-            {String(errorMessage).includes('no_route') && routeSuggestion?.status === 'none' && (
-              <Text size={12} className="px-4" style={{ color: primaryColor300 }}>
-                No middleman routes available right now.
+    <Log name="RebalanceStepRow">
+      <View className="mx-4 my-1.5" style={isDone ? { opacity: 0.85 } : undefined}>
+        <TransferCard>
+          {chainInfo ? (
+            <VStack gap={6} className="px-4 pt-4">
+              <Text size={11} bold style={{ color: primaryColor400 }}>
+                Middleman route
               </Text>
-            )}
-            <HStack gap={8} className="px-4">
-              {routeSuggestion?.status === 'found' && routeSuggestion?.path && onRouteThrough ? (
-                <TouchableOpacity
-                  onPress={onRouteThrough}
-                  haptics
-                  style={{
-                    backgroundColor: primaryColor700,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 6,
-                  }}>
-                  <VStack gap={2}>
+              <HStack align="center" gap={4} className="flex-wrap gap-y-1">
+                {chainInfo.chainPath.map((url, idx) => {
+                  const info = chainInfo.pathMintInfos[idx];
+                  const name = getMintDisplayName(url, info);
+                  const isActiveNode =
+                    idx === chainInfo.chainHopIndex || idx === chainInfo.chainHopIndex + 1;
+                  const isIntermediary = idx > 0 && idx < chainInfo.chainPath.length - 1;
+
+                  return (
+                    <React.Fragment key={url + idx}>
+                      {idx > 0 && (
+                        <Icon
+                          name="mdi:chevron-right"
+                          size={14}
+                          color={
+                            idx === chainInfo.chainHopIndex + 1 ? primaryColor0 : primaryColor400
+                          }
+                        />
+                      )}
+                      <HStack
+                        align="center"
+                        gap={3}
+                        className={`min-w-0 shrink ${!isActiveNode ? 'opacity-40' : ''}`}>
+                        <Avatar
+                          picture={info?.icon_url}
+                          size={20}
+                          name={name}
+                          alt={`${name} icon`}
+                        />
+                        <Text
+                          size={10}
+                          numberOfLines={1}
+                          bold={isIntermediary}
+                          className="flex-1"
+                          style={{ color: primaryColor0 }}>
+                          {name}
+                        </Text>
+                      </HStack>
+                    </React.Fragment>
+                  );
+                })}
+              </HStack>
+              <Text size={10} style={{ color: primaryColor400 }}>
+                Leg {chainInfo.chainHopIndex + 1} of {totalHops} — {fromName} → {toName}
+              </Text>
+            </VStack>
+          ) : null}
+
+          <TransferEntryRow
+            type="send"
+            mintIconUrl={fromMintInfo?.icon_url}
+            mintName={fromName}
+            amount={amount}
+            unit={unit}
+          />
+
+          <TransferStepChain
+            status={status}
+            routingDetail={routingDetail}
+            middleLabel={chainInfo ? 'Swap' : 'Send'}
+          />
+
+          <TransferEntryRow
+            type="receive"
+            mintIconUrl={toMintInfo?.icon_url}
+            mintName={toName}
+            amount={amount}
+            unit={unit}
+          />
+
+          {isFailed && errorMessage && (
+            <VStack gap={8} className="pb-3">
+              <TransferErrorBanner message={errorMessage} />
+
+              {String(errorMessage).includes('no_route') &&
+                routeSuggestion?.status === 'searching' && (
+                  <HStack align="center" gap={8} className="px-4">
+                    <Spinner size={14} />
+                    <Text size={12} style={{ color: primaryColor300 }}>
+                      Finding a middleman…
+                    </Text>
+                  </HStack>
+                )}
+              {String(errorMessage).includes('no_route') && routeSuggestion?.status === 'none' && (
+                <Text size={12} className="px-4" style={{ color: primaryColor300 }}>
+                  No middleman routes available right now.
+                </Text>
+              )}
+              <HStack gap={8} className="px-4">
+                {routeSuggestion?.status === 'found' && routeSuggestion?.path && onRouteThrough ? (
+                  <TouchableOpacity
+                    onPress={onRouteThrough}
+                    haptics
+                    style={{
+                      backgroundColor: primaryColor700,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 6,
+                    }}>
+                    <VStack gap={2}>
+                      <HStack align="center" gap={4}>
+                        <Icon name="mdi:swap-horizontal" size={14} color={primaryColor0} />
+                        <Text bold size={12} className="text-foreground">
+                          Retry through middleman
+                        </Text>
+                      </HStack>
+                      {routeViaLabel && (
+                        <Text size={10} style={{ color: primaryColor400, paddingLeft: 18 }}>
+                          via {routeViaLabel}
+                        </Text>
+                      )}
+                    </VStack>
+                  </TouchableOpacity>
+                ) : onRetry ? (
+                  <TouchableOpacity
+                    onPress={onRetry}
+                    haptics
+                    style={{
+                      backgroundColor: primaryColor700,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 6,
+                    }}>
                     <HStack align="center" gap={4}>
-                      <Icon name="mdi:swap-horizontal" size={14} color={primaryColor0} />
+                      <Icon name="mdi:refresh" size={14} color={primaryColor0} />
                       <Text bold size={12} className="text-foreground">
-                        Retry through middleman
+                        Retry
                       </Text>
                     </HStack>
-                    {routeViaLabel && (
-                      <Text size={10} style={{ color: primaryColor400, paddingLeft: 18 }}>
-                        via {routeViaLabel}
+                  </TouchableOpacity>
+                ) : null}
+                {onSkip && (
+                  <TouchableOpacity
+                    onPress={onSkip}
+                    haptics
+                    style={{
+                      backgroundColor: primaryColor700,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 6,
+                    }}>
+                    <HStack align="center" gap={4}>
+                      <Icon name="mdi:skip-next" size={14} color={primaryColor0} />
+                      <Text bold size={12} className="text-foreground">
+                        Skip
                       </Text>
-                    )}
-                  </VStack>
-                </TouchableOpacity>
-              ) : onRetry ? (
-                <TouchableOpacity
-                  onPress={onRetry}
-                  haptics
-                  style={{
-                    backgroundColor: primaryColor700,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 6,
-                  }}>
-                  <HStack align="center" gap={4}>
-                    <Icon name="mdi:refresh" size={14} color={primaryColor0} />
-                    <Text bold size={12} className="text-foreground">
-                      Retry
-                    </Text>
-                  </HStack>
-                </TouchableOpacity>
-              ) : null}
-              {onSkip && (
-                <TouchableOpacity
-                  onPress={onSkip}
-                  haptics
-                  style={{
-                    backgroundColor: primaryColor700,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 6,
-                  }}>
-                  <HStack align="center" gap={4}>
-                    <Icon name="mdi:skip-next" size={14} color={primaryColor0} />
-                    <Text bold size={12} className="text-foreground">
-                      Skip
-                    </Text>
-                  </HStack>
-                </TouchableOpacity>
-              )}
-            </HStack>
-          </VStack>
-        )}
-      </TransferCard>
-    </View>
+                    </HStack>
+                  </TouchableOpacity>
+                )}
+              </HStack>
+            </VStack>
+          )}
+        </TransferCard>
+      </View>
+    </Log>
   );
 };

@@ -1,13 +1,12 @@
 /**
- * NFC module: Cashu POS payments and token write.
+ * NFC module: adapter for coco-payment-ux POS flows and standalone token write.
  *
- * - NfcPayment.performPayment(): full POS flow (read request → create token → write back)
+ * - createNfcAdapter(): NfcIOAdapter for coco-payment-ux machine
  * - writeTokenToNFC(): write token to tag (e.g. P2P sharing)
  * - NfcError: typed errors with .code for UI handling
  */
 
 export { NfcError } from './errors';
-export { NfcPayment, performNfcPayment } from './payment';
-export type { PaymentOptions, PaymentResult } from './payment';
+export { createNfcAdapter } from './adapter';
 export { writeTokenToNFC } from './write-token';
 export type { NfcTokenWriteResult } from './write-token';

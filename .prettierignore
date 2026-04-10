@@ -4,3 +4,4 @@ coco/**
 dist/**
 ios/**
 node_modules/**
+coco-payment-ux/**

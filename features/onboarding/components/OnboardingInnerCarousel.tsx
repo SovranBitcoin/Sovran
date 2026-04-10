@@ -15,6 +15,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import OnboardingSlideItem from './OnboardingSlideItem';
 import OnboardingPagination from './OnboardingPagination';
 import { OnboardingCarouselProps, OnboardingSlide } from './types';
+import { log, Log } from '@/shared/lib/logger';
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<OnboardingSlide>);
 
@@ -42,6 +43,7 @@ const OnboardingInnerCarousel: React.FC<OnboardingCarouselProps> = ({
       if (viewableItems.length > 0) {
         const viewableItem = viewableItems[0];
         if (viewableItem && viewableItem.index !== null) {
+          log.info('onboarding.slide.change', { slideIndex: viewableItem.index });
           setCurrentSlideIndex(viewableItem.index);
         }
       }
@@ -92,63 +94,65 @@ const OnboardingInnerCarousel: React.FC<OnboardingCarouselProps> = ({
   );
 
   return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          width: '100%',
-          top: insets.top,
-          height: screenHeight - insets.top - insets.bottom - 60,
-        },
-        containerStyle,
-      ]}>
-      <AnimatedFlatList
-        ref={horizontalListRef}
-        data={data}
-        renderItem={({ item, index }) => (
-          <OnboardingSlideItem
-            item={item}
-            index={index}
-            width={screenWidth}
-            scrollOffsetX={scrollOffsetX}
-          />
-        )}
-        horizontal
-        pagingEnabled
-        initialScrollIndex={0}
-        getItemLayout={(_, index) => ({
-          length: screenWidth,
-          offset: screenWidth * index,
-          index,
-        })}
-        scrollEventThrottle={16}
-        onScroll={scrollHandler}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        onEndReached={() => {
-          if (Platform.OS === 'android') {
-            setTimeout(() => {
+    <Log name="OnboardingInnerCarousel">
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            width: '100%',
+            top: insets.top,
+            height: screenHeight - insets.top - insets.bottom - 60,
+          },
+          containerStyle,
+        ]}>
+        <AnimatedFlatList
+          ref={horizontalListRef}
+          data={data}
+          renderItem={({ item, index }) => (
+            <OnboardingSlideItem
+              item={item}
+              index={index}
+              width={screenWidth}
+              scrollOffsetX={scrollOffsetX}
+            />
+          )}
+          horizontal
+          pagingEnabled
+          initialScrollIndex={0}
+          getItemLayout={(_, index) => ({
+            length: screenWidth,
+            offset: screenWidth * index,
+            index,
+          })}
+          scrollEventThrottle={16}
+          onScroll={scrollHandler}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          onEndReached={() => {
+            if (Platform.OS === 'android') {
+              setTimeout(() => {
+                horizontalListRef?.current?.scrollToIndex({ index: 0, animated: false });
+              }, 100);
+            } else {
               horizontalListRef?.current?.scrollToIndex({ index: 0, animated: false });
-            }, 100);
-          } else {
-            horizontalListRef?.current?.scrollToIndex({ index: 0, animated: false });
-          }
-        }}
-        showsHorizontalScrollIndicator={false}
-        scrollEnabled={isHorizontalScrollEnabled}
-      />
-      <Animated.View style={paginationStyle}>
-        <OnboardingPagination
-          slides={slides}
-          currentSlideIndex={currentSlideIndex}
-          animatedSlideIndex={animatedSlideIndex}
-          isDragging={isDragging}
-          handleScrollToIndex={handleScrollToIndex}
-          translateY={translateY}
-          topCarouselOffset={topCarouselOffset}
+            }
+          }}
+          showsHorizontalScrollIndicator={false}
+          scrollEnabled={isHorizontalScrollEnabled}
         />
+        <Animated.View style={paginationStyle}>
+          <OnboardingPagination
+            slides={slides}
+            currentSlideIndex={currentSlideIndex}
+            animatedSlideIndex={animatedSlideIndex}
+            isDragging={isDragging}
+            handleScrollToIndex={handleScrollToIndex}
+            translateY={translateY}
+            topCarouselOffset={topCarouselOffset}
+          />
+        </Animated.View>
       </Animated.View>
-    </Animated.View>
+    </Log>
   );
 };
 

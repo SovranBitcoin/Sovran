@@ -65,6 +65,7 @@ import {
   LayoutChangeEvent,
   GestureResponderEvent,
 } from 'react-native';
+import { log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
@@ -424,7 +425,7 @@ export const Button = ({
         }
       } catch (error) {
         // Silently fail if haptics are not supported
-        console.warn('Haptic feedback not supported on this device:', error);
+        log.warn('ui.haptics.not_supported', { type: 'button_press', error });
       }
     },
     [shouldUseHaptics, type, impactStyle, notificationType, onPressStart, onPressEnd]

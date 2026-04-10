@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log, storeLog } from '@/shared/lib/logger';
 
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
@@ -42,6 +43,7 @@ export const useAuditMintStore = create<AuditMintStore>()(
 
       setCached: (mintUrl: string, auditData: AuditMintResponse, mintInfo: GetInfoResponse) => {
         const normalized = normalizeMintUrlKey(mintUrl);
+        storeLog.debug('store.audit_mint.set_cached', { mintUrl: normalized });
         set((state) => ({
           cache: {
             ...state.cache,
@@ -55,11 +57,13 @@ export const useAuditMintStore = create<AuditMintStore>()(
       },
 
       clearCache: () => {
+        storeLog.info('store.audit_mint.clear_cache');
         set({ cache: {} });
       },
 
       clearMintCache: (mintUrl: string) => {
         const normalized = normalizeMintUrlKey(mintUrl);
+        storeLog.debug('store.audit_mint.clear_mint_cache', { mintUrl: normalized });
         set((state) => {
           const newCache = { ...state.cache };
           delete newCache[normalized];
@@ -83,7 +87,7 @@ export const useAuditMintStore = create<AuditMintStore>()(
           await AsyncStorage.removeItem('audit-mint-store');
           set({ cache: {} });
         } catch (error) {
-          console.error('AuditMintStore: Error clearing data:', error);
+          log.error('store.audit_mint.clear_failed', { error });
           throw error;
         }
       },
@@ -95,7 +99,7 @@ export const useAuditMintStore = create<AuditMintStore>()(
       partialize: (state) => ({ cache: state.cache }),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('AuditMintStore: Failed to rehydrate:', error);
+          log.warn('store.audit_mint.rehydrate_failed', { error });
         }
       },
     }

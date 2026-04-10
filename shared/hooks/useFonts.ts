@@ -1,4 +1,7 @@
+import { useEffect } from 'react';
 import { useFonts as useExpoFonts } from 'expo-font';
+
+import { log } from '@/shared/lib/logger';
 
 // Use assets alias (babel maps assets to ./assets at project root)
 const FONTS = {
@@ -14,5 +17,12 @@ const FONTS = {
 };
 
 export function useFonts() {
-  return useExpoFonts(FONTS);
+  const [loaded, error] = useExpoFonts(FONTS);
+
+  useEffect(() => {
+    if (loaded) log.info('fonts.loaded', { count: Object.keys(FONTS).length });
+    if (error) log.error('fonts.error', { error });
+  }, [loaded, error]);
+
+  return [loaded, error] as const;
 }

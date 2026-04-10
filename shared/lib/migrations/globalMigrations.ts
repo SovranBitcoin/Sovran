@@ -14,10 +14,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { PROFILE_SCOPED_STORE_KEYS } from '@/shared/lib/cashu/profileScopedStorage';
+import { log } from '../logger';
 
 const GLOBAL_MIGRATIONS_COMPLETED_KEY = 'global-migrations-completed';
 
-export interface Migration {
+interface Migration {
   id: string;
   run: () => Promise<void>;
 }
@@ -62,9 +63,7 @@ async function migrateIndexKeysToPubkeyKeys(): Promise<void> {
     }
   }
 
-  console.log(
-    `[GlobalMigrations] index-to-pubkey: moved ${migratedCount} keys across ${profiles.length} profiles`
-  );
+  log.info('migrations.global.index_to_pubkey', { migratedCount, profileCount: profiles.length });
 }
 
 /**
@@ -72,8 +71,8 @@ async function migrateIndexKeysToPubkeyKeys(): Promise<void> {
  * is already in the completed set. Each function must be safe to call
  * after a partial prior run (idempotent at the key level).
  */
-export const MIGRATIONS: Migration[] = [
-  { id: 'index-to-pubkey-v2', run: migrateIndexKeysToPubkeyKeys },
+const MIGRATIONS: Migration[] = [
+  { id: 'index-to-pubkey-keys-v2', run: migrateIndexKeysToPubkeyKeys },
 ];
 
 async function readCompletedMigrationIds(): Promise<Set<string>> {
@@ -107,9 +106,9 @@ export async function runGlobalMigrations(): Promise<void> {
       await migration.run();
       completedIds.add(migration.id);
       await writeCompletedMigrationIds(completedIds);
-      console.log(`[GlobalMigrations] Completed: ${migration.id}`);
+      log.info('migrations.global.completed', { migrationId: migration.id });
     } catch (error) {
-      console.error(`[GlobalMigrations] Migration "${migration.id}" failed:`, error);
+      log.error('migrations.global.failed', { migrationId: migration.id, error });
     }
   }
 }

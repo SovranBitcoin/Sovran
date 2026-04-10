@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { NPCClient, JWTAuthProvider } from 'npubcash-sdk';
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
+import { log, storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -78,6 +79,8 @@ export const useNpcMintStore = create<NpcMintStore>()(
         if (!pubkey) return undefined;
         if (get().isSyncing) return getOrDefault(get().mintUrls, pubkey);
 
+        storeLog.info('store.npc_mint.sync.start');
+        const startTime = performance.now();
         set({ isSyncing: true });
         try {
           const npcApi = manager?.ext?.npc;
@@ -87,6 +90,10 @@ export const useNpcMintStore = create<NpcMintStore>()(
           const mintUrl = npcInfo?.mintUrl ?? npcInfo?.mint_url;
 
           if (mintUrl) {
+            storeLog.info('store.npc_mint.sync.success', {
+              mintUrl,
+              duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+            });
             set((state) => ({
               mintUrls: { ...state.mintUrls, [pubkey]: mintUrl },
               lastSyncedAt: { ...state.lastSyncedAt, [pubkey]: Date.now() },
@@ -96,7 +103,7 @@ export const useNpcMintStore = create<NpcMintStore>()(
 
           return getOrDefault(get().mintUrls, pubkey);
         } catch (error) {
-          console.warn('npcMintStore: syncFromServer failed, returning cached value:', error);
+          log.warn('store.npc_mint.sync_failed', { error });
           return getOrDefault(get().mintUrls, pubkey);
         } finally {
           set({ isSyncing: false });
@@ -108,18 +115,24 @@ export const useNpcMintStore = create<NpcMintStore>()(
         if (!pubkey) return false;
         if (get().isUpdating) return false;
 
+        storeLog.info('store.npc_mint.update.start', { newMintUrl });
+        const startTime = performance.now();
         set({ isUpdating: true });
         try {
           const client = createNpcClient(privateKey);
           await client.settings.setMintUrl(newMintUrl);
 
+          storeLog.info('store.npc_mint.update.success', {
+            newMintUrl,
+            duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+          });
           set((state) => ({
             mintUrls: { ...state.mintUrls, [pubkey]: newMintUrl },
             lastSyncedAt: { ...state.lastSyncedAt, [pubkey]: Date.now() },
           }));
           return true;
         } catch (error) {
-          console.error('npcMintStore: updateServerMint failed:', error);
+          log.error('store.npc_mint.update_failed', { error });
           return false;
         } finally {
           set({ isUpdating: false });

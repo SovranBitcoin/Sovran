@@ -1,15 +1,25 @@
 import type {
+  AnnotatedOption,
+  PaymentMachine,
+  ParsedPaymentInput,
+  StepDataMap,
+} from 'coco-payment-ux';
+import type {
   ButtonHandlerActionButton,
   ButtonHandlerButton,
 } from '@/shared/ui/composed/ButtonHandler';
 
 type EmojiPickerPayload = { token: string };
-type OfflineSendSuggestionsPayload = {
-  requestedAmount: number;
-  roundDownAmount: number | null;
-  roundUpAmount: number | null;
-  unit: string;
-  onSelectAmount: (amount: number) => void | Promise<void>;
+
+/** Directly uses StepDataMap['chooseOption'] + machine reference. */
+type PaymentOptionsPayload = StepDataMap['chooseOption'] & {
+  machine: PaymentMachine;
+  onDismiss?: () => void;
+};
+
+/** Directly uses StepDataMap['chooseProofs'] + machine reference. */
+type ProofSelectorPayload = StepDataMap['chooseProofs'] & {
+  machine: PaymentMachine;
 };
 
 export type ProfileSwitcherAction =
@@ -31,12 +41,24 @@ export type ProfileSwitcherAction =
  * Addressable custom sheet IDs. Nested pages that only exist inside a sheet flow
  * (for example profile-switcher's import route) should stay internal to that sheet.
  */
+type PaymentFallbackPayload = {
+  parsed: ParsedPaymentInput;
+  options: AnnotatedOption[];
+  unit: string;
+  failedOptionValues: string[];
+  lastFailedMessage?: string;
+  machine: PaymentMachine;
+  onDismiss?: () => void;
+};
+
 type BaseActionSheetPayloads = {
   'profile-switcher': {
     onRequestAction: (action: ProfileSwitcherAction) => void;
   };
   'emoji-picker': EmojiPickerPayload;
-  'offline-send-suggestions': OfflineSendSuggestionsPayload;
+  'proof-selector': ProofSelectorPayload;
+  'payment-options': PaymentOptionsPayload;
+  'payment-fallback': PaymentFallbackPayload;
 };
 
 type ButtonHandlerPushTarget = {

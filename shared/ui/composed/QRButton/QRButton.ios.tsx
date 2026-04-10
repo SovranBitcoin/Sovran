@@ -1,14 +1,12 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
-import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
-import { View } from '@/shared/ui/primitives/View/View';
+import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { supportsLiquidGlass } from '@/shared/lib/version';
-import { QRButtonLiquid } from './QRButton.liquid';
 
 export interface QRButtonProps {
   onPress: () => void;
@@ -17,79 +15,81 @@ export interface QRButtonProps {
   size?: number;
 }
 
-const DEFAULT_SIZE = 72;
+const DEFAULT_SIZE = 64;
+
+const WHITE = '#FFFFFF';
 
 export function QRButton(props: QRButtonProps): React.ReactElement {
-  const [foreground, shadeColor100, shadeColor300] = useThemeColor([
-    'foreground',
-    'shade-100',
-    'shade-300',
-  ] as const);
-  const { onPress, accentColor = shadeColor100, color = foreground, size = DEFAULT_SIZE } = props;
+  const [surfaceTertiary] = useThemeColor(['surface-tertiary'] as const);
 
-  if (supportsLiquidGlass()) {
-    return <QRButtonLiquid onPress={onPress} accentColor={accentColor} color={color} size={size} />;
-  }
+  const { onPress, size = DEFAULT_SIZE } = props;
+
+  const borderRadius = size * 0.18;
+  const glow = { color: WHITE, opacity: 0.6, radius: 10, offset: { width: 0, height: 0 } };
+
+  const containerStyle = {
+    width: size,
+    height: size,
+    borderRadius,
+    borderCurve: 'continuous' as const,
+    overflow: 'hidden' as const,
+  };
+
+  const pressableStyle = {
+    ...containerStyle,
+    shadowColor: glow.color,
+    shadowOffset: glow.offset,
+    shadowOpacity: glow.opacity,
+    shadowRadius: glow.radius,
+    elevation: 5,
+  };
 
   return (
-    <View
-      style={[
-        styles.touchable,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          shadowColor: accentColor,
-          borderColor: opacity(accentColor, 0.35),
-        },
-      ]}>
-      <BlurCardFrame accentColor={accentColor}>
-        <PressableFeedback
-          animation={false}
-          onPress={onPress}
-          style={[
-            styles.pressable,
-            {
-              width: size,
-              height: size,
-              borderRadius: size / 2,
-            },
-          ]}>
+    <Log name="QRButton">
+      <PressableFeedback
+        animation={false}
+        onPress={onPress}
+        style={[styles.pressable, pressableStyle]}>
+        <PressableFeedback.Ripple />
+        <View style={[styles.container, containerStyle]} pointerEvents="none">
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0f0f12' }]} />
+          <View
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: opacity(WHITE, 0.35) }]}
+          />
+          <LinearGradient
+            colors={[WHITE, opacity(WHITE, 0.8), opacity(WHITE, 0.7), opacity(WHITE, 0.6)]}
+            locations={[0, 0.35, 0.6, 1]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
           <View
             style={[
-              styles.content,
-              {
-                backgroundColor: opacity(shadeColor300, 0.1),
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-              },
-            ]}>
-            <Icon name="stash:qr-code" size={24} color={color} />
-          </View>
-          <PressableFeedback.Ripple />
-        </PressableFeedback>
-      </BlurCardFrame>
-    </View>
+              StyleSheet.absoluteFillObject,
+              { borderWidth: 1, borderColor: opacity(WHITE, 0.4) },
+            ]}
+          />
+        </View>
+        <View
+          style={[
+            StyleSheet.absoluteFillObject,
+            { justifyContent: 'center', alignItems: 'center' },
+          ]}
+          pointerEvents="none">
+          <Icon name="stash:qr-code" size={38} color={surfaceTertiary} />
+        </View>
+      </PressableFeedback>
+    </Log>
   );
 }
 
 const styles = StyleSheet.create({
-  touchable: {
+  pressable: {
     borderCurve: 'continuous',
     overflow: 'hidden',
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 10,
-    elevation: 6,
   },
-  pressable: {
+  container: {
     overflow: 'hidden',
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute',
   },
 });

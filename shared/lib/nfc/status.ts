@@ -3,15 +3,15 @@
  */
 
 import NfcManager from 'react-native-nfc-manager';
-import { logDebug, logWarn } from './logger';
+import { nfcLog } from '../logger';
 
 export async function isNfcSupported(): Promise<boolean> {
   try {
     const supported = await NfcManager.isSupported();
-    logDebug(`NFC supported: ${supported}`);
+    nfcLog.debug('nfc.supported', { supported });
     return supported;
   } catch (error) {
-    logWarn('Failed to check NFC support:', error);
+    nfcLog.warn('nfc.support_check_failed', { error });
     return false;
   }
 }
@@ -19,10 +19,10 @@ export async function isNfcSupported(): Promise<boolean> {
 export async function isNfcEnabled(): Promise<boolean> {
   try {
     const enabled = await NfcManager.isEnabled();
-    logDebug(`NFC enabled: ${enabled}`);
+    nfcLog.debug('nfc.enabled', { enabled });
     return enabled;
   } catch (error) {
-    logWarn('Failed to check if NFC is enabled:', error);
+    nfcLog.warn('nfc.enabled_check_failed', { error });
     return false;
   }
 }

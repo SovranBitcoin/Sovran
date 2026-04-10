@@ -8,6 +8,7 @@ import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { FiatCurrencyPillLiquid } from './FiatCurrencyPill.liquid';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
+import { Log } from '@/shared/lib/logger';
 
 export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactElement {
   const shared = useFiatCurrencyPill(props);
@@ -47,27 +48,29 @@ export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactEleme
   const longPressHandler = enableCurrencyMenu && onPress ? openCurrencySheet : undefined;
 
   return (
-    <TouchableOpacity
-      disabled={!primaryHandler && !longPressHandler}
-      onPress={primaryHandler}
-      onLongPress={longPressHandler}>
-      <HStack
-        align="center"
-        justify="center"
-        gap={6}
-        className="overflow-hidden rounded-full"
-        style={{
-          backgroundColor: opacity(green500, 0.15),
-          borderWidth: 1,
-          borderColor: opacity(green400, 0.2),
-          paddingHorizontal: 14,
-          paddingVertical: 6,
-          minHeight: iosHeight,
-        }}>
-        <Text overpass size={textSize} bold color={success} style={{ letterSpacing: 0.3 }}>
-          {text}
-        </Text>
-      </HStack>
-    </TouchableOpacity>
+    <Log name="FiatCurrencyPill">
+      <TouchableOpacity
+        disabled={!primaryHandler && !longPressHandler}
+        onPress={primaryHandler}
+        onLongPress={longPressHandler}>
+        <HStack
+          align="center"
+          justify="center"
+          gap={6}
+          className="overflow-hidden rounded-full"
+          style={{
+            backgroundColor: opacity(green500, 0.15),
+            borderWidth: 1,
+            borderColor: opacity(green400, 0.2),
+            paddingHorizontal: 14,
+            paddingVertical: 6,
+            minHeight: iosHeight,
+          }}>
+          <Text overpass size={textSize} bold color={success} style={{ letterSpacing: 0.3 }}>
+            {text}
+          </Text>
+        </HStack>
+      </TouchableOpacity>
+    </Log>
   );
 }

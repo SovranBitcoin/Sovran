@@ -16,6 +16,7 @@ import Animated, {
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { cashuLog, Log } from '@/shared/lib/logger';
 // Size constants
 const LARGE_ICON_SIZE = 28;
 const SMALL_ICON_SIZE = 22;
@@ -218,6 +219,7 @@ export function MintCurrencyTabs({
 
   const handleCurrencyChange = useCallback(
     (currency: string) => {
+      cashuLog.info('mint.currency.tab.select', { currency });
       onCurrencyChange(currency);
     },
     [onCurrencyChange]
@@ -239,25 +241,27 @@ export function MintCurrencyTabs({
   });
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      className="px-4 pb-2"
-      contentContainerStyle={{ alignItems: 'center' }}>
-      <Animated.View className="flex-row items-center" style={animatedListGapStyle}>
-        {currencies.map((currency) => (
-          <AnimatedCurrencyTab
-            key={currency}
-            currency={currency}
-            isSelected={selectedCurrency === currency}
-            onPress={() => handleCurrencyChange(currency)}
-            scrollY={scrollY}
-            primaryColor0={primaryColor0}
-            primaryColor700={primaryColor700}
-            primaryColor900={primaryColor900}
-          />
-        ))}
-      </Animated.View>
-    </ScrollView>
+    <Log name="MintCurrencyTabs">
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        className="px-4 pb-2"
+        contentContainerStyle={{ alignItems: 'center' }}>
+        <Animated.View className="flex-row items-center" style={animatedListGapStyle}>
+          {currencies.map((currency) => (
+            <AnimatedCurrencyTab
+              key={currency}
+              currency={currency}
+              isSelected={selectedCurrency === currency}
+              onPress={() => handleCurrencyChange(currency)}
+              scrollY={scrollY}
+              primaryColor0={primaryColor0}
+              primaryColor700={primaryColor700}
+              primaryColor900={primaryColor900}
+            />
+          ))}
+        </Animated.View>
+      </ScrollView>
+    </Log>
   );
 }

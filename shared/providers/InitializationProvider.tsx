@@ -8,7 +8,7 @@ import React, {
   useRef,
   memo,
 } from 'react';
-import { initLog } from '@/shared/lib/initTiming';
+import { initLog, log } from '@/shared/lib/logger';
 import { Dimensions } from 'react-native';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -270,7 +270,7 @@ export function InitializationProvider({
               return prevLog;
             }
 
-            console.log(`[InitializationProvider] Adding to log history: ${message}`);
+            log.debug('init.provider.log_history', { message });
             return [
               ...prevLog,
               {
@@ -372,15 +372,19 @@ export function InitializationProvider({
     prevInitializing.current = isInitializing;
   }
 
-  // Clear forceReinitialize once real stages have registered (they'll keep isInitializing true)
+  // Clear forceReinitialize / holdSplashVisible once real stages have registered
+  // (they'll keep isInitializing true via their own blocking status).
+  // This ensures the splash is released after a profile switch even if
+  // cancelResetStages() was never called (e.g. DevSettings.reload() in dev).
   useEffect(() => {
-    if (forceReinitialize && stages.size > 0) {
+    if ((forceReinitialize || holdSplashVisible) && stages.size > 0) {
       setForceReinitialize(false);
+      setHoldSplashVisible(false);
     }
-  }, [forceReinitialize, stages.size]);
+  }, [forceReinitialize, holdSplashVisible, stages.size]);
 
   const resetStages = useCallback((options?: { holdUntilCancel?: boolean }) => {
-    console.log('[InitializationProvider] resetStages called — forcing loading screen');
+    log.info('init.provider.reset_stages');
     // Force the loading screen to show immediately
     setForceReinitialize(true);
     setHoldSplashVisible(options?.holdUntilCancel === true);
@@ -400,7 +404,7 @@ export function InitializationProvider({
   }, []);
 
   const startTestAnimation = useCallback(() => {
-    console.log('[InitializationProvider] Starting test animation');
+    log.debug('init.provider.test_animation_start');
     setIsTestMode(true);
     setStages(new Map());
     setLogHistory([]);
@@ -467,7 +471,7 @@ export function InitializationProvider({
               return newStages;
             });
             setTimeout(() => {
-              console.log('[InitializationProvider] Test animation complete');
+              log.debug('init.provider.test_animation_done');
               setIsTestMode(false);
             }, 1000);
           }, 500);
@@ -488,15 +492,15 @@ export function InitializationProvider({
   }, []);
 
   useEffect(() => {
-    console.log('[InitializationProvider] State update:');
-    console.log('  - Total stages:', stages.size);
-    console.log('  - Log history entries:', logHistory.length);
-    console.log('  - Current stage:', currentStage?.id, currentStage?.message);
-    console.log('  - Is initializing:', isInitializing);
-    console.log(
-      '  - All stages:',
-      Array.from(stages.entries()).map(([id, s]) => ({ id, status: s.status }))
-    );
+    const stagesDebug = Array.from(stages.entries()).map(([id, s]) => ({ id, status: s.status }));
+    log.debug('init.provider.state', {
+      totalStages: stages.size,
+      logHistory: logHistory.length,
+      currentStageId: currentStage?.id,
+      currentStageMessage: currentStage?.message,
+      isInitializing,
+      stages: stagesDebug,
+    });
   }, [stages, logHistory, currentStage, isInitializing]);
 
   const contextValue: InitializationContextValue = {
@@ -775,7 +779,7 @@ function LogoInitializationScreen() {
         right: 0,
         bottom: 0,
         zIndex: 9999,
-        backgroundColor: '#000',
+        backgroundColor: '#030303',
       }}>
       <Animated.View
         style={[
@@ -786,7 +790,7 @@ function LogoInitializationScreen() {
             right: 0,
             bottom: 0,
             zIndex: 9999,
-            backgroundColor: '#000',
+            backgroundColor: '#030303',
             justifyContent: 'center',
             alignItems: 'center',
           },
@@ -967,7 +971,7 @@ function InitializationScreenInternal() {
         right: 0,
         bottom: 0,
         zIndex: 9999,
-        backgroundColor: '#000',
+        backgroundColor: '#030303',
       }}>
       <Animated.View
         style={[
@@ -978,7 +982,7 @@ function InitializationScreenInternal() {
             right: 0,
             bottom: 0,
             zIndex: 9999,
-            backgroundColor: '#000',
+            backgroundColor: '#030303',
             justifyContent: 'center',
             alignItems: 'center',
           },
@@ -992,7 +996,7 @@ function InitializationScreenInternal() {
             justifyContent: 'center',
             alignItems: 'center',
             overflow: 'hidden',
-            backgroundColor: '#000',
+            backgroundColor: '#030303',
           }}>
           <Animated.View style={[{ width: '100%', backgroundColor: 'transparent' }, listAnimStyle]}>
             {logHistory.map((entry, index) => {

@@ -13,6 +13,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { log, storeLog } from '@/shared/lib/logger';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -33,6 +34,12 @@ interface ScanHistoryEntry {
   type: ScanType;
   /** Source of the scan (how it was scanned) */
   source: ScanSource;
+  /** Structural input type from the parser (e.g., 'bip321', 'payment', 'mintUrl') */
+  inputType?: string;
+  /** Container format (e.g., 'bip321' when input was a bitcoin: URI) */
+  container?: string;
+  /** Payment option kinds available in the input (e.g., ['lightningInvoice', 'paymentRequest']) */
+  optionKinds?: string[];
   /** Timestamp when scanned */
   scannedAt: number;
   /** ID of the transaction history entry this scan resulted in */
@@ -45,7 +52,15 @@ interface ScanHistoryState {
 
 interface ScanHistoryActions {
   /** Add a scan to history */
-  addScan: (raw: string, processed: string, type: ScanType, source: ScanSource) => void;
+  addScan: (
+    raw: string,
+    processed: string,
+    type: ScanType,
+    source: ScanSource,
+    inputType?: string,
+    container?: string,
+    optionKinds?: string[]
+  ) => void;
   /** Get all scan history entries */
   getEntries: () => ScanHistoryEntry[];
   /** Get entries filtered by type */
@@ -85,7 +100,16 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       entries: [],
 
       // Add a scan to history
-      addScan: (raw: string, processed: string, type: ScanType, source: ScanSource) => {
+      addScan: (
+        raw: string,
+        processed: string,
+        type: ScanType,
+        source: ScanSource,
+        inputType?: string,
+        container?: string,
+        optionKinds?: string[]
+      ) => {
+        storeLog.info('store.scan_history.add', { type, source, inputType, container });
         const { entries } = get();
         const now = Date.now();
 
@@ -99,6 +123,9 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
             ...updated[existingIndex],
             source,
             scannedAt: now,
+            ...(inputType != null && { inputType }),
+            ...(container != null && { container }),
+            ...(optionKinds != null && { optionKinds }),
           };
           set({ entries: updated });
         } else {
@@ -109,6 +136,9 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
             processed,
             type,
             source,
+            ...(inputType != null && { inputType }),
+            ...(container != null && { container }),
+            ...(optionKinds != null && { optionKinds }),
             scannedAt: now,
           };
           set({ entries: [...entries, newEntry] });
@@ -163,6 +193,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       // Link a scan entry to a transaction by matching the processed string
       linkTransaction: (processed: string, transactionId: string) => {
         if (!processed || !transactionId) return;
+        storeLog.debug('store.scan_history.link_transaction', { transactionId });
 
         const { entries } = get();
         const index = entries.findIndex((entry) => entry.processed === processed);
@@ -179,17 +210,20 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
 
       // Remove entry by id
       removeEntry: (id: string) => {
+        storeLog.debug('store.scan_history.remove', { id });
         const { entries } = get();
         set({ entries: entries.filter((entry) => entry.id !== id) });
       },
 
       // Clear all history
       clearHistory: () => {
+        storeLog.info('store.scan_history.clear');
         set({ entries: [] });
       },
 
       // Clear history for a specific type
       clearHistoryByType: (type: ScanType) => {
+        storeLog.info('store.scan_history.clear_by_type', { type });
         const { entries } = get();
         set({ entries: entries.filter((entry) => entry.type !== type) });
       },
@@ -200,7 +234,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
           await profileStorage.removeItem('scan-history-store');
           set({ entries: [] });
         } catch (error) {
-          console.error('ScanHistoryStore: Error clearing data:', error);
+          log.error('store.scan_history.clear_failed', { error });
           throw error;
         }
       },
@@ -210,7 +244,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       storage: createJSONStorage(() => profileStorage),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('ScanHistoryStore: Failed to rehydrate:', error);
+          log.warn('store.scan_history.rehydrate_failed', { error });
         }
       },
     }

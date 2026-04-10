@@ -14,6 +14,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { log, storeLog } from '@/shared/lib/logger';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -111,6 +112,7 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
 
       startGroup: ({ unit, title }) => {
         const id = generateGroupId();
+        storeLog.info('store.swap_tx.start_group', { id, unit, title });
         const group: SwapGroup = {
           id,
           unit,
@@ -128,6 +130,7 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
       },
 
       finalizeGroup: (groupId, nextState) => {
+        storeLog.info('store.swap_tx.finalize_group', { groupId, nextState });
         set((state) => {
           const group = state.groups[groupId];
           if (!group) return state;
@@ -143,6 +146,13 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
 
       addLeg: (groupId, leg) => {
         const legId = generateLegId();
+        storeLog.info('store.swap_tx.add_leg', {
+          groupId,
+          legId,
+          fromMint: leg.fromMintUrl,
+          toMint: leg.toMintUrl,
+          amount: leg.amount,
+        });
 
         set((state) => {
           const group = state.groups[groupId];
@@ -163,6 +173,7 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
 
       tagMintQuote: (groupId, legId, quoteId) => {
         if (!quoteId) return;
+        storeLog.debug('store.swap_tx.tag_mint_quote', { groupId, legId, quoteId });
 
         set((state) => {
           const group = state.groups[groupId];
@@ -188,6 +199,7 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
 
       tagMelt: (groupId, legId, { quoteId, operationId }) => {
         if (!quoteId) return;
+        storeLog.debug('store.swap_tx.tag_melt', { groupId, legId, quoteId, operationId });
 
         set((state) => {
           const group = state.groups[groupId];
@@ -212,6 +224,12 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
       },
 
       setLegStatus: (groupId, legId, { localStatus, errorMessage }) => {
+        storeLog.debug('store.swap_tx.set_leg_status', {
+          groupId,
+          legId,
+          localStatus,
+          errorMessage,
+        });
         set((state) => {
           const group = state.groups[groupId];
           if (!group) return state;
@@ -252,7 +270,7 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
           await profileStorage.removeItem('swap-transactions-store');
           set({ groups: {}, quoteIdToGroup: {} });
         } catch (error) {
-          console.error('SwapTransactionsStore: Error clearing data:', error);
+          log.error('store.swap_tx.clear_failed', { error });
           throw error;
         }
       },
@@ -266,7 +284,7 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
       }),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('SwapTransactionsStore: Failed to rehydrate from storage:', error);
+          log.warn('store.swap_tx.rehydrate_failed', { error });
         }
       },
     }

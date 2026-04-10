@@ -1,26 +1,50 @@
 /**
  * @fileoverview Receive flow mintQuote route wrapper
  *
- * Part of the (receive-flow) modal group - displays with back button.
+ * Displays a mint quote that was created before navigation.
+ * The mintHistoryEntry param contains the full MintHistoryEntry as JSON.
+ * Wires up the resolver so MintSelector can trigger changeMint(),
+ * which re-runs the createMintQuote handler with the new mint.
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useLocalSearchParams, Stack } from 'expo-router';
-import type { MintHistoryEntry } from 'coco-cashu-core';
-import { MintQuoteScreen, getFormattedMintQuoteTitle } from '@/features/receive';
+
+import { MintQuoteScreen } from '@/features/receive';
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 
 function ModalScreen() {
-  const { mintHistoryEntry: mintHistoryEntryString } = useLocalSearchParams<{
+  const params = useLocalSearchParams<{
     mintHistoryEntry: string;
+    unit?: string;
   }>();
 
-  const mintHistoryEntry = JSON.parse(mintHistoryEntryString) as MintHistoryEntry;
-  const title = getFormattedMintQuoteTitle(mintHistoryEntry.unit);
+  const unit = params.unit ?? 'sat';
+
+  const walletContext = useWalletContext();
+  const machine = usePaymentFlowMachine({ walletContext, unit });
+
+  const handleMintSelected = useCallback(
+    (mintUrl: string) => {
+      void machine.changeMint(mintUrl);
+    },
+    [machine]
+  );
+
+  const handleRequestMintList = useCallback(() => {
+    void machine.requestMintSelector();
+  }, [machine]);
 
   return (
     <>
-      <Stack.Screen options={{ headerTitle: title }} />
-      <MintQuoteScreen mintHistoryEntry={mintHistoryEntry} />
+      <Stack.Screen options={{ headerTitle: 'Receive' }} />
+      <MintQuoteScreen
+        key={params.mintHistoryEntry}
+        mintHistoryEntry={params.mintHistoryEntry}
+        onMintSelected={handleMintSelected}
+        onRequestMintList={handleRequestMintList}
+      />
     </>
   );
 }

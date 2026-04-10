@@ -73,7 +73,7 @@ export function EmojiPickerContent({
   const handleEmojiSelect = async (emoji: string) => {
     const encodedEmoji = encode(emoji, payload.token);
     await Clipboard.setStringAsync(encodedEmoji);
-    copyPopup('ecashToken', { onOpen: close });
+    copyPopup('token', { onOpen: close });
   };
 
   return (

@@ -16,6 +16,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 const StarRating = React.memo(function StarRating({
   score,
@@ -53,7 +54,7 @@ const ReviewItem = React.memo(function ReviewItem({
     'surface-secondary',
   ] as const);
 
-  const reviewText = review.comment?.split(']')[1] || review.comment;
+  const reviewText = review.comment?.trim() || '';
   const reviewScore = review.score ?? 0;
   const displayName = getUsername(review.pubkey);
 
@@ -67,40 +68,42 @@ const ReviewItem = React.memo(function ReviewItem({
 
   return (
     <View className="py-4">
-      <HStack align="flex-start" gap={12} className="flex-1">
+      <HStack align="flex-start" gap={12}>
         <View className="shrink-0">
-          <Avatar seed={review.pubkey} name={displayName} size={48} />
+          <Avatar seed={review.pubkey} name={displayName} size={40} />
         </View>
 
-        <VStack spacing={6} className="min-w-0 flex-1">
-          <HStack align="center" justify="space-between" className="flex-1">
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text
-              size={15}
+              size={14}
               bold
-              className="flex-1"
-              style={{ color: foreground }}
+              style={{ color: foreground, flex: 1, marginRight: 8 }}
               numberOfLines={1}
               ellipsizeMode="tail">
               {displayName}
             </Text>
             {formattedDate && (
-              <Text size={12} style={{ color: opacity(foreground, 0.4) }}>
+              <Text size={12} style={{ color: opacity(foreground, 0.35), flexShrink: 0 }}>
                 {formattedDate}
               </Text>
             )}
-          </HStack>
+          </View>
 
-          <StarRating score={reviewScore} size={16} />
+          <View style={{ marginTop: 4 }}>
+            <StarRating score={reviewScore} size={14} />
+          </View>
 
-          {reviewText && (
+          {reviewText.length > 0 && (
             <Text
               size={14}
-              style={{ color: opacity(foreground, 0.66), lineHeight: 20 }}
+              style={{ color: opacity(foreground, 0.6), lineHeight: 20, marginTop: 6 }}
               numberOfLines={10}>
-              {reviewText.trim()}
+              {reviewText}
             </Text>
           )}
-        </VStack>
+        </View>
       </HStack>
 
       {!isLast && <View className="mt-4 h-px" style={{ backgroundColor: surfaceSecondary }} />}
@@ -274,6 +277,7 @@ const HeaderStats = React.memo(function HeaderStats({
 });
 
 export function MintReviewsScreen() {
+  useLifecycleLogger('MintReviewsScreen');
   const background = useThemeColor('background');
   const insets = useSafeAreaInsets();
   const { mintUrl } = useLocalSearchParams<{ mintUrl: string }>();
@@ -284,16 +288,27 @@ export function MintReviewsScreen() {
     loading: kymLoading,
   } = useKYMMint(mintUrl || '');
 
+  log.debug('mint.reviews.load', { mintUrl, kymLoading, score: kymScore });
+
   const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
     const timeout = setTimeout(() => {
-      if (kymLoading) setTimedOut(true);
+      if (kymLoading) {
+        setTimedOut(true);
+        log.warn('mint.reviews.timeout', { mintUrl });
+      }
     }, 5000);
     return () => clearTimeout(timeout);
   }, [kymLoading]);
 
   const isLoading = kymLoading && !timedOut;
-  const reviews = useMemo(() => kymRecommendations || [], [kymRecommendations]);
+  const reviews = useMemo(() => {
+    const all = kymRecommendations || [];
+    const withContent = all.filter((r) => r.comment?.trim());
+    const withoutContent = all.filter((r) => !r.comment?.trim());
+    const byDate = (a: any, b: any) => (b.created_at ?? 0) - (a.created_at ?? 0);
+    return [...withContent.sort(byDate), ...withoutContent.sort(byDate)];
+  }, [kymRecommendations]);
   const totalReviews = reviews.length;
 
   const renderItem = useCallback(
@@ -328,7 +343,7 @@ export function MintReviewsScreen() {
   const showEmptyState = !isLoading && totalReviews === 0;
 
   return (
-    <View className="flex-1" style={{ backgroundColor: background }}>
+    <Screen name="MintReviewsScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen options={{ title: 'Reviews' }} />
 
       {showEmptyState ? (
@@ -366,6 +381,6 @@ export function MintReviewsScreen() {
           ]}
         />
       </BottomButtons>
-    </View>
+    </Screen>
   );
 }

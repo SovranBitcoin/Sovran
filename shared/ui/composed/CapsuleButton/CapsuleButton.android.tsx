@@ -3,6 +3,7 @@ import { LiquidButtonView } from 'expo-liquid-glass-native';
 import { hasAndroidLiquidButtonView } from '@/navigation/nativeTabs';
 
 import Icon from 'assets/icons';
+import { Log } from '@/shared/lib/logger';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -17,7 +18,7 @@ export interface CapsuleButtonProps {
   height?: number;
 }
 
-const DEFAULT_HEIGHT = 48;
+const DEFAULT_HEIGHT = 46;
 const INVISIBLE_TITLE = '\u2007'.repeat(12);
 
 export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
@@ -26,37 +27,49 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
 
   if (hasAndroidLiquidButtonView()) {
     return (
-      <View className="w-full" style={{ height }}>
-        <LiquidButtonView
-          title={INVISIBLE_TITLE}
-          enabled
-          tint="transparent"
-          blurRadius={3}
-          onPress={onPress}
-          style={{ width: '100%', height, borderRadius: height / 2 }}
-        />
-        <View
-          pointerEvents="none"
-          className="absolute inset-0 flex-row items-center justify-center gap-2"
-          style={{ elevation: 1 }}>
-          <Icon name={icon} size={16} color={color} />
-          <Text size={14} style={{ color, fontFamily: 'OxygenBold' }}>
-            {label}
-          </Text>
+      <Log name="CapsuleButton">
+        <View className="w-full" style={{ height }}>
+          <LiquidButtonView
+            title={INVISIBLE_TITLE}
+            enabled
+            tint="transparent"
+            blurRadius={3}
+            onPress={onPress}
+            style={{ width: '100%', height, borderRadius: height / 2 }}
+          />
+          <View
+            pointerEvents="none"
+            className="absolute inset-0 flex-row items-center justify-center gap-2"
+            style={{ elevation: 1 }}>
+            <Icon name={icon} size={16} color={color} />
+            <Text size={14} style={{ color, fontFamily: 'OxygenBold' }}>
+              {label}
+            </Text>
+          </View>
         </View>
-      </View>
+      </Log>
     );
   }
 
   return (
-    <Button
-      text={label}
-      icon={<Icon name={icon} size={16} color={color} />}
-      onPress={onPress}
-      variant="secondary"
-      blur={{ intensity: 70, tint: 'dark' }}
-      haptics
-      style={{ margin: 0, marginBottom: 0, width: '100%', minHeight: height }}
-    />
+    <Log name="CapsuleButton">
+      <Button
+        text={label}
+        icon={<Icon name={icon} size={16} color={color} />}
+        onPress={onPress}
+        variant="secondary"
+        blur={{ intensity: 70, tint: 'dark' }}
+        haptics
+        style={{
+          margin: 0,
+          marginBottom: 0,
+          width: '100%',
+          minHeight: height,
+          maxWidth: 140,
+          alignSelf: 'center',
+          borderRadius: 24,
+        }}
+      />
+    </Log>
   );
 }

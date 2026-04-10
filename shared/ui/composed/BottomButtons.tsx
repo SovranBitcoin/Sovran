@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
 import { StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 
 interface BottomButtonsProps {
@@ -16,16 +17,18 @@ interface BottomButtonsProps {
  */
 export function BottomButtons({ children, paddingBottom = 0, style }: BottomButtonsProps) {
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingBottom,
-        },
-        style,
-      ]}>
-      {children}
-    </View>
+    <Log name="BottomButtons">
+      <View
+        style={[
+          styles.container,
+          {
+            paddingBottom,
+          },
+          style,
+        ]}>
+        {children}
+      </View>
+    </Log>
   );
 }
 

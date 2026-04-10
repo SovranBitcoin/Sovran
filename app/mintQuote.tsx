@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
-import type { MintHistoryEntry } from 'coco-cashu-core';
+import type { MintHistoryEntry } from '@cashu/coco-core';
 import { MintQuoteScreen } from '@/features/receive';
 
 function ModalScreen() {

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useManager, usePaginatedHistory } from 'coco-cashu-react';
-import type { MeltHistoryEntry } from 'coco-cashu-core';
+import { useManager, usePaginatedHistory } from '@cashu/coco-react';
+import type { HistoryEntry, MeltHistoryEntry } from '@cashu/coco-core';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
+import { log } from '@/shared/lib/logger';
 
 /**
  * Shape of a MeltOperation from coco's MeltOperationRepository.
@@ -89,10 +90,18 @@ export function useHistoryWithMelts(pageSize = 100) {
         .map(meltOpToHistoryEntry)
         .filter((e): e is MeltHistoryEntry => e !== null);
 
+      log.debug('tx.melt_ops.fetched', {
+        finalized: finalized.length,
+        pending: pending.length,
+        prepared: prepared.length,
+        converted: entries.length,
+      });
+
       if (isMountedRef.current) {
         setMeltEntries(entries);
       }
     } catch {
+      log.warn('tx.melt_ops.fetch_error');
       // Repository may not be accessible — fall back to history-only
     }
   }, [manager]);
@@ -118,9 +127,10 @@ export function useHistoryWithMelts(pageSize = 100) {
     };
   }, [manager, fetchMeltOps]);
 
-  // Merge melt operations into history, deduplicating by quoteId
+  // Merge melt operations into history, deduplicating by quoteId.
+  // Stabilise: only return a new array ref if entries actually changed.
+  const prevMergedRef = useRef<HistoryEntry[]>([]);
   const mergedHistory = useMemo(() => {
-    // Collect quoteIds already present in the regular history
     const existingQuoteIds = new Set<string>();
     for (const h of paginatedResult.history) {
       if (h.type === 'melt') {
@@ -130,9 +140,31 @@ export function useHistoryWithMelts(pageSize = 100) {
     }
 
     const newMelts = meltEntries.filter((m) => !existingQuoteIds.has(m.quoteId));
-    if (newMelts.length === 0) return paginatedResult.history;
+    const merged =
+      newMelts.length === 0
+        ? paginatedResult.history
+        : [...paginatedResult.history, ...newMelts].sort((a, b) => b.createdAt - a.createdAt);
 
-    return [...paginatedResult.history, ...newMelts].sort((a, b) => b.createdAt - a.createdAt);
+    if (newMelts.length > 0) {
+      log.debug('tx.history.merged', {
+        paginatedCount: paginatedResult.history.length,
+        supplementedMelts: newMelts.length,
+        totalCount: merged.length,
+      });
+    }
+
+    // Reference stability: if length and first/last entry IDs match, keep the old ref
+    const prev = prevMergedRef.current;
+    if (
+      prev.length === merged.length &&
+      prev.length > 0 &&
+      prev[0].id === merged[0].id &&
+      prev[prev.length - 1].id === merged[merged.length - 1].id
+    ) {
+      return prev;
+    }
+    prevMergedRef.current = merged;
+    return merged;
   }, [paginatedResult.history, meltEntries]);
 
   // Wrap refresh to also re-fetch melt operations

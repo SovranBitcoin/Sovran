@@ -46,6 +46,15 @@ export function openLinkFailedPopup(): void {
   popup({ message: 'Failed to open link', icon: 'icon:mdi:link-off', type: 'error' });
 }
 
+export function walletStillLoadingPopup(): void {
+  popup({
+    message: 'Wallet is still loading',
+    text: 'Please wait for the wallet to finish loading before switching profiles.',
+    icon: 'icon:mdi:timer-sand',
+    type: 'info',
+  });
+}
+
 export function engagementUpdateFailedPopup(action: 'follow' | 'like' | 'repost'): void {
   popup({
     message: `Unable to update ${action} right now`,

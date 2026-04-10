@@ -1,15 +1,18 @@
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, useEffect, memo } from 'react';
 import { View } from '@/shared/ui/primitives/View/View';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import Icon from 'assets/icons';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
+import { Log } from '@/shared/lib/logger';
 
 interface CustomKeyboardProps {
   onKeyPress: (value: string) => void;
   unit: 'sat' | string;
   loading?: boolean;
   compact?: boolean;
+  /** External value to sync internal state (e.g. after fiat/sats toggle) */
+  value?: string;
 }
 
 type KeyboardValue = string | number;
@@ -19,8 +22,15 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   unit,
   loading = false,
   compact = false,
+  value,
 }) => {
-  const [, setInputValue] = useState('');
+  const [, setInputValue] = useState(value ?? '');
+
+  useEffect(() => {
+    if (value !== undefined) {
+      setInputValue(value);
+    }
+  }, [value]);
 
   const handlePress = useCallback(
     (value: KeyboardValue) => {
@@ -91,15 +101,17 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
   ];
 
   return (
-    <View
-      className="items-center justify-center bg-transparent"
-      style={{ opacity: loading ? 0.5 : 1 }}>
-      {buttons.map((row, rowIndex) => (
-        <View key={rowIndex} className="mb-0.25 flex-row justify-between">
-          {row.map(renderButton)}
-        </View>
-      ))}
-    </View>
+    <Log name="CustomKeyboard">
+      <View
+        className="items-center justify-center bg-transparent"
+        style={{ opacity: loading ? 0.5 : 1 }}>
+        {buttons.map((row, rowIndex) => (
+          <View key={rowIndex} className="mb-0.25 flex-row justify-between">
+            {row.map(renderButton)}
+          </View>
+        ))}
+      </View>
+    </Log>
   );
 };
 

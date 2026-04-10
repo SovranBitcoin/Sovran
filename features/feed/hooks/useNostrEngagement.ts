@@ -5,6 +5,7 @@ import { EventDeletion, Reaction, Repost } from 'nostr-tools/kinds';
 import { useShallow } from 'zustand/shallow';
 
 import type { FeedEvent, NoteMetrics } from '@/features/feed/components/nostr/shared';
+import { log } from '@/shared/lib/logger';
 import { engagementUpdateFailedPopup } from '@/shared/lib/popup';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -372,7 +373,7 @@ export function useNostrEngagement(
     }
     if (staleCount > 0) {
       lastStaleWarningRef.current = now;
-      console.warn('useNostrEngagement: stale optimistic entries detected', { staleCount });
+      log.warn('feed.engagement.stale_optimistic', { staleCount });
     }
   }, [eventIds, optimisticLikesByEventId, optimisticRepostsByEventId]);
 

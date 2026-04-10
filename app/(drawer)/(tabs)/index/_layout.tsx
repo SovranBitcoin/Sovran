@@ -1,85 +1,41 @@
-import { useCallback, useMemo } from 'react';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Stack, router } from 'expo-router';
-import { useWindowDimensions, View } from 'react-native';
+import { useCallback } from 'react';
+import { View } from 'react-native';
+import { Stack } from 'expo-router';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
-import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { useBalanceContext, useManager } from 'coco-cashu-react';
-import { useSendWithHistory } from '@/features/send';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { WalletHeaderTitle, useWalletHeaderState } from '@/features/wallet';
-import { useMintManagement } from '@/features/mint';
-import {
-  AndroidLiquidHeaderOverlay,
-  AndroidLiquidHeaderTitleButton,
-  buildExpoRouterHeaderOptions,
-  isAndroidLiquidHeaderSupported,
-} from '@/navigation/nativeTabs';
-import {
-  getHeaderTitleWidthFromWidth,
-  getHeaderTitleHeight,
-  getHeaderContentWidthFromWidth,
-  getHeaderContentHeight,
-} from '@/features/wallet/lib/walletHeader';
-import { useNfcEcashPayment } from '@/shared/hooks/useNfcEcashPayment';
+
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { MintSelector } from '@/features/wallet';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 
 export { HEADER_LAYOUT, MOCK_NFC_SUCCESS_SATS } from '@/features/wallet/lib/walletHeader';
 
 export default function HomeLayout() {
   const iconColor = useThemeColor('foreground');
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
-  const useAndroidLiquidHeader = isAndroidLiquidHeaderSupported();
-  const { send } = useSendWithHistory();
-  const manager = useManager();
-  const { mints, isLoading: isMintsLoading } = useMintManagement();
-  const { keys } = useNostrKeysContext();
-  const getSelectedMint = useMintStore((state) => state.getSelectedMint);
-  const selectedMint = keys?.pubkey ? getSelectedMint(keys.pubkey) : undefined;
-  const { balance: balancesWithTotal } = useBalanceContext();
-  const { total: _total, ...availableMints } = balancesWithTotal;
-  const displayCurrency = useSettingsStore((state) => state.displayCurrency);
-  const btcPrice = useBtcPrice(displayCurrency);
 
-  const headerTitleWidth = useMemo(() => getHeaderTitleWidthFromWidth(windowWidth), [windowWidth]);
-  const headerContentWidth = useMemo(
-    () => getHeaderContentWidthFromWidth(windowWidth),
-    [windowWidth]
-  );
+  const walletContext = useWalletContext();
+  const machine = usePaymentFlowMachine({ walletContext });
 
-  const headerBalance = selectedMint ? balancesWithTotal[selectedMint] || 0 : 0;
-  const header = useWalletHeaderState({
-    selectedMint,
-    balanceForMint: headerBalance,
-    mints,
-    isMintsLoading,
-  });
-
-  const usdToSats = useCallback(
-    (usd: number): number | undefined => {
-      if (!btcPrice) return undefined;
-      return Math.floor((usd / btcPrice) * 100_000_000);
-    },
-    [btcPrice]
-  );
-
-  const nfc = useNfcEcashPayment({
-    send,
-    manager: manager ?? undefined,
-    availableMints,
-    preferredMint: selectedMint,
-    getSelectedMint,
-    pubkey: keys?.pubkey,
-    usdToSats,
-  });
+  const handleNfcPayment = useCallback(() => {
+    void machine.scan?.(undefined, { source: 'nfc' });
+  }, [machine]);
 
   const openDrawer = useCallback(() => {
     navigation.dispatch(DrawerActions.openDrawer());
   }, [navigation]);
+
+  const handleMintSelected = useCallback(
+    (mintUrl: string) => {
+      void machine.changeMint(mintUrl);
+    },
+    [machine]
+  );
+
+  const handleRequestMintList = useCallback(() => {
+    void machine.requestMintSelector({ reset: true });
+  }, [machine]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -94,46 +50,20 @@ export default function HomeLayout() {
             headerLeftIcon: 'line.3.horizontal',
             onHeaderLeftPress: openDrawer,
             headerRightIcon: 'wave.3.right',
-            onHeaderRightPress: nfc.handleNfcPaymentAlert,
+            onHeaderRightPress: handleNfcPayment,
             options: {
-              headerShown: !useAndroidLiquidHeader,
               headerTransparent: true,
               headerTitleAlign: 'center',
               headerTitle: () => (
-                <WalletHeaderTitle
-                  liquidGlass
-                  style={{ width: headerTitleWidth, height: getHeaderTitleHeight() }}
-                  contentWidth={headerContentWidth}
-                  contentHeight={getHeaderContentHeight()}
+                <MintSelector
+                  onMintSelected={handleMintSelected}
+                  onRequestMintList={handleRequestMintList}
                 />
               ),
             },
           })}
         />
       </Stack>
-      {useAndroidLiquidHeader ? (
-        <AndroidLiquidHeaderOverlay
-          topInset={insets.top}
-          iconColor={iconColor}
-          leftIcon="line.3.horizontal"
-          onLeftPress={openDrawer}
-          rightIcon="wave.3.right"
-          onRightPress={nfc.handleNfcPaymentAlert}
-          centerWidth={headerTitleWidth}
-          center={
-            <AndroidLiquidHeaderTitleButton
-              width={headerTitleWidth}
-              lineOneText={header.headerMintName}
-              lineTwoText={header.headerAmountLabel}
-              avatarName={header.headerMintName}
-              avatarPicture={header.headerMintInfo?.icon_url}
-              onPress={() => {
-                router.navigate('/(mint-flow)/list' as any);
-              }}
-            />
-          }
-        />
-      ) : null}
     </View>
   );
 }

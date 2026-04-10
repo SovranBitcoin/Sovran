@@ -4,13 +4,14 @@ import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 import { fetchMintInfo } from '@/shared/lib/apiClient';
+import { cashuLog } from '@/shared/lib/logger';
 import {
   isCashuRecommendationEvent,
   extractMintUrlFromEvent,
   parseRecommendation,
   type NostrEvent,
 } from '@/shared/lib/nostr/client';
-import { normalizeMintUrlKey } from '@/shared/lib/url';
+import { normalizeMintUrlKey, normalizeUrlForApi } from '@/shared/lib/url';
 
 import type { MintRecommendation } from './useKYMMints';
 import { useMintManagement } from './useMintManagement';
@@ -81,62 +82,87 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
 
       const knownMintUrls = new Set(knownMints.map((mint) => normalizeMintUrlKey(mint.mintUrl)));
 
-      const recommendationsByUrl = new Map<string, MintRecommendation[]>();
+      // Map normalized key → { fullUrl, recommendations }
+      const recommendationsByKey = new Map<
+        string,
+        { fullUrl: string; recs: MintRecommendation[] }
+      >();
 
       events.forEach((event: any) => {
         if (!isCashuRecommendationEvent(event as NostrEvent)) return;
         const mintUrl = extractMintUrlFromEvent(event as NostrEvent);
         if (!mintUrl) return;
 
-        const normalized = normalizeMintUrlKey(mintUrl);
-        if (knownMintUrls.has(normalized)) return;
+        const key = normalizeMintUrlKey(mintUrl);
+        if (knownMintUrls.has(key)) return;
 
         const recommendation = parseRecommendation(event.content);
         if (!recommendation) return;
 
-        const existing = recommendationsByUrl.get(normalized) || [];
-        existing.push({
+        const entry = recommendationsByKey.get(key) ?? {
+          fullUrl: normalizeUrlForApi(mintUrl),
+          recs: [],
+        };
+        entry.recs.push({
           score: recommendation.score,
           comment: recommendation.comment,
           pubkey: event.pubkey,
           eventId: event.id,
           created_at: event.created_at,
         });
-        recommendationsByUrl.set(normalized, existing);
+        recommendationsByKey.set(key, entry);
       });
 
-      const urlsToProcess: string[] = [];
-      recommendationsByUrl.forEach((_recs, url) => {
-        if (processedUrls.current.has(url)) return;
-        processedUrls.current.add(url);
-        urlsToProcess.push(url);
+      const urlsToProcess: { key: string; fullUrl: string; recs: MintRecommendation[] }[] = [];
+      recommendationsByKey.forEach((entry, key) => {
+        if (processedUrls.current.has(key)) return;
+        processedUrls.current.add(key);
+        urlsToProcess.push({ key, ...entry });
       });
 
       if (urlsToProcess.length === 0) return;
 
-      urlsToProcess.forEach(async (url) => {
-        const recommendations = recommendationsByUrl.get(url)!;
+      cashuLog.info('mint.nostr.discovered', {
+        newUrls: urlsToProcess.length,
+        totalProcessed: processedUrls.current.size,
+      });
+      urlsToProcess.forEach(async ({ fullUrl: url, recs: recommendations }) => {
         const score = averageScore(recommendations);
 
         try {
           const mintInfoResult = await fetchMintInfo(url);
+          const info = mintInfoResult.isOk() ? mintInfoResult.value : null;
+          cashuLog.debug('mint.nostr.info.resolved', {
+            url,
+            hasInfo: !!info,
+            hasIcon: !!info?.icon_url,
+            name: info?.name,
+          });
           appendMintIfNew(setMints, {
             url,
             score,
             recommendations,
-            mintInfo: mintInfoResult.isOk() ? mintInfoResult.value : null,
+            mintInfo: info,
           });
-        } catch {
+        } catch (err) {
+          cashuLog.warn('mint.nostr.info.error', {
+            url,
+            error: err instanceof Error ? err : new Error(String(err)),
+          });
           appendMintIfNew(setMints, { url, score, recommendations, mintInfo: null });
         }
       });
-    } catch {
+    } catch (err) {
+      cashuLog.error('mint.nostr.error', {
+        error: err instanceof Error ? err : new Error(String(err)),
+      });
       setError('Failed to process mint recommendations. Please try again.');
     }
   }, [events, knownMints, eose]);
 
   useEffect(() => {
     if (retryCount > 0) {
+      cashuLog.info('mint.nostr.retry', { retryCount });
       setMints([]);
       setError(null);
       setLoading(true);

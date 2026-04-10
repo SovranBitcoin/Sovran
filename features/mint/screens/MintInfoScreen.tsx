@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useRef, useMemo, useEffect, useCallback } from 'react';
 import {
   ScrollView,
   Animated,
@@ -16,25 +16,21 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
-import { useAuditedMint } from '@/features/mint/hooks/useAuditedMint';
-import { useKYMMint } from '@/features/mint/hooks/useKYMMint';
 import { Card } from '@/shared/ui/composed/Card';
 import { Section } from '@/features/settings/screens/SettingsScreen';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Badge } from '@/shared/ui/primitives/Badge';
-import { truncateMiddle } from '@/shared/lib/strings';
-import { getMintDisplayName } from '@/shared/lib/url';
 import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
-import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
-import { useReceive } from 'coco-cashu-react';
+import { useScreenActions } from 'coco-payment-ux/react';
 import opacity from 'hex-color-opacity';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 function ProgressRingComponent({
   size = 84,
@@ -411,161 +407,57 @@ function RatingBarChartComponent({ score }: { score: number }) {
 const RatingBarChart = React.memo(RatingBarChartComponent);
 
 export function MintInfoScreen() {
-  const foreground = useThemeColor('foreground');
+  useLifecycleLogger('MintInfoScreen');
+  const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const [danger, success, warning] = useThemeColor(['danger', 'success', 'yellow-300'] as const);
   const insets = useSafeAreaInsets();
-  const { mintUrl, fromScan, fromAccepter, token } = useLocalSearchParams<{
-    mintUrl: string;
-    fromScan?: string;
-    fromAccepter?: string;
-    token?: string;
-  }>();
-  const {
-    getMintInfo,
-    isKnownMint,
-    addMint,
-    isLoading: mintManagementLoading,
-  } = useMintManagement();
-  const { receive } = useReceive();
+  const { mintInfoEntry: entryParam } = useLocalSearchParams<{ mintInfoEntry?: string }>();
+  const { entry, actions } = useScreenActions('mintInfo', entryParam);
 
-  const [mintInfo, setMintInfo] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [isKnownMintState, setIsKnownMintState] = useState<boolean | null>(null);
-  const [addingMint, setAddingMint] = useState(false);
+  const mintUrl = (entry?.mintUrl as string) ?? '';
+  const displayName = (entry?.displayName as string) ?? mintUrl;
 
-  const {
-    auditInfo,
-    mintInfo: auditMintInfo,
-    loading: auditLoading,
-  } = useAuditedMint(mintUrl || '');
-  const { score: kymScore } = useKYMMint(mintUrl || '');
+  log.debug('mint.info.display', { mintUrl, displayName, hasEntry: !!entry });
 
-  const handleCopy = useCallback(async (text: string) => {
+  const handleContactPress = useCallback(async (method: string, info: string) => {
+    log.info('mint.info.contact.press', { method });
     try {
-      await Clipboard.setStringAsync(text);
+      switch (method.toLowerCase()) {
+        case 'email':
+          await Linking.openURL(`mailto:${info}`);
+          break;
+        case 'twitter':
+        case 'x':
+          await Linking.openURL(`https://x.com/${info.replace('@', '')}`);
+          break;
+        case 'nostr':
+          router.navigate({ pathname: '/userMessages', params: { pubkey: npubToPubkey(info) } });
+          break;
+        default:
+          await Clipboard.setStringAsync(info);
+      }
     } catch {
-      Alert.alert('Error', 'Failed to copy to clipboard');
+      await Clipboard.setStringAsync(info);
     }
   }, []);
 
-  const handleContactPress = useCallback(
-    async (method: string, info: string) => {
-      try {
-        switch (method.toLowerCase()) {
-          case 'email':
-            await Linking.openURL(`mailto:${info}`);
-            break;
-          case 'twitter':
-          case 'x':
-            await Linking.openURL(`https://x.com/${info.replace('@', '')}`);
-            break;
-          case 'nostr':
-            router.navigate({ pathname: '/userMessages', params: { pubkey: npubToPubkey(info) } });
-            break;
-          default:
-            await handleCopy(info);
-        }
-      } catch {
-        handleCopy(info);
-      }
-    },
-    [handleCopy]
-  );
-
-  useEffect(() => {
-    const fetchMintInfo = async () => {
-      if (!mintUrl) {
-        setLoading(false);
-        return;
-      }
-      try {
-        setLoading(true);
-        const data = await getMintInfo(mintUrl);
-        setMintInfo(data);
-      } catch {
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMintInfo();
-  }, [mintUrl, getMintInfo]);
-
-  useEffect(() => {
-    const checkIfKnown = async () => {
-      if (!mintUrl) {
-        setIsKnownMintState(null);
-        return;
-      }
-      try {
-        const known = await isKnownMint(mintUrl);
-        setIsKnownMintState(known);
-      } catch {
-        // Treat errors as mint not being known
-        setIsKnownMintState(false);
-      }
-    };
-    checkIfKnown();
-  }, [mintUrl, isKnownMint]);
-
-  const handleAddMint = useCallback(async () => {
-    if (!mintUrl) return;
-    setAddingMint(true);
-    try {
-      await addMint(mintUrl);
-      if (fromAccepter === '1' && token) {
-        // Trust + redeem in one step, then dismiss back
-        await receive(token);
-        router.back();
-      } else if (fromAccepter === '1') {
-        router.back();
-      } else {
-        Alert.alert('Success', 'Mint added successfully', [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
-      }
-    } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to add mint');
-    } finally {
-      setAddingMint(false);
-    }
-  }, [mintUrl, addMint, fromAccepter, token, receive]);
-
-  const isLoading = loading || auditLoading;
-
-  const { successRate, totalMints, totalMelts } = useMemo(() => {
-    const mints = auditInfo?.auditorData?.mints;
-    const melts = auditInfo?.auditorData?.melts;
-    const errors = auditInfo?.auditorData?.errors;
-    const totalOps = (mints || 0) + (melts || 0);
-    const rate =
-      typeof auditInfo?.successRate === 'number'
-        ? auditInfo.successRate
-        : typeof auditInfo?.score === 'number'
-          ? auditInfo.score / 5
-          : totalOps > 0
-            ? 1 - (errors || 0) / totalOps
-            : undefined;
-    return { successRate: rate, totalMints: mints, totalMelts: melts };
-  }, [auditInfo]);
-
-  const displayName = useMemo(() => {
-    const name = mintInfo?.name || auditMintInfo?.name || auditInfo?.auditorData?.name;
-    return getMintDisplayName(mintUrl || '', name ? { name } : undefined);
-  }, [mintInfo, auditMintInfo, auditInfo, mintUrl]);
+  const contact = entry?.contact as
+    | Array<{ method: string; info: import('coco-payment-ux').FormattedString }>
+    | undefined;
 
   return (
-    <View className="bg-background flex-1">
+    <Screen name="MintInfoScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
-          title: fromAccepter === '1' ? 'Verify Mint' : isLoading ? 'Mint Details' : displayName,
+          title: entry?.fromAccepter ? 'Verify Mint' : displayName || 'Mint Details',
           headerRight:
-            fromAccepter === '1'
+            entry?.fromAccepter || !(typeof entry?.kymScore === 'number' && entry.kymScore >= 0)
               ? undefined
               : () => (
                   <Link
                     href={{
                       pathname: '/reviews',
-                      params: { mintUrl: mintUrl || '' },
+                      params: { mintUrl },
                     }}
                     asChild>
                     <TouchableOpacity style={{ padding: 8 }}>
@@ -585,91 +477,92 @@ export function MintInfoScreen() {
         }}
         showsVerticalScrollIndicator={false}>
         <VStack align="center" className="w-full pb-8 pt-6">
-          {/* Progress Ring with Avatar */}
           <ProgressRing
             size={84}
-            progress={successRate ?? 0.5}
+            progress={(entry?.successRate as number) ?? 0.5}
             successColor={success}
             errorColor={danger}>
             <AnimatedAvatar
-              picture={mintInfo?.icon_url || auditMintInfo?.icon_url}
+              picture={entry?.iconUrl as string | undefined}
               name={displayName}
               alt={`${displayName} icon`}
-              status={auditInfo?.auditorData?.state}
+              status={entry?.auditState as string | undefined}
               size={70}
-              isLoading={isLoading}
+              isLoading={!entry}
             />
           </ProgressRing>
 
           <Spacer size={16} />
 
-          <RatingBarChart score={kymScore ?? -1} />
+          {typeof entry?.kymScore === 'number' && entry.kymScore >= 0 && (
+            <RatingBarChart score={entry.kymScore} />
+          )}
 
-          <StatsGrid
-            successRate={successRate}
-            avgTimeMs={auditInfo?.avgTimeMs}
-            swapSuccess={auditInfo?.swapSuccess}
-            swapTotal={auditInfo?.swapTotal}
-            totalMints={totalMints}
-            totalMelts={totalMelts}
-          />
+          {entry?.auditState != null && (
+            <StatsGrid
+              successRate={entry?.successRate as number | undefined}
+              avgTimeMs={entry?.avgTimeMs as number | undefined}
+              swapSuccess={entry?.swapSuccess as number | undefined}
+              swapTotal={entry?.swapTotal as number | undefined}
+              totalMints={entry?.totalMints as number | undefined}
+              totalMelts={entry?.totalMelts as number | undefined}
+            />
+          )}
         </VStack>
 
-        {/* Info Cards */}
-        {mintInfo?.description && (
+        {typeof entry?.description === 'string' && (
           <>
-            <Card variant="info" message={mintInfo.description} />
+            <Card variant="info" message={entry.description} />
             <Spacer size={12} />
           </>
         )}
 
-        {mintInfo?.description_long && (
+        {typeof entry?.longDescription === 'string' && (
           <>
-            <Card variant="warning" message={mintInfo.description_long} />
+            <Card variant="warning" message={entry.longDescription} />
             <Spacer size={12} />
           </>
         )}
 
-        {mintInfo?.motd && (
+        {typeof entry?.motd === 'string' && (
           <>
-            <Card variant="warning" message={`Message: ${mintInfo.motd}`} />
+            <Card variant="warning" message={`Message: ${entry.motd}`} />
             <Spacer size={12} />
           </>
         )}
 
-        {/* Contact Section */}
-        {mintInfo?.contact && mintInfo.contact.length > 0 && (
+        {contact && contact.length > 0 && (
           <Section title="Contact">
             <ListGroup variant="secondary">
-              {mintInfo.contact.map((contact: any, index: number) => (
+              {contact.map((c, index) => (
                 <PressableFeedback
                   key={index}
                   animation={false}
-                  onPress={() => handleContactPress(contact.method, contact.info)}>
+                  onPress={() => handleContactPress(c.method, c.info.toString())}>
                   <PressableFeedback.Scale>
                     <ListGroup.Item disabled>
                       <ListGroup.ItemPrefix>
-                        {contact.method.toUpperCase() === 'NOSTR' ? (
+                        {c.method.toUpperCase() === 'NOSTR' ? (
                           <CurrencyIcon
                             colors={[opacity(foreground, 0.4)]}
                             width={20}
                             currency="nostr"
                           />
-                        ) : ['X', 'TWITTER'].includes(contact.method.toUpperCase()) ? (
+                        ) : ['X', 'TWITTER'].includes(c.method.toUpperCase()) ? (
                           <Icon
                             name="hugeicons:new-twitter"
                             size={20}
                             color={opacity(foreground, 0.4)}
                           />
-                        ) : contact.method.toUpperCase() === 'EMAIL' ? (
+                        ) : c.method.toUpperCase() === 'EMAIL' ? (
                           <Icon name="mdi:at" size={20} color={opacity(foreground, 0.4)} />
                         ) : undefined}
                       </ListGroup.ItemPrefix>
                       <ListGroup.ItemContent>
                         <ListGroup.ItemTitle>
-                          {contact.method.toUpperCase() === 'NOSTR'
-                            ? truncateMiddle(contact.info, 10)
-                            : contact.info}
+                          {c.method.toUpperCase() === 'NOSTR'
+                            ? c.info.truncate(10)
+                            : c.info.toString()}
                         </ListGroup.ItemTitle>
                       </ListGroup.ItemContent>
                       <ListGroup.ItemSuffix />
@@ -682,13 +575,10 @@ export function MintInfoScreen() {
           </Section>
         )}
 
-        {isKnownMintState && fromAccepter !== '1' && (
+        {entry?.isTrusted === true && !entry?.fromAccepter && (
           <Section title="Settings">
             <ListGroup variant="secondary">
-              <PressableFeedback
-                animation={false}
-                // Route into the balance split editor (mint-flow modal).
-                onPress={() => router.navigate('/distribution')}>
+              <PressableFeedback animation={false} onPress={() => router.navigate('/distribution')}>
                 <PressableFeedback.Scale>
                   <ListGroup.Item disabled>
                     <ListGroup.ItemPrefix>
@@ -714,7 +604,7 @@ export function MintInfoScreen() {
       <BottomButtons>
         <ButtonHandler
           buttons={
-            fromAccepter === '1'
+            entry?.fromAccepter
               ? [
                   {
                     text: 'Reject',
@@ -724,13 +614,13 @@ export function MintInfoScreen() {
                     },
                   },
                   {
-                    text: addingMint ? 'Accepting...' : 'Accept',
+                    text: actions.trust.loading ? 'Accepting...' : 'Accept',
                     variant: 'primary',
-                    disabled: addingMint || mintManagementLoading,
-                    onPress: handleAddMint,
+                    disabled: !actions.trust.available || actions.trust.loading,
+                    onPress: () => actions.trust.execute(),
                   },
                 ]
-              : mintUrl && (fromScan === '1' || isKnownMintState === false)
+              : mintUrl && (entry?.fromScan || !entry?.isTrusted)
                 ? [
                     {
                       text: 'Close',
@@ -740,10 +630,10 @@ export function MintInfoScreen() {
                       },
                     },
                     {
-                      text: addingMint ? 'Adding...' : 'Add mint',
+                      text: actions.trust.loading ? 'Adding...' : 'Add mint',
                       variant: 'primary',
-                      disabled: addingMint || mintManagementLoading,
-                      onPress: handleAddMint,
+                      disabled: !actions.trust.available || actions.trust.loading,
+                      onPress: () => actions.trust.execute(),
                     },
                   ]
                 : [
@@ -758,7 +648,7 @@ export function MintInfoScreen() {
           }
         />
       </BottomButtons>
-    </View>
+    </Screen>
   );
 }
 
@@ -789,21 +679,5 @@ const styles = StyleSheet.create({
   },
   statCardStretch: {
     flex: 1,
-  },
-  skeletonLabel: {
-    width: 80,
-    height: 14,
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  skeletonValue: {
-    height: 28,
-    borderRadius: 4,
-    marginBottom: 4,
-  },
-  skeletonDesc: {
-    width: 120,
-    height: 14,
-    borderRadius: 4,
   },
 });

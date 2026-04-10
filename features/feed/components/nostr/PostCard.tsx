@@ -29,6 +29,7 @@ import {
   sharedStyles,
 } from './shared';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 type PostCardVariant = 'feed' | 'repost-original' | 'thread-target' | 'thread-reply';
 
@@ -182,67 +183,69 @@ export const PostCard = React.memo(function PostCard({
     const truncatedNpub = `${tryNpubEncode(event.pubkey).slice(0, 16)}…`;
 
     return (
-      <View>
-        <View style={pcStyles.targetRow}>
-          <Pressable
-            onPressIn={handleNestedPressIn}
-            onPressOut={handleNestedPressOut}
-            onPress={navigateToProfile}>
-            <HStack align="center" gap={10} style={sharedStyles.mb6}>
-              <Avatar
-                picture={profile?.picture}
-                seed={event.pubkey}
-                size={AVATAR_SIZE}
-                name={displayName}
-              />
-              <VStack style={sharedStyles.flex1}>
-                <Text bold size={15} style={textPrimary} numberOfLines={1}>
-                  {displayName}
-                </Text>
-                <Text semibold size={13} style={textMuted}>
-                  {truncatedNpub}
-                </Text>
-              </VStack>
-            </HStack>
-          </Pressable>
+      <Log name="PostCard">
+        <View>
+          <View style={pcStyles.targetRow}>
+            <Pressable
+              onPressIn={handleNestedPressIn}
+              onPressOut={handleNestedPressOut}
+              onPress={navigateToProfile}>
+              <HStack align="center" gap={10} style={sharedStyles.mb6}>
+                <Avatar
+                  picture={profile?.picture}
+                  seed={event.pubkey}
+                  size={AVATAR_SIZE}
+                  name={displayName}
+                />
+                <VStack style={sharedStyles.flex1}>
+                  <Text bold size={15} style={textPrimary} numberOfLines={1}>
+                    {displayName}
+                  </Text>
+                  <Text semibold size={13} style={textMuted}>
+                    {truncatedNpub}
+                  </Text>
+                </VStack>
+              </HStack>
+            </Pressable>
 
-          <NoteContent
-            content={event.content}
-            quotedEvents={quotedEvents}
-            profiles={profiles}
-            getMetrics={getMetrics}
-            onVideoTap={onVideoTap}
-            onQuotedPressIn={handleNestedPressIn}
-            onQuotedPressOut={handleNestedPressOut}
-            onInlineActionPressIn={handleNestedPressIn}
-            onInlineActionPressOut={handleNestedPressOut}
-          />
+            <NoteContent
+              content={event.content}
+              quotedEvents={quotedEvents}
+              profiles={profiles}
+              getMetrics={getMetrics}
+              onVideoTap={onVideoTap}
+              onQuotedPressIn={handleNestedPressIn}
+              onQuotedPressOut={handleNestedPressOut}
+              onInlineActionPressIn={handleNestedPressIn}
+              onInlineActionPressOut={handleNestedPressOut}
+            />
 
-          {fullDate ? (
-            <Text size={13} style={[textMuted, pcStyles.targetDate]}>
-              {fullDate}
-            </Text>
-          ) : null}
+            {fullDate ? (
+              <Text size={13} style={[textMuted, pcStyles.targetDate]}>
+                {fullDate}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={pcStyles.targetMetrics}>
+            <MetricsFooter
+              metrics={metrics}
+              borderColor={foreground}
+              onCommentPress={onCommentPress ?? navigateToThread}
+              onRepostPress={onRepostPress}
+              onLikePress={onLikePress}
+              reposted={reposted}
+              liked={liked}
+              repostPending={repostPending}
+              likePending={likePending}
+              repostPendingDirection={repostPendingDirection}
+              likePendingDirection={likePendingDirection}
+              onActionPressIn={handleNestedPressIn}
+              onActionPressOut={handleNestedPressOut}
+            />
+          </View>
         </View>
-
-        <View style={pcStyles.targetMetrics}>
-          <MetricsFooter
-            metrics={metrics}
-            borderColor={foreground}
-            onCommentPress={onCommentPress ?? navigateToThread}
-            onRepostPress={onRepostPress}
-            onLikePress={onLikePress}
-            reposted={reposted}
-            liked={liked}
-            repostPending={repostPending}
-            likePending={likePending}
-            repostPendingDirection={repostPendingDirection}
-            likePendingDirection={likePendingDirection}
-            onActionPressIn={handleNestedPressIn}
-            onActionPressOut={handleNestedPressOut}
-          />
-        </View>
-      </View>
+      </Log>
     );
   }
 
@@ -351,17 +354,23 @@ export const PostCard = React.memo(function PostCard({
 
   if (isFeed) {
     return (
-      <GestureDetector gesture={tapGesture}>
-        <Reanimated.View style={animStyle}>{gutterContent}</Reanimated.View>
-      </GestureDetector>
+      <Log name="PostCard">
+        <GestureDetector gesture={tapGesture}>
+          <Reanimated.View style={animStyle}>{gutterContent}</Reanimated.View>
+        </GestureDetector>
+      </Log>
     );
   }
 
   if (isThread) {
-    return <Pressable onPress={handleThreadPress}>{gutterContent}</Pressable>;
+    return (
+      <Log name="PostCard">
+        <Pressable onPress={handleThreadPress}>{gutterContent}</Pressable>
+      </Log>
+    );
   }
 
-  return gutterContent;
+  return <Log name="PostCard">{gutterContent}</Log>;
 });
 
 const pcStyles = StyleSheet.create({

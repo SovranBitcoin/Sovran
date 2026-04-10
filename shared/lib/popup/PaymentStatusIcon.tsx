@@ -26,7 +26,7 @@ const PENDING_OFFSET = 45;
 
 const AnimatedPath = createAnimatedComponent(Path);
 
-type Status = 'pending' | 'confirmed' | 'failed';
+type Status = 'pending' | 'delivered' | 'confirmed' | 'failed';
 
 export function PaymentStatusIcon({
   size,
@@ -43,7 +43,7 @@ export function PaymentStatusIcon({
   const colorProgress = useSharedValue(status === 'confirmed' || status === 'failed' ? 1 : 0);
 
   useEffect(() => {
-    if (status === 'pending') {
+    if (status === 'pending' || status === 'delivered') {
       circleOffset.set(PENDING_OFFSET);
       checkmarkOffset.set(CHECKMARK_LENGTH);
       crossOffset.set(CROSS_LENGTH);

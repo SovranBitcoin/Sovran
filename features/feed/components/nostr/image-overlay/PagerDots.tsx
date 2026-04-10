@@ -15,6 +15,7 @@ import {
   DOTS_OPACITY_INPUT,
   DOTS_OPACITY_OUTPUT,
 } from './config';
+import { Log } from '@/shared/lib/logger';
 
 const DOT_CONTAINER_WIDTH = DOTS_SIZE + DOTS_GAP;
 
@@ -48,9 +49,11 @@ export function OverlayDot({
   });
 
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.dot, animatedDotStyle, { backgroundColor: activeColor }]} />
-    </View>
+    <Log name="OverlayDot">
+      <View style={styles.container}>
+        <Animated.View style={[styles.dot, animatedDotStyle, { backgroundColor: activeColor }]} />
+      </View>
+    </Log>
   );
 }
 

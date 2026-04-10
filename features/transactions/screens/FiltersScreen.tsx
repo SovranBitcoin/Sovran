@@ -5,8 +5,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { HistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
-import { useMints } from 'coco-cashu-react';
+import { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
+import { useMints } from '@cashu/coco-react';
 
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -19,6 +19,7 @@ import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import opacity from 'hex-color-opacity';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 type PaymentType = 'all' | 'lightning' | 'ecash';
 type Direction = 'all' | 'incoming' | 'outgoing';
@@ -117,6 +118,7 @@ const MintSelectorChip: React.FC<{
 };
 
 export function FiltersScreen() {
+  useLifecycleLogger('FiltersScreen');
   const foreground = useThemeColor('foreground');
   const { trustedMints } = useMints();
   const { history } = useHistoryWithMelts();
@@ -152,6 +154,7 @@ export function FiltersScreen() {
   );
 
   const handleApply = useCallback(() => {
+    log.info('tx.filters.apply', { currency, paymentType, direction, status, mintUrl });
     router.dismissTo({
       pathname: '/transactions',
       params: {
@@ -165,6 +168,7 @@ export function FiltersScreen() {
   }, [currency, paymentType, direction, status, mintUrl]);
 
   const handleReset = useCallback(() => {
+    log.info('tx.filters.reset');
     setCurrency('sat');
     setPaymentType('all');
     setDirection('all');
@@ -274,105 +278,107 @@ export function FiltersScreen() {
           </Pressable>
         </View>
       }>
-      <View style={styles.filterContent}>
-        <Section title="Mint">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.mintChipsRow}>
-            {mintOptions.map((mint) => (
-              <MintSelectorChip
-                key={mint.mintUrl}
-                showIcon={mint.mintUrl !== 'all'}
-                name={mint.name}
-                iconUrl={mint.icon_url}
-                isSelected={mintUrl === mint.mintUrl}
-                onPress={() => setMintUrl(mint.mintUrl)}
+      <Screen name="FiltersScreen">
+        <View style={styles.filterContent}>
+          <Section title="Mint">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.mintChipsRow}>
+              {mintOptions.map((mint) => (
+                <MintSelectorChip
+                  key={mint.mintUrl}
+                  showIcon={mint.mintUrl !== 'all'}
+                  name={mint.name}
+                  iconUrl={mint.icon_url}
+                  isSelected={mintUrl === mint.mintUrl}
+                  onPress={() => setMintUrl(mint.mintUrl)}
+                />
+              ))}
+            </ScrollView>
+          </Section>
+
+          <Section title="Currency">
+            {SUPPORTED_CURRENCIES.map((curr) => (
+              <Chip
+                key={curr}
+                label={curr}
+                isSelected={currency.toUpperCase() === curr}
+                onPress={() => setCurrency(curr.toLowerCase())}
               />
             ))}
-          </ScrollView>
-        </Section>
+          </Section>
 
-        <Section title="Currency">
-          {SUPPORTED_CURRENCIES.map((curr) => (
+          <Section title="Type">
             <Chip
-              key={curr}
-              label={curr}
-              isSelected={currency.toUpperCase() === curr}
-              onPress={() => setCurrency(curr.toLowerCase())}
+              label="All"
+              icon="fluent:apps-16-filled"
+              isSelected={paymentType === 'all'}
+              onPress={() => setPaymentType('all')}
             />
-          ))}
-        </Section>
+            <Chip
+              label="Lightning"
+              icon="mingcute:lightning-fill"
+              isSelected={paymentType === 'lightning'}
+              onPress={() => setPaymentType('lightning')}
+            />
+            <Chip
+              label="Ecash"
+              icon="majesticons:coins"
+              isSelected={paymentType === 'ecash'}
+              onPress={() => setPaymentType('ecash')}
+            />
+          </Section>
 
-        <Section title="Type">
-          <Chip
-            label="All"
-            icon="fluent:apps-16-filled"
-            isSelected={paymentType === 'all'}
-            onPress={() => setPaymentType('all')}
-          />
-          <Chip
-            label="Lightning"
-            icon="mingcute:lightning-fill"
-            isSelected={paymentType === 'lightning'}
-            onPress={() => setPaymentType('lightning')}
-          />
-          <Chip
-            label="Ecash"
-            icon="majesticons:coins"
-            isSelected={paymentType === 'ecash'}
-            onPress={() => setPaymentType('ecash')}
-          />
-        </Section>
+          <Section title="Direction">
+            <Chip
+              label="All"
+              icon="fluent:arrow-swap-16-filled"
+              isSelected={direction === 'all'}
+              onPress={() => setDirection('all')}
+            />
+            <Chip
+              label="In"
+              icon="fluent:arrow-download-16-filled"
+              isSelected={direction === 'incoming'}
+              onPress={() => setDirection('incoming')}
+            />
+            <Chip
+              label="Out"
+              icon="fluent:arrow-upload-16-filled"
+              isSelected={direction === 'outgoing'}
+              onPress={() => setDirection('outgoing')}
+            />
+          </Section>
 
-        <Section title="Direction">
-          <Chip
-            label="All"
-            icon="fluent:arrow-swap-16-filled"
-            isSelected={direction === 'all'}
-            onPress={() => setDirection('all')}
-          />
-          <Chip
-            label="In"
-            icon="fluent:arrow-download-16-filled"
-            isSelected={direction === 'incoming'}
-            onPress={() => setDirection('incoming')}
-          />
-          <Chip
-            label="Out"
-            icon="fluent:arrow-upload-16-filled"
-            isSelected={direction === 'outgoing'}
-            onPress={() => setDirection('outgoing')}
-          />
-        </Section>
-
-        <Section title="Status">
-          <Chip
-            label="All"
-            icon="fluent:list-16-filled"
-            isSelected={status === 'All'}
-            onPress={() => setStatus('All')}
-          />
-          <Chip
-            label="Confirmed"
-            icon="fluent:checkmark-circle-16-filled"
-            isSelected={status === 'Confirmed'}
-            onPress={() => setStatus('Confirmed')}
-          />
-          <Chip
-            label="Pending"
-            icon="fluent:clock-16-filled"
-            isSelected={status === 'Pending'}
-            onPress={() => setStatus('Pending')}
-          />
-          <Chip
-            label="Expired"
-            icon="fluent:dismiss-circle-16-filled"
-            isSelected={status === 'Expired'}
-            onPress={() => setStatus('Expired')}
-          />
-        </Section>
-      </View>
+          <Section title="Status">
+            <Chip
+              label="All"
+              icon="fluent:list-16-filled"
+              isSelected={status === 'All'}
+              onPress={() => setStatus('All')}
+            />
+            <Chip
+              label="Confirmed"
+              icon="fluent:checkmark-circle-16-filled"
+              isSelected={status === 'Confirmed'}
+              onPress={() => setStatus('Confirmed')}
+            />
+            <Chip
+              label="Pending"
+              icon="fluent:clock-16-filled"
+              isSelected={status === 'Pending'}
+              onPress={() => setStatus('Pending')}
+            />
+            <Chip
+              label="Expired"
+              icon="fluent:dismiss-circle-16-filled"
+              isSelected={status === 'Expired'}
+              onPress={() => setStatus('Expired')}
+            />
+          </Section>
+        </View>
+      </Screen>
     </ModalScreenLayout>
   );
 }

@@ -4,6 +4,7 @@ import { PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
+import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
@@ -21,44 +22,59 @@ export interface CapsuleButtonProps {
   height?: number;
 }
 
-const DEFAULT_HEIGHT = 48;
+const DEFAULT_HEIGHT = 46;
 
 export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
   const { label, icon, onPress, color = foreground, height = DEFAULT_HEIGHT } = props;
 
   if (supportsLiquidGlass()) {
-    return <CapsuleButtonLiquid {...props} color={color} />;
+    return (
+      <Log name="CapsuleButton">
+        <CapsuleButtonLiquid {...props} color={color} />
+      </Log>
+    );
   }
 
   return (
-    <View style={[styles.card, { borderColor: opacity(muted, 0.3), minHeight: height }]}>
-      <BlurCardFrame accentColor={muted}>
-        <PressableFeedback
-          animation={false}
-          onPress={onPress}
-          style={[styles.pressable, { minHeight: height }]}>
-          <HStack
-            align="center"
-            justify="center"
-            spacing={8}
-            style={[styles.content, { minHeight: height }]}>
-            <Icon name={icon} size={16} color={color} />
-            <Text size={14} bold style={{ color }}>
-              {label}
-            </Text>
-          </HStack>
-          <PressableFeedback.Ripple />
-        </PressableFeedback>
-      </BlurCardFrame>
-    </View>
+    <Log name="CapsuleButton">
+      <View
+        style={[
+          styles.card,
+          {
+            borderColor: opacity(muted, 0.3),
+            minHeight: height,
+            maxWidth: 140,
+            alignSelf: 'center',
+          },
+        ]}>
+        <BlurCardFrame accentColor={muted}>
+          <PressableFeedback
+            animation={false}
+            onPress={onPress}
+            style={[styles.pressable, { minHeight: height }]}>
+            <HStack
+              align="center"
+              justify="center"
+              spacing={8}
+              style={[styles.content, { minHeight: height }]}>
+              <Icon name={icon} size={16} color={color} />
+              <Text size={14} bold style={{ color }}>
+                {label}
+              </Text>
+            </HStack>
+            <PressableFeedback.Ripple />
+          </PressableFeedback>
+        </BlurCardFrame>
+      </View>
+    </Log>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    borderRadius: 20,
+    borderRadius: 24,
     borderCurve: 'continuous',
     overflow: 'hidden',
     borderWidth: 1,

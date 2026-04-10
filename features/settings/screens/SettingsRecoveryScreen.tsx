@@ -6,10 +6,11 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
+import { log, Screen, useLifecycleLogger } from '@/shared/lib/logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useMintManagement } from '@/features/mint';
 import { useNavigation, router } from 'expo-router';
-import { Mint } from 'coco-cashu-core';
+import { Mint } from '@cashu/coco-core';
 import opacity from 'hex-color-opacity';
 import { Button, Card } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -23,6 +24,7 @@ interface RecoveryResult {
 }
 
 export const SettingsRecoveryScreen: React.FC = () => {
+  useLifecycleLogger('SettingsRecoveryScreen');
   const [foreground, green400, red400] = useThemeColor([
     'foreground',
     'green-400',
@@ -93,9 +95,9 @@ export const SettingsRecoveryScreen: React.FC = () => {
       setCurrentMintIndex(mints.length); // Show "recovering pending transactions" state
       try {
         const manager = CocoManager.getInstance();
-        await manager.send.recoverPendingOperations();
+        await manager.ops.send.recovery.run();
       } catch (error) {
-        console.warn('Failed to recover pending operations:', error);
+        log.warn('settings.recovery.failed', { error });
       }
 
       // Reload mints/balances
@@ -310,15 +312,17 @@ export const SettingsRecoveryScreen: React.FC = () => {
 
   return (
     <Container>
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ flexGrow: 1 }}
-        scrollEnabled={recoveryState !== 'recovering'}>
-        {recoveryState === 'idle' && renderIdleState()}
-        {recoveryState === 'recovering' && renderRecoveringState()}
-        {recoveryState === 'complete' && renderCompleteState()}
-        {recoveryState === 'error' && renderErrorState()}
-      </ScrollView>
+      <Screen name="SettingsRecoveryScreen">
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ flexGrow: 1 }}
+          scrollEnabled={recoveryState !== 'recovering'}>
+          {recoveryState === 'idle' && renderIdleState()}
+          {recoveryState === 'recovering' && renderRecoveringState()}
+          {recoveryState === 'complete' && renderCompleteState()}
+          {recoveryState === 'error' && renderErrorState()}
+        </ScrollView>
+      </Screen>
     </Container>
   );
 };

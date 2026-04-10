@@ -14,7 +14,8 @@ import { WalletHealthModalContent } from '@/features/health/components/WalletHea
 import type { HealthCta } from '@/features/health/lib/walletHealth';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
-import { useMints } from 'coco-cashu-react';
+import { useMints } from '@cashu/coco-react';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 const DEFAULT_CURRENCIES = ['SAT'];
 const HEADER_OVERLAP = 24;
@@ -36,6 +37,7 @@ function getCurrenciesFromMints(trustedMints: any[]): string[] {
 }
 
 export function HealthModalScreen() {
+  useLifecycleLogger('HealthModalScreen');
   const params = useLocalSearchParams<{ unit?: string }>();
   const initialUnit = (params.unit || 'sat').toLowerCase();
 
@@ -64,6 +66,10 @@ export function HealthModalScreen() {
   );
 
   const handleAction = useCallback((action: HealthCta) => {
+    log.info('health.action', {
+      type: action.type,
+      unit: 'unit' in action ? action.unit : undefined,
+    });
     if (action.type === 'openPendingEcash') {
       router.navigate('/pendingEcash');
       return;
@@ -83,81 +89,83 @@ export function HealthModalScreen() {
   }, [hero, unit]);
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          headerTransparent: true,
-          headerShadowVisible: false,
-          headerTitle: '',
-          headerBackVisible: false,
-          headerTintColor: foreground,
-          headerBlurEffect: 'none',
-          headerBackground: () => null,
-          headerLeft: () => (
-            <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
-              <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-            </TouchableOpacity>
-          ),
-        }}
-      />
+    <Screen name="HealthModalScreen">
+      <>
+        <Stack.Screen
+          options={{
+            headerShown: true,
+            headerTransparent: true,
+            headerShadowVisible: false,
+            headerTitle: '',
+            headerBackVisible: false,
+            headerTintColor: foreground,
+            headerBlurEffect: 'none',
+            headerBackground: () => null,
+            headerLeft: () => (
+              <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
+                <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
+              </TouchableOpacity>
+            ),
+          }}
+        />
 
-      <WalletHealthModalContent
-        unit={unit}
-        onAction={handleAction}
-        topOffset={topOffset}
-        currencies={availableCurrencies}
-        selectedCurrency={selectedCurrency}
-        onCurrencyChange={setSelectedCurrency}
-        scrollY={scrollY}>
-        {({ heroContent, tabsContent, bodyContent }) => (
-          <RNView style={{ flex: 1 }}>
-            <ModalLayoutWrapper
-              contentPadding={0}
-              useAnimatedScroll
-              scrollY={scrollY}
-              bottomPadding={32}
-              disableHeaderSpacer
-              scrollIndicatorInsets={{
-                top: Math.max(0, stickyHeaderHeight - nativeHeaderHeight),
-              }}>
-              <RNView style={{ height: stickyHeaderHeight }} />
+        <WalletHealthModalContent
+          unit={unit}
+          onAction={handleAction}
+          topOffset={topOffset}
+          currencies={availableCurrencies}
+          selectedCurrency={selectedCurrency}
+          onCurrencyChange={setSelectedCurrency}
+          scrollY={scrollY}>
+          {({ heroContent, tabsContent, bodyContent }) => (
+            <RNView style={{ flex: 1 }}>
+              <ModalLayoutWrapper
+                contentPadding={0}
+                useAnimatedScroll
+                scrollY={scrollY}
+                bottomPadding={32}
+                disableHeaderSpacer
+                scrollIndicatorInsets={{
+                  top: Math.max(0, stickyHeaderHeight - nativeHeaderHeight),
+                }}>
+                <RNView style={{ height: stickyHeaderHeight }} />
+
+                <RNView
+                  style={{
+                    marginTop: -HEADER_OVERLAP,
+                    paddingTop: HEADER_OVERLAP,
+                  }}>
+                  {bodyContent}
+                </RNView>
+              </ModalLayoutWrapper>
 
               <RNView
-                style={{
-                  marginTop: -HEADER_OVERLAP,
-                  paddingTop: HEADER_OVERLAP,
-                }}>
-                {bodyContent}
-              </RNView>
-            </ModalLayoutWrapper>
+                style={styles.stickyHeader}
+                pointerEvents="box-none"
+                onLayout={handleStickyLayout}>
+                <RNView>
+                  <RNView
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { backgroundColor: background, bottom: HEADER_OVERLAP },
+                    ]}
+                  />
+                  <LinearGradient
+                    colors={[background, opacity(background, 0)]}
+                    style={styles.headerGradient}
+                    pointerEvents="none"
+                  />
 
-            <RNView
-              style={styles.stickyHeader}
-              pointerEvents="box-none"
-              onLayout={handleStickyLayout}>
-              <RNView>
-                <RNView
-                  style={[
-                    StyleSheet.absoluteFill,
-                    { backgroundColor: background, bottom: HEADER_OVERLAP },
-                  ]}
-                />
-                <LinearGradient
-                  colors={[background, opacity(background, 0)]}
-                  style={styles.headerGradient}
-                  pointerEvents="none"
-                />
+                  {heroContent}
 
-                {heroContent}
-
-                <RNView style={{ marginTop: 10 }}>{tabsContent}</RNView>
+                  <RNView style={{ marginTop: 10 }}>{tabsContent}</RNView>
+                </RNView>
               </RNView>
             </RNView>
-          </RNView>
-        )}
-      </WalletHealthModalContent>
-    </>
+          )}
+        </WalletHealthModalContent>
+      </>
+    </Screen>
   );
 }
 

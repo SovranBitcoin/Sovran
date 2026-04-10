@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import {
   TouchableOpacity,
   ActivityIndicator,
@@ -18,6 +18,8 @@ import { useDebouncedMintValidation } from '@/features/mint/hooks/useDebouncedMi
 import { useNostrDiscoveredMints } from '@/features/mint/hooks/useNostrDiscoveredMints';
 import { useSovranDiscoveredMints } from '@/features/mint/hooks/useSovranDiscoveredMints';
 import { useKYMMints } from '@/features/mint/hooks/useKYMMints';
+import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
+import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
 import { filterMints } from '@/shared/lib/fuzzySearch';
 import {
   extractDomain,
@@ -36,19 +38,39 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Badge } from '@/shared/ui/primitives/Badge';
 import { Checkbox } from '@/shared/ui/primitives/Checkbox';
 import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
+import Icon from 'assets/icons';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useAuditedMints, type AuditedMintData } from '@/features/mint/hooks/useAuditedMints';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import opacity from 'hex-color-opacity';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 // Height constant for currency tabs (same as MintListScreen)
 const CURRENCY_TABS_HEIGHT = 48;
+
+const MintStatCell = memo(function MintStatCell({
+  icon,
+  value,
+  color,
+}: {
+  icon: string;
+  value: string;
+  color: string;
+}) {
+  return (
+    <HStack align="center" justify="center" gap={5} style={{ flex: 1, paddingVertical: 10 }}>
+      <Icon name={icon} size={14} color={color} />
+      <Text size={13} bold color={color}>
+        {value}
+      </Text>
+    </HStack>
+  );
+});
 
 interface PseudoMint {
   url: string;
@@ -63,14 +85,21 @@ interface SearchableDiscoveredMint {
   recommendations: any[];
   mintInfo: any | null;
   name: string;
+  contactFollowers?: number;
+  contactReputation?: number;
 }
 
 type SearchableMint = SearchableDiscoveredMint | PseudoMint;
 
-const adaptDiscoveredMint = (mint: any): SearchableDiscoveredMint => ({
-  ...mint,
-  name: mint.mintInfo?.name || extractDomain(mint.url),
-});
+function adaptDiscoveredMint(mint: any): SearchableDiscoveredMint {
+  const profile = useMintProfileStore.getState().getCached(mint.url);
+  return {
+    ...mint,
+    name: mint.mintInfo?.name || extractDomain(mint.url),
+    contactFollowers: profile?.followers,
+    contactReputation: profile ? Math.round(profile.reputation) : undefined,
+  };
+}
 
 // Fallback search header for Android with validation state
 const FallbackSearchHeader = memo(function FallbackSearchHeader({
@@ -279,40 +308,93 @@ const MintItem = memo(function MintItem({
           />
         </HStack>
 
-        {/* Bottom section: Score and Success Rate badges */}
-        <HStack gap={8}>
-          {displayScore ? (
-            <Badge className="h-[24px] w-[56px]" variant="star" icon="ic:round-star" size={14}>
-              {displayScore}
-            </Badge>
-          ) : kymLoading ? (
-            <Skeleton
-              className="h-[24px] w-[56px] rounded-full"
-              style={{ backgroundColor: opacity(warning, 0.2) }}
-            />
-          ) : null}
+        {/* Stats grid */}
+        {(displayScore ||
+          successRate !== undefined ||
+          ('contactReputation' in mint && mint.contactReputation) ||
+          ('contactFollowers' in mint && mint.contactFollowers)) && (
+          <View
+            className="bg-surface-secondary overflow-hidden"
+            style={{ borderRadius: 16, borderCurve: 'continuous' }}>
+            {/* Row 1: Score + Success */}
+            {(displayScore || successRate !== undefined) && (
+              <HStack>
+                {displayScore ? (
+                  <MintStatCell icon="ic:round-star" value={displayScore} color={warning} />
+                ) : null}
+                {displayScore && successRate !== undefined ? (
+                  <View
+                    style={{
+                      width: 1,
+                      backgroundColor: opacity(foreground, 0.08),
+                      marginVertical: 6,
+                    }}
+                  />
+                ) : null}
+                {successRate !== undefined ? (
+                  <MintStatCell
+                    icon="lucide:activity"
+                    value={`${successRate}%`}
+                    color={activityBadgeVariant === 'error' ? '#EF4444' : success}
+                  />
+                ) : null}
+              </HStack>
+            )}
 
-          {successRate !== undefined ? (
-            <Badge
-              className="h-[24px] w-[60px]"
-              variant={activityBadgeVariant}
-              icon="lucide:activity"
-              size={14}>
-              {`${successRate}%`}
-            </Badge>
-          ) : auditLoading ? (
-            <Skeleton
-              className="h-[24px] w-[60px] rounded-full"
-              style={{ backgroundColor: opacity(success, 0.2) }}
-            />
-          ) : null}
-        </HStack>
+            {/* Row divider */}
+            {(displayScore || successRate !== undefined) &&
+            (('contactReputation' in mint && mint.contactReputation) ||
+              ('contactFollowers' in mint && mint.contactFollowers)) ? (
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: opacity(foreground, 0.08),
+                  marginHorizontal: 8,
+                }}
+              />
+            ) : null}
+
+            {/* Row 2: Reputation + Followers */}
+            {(('contactReputation' in mint && mint.contactReputation) ||
+              ('contactFollowers' in mint && mint.contactFollowers)) && (
+              <HStack>
+                {'contactReputation' in mint && mint.contactReputation ? (
+                  <MintStatCell
+                    icon="mdi:shield-check"
+                    value={`${mint.contactReputation} / 100`}
+                    color="#3B82F6"
+                  />
+                ) : null}
+                {'contactReputation' in mint &&
+                mint.contactReputation &&
+                'contactFollowers' in mint &&
+                mint.contactFollowers ? (
+                  <View
+                    style={{
+                      width: 1,
+                      backgroundColor: opacity(foreground, 0.08),
+                      marginVertical: 6,
+                    }}
+                  />
+                ) : null}
+                {'contactFollowers' in mint && mint.contactFollowers ? (
+                  <MintStatCell
+                    icon="mdi:account-group"
+                    value={mint.contactFollowers.toLocaleString()}
+                    color="#3B82F6"
+                  />
+                ) : null}
+              </HStack>
+            )}
+          </View>
+        )}
       </VStack>
     </TouchableOpacity>
   );
 });
 
 export function MintAddScreen() {
+  useLifecycleLogger('MintAddScreen');
   const foreground = useThemeColor('foreground');
   const { width: windowWidth } = useWindowDimensions();
 
@@ -350,10 +432,32 @@ export function MintAddScreen() {
         uniqueMints.push(mint);
       }
     }
+    const withInfo = uniqueMints.filter((m) => m.mintInfo);
+    const withIcon = uniqueMints.filter((m) => m.mintInfo?.icon_url);
+    log.debug('mint.add.merged', {
+      nostr: nostrDiscoveredMints.length,
+      sovran: sovranDiscoveredMints.length,
+      unique: uniqueMints.length,
+      withInfo: withInfo.length,
+      withIcon: withIcon.length,
+    });
     return uniqueMints;
   }, [nostrDiscoveredMints, sovranDiscoveredMints]);
 
+  // Fetch Nostr profiles (followers/reputation) for mints with operator pubkeys
+  useMintProfiles(discoveredMints);
+
   const discoveryLoading = nostrLoading || sovranLoading;
+
+  // Hold a skeleton until the discovered list stops changing for 500ms.
+  // Individual fetchMintInfo calls resolve at different times, causing the list
+  // to shift as mints pop in one-by-one. This waits for them to settle.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    setSettled(false);
+    const timer = setTimeout(() => setSettled(true), 500);
+    return () => clearTimeout(timer);
+  }, [discoveredMints]);
 
   const { mints: knownMints } = useMintManagement();
 
@@ -502,9 +606,11 @@ export function MintAddScreen() {
     }
     if (isAdding) return;
 
+    log.info('mint.add.batch.start', { count: selectedMints.size });
     setIsAdding(true);
     try {
       if (!CocoManager.isInitialized()) {
+        log.error('mint.add.batch.manager_not_initialized');
         managerNotInitializedPopup();
         setIsAdding(false);
         return;
@@ -540,6 +646,7 @@ export function MintAddScreen() {
         }
       }
 
+      log.info('mint.add.batch.complete', { added: results.length, failed: errors.length });
       if (errors.length === 0) {
         mintsAddedPopup({ added: results.length });
         router.back();
@@ -550,6 +657,7 @@ export function MintAddScreen() {
         mintsAddFailedPopup();
       }
     } catch {
+      log.error('mint.add.batch.unexpected_error');
       mintsAddFailedPopup();
     } finally {
       setIsAdding(false);
@@ -585,7 +693,7 @@ export function MintAddScreen() {
 
   const keyExtractor = useCallback((item: SearchableMint) => item.url, []);
 
-  const showContent = !discoveryLoading || discoveredMints.length > 0;
+  const showContent = settled && discoveredMints.length > 0;
   const isSearching = url.trim().length > 0;
   const showCancelButton = isInputFocused || isSearching;
 
@@ -692,7 +800,7 @@ export function MintAddScreen() {
   const renderHeaderRight = useCallback(() => headerRightButton, [headerRightButton]);
 
   return (
-    <>
+    <Screen name="MintAddScreen">
       <Stack.Screen
         options={{
           title: 'Add Mints',
@@ -733,6 +841,6 @@ export function MintAddScreen() {
           />
         )}
       </ModalLayoutWrapper>
-    </>
+    </Screen>
   );
 }

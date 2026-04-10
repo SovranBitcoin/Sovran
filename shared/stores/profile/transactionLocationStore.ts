@@ -9,6 +9,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { log, storeLog } from '@/shared/lib/logger';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -55,6 +56,7 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
         entryId: string,
         location: Omit<TransactionLocation, 'createdAt'>
       ) => {
+        storeLog.debug('store.tx_location.set', { entryId });
         set((state) => ({
           locations: {
             ...state.locations,
@@ -72,6 +74,7 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
       },
 
       removeTransactionLocation: (entryId: string) => {
+        storeLog.debug('store.tx_location.remove', { entryId });
         set((state) => {
           const { [entryId]: _, ...rest } = state.locations;
           return { locations: rest };
@@ -79,6 +82,7 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
       },
 
       clearAllLocations: () => {
+        storeLog.info('store.tx_location.clear_all');
         set({ locations: {} });
       },
 
@@ -87,7 +91,7 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
           await profileStorage.removeItem('transaction-location-store');
           set({ locations: {} });
         } catch (error) {
-          console.error('TransactionLocationStore: Error clearing data:', error);
+          log.error('store.tx_location.clear_failed', { error });
           throw error;
         }
       },
@@ -100,7 +104,7 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
       }),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
-          console.warn('TransactionLocationStore: Failed to rehydrate from storage:', error);
+          log.warn('store.tx_location.rehydrate_failed', { error });
         }
       },
     }

@@ -26,6 +26,7 @@ import { useWalletHealthData } from '../hooks/useWalletHealthData';
 import type { HealthCta } from '../lib/walletHealth';
 import { formatPctFromBp, normalizeBpLargestRemainder } from '../lib/walletHealth';
 import { WalletHealthCardFrame } from './WalletHealthCardFrame';
+import { walletLog, Log } from '@/shared/lib/logger';
 
 const HERO_PADDING = 18;
 const HEART_RING_SIZE = 72;
@@ -62,17 +63,17 @@ export function WalletHealthModalContent({
   scrollY?: SharedValue<number>;
   children?: (layout: WalletHealthLayout) => React.ReactNode;
 }) {
-  const [foreground, background, shade300] = useThemeColor([
+  const [foreground, background, red300] = useThemeColor([
     'foreground',
     'background',
-    'shade-300',
+    'red-300',
   ] as const);
   const heroTransition = useHeroTransition();
   const primary50 = useMemo(() => opacity(foreground, 0.9), [foreground]);
   const primary300 = useMemo(() => opacity(foreground, 0.5), [foreground]);
   const primary400 = useMemo(() => opacity(foreground, 0.4), [foreground]);
   const primary950 = background;
-  const red = shade300;
+  const red = red300;
 
   // Keep the background gradient consistently "red-warm" (like the Needs rebalance state),
   // even when the wallet is Balanced (where hero.accent is intentionally white for text/icon tones).
@@ -187,12 +188,14 @@ export function WalletHealthModalContent({
   }, [totalBalance, hasDesired, needsRebalance, red, primary50]);
 
   const handleRebalancePress = useCallback(() => {
+    walletLog.info('wallet.health.rebalance.press', { unit: normalizedUnit, maxDriftBp });
     onAction({ type: 'openRebalancePlan', unit: normalizedUnit });
-  }, [onAction, normalizedUnit]);
+  }, [onAction, normalizedUnit, maxDriftBp]);
 
   const handleSplitPress = useCallback(() => {
+    walletLog.info('wallet.health.split.press', { unit: normalizedUnit, hasDesired });
     onAction({ type: 'openBalanceSplit', unit: normalizedUnit });
-  }, [onAction, normalizedUnit]);
+  }, [onAction, normalizedUnit, hasDesired]);
 
   const heroStats = useMemo(() => {
     return [
@@ -415,11 +418,13 @@ export function WalletHealthModalContent({
 
   // Fallback: original inline layout
   return (
-    <VStack gap={10}>
-      {heroContent}
-      {tabsContent}
-      {bodyContent}
-    </VStack>
+    <Log name="WalletHealthModalContent">
+      <VStack gap={10}>
+        {heroContent}
+        {tabsContent}
+        {bodyContent}
+      </VStack>
+    </Log>
   );
 }
 

@@ -5,7 +5,7 @@
 import { Buffer } from 'buffer';
 import { NfcError } from './errors';
 import { SHORT_RECORD_FLAG } from './constants';
-import { logDebug, logWarn } from './logger';
+import { nfcLog } from '../logger';
 
 function toBytes(str: string): number[] {
   return Array.from(Buffer.from(str, 'utf8'));
@@ -23,7 +23,7 @@ export function buildTextNdef(text: string): number[] {
   let recordHeader: number[];
 
   if (payload.length <= 255) {
-    logDebug(`Building Short Record NDEF (payload: ${payload.length} bytes)`);
+    nfcLog.debug('nfc.ndef.build_short_record', { payloadBytes: payload.length });
     recordHeader = [
       0xd1,
       0x01,
@@ -32,7 +32,7 @@ export function buildTextNdef(text: string): number[] {
       ...payload,
     ];
   } else {
-    logDebug(`Building Normal Record NDEF (payload: ${payload.length} bytes)`);
+    nfcLog.debug('nfc.ndef.build_normal_record', { payloadBytes: payload.length });
     const len = payload.length;
     recordHeader = [
       0xc1,
@@ -47,7 +47,7 @@ export function buildTextNdef(text: string): number[] {
   }
 
   const nlen = recordHeader.length;
-  logDebug(`NDEF message total size: ${nlen + 2} bytes (NLEN=${nlen})`);
+  nfcLog.debug('nfc.ndef.build_complete', { totalBytes: nlen + 2, nlen });
   return [(nlen >> 8) & 0xff, nlen & 0xff, ...recordHeader];
 }
 
@@ -66,12 +66,10 @@ export function decodeTextRecord(ndef: number[]): string {
   const typeLen = ndef[1];
   const isShortRecord = (header & SHORT_RECORD_FLAG) !== 0;
 
-  logDebug(
-    `Parsing NDEF: header=0x${header.toString(16)}, typeLen=${typeLen}, SR=${isShortRecord}`
-  );
+  nfcLog.debug('nfc.ndef.parse', { header: `0x${header.toString(16)}`, typeLen, isShortRecord });
 
   const tnf = header & 0x07;
-  if (tnf !== 0x01) logWarn(`Unexpected TNF: ${tnf} (expected 1)`);
+  if (tnf !== 0x01) nfcLog.warn('nfc.ndef.unexpected_tnf', { tnf, expected: 1 });
 
   let payloadLen: number;
   let typeFieldStart: number;
@@ -87,7 +85,7 @@ export function decodeTextRecord(ndef: number[]): string {
     typeFieldStart = 6;
   }
 
-  logDebug(`Payload length: ${payloadLen}, type field starts at: ${typeFieldStart}`);
+  nfcLog.debug('nfc.ndef.payload_info', { payloadLen, typeFieldStart });
 
   if (typeFieldStart >= ndef.length) {
     throw new NfcError('Invalid NDEF: type field offset out of bounds', 'INVALID_NDEF_FORMAT');
@@ -109,8 +107,8 @@ export function decodeTextRecord(ndef: number[]): string {
   const status = ndef[payloadStart];
   const langLen = status & 0x3f;
   const isUtf16 = (status & 0x80) !== 0;
-  logDebug(`Text record: status=0x${status.toString(16)}, langLen=${langLen}, UTF-16=${isUtf16}`);
-  if (isUtf16) logWarn('UTF-16 encoding detected - assuming UTF-8');
+  nfcLog.debug('nfc.ndef.text_record', { status: `0x${status.toString(16)}`, langLen, isUtf16 });
+  if (isUtf16) nfcLog.warn('nfc.ndef.utf16_detected');
 
   const textStart = payloadStart + 1 + langLen;
   const textLen = payloadLen - 1 - langLen;
@@ -124,6 +122,6 @@ export function decodeTextRecord(ndef: number[]): string {
 
   const textBytes = ndef.slice(textStart, textStart + textLen);
   const text = Buffer.from(textBytes).toString('utf8');
-  logDebug(`Decoded text: ${textLen} bytes -> ${text.length} chars`);
+  nfcLog.debug('nfc.ndef.decoded', { textLen, chars: text.length });
   return text;
 }

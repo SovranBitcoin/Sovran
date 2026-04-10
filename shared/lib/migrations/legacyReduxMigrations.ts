@@ -1,6 +1,6 @@
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { DataMigration } from '@/shared/lib/cashu/migration';
-import { initLog } from '@/shared/lib/initTiming';
+import { log, initLog } from '../logger';
 import {
   deriveCashuMnemonic,
   deriveNostrKeys,
@@ -98,6 +98,12 @@ async function bootstrapProfileStore(
   const existingState = useProfileStore.getState();
   for (const [index, profile] of legacyProfiles.entries()) {
     const accountIndex = typeof profile.id === 'number' ? profile.id : index;
+
+    // Skip expensive key derivation if profile already exists in persisted store
+    if (existingState.profiles.some((p) => p.accountIndex === accountIndex)) {
+      continue;
+    }
+
     const pubkey = deriveLegacyProfilePubkey(profile, rootMnemonic, accountIndex);
     if (!pubkey) continue;
 
@@ -164,10 +170,10 @@ async function migrateReduxCashuProfiles(
       if (needsMigration) {
         const result = await migration.migrateFromRedux();
         if (result.errors.length > 0) {
-          console.warn(
-            `Legacy Redux->Coco migration completed with errors for account ${accountIndex}:`,
-            result.errors
-          );
+          log.warn('migrations.legacy.completed_with_errors', {
+            accountIndex,
+            errors: result.errors,
+          });
         }
       }
 

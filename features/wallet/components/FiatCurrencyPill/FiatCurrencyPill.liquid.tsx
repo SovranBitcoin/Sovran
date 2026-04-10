@@ -4,6 +4,7 @@ import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/mod
 import opacity from 'hex-color-opacity';
 
 import type { FiatCurrencyPillShared } from './useFiatCurrencyPill';
+import { Log } from '@/shared/lib/logger';
 
 export function FiatCurrencyPillLiquid({
   success,
@@ -58,10 +59,12 @@ export function FiatCurrencyPillLiquid({
   }
 
   return (
-    <Host style={{ zIndex: 10 }} matchContents>
-      <SwiftUIButton onPress={onPress} modifiers={glassModifiers}>
-        <SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>
-      </SwiftUIButton>
-    </Host>
+    <Log name="FiatCurrencyPillLiquid">
+      <Host style={{ zIndex: 10 }} matchContents>
+        <SwiftUIButton onPress={onPress} modifiers={glassModifiers}>
+          <SwiftUIText modifiers={glassTextModifiers}>{text}</SwiftUIText>
+        </SwiftUIButton>
+      </Host>
+    </Log>
   );
 }

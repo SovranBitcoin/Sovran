@@ -9,12 +9,18 @@ export function emojiPickerPopup(payload: ActionSheetPayloads['emoji-picker']): 
   showActionSheet('emoji-picker', payload);
 }
 
-export function offlineSendSuggestionsPopup(
-  payload: ActionSheetPayloads['offline-send-suggestions']
-): void {
-  showActionSheet('offline-send-suggestions', payload);
+export function proofSelectorPopup(payload: ActionSheetPayloads['proof-selector']): void {
+  showActionSheet('proof-selector', payload);
 }
 
 export function buttonHandlerPopup(payload: ActionSheetPayloads['button-handler']): void {
   showActionSheet('button-handler', payload);
+}
+
+export function paymentOptionsPopup(payload: ActionSheetPayloads['payment-options']): void {
+  showActionSheet('payment-options', payload);
+}
+
+export function paymentFallbackPopup(payload: ActionSheetPayloads['payment-fallback']): void {
+  showActionSheet('payment-fallback', payload);
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { log, storeLog } from '@/shared/lib/logger';
 
 interface BTCMapPlace {
   id: number;
@@ -72,11 +73,7 @@ const PLACES_CACHE_TTL = 60 * 60 * 1000;
 /** 24 hours for individual place details */
 const PLACE_DETAILS_CACHE_TTL = 24 * 60 * 60 * 1000;
 
-const BTCMAP_API_URL =
-  'https://api.btcmap.org/v4/places?fields=id,lat,lon,icon,comments,boosted_until,deleted_at,updated_at&include_deleted=false';
-
-const BTCMAP_PLACE_DETAILS_FIELDS =
-  'id,lat,lon,icon,comments,boosted_until,deleted_at,updated_at,name,address,description,phone,website,twitter,facebook,instagram,email,opening_hours,created_at,verified_at,osm_id,osm_url,osm:contact:instagram,osm:contact:twitter,osm:contact:facebook,osm:contact:phone,osm:contact:website,osm:contact:email,required_app_url,osm:payment:onchain,osm:payment:lightning,osm:payment:lightning_contactless,osm:payment:bitcoin,osm:payment:uri,osm:payment:coinos,osm:payment:pouch,osm:amenity,osm:category,osm:survey:date,osm:check_date,osm:check_date:currency:XBT';
+const SOVRAN_API_BASE = 'https://api.sovran.money/api/btcmap';
 
 function isCacheExpired(timestamp: number, ttl: number): boolean {
   return Date.now() - timestamp > ttl;
@@ -128,15 +125,21 @@ export const useBTCMapStore = create<BTCMapStore>()(
           if (cached && cached.length > 0) return cached;
         }
 
+        storeLog.info('store.btc_map.fetch_places.start', { forceRefresh });
+        const startTime = performance.now();
         set({ isLoading: true, error: null });
 
         try {
-          const response = await fetch(BTCMAP_API_URL);
+          const response = await fetch(`${SOVRAN_API_BASE}/places`);
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
 
           const data: BTCMapPlace[] = await response.json();
+          storeLog.info('store.btc_map.fetch_places.success', {
+            count: data.length,
+            duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+          });
 
           set({
             placesCache: { data, timestamp: Date.now() },
@@ -147,6 +150,10 @@ export const useBTCMapStore = create<BTCMapStore>()(
           return data;
         } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to load merchants';
+          storeLog.error('store.btc_map.fetch_places.failed', {
+            error: errorMessage,
+            duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+          });
           set({ isLoading: false, error: errorMessage });
 
           const cache = get().placesCache;
@@ -173,17 +180,21 @@ export const useBTCMapStore = create<BTCMapStore>()(
           }
         }
 
+        storeLog.info('store.btc_map.fetch_details.start', { id, forceRefresh });
+        const startTime = performance.now();
         set({ isLoadingDetails: true });
 
         try {
-          const response = await fetch(
-            `https://api.btcmap.org/v4/places/${id}?fields=${BTCMAP_PLACE_DETAILS_FIELDS}`
-          );
+          const response = await fetch(`${SOVRAN_API_BASE}/places/${id}`);
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
 
           const data: BTCMapPlaceDetails = await response.json();
+          storeLog.info('store.btc_map.fetch_details.success', {
+            id,
+            duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+          });
 
           set((s) => ({
             placeDetailsCache: {
@@ -196,17 +207,26 @@ export const useBTCMapStore = create<BTCMapStore>()(
 
           return data;
         } catch (error: unknown) {
-          console.error('BTCMapStore: Failed to fetch place details:', error);
+          log.error('store.btc_map.fetch_details_failed', { error });
           set({ isLoadingDetails: false });
           throw error;
         }
       },
 
-      setSelectedPlace: (place) => set({ selectedPlace: place }),
+      setSelectedPlace: (place) => {
+        storeLog.debug('store.btc_map.set_selected_place', { id: place?.id ?? null });
+        set({ selectedPlace: place });
+      },
 
-      setError: (error) => set({ error }),
+      setError: (error) => {
+        if (error) storeLog.warn('store.btc_map.set_error', { error });
+        set({ error });
+      },
 
-      clearCache: () => set({ placesCache: null, placeDetailsCache: {} }),
+      clearCache: () => {
+        storeLog.info('store.btc_map.clear_cache');
+        set({ placesCache: null, placeDetailsCache: {} });
+      },
 
       clearAllData: async () => {
         try {
@@ -220,7 +240,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
             error: null,
           });
         } catch (error) {
-          console.error('BTCMapStore: Error clearing data:', error);
+          log.error('store.btc_map.clear_failed', { error });
           throw error;
         }
       },
@@ -234,7 +254,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
       }),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          console.warn('BTCMapStore: Failed to rehydrate from storage:', error);
+          log.warn('store.btc_map.rehydrate_failed', { error });
         }
       },
     }

@@ -9,7 +9,7 @@ import 'intl/locale-data/jsonp/en';
 import 'react-native-reanimated';
 
 import { useFonts } from '@/shared/hooks/useFonts';
-import { initLog } from '@/shared/lib/initTiming';
+import { initLog } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Image, LogBox, TouchableOpacity, Platform, View } from 'react-native';
@@ -41,7 +41,9 @@ import { persistor, store } from '@/redux/store/store.deprecated';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
+import { WalletContextProvider } from '@/shared/providers/WalletContextProvider';
 import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
+import { CocoPaymentUXProvider } from '@/features/send/providers/CocoPaymentUX';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useAppBalance } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
@@ -67,7 +69,7 @@ initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called')
 LogBox.ignoreAllLogs();
 
 const IOS_SPLASH_IMAGE_WIDTH = 390;
-const REINIT_SPLASH_IMAGE = require('../assets/images/splash.png');
+const REINIT_SPLASH_IMAGE = require('../assets/images/light-t.png');
 const REINIT_SPLASH_IMAGE_SIZE = Image.resolveAssetSource(REINIT_SPLASH_IMAGE);
 const PROFILE_SWITCH_SPLASH_BOX_SIZE =
   REINIT_SPLASH_IMAGE_SIZE?.width && REINIT_SPLASH_IMAGE_SIZE?.height
@@ -103,6 +105,8 @@ function AccountScopedProviders({
         [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
         [NostrNDKProvider, { accountIndex }],
         CocoProvider,
+        WalletContextProvider,
+        CocoPaymentUXProvider,
         ActionSheetProvider,
         PricelistProvider,
         PasscodeGate,
@@ -347,7 +351,7 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: '#000000',
+            backgroundColor: '#030303',
             justifyContent: 'center',
             alignItems: 'center',
             zIndex: 9999,
@@ -404,11 +408,11 @@ export default function RootLayout() {
                 key={`account-${activeAccountIndex}`}
                 accountIndex={activeAccountIndex}>
                 <RootLayoutContent />
+                <PopupHost />
               </AccountScopedProviders>
             </GlobalMigrationGate>
           </LegacyMigrationGate>
         </NativeSplashLayoutGate>
-        <PopupHost />
       </OuterProviders>
     </GestureHandlerRootView>
   );

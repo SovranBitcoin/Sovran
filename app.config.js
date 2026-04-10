@@ -18,10 +18,8 @@ module.exports = ({ config }) => {
     );
   }
 
-  // Use development icon for TestFlight (preview) and local development builds
-  const appIcon = isDevelopment
-    ? './assets/images/development.png'
-    : './assets/images/production.png';
+  const appIcon = './assets/images/light.png';
+  const adaptiveIcon = './assets/images/light-t.png';
   const androidGoogleMapsApiKey =
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 
@@ -50,7 +48,7 @@ module.exports = ({ config }) => {
       },
       adaptiveIcon: {
         ...config.android?.adaptiveIcon,
-        foregroundImage: appIcon,
+        foregroundImage: adaptiveIcon,
       },
       package: isDevelopment ? 'com.sovranbitcoin.dev' : 'com.sovranbitcoin',
     },

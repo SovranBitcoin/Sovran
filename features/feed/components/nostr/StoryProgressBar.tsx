@@ -13,6 +13,7 @@ import Animated, {
   SharedValue,
   useAnimatedStyle,
 } from 'react-native-reanimated';
+import { Log } from '@/shared/lib/logger';
 
 type Props = {
   index: number;
@@ -33,9 +34,11 @@ export const StoryProgressBar: FC<Props> = ({ index, currentStoryIndex, storyPro
   });
 
   return (
-    <View style={styles.track}>
-      <Animated.View style={[styles.fill, rBarStyle]} />
-    </View>
+    <Log name="StoryProgressBar">
+      <View style={styles.track}>
+        <Animated.View style={[styles.fill, rBarStyle]} />
+      </View>
+    </Log>
   );
 };
 

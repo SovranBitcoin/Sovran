@@ -6,6 +6,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { getContrastColors, FALLBACK_COLORS, useDominantColor } from './colorUtils';
+import { Log } from '@/shared/lib/logger';
 
 const MIN_PERCENTAGE_FOR_AVATAR = 12;
 const AVATAR_SIZE = 20;
@@ -154,32 +155,34 @@ export const DistributionBar: React.FC<DistributionBarProps> = ({
   const isEmpty = activeCount === 0;
 
   return (
-    <View className="mx-4 mb-2 h-8 overflow-visible" onLayout={handleLayout}>
-      {containerWidth > 0 && !isEmpty && (
-        <View className="flex-1 flex-row">
-          {mintUrls.map((mintUrl, index) => {
-            const bp = distribution[mintUrl] || 0;
-            if (bp === 0) return null;
+    <Log name="DistributionBar">
+      <View className="mx-4 mb-2 h-8 overflow-visible" onLayout={handleLayout}>
+        {containerWidth > 0 && !isEmpty && (
+          <View className="flex-1 flex-row">
+            {mintUrls.map((mintUrl, index) => {
+              const bp = distribution[mintUrl] || 0;
+              if (bp === 0) return null;
 
-            const activeIndexBeforeThis = mintUrls
-              .slice(0, index)
-              .filter((url) => (distribution[url] || 0) > 0).length;
+              const activeIndexBeforeThis = mintUrls
+                .slice(0, index)
+                .filter((url) => (distribution[url] || 0) > 0).length;
 
-            return (
-              <AnimatedSegment
-                key={mintUrl}
-                mintInfo={mintInfoMap[mintUrl]}
-                bp={bp}
-                totalWidth={containerWidth}
-                colorIndex={index}
-                isFirst={activeIndexBeforeThis === 0}
-                activeCount={activeCount}
-              />
-            );
-          })}
-        </View>
-      )}
-    </View>
+              return (
+                <AnimatedSegment
+                  key={mintUrl}
+                  mintInfo={mintInfoMap[mintUrl]}
+                  bp={bp}
+                  totalWidth={containerWidth}
+                  colorIndex={index}
+                  isFirst={activeIndexBeforeThis === 0}
+                  activeCount={activeCount}
+                />
+              );
+            })}
+          </View>
+        )}
+      </View>
+    </Log>
   );
 };
 

@@ -1,6 +1,6 @@
 /**
  * Subscribes to coco events for payment status.
- * Receive (mint): mint-quote:state-changed (PAID) or mint-quote:added (PAID) → mint-quote:redeemed.
+ * Receive (mint): mint-op:quote-state-changed (PAID) or mint-op:pending (PAID) → mint-op:finalized.
  * Receive (ecash): toast shown on redeem button → receive:created updates to confirmed.
  * Send: send:finalized confirms an active send/payment-request toast when present,
  * otherwise shows the standard send confirmation toast.
@@ -9,10 +9,11 @@
 
 import { useEffect, useRef } from 'react';
 
-import { useManagerContext } from 'coco-cashu-react';
+import { useManagerContext } from '@cashu/coco-react';
 
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import { paymentLog } from '@/shared/lib/logger';
 
 const NPC_RECEIVE_POPUP_MAX_AGE_MS = 2 * 60 * 1000;
 
@@ -48,12 +49,31 @@ export function usePaymentStatusListener(): void {
   const cancelledRef = useRef(false);
 
   useEffect(() => {
-    if (!manager) return;
+    if (!manager) {
+      paymentLog.debug('hook.payment_status.no_manager');
+      return;
+    }
+    paymentLog.info('hook.payment_status.subscribing');
     cancelledRef.current = false;
 
     const offStateChanged = manager.on(
-      'mint-quote:state-changed',
-      async ({ mintUrl, quoteId, state }: { mintUrl: string; quoteId: string; state: string }) => {
+      'mint-op:quote-state-changed',
+      async ({
+        mintUrl,
+        quoteId,
+        state,
+      }: {
+        mintUrl: string;
+        quoteId: string;
+        state: string;
+        operationId: string;
+        operation: any;
+      }) => {
+        paymentLog.debug('hook.payment_status.mint_quote_state_changed', {
+          quoteId,
+          state,
+          mintUrl,
+        });
         if (state !== 'PAID') return;
 
         const history = await manager.history.getPaginatedHistory(0, 100);
@@ -66,6 +86,12 @@ export function usePaymentStatusListener(): void {
         const amount = entry.amount ?? 0;
         const unit = entry.unit ?? 'sat';
 
+        paymentLog.info('hook.payment_status.receive_processing', {
+          quoteId,
+          mintUrl,
+          amount,
+          unit,
+        });
         usePaymentStatusStore.getState().setActive({
           variant: 'receive',
           id: quoteId,
@@ -80,14 +106,38 @@ export function usePaymentStatusListener(): void {
     );
 
     const offAdded = manager.on(
-      'mint-quote:added',
-      ({ mintUrl, quoteId, quote }: { mintUrl: string; quoteId: string; quote: RawMintQuote }) => {
-        if (quote.state !== 'PAID') return;
-        if (!shouldShowNpcReceivePopup(quote)) return;
+      'mint-op:pending',
+      ({
+        mintUrl,
+        operationId,
+        operation,
+      }: {
+        mintUrl: string;
+        operationId: string;
+        operation: any;
+      }) => {
+        const op = operation as any;
+        const quoteId = op.quote?.quoteId ?? operationId;
+        const state = op.quote?.state ?? op.lastObservedRemoteState;
+        paymentLog.debug('hook.payment_status.mint_quote_added', { quoteId, state, mintUrl });
+        if (state !== 'PAID') return;
 
-        const amount = quote.amount ?? 0;
-        const unit = quote.unit ?? 'sat';
+        const paidAt = op.quote?.paidAt ?? op.updatedAt;
+        const createdAt = op.createdAt;
+        if (!shouldShowNpcReceivePopup({ paidAt, createdAt })) {
+          paymentLog.debug('hook.payment_status.npc_quote_too_old', { quoteId });
+          return;
+        }
 
+        const amount = op.intent?.amount ?? 0;
+        const unit = op.intent?.unit ?? 'sat';
+
+        paymentLog.info('hook.payment_status.npc_receive_processing', {
+          quoteId,
+          mintUrl,
+          amount,
+          unit,
+        });
         usePaymentStatusStore.getState().setActive({
           variant: 'receive',
           id: quoteId,
@@ -101,14 +151,24 @@ export function usePaymentStatusListener(): void {
       }
     );
 
-    const offRedeemed = manager.on('mint-quote:redeemed', ({ quoteId }: { quoteId: string }) => {
-      usePaymentStatusStore.getState().setConfirmed(quoteId);
-    });
+    const offRedeemed = manager.on(
+      'mint-op:finalized',
+      ({ operationId, operation }: { mintUrl: string; operationId: string; operation: any }) => {
+        const quoteId = (operation as any)?.quote?.quoteId ?? operationId;
+        paymentLog.info('hook.payment_status.mint_quote_redeemed', { operationId, quoteId });
+        usePaymentStatusStore.getState().setConfirmed(quoteId);
+      }
+    );
 
     const offReceiveCreated = manager.on(
       'receive:created',
       async ({ mintUrl, token }: { mintUrl: string; token: { proofs: { amount: number }[] } }) => {
         const amount = token.proofs.reduce((acc, p) => acc + p.amount, 0);
+        paymentLog.info('hook.payment_status.receive_created', {
+          mintUrl,
+          amount,
+          proofCount: token.proofs.length,
+        });
         const store = usePaymentStatusStore.getState();
         const hadPending =
           store.active?.variant === 'receive-ecash' &&
@@ -143,13 +203,16 @@ export function usePaymentStatusListener(): void {
       }) => {
         const amount = operation.amount;
         const unit = 'sat';
+        paymentLog.info('hook.payment_status.send_finalized', { operationId, mintUrl, amount });
         const store = usePaymentStatusStore.getState();
         const hadPending =
-          store.active?.id === operationId &&
-          (store.active.variant === 'send' || store.active.variant === 'payment-request');
+          (store.active?.id === operationId &&
+            (store.active.variant === 'send' || store.active.variant === 'payment-request')) ||
+          (store.active?.variant === 'payment-request' &&
+            (store.active?.state === 'processing' || store.active?.state === 'delivered'));
 
         if (hadPending) {
-          store.setConfirmed(operationId);
+          store.setConfirmed(store.active!.id, { operationId });
           return;
         }
 
@@ -166,17 +229,43 @@ export function usePaymentStatusListener(): void {
       }
     );
 
+    const offMeltRolledBack = manager.on(
+      'melt-op:rolled-back',
+      ({ operation }: { operation: { error?: string } }) => {
+        paymentLog.warn('hook.payment_status.melt_rolled_back', { error: operation.error });
+        const store = usePaymentStatusStore.getState();
+        if (store.active?.variant === 'melt' && store.active?.state === 'processing') {
+          paymentLog.error('hook.payment_status.melt_failed', {
+            id: store.active.id,
+            error: operation.error,
+          });
+          store.setFailed(store.active.id, new Error(operation.error ?? 'Payment was rolled back'));
+        }
+      }
+    );
+
     const offMeltFinalized = manager.on(
       'melt-op:finalized',
       ({ mintUrl, operationId, operation }) => {
         if (!('quoteId' in operation) || !('amount' in operation)) return;
+        paymentLog.info('hook.payment_status.melt_finalized', {
+          operationId,
+          mintUrl,
+          quoteId: operation.quoteId,
+          amount: operation.amount,
+        });
         const store = usePaymentStatusStore.getState();
-        const hadPending =
-          store.active?.id === operation.quoteId && store.active?.state === 'processing';
+        // Match by variant, not quoteId — the machine's onPaymentProcessing
+        // uses a timestamp-based ID that won't match the real quoteId.
+        const hadActive =
+          store.active?.variant === 'melt' &&
+          (store.active?.state === 'processing' || store.active?.state === 'confirmed');
 
-        if (hadPending) {
-          store.setConfirmed(operation.quoteId, { operationId });
+        if (hadActive) {
+          // Still processing → confirm. Already confirmed → just merge operationId for View button.
+          store.setConfirmed(store.active!.id, { operationId });
         } else {
+          // Background melt (no active toast) — show new confirmed toast
           const amount = operation.amount;
           const unit = 'sat';
           store.setActive({
@@ -201,12 +290,14 @@ export function usePaymentStatusListener(): void {
     );
 
     return () => {
+      paymentLog.debug('hook.payment_status.unsubscribing');
       cancelledRef.current = true;
       offStateChanged();
       offAdded();
       offRedeemed();
       offReceiveCreated();
       offSendFinalized();
+      offMeltRolledBack();
       offMeltFinalized();
     };
   }, [manager]);

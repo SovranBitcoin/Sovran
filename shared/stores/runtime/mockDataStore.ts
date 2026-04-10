@@ -18,7 +18,7 @@ import {
   type SwapGroup,
 } from '@/shared/stores/profile/swapTransactionsStore';
 import { useTransactionLocationStore } from '@/shared/stores/profile/transactionLocationStore';
-import type { HistoryEntry } from 'coco-cashu-core';
+import type { HistoryEntry } from '@cashu/coco-core';
 
 // ---------------------------------------------------------------------------
 // Demo row definition — single source of truth for all mock data.

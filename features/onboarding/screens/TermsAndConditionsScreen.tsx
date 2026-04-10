@@ -6,6 +6,7 @@ import { Button, Card, ControlField, Label } from 'heroui-native';
 import Container from '@/shared/ui/composed/Container';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
+import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
 
 const TERMS_TEXT = `IMPORTANT NOTICE: THESE TERMS OF SERVICE INCLUDE A MEDIATION-FIRST CLAUSE REQUIRING MEDIATION BEFORE ARBITRATION OR LITIGATION. PLEASE READ THESE TERMS CAREFULLY. IF YOU DO NOT AGREE, DO NOT USE SOVRAN.
 
@@ -152,42 +153,45 @@ export function TermsAndConditionsScreen({
   checkboxText = 'I have read and agree to the Terms and Conditions',
   showCheckbox = true,
 }: TermsAndConditionsScreenProps) {
+  useLifecycleLogger('TermsAndConditionsScreen');
   const [isChecked, setIsChecked] = useState(false);
 
   return (
     <Container className="bg-surface">
-      <VStack spacing={16} flex={1} className="p-4">
-        <Text bold size={32} className="text-foreground py-2 text-center">
-          {title}
-        </Text>
+      <Screen name="TermsAndConditionsScreen">
+        <VStack spacing={16} flex={1} className="p-4">
+          <Text bold size={32} className="text-foreground py-2 text-center">
+            {title}
+          </Text>
 
-        <Card variant="secondary" className="flex-1">
-          <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
-            <Text size={14} className="text-foreground leading-[22px]">
-              {TERMS_TEXT}
-            </Text>
-          </ScrollView>
-        </Card>
+          <Card variant="secondary" className="flex-1">
+            <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
+              <Text size={14} className="text-foreground leading-[22px]">
+                {TERMS_TEXT}
+              </Text>
+            </ScrollView>
+          </Card>
 
-        <VStack spacing={16}>
-          {showCheckbox && (
-            <ControlField isSelected={isChecked} onSelectedChange={setIsChecked}>
-              <View className="flex-1">
-                <Label>{checkboxText}</Label>
-              </View>
-              <ControlField.Indicator />
-            </ControlField>
-          )}
+          <VStack spacing={16}>
+            {showCheckbox && (
+              <ControlField isSelected={isChecked} onSelectedChange={setIsChecked}>
+                <View className="flex-1">
+                  <Label>{checkboxText}</Label>
+                </View>
+                <ControlField.Indicator />
+              </ControlField>
+            )}
 
-          <Button
-            variant="primary"
-            className="w-full"
-            onPress={onClose}
-            isDisabled={showCheckbox ? !isChecked : false}>
-            <Button.Label>{buttonText}</Button.Label>
-          </Button>
+            <Button
+              variant="primary"
+              className="w-full"
+              onPress={onClose}
+              isDisabled={showCheckbox ? !isChecked : false}>
+              <Button.Label>{buttonText}</Button.Label>
+            </Button>
+          </VStack>
         </VStack>
-      </VStack>
+      </Screen>
     </Container>
   );
 }

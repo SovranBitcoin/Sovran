@@ -25,10 +25,11 @@ import { liquidGlassModifiers, supportsLiquidGlass } from '@/shared/lib/version'
 import { useRouter } from 'expo-router';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { reservedProofsFreedPopup, reservedProofsFailedPopup } from '@/shared/lib/popup';
-import { usePaginatedHistory } from 'coco-cashu-react';
-import type { SendHistoryEntry } from 'coco-cashu-core';
+import { usePaginatedHistory } from '@cashu/coco-react';
+import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useReservedProofs } from '@/shared/hooks/useReservedProofs';
+import { walletLog, Log } from '@/shared/lib/logger';
 
 interface Account {
   unit: CurrencyUnit;
@@ -189,10 +190,13 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
   const handleReservedPress = useCallback(() => {
     const recoverPending = async () => {
+      walletLog.info('wallet.reserved.recovery_start', { reservedTotal });
       try {
         const manager = CocoManager.getInstance();
-        await manager.recoverPendingSendOperations();
-        await manager.recoverPendingMeltOperations();
+
+        await manager.ops.send.recovery.run();
+        await manager.ops.melt.recovery.run();
+        walletLog.info('wallet.reserved.recovery_complete');
         reservedProofsFreedPopup({
           text:
             'Recovery completed.\n' +
@@ -200,24 +204,9 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
             'If reserved balance is still stuck, use force cleanup.',
         });
       } catch (error) {
-        reservedProofsFailedPopup({
-          text: error instanceof Error ? error.message : 'Unknown error',
+        walletLog.error('wallet.reserved.recovery_failed', {
+          error: error instanceof Error ? error : new Error(String(error)),
         });
-      }
-    };
-
-    const forceFreeAll = async () => {
-      try {
-        const result = await CocoManager.freeAllReservedProofs();
-        reservedProofsFreedPopup({
-          text:
-            `Reserved proofs found: ${result.totalReservedProofs}\n` +
-            `Rolled back send ops: ${result.rolledBackSendOperations}\n` +
-            `Rolled back melt ops: ${result.rolledBackMeltOperations}\n` +
-            `Orphaned reservations released: ${result.releasedOrphanedReservations}\n` +
-            `Errors: ${result.errors.length}`,
-        });
-      } catch (error) {
         reservedProofsFailedPopup({
           text: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -227,35 +216,32 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     Alert.alert('Reserved Proofs', 'Choose a recovery action.', [
       { text: 'Close', style: 'cancel' },
       { text: 'Recover Pending Operations', onPress: recoverPending },
-      {
-        text: 'Force Free All Reserved Proofs',
-        style: 'destructive',
-        onPress: forceFreeAll,
-      },
     ]);
   }, []);
 
   return (
-    <VStack align="center" gap={8} className="z-9">
-      <FiatCurrencyPill displayText={displayText} textSize={12} />
-      <TouchableOpacity onPress={toggleUnit} className="flex-col items-center">
-        <AmountFormatter weight="heavy" amount={balance} unit={account.unit} />
-      </TouchableOpacity>
-      <EcashStatusPill
-        label="PENDING"
-        totalAmount={pendingTotal}
-        unit={pendingUnit}
-        sfSymbol="clock.arrow.trianglehead.counterclockwise.rotate.90"
-        onPress={handlePendingPress}
-      />
-      <EcashStatusPill
-        label="RESERVED"
-        totalAmount={reservedTotal}
-        unit="sat"
-        sfSymbol="lock.fill"
-        tintColor={warning}
-        onPress={handleReservedPress}
-      />
-    </VStack>
+    <Log name="PrimaryBalance">
+      <VStack align="center" gap={8} className="z-9">
+        <FiatCurrencyPill displayText={displayText} textSize={12} />
+        <TouchableOpacity onPress={toggleUnit} className="flex-col items-center">
+          <AmountFormatter weight="heavy" amount={balance} unit={account.unit} />
+        </TouchableOpacity>
+        <EcashStatusPill
+          label="PENDING"
+          totalAmount={pendingTotal}
+          unit={pendingUnit}
+          sfSymbol="clock.arrow.trianglehead.counterclockwise.rotate.90"
+          onPress={handlePendingPress}
+        />
+        <EcashStatusPill
+          label="RESERVED"
+          totalAmount={reservedTotal}
+          unit="sat"
+          sfSymbol="lock.fill"
+          tintColor={warning}
+          onPress={handleReservedPress}
+        />
+      </VStack>
+    </Log>
   );
 }

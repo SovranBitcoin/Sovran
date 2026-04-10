@@ -9,6 +9,7 @@ import { HDKey } from '@scure/bip32';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { storeMnemonic } from '@/shared/lib/nostr/secureStorage';
+import { log } from '@/shared/lib/logger';
 
 const thunkMiddleware = require('redux-thunk').thunk;
 
@@ -230,7 +231,10 @@ const migrations = {
               }
               // Fallback, just in case there's an unknown transaction type
               else {
-                console.warn(`Unknown transaction type: ${oldTx.type}-${oldTx.transactionType}`);
+                log.warn('redux.migration.unknown_tx_type', {
+                  type: oldTx.type,
+                  transactionType: oldTx.transactionType,
+                });
                 return baseTx;
               }
             }),
@@ -348,13 +352,13 @@ const migrations = {
   },
   150: (state: PersistedState): PersistedState => {
     if (!state || typeof state !== 'object') return state;
-    console.log('=== MIGRATION 123 DEBUG START ===');
+    log.debug('redux.migration.123.start');
     const rootState = state as unknown as RootState;
 
     // Generate allocation config based on highest balance mints
     // Use EXACT same logic as memoizedGetAllBalancesMultipleCurrencies
     const currentProfileId = rootState.nostr?.currentProfile?.id;
-    console.log('Current Profile ID:', currentProfileId);
+    log.debug('redux.migration.123.profile', { currentProfileId });
 
     // Get data using same selectors logic
     const mints = rootState.cashu.profiles[currentProfileId]?.mints || [];
@@ -362,55 +366,64 @@ const migrations = {
     const keysets = rootState.cashu?.keysets || {};
     const info = rootState.cashu?.info || {};
 
-    console.log('Raw data extracted:');
-    console.log('- Mints array:', mints);
-    console.log('- ProofsByMint keys:', Object.keys(proofsByMint));
-    console.log('- Keysets keys:', Object.keys(keysets));
-    console.log('- Info keys:', Object.keys(info));
+    log.debug('redux.migration.123.raw_data', {
+      mintCount: mints?.length,
+      proofKeys: Object.keys(proofsByMint),
+      keysetKeys: Object.keys(keysets),
+      infoKeys: Object.keys(info),
+    });
 
     // Exact same logic as memoizedGetAllBalancesMultipleCurrencies
     const allMints = mints || [];
 
     // Create a set of all mints (both from mints list and proofs)
     const mintSet = new Set([...allMints, ...Object.keys(proofsByMint)]);
-    console.log('Mint set created:', Array.from(mintSet));
+    log.debug('redux.migration.123.mint_set', { mints: Array.from(mintSet) });
 
     // Convert Set back to array
     const uniqueMints = Array.from(mintSet);
-    console.log('Unique mints to process:', uniqueMints);
+    log.debug('redux.migration.123.unique_mints', { mints: uniqueMints });
 
     // Process each mint exactly like the selector
     const allBalances = uniqueMints
       .map((mint) => {
-        console.log(`\n--- Processing mint: ${mint} ---`);
+        log.debug('redux.migration.123.process_mint', { mint });
 
         // Get all unique units from keysets for this mint
         const mintKeysets = keysets[mint] || [];
         const mintInfo = info[mint] || {};
-        console.log(`Mint keysets count: ${mintKeysets.length}`);
-        console.log(`Mint info:`, mintInfo);
+        log.debug('redux.migration.123.process_mint', {
+          mint,
+          keysetsCount: mintKeysets.length,
+          mintInfo,
+        });
 
         const uniqueUnits = [...new Set(mintKeysets.map((ks: any) => ks.unit))];
-        console.log(`Unique units from keysets:`, uniqueUnits);
 
         // If no units found, default to common currencies (like selector)
         const units = uniqueUnits.length > 0 ? uniqueUnits : ['sat', 'usd', 'eur', 'gbp'];
-        console.log(`Final units to process:`, units);
 
         // Get proofs for this mint (or empty array if none)
         const proofs = proofsByMint[mint] || [];
-        console.log(`Proofs count for mint: ${proofs.length}`);
+        log.debug('redux.migration.123.process_mint', {
+          mint,
+          uniqueUnits,
+          units,
+          proofsCount: proofs.length,
+        });
 
         // Calculate balance for each unit exactly like selector
         return units.map((unit) => {
-          console.log(`  Processing unit: ${unit}`);
-
           const matchingKeysets = mintKeysets.filter((ks: any) => ks.unit === unit);
-          console.log(`  Matching keysets for ${unit}:`, matchingKeysets.length);
 
           // If there are no matching keysets for this unit, balance is 0
           if (matchingKeysets.length === 0) {
-            console.log(`  ❌ No matching keysets for ${unit}, balance = 0`);
+            log.debug('redux.migration.123.process_mint', {
+              mint,
+              unit,
+              matchingKeysets: 0,
+              amount: 0,
+            });
             return {
               mintUrl: mint,
               amount: 0,
@@ -421,20 +434,20 @@ const migrations = {
 
           // Get all keyset IDs for this unit
           const keysetIds = matchingKeysets.map((ks: any) => ks.id);
-          console.log(`  Keyset IDs for ${unit}:`, keysetIds);
 
           // Filter proofs that match these keysets
           const filteredProofs = proofs.filter((proof: any) => keysetIds.includes(proof.id));
-          console.log(`  Filtered proofs count: ${filteredProofs.length}`);
-          console.log(
-            `  Filtered proofs:`,
-            filteredProofs.map((p) => ({ id: p.id, amount: p.amount }))
-          );
 
           // Sum amounts (or 0 if no proofs) - exact same logic
           const amount =
             filteredProofs.reduce((sum: number, proof: any) => sum + (proof.amount || 0), 0) || 0;
-          console.log(`  ✅ Final amount for ${unit}: ${amount}`);
+          log.debug('redux.migration.123.process_mint', {
+            mint,
+            unit,
+            keysetIds,
+            filteredProofsCount: filteredProofs.length,
+            amount,
+          });
 
           return {
             mintUrl: mint,
@@ -446,8 +459,7 @@ const migrations = {
       })
       .flat(); // Flatten array of arrays into single array
 
-    console.log('\n=== ALL BALANCES CALCULATED ===');
-    console.log('All balances:', allBalances);
+    log.debug('redux.migration.123.balances', { allBalances });
 
     // Group balances by currency
     const balancesByCurrency: Record<string, { mintUrl: string; amount: number }[]> = {};
@@ -462,20 +474,14 @@ const migrations = {
       });
     });
 
-    console.log('\n=== BALANCES GROUPED BY CURRENCY ===');
-    Object.entries(balancesByCurrency).forEach(([currency, balances]) => {
-      console.log(`${currency}:`, balances);
-    });
+    log.debug('redux.migration.123.grouped', { balancesByCurrency });
 
     // Create allocation config
     const allocation: Record<string, Record<string, number>> = {};
 
     Object.entries(balancesByCurrency).forEach(([currency, balances]) => {
-      console.log(`\n--- Creating allocation for ${currency} ---`);
-
       // Sort by balance descending (highest first, even if 0)
       balances.sort((a, b) => b.amount - a.amount);
-      console.log(`Sorted balances:`, balances);
 
       const currencyAllocation: Record<string, number> = {};
 
@@ -483,29 +489,26 @@ const migrations = {
       if (balances.length > 0) {
         const topMint = balances[0].mintUrl;
         currencyAllocation[topMint] = 10000;
-        console.log(`✅ Assigned 100% (10000) to top mint: ${topMint}`);
 
         // Set all others to 0
         balances.slice(1).forEach(({ mintUrl }) => {
           currencyAllocation[mintUrl] = 0;
-          console.log(`  Set ${mintUrl} to 0%`);
         });
       }
 
       allocation[currency] = currencyAllocation;
-      console.log(`Final allocation for ${currency}:`, currencyAllocation);
+      log.debug('redux.migration.123.allocation', { currency, allocation: currencyAllocation });
     });
 
-    console.log('\n=== FINAL ALLOCATION CONFIG ===');
-    console.log('Complete allocation:', JSON.stringify(allocation, null, 2));
+    log.debug('redux.migration.123.final_allocation', { allocation });
 
-    console.log('\n=== MIGRATION 123 DEBUG END ===');
+    log.debug('redux.migration.123.done');
 
     return _.update('cashu.allocation', () => allocation, rootState) as PersistedState;
   },
   151: (state: PersistedState): PersistedState => {
     if (!state || typeof state !== 'object') return state;
-    console.log('=== MIGRATION 151: Moving mnemonic to secure storage ===');
+    log.info('redux.migration.151.start');
     const rootState = state as unknown as RootState;
 
     try {
@@ -514,25 +517,25 @@ const migrations = {
       const profile0 = profiles[0];
 
       if (!profile0) {
-        console.log('No profile 0 found, skipping migration');
+        log.debug('redux.migration.151.no_profile');
         return state;
       }
 
       if (!profile0.mnemonic) {
-        console.log('No mnemonic found in profile 0, skipping migration');
+        log.debug('redux.migration.151.no_mnemonic');
         return state;
       }
 
-      console.log('Found mnemonic in profile 0, storing in secure storage...');
+      log.info('redux.migration.151.storing_mnemonic');
 
       // Store the mnemonic in secure storage (async operation)
       // We'll handle the completion in MigrationGate
       storeMnemonic(profile0.mnemonic)
         .then((success) => {
           if (success) {
-            console.log('✅ Successfully stored mnemonic in secure storage');
+            log.info('redux.migration.151.stored');
           } else {
-            console.log('❌ Failed to store mnemonic in secure storage');
+            log.error('redux.migration.151.store_failed');
             Alert.alert(
               'Migration Warning',
               'Failed to store mnemonic in secure storage. Please contact support if this persists.'
@@ -540,26 +543,26 @@ const migrations = {
           }
         })
         .catch((error) => {
-          console.error('Migration 151 error:', error);
+          log.error('redux.migration.151.error', { error });
           Alert.alert(
             'Migration Error',
             'An error occurred during migration. Please contact support if this persists.'
           );
         });
     } catch (error) {
-      console.error('Migration 151 error:', error);
+      log.error('redux.migration.151.error', { error });
       Alert.alert(
         'Migration Error',
         'An error occurred during migration. Please contact support if this persists.'
       );
     }
 
-    console.log('=== MIGRATION 151 COMPLETE ===');
+    log.info('redux.migration.151.done');
     return state;
   },
   152: (state: PersistedState): PersistedState => {
     if (!state || typeof state !== 'object') return state;
-    console.log('=== MIGRATION 152: Migrating settings from Redux to Zustand ===');
+    log.info('redux.migration.152.start');
     const rootState = state as unknown as RootState;
 
     try {
@@ -568,20 +571,20 @@ const migrations = {
         .then(({ migrateSettingsFromRedux }) => {
           migrateSettingsFromRedux(rootState)
             .then(() => {
-              console.log('✅ Settings migration to Zustand completed');
+              log.info('redux.migration.152.done');
             })
             .catch((error) => {
-              console.error('❌ Settings migration failed:', error);
+              log.error('redux.migration.152.settings_failed', { error });
             });
         })
         .catch((error) => {
-          console.error('❌ Failed to import migration function:', error);
+          log.error('redux.migration.152.import_failed', { error });
         });
     } catch (error) {
-      console.error('Migration 152 error:', error);
+      log.error('redux.migration.152.error', { error });
     }
 
-    console.log('=== MIGRATION 152 COMPLETE ===');
+    log.info('redux.migration.152.complete');
     return state;
   },
 };

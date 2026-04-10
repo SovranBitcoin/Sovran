@@ -7,7 +7,7 @@ import {
 
 export type SemanticVars = Record<string, string>;
 
-const SHADE_300_HEX = '#ED0C46';
+const SHADE_300_HEX = '#3B82F6';
 
 /**
  * Static color scales — constant across all themes.
@@ -18,11 +18,13 @@ const SHADE_300_HEX = '#ED0C46';
  * Uniwind's runtime does NOT follow var() chains, so both forms are needed.
  */
 const STATIC_COLOR_VALUES: Record<string, string> = {
-  'shade-100': '#FF5841',
-  'shade-200': '#FF353C',
-  'shade-300': '#ED0C46',
-  'shade-400': '#CF014E',
-  'shade-500': '#BF004E',
+  'shade-0': '#F8FAFC',
+  'shade-50': '#EFF6FF',
+  'shade-100': '#DBEAFE',
+  'shade-200': '#93C5FD',
+  'shade-300': '#3B82F6',
+  'shade-400': '#2563EB',
+  'shade-500': '#1D4ED8',
 
   'red-100': '#F8E0E6',
   'red-200': '#E4A3B4',

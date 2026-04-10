@@ -1,0 +1,212 @@
+import { useEffect, useMemo, useState } from 'react';
+import { NDKEvent, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { paymentLog } from '@/shared/lib/logger';
+import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
+import { EncryptedDirectMessage } from 'nostr-tools/kinds';
+import { decryptNip04Events } from '../lib/decryptNip04Events';
+
+/** Pre-computed hex pubkeys — avoids runtime nip19.decode() on every mount */
+const DEFAULT_CONTACTS = [
+  {
+    pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2',
+    label: 'Sovran',
+  },
+  {
+    pubkey: 'c673ff0b5f228feb0abb1001882178d4c588bc4e50f857173544b5543b454f81',
+    label: 'kelbie',
+  },
+];
+
+interface NostrKeys {
+  pubkey?: string;
+  privateKey?: Uint8Array;
+}
+
+export function useRecentContacts(nostrKeys: NostrKeys | null) {
+  const defaultContactPubkeys = useMemo(
+    () =>
+      DEFAULT_CONTACTS.map((contact) => ({
+        pubkey: contact.pubkey,
+        label: contact.label,
+      })),
+    []
+  );
+
+  // NIP-04 DM subscription
+  const dmFilters = useMemo(() => {
+    if (!nostrKeys?.pubkey) return null;
+    return [
+      { kinds: [EncryptedDirectMessage], authors: [nostrKeys.pubkey] },
+      { kinds: [EncryptedDirectMessage], '#p': [nostrKeys.pubkey] },
+    ];
+  }, [nostrKeys?.pubkey]);
+
+  const { events: dmEvents } = useSubscribe({ filters: dmFilters });
+
+  // NIP-17 gift-wrap subscription
+  const giftWrapFilters = useMemo(() => {
+    if (!nostrKeys?.pubkey) return null;
+    return [{ kinds: [1059 as number], '#p': [nostrKeys.pubkey] }];
+  }, [nostrKeys?.pubkey]);
+
+  const { events: giftWrapEvents } = useSubscribe({ filters: giftWrapFilters });
+
+  const unwrappedDMs = useMemo(() => {
+    const privateKey = nostrKeys?.privateKey;
+    if (!giftWrapEvents?.length || !privateKey) return [];
+    return giftWrapEvents
+      .map((event) => {
+        const unwrapped = unwrapGiftWrap(
+          { content: event.content, pubkey: event.pubkey },
+          privateKey
+        );
+        if (!unwrapped) return null;
+        return { ...unwrapped, wrapId: event.id };
+      })
+      .filter((dm): dm is NonNullable<typeof dm> => dm !== null);
+  }, [giftWrapEvents, nostrKeys?.privateKey]);
+
+  const [decryptedContacts, setDecryptedContacts] = useState<any[]>([]);
+
+  // Build recent activity contacts from NIP-04 and NIP-17 events
+  const recentActivityContacts = useMemo(() => {
+    if (!nostrKeys?.pubkey) return [];
+
+    const contactMap = new Map<
+      string,
+      { type: string; event?: NDKEvent; dm?: (typeof unwrappedDMs)[number]; timestamp: number }
+    >();
+
+    dmEvents?.forEach((event) => {
+      const otherPubkey =
+        event.pubkey === nostrKeys.pubkey
+          ? event.tags.find((tag) => tag[0] === 'p')?.[1]
+          : event.pubkey;
+      if (!otherPubkey) return;
+
+      const existing = contactMap.get(otherPubkey);
+      const ts = event.created_at || 0;
+      if (!existing || ts > existing.timestamp) {
+        contactMap.set(otherPubkey, { type: 'nip04', event, timestamp: ts });
+      }
+    });
+
+    unwrappedDMs.forEach((dm) => {
+      const otherPubkey =
+        dm.senderPubkey === nostrKeys.pubkey ? dm.recipientPubkeys[0] : dm.senderPubkey;
+      if (!otherPubkey) return;
+
+      const existing = contactMap.get(otherPubkey);
+      if (!existing || dm.created_at > existing.timestamp) {
+        contactMap.set(otherPubkey, { type: 'nip17', dm, timestamp: dm.created_at });
+      }
+    });
+
+    const contacts = Array.from(contactMap.entries())
+      .map(([pubkey, entry]) => ({
+        type: 'contact',
+        pubkey,
+        dmEvent: entry.type === 'nip04' ? entry.event : null,
+        nip17Content: entry.type === 'nip17' ? entry.dm?.content : undefined,
+        timestamp: entry.timestamp,
+      }))
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    paymentLog.debug('payment.contacts.recent', {
+      contactCount: contacts.length,
+      nip04Events: dmEvents?.length ?? 0,
+      nip17Events: unwrappedDMs.length,
+    });
+    return contacts;
+  }, [dmEvents, unwrappedDMs, nostrKeys?.pubkey]);
+
+  // Merge default contacts with recent activity contacts
+  const contactsWithDefaults = useMemo(() => {
+    const existingPubkeys = new Set(recentActivityContacts.map((c) => c.pubkey));
+
+    const defaultsToAdd = defaultContactPubkeys
+      .filter((dc) => !existingPubkeys.has(dc.pubkey))
+      .map((dc) => ({
+        type: 'contact' as const,
+        pubkey: dc.pubkey,
+        dmEvent: null,
+        nip17Content: undefined as string | undefined,
+        timestamp: 0,
+        isDefault: true,
+      }));
+
+    return [...recentActivityContacts, ...defaultsToAdd];
+  }, [recentActivityContacts, defaultContactPubkeys]);
+
+  // Decrypt contact DM events
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!contactsWithDefaults.length) {
+        setDecryptedContacts([]);
+        return;
+      }
+
+      if (!nostrKeys?.pubkey || !nostrKeys?.privateKey) {
+        setDecryptedContacts(
+          contactsWithDefaults.map((c) =>
+            c.nip17Content !== undefined ? { ...c, dmEvent: { content: c.nip17Content } } : c
+          )
+        );
+        return;
+      }
+
+      try {
+        // Split into items that actually need decryption vs passthrough
+        const needsDecrypt = contactsWithDefaults.filter(
+          (c) => c.dmEvent || c.nip17Content !== undefined
+        );
+        const passthrough = contactsWithDefaults.filter(
+          (c) => !c.dmEvent && c.nip17Content === undefined
+        );
+        const decrypted =
+          needsDecrypt.length > 0
+            ? await decryptNip04Events(needsDecrypt, nostrKeys.privateKey)
+            : [];
+        const results = [...decrypted, ...passthrough];
+        paymentLog.debug('payment.contacts.decrypt', { decryptedCount: results.length });
+        if (!cancelled) setDecryptedContacts(results);
+      } catch (err) {
+        paymentLog.error('payment.contacts.decrypt.error', {
+          error: err instanceof Error ? err : new Error(String(err)),
+        });
+        if (!cancelled) setDecryptedContacts(contactsWithDefaults);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [contactsWithDefaults, nostrKeys?.pubkey, nostrKeys?.privateKey]);
+
+  // Overlay decrypted message content per-pubkey when available
+  const displayContacts = useMemo(() => {
+    const decryptedByPubkey = new Map<string, any>();
+    decryptedContacts.forEach((c) => {
+      if (c.pubkey) decryptedByPubkey.set(c.pubkey, c);
+    });
+
+    return contactsWithDefaults.map((c) => {
+      const decrypted = decryptedByPubkey.get(c.pubkey);
+      if (decrypted) return decrypted;
+      return {
+        ...c,
+        dmEvent: c.nip17Content !== undefined ? { content: c.nip17Content } : undefined,
+      };
+    });
+  }, [decryptedContacts, contactsWithDefaults]);
+
+  const contactPubkeys = useMemo(
+    () => contactsWithDefaults.map((c) => c.pubkey).filter(Boolean),
+    [contactsWithDefaults]
+  );
+
+  return { displayContacts, contactPubkeys, dmEvents };
+}

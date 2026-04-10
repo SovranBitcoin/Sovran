@@ -7,28 +7,18 @@
  */
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
-import {
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  useWindowDimensions,
-} from 'react-native';
+import { StyleSheet, ActivityIndicator, RefreshControl, useWindowDimensions } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
-import { npubToPubkeySafe } from '@/shared/lib/nostr/client';
+import { log, Log } from '@/shared/lib/logger';
 import { LegendList, type LegendListRenderItemProps, type LegendListRef } from '@legendapp/list';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
-import Reanimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useHeaderHeight } from '@react-navigation/elements';
 
 import {
   type FeedEvent,
@@ -56,7 +46,7 @@ import {
   computeFeedIndicesWithVideo,
   enrichFeedPage,
 } from './nostr/shared';
-import { CATEGORY_NPUBS } from './nostr/categoryNpubs';
+import { CATEGORY_PUBKEYS } from './nostr/categoryNpubs';
 
 import { PostCard } from './nostr/PostCard';
 import { RepostCard } from './UserFeed';
@@ -74,7 +64,11 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 // Types
 // ============================================================================
 
-type HomeFeedListItem = { type: 'stories' } | { type: 'tabs' } | FeedItem;
+type HomeFeedListItem = { type: 'stories' } | FeedItem;
+
+interface HomeFeedProps {
+  activeFilter?: string;
+}
 
 interface FeedSpec {
   name: string;
@@ -106,7 +100,7 @@ function hydrateSpecWithPubkey(spec: string, pubkey: string): string {
   return spec;
 }
 
-function categoryToLabel(category: string): string {
+export function categoryToLabel(category: string): string {
   return category
     .split('_')
     .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
@@ -131,6 +125,7 @@ function getCategoryPubkeysFromSpec(spec: string): string[] {
 }
 
 function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): FeedParseResult {
+  const t0 = performance.now();
   const eventMap = new Map<string, FeedEvent>();
   const notes: FeedEvent[] = [];
   const reposts: FeedEvent[] = [];
@@ -284,6 +279,22 @@ function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): FeedParseResult
     }
   }
 
+  const duration = Math.round((performance.now() - t0) * 100) / 100;
+  if (duration > 50) {
+    log.warn('feed.parse.slow', {
+      duration_ms: duration,
+      rawEvents: feedRawEvents.length,
+      feedItems: orderedFeedItems.length,
+      profiles: profilesMap.size,
+    });
+  } else {
+    log.debug('feed.parse.done', {
+      duration_ms: duration,
+      rawEvents: feedRawEvents.length,
+      feedItems: orderedFeedItems.length,
+    });
+  }
+
   return {
     orderedFeedItems,
     metricsMap,
@@ -322,20 +333,19 @@ function EmptyFeed() {
 // Main HomeFeed Component
 // ============================================================================
 
-function HomeFeedInner() {
+function HomeFeedInner({ activeFilter }: HomeFeedProps) {
   useBackgroundConfig(BG_CONFIG);
   const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const imageOverlay = useImageOverlay();
   const { keys: nostrKeys } = useNostrKeysContext();
   const userPubkey = nostrKeys?.pubkey;
-  const insets = useSafeAreaInsets();
-  const nativeHeaderHeight = useHeaderHeight();
-  const topContentInset = Math.max(nativeHeaderHeight, insets.top + 56);
-
-  const { height: screenHeight } = useWindowDimensions();
   const [, startTransition] = useTransition();
   const [feedSpecs, setFeedSpecs] = useState<FeedSpec[]>([]);
-  const [activeSpecIndex, setActiveSpecIndex] = useState(0);
+  const activeSpecIndex = useMemo(() => {
+    if (!activeFilter) return 0;
+    const idx = feedSpecs.findIndex((s) => s.name === activeFilter);
+    return idx >= 0 ? idx : 0;
+  }, [activeFilter, feedSpecs]);
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(new Map());
   const [quotedEventsMap, setQuotedEventsMap] = useState<Map<string, FeedEvent>>(new Map());
@@ -360,32 +370,20 @@ function HomeFeedInner() {
   const isFirstRender = useRef(true);
 
   const listRef = useRef<LegendListRef>(null);
-  const [tabMeasurements, setTabMeasurements] = useState<
-    Record<number, { x: number; width: number }>
-  >({});
-  const indicatorX = useSharedValue(0);
-  const indicatorWidth = useSharedValue(0);
 
-  const pendingScrollToTabsRef = useRef(false);
   const storiesHeightRef = useRef(0);
   const scrollOffsetRef = useRef(0);
 
   const categoryFeedSpecs = useMemo<FeedSpec[]>(() => {
-    return Object.entries(CATEGORY_NPUBS).map(([category, npubs]) => {
-      const pubkeys = npubs
-        .map((npub) => npubToPubkeySafe(npub))
-        .filter((pubkey): pubkey is string => !!pubkey);
-
-      return {
-        name: categoryToLabel(category),
-        spec: JSON.stringify({
-          id: 'feed',
-          kind: 'notes',
-          notes: 'authored',
-          pubkeys,
-        }),
-      };
-    });
+    return Object.entries(CATEGORY_PUBKEYS).map(([category, pubkeys]) => ({
+      name: categoryToLabel(category),
+      spec: JSON.stringify({
+        id: 'feed',
+        kind: 'notes',
+        notes: 'authored',
+        pubkeys,
+      }),
+    }));
   }, []);
 
   // ── Phase 0: Fetch available feed specs ──
@@ -513,7 +511,7 @@ function HomeFeedInner() {
           }
         );
       } catch (error) {
-        console.error('HomeFeed: Failed to load feed', error);
+        log.error('feed.home.load_failed', { error });
         setFeedItems([]);
         setMetricsMap(new Map());
         setQuotedEventsMap(new Map());
@@ -539,62 +537,21 @@ function HomeFeedInner() {
     loadFeed(activeSpecIndex);
   }, [activeSpecIndex, currentSpec, userPubkey, loadFeed]);
 
-  useEffect(() => {
-    if (feedSpecs.length === 0) return;
-    if (activeSpecIndex < feedSpecs.length) return;
-    setActiveSpecIndex(0);
-  }, [activeSpecIndex, feedSpecs.length]);
-
   const handleRefresh = useCallback(() => {
     if (!currentSpec) return;
     setIsRefreshing(true);
     loadFeed(activeSpecIndex, true);
   }, [activeSpecIndex, currentSpec, loadFeed]);
 
-  const handleSpecChange = useCallback(
-    (index: number) => {
-      if (index === activeSpecIndex) return;
-      const storiesWereHidden = scrollOffsetRef.current > storiesHeightRef.current;
-      if (storiesWereHidden) {
-        listRef.current?.scrollToOffset({
-          offset: storiesHeightRef.current,
-          animated: false,
-        });
-      }
-      setActiveSpecIndex(index);
+  // Reset feed items when the active filter changes
+  const prevActiveSpecIndex = useRef(activeSpecIndex);
+  useEffect(() => {
+    if (prevActiveSpecIndex.current !== activeSpecIndex) {
+      prevActiveSpecIndex.current = activeSpecIndex;
       setIsLoading(true);
       setFeedItems([]);
-      pendingScrollToTabsRef.current = storiesWereHidden;
-    },
-    [activeSpecIndex]
-  );
-
-  const handleTabLayout = useCallback((index: number, x: number, width: number) => {
-    setTabMeasurements((prev) => {
-      const existing = prev[index];
-      if (existing?.x === x && existing?.width === width) return prev;
-      return { ...prev, [index]: { x, width } };
-    });
-  }, []);
-
-  useEffect(() => {
-    const measurement = tabMeasurements[activeSpecIndex];
-    if (!measurement) return;
-    indicatorX.set(withTiming(measurement.x, { duration: 220 }));
-    indicatorWidth.set(withTiming(measurement.width, { duration: 220 }));
-  }, [activeSpecIndex, indicatorWidth, indicatorX, tabMeasurements]);
-
-  // Re-apply scroll position once new feed items arrive after a tab switch
-  useEffect(() => {
-    if (!pendingScrollToTabsRef.current || feedItems.length === 0) return;
-    pendingScrollToTabsRef.current = false;
-    requestAnimationFrame(() => {
-      listRef.current?.scrollToOffset({
-        offset: storiesHeightRef.current,
-        animated: false,
-      });
-    });
-  }, [feedItems]);
+    }
+  }, [activeSpecIndex]);
 
   // ── Pagination: load older items ──
 
@@ -758,7 +715,7 @@ function HomeFeedInner() {
       );
       return newItems;
     } catch (error) {
-      console.error('HomeFeed: loadMore failed', error);
+      log.error('feed.home.load_more_failed', { error });
       return [];
     } finally {
       client.close();
@@ -842,64 +799,6 @@ function HomeFeedInner() {
   );
 
   // ── Render ──
-
-  const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: indicatorX.get() }],
-    width: indicatorWidth.get(),
-  }));
-
-  const tabLabelActiveColor = useMemo(() => opacity(foreground, 0.95), [foreground]);
-  const tabLabelInactiveColor = useMemo(() => opacity(foreground, 0.45), [foreground]);
-
-  const tabsBar = useMemo(
-    () =>
-      feedSpecs.length > 1 ? (
-        <View style={[styles.feedTabsContainer, { backgroundColor: surface }]}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.feedTabsRow}>
-            {feedSpecs.map((spec, idx) => {
-              const isActive = idx === activeSpecIndex;
-              return (
-                <TouchableOpacity
-                  key={spec.name}
-                  style={styles.feedTab}
-                  onPress={() => handleSpecChange(idx)}
-                  onLayout={(event) => {
-                    const { x, width } = event.nativeEvent.layout;
-                    handleTabLayout(idx, x, width);
-                  }}>
-                  <Text
-                    size={14}
-                    heavy
-                    style={{
-                      color: isActive ? tabLabelActiveColor : tabLabelInactiveColor,
-                    }}>
-                    {spec.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-            <Reanimated.View
-              pointerEvents="none"
-              style={[styles.feedTabIndicator, { backgroundColor: foreground }, indicatorStyle]}
-            />
-          </ScrollView>
-        </View>
-      ) : null,
-    [
-      activeSpecIndex,
-      feedSpecs,
-      foreground,
-      surface,
-      handleSpecChange,
-      handleTabLayout,
-      indicatorStyle,
-      tabLabelActiveColor,
-      tabLabelInactiveColor,
-    ]
-  );
 
   const renderFeedItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
@@ -986,10 +885,8 @@ function HomeFeedInner() {
     [isRefreshing, handleRefresh, refreshTintColor]
   );
 
-  // Tabs are always prepended; stories are currently feature-flagged off.
-  // stickyHeaderIndices pins the tabs row at the top while scrolling.
   const listData = useMemo<HomeFeedListItem[]>(
-    () => (SHOW_STORIES_ROW ? [STORIES_ITEM, TABS_ITEM, ...feedItems] : [TABS_ITEM, ...feedItems]),
+    () => (SHOW_STORIES_ROW ? [STORIES_ITEM, ...feedItems] : feedItems),
     [feedItems]
   );
 
@@ -1005,15 +902,12 @@ function HomeFeedInner() {
           </View>
         );
       }
-      if (item.type === 'tabs') {
-        return tabsBar;
-      }
       return renderFeedItem({
         item,
         index,
       } as LegendListRenderItemProps<FeedItem, string | undefined>);
     },
-    [userPubkey, tabsBar, renderFeedItem]
+    [userPubkey, renderFeedItem]
   );
 
   const handleScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
@@ -1031,51 +925,47 @@ function HomeFeedInner() {
   );
 
   return (
-    <ImageOverlayProvider
-      getDisplayMetrics={getDisplayMetrics}
-      getEngagementState={getEngagementState}
-      onSwipeUpToNextPost={onSwipeUpToNextPost}
-      getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
-      <View style={[styles.flex1, { paddingTop: topContentInset }]}>
-        <LegendList
-          ref={listRef}
-          data={listData}
-          keyExtractor={listKeyExtractor}
-          getItemType={listGetItemType}
-          estimatedItemSize={300}
-          drawDistance={400}
-          renderItem={renderItem}
-          extraData={`${dataVersion}:${engagementRevision}`}
-          recycleItems
-          stickyHeaderIndices={STICKY_INDICES}
-          ListFooterComponent={
-            isLoading ? (
-              <View style={{ height: screenHeight }}>
-                <ActivityIndicator style={styles.loader} />
-              </View>
-            ) : feedItems.length === 0 ? (
-              <EmptyFeed />
-            ) : isLoadingMore ? (
-              <ActivityIndicator style={styles.loadMoreSpinner} />
-            ) : null
-          }
-          onEndReached={handleEndReached}
-          onEndReachedThreshold={0.4}
-          style={styles.flex1}
-          contentContainerStyle={LIST_CONTENT_STYLE}
-          showsVerticalScrollIndicator={false}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-          refreshControl={refreshControl}
-        />
-      </View>
-      <AnimatedImageOverlay />
-    </ImageOverlayProvider>
+    <Log name="HomeFeed">
+      <ImageOverlayProvider
+        getDisplayMetrics={getDisplayMetrics}
+        getEngagementState={getEngagementState}
+        onSwipeUpToNextPost={onSwipeUpToNextPost}
+        getVideoFeedLayoutsAndIndex={getVideoFeedLayoutsAndIndex}>
+        <View style={styles.flex1}>
+          <LegendList
+            ref={listRef}
+            data={listData}
+            keyExtractor={listKeyExtractor}
+            getItemType={listGetItemType}
+            estimatedItemSize={300}
+            drawDistance={400}
+            renderItem={renderItem}
+            extraData={`${dataVersion}:${engagementRevision}`}
+            recycleItems
+            ListEmptyComponent={
+              isLoading ? <ActivityIndicator style={styles.loader} /> : <EmptyFeed />
+            }
+            ListFooterComponent={
+              isLoadingMore ? <ActivityIndicator style={styles.loadMoreSpinner} /> : null
+            }
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.4}
+            style={styles.flex1}
+            contentContainerStyle={LIST_CONTENT_STYLE}
+            showsVerticalScrollIndicator={false}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            refreshControl={refreshControl}
+          />
+        </View>
+        <AnimatedImageOverlay />
+      </ImageOverlayProvider>
+    </Log>
   );
 }
 
-function HomeFeedComponent() {
-  return <HomeFeedInner />;
+function HomeFeedComponent({ activeFilter }: HomeFeedProps) {
+  return <HomeFeedInner activeFilter={activeFilter} />;
 }
 
 export const HomeFeed = React.memo(HomeFeedComponent);
@@ -1085,19 +975,16 @@ export const HomeFeed = React.memo(HomeFeedComponent);
 // ============================================================================
 
 const STORIES_ITEM: HomeFeedListItem = { type: 'stories' };
-const TABS_ITEM: HomeFeedListItem = { type: 'tabs' };
 const SHOW_STORIES_ROW = false;
-const STICKY_INDICES = [SHOW_STORIES_ROW ? 1 : 0];
 const LIST_CONTENT_STYLE = { paddingBottom: 120 };
 
 const listKeyExtractor = (item: HomeFeedListItem) => {
   if (item.type === 'stories') return '__stories__';
-  if (item.type === 'tabs') return '__tabs__';
   return item.type === 'note' ? item.event.id : item.repostEvent.id;
 };
 const listGetItemType = (item: HomeFeedListItem) => item.type;
 
-const PRIMAL_FEED_SPECS: FeedSpec[] = [
+export const PRIMAL_FEED_SPECS: FeedSpec[] = [
   {
     name: 'Trending',
     spec: JSON.stringify({ id: 'global-trending', kind: 'notes', hours: 24 }),
@@ -1117,30 +1004,6 @@ const PRIMAL_FEED_SPECS: FeedSpec[] = [
 // ============================================================================
 
 const styles = StyleSheet.create({
-  feedTabsContainer: {
-    overflow: 'hidden',
-    paddingTop: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-  },
-  feedTabsRow: {
-    paddingHorizontal: 16,
-    minHeight: 38,
-    alignItems: 'flex-end',
-  },
-  feedTab: {
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-    paddingTop: 6,
-    marginRight: 10,
-  },
-  feedTabIndicator: {
-    position: 'absolute',
-    left: 0,
-    bottom: 0,
-    height: 3,
-    borderRadius: 999,
-  },
   emptyState: {
     paddingVertical: 32,
     paddingHorizontal: 16,

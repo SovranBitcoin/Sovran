@@ -1,9 +1,8 @@
 import { Skeleton } from 'heroui-native/skeleton';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image as RNImage, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-
-import { UntranslatedText } from '@/shared/ui/primitives/Text';
 
 import Icon from 'assets/icons';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -23,56 +22,15 @@ interface AvatarProps {
 
 type ImageStatus = 'idle' | 'loading' | 'loaded' | 'failed';
 
-function getGradientTextColor(gradientColor: string): string {
-  const match = gradientColor.match(/hsla?\((\d+)/i);
-  if (!match) return 'rgba(17, 24, 39, 0.92)';
-
-  const hue = Number(match[1]);
-  return `hsla(${hue}, 34%, 14%, 0.92)`;
-}
-
-function getFallbackText(name: string | undefined, seed: string | undefined, size: number): string {
-  if (name && name.trim().length > 0) {
-    const cleaned = name.trim().replace(/[_-]+/g, ' ');
-    if (size >= 52) {
-      return cleaned.split(/\s+/)[0] ?? cleaned;
-    }
-    return cleaned
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? '')
-      .join('');
-  }
-
-  if (seed && seed.length > 0) {
-    return seed.slice(0, 2).toUpperCase();
-  }
-
-  return '';
-}
-
 function FallbackContent({
-  fallbackText,
   gradientTheme,
-  gradientTextColor,
-  fallbackIcon,
   borderRadius,
-  size,
 }: {
-  fallbackText: string;
   gradientTheme: ReturnType<typeof generateSeededGradient>;
-  gradientTextColor: string;
-  fallbackIcon: string;
   borderRadius: number;
-  size: number;
 }) {
   return (
-    <View
-      pointerEvents="none"
-      style={[
-        StyleSheet.absoluteFillObject,
-        { borderRadius, justifyContent: 'center', alignItems: 'center' },
-      ]}>
+    <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { borderRadius }]}>
       <LinearGradient
         colors={gradientTheme.primaryColors}
         start={gradientTheme.primaryStart}
@@ -85,18 +43,6 @@ function FallbackContent({
         end={gradientTheme.overlayEnd}
         style={StyleSheet.absoluteFill}
       />
-      {fallbackText ? (
-        <UntranslatedText
-          bold
-          style={{ color: gradientTextColor }}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.65}>
-          {fallbackText}
-        </UntranslatedText>
-      ) : (
-        <Icon name={fallbackIcon} size={Math.max(14, Math.round(size * 0.46))} color="#FFFFFF" />
-      )}
     </View>
   );
 }
@@ -127,14 +73,9 @@ export const Avatar = ({
   const statusIconSize = size * 0.33;
   const avatarStyle = { width: size, height: size, borderRadius, overflow: 'hidden' } as const;
 
-  const fallbackText = getFallbackText(name, seed, size);
   const gradientTheme = useMemo(
     () => generateSeededGradient(`${seed ?? name ?? ''}`),
     [name, seed]
-  );
-  const gradientTextColor = useMemo(
-    () => getGradientTextColor(gradientTheme.primaryColors[1]),
-    [gradientTheme]
   );
 
   const statusBadge = useMemo(() => {
@@ -150,8 +91,6 @@ export const Avatar = ({
     };
     return statusConfig[status] ?? null;
   }, [status]);
-
-  const fallbackIcon = 'ph:user-bold';
 
   const showSkeleton =
     loading || (!!picture && imageStatus !== 'loaded' && imageStatus !== 'failed');
@@ -180,14 +119,7 @@ export const Avatar = ({
   };
 
   const fallbackContent = (
-    <FallbackContent
-      fallbackText={fallbackText}
-      gradientTheme={gradientTheme}
-      gradientTextColor={gradientTextColor}
-      fallbackIcon={fallbackIcon}
-      borderRadius={borderRadius}
-      size={size}
-    />
+    <FallbackContent gradientTheme={gradientTheme} borderRadius={borderRadius} />
   );
 
   const SkeletonOverlay = (
@@ -216,8 +148,9 @@ export const Avatar = ({
   if (hasPicture && showSkeleton) {
     return (
       <VStack style={{ position: 'relative', overflow: 'hidden' }}>
-        <RNImage
+        <ExpoImage
           source={{ uri: picture }}
+          cachePolicy="memory-disk"
           style={[avatarStyle, { opacity: 0 }]}
           accessibilityLabel={imageAlt}
           onLoad={handleImageLoad}
@@ -233,7 +166,12 @@ export const Avatar = ({
   if (hasPicture && imageStatus === 'loaded') {
     return (
       <VStack style={{ position: 'relative', overflow: 'hidden' }}>
-        <RNImage source={{ uri: picture }} style={avatarStyle} accessibilityLabel={imageAlt} />
+        <ExpoImage
+          source={{ uri: picture }}
+          cachePolicy="memory-disk"
+          style={avatarStyle}
+          accessibilityLabel={imageAlt}
+        />
         {StatusBadgeWrapper}
       </VStack>
     );

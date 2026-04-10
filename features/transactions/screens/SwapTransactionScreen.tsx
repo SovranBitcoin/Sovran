@@ -29,7 +29,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { useHistoryWithMelts } from '@/features/transactions';
-import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
+import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 import {
   useSwapTransactionsStore,
   type SwapLeg,
@@ -53,6 +53,7 @@ import { router } from 'expo-router';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 interface Props {
   groupId: string | undefined;
@@ -207,6 +208,7 @@ CollapsedLegGroup.displayName = 'CollapsedLegGroup';
 // -----------------------------------------------------------------------
 
 export function SwapTransactionScreen({ groupId }: Props) {
+  useLifecycleLogger('SwapTransactionScreen');
   const [foreground, muted, danger, success] = useThemeColor([
     'foreground',
     'muted',
@@ -222,6 +224,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
   const toggleExpanded = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    log.debug('tx.swap.toggle_expanded', { groupId });
     setExpanded((prev) => {
       chevronRotation.value = withTiming(prev ? 0 : 180, {
         duration: 280,
@@ -310,12 +313,14 @@ export function SwapTransactionScreen({ groupId }: Props) {
   }, [group]);
 
   // ── Compute totals for the header and footer ──
-  const { totalReceived, totalSent, totalFees, stepCount } = useMemo(() => {
-    if (!group) return { totalReceived: 0, totalSent: 0, totalFees: 0, stepCount: 0 };
+  const { totalReceived, totalSent, totalFees, stepCount, historyReady } = useMemo(() => {
+    if (!group)
+      return { totalReceived: 0, totalSent: 0, totalFees: 0, stepCount: 0, historyReady: false };
 
     let received = 0;
     let sent = 0;
     let steps = 0;
+    let hasMintHistory = false;
 
     for (const lg of legGroups) {
       steps += lg.legs.length;
@@ -328,21 +333,30 @@ export function SwapTransactionScreen({ groupId }: Props) {
           ? (historyByQuoteId.get(leg.meltQuoteId) as MeltHistoryEntry | undefined)
           : undefined;
 
-        if (mintEntry) received += Math.abs(mintEntry.amount);
+        if (mintEntry) {
+          received += Math.abs(mintEntry.amount);
+          hasMintHistory = true;
+        }
         if (meltEntry) sent += Math.abs(meltEntry.amount);
         else if (leg.amount > 0) sent += leg.amount; // fallback for synthetic melts
       }
     }
 
+    // Don't compute fees until mint history is loaded — otherwise received=0
+    // makes it look like everything was lost to fees.
+    const ready = hasMintHistory || group.state === 'cancelled';
+
     return {
       totalReceived: received,
       totalSent: sent,
-      totalFees: Math.max(0, sent - received),
+      totalFees: ready ? Math.max(0, sent - received) : 0,
       stepCount: steps,
+      historyReady: ready,
     };
   }, [group, legGroups, historyByQuoteId]);
 
   if (!groupId || !group) {
+    log.warn('tx.swap.not_found', { groupId });
     return (
       <ModalLayoutWrapper>
         <View style={styles.center}>
@@ -351,6 +365,14 @@ export function SwapTransactionScreen({ groupId }: Props) {
       </ModalLayoutWrapper>
     );
   }
+
+  log.debug('tx.swap.display', {
+    groupId,
+    state: group.state,
+    legCount: legGroups.length,
+    totalReceived,
+    totalFees,
+  });
 
   const unit = group.unit || 'sat';
   const isFailed = group.state === 'cancelled';
@@ -365,188 +387,190 @@ export function SwapTransactionScreen({ groupId }: Props) {
 
   return (
     <ModalLayoutWrapper contentPadding={0}>
-      <VStack gap={12}>
-        {/* ── Header: amount + swap icon (matches HistoryEntryHeader pattern) ── */}
-        <HStack align="center" justify="space-between" className="p-5 pb-0 pt-0">
-          <VStack>
-            <HStack align="center">
-              <Spacer size={8} />
-              <AmountFormatter
-                amount={totalReceived || totalSent}
-                unit={unit}
-                size={28}
-                weight="heavy"
-                color={headerColor}
-              />
-            </HStack>
-            <Text overpass size={18} color={opacity(foreground, 0.9)} bold>
-              <Text overpass size={18} color={opacity(foreground, 0.9)} style={{ marginLeft: 8 }}>
-                {fiatAmount}
+      <Screen name="SwapTransactionScreen">
+        <VStack gap={12}>
+          {/* ── Header: amount + swap icon (matches HistoryEntryHeader pattern) ── */}
+          <HStack align="center" justify="space-between" className="p-5 pb-0 pt-0">
+            <VStack>
+              <HStack align="center">
+                <Spacer size={8} />
+                <AmountFormatter
+                  amount={totalReceived || totalSent}
+                  unit={unit}
+                  size={28}
+                  weight="heavy"
+                  color={headerColor}
+                />
+              </HStack>
+              <Text overpass size={18} color={opacity(foreground, 0.9)} bold>
+                <Text overpass size={18} color={opacity(foreground, 0.9)} style={{ marginLeft: 8 }}>
+                  {fiatAmount}
+                </Text>
               </Text>
-            </Text>
-          </VStack>
+            </VStack>
 
-          {/* Swap icon — same style as TransactionIcon in HistoryEntryHeader */}
-          <View className="scale-125 transform bg-transparent p-4">
-            <Icon name="mdi:swap-horizontal" size={28} color={opacity(foreground, 0.9)} />
-          </View>
-        </HStack>
-
-        {/* ── Disclosure toggle (animated chevron, like SwiftUI DisclosureGroup) ── */}
-        <TouchableOpacity onPress={toggleExpanded} style={{ marginHorizontal: 16 }}>
-          <HStack align="center" justify="space-between" style={styles.toggleHeader}>
-            <UntranslatedText bold size={13} color={opacity(foreground, 0.66)}>
-              Transactions
-            </UntranslatedText>
-            <Animated.View style={chevronAnimatedStyle}>
-              <IconSymbol
-                name="chevron.down"
-                size={14}
-                color={opacity(foreground, 0.5)}
-                weight="semibold"
-              />
-            </Animated.View>
-          </HStack>
-        </TouchableOpacity>
-
-        {/* ── Leg cards: expanded or collapsed (Reanimated layout transition) ── */}
-        <Animated.View layout={LinearTransition.duration(280)}>
-          {expanded ? (
-            legGroups.map((legGroup, groupIdx) => {
-              const isChain = legGroup.chainId != null;
-
-              return (
-                <View key={legGroup.id} style={{ marginHorizontal: 16 }}>
-                  {groupIdx > 0 ? <View style={styles.legSpacer} /> : null}
-
-                  <TransferCard accentColor={accentColor}>
-                    {/* Render each leg in the group */}
-                    {legGroup.legs.map((leg, legIdx) => {
-                      const mintEntry = leg.mintQuoteId
-                        ? (historyByQuoteId.get(leg.mintQuoteId) as MintHistoryEntry | undefined)
-                        : undefined;
-                      const meltEntry = leg.meltQuoteId
-                        ? (historyByQuoteId.get(leg.meltQuoteId) as MeltHistoryEntry | undefined)
-                        : undefined;
-
-                      // Synthetic MeltHistoryEntry for v3 melts missing from Coco history
-                      const meltEntryForDisplay: MeltHistoryEntry | undefined =
-                        meltEntry ??
-                        (leg.meltQuoteId
-                          ? {
-                              id: leg.meltOperationId ?? leg.id,
-                              createdAt: group.createdAt,
-                              mintUrl: leg.fromMintUrl,
-                              unit: group.unit,
-                              type: 'melt' as const,
-                              quoteId: leg.meltQuoteId,
-                              state: leg.localStatus === 'done' ? 'PAID' : 'UNPAID',
-                              amount: leg.amount,
-                            }
-                          : undefined);
-
-                      const fromInfo = mintInfoMap[leg.fromMintUrl];
-                      const toInfo = mintInfoMap[leg.toMintUrl];
-                      const fromName = getMintDisplayName(leg.fromMintUrl, fromInfo);
-                      const toName = getMintDisplayName(leg.toMintUrl, toInfo);
-                      const hasError = leg.localStatus === 'failed';
-
-                      // Skip the separator between chained legs when the previous
-                      // leg's destination is the same mint as this leg's source
-                      const prevLeg = legIdx > 0 ? legGroup.legs[legIdx - 1] : null;
-                      const sameMintAsPrev =
-                        prevLeg != null && prevLeg.toMintUrl === leg.fromMintUrl;
-
-                      return (
-                        <View key={leg.id}>
-                          {/* Separator between chained legs (skip if same mint) */}
-                          {isChain && legIdx > 0 && !sameMintAsPrev && (
-                            <TransferSeparator failed={hasError} />
-                          )}
-
-                          {/* Melt row (send from source) */}
-                          {meltEntryForDisplay ? (
-                            <TransferEntryRow
-                              {...buildSwapEntryRowProps(
-                                meltEntryForDisplay,
-                                fromInfo?.icon_url,
-                                fromName
-                              )}
-                            />
-                          ) : null}
-
-                          {/* Colored separator between melt → mint */}
-                          {meltEntryForDisplay && mintEntry ? (
-                            <TransferSeparator failed={hasError} />
-                          ) : null}
-
-                          {/* Mint row (receive on destination) */}
-                          {mintEntry ? (
-                            <TransferEntryRow
-                              {...buildSwapEntryRowProps(mintEntry, toInfo?.icon_url, toName)}
-                            />
-                          ) : null}
-
-                          {/* Error banner */}
-                          {hasError && leg.errorMessage ? (
-                            <TransferErrorBanner message={leg.errorMessage} />
-                          ) : null}
-                        </View>
-                      );
-                    })}
-                  </TransferCard>
-                </View>
-              );
-            })
-          ) : (
-            /* ── Collapsed: compact summary per leg group ── */
-            <View style={{ marginHorizontal: 16 }}>
-              <TransferCard accentColor={accentColor}>
-                {legGroups.map((legGroup, groupIdx) => (
-                  <React.Fragment key={legGroup.id}>
-                    {groupIdx > 0 && (
-                      <View
-                        style={{
-                          height: StyleSheet.hairlineWidth,
-                          backgroundColor: opacity(foreground, 0.1),
-                          marginHorizontal: 16,
-                        }}
-                      />
-                    )}
-                    <CollapsedLegGroup legGroup={legGroup} mintInfoMap={mintInfoMap} />
-                  </React.Fragment>
-                ))}
-              </TransferCard>
+            {/* Swap icon — same style as TransactionIcon in HistoryEntryHeader */}
+            <View className="scale-125 transform bg-transparent p-4">
+              <Icon name="mdi:swap-horizontal" size={28} color={opacity(foreground, 0.9)} />
             </View>
-          )}
-        </Animated.View>
+          </HStack>
 
-        {/* ── Section: metadata (below the cards, matching other screens) ── */}
-        <Section
-          items={[
-            {
-              title: 'Status',
-              value:
-                group.state === 'finished'
-                  ? 'Complete'
-                  : group.state.charAt(0).toUpperCase() + group.state.slice(1),
-            },
-            { title: 'Steps', value: String(stepCount) },
-            ...(totalFees > 0
-              ? [
-                  {
-                    title: 'Total Fees',
-                    value: `${totalFees} ${unit}`,
-                  },
-                ]
-              : []),
-            {
-              title: 'Date',
-              value: convertTime(new Date(group.createdAt)),
-            },
-          ]}
-        />
-      </VStack>
+          {/* ── Disclosure toggle (animated chevron, like SwiftUI DisclosureGroup) ── */}
+          <TouchableOpacity onPress={toggleExpanded} style={{ marginHorizontal: 16 }}>
+            <HStack align="center" justify="space-between" style={styles.toggleHeader}>
+              <UntranslatedText bold size={13} color={opacity(foreground, 0.66)}>
+                Transactions
+              </UntranslatedText>
+              <Animated.View style={chevronAnimatedStyle}>
+                <IconSymbol
+                  name="chevron.down"
+                  size={14}
+                  color={opacity(foreground, 0.5)}
+                  weight="semibold"
+                />
+              </Animated.View>
+            </HStack>
+          </TouchableOpacity>
+
+          {/* ── Leg cards: expanded or collapsed (Reanimated layout transition) ── */}
+          <Animated.View layout={LinearTransition.duration(280)}>
+            {expanded ? (
+              legGroups.map((legGroup, groupIdx) => {
+                const isChain = legGroup.chainId != null;
+
+                return (
+                  <View key={legGroup.id} style={{ marginHorizontal: 16 }}>
+                    {groupIdx > 0 ? <View style={styles.legSpacer} /> : null}
+
+                    <TransferCard accentColor={accentColor}>
+                      {/* Render each leg in the group */}
+                      {legGroup.legs.map((leg, legIdx) => {
+                        const mintEntry = leg.mintQuoteId
+                          ? (historyByQuoteId.get(leg.mintQuoteId) as MintHistoryEntry | undefined)
+                          : undefined;
+                        const meltEntry = leg.meltQuoteId
+                          ? (historyByQuoteId.get(leg.meltQuoteId) as MeltHistoryEntry | undefined)
+                          : undefined;
+
+                        // Synthetic MeltHistoryEntry for v3 melts missing from Coco history
+                        const meltEntryForDisplay: MeltHistoryEntry | undefined =
+                          meltEntry ??
+                          (leg.meltQuoteId
+                            ? {
+                                id: leg.meltOperationId ?? leg.id,
+                                createdAt: group.createdAt,
+                                mintUrl: leg.fromMintUrl,
+                                unit: group.unit,
+                                type: 'melt' as const,
+                                quoteId: leg.meltQuoteId,
+                                state: leg.localStatus === 'done' ? 'PAID' : 'UNPAID',
+                                amount: leg.amount,
+                              }
+                            : undefined);
+
+                        const fromInfo = mintInfoMap[leg.fromMintUrl];
+                        const toInfo = mintInfoMap[leg.toMintUrl];
+                        const fromName = getMintDisplayName(leg.fromMintUrl, fromInfo);
+                        const toName = getMintDisplayName(leg.toMintUrl, toInfo);
+                        const hasError = leg.localStatus === 'failed';
+
+                        // Skip the separator between chained legs when the previous
+                        // leg's destination is the same mint as this leg's source
+                        const prevLeg = legIdx > 0 ? legGroup.legs[legIdx - 1] : null;
+                        const sameMintAsPrev =
+                          prevLeg != null && prevLeg.toMintUrl === leg.fromMintUrl;
+
+                        return (
+                          <View key={leg.id}>
+                            {/* Separator between chained legs (skip if same mint) */}
+                            {isChain && legIdx > 0 && !sameMintAsPrev && (
+                              <TransferSeparator failed={hasError} />
+                            )}
+
+                            {/* Melt row (send from source) */}
+                            {meltEntryForDisplay ? (
+                              <TransferEntryRow
+                                {...buildSwapEntryRowProps(
+                                  meltEntryForDisplay,
+                                  fromInfo?.icon_url,
+                                  fromName
+                                )}
+                              />
+                            ) : null}
+
+                            {/* Colored separator between melt → mint */}
+                            {meltEntryForDisplay && mintEntry ? (
+                              <TransferSeparator failed={hasError} />
+                            ) : null}
+
+                            {/* Mint row (receive on destination) */}
+                            {mintEntry ? (
+                              <TransferEntryRow
+                                {...buildSwapEntryRowProps(mintEntry, toInfo?.icon_url, toName)}
+                              />
+                            ) : null}
+
+                            {/* Error banner */}
+                            {hasError && leg.errorMessage ? (
+                              <TransferErrorBanner message={leg.errorMessage} />
+                            ) : null}
+                          </View>
+                        );
+                      })}
+                    </TransferCard>
+                  </View>
+                );
+              })
+            ) : (
+              /* ── Collapsed: compact summary per leg group ── */
+              <View style={{ marginHorizontal: 16 }}>
+                <TransferCard accentColor={accentColor}>
+                  {legGroups.map((legGroup, groupIdx) => (
+                    <React.Fragment key={legGroup.id}>
+                      {groupIdx > 0 && (
+                        <View
+                          style={{
+                            height: StyleSheet.hairlineWidth,
+                            backgroundColor: opacity(foreground, 0.1),
+                            marginHorizontal: 16,
+                          }}
+                        />
+                      )}
+                      <CollapsedLegGroup legGroup={legGroup} mintInfoMap={mintInfoMap} />
+                    </React.Fragment>
+                  ))}
+                </TransferCard>
+              </View>
+            )}
+          </Animated.View>
+
+          {/* ── Section: metadata (below the cards, matching other screens) ── */}
+          <Section
+            items={[
+              {
+                title: 'Status',
+                value:
+                  group.state === 'finished'
+                    ? 'Complete'
+                    : group.state.charAt(0).toUpperCase() + group.state.slice(1),
+              },
+              { title: 'Steps', value: String(stepCount) },
+              ...(totalFees > 0
+                ? [
+                    {
+                      title: 'Total Fees',
+                      value: `${totalFees} ${unit}`,
+                    },
+                  ]
+                : []),
+              {
+                title: 'Date',
+                value: convertTime(new Date(group.createdAt)),
+              },
+            ]}
+          />
+        </VStack>
+      </Screen>
     </ModalLayoutWrapper>
   );
 }

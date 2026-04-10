@@ -15,9 +15,10 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Transactions } from '@/features/transactions/components/Transactions';
 import { MonthSelector } from '@/features/transactions/components/MonthSelector';
-import { HistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry } from '@cashu/coco-core';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 type PaymentType = 'all' | 'lightning' | 'ecash';
@@ -56,6 +57,7 @@ export function TransactionsScreen({
   filterMonth,
   onMonthChange,
 }: TransactionsScreenProps) {
+  useLifecycleLogger('TransactionsScreen');
   // Use external filter props if provided, otherwise use internal state
   const selectedCurrency = filterCurrency || initialAccount?.unit || 'sat';
   const paymentType = filterPaymentType;
@@ -97,6 +99,15 @@ export function TransactionsScreen({
 
   const { history, isFetching } = useHistoryWithMelts();
 
+  log.debug('tx.list.render', {
+    totalHistory: history.length,
+    isFetching,
+    currency: selectedCurrency,
+    paymentType,
+    direction,
+    tab,
+  });
+
   const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}-${selectedMonth}`;
 
   // Filter by currency and payment type/direction
@@ -137,23 +148,25 @@ export function TransactionsScreen({
       stickyContentHeight={MONTH_SELECTOR_HEIGHT}
       useCustomScrollView
       onHeaderHeightChange={setTotalHeaderHeight}>
-      {/* Transaction list with proper header spacer */}
-      <Transactions
-        listKey={listKey}
-        account={{ ...parsedAccount, unit: selectedCurrency }}
-        showMore={false}
-        history={history}
-        isFetching={isFetching}
-        filter={direction}
-        type={paymentType}
-        mintUrlFilter={filterMintUrl}
-        at="all"
-        tab={tab}
-        selectedMonth={selectedMonth}
-        onTransactionPress={onTransactionPress}
-        header={listHeader}
-        disableContentInsetAdjustment
-      />
+      <Screen name="TransactionsScreen">
+        {/* Transaction list with proper header spacer */}
+        <Transactions
+          listKey={listKey}
+          account={{ ...parsedAccount, unit: selectedCurrency }}
+          showMore={false}
+          history={history}
+          isFetching={isFetching}
+          filter={direction}
+          type={paymentType}
+          mintUrlFilter={filterMintUrl}
+          at="all"
+          tab={tab}
+          selectedMonth={selectedMonth}
+          onTransactionPress={onTransactionPress}
+          header={listHeader}
+          disableContentInsetAdjustment
+        />
+      </Screen>
     </ModalLayoutWrapper>
   );
 }

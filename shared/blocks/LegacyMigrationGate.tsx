@@ -1,7 +1,7 @@
 import React, { ReactNode, useEffect, useRef, useState } from 'react';
 
 import { runLegacyReduxBootstrap } from '@/shared/lib/migrations/legacyReduxMigrations';
-import { initLog } from '@/shared/lib/initTiming';
+import { initLog, log, Log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 
 interface LegacyMigrationGateProps {
@@ -13,6 +13,7 @@ interface LegacyMigrationGateProps {
  * newer AsyncStorage/Zustand key-shape migrations run.
  */
 export default function LegacyMigrationGate({ children }: LegacyMigrationGateProps) {
+  useLifecycleLogger('LegacyMigrationGate');
   const stage = useInitializationStage('legacy-redux-bootstrap', {
     message: 'Migrating legacy app data...',
     blocking: true,
@@ -28,12 +29,17 @@ export default function LegacyMigrationGate({ children }: LegacyMigrationGatePro
       try {
         stage.log('Migrating legacy app data...');
         initLog('LegacyMigrationGate', 'starting legacy bootstrap');
+        log.info('gate.legacy_migration.start');
         await runLegacyReduxBootstrap();
         stage.complete();
         setIsComplete(true);
+        log.info('gate.legacy_migration.complete');
         initLog('LegacyMigrationGate', 'legacy bootstrap complete');
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Legacy migrations failed';
+        log.error('gate.legacy_migration.failed', {
+          error: error instanceof Error ? error : new Error(String(error)),
+        });
         stage.error(msg);
         setIsComplete(true);
         initLog('LegacyMigrationGate', `ERROR: ${error}`);
@@ -46,5 +52,5 @@ export default function LegacyMigrationGate({ children }: LegacyMigrationGatePro
 
   if (!isComplete) return null;
 
-  return <>{children}</>;
+  return <Log name="LegacyMigrationGate">{children}</Log>;
 }

@@ -2,9 +2,8 @@
  * @fileoverview Send flow sendToken route wrapper
  *
  * Part of the (send-flow) modal group - displays with back button.
- * Supports two modes:
- * 1. Normal mode: Token already created (sendHistoryEntry param)
- * 2. Payment request mode: No token yet, shows confirmation UI (paymentRequest + amount + selectedMintUrl params)
+ * The token is created by the confirmSend handler before navigation.
+ * This screen only renders the pre-built SendHistoryEntry.
  */
 
 import React from 'react';
@@ -12,34 +11,17 @@ import { useLocalSearchParams, router, Stack } from 'expo-router';
 import { SendTokenScreen } from '@/features/send';
 
 function ModalScreen() {
-  const params = useLocalSearchParams<{
-    // Normal mode: token already created
+  const { sendHistoryEntry, mintWasOffline } = useLocalSearchParams<{
     sendHistoryEntry?: string;
-    // Payment request mode: no token yet, confirmation UI
-    paymentRequest?: string; // Encoded payment request (creqA...)
-    amount?: string; // Amount in sats
-    selectedMintUrl?: string; // Mint URL to use
-    // Indicates Nostr DM was already sent (from CurrencyScreen payment request flow)
-    nostrSent?: string;
+    mintWasOffline?: string;
   }>();
-
-  // Build payment request prop if in payment request mode
-  const paymentRequestProp =
-    params.paymentRequest && params.amount && params.selectedMintUrl
-      ? {
-          encodedRequest: params.paymentRequest,
-          amount: parseInt(params.amount, 10),
-          mintUrl: params.selectedMintUrl,
-        }
-      : undefined;
 
   return (
     <>
-      <Stack.Screen options={{ title: paymentRequestProp ? 'Payment Request' : 'Send Ecash' }} />
+      <Stack.Screen options={{ title: 'Send Ecash' }} />
       <SendTokenScreen
-        sendHistoryEntry={params.sendHistoryEntry}
-        paymentRequest={paymentRequestProp}
-        initialNostrSent={params.nostrSent === 'true'}
+        sendHistoryEntry={sendHistoryEntry}
+        mintWasOffline={mintWasOffline === 'true'}
         onNavigateBack={() => router.back()}
       />
     </>

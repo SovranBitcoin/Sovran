@@ -1,5 +1,8 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# log-doctor working file
+log.txt
+
 # dependencies
 node_modules/
 

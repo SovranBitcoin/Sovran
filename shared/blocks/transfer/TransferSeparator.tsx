@@ -16,6 +16,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import Icon from 'assets/icons';
+import { Log } from '@/shared/lib/logger';
 
 interface TransferSeparatorProps {
   /** Whether the separator should display in failed/error state (red).
@@ -46,7 +47,11 @@ export const TransferSeparator = React.memo(({ failed, status }: TransferSeparat
     }
   };
 
-  return <View style={[styles.separator, { backgroundColor: bgColor }]}>{renderIcon()}</View>;
+  return (
+    <Log name="TransferSeparator">
+      <View style={[styles.separator, { backgroundColor: bgColor }]}>{renderIcon()}</View>
+    </Log>
+  );
 });
 TransferSeparator.displayName = 'TransferSeparator';
 

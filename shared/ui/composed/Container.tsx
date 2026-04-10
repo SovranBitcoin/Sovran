@@ -1,6 +1,7 @@
 import React from 'react';
 import { SafeAreaView } from 'react-native';
 
+import { Log } from '@/shared/lib/logger';
 import { cn } from '@/shared/lib/utils';
 
 const Container: React.FC<{
@@ -9,9 +10,11 @@ const Container: React.FC<{
   className?: string;
 }> = ({ children, style, className }) => {
   return (
-    <SafeAreaView style={style} className={cn('bg-primary-950 flex-1', className)}>
-      {children}
-    </SafeAreaView>
+    <Log name="Container">
+      <SafeAreaView style={style} className={cn('bg-primary-950 flex-1', className)}>
+        {children}
+      </SafeAreaView>
+    </Log>
   );
 };
 

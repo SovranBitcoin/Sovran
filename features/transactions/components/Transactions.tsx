@@ -6,7 +6,7 @@ import { Link } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import _ from 'lodash';
 
-import { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from 'coco-cashu-core';
+import { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 
 import Icon from 'assets/icons';
 import { SwapTransactionRow } from '@/features/transactions/components/SwapTransactionRow';
@@ -19,6 +19,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/time';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
+import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import {
   useSwapTransactionsStore,
@@ -119,68 +120,76 @@ export const Transactions = React.memo(
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;
 
-    const filteredHistory = useMemo(
-      () =>
-        _.filter(history, (historyEntry: HistoryEntry) => {
-          if (account.unit !== 'all' && historyEntry.unit !== account.unit) return false;
-          if (mintUrlFilter !== 'all' && historyEntry.mintUrl !== mintUrlFilter) return false;
+    const filteredHistory = useMemo(() => {
+      const t0 = performance.now();
+      const result = _.filter(history, (historyEntry: HistoryEntry) => {
+        if (account.unit !== 'all' && historyEntry.unit !== account.unit) return false;
+        if (mintUrlFilter !== 'all' && historyEntry.mintUrl !== mintUrlFilter) return false;
 
-          if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
-            const quoteId = (historyEntry as MintHistoryEntry | MeltHistoryEntry).quoteId;
-            if (quoteId && quoteIdToGroup[quoteId]) return false;
+        if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
+          const quoteId = (historyEntry as MintHistoryEntry | MeltHistoryEntry).quoteId;
+          if (quoteId && quoteIdToGroup[quoteId]) return false;
+        }
+
+        if (
+          filter === 'incoming' &&
+          historyEntry.type !== 'mint' &&
+          historyEntry.type !== 'receive'
+        )
+          return false;
+        if (filter === 'outgoing' && historyEntry.type !== 'send' && historyEntry.type !== 'melt')
+          return false;
+        if (type === 'lightning' && historyEntry.type !== 'mint' && historyEntry.type !== 'melt')
+          return false;
+        if (type === 'ecash' && historyEntry.type !== 'send' && historyEntry.type !== 'receive')
+          return false;
+
+        // Filter out expired transactions if hideExpired is true
+        if (hideExpired) {
+          const isExpired =
+            historyEntry.type === 'mint' &&
+            historyEntry.state === 'UNPAID' &&
+            mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
+          if (isExpired) return false;
+
+          // Filter out unpaid melt quotes
+          if (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') {
+            return false;
           }
+        }
 
-          if (
-            filter === 'incoming' &&
-            historyEntry.type !== 'mint' &&
-            historyEntry.type !== 'receive'
-          )
+        // Filter by selected month if provided
+        if (selectedMonth) {
+          const [yearStr, monthStr] = selectedMonth.split('-');
+          const filterYear = parseInt(yearStr, 10);
+          const filterMonthNum = parseInt(monthStr, 10) - 1; // 0-indexed
+          const date = new Date(historyEntry.createdAt);
+          if (date.getFullYear() !== filterYear || date.getMonth() !== filterMonthNum) {
             return false;
-          if (filter === 'outgoing' && historyEntry.type !== 'send' && historyEntry.type !== 'melt')
-            return false;
-          if (type === 'lightning' && historyEntry.type !== 'mint' && historyEntry.type !== 'melt')
-            return false;
-          if (type === 'ecash' && historyEntry.type !== 'send' && historyEntry.type !== 'receive')
-            return false;
-
-          // Filter out expired transactions if hideExpired is true
-          if (hideExpired) {
-            const isExpired =
-              historyEntry.type === 'mint' &&
-              historyEntry.state === 'UNPAID' &&
-              mintHistoryEntryExpired(historyEntry as MintHistoryEntry);
-            if (isExpired) return false;
-
-            // Filter out unpaid melt quotes
-            if (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') {
-              return false;
-            }
           }
+        }
 
-          // Filter by selected month if provided
-          if (selectedMonth) {
-            const [yearStr, monthStr] = selectedMonth.split('-');
-            const filterYear = parseInt(yearStr, 10);
-            const filterMonthNum = parseInt(monthStr, 10) - 1; // 0-indexed
-            const date = new Date(historyEntry.createdAt);
-            if (date.getFullYear() !== filterYear || date.getMonth() !== filterMonthNum) {
-              return false;
-            }
-          }
-
-          return true;
-        }),
-      [
-        history,
-        account.unit,
-        mintUrlFilter,
-        filter,
-        type,
-        hideExpired,
-        selectedMonth,
-        quoteIdToGroup,
-      ]
-    );
+        return true;
+      });
+      const duration = Math.round((performance.now() - t0) * 100) / 100;
+      if (duration > 20) {
+        log.warn('transactions.filter.slow', {
+          duration_ms: duration,
+          input: history.length,
+          output: result.length,
+        });
+      }
+      return result;
+    }, [
+      history,
+      account.unit,
+      mintUrlFilter,
+      filter,
+      type,
+      hideExpired,
+      selectedMonth,
+      quoteIdToGroup,
+    ]);
 
     // Build unified timeline: mix history entries + swap groups chronologically
     const timelineItems: TimelineItem[] = useMemo(() => {
@@ -240,6 +249,7 @@ export const Transactions = React.memo(
     );
 
     const sections = useMemo(() => {
+      const t0 = performance.now();
       const createSections = (items: TimelineItem[], prefix: string) => {
         // Group by date string for display, but keep track of the original date for sorting
         const groupedByDate = _.groupBy(items, (item) => formatDate(getTimelineCreatedAt(item)));
@@ -273,15 +283,32 @@ export const Transactions = React.memo(
       const confirmedSections = createSections(confirmed || [], 'confirmed');
       const expiredSections = createSections(expired || [], 'expired');
 
-      return {
+      const result = {
         pending: pendingSections,
         confirmed: confirmedSections,
         expired: expiredSections,
         all: [...pendingSections, ...confirmedSections, ...expiredSections],
       };
+      const duration = Math.round((performance.now() - t0) * 100) / 100;
+      if (duration > 20) {
+        log.warn('transactions.sections.slow', {
+          duration_ms: duration,
+          pending: pendingSections.length,
+          confirmed: confirmedSections.length,
+          expired: expiredSections.length,
+        });
+      }
+      return result;
     }, [pending, confirmed, expired, showMore, days]);
 
     const sectionsToDisplay = useMemo(() => {
+      log.debug('transactions.sections_computed', {
+        tab,
+        pending: sections.pending.length,
+        confirmed: sections.confirmed.length,
+        expired: sections.expired.length,
+        total: sections.all.length,
+      });
       if (tab === 'Pending') return sections.pending;
       if (tab === 'Confirmed') return sections.confirmed;
       if (tab === 'Expired') return sections.expired;
@@ -461,37 +488,39 @@ export const Transactions = React.memo(
       HEADER_HEIGHT + section.data.length * ITEM_HEIGHT + 16; // 16 for spacing
 
     return (
-      <LegendList
-        waitForInitialLayout={false}
-        key={listKey}
-        style={{ flex: 1 }}
-        data={sectionsToDisplay}
-        keyExtractor={(section) => section.index!}
-        estimatedItemSize={estimateSectionHeight(sectionsToDisplay[0] || { data: [] })}
-        maintainVisibleContentPosition
-        contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
-        ListHeaderComponent={<View>{typeof header === 'function' ? header() : header}</View>}
-        ListEmptyComponent={emptyComponent}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        renderItem={({ item: section }) => (
-          <VStack spacing={4} className="mb-4">
-            <Text
-              size={14}
-              heavy
-              color={opacity(foreground, 0.33)}
-              style={{ height: HEADER_HEIGHT }}>
-              {section.title}
-            </Text>
-            <View style={[styles.card, { borderColor }]}>
-              <BlurCardFrame accentColor={muted}>
-                <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
-              </BlurCardFrame>
-            </View>
-          </VStack>
-        )}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
-      />
+      <Log name="Transactions">
+        <LegendList
+          waitForInitialLayout={false}
+          key={listKey}
+          style={{ flex: 1 }}
+          data={sectionsToDisplay}
+          keyExtractor={(section) => section.index!}
+          estimatedItemSize={estimateSectionHeight(sectionsToDisplay[0] || { data: [] })}
+          maintainVisibleContentPosition
+          contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
+          ListHeaderComponent={<View>{typeof header === 'function' ? header() : header}</View>}
+          ListEmptyComponent={emptyComponent}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          renderItem={({ item: section }) => (
+            <VStack spacing={4} className="mb-4">
+              <Text
+                size={14}
+                heavy
+                color={opacity(foreground, 0.33)}
+                style={{ height: HEADER_HEIGHT }}>
+                {section.title}
+              </Text>
+              <View style={[styles.card, { borderColor }]}>
+                <BlurCardFrame accentColor={muted}>
+                  <View style={styles.content}>{section.data.map(renderTimelineItem)}</View>
+                </BlurCardFrame>
+              </View>
+            </VStack>
+          )}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 250 }}
+        />
+      </Log>
     );
   }
 );

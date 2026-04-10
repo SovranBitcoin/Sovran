@@ -17,6 +17,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { log } from '../logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { restartApp } from '@/shared/lib/profile/appRestart';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
@@ -37,7 +38,7 @@ async function beginTransition(): Promise<boolean> {
       if (Date.now() - guard.startedAt < TRANSITION_EXPIRY_MS) {
         return false;
       }
-      console.warn('[ProfileOrchestrator] Stale transition guard expired');
+      log.warn('profile.orchestrator.stale_guard');
     }
     await AsyncStorage.setItem(TRANSITION_KEY, JSON.stringify({ startedAt: Date.now() }));
     return true;
@@ -99,10 +100,13 @@ async function teardownAndRestart(): Promise<boolean> {
 
   const restarted = await restartApp();
   if (!restarted) {
-    console.error('[ProfileOrchestrator] Restart failed — app will rely on React key remount');
+    log.error('profile.orchestrator.restart_failed');
   }
   return restarted;
 }
+
+// ── Synchronous in-memory guard (supplements the async AsyncStorage guard) ──
+let transitionInFlight = false;
 
 // ── Public API ───────────────────────────────────────────────────
 
@@ -111,11 +115,27 @@ export async function switchToExistingProfile(opts: {
   resetStages?: TransitionControls['resetStages'];
   cancelResetStages?: TransitionControls['cancelResetStages'];
 }): Promise<boolean> {
+  if (transitionInFlight) {
+    log.warn('profile.orchestrator.switch_blocked_in_flight');
+    return false;
+  }
+  if (!CocoManager.isReadyForCleanup()) {
+    log.warn('profile.orchestrator.switch_blocked_coco_not_ready', {
+      isInitialized: CocoManager.isInitialized(),
+    });
+    return false;
+  }
+  transitionInFlight = true;
+
   const resetStages = opts.resetStages ?? registeredControls?.resetStages;
   const cancelResetStages = opts.cancelResetStages ?? registeredControls?.cancelResetStages;
 
-  if (!(await beginTransition())) return false;
+  if (!(await beginTransition())) {
+    transitionInFlight = false;
+    return false;
+  }
   try {
+    log.info('profile.orchestrator.switch_start', { accountIndex: opts.accountIndex });
     resetStages?.({ holdUntilCancel: true });
     usePopupStore.getState().close();
 
@@ -128,14 +148,19 @@ export async function switchToExistingProfile(opts: {
 
     await flushProfileStoreToDisk();
     const restarted = await teardownAndRestart();
-    if (!restarted) cancelResetStages?.();
+    if (!restarted) {
+      cancelResetStages?.();
+      transitionInFlight = false;
+      await endTransition();
+    }
+    // If restarted, leave transitionInFlight=true — the module is about to reload.
     return true;
   } catch (error) {
-    console.error('[ProfileOrchestrator] switch failed:', error);
+    log.error('profile.orchestrator.switch_failed', { error });
     cancelResetStages?.();
-    return false;
-  } finally {
+    transitionInFlight = false;
     await endTransition();
+    return false;
   }
 }
 
@@ -148,12 +173,19 @@ export async function createAndSwitchProfile(opts?: {
   const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
   const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
 
+  if (transitionInFlight) return false;
+  transitionInFlight = true;
+
   if (!getKeysForAccount) {
-    console.error('[ProfileOrchestrator] No key derivation function registered');
+    log.error('profile.orchestrator.no_key_derivation');
+    transitionInFlight = false;
     return false;
   }
 
-  if (!(await beginTransition())) return false;
+  if (!(await beginTransition())) {
+    transitionInFlight = false;
+    return false;
+  }
   try {
     resetStages?.({ holdUntilCancel: true });
     usePopupStore.getState().close();
@@ -162,7 +194,7 @@ export async function createAndSwitchProfile(opts?: {
     const nextIndex = profileStore.getNextAccountIndex();
     const newKeys = await getKeysForAccount(nextIndex);
     if (!newKeys?.pubkey) {
-      console.warn('[ProfileOrchestrator] Failed to derive keys for new profile');
+      log.warn('profile.orchestrator.key_derivation_failed');
       cancelResetStages?.();
       return false;
     }
@@ -177,14 +209,18 @@ export async function createAndSwitchProfile(opts?: {
 
     await flushProfileStoreToDisk();
     const restarted = await teardownAndRestart();
-    if (!restarted) cancelResetStages?.();
+    if (!restarted) {
+      cancelResetStages?.();
+      transitionInFlight = false;
+      await endTransition();
+    }
     return true;
   } catch (error) {
-    console.error('[ProfileOrchestrator] create failed:', error);
+    log.error('profile.orchestrator.create_failed', { error });
     cancelResetStages?.();
-    return false;
-  } finally {
+    transitionInFlight = false;
     await endTransition();
+    return false;
   }
 }
 
@@ -208,7 +244,13 @@ export async function deleteAllProfiles(opts?: {
   const resetStages = opts?.resetStages ?? registeredControls?.resetStages;
   const cancelResetStages = opts?.cancelResetStages ?? registeredControls?.cancelResetStages;
 
-  if (!(await beginTransition())) return false;
+  if (transitionInFlight) return false;
+  transitionInFlight = true;
+
+  if (!(await beginTransition())) {
+    transitionInFlight = false;
+    return false;
+  }
   try {
     resetStages?.({ holdUntilCancel: true });
     usePopupStore.getState().close();
@@ -221,7 +263,7 @@ export async function deleteAllProfiles(opts?: {
     try {
       await CocoManager.completeReset(accountIndexes);
     } catch (e) {
-      console.warn('[ProfileOrchestrator] Coco completeReset failed:', e);
+      log.warn('profile.orchestrator.coco_reset_failed', { error: e });
     }
 
     // 2. Clear ALL secure storage (mnemonic, derived keys, cashu mnemonics, imported nsecs)
@@ -229,14 +271,14 @@ export async function deleteAllProfiles(opts?: {
       const { clearAllSecureData } = await import('@/shared/lib/nostr/secureStorage');
       await clearAllSecureData(accountIndexes, importedPubkeys);
     } catch (e) {
-      console.warn('[ProfileOrchestrator] clearAllSecureData failed:', e);
+      log.warn('profile.orchestrator.clear_secure_data_failed', { error: e });
     }
 
     // 3. Nuclear AsyncStorage wipe — every key, every store, everything
     try {
       await AsyncStorage.clear();
     } catch (e) {
-      console.warn('[ProfileOrchestrator] AsyncStorage.clear() failed:', e);
+      log.warn('profile.orchestrator.async_storage_clear_failed', { error: e });
     }
 
     // 4. Purge Redux persisted state
@@ -244,7 +286,7 @@ export async function deleteAllProfiles(opts?: {
       const { persistor } = await import('@/redux/store/store.deprecated');
       await persistor.purge();
     } catch (e) {
-      console.warn('[ProfileOrchestrator] Redux persistor.purge() failed:', e);
+      log.warn('profile.orchestrator.redux_purge_failed', { error: e });
     }
 
     // 5. Clear all Zustand in-memory state so nothing bleeds before restart
@@ -257,6 +299,8 @@ export async function deleteAllProfiles(opts?: {
     const restarted = await teardownAndRestart();
     if (!restarted) {
       cancelResetStages?.();
+      transitionInFlight = false;
+      await endTransition();
       const { Alert } = await import('react-native');
       Alert.alert('Restart Required', 'Please close and reopen the app to complete the reset.', [
         { text: 'OK' },
@@ -264,10 +308,10 @@ export async function deleteAllProfiles(opts?: {
     }
     return true;
   } catch (error) {
-    console.error('[ProfileOrchestrator] delete all profiles failed:', error);
+    log.error('profile.orchestrator.delete_all_failed', { error });
     cancelResetStages?.();
-    return false;
-  } finally {
+    transitionInFlight = false;
     await endTransition();
+    return false;
   }
 }

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Image, StyleSheet, UIManager, View } from 'react-native';
+import { Log } from '@/shared/lib/logger';
 import { usePathname, useRouter, useRootNavigationState } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomTabsContentView } from 'expo-liquid-glass-native';
@@ -13,12 +14,11 @@ export const isLiquidGlassTabBarAvailable = () => {
   return Boolean(config || hasConfig);
 };
 
-const TAB_PATHS = ['/payments', '/', '/explore'];
+const TAB_PATHS = ['/', '/explore'];
 
 function getTabIndexFromPathname(pathname: string): number | null {
-  if (pathname === '/payments' || pathname.startsWith('/payments/')) return 0;
-  if (pathname === '/' || pathname === '/index' || pathname.startsWith('/index/')) return 1;
-  if (pathname === '/explore' || pathname.startsWith('/explore/')) return 2;
+  if (pathname === '/' || pathname === '/index' || pathname.startsWith('/index/')) return 0;
+  if (pathname === '/explore' || pathname.startsWith('/explore/')) return 1;
   return null;
 }
 
@@ -111,7 +111,7 @@ export function GlobalLiquidGlassTabsOverlay() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
-  const [selectedTabIndex, setSelectedTabIndex] = useState(1);
+  const [selectedTabIndex, setSelectedTabIndex] = useState(0);
   const isOnTabScreen = useIsOnTabScreen();
 
   const resolvedTabIndex = useMemo(() => {
@@ -122,21 +122,23 @@ export function GlobalLiquidGlassTabsOverlay() {
   if (!isLiquidGlassTabBarAvailable() || !isOnTabScreen) return null;
 
   return (
-    <View pointerEvents="box-none" style={styles.overlay}>
-      <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-        <BottomTabs
-          style={styles.nativeTabs}
-          selectedTabIndex={resolvedTabIndex}
-          tabsCount={3}
-          tabLabels={['Payments', 'Wallet', 'Explore']}
-          iconTintEnabled
-          onTabSelected={(index) => {
-            setSelectedTabIndex(index);
-            router.navigate(TAB_PATHS[index] as any);
-          }}
-        />
+    <Log name="GlobalLiquidGlassTabsOverlay">
+      <View pointerEvents="box-none" style={styles.overlay}>
+        <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+          <BottomTabs
+            style={styles.nativeTabs}
+            selectedTabIndex={resolvedTabIndex}
+            tabsCount={2}
+            tabLabels={['Wallet', 'Explore']}
+            iconTintEnabled
+            onTabSelected={(index) => {
+              setSelectedTabIndex(index);
+              router.navigate(TAB_PATHS[index] as any);
+            }}
+          />
+        </View>
       </View>
-    </View>
+    </Log>
   );
 }
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ReactNode } from 'react';
+import { log } from '../logger';
 import type { PopupIcon } from './icons';
 import type { PopupTextSegment } from './format';
 import { usePopupStore } from '@/shared/stores/runtime/popupStore';
@@ -53,7 +54,7 @@ export type SheetConfig = {
 
 export function showToast(config: ToastConfig) {
   if (!toastManagerRef) {
-    console.warn('popup: toast manager not registered yet');
+    log.warn('popup.toast_manager_not_registered');
     return;
   }
 
@@ -73,7 +74,7 @@ export function showToast(config: ToastConfig) {
 
 export function showCustomToast(config: CustomToastConfig) {
   if (!toastManagerRef) {
-    console.warn('popup: toast manager not registered yet');
+    log.warn('popup.toast_manager_not_registered');
     return;
   }
 

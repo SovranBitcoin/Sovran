@@ -1,130 +1,81 @@
 /**
  * @fileoverview Mint Selection screen for Send Flow
  *
- * Entry point when user has no balance on current mint.
- * Shows list of mints with balances to select from.
- * After selection, navigates horizontally to currency screen.
+ * Thin UI screen — reads entry from params and delegates all actions
+ * to useScreenActions('mintSelector'). The entry is pre-built by the
+ * selectMint step handler with items, scope, and destination.
  *
- * Also supports NFC Lightning flow - when invoice param is provided,
- * creates a melt quote to validate fees before navigating to meltQuote.
- * The pre-created quote is passed to meltQuote to avoid duplicate creation.
+ * Availability is derived from the entry: when destination is absent
+ * (persist/management flow), getInfo and addMint actions are available.
  */
 
-import React, { useCallback } from 'react';
-import { Alert } from 'react-native';
+import React, { useEffect } from 'react';
+import { TouchableOpacity } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+
+import { useScreenActions } from 'coco-payment-ux/react';
+import type { MintListItem } from 'coco-payment-ux';
+
 import { MintListScreen } from '@/features/mint';
-import { useMeltWithHistory } from '@/features/send';
-import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
-import { captureAndStoreLocation } from '@/shared/hooks/useTransactionLocation';
-import type { Mint } from 'coco-cashu-core';
+import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
+import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import Icon from 'assets/icons';
 
 function MintSelectRoute() {
-  const { prepareMeltQuote } = useMeltWithHistory();
-  const params = useLocalSearchParams<{
-    unit?: string;
-    to?: string;
-    minAmount?: string;
-    amount?: string;
-    invoice?: string; // Lightning invoice from NFC scan
-    paymentRequest?: string; // NUT-18 payment request (creqA...)
-    allowedMints?: string; // JSON array of allowed mint URLs (for payment requests with specified mints)
-  }>();
+  useLifecycleLogger('SendMintSelectRoute');
+  const foreground = useThemeColor('foreground');
+  const params = useLocalSearchParams<{ mintSelectorEntry?: string }>();
 
-  // Parse minAmount from params (filters out mints with insufficient balance)
-  const minAmount = params.minAmount ? parseInt(params.minAmount, 10) : undefined;
+  const walletContext = useWalletContext();
+  usePaymentFlowMachine({ walletContext });
 
-  // Parse allowedMints from params (only show mints in this list)
-  const allowedMints = params.allowedMints ? JSON.parse(params.allowedMints) : undefined;
+  const { entry, actions } = useScreenActions('mintSelector', params.mintSelectorEntry);
 
-  // Handle mint selection
-  const handleMintNavigation = useCallback(
-    async (mint: Mint & { amount: number; unit: string }) => {
-      // Check if coming from NFC Lightning scan with invoice
-      if (params.to === 'meltQuote' && params.invoice) {
-        try {
-          // Create melt quote to get actual fees and history entry
-          const { quote, historyEntry } = await prepareMeltQuote(mint.mintUrl, params.invoice);
-          const totalRequired = quote.amount + quote.fee_reserve;
+  const items: MintListItem[] = Array.isArray(entry?.items) ? (entry.items as MintListItem[]) : [];
 
-          if (mint.amount >= totalRequired) {
-            // Capture location and link scan to transaction only when proceeding
-            await captureAndStoreLocation(historyEntry.id);
-            useScanHistoryStore.getState().linkTransaction(params.invoice, historyEntry.id);
-
-            // Sufficient balance including fees - navigate to meltQuote with pre-created quote
-            router.navigate({
-              pathname: '/meltQuote',
-              params: {
-                meltHistoryEntry: JSON.stringify(historyEntry),
-                invoice: params.invoice, // Pass invoice for mint change re-creation
-              },
-            });
-          } else {
-            // Insufficient balance when including fees
-            Alert.alert(
-              'Insufficient Balance',
-              `This payment requires ${totalRequired} sats (${quote.amount} + ${quote.fee_reserve} fee reserve), but this mint only has ${mint.amount} sats.`,
-              [{ text: 'OK' }]
-            );
-          }
-        } catch (error) {
-          Alert.alert(
-            'Quote Failed',
-            error instanceof Error ? error.message : 'Failed to create quote',
-            [{ text: 'OK' }]
-          );
-        }
-      } else if (params.to === 'paymentRequest' && params.paymentRequest && params.minAmount) {
-        // Payment request with amount specified - go directly to SendTokenScreen in payment request mode
-        router.navigate({
-          pathname: '/sendToken',
-          params: {
-            paymentRequest: params.paymentRequest,
-            amount: params.minAmount,
-            selectedMintUrl: mint.mintUrl,
-          },
-        });
-      } else if (params.to === 'currency' && params.paymentRequest) {
-        // Payment request without amount - go to currency screen first
-        router.navigate({
-          pathname: '/currency',
-          params: {
-            to: 'paymentRequest',
-            paymentRequest: params.paymentRequest,
-            unit: mint.unit.toLowerCase(),
-          },
-        });
-      } else {
-        // Normal flow - go to currency screen
-        router.navigate({
-          pathname: '/currency',
-          params: {
-            to: params.to || 'sendToken',
-            unit: mint.unit.toLowerCase(),
-            // Preserve the amount if coming from currency screen with insufficient balance
-            ...(params.amount && { amount: params.amount }),
-            // Forward payment request if present (for NUT-18 flow)
-            ...(params.paymentRequest && { paymentRequest: params.paymentRequest }),
-          },
-        });
-      }
-    },
-    [params, prepareMeltQuote]
-  );
+  useEffect(() => {
+    const available = items.filter((i) => i.status === 'available').length;
+    const disabled = items.filter((i) => i.status === 'disabled').length;
+    const withIcon = items.filter((i) => i.iconUrl).length;
+    const withReputation = items.filter((i) => (i.contactReputation ?? 0) > 0).length;
+    log.info('mint.selector.entry', {
+      flow: 'send',
+      scope: entry?.scope,
+      destination: entry?.destination,
+      total: items.length,
+      available,
+      disabled,
+      withIcon,
+      withReputation,
+      disabledReasons: items
+        .filter((i) => i.reason)
+        .map((i) => ({ mint: i.displayName, reason: i.reason?.code })),
+    });
+  }, [items, entry?.scope, entry?.destination]);
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Select Mint' }} />
+      <Stack.Screen
+        options={{
+          title: 'Select Mint',
+          headerRight: () =>
+            actions.addMint.available ? (
+              <TouchableOpacity style={{ padding: 8 }} onPress={() => actions.addMint.execute()}>
+                <Icon name="fluent:add-24-filled" size={24} color={foreground} />
+              </TouchableOpacity>
+            ) : null,
+        }}
+      />
       <MintListScreen
-        requireBalance={true}
-        minAmount={minAmount}
-        allowedMints={allowedMints}
-        showDetailsButton={false}
-        currencyLabel="Send payment in"
-        mintsLabel="Send from"
+        items={items}
+        showDetailsButton={actions.getInfo.available}
         closeButtonLabel="Cancel"
-        onMintSelect={handleMintNavigation}
+        onMintSelect={(item) => actions.select.execute({ mintUrl: item.mintUrl })}
+        onInspectMint={
+          actions.getInfo.available ? (url) => actions.getInfo.execute({ mintUrl: url }) : undefined
+        }
         onClose={() => router.back()}
       />
     </>

@@ -16,6 +16,7 @@ import { StyleSheet } from 'react-native';
 
 import opacity from 'hex-color-opacity';
 
+import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -303,58 +304,60 @@ export const TransferStepChain = React.memo(
     const isRouting = status === 'routing';
 
     return (
-      <View style={styles.container}>
-        <View style={styles.chainRow}>
-          {chain.map((node, idx) => {
-            const isLast = idx === chain.length - 1;
-            const isActive = isCompleteish(node.type);
-            const lineFilled = isDoneNode(node.type);
+      <Log name="TransferStepChain">
+        <View style={styles.container}>
+          <View style={styles.chainRow}>
+            {chain.map((node, idx) => {
+              const isLast = idx === chain.length - 1;
+              const isActive = isCompleteish(node.type);
+              const lineFilled = isDoneNode(node.type);
 
-            return (
-              <React.Fragment key={node.label}>
-                <View style={styles.nodeColumn}>
-                  <AnimatedCheckpointDot
-                    type={nodeTypeToCheckpointDotType(node.type)}
-                    delayMs={nodeDelays[idx]}
-                    greenColor={greenColor}
-                    redColor={redColor}
-                    orangeColor={orangeColor}
-                    greyColor={greyColor}
-                  />
-                  <AnimatedLabel
-                    label={node.label}
-                    active={isActive}
-                    delayMs={nodeDelays[idx]}
-                    isCurrent={node.type === 'current'}
-                    labelColor={labelColor}
-                    dimColor={dimLabelColor}
-                  />
-                </View>
+              return (
+                <React.Fragment key={node.label}>
+                  <View style={styles.nodeColumn}>
+                    <AnimatedCheckpointDot
+                      type={nodeTypeToCheckpointDotType(node.type)}
+                      delayMs={nodeDelays[idx]}
+                      greenColor={greenColor}
+                      redColor={redColor}
+                      orangeColor={orangeColor}
+                      greyColor={greyColor}
+                    />
+                    <AnimatedLabel
+                      label={node.label}
+                      active={isActive}
+                      delayMs={nodeDelays[idx]}
+                      isCurrent={node.type === 'current'}
+                      labelColor={labelColor}
+                      dimColor={dimLabelColor}
+                    />
+                  </View>
 
-                {!isLast && (
-                  <AnimatedChainLine
-                    filled={lineFilled}
-                    delayMs={lineDelays[idx]}
-                    greenColor={greenColor}
-                    greyColor={greyColor}
-                  />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </View>
-
-        {isRouting && routingDetail ? (
-          <View style={[styles.routingBanner, { backgroundColor: opacity(foreground, 0.08) }]}>
-            <HStack spacing={6} align="center" justify="center">
-              <Spinner size={12} />
-              <UntranslatedText size={11} color={labelColor}>
-                {routingDetail}
-              </UntranslatedText>
-            </HStack>
+                  {!isLast && (
+                    <AnimatedChainLine
+                      filled={lineFilled}
+                      delayMs={lineDelays[idx]}
+                      greenColor={greenColor}
+                      greyColor={greyColor}
+                    />
+                  )}
+                </React.Fragment>
+              );
+            })}
           </View>
-        ) : null}
-      </View>
+
+          {isRouting && routingDetail ? (
+            <View style={[styles.routingBanner, { backgroundColor: opacity(foreground, 0.08) }]}>
+              <HStack spacing={6} align="center" justify="center">
+                <Spinner size={12} />
+                <UntranslatedText size={11} color={labelColor}>
+                  {routingDetail}
+                </UntranslatedText>
+              </HStack>
+            </View>
+          ) : null}
+        </View>
+      </Log>
     );
   }
 );

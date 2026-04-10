@@ -234,7 +234,8 @@ struct PayWidgetEntryView: View {
                 }
                 Spacer()
             }
-            .padding(.horizontal, 4)
+            .padding(.leading, 2)
+            .padding(.trailing, 4)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
