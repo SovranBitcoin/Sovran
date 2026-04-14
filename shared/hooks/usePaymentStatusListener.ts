@@ -154,7 +154,9 @@ export function usePaymentStatusListener(): void {
     const offRedeemed = manager.on(
       'mint-op:finalized',
       ({ operationId, operation }: { mintUrl: string; operationId: string; operation: any }) => {
-        const quoteId = (operation as any)?.quote?.quoteId ?? operationId;
+        // operation.quoteId is the cashu-ts quote ID that matches the popup's id.
+        // Fallback chain: operation.quoteId → operation.quote?.quoteId → operationId
+        const quoteId = (operation as any)?.quoteId ?? (operation as any)?.quote?.quoteId ?? operationId;
         paymentLog.info('hook.payment_status.mint_quote_redeemed', { operationId, quoteId });
         usePaymentStatusStore.getState().setConfirmed(quoteId);
       }

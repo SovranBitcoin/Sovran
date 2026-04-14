@@ -107,6 +107,7 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'search-history-store',
   'swap-transactions-store',
   'transaction-location-store',
+  'transaction-distribution-store',
   'nostr-social-store',
 ];
 
@@ -133,6 +134,8 @@ async function rehydrateProfileStores(): Promise<void> {
     await import('@/shared/stores/profile/swapTransactionsStore');
   const { useTransactionLocationStore } =
     await import('@/shared/stores/profile/transactionLocationStore');
+  const { useTransactionDistributionStore } =
+    await import('@/shared/stores/profile/transactionDistributionStore');
   const { useNostrSocialStore } = await import('@/shared/stores/profile/nostrSocialStore');
   const { useNpcMintStore } = await import('@/shared/stores/profile/npcMintStore');
 
@@ -158,6 +161,7 @@ async function rehydrateProfileStores(): Promise<void> {
       useSearchHistoryStore.setState({ recentSearches: {} });
       useSwapTransactionsStore.setState({ groups: {}, quoteIdToGroup: {} });
       useTransactionLocationStore.setState({ locations: {} });
+      useTransactionDistributionStore.setState({ distributions: {} });
       useNpcMintStore.setState({
         mintUrls: {},
         lastSyncedAt: {},
@@ -190,6 +194,7 @@ async function rehydrateProfileStores(): Promise<void> {
     useSearchHistoryStore.persist.rehydrate(),
     useSwapTransactionsStore.persist.rehydrate(),
     useTransactionLocationStore.persist.rehydrate(),
+    useTransactionDistributionStore.persist.rehydrate(),
     useNpcMintStore.persist.rehydrate(),
     useNostrSocialStore.persist.rehydrate(),
   ]);

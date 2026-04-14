@@ -13,6 +13,11 @@
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
+#if defined(__APPLE__)
+#include <stdlib.h>  /* arc4random_buf */
+#elif defined(__linux__)
+#include <sys/syscall.h>  /* SYS_getrandom */
+#endif
 
 static const unsigned char DOMAIN_SEPARATOR[] = "Secp256k1_HashToCurve_Cashu_";
 #define DOMAIN_SEPARATOR_LEN (sizeof(DOMAIN_SEPARATOR) - 1)
@@ -43,11 +48,20 @@ static int ct_eq(const uint8_t *a, const uint8_t *b, size_t len) {
 }
 
 static int secure_random(uint8_t *buf, size_t len) {
+#if defined(__APPLE__)
+    /* arc4random_buf never fails on Apple platforms */
+    arc4random_buf(buf, len);
+    return 1;
+#elif defined(__linux__) && defined(SYS_getrandom)
+    ssize_t n = syscall(SYS_getrandom, buf, len, 0);
+    return (n >= 0 && (size_t)n == len);
+#else
     int fd = open("/dev/urandom", O_RDONLY);
     if (fd < 0) return 0;
     ssize_t n = read(fd, buf, len);
     close(fd);
     return (n >= 0 && (size_t)n == len);
+#endif
 }
 
 static void bytes_to_hex(const uint8_t *bytes, size_t len, char *out) {
@@ -504,6 +518,27 @@ crypto_err_t batch_derive_legacy(const uint8_t *seed, size_t seed_len,
         memcpy(out + i * 64 + 32, blinding_key.key, 32);
     }
 
+    return CRYPTO_OK;
+}
+
+crypto_err_t batch_blind(const uint8_t *msgs, const size_t *msg_lens,
+                          const uint8_t *rs, size_t count, uint8_t *out) {
+    for (size_t i = 0; i < count; i++) {
+        size_t msg_offset = 0;
+        for (size_t j = 0; j < i; j++) msg_offset += msg_lens[j];
+        crypto_err_t err = blind(msgs + msg_offset, msg_lens[i],
+                                  rs + i * 32, out + i * 33);
+        if (err != CRYPTO_OK) return err;
+    }
+    return CRYPTO_OK;
+}
+
+crypto_err_t batch_unblind(const uint8_t *C_s, const uint8_t *rs,
+                            const uint8_t *A_33, size_t count, uint8_t *out) {
+    for (size_t i = 0; i < count; i++) {
+        crypto_err_t err = unblind(C_s + i * 33, rs + i * 32, A_33, out + i * 33);
+        if (err != CRYPTO_OK) return err;
+    }
     return CRYPTO_OK;
 }
 

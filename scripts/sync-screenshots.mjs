@@ -21,9 +21,9 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
 
 // Paths
-const SOVRAN_IOS_DIR = path.join(ROOT_DIR, 'sovran.money/public/ios');
-const ALTSTORE_SOURCE_PATH = path.join(ROOT_DIR, 'freedomstore/altstore-source.json');
-const SCREENSHOTS_TS_PATH = path.join(ROOT_DIR, 'sovran.money/src/screenshots.ts');
+const SOVRAN_IOS_DIR = path.join(ROOT_DIR, '../sovran.money/public/ios');
+const ALTSTORE_SOURCE_PATH = path.join(ROOT_DIR, '../freedomstore/altstore-source.json');
+const SCREENSHOTS_TS_PATH = path.join(ROOT_DIR, '../sovran.money/src/screenshots.ts');
 const SOVRAN_BUNDLE_ID = 'com.sovranbitcoin';
 const PREFERRED_LOCALES = ['en-US', 'en-GB'];
 

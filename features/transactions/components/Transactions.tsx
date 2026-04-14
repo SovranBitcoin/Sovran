@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 
 import { LegendList } from '@legendapp/list';
@@ -21,10 +21,12 @@ import { formatDate } from '@/shared/lib/time';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import {
   useSwapTransactionsStore,
   type SwapGroup,
 } from '@/shared/stores/profile/swapTransactionsStore';
+import { useTransactionLocationStore } from '@/shared/stores/profile/transactionLocationStore';
 
 // ---------------------------------------------------------------------------
 // Timeline item: a discriminated union so transactions and swap groups can
@@ -107,6 +109,28 @@ export const Transactions = React.memo(
     disableContentInsetAdjustment = false,
   }: Props) => {
     const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
+
+    // DIAGNOSTIC: dump both lookup stores once when the transactions list mounts.
+    // Remove after investigating why old transactions show no location/source.
+    useEffect(() => {
+      const locationState = useTransactionLocationStore.getState();
+      const scanState = useScanHistoryStore.getState();
+      log.info('tx.stores.dump', {
+        locationCount: Object.keys(locationState.locations).length,
+        locations: locationState.locations,
+        scanCount: scanState.entries.length,
+        scanEntries: scanState.entries,
+        visibleHistoryCount: history.length,
+        visibleHistorySample: history.slice(0, 20).map((h) => ({
+          id: h.id,
+          type: h.type,
+          createdAt: h.createdAt,
+          mintUrl: h.mintUrl,
+        })),
+      });
+      // Intentionally empty deps — one-shot dump per mount.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
     const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);

@@ -1,29 +1,27 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { LegendList } from '@legendapp/list';
 import { Feather } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeOut, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintManagement } from '@/features/mint';
 import { useRecentContacts } from '@/features/payments/hooks/useRecentContacts';
 import { useMintContacts } from '@/features/payments/hooks/useMintContacts';
-import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/useContactSearch';
 import { prefetchImages } from '@/shared/lib/imageCache';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
-import { useContactsSearch } from '@/app/(drawer)/(tabs)/contacts/_layout';
+import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
 import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { ContactListItem } from '../components/ContactListItem';
-import { ContactSearchResultItem } from '../components/ContactSearchResultItem';
 import { SearchFilters } from '../components/search/SearchFilters';
-import { NoResultsFound } from '@/features/payments/components/NoResultsFound';
 import { SEARCH_FILTERS_HEIGHT } from '../lib/constants/styles';
-import { HEADER_SPRING_CONFIG } from '../lib/constants/animation-configs';
+import { SearchResultsList } from '@/shared/ui/composed/SearchResultsList';
 
 export const ContactsScreen = () => {
   useLifecycleLogger('ContactsScreen');
-  const { isSearching, searchQuery } = useContactsSearch();
+  const { isSearching, searchQuery } = useSearchContext();
   const [activeFilter, setActiveFilter] = useState('All');
   const [foreground, surface, separator] = useThemeColor([
     'foreground',
@@ -31,17 +29,13 @@ export const ContactsScreen = () => {
     'separator-secondary',
   ] as const);
 
-  // Reset filter when leaving search
   useEffect(() => {
-    if (!isSearching) {
-      setActiveFilter('All');
-    }
+    if (!isSearching) setActiveFilter('All');
   }, [isSearching]);
 
   const { keys: nostrKeys } = useNostrKeysContext();
   const { mints, getMintInfo } = useMintManagement();
 
-  // Real data hooks (same as payments)
   const { displayContacts, contactPubkeys, dmEvents } = useRecentContacts(nostrKeys);
   const { displayMints, mintPubkeys, mintInfoLoading } = useMintContacts(
     nostrKeys,
@@ -49,19 +43,14 @@ export const ContactsScreen = () => {
     getMintInfo,
     dmEvents
   );
-  const { displayResults, searchLoading, hasSearched, showNoResults, handleSearchResultPress } =
-    useContactSearch(searchQuery);
 
-  // Profile subscription for avatars/names
   const profileFilters = useMemo(() => {
     const allPubkeys = [...new Set([...contactPubkeys, ...mintPubkeys])];
     if (allPubkeys.length === 0) return null;
     return [{ kinds: [0], authors: allPubkeys }];
   }, [contactPubkeys, mintPubkeys]);
 
-  const { events: profileEvents } = useSubscribe({
-    filters: profileFilters,
-  });
+  const { events: profileEvents } = useSubscribe({ filters: profileFilters });
 
   const profilesMap = useMemo(() => {
     const t0 = performance.now();
@@ -84,25 +73,26 @@ export const ContactsScreen = () => {
     prefetchImages(Array.from(profilesMap.values()).map((p: any) => p?.picture));
   }, [profilesMap]);
 
-  // Determine which list to show based on active filter
   const currentListData = useMemo(() => {
     switch (activeFilter) {
       case 'Recent':
         return displayContacts;
       case 'Mints':
         return displayMints;
-      default:
-        // "All" — merge recent + mints, deduplicated by pubkey (or mintUrl for mints without pubkey)
-        const seen = new Set<string>();
-        const merged: any[] = [];
-        for (const item of [...displayContacts, ...displayMints]) {
+      default: {
+        // Mints take priority over contacts with the same pubkey
+        // (e.g. Sovran's nostr pubkey appears in both lists)
+        const byKey = new Map<string, any>();
+        for (const item of displayContacts) {
           const key = item.pubkey || item.mint?.mintUrl;
-          if (key && !seen.has(key)) {
-            seen.add(key);
-            merged.push(item);
-          }
+          if (key) byKey.set(key, item);
         }
-        return merged;
+        for (const item of displayMints) {
+          const key = item.pubkey || item.mint?.mintUrl;
+          if (key) byKey.set(key, item);
+        }
+        return Array.from(byKey.values());
+      }
     }
   }, [activeFilter, displayContacts, displayMints]);
 
@@ -111,13 +101,11 @@ export const ContactsScreen = () => {
     setActiveFilter(filter);
   }, []);
 
-  // Render a contact/mint item from the real data
   const renderContactItem = useCallback(
     ({ item }: { item: any }) => {
       const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
       const lastMessage = item.dmEvent?.content;
       const isLoadingProfile = item.pubkey !== undefined && profile === undefined;
-
       return (
         <ContactListItem
           pubkey={item.pubkey}
@@ -125,6 +113,7 @@ export const ContactsScreen = () => {
           subtitle={lastMessage}
           type={item.type}
           mintInfo={item.mintInfo}
+          mintUrl={item.mint?.mintUrl}
           isLoadingProfile={isLoadingProfile}
         />
       );
@@ -132,23 +121,7 @@ export const ContactsScreen = () => {
     [profilesMap]
   );
 
-  // Render a search result item
-  const renderSearchResult = useCallback(
-    ({ item }: { item: DisplayResult }) => (
-      <ContactSearchResultItem
-        result={item}
-        loading={searchLoading || !hasSearched}
-        onPress={handleSearchResultPress}
-      />
-    ),
-    [searchLoading, hasSearched, handleSearchResultPress]
-  );
-
   const renderEmpty = useCallback(() => {
-    if (isSearching && showNoResults) {
-      return <NoResultsFound />;
-    }
-
     if (activeFilter === 'Mints' && mintInfoLoading) {
       return (
         <View style={styles.emptyContainer}>
@@ -158,7 +131,6 @@ export const ContactsScreen = () => {
         </View>
       );
     }
-
     return (
       <View style={styles.emptyContainer}>
         <Feather name="users" size={30} color={opacity(foreground, 0.3)} />
@@ -169,30 +141,18 @@ export const ContactsScreen = () => {
         </Text>
       </View>
     );
-  }, [isSearching, showNoResults, foreground, activeFilter, mintInfoLoading]);
+  }, [foreground, activeFilter, mintInfoLoading]);
 
-  // Show API search results only when there's a typed query and "All" filter is active
   const showSearchResults = isSearching && searchQuery.trim().length > 0 && activeFilter === 'All';
-
-  // Animated spacer — pushes ScreenContainer down when filters strip appears
-  const rTopStyle = useAnimatedStyle(() => ({
-    height: withSpring(isSearching ? SEARCH_FILTERS_HEIGHT : 0, HEADER_SPRING_CONFIG),
-  }));
 
   return (
     <Screen name="ContactsScreen" style={styles.root}>
-      {/* Spacer that animates to push content below the transparent header + filters */}
-      <Animated.View style={rTopStyle} />
-
-      {/* Filters strip — floats above ScreenContainer, fades in/out */}
       {isSearching && (
         <Animated.View
           entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
           style={[
             styles.filtersRow,
             {
-              top: 0,
               backgroundColor: surface,
               paddingHorizontal: 20,
               borderBottomWidth: 0.5,
@@ -205,22 +165,16 @@ export const ContactsScreen = () => {
 
       <ScreenContainer>
         {showSearchResults ? (
-          <FlatList
-            data={showNoResults ? [] : displayResults}
-            keyExtractor={(item) => item.pubkey}
-            renderItem={renderSearchResult}
-            keyboardDismissMode="on-drag"
-            keyboardShouldPersistTaps="handled"
-            ListEmptyComponent={renderEmpty}
-            contentContainerStyle={showNoResults ? styles.emptyList : undefined}
-          />
+          <SearchResultsList searchQuery={searchQuery} />
         ) : (
-          <FlatList
+          <LegendList
             data={currentListData}
+            extraData={profilesMap.size}
+            estimatedItemSize={68}
             keyExtractor={(item, index) => item.pubkey || item.mint?.mintUrl || `contact-${index}`}
             renderItem={renderContactItem}
             keyboardDismissMode="on-drag"
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
             ListEmptyComponent={renderEmpty}
             contentContainerStyle={currentListData.length === 0 ? styles.emptyList : undefined}
           />
@@ -235,10 +189,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   filtersRow: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 10,
     height: SEARCH_FILTERS_HEIGHT,
   },
   emptyContainer: {

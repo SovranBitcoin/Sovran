@@ -620,9 +620,10 @@ export function UserProfileScreen() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
-  const { npub: npubParam, pubkey: pubkeyParam } = useLocalSearchParams<{
+  const { npub: npubParam, pubkey: pubkeyParam, mintUrl: mintUrlParam } = useLocalSearchParams<{
     npub?: string;
     pubkey?: string;
+    mintUrl?: string;
   }>();
 
   const pubkey = useMemo(() => {
@@ -922,12 +923,12 @@ export function UserProfileScreen() {
           title: isMetadataLoading ? 'Profile' : displayName,
           headerRight: () => (
             <HStack gap={4}>
-              {profileData?.mintUrl && (
+              {(profileData?.mintUrl || mintUrlParam) && (
                 <Link
                   href={{
                     pathname: '/(mint-flow)/info' as any,
                     params: {
-                      mintInfoEntry: JSON.stringify({ mintUrl: profileData.mintUrl }),
+                      mintInfoEntry: JSON.stringify({ mintUrl: profileData?.mintUrl || mintUrlParam }),
                     },
                   }}
                   asChild>

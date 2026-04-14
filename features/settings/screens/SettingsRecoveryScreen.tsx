@@ -103,8 +103,16 @@ const ShieldStatusIcon: React.FC<{
   const checkmarkOffset = useSharedValue(CHECKMARK_LENGTH);
   const crossOffset = useSharedValue(CROSS_LENGTH);
   const colorProgress = useSharedValue(0);
+  const prevStatusRef = React.useRef<ShieldStatus>(status);
 
   useEffect(() => {
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = status;
+
+    // Don't re-animate if already in a terminal state (success/error)
+    if (prevStatus === status && status !== 'loading') return;
+    if ((prevStatus === 'success' || prevStatus === 'error') && prevStatus === status) return;
+
     if (status === 'loading') {
       circleOffset.value = PENDING_OFFSET;
       checkmarkOffset.value = CHECKMARK_LENGTH;

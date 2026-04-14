@@ -26,6 +26,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
+import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 
@@ -63,6 +64,7 @@ export function ReceiveTokenScreen({
       <ButtonHandler
         buttons={[
           {
+            testID: 'receive-token-close',
             text: 'Close',
             icon: 'ri:close-circle-line',
             variant: 'secondary',
@@ -70,12 +72,14 @@ export function ReceiveTokenScreen({
             condition: isRedeemed,
           },
           {
+            testID: 'receive-token-cancel',
             text: 'Cancel',
             variant: 'secondary',
             onPress: async () => onNavigateBack(),
             condition: !isRedeemed,
           },
           {
+            testID: 'receive-token-redeem',
             text: actions.redeem.loading ? 'Redeeming...' : 'Redeem Ecash',
             variant: 'primary',
             onPress: async () => {
@@ -92,6 +96,7 @@ export function ReceiveTokenScreen({
   return (
     <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
       <Screen name="ReceiveTokenScreen">
+        <View testID={`receive-token-id-${entry.id}`}>
         <VStack gap={12}>
           <HistoryEntryHeader historyEntry={entry} />
 
@@ -121,6 +126,7 @@ export function ReceiveTokenScreen({
             ].flatMap((item) => (item ? [item] : []))}
           />
         </VStack>
+        </View>
       </Screen>
     </ModalLayoutWrapper>
   );

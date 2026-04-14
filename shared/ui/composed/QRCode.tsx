@@ -351,7 +351,11 @@ export const QRSpeedControls = memo(function QRSpeedControls({
       className="bg-surface-secondary overflow-hidden"
       style={{ marginHorizontal: 16, borderRadius: 24, borderCurve: 'continuous' }}>
       <HStack style={{ minHeight: 44 }}>
-        <PressableFeedback animation={false} onPress={onCycleSpeed} style={{ flex: 1 }}>
+        <PressableFeedback
+          testID="qr-speed-control"
+          animation={false}
+          onPress={onCycleSpeed}
+          style={{ flex: 1 }}>
           <PressableFeedback.Scale>
             <HStack align="center" justify="center" gap={6} style={{ paddingVertical: 12 }}>
               <SpeedGaugeIcon size={16} color={opacity(foreground, 0.5)} speedIndex={speedIndex} />
@@ -367,7 +371,11 @@ export const QRSpeedControls = memo(function QRSpeedControls({
           style={{ width: 1, backgroundColor: opacity(foreground, 0.08), marginVertical: 10 }}
         />
 
-        <PressableFeedback animation={false} onPress={onCycleDensity} style={{ flex: 1 }}>
+        <PressableFeedback
+          testID="qr-density-control"
+          animation={false}
+          onPress={onCycleDensity}
+          style={{ flex: 1 }}>
           <PressableFeedback.Scale>
             <HStack align="center" justify="center" gap={6} style={{ paddingVertical: 12 }}>
               <Icon name="stash:qr-code" size={16} color={opacity(foreground, 0.5)} />

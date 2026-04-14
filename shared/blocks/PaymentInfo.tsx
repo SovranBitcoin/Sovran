@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, Text } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import {
@@ -19,6 +19,20 @@ import { log, Log } from '@/shared/lib/logger';
 
 // Threshold matches AnimatedQRCode's ANIMATE_THRESHOLD
 const ANIMATE_THRESHOLD = 500;
+
+/**
+ * camelCase → kebab-case for testID generation. Keeps the AX testIDs
+ * uniform with the kebab-case `<screen>-<action>` convention used
+ * across the app, so log-doctor's selector parser (which only accepts
+ * [a-z0-9-]) can target them. `paymentRequest` → `payment-request`,
+ * `token` stays `token`.
+ */
+function kebabCase(s: string): string {
+  return s
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase();
+}
 
 interface PaymentInfoProps {
   unit: string;
@@ -107,6 +121,26 @@ export function PaymentInfo({
   return (
     <Log name="PaymentInfo">
       <View>
+        {/* Hidden Text node carrying the full payment value, so log-doctor's
+            `capture-id-label` step can read the token/address straight from
+            the AX tree without bouncing through the iOS pasteboard. Text
+            elements are always included in the iOS AX tree (unlike Views
+            with opacity:0, which iOS strips), and the visible content is
+            what populates the WDA `name`/`label` fields — that's why the
+            value is the Text child rather than `accessibilityLabel`. */}
+        <Text
+          testID={`payment-info-${kebabCase(copyTarget)}-data`}
+          numberOfLines={1}
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            fontSize: 1,
+            color: 'transparent',
+            overflow: 'hidden',
+          }}>
+          {selectedValue}
+        </Text>
         {/* QR code — tap to copy */}
         <Pressable onPress={handleCopyPress}>
           <ViewShot captureMode="mount" onCapture={setUri}>

@@ -54,7 +54,7 @@ export function AccountPagerViewLayout({
         className="relative w-full justify-center px-3"
         style={{ marginTop: 8, height: Math.max(QR_SIZE, BUTTON_H) }}>
         <View className="flex-row gap-3">
-          <View className="flex-1">
+          <View testID="wallet-receive" className="flex-1">
             <CapsuleButton
               label="Receive"
               icon="lucide:arrow-down-left"
@@ -62,7 +62,7 @@ export function AccountPagerViewLayout({
               onPress={handleReceive}
             />
           </View>
-          <View className="flex-1">
+          <View testID="wallet-send" className="flex-1">
             <CapsuleButton
               label="Send"
               icon="lucide:arrow-up-right"

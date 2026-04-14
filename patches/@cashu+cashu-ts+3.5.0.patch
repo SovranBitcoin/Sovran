@@ -1,5 +1,5 @@
 diff --git a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
-index 6480cbd..1e3749f 100644
+index 6480cbd..d33811d 100644
 --- a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
 +++ b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
 @@ -615,12 +615,52 @@ function hs(s, t, e) {
@@ -204,7 +204,40 @@ index 6480cbd..1e3749f 100644
  };
  function ei(s, t) {
    return je("HTLC", s, t);
-@@ -2757,6 +2865,7 @@ class ge {
+@@ -1695,12 +1803,17 @@ function Pn(s) {
+   });
+ }
+ function ai(s, t) {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var _result;
+   if (le(s.proofs) || t?.version === 3) {
+     if (t?.version === 4)
+       throw new Error("can not encode to v4 token if proofs contain non-hex keyset id");
+-    return ir(s, t?.removeDleq);
++    _result = ir(s, t?.removeDleq);
++  } else {
++    _result = or(s, t?.removeDleq);
+   }
+-  return or(s, t?.removeDleq);
++  if (_p && _p.enabled) _p.push({ op: "encodeToken", ms: performance.now() - _t0, version: le(s.proofs) || t?.version === 3 ? 3 : 4, proofCount: s.proofs?.length, tokenLength: _result.length });
++  return _result;
+ }
+ function or(s, t) {
+   if (t && (s.proofs = Cn(s.proofs)), s.proofs.forEach((c) => {
+@@ -1786,8 +1899,11 @@ function En(s) {
+   return s.d && (e.memo = s.d), e;
+ }
+ function ar(s, t) {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+   const e = (t ?? []).map((i) => typeof i == "string" ? i : i.id), n = Bn(s), r = In(n);
+-  return r.proofs = lr(r.proofs, e), r;
++  r.proofs = lr(r.proofs, e);
++  if (_p && _p.enabled) _p.push({ op: "decodeToken", ms: performance.now() - _t0, proofCount: r.proofs?.length, mint: r.mint?.slice(0, 40), tokenLength: s.length });
++  return r;
+ }
+ function ci(s) {
+   s = Bn(s);
+@@ -2757,6 +2873,7 @@ class ge {
     * @returns Signed outputs.
     */
    async swap(t, e) {
@@ -212,7 +245,7 @@ index 6480cbd..1e3749f 100644
      const n = await this.requestWithAuth(
        "POST",
        "/v1/swap",
-@@ -2765,6 +2874,7 @@ class ge {
+@@ -2765,6 +2882,7 @@ class ge {
      );
      if (!U(n) || !Array.isArray(n?.signatures))
        throw this._logger.error("Invalid response from mint...", { data: n, op: "swap" }), new Error("Invalid response from mint");
@@ -220,7 +253,7 @@ index 6480cbd..1e3749f 100644
      return n;
    }
    /**
-@@ -2828,6 +2938,7 @@ class ge {
+@@ -2828,6 +2946,7 @@ class ge {
     * @returns Serialized blinded signatures.
     */
    async mintBolt11(t, e) {
@@ -228,7 +261,7 @@ index 6480cbd..1e3749f 100644
      const n = await this.requestWithAuth(
        "POST",
        "/v1/mint/bolt11",
-@@ -2836,6 +2947,7 @@ class ge {
+@@ -2836,6 +2955,7 @@ class ge {
      );
      if (!U(n) || !Array.isArray(n?.signatures))
        throw this._logger.error("Invalid response from mint...", { data: n, op: "mintBolt11" }), new Error("Invalid response from mint");
@@ -236,7 +269,7 @@ index 6480cbd..1e3749f 100644
      return n;
    }
    /**
-@@ -2961,9 +3073,11 @@ class ge {
+@@ -2961,9 +3081,11 @@ class ge {
     * @returns The melt response.
     */
    async meltBolt11(t, e) {
@@ -248,7 +281,7 @@ index 6480cbd..1e3749f 100644
      return r;
    }
    /**
-@@ -3097,17 +3211,20 @@ class ge {
+@@ -3097,17 +3219,20 @@ class ge {
      return this._logger.error("Blind Authentication Token...", { bat: r }), r;
    }
    async requestWithAuth(t, e, n = {}, r) {
@@ -270,7 +303,7 @@ index 6480cbd..1e3749f 100644
    }
    isValidMethodString(t) {
      return !!(typeof t == "string" && /^[a-z0-9_-]+$/.test(t));
-@@ -3515,6 +3632,7 @@ class D {
+@@ -3515,6 +3640,7 @@ class D {
      this.secret = n, this.blindingFactor = e, this.blindedMessage = t;
    }
    toProof(t, e) {
@@ -278,7 +311,7 @@ index 6480cbd..1e3749f 100644
      let n;
      t.dleq && (n = {
        s: z(t.dleq.s),
-@@ -3535,7 +3653,9 @@ class D {
+@@ -3535,7 +3661,9 @@ class D {
          }
        }
      }, c = wr(this);
@@ -289,7 +322,7 @@ index 6480cbd..1e3749f 100644
    }
    static createP2PKData(t, e, n, r) {
      return Q(e, n.keys, r).map((o) => this.createSingleP2PKData(t, o, n.id));
-@@ -3576,20 +3696,61 @@ class D {
+@@ -3576,20 +3704,61 @@ class D {
      return t.blindKeys && d && yr(Z, d), Z;
    }
    static createRandomData(t, e, n) {
@@ -356,7 +389,20 @@ index 6480cbd..1e3749f 100644
    }
    /**
     * @throws May throw if blinding factor is out of range. Caller should catch, increment counter,
-@@ -5437,7 +5598,9 @@ class me {
+@@ -5040,10 +5209,12 @@ class me {
+    * @throws If fetching mint info, keysets, or keys fails.
+    */
+   async loadMint(t) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     const e = [];
+     (!this._mintInfo || t) && e.push(
+       this.mint.getInfo().then((n) => (this._mintInfo = new Et(n), null))
+     ), e.push(this._keyChain.init(t)), await Promise.all(e), this.finishInit();
++    if (_p && _p.enabled) _p.push({ op: "wallet.loadMint", ms: performance.now() - _t0, mintUrl: this.mint._mintUrl?.slice(0, 40) });
+   }
+   /**
+    * Load mint information, keysets, and keys from cached data.
+@@ -5437,7 +5608,9 @@ class me {
     * @returns Newly minted proofs.
     */
    async receive(t, e, n) {
@@ -366,7 +412,7 @@ index 6480cbd..1e3749f 100644
      return i;
    }
    /**
-@@ -5463,6 +5626,7 @@ class me {
+@@ -5463,6 +5636,7 @@ class me {
     * @returns SwapPreview with metadata for swap transaction.
     */
    async prepareSwapToReceive(t, e, n) {
@@ -374,7 +420,7 @@ index 6480cbd..1e3749f 100644
      const { keysetId: r, requireDleq: i, proofsWeHave: o, onCountersReserved: a } = e || {};
      n = n ?? this.defaultOutputType();
      const c = typeof t == "string" ? this.decodeToken(t) : t, h = Mn(c.mint);
-@@ -5495,6 +5659,7 @@ class me {
+@@ -5495,6 +5669,7 @@ class me {
      const b = await this.addCountersToOutputTypes(d.id, m);
      [m] = b.outputTypes, b.used && this.safeCallback(a, b.used, { op: "receive" }), this._logger.debug("receive counter", { counter: b.used, receiveOT: m });
      const S = this.createOutputData(this.preparedTotal(m), d, m);
@@ -382,7 +428,7 @@ index 6480cbd..1e3749f 100644
      return {
        amount: p,
        fees: f,
-@@ -5550,6 +5715,7 @@ class me {
+@@ -5550,6 +5725,7 @@ class me {
     * @throws Throws if the send cannot be completed offline or if funds are insufficient.
     */
    async send(t, e, n, r) {
@@ -390,7 +436,7 @@ index 6480cbd..1e3749f 100644
      this.assertAmount(t, "send");
      const { keysetId: i, includeFees: o = !1 } = n || {};
      r = r ?? {
-@@ -5568,14 +5734,18 @@ class me {
+@@ -5568,14 +5744,18 @@ class me {
          requireDleq: !1
          // safety
        }), d = o ? this.getFeesForProofs(l) : 0;
@@ -411,7 +457,7 @@ index 6480cbd..1e3749f 100644
    }
    /**
     * Prepare A Send Transaction.
-@@ -5601,6 +5771,7 @@ class me {
+@@ -5601,6 +5781,7 @@ class me {
     * @throws Throws if the send cannot be completed offline or if funds are insufficient.
     */
    async prepareSwapToSend(t, e, n, r) {
@@ -419,7 +465,7 @@ index 6480cbd..1e3749f 100644
      const { keysetId: i, includeFees: o = !1, onCountersReserved: a } = n || {};
      r = r ?? {
        send: this.defaultOutputType(),
-@@ -5638,6 +5809,7 @@ class me {
+@@ -5638,6 +5819,7 @@ class me {
      const S = this.preparedTotal(b), v = await this.addCountersToOutputTypes(c.id, h, b);
      [h, b] = v.outputTypes, v.used && this.safeCallback(a, v.used, { op: "send" }), this._logger.debug("send counters", { counter: v.used, sendOT: h, keepOT: b });
      const O = this.createOutputData(u, c, h), at = this.createOutputData(S, c, b);
@@ -427,7 +473,7 @@ index 6480cbd..1e3749f 100644
      return {
        amount: t,
        fees: p,
-@@ -5666,6 +5838,7 @@ class me {
+@@ -5666,6 +5848,7 @@ class me {
     * @returns SendResponse with keep/send proofs.
     */
    async completeSwap(t, e) {
@@ -435,7 +481,7 @@ index 6480cbd..1e3749f 100644
      const n = t?.keepOutputs ? t.keepOutputs : [], r = t.sendOutputs ? t.sendOutputs : [], i = t.unselectedProofs ? t.unselectedProofs : [];
      e && (t.inputs = this.signP2PKProofs(t.inputs, e, [
        ...n,
-@@ -5675,7 +5848,10 @@ class me {
+@@ -5675,7 +5858,10 @@ class me {
        t.inputs,
        n,
        r
@@ -447,7 +493,7 @@ index 6480cbd..1e3749f 100644
      this.failIf(
        a.length < o.outputData.length,
        `Mint returned ${a.length} signatures, expected ${o.outputData.length}`
-@@ -5685,13 +5861,16 @@ class me {
+@@ -5685,13 +5871,16 @@ class me {
        l[p] = o.keepVector[m], u[p] = h[m];
      });
      const d = [], f = [];
@@ -467,7 +513,7 @@ index 6480cbd..1e3749f 100644
        keep: [...d, ...i],
        send: f
      };
-@@ -5714,6 +5893,7 @@ class me {
+@@ -5714,6 +5903,7 @@ class me {
     * @see https://crypto.ethz.ch/publications/files/Przyda02.pdf
     */
    selectProofsToSend(t, e, n = !1, r = !1) {
@@ -475,7 +521,7 @@ index 6480cbd..1e3749f 100644
      this.assertAmount(e, "selectProofsToSend");
      const { keep: i, send: o } = this._selectProofs(
        t,
-@@ -5722,6 +5902,7 @@ class me {
+@@ -5722,6 +5912,7 @@ class me {
        n,
        r
      );
@@ -483,7 +529,7 @@ index 6480cbd..1e3749f 100644
      return { keep: i, send: o };
    }
    /**
-@@ -5838,12 +6019,20 @@ class me {
+@@ -5838,12 +6029,20 @@ class me {
     *   default one will be used.
     */
    async batchRestore(t = 300, e = 100, n = 0, r) {
@@ -504,7 +550,7 @@ index 6480cbd..1e3749f 100644
      return { proofs: o, lastCounterWithSignature: a };
    }
    /**
-@@ -5854,12 +6043,27 @@ class me {
+@@ -5854,12 +6053,27 @@ class me {
     * @param options.keysetId Set a custom keysetId to restore from. @see `keyChain)`
     */
    async restore(t, e, n) {
@@ -534,7 +580,7 @@ index 6480cbd..1e3749f 100644
      c.forEach((f, p) => u[f.B_] = h[p]);
      const l = [];
      let d;
-@@ -5867,6 +6071,7 @@ class me {
+@@ -5867,6 +6081,7 @@ class me {
        const p = u[a[f].blindedMessage.B_];
        p && (d = t + f, a[f].blindedMessage.amount = p.amount, l.push(a[f].toProof(p, i)));
      }
@@ -542,7 +588,7 @@ index 6480cbd..1e3749f 100644
      return {
        proofs: l,
        lastCounterWithSignature: d
-@@ -5892,12 +6097,14 @@ class me {
+@@ -5892,12 +6107,14 @@ class me {
     *   specified amount and unit.
     */
    async createMintQuoteBolt11(t, e) {
@@ -557,7 +603,7 @@ index 6480cbd..1e3749f 100644
      return { ...r, amount: r.amount || t, unit: r.unit || this._unit };
    }
    /**
-@@ -6027,6 +6234,7 @@ class me {
+@@ -6027,6 +6244,7 @@ class me {
     * @throws If params are invalid or mint returns errors.
     */
    async _mintProofs(t, e, n, r, i) {
@@ -565,7 +611,7 @@ index 6480cbd..1e3749f 100644
      this.assertAmount(e, `_mintProofs: ${t}`), i = i ?? this.defaultOutputType();
      const { privkey: o, keysetId: a, proofsWeHave: c, onCountersReserved: h } = r ?? {}, u = this.getKeyset(a);
      let l = this.configureOutputs(
-@@ -6039,20 +6247,28 @@ class me {
+@@ -6039,20 +6257,28 @@ class me {
      );
      const d = this.preparedTotal(l), f = await this.addCountersToOutputTypes(u.id, l);
      [l] = f.outputTypes, f.used && this.safeCallback(h, f.used, { op: "mintProofs" }), this._logger.debug("mint counter", { counter: f.used, mintOT: l });
@@ -596,7 +642,7 @@ index 6480cbd..1e3749f 100644
    }
    // -----------------------------------------------------------------
    // Section: Create Melt Quote
-@@ -6074,6 +6290,7 @@ class me {
+@@ -6074,6 +6300,7 @@ class me {
     *   reserve.
     */
    async createMeltQuoteBolt11(t, e) {
@@ -604,7 +650,7 @@ index 6480cbd..1e3749f 100644
      e !== void 0 && (this.failIf(
        fr(t),
        "amountMsat supplied but invoice already contains an amount. Leave amountMsat undefined for non-zero invoices."
-@@ -6089,6 +6306,7 @@ class me {
+@@ -6089,6 +6316,7 @@ class me {
          }
        } : {}
      }, i = await this.mint.createMeltQuoteBolt11(r);
@@ -612,7 +658,7 @@ index 6480cbd..1e3749f 100644
      return {
        ...i,
        unit: i.unit || this._unit,
-@@ -6227,6 +6445,7 @@ class me {
+@@ -6227,6 +6455,7 @@ class me {
     * @see https://github.com/cashubtc/nuts/blob/main/08.md.
     */
    async prepareMelt(t, e, n, r, i) {
@@ -620,7 +666,7 @@ index 6480cbd..1e3749f 100644
      i = i ?? this.defaultOutputType();
      const { keysetId: o, onChangeOutputsCreated: a, onCountersReserved: c } = r || {}, h = this.getKeyset(o), u = nt(n), l = u - e.amount;
      let d = [];
-@@ -6268,6 +6487,7 @@ class me {
+@@ -6268,6 +6497,7 @@ class me {
        };
        this.safeCallback(a, p, { op: "meltProofs" }), this.on._emitMeltBlanksCreated(p);
      }
@@ -628,7 +674,7 @@ index 6480cbd..1e3749f 100644
      return f;
    }
    /**
-@@ -6284,6 +6504,7 @@ class me {
+@@ -6284,6 +6514,7 @@ class me {
     * @throws If melt fails or signatures don't match output count.
     */
    async completeMelt(t, e, n) {
@@ -636,7 +682,7 @@ index 6480cbd..1e3749f 100644
      t = this.maybeConvertMeltBlanks(t);
      let r = t.inputs;
      const i = t.outputData.map((d) => d.blindedMessage), o = t.quote.quote, a = this.getKeyset(t.keysetId);
-@@ -6293,13 +6514,18 @@ class me {
+@@ -6293,13 +6524,18 @@ class me {
        inputs: r,
        outputs: i,
        ...n ? { prefer_async: !0 } : {}
@@ -657,3 +703,28 @@ index 6480cbd..1e3749f 100644
        ...t.quote,
        ...h
      }, change: u };
+@@ -6332,9 +6568,14 @@ class me {
+    * @returns NUT-07 state for each proof, in same order.
+    */
+   async checkProofsStates(t) {
+-    const e = new TextEncoder(), n = t.map(
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++    const e = new TextEncoder();
++    var _tHash0 = _p && _p.enabled ? performance.now() : 0;
++    const n = t.map(
+       (o) => pt(e.encode(o.secret)).toHex(!0)
+-    ), r = 100, i = [];
++    );
++    var _tHashDone = _p && _p.enabled ? performance.now() : 0;
++    const r = 100, i = [];
+     for (let o = 0; o < n.length; o += r) {
+       const a = n.slice(o, o + r), { states: c } = await this.mint.check({
+         Ys: a
+@@ -6347,6 +6588,7 @@ class me {
+         this.failIfNullish(l, "Could not find state for proof with Y: " + a[u]), i.push(l);
+       }
+     }
++    if (_p && _p.enabled) _p.push({ op: "wallet.checkProofsStates", ms: performance.now() - _t0, hashMs: _tHashDone - _tHash0, proofCount: t.length, batches: Math.ceil(n.length / r) });
+     return i;
+   }
+   /**

@@ -10,8 +10,9 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable } from 'react-native';
 import opacity from 'hex-color-opacity';
-import { ListGroup, PressableFeedback } from 'heroui-native';
+import { ListGroup } from 'heroui-native';
 import Icon from 'assets/icons';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -56,6 +57,7 @@ export function ButtonHandlerContent({
       }
 
       const result = button.onPress?.(() => {
+        setProcessingButtonIndex(undefined);
         close();
       });
 
@@ -107,41 +109,38 @@ export function ButtonHandlerContent({
           const isDangerous = button.variant === 'dangerous';
 
           return (
-            <PressableFeedback
+            <Pressable
               key={i}
-              animation={false}
+              testID={button.testID ? `overflow-${button.testID}` : undefined}
               onPress={() => handleButtonPress(i)}
-              isDisabled={processingButtonIndex !== undefined}>
-              <PressableFeedback.Scale>
-                <ListGroup.Item testID={button.testID} disabled>
-                  <ListGroup.ItemPrefix>
-                    <View
-                      className="rounded-full p-1"
-                      style={{ backgroundColor: opacity(muted, 0.25) }}>
-                      {button.icon ? (
-                        <Icon
-                          color={isDangerous ? danger : foreground}
-                          name={button.icon}
-                          size={24}
-                        />
-                      ) : (
-                        <Icon
-                          color={isDangerous ? danger : foreground}
-                          name="mdi:gesture-tap-button"
-                          size={24}
-                        />
-                      )}
-                    </View>
-                  </ListGroup.ItemPrefix>
-                  <ListGroup.ItemContent>
-                    <ListGroup.ItemTitle>
-                      {processingButtonIndex === i ? `${button.text}...` : button.text}
-                    </ListGroup.ItemTitle>
-                  </ListGroup.ItemContent>
-                </ListGroup.Item>
-              </PressableFeedback.Scale>
-              <PressableFeedback.Ripple />
-            </PressableFeedback>
+              disabled={processingButtonIndex !== undefined}>
+              <ListGroup.Item disabled>
+                <ListGroup.ItemPrefix>
+                  <View
+                    className="rounded-full p-1"
+                    style={{ backgroundColor: opacity(muted, 0.25) }}>
+                    {button.icon ? (
+                      <Icon
+                        color={isDangerous ? danger : foreground}
+                        name={button.icon}
+                        size={24}
+                      />
+                    ) : (
+                      <Icon
+                        color={isDangerous ? danger : foreground}
+                        name="mdi:gesture-tap-button"
+                        size={24}
+                      />
+                    )}
+                  </View>
+                </ListGroup.ItemPrefix>
+                <ListGroup.ItemContent>
+                  <ListGroup.ItemTitle>
+                    {processingButtonIndex === i ? `${button.text}...` : button.text}
+                  </ListGroup.ItemTitle>
+                </ListGroup.ItemContent>
+              </ListGroup.Item>
+            </Pressable>
           );
         })}
       </ListGroup>

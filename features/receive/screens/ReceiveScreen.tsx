@@ -212,6 +212,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
         <ButtonHandler
           buttons={[
             {
+              testID: 'receive-paste',
               text: actions.paste.loading ? 'Pasting...' : 'Paste',
               icon: 'lets-icons:copy',
               variant: 'primary',
@@ -222,6 +223,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
               condition: actions.paste.available,
             },
             {
+              testID: 'receive-fixed-amount',
               text: actions.fixedAmount.loading ? 'Opening...' : 'Fixed Amount',
               icon: 'mdi:decimal',
               variant: 'secondary',
@@ -232,6 +234,7 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
               condition: actions.fixedAmount.available,
             },
             {
+              testID: 'receive-scan-qr',
               text: actions.scanQr.loading ? 'Opening...' : 'Scan QR',
               icon: 'stash:qr-code',
               variant: 'secondary',

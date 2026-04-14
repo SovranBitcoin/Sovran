@@ -11,13 +11,14 @@
  * via createCocoPaymentUX in the library.
  */
 
+import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { paymentLog } from '@/shared/lib/logger';
 
-import { getEncodedTokenV4 } from '@cashu/cashu-ts';
+import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
 import type {
   Manager,
   SendHistoryEntry,
@@ -26,6 +27,7 @@ import type {
   ReceiveHistoryEntry,
 } from '@cashu/coco-core';
 import {
+  type MachineOperations,
   type NotificationHandlerMap,
   type PaymentMachine,
   type ScanSources,
@@ -89,6 +91,294 @@ import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
+import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
+
+// =============================================================================
+// createSovranExecuteReceive
+// =============================================================================
+
+/**
+ * Sovran-side override for coco-payment-ux's default `executeReceive`.
+ *
+ * Why this exists:
+ *
+ * coco-payment-ux's default `executeReceive` (defaultOperations.ts:502) calls
+ * `mgr.wallet.receive(token)`, then tries to find the resulting persisted
+ * history entry by matching `metadata.rawToken === tokenString || h.token ===
+ * tokenString`. When the lookup fails (race against coco's history write, or
+ * a metadata-shape mismatch), it falls back to a SYNTHESIZED entry with id
+ * `redeemed-${Date.now()}`.
+ *
+ * That synthesized id then propagates through the entire downstream chain
+ * (setEntry, linkTransaction, onReceiveConfirmed, onTransactionCreated), so
+ * the location stamp and scan-history link end up keyed to a fake id. When
+ * the user later opens the receive from the transaction list, the row carries
+ * coco's *real* persisted id, the lookups miss, and the location/source
+ * disappear.
+ *
+ * The fix is to NEVER let a synthesized id flow downstream. We snapshot the
+ * set of receive entry ids for this mint BEFORE calling `wallet.receive`,
+ * then after the receive we poll the history for any new id that wasn't in
+ * the snapshot. Set-difference is robust regardless of how `metadata` /
+ * `token` is shaped on the persisted entry.
+ */
+export function createSovranExecuteReceive(
+  getManager: () => Manager | null
+): NonNullable<MachineOperations['executeReceive']> {
+  return async (tokenString, mintUrl, _amount) => {
+    const manager = getManager();
+    if (!manager) {
+      paymentLog.error('payment.execute_receive.no_manager');
+      throw new Error('Wallet manager is not available');
+    }
+
+    // Snapshot existing receive ids for this mint so we can identify the
+    // newly-persisted entry by set difference after the receive completes.
+    let beforeIds: Set<string>;
+    try {
+      const beforeHistory = await manager.history.getPaginatedHistory(0, 100);
+      beforeIds = new Set(
+        (beforeHistory as ReadonlyArray<Record<string, unknown>>)
+          .filter((h) => h.type === 'receive' && h.mintUrl === mintUrl)
+          .map((h) => (typeof h.id === 'string' ? h.id : ''))
+          .filter((id) => id.length > 0)
+      );
+    } catch (e) {
+      paymentLog.warn('payment.execute_receive.snapshot_failed', {
+        error: e instanceof Error ? e.message : String(e),
+      });
+      beforeIds = new Set();
+    }
+
+    // P2PK detection — preserved from coco's default so the downstream
+    // onP2PKReceiveCompleted notification still fires for users with
+    // `regenerateP2PKOnReceive` enabled.
+    let hadP2PKProofs = false;
+    try {
+      const decoded = getDecodedToken(tokenString);
+      hadP2PKProofs = decoded.proofs.some((p) => {
+        try {
+          const parsed = JSON.parse(p.secret);
+          return Array.isArray(parsed) && parsed[0] === 'P2PK';
+        } catch {
+          return false;
+        }
+      });
+    } catch {
+      // proof decode failure — fall back to false (no regression)
+    }
+
+    paymentLog.info('payment.execute_receive.start', {
+      mintUrl,
+      beforeCount: beforeIds.size,
+    });
+    await manager.wallet.receive(tokenString);
+
+    // Poll for the newly persisted receive entry. Set difference makes this
+    // robust to race conditions in coco's history flush — we just wait until
+    // a new receive id appears for this mint.
+    const MAX_ATTEMPTS = 50; // ~10s of polling at 200ms intervals
+    const DELAY_MS = 200;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      try {
+        const after = await manager.history.getPaginatedHistory(0, 100);
+        const newEntry = (after as ReadonlyArray<Record<string, unknown>>).find((h) => {
+          const id = typeof h.id === 'string' ? h.id : '';
+          return (
+            h.type === 'receive' &&
+            h.mintUrl === mintUrl &&
+            id.length > 0 &&
+            !beforeIds.has(id)
+          );
+        });
+        if (newEntry?.id) {
+          paymentLog.info('payment.execute_receive.found', {
+            mintUrl,
+            realId: newEntry.id,
+            attempts: attempt + 1,
+          });
+          return {
+            historyEntry: JSON.stringify(newEntry),
+            hadP2PKProofs,
+          };
+        }
+      } catch (e) {
+        paymentLog.warn('payment.execute_receive.poll_failed', {
+          attempt,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+      await new Promise((r) => setTimeout(r, DELAY_MS));
+    }
+
+    // No real entry materialized within ~10s. The receive's proofs are
+    // already persisted (mgr.wallet.receive returned successfully), so we
+    // cannot fail the UX without confusing the user. Fall back to coco's
+    // original synthesized-entry behavior so the receive screen still
+    // completes — but log loudly so the deeper coco-history flush issue
+    // gets attention.
+    paymentLog.error('payment.execute_receive.timeout_fallback', {
+      mintUrl,
+      polledMs: MAX_ATTEMPTS * DELAY_MS,
+    });
+    let tokenAmount = 0;
+    try {
+      const decoded = getDecodedToken(tokenString);
+      tokenAmount = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
+    } catch {
+      /* ignore */
+    }
+    const fallbackEntry = {
+      id: `redeemed-${Date.now()}`,
+      type: 'receive' as const,
+      createdAt: Date.now(),
+      mintUrl,
+      unit: 'sat',
+      amount: tokenAmount,
+      metadata: { rawToken: tokenString },
+    };
+    return {
+      historyEntry: JSON.stringify(fallbackEntry),
+      hadP2PKProofs,
+    };
+  };
+}
+
+// =============================================================================
+// createSovranExecuteMintQuote
+// =============================================================================
+
+/**
+ * Sovran-side override for coco-payment-ux's default `executeMintQuote`.
+ *
+ * coco-payment-ux's default (defaultOperations.ts:275) calls
+ * `mgr.ops.mint.prepare(...)` and constructs the history entry directly from
+ * the returned operation, using `mintOp.id` as the entry id. The comment at
+ * defaultOperations.ts:291 acknowledges the race: it builds from the
+ * operation result *to avoid a race where getPaginatedHistory runs before
+ * HistoryService persists the row*. The unspoken risk is that coco's
+ * persisted row may end up with a different id (or different field shape)
+ * than `mintOp.id`. When that happens, the location stamp captured at
+ * onTransactionCreated (under `mintOp.id`) and the scan history link end up
+ * keyed to an id that doesn't match what `usePaginatedHistory` returns
+ * later — same class of bug as the receive case.
+ *
+ * Fix: snapshot mint ids for this mintUrl before prepare, then poll coco
+ * history for the persisted row by `quoteId` (deterministic — no race) and
+ * fall back to set-difference. Use coco's persisted row as authoritative for
+ * the id, while preserving `paymentRequest` from the operation result so
+ * the MintQuoteScreen still has a lightning invoice to display.
+ */
+export function createSovranExecuteMintQuote(
+  getManager: () => Manager | null
+): NonNullable<MachineOperations['executeMintQuote']> {
+  return async (mintUrl, amount, _unit) => {
+    const manager = getManager();
+    if (!manager) {
+      paymentLog.error('payment.execute_mint_quote.no_manager');
+      throw new Error('Wallet manager is not available');
+    }
+
+    // Snapshot existing mint ids for this mint URL so we can detect the
+    // newly-persisted row by set difference if quoteId matching fails.
+    let beforeIds: Set<string>;
+    try {
+      const beforeHistory = await manager.history.getPaginatedHistory(0, 100);
+      beforeIds = new Set(
+        (beforeHistory as ReadonlyArray<Record<string, unknown>>)
+          .filter((h) => h.type === 'mint' && h.mintUrl === mintUrl)
+          .map((h) => (typeof h.id === 'string' ? h.id : ''))
+          .filter((id) => id.length > 0)
+      );
+    } catch (e) {
+      paymentLog.warn('payment.execute_mint_quote.snapshot_failed', {
+        error: e instanceof Error ? e.message : String(e),
+      });
+      beforeIds = new Set();
+    }
+
+    paymentLog.info('payment.execute_mint_quote.start', { mintUrl, amount });
+    const mintOp = await manager.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' });
+    paymentLog.info('payment.execute_mint_quote.prepared', {
+      operationId: mintOp.id,
+      quoteId: mintOp.quoteId,
+    });
+
+    // Constructed entry — used as a fallback (same shape as coco's default
+    // executeMintQuote) and as the source of `paymentRequest` if coco's
+    // persisted row doesn't carry it.
+    const constructedEntry = {
+      id: mintOp.id,
+      type: 'mint' as const,
+      createdAt: (mintOp as Record<string, unknown>).createdAt ?? Date.now(),
+      mintUrl: ((mintOp as Record<string, unknown>).mintUrl as string) ?? mintUrl,
+      unit: ((mintOp as Record<string, unknown>).unit as string) ?? 'sat',
+      quoteId: mintOp.quoteId,
+      state: 'UNPAID' as const,
+      amount: ((mintOp as Record<string, unknown>).amount as number) ?? amount,
+      paymentRequest: (mintOp as Record<string, unknown>).request as string | undefined,
+      metadata: { operationId: mintOp.id },
+    };
+
+    // Poll for coco's persisted row. Prefer quoteId match (deterministic);
+    // fall back to id-diff against the pre-prepare snapshot.
+    const MAX_ATTEMPTS = 50; // ~10s of polling at 200ms intervals
+    const DELAY_MS = 200;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      try {
+        const after = await manager.history.getPaginatedHistory(0, 100);
+        const persisted = (after as ReadonlyArray<Record<string, unknown>>).find((h) => {
+          if (h.type !== 'mint' || h.mintUrl !== mintUrl) return false;
+          // Preferred: deterministic quoteId match
+          if (
+            mintOp.quoteId &&
+            typeof h.quoteId === 'string' &&
+            h.quoteId === mintOp.quoteId
+          ) {
+            return true;
+          }
+          // Fallback: set difference on ids
+          const id = typeof h.id === 'string' ? h.id : '';
+          return id.length > 0 && !beforeIds.has(id);
+        });
+        if (persisted) {
+          paymentLog.info('payment.execute_mint_quote.found', {
+            mintUrl,
+            persistedId: persisted.id,
+            constructedId: mintOp.id,
+            matchedById: persisted.id === mintOp.id,
+            attempts: attempt + 1,
+          });
+          // Use coco's persisted row as authoritative (so its real id flows
+          // downstream), but preserve `paymentRequest` from the operation
+          // result if coco's row doesn't carry it.
+          const merged = {
+            ...persisted,
+            paymentRequest:
+              (persisted as Record<string, unknown>).paymentRequest ??
+              constructedEntry.paymentRequest,
+          };
+          return { historyEntry: JSON.stringify(merged) };
+        }
+      } catch (e) {
+        paymentLog.warn('payment.execute_mint_quote.poll_failed', {
+          attempt,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+      await new Promise((r) => setTimeout(r, DELAY_MS));
+    }
+
+    // Last resort: same fallback as coco's default. Logged loudly so we know
+    // the polling didn't catch the persisted row.
+    paymentLog.error('payment.execute_mint_quote.timeout_fallback', {
+      mintUrl,
+      operationId: mintOp.id,
+      polledMs: MAX_ATTEMPTS * DELAY_MS,
+    });
+    return { historyEntry: JSON.stringify(constructedEntry) };
+  };
+}
 
 // =============================================================================
 // createSovranNotifications
@@ -789,6 +1079,94 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         const { entry } = sendCtx(rawCtx);
         if (!entry.token) return;
         emojiPickerPopup({ token: getEncodedTokenV4(entry.token) });
+      },
+    },
+
+    // ── mintQuote (Lightning receive) ────────────────────────────────
+    //
+    // We override copy/share so we can record the *outbound distribution*
+    // method for the resulting transaction. The other wallet's payment
+    // method is unknowable, but we can capture which channel WE used to
+    // share the lightning invoice. The 'displayed' fallback is written by
+    // a global subscription in CocoPaymentUX.tsx when the quote transitions
+    // to PAID/ISSUED without any explicit copy/share action.
+    //
+    // The distribution store is keyed by `quoteId` (NOT historyEntry.id)
+    // for mint entries. quoteId is the deterministic identifier carried
+    // by the lightning quote itself — it's identical whether resolved from
+    // the screen entry, from a coco event payload, or from the persisted
+    // history row. Using historyEntry.id would risk a key mismatch if the
+    // screen entry's id (e.g. mintOp.id from a fallback) differs from
+    // coco's persisted row id, which is exactly the bug that caused the
+    // first-write-wins guard to silently fail in earlier versions.
+    //
+    // Both overrides reproduce the built-in handler's user-facing behavior
+    // (clipboard write / share sheet + popup) so the UX is unchanged.
+    mintQuote: {
+      copy: async (rawCtx) => {
+        const { entry } = mintQuoteCtx(rawCtx);
+        const paymentRequest = entry.paymentRequest;
+        const quoteId = entry.quoteId;
+        if (!paymentRequest || !quoteId) {
+          paymentLog.warn('payment.mint_quote.copy.no_payment_request', {
+            hasPaymentRequest: !!paymentRequest,
+            hasQuoteId: !!quoteId,
+          });
+          return;
+        }
+        try {
+          await Clipboard.setStringAsync(paymentRequest);
+          useTransactionDistributionStore.getState().setDistribution(quoteId, 'copy');
+          paymentLog.info('payment.mint_quote.copy.success', {
+            quoteId,
+            entryId: entry.id,
+          });
+          copyPopup('paymentRequest');
+        } catch (e) {
+          paymentLog.error('payment.mint_quote.copy.failed', {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      },
+
+      share: async (rawCtx) => {
+        const { entry } = mintQuoteCtx(rawCtx);
+        const paymentRequest = entry.paymentRequest;
+        const quoteId = entry.quoteId;
+        if (!paymentRequest || !quoteId) {
+          paymentLog.warn('payment.mint_quote.share.no_payment_request', {
+            hasPaymentRequest: !!paymentRequest,
+            hasQuoteId: !!quoteId,
+          });
+          return;
+        }
+        try {
+          // Read the share result so we can detect AirDrop on iOS. The
+          // built-in coco-payment-ux platform.share at CocoPaymentUX.tsx
+          // discards the result, so we can't piggyback on it.
+          const result = await Share.share({ message: paymentRequest });
+          if (result.action !== Share.sharedAction) {
+            paymentLog.debug('payment.mint_quote.share.dismissed', { quoteId });
+            return;
+          }
+          // iOS sets activityType to a UTI string identifying the chosen
+          // activity (e.g. 'com.apple.UIKit.activity.AirDrop'). Android
+          // always returns undefined, in which case we fall through to
+          // the generic 'share' source.
+          const isAirDrop = result.activityType === 'com.apple.UIKit.activity.AirDrop';
+          const source = isAirDrop ? 'airdrop' : 'share';
+          useTransactionDistributionStore.getState().setDistribution(quoteId, source);
+          paymentLog.info('payment.mint_quote.share.success', {
+            quoteId,
+            entryId: entry.id,
+            activityType: result.activityType ?? null,
+            source,
+          });
+        } catch (e) {
+          paymentLog.error('payment.mint_quote.share.failed', {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
       },
     },
   };

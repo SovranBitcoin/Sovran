@@ -42,6 +42,7 @@ The script auto-reads `sovran-app/log.txt` if no stdin is piped.
 | `ws` | WebSocket connection health, subscription analysis, message rates | ~200 tokens |
 | `gc` | Hermes memory trend, GC pressure, JS thread blocks, leak detection | ~200 tokens |
 | `budget` | Token cost meta-analysis — shows which modes fit in which context windows | ~200 tokens |
+| `phone` | Drive a real iPhone via WebDriverAgent — tap, type, screenshot, accessibility tree (subcommands) | n/a (device I/O) |
 
 ## Recommended workflow
 
@@ -265,3 +266,129 @@ npm run log-doctor -- renders --latest
 In the app's debug console, call `log.dumpForLLM()` to get the ring buffer contents. Use `log.dumpForLLM({ format: 'md' })` for ~56% fewer tokens. Paste into `sovran-app/log.txt`.
 
 Alternatively, copy structured JSON log output from the Metro terminal directly.
+
+## Driving the device (`phone` mode)
+
+The `phone` mode lets log-doctor (and any LLM agent calling it via Bash) drive
+a real iPhone running the dev build — tap buttons, type text, dump the
+accessibility tree, take screenshots — talking to a WebDriverAgent REST server
+on `localhost:8100`. The same WDA also backs the `mobile-mcp` MCP server, so
+both Claude Code (live, in conversation) and `phone` mode (shell-driven) can
+drive the device safely without fighting over sessions.
+
+**Setup is in [`docs/device-automation.md`](../../docs/device-automation.md)** —
+that's the comprehensive guide covering one-time install, daily bring-up,
+target architecture, and the long list of things that can go wrong. **Read it
+once.** This section just covers the day-to-day commands.
+
+### Daily bring-up
+
+```bash
+npm run dev
+```
+
+That's it. `scripts/dev.sh` runs Metro in the foreground and brings WDA up in
+the background via `scripts/start-wda.sh`. If no iPhone is connected, WDA
+bring-up skips gracefully and Metro starts as normal.
+
+To bring WDA up without Metro: `npm run dev:wda`. Tail the bring-up log:
+`tail -f wda.log`.
+
+### Subcommands
+
+```bash
+npm run log-doctor -- phone help              # full reference
+npm run log-doctor -- phone status            # WDA health
+npm run log-doctor -- phone tree              # accessibility tree, testID-first
+npm run log-doctor -- phone tree --all        # also include unlabeled containers
+npm run log-doctor -- phone tap-id <testID>   # PREFERRED: tap by accessibility id
+npm run log-doctor -- phone tap "<text>"      # FALLBACK: tap by visible label
+npm run log-doctor -- phone tap-xy <x> <y>    # LAST RESORT: tap by coordinates
+npm run log-doctor -- phone text "<input>"   # type into focused field
+npm run log-doctor -- phone shot [path]       # save a PNG screenshot
+npm run log-doctor -- phone home              # press home button
+npm run log-doctor -- phone dismiss-modal     # swipe down to dismiss top sheet
+npm run log-doctor -- phone swipe <dir>       # swipe up|down|left|right
+```
+
+### Verified end-to-end flows (`phone test`)
+
+End-to-end tests live in `tests/*.sov` files at the repo root and use the
+**Sovran Test DSL** — a line-oriented, verb-first language designed for this
+codebase. See [`tests/README.md`](../../tests/README.md) for the full reference.
+
+```bash
+npm run log-doctor -- phone test              # list discovered tests
+npm run log-doctor -- phone test <name>       # run a single test
+npm run log-doctor -- phone test all          # run every test
+npm run log-doctor -- phone test parse <file> # parse-only debug, prints AST
+```
+
+A passing run stamps a `# verified: <date> — <device>` line inside the test
+block in place — file formatting is otherwise byte-identical, so your
+comments and whitespace are preserved.
+
+Quick example:
+
+```
+test "Create mint quote via keypad and verify pending entry"
+
+  launch com.sovranbitcoin.dev
+  tap #wallet-receive when visible
+  tap #receive-fixed-amount when visible
+  keypad 1
+  tap #amount-next
+  wait for screen #screen-mint-quote
+
+  dismiss
+  wait for screen #screen-wallet
+  capture #transaction-mint-* suffix as $mintId
+
+end
+```
+
+Selectors: `#testID` (preferred), `"text"` (fallback), `#prefix*` (wildcard).
+Variables: `capture ... as $name`, interpolated as `${name}` or `$name`.
+Control flow: `if visible / if not visible / repeat N times / define / run`.
+Wallet ops: `wallet send cashu N as $token`, `wallet send bolt11 $invoice`,
+etc. — these shell out to `cocod` (Cashu wallet daemon, must be running).
+
+### Targeting priority — testID-first, always
+
+The order matters and `phone` mode actively pushes you up it:
+
+1. **`tap-id <testID>`** is the right answer 95% of the time. Stable across
+   copy edits, i18n, theme changes, and layout reflows.
+2. **`tap "<text>"`** is a fallback. When it has to use this path because no
+   testID exists, it prints a loud nudge with the exact `rg` command to find
+   the source and the recommended testID name to add. Fix it once, never see
+   the nudge again.
+3. **`tap-xy <x> <y>`** is the last resort. Always emits a nudge.
+
+`ButtonHandler` and the `Button` primitive both already accept a `testID`
+prop — adding one is a one-line change at the call site. Convention is
+kebab-case `<screen>-<action>`, e.g. `receive-fixed-amount`, `send-confirm`,
+`mint-add`. **Metro Fast Refresh picks up new testIDs immediately**, no
+rebuild needed.
+
+### Env overrides
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `WDA_BASE_URL` | `http://localhost:8100` | Override if you forwarded WDA to a different port |
+| `WDA_PORT` | `8100` | Used by `start-wda.sh` |
+| `IOS_UDID` | first device from `ios list` | Pin to a specific device |
+| `WDA_BUNDLE_ID` | auto-discovered | Override the WDA runner bundle ID |
+
+### Troubleshooting
+
+The full troubleshooting list is in
+[`docs/device-automation.md`](../../docs/device-automation.md#troubleshooting).
+Common quick hits:
+
+| Symptom | Fix |
+|---|---|
+| `WDA unreachable at http://localhost:8100` | `npm run dev:wda` (idempotent), or check `wda.log` |
+| testIDs not showing up in `phone tree` | Metro hasn't hot-reloaded yet, or the element is unmounted |
+| `phone tap "Receive"` taps a transaction history row | Add a testID to the global Receive button — `phone tap` will tell you exactly what to do |
+| Driving the wrong app (prod vs dev) | Defaults to `com.sovranbitcoin.dev`. Override with `SOVRAN_BUNDLE_ID=...` |

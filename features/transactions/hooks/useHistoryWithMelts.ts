@@ -127,6 +127,14 @@ export function useHistoryWithMelts(pageSize = 100) {
     };
   }, [manager, fetchMeltOps]);
 
+  // Re-fetch history when any transaction state changes (pending → confirmed, etc.)
+  useEffect(() => {
+    const unsub = manager.on('history:updated', () => {
+      void paginatedResult.refresh();
+    });
+    return unsub;
+  }, [manager, paginatedResult.refresh]);
+
   // Merge melt operations into history, deduplicating by quoteId.
   // Stabilise: only return a new array ref if entries actually changed.
   const prevMergedRef = useRef<HistoryEntry[]>([]);
@@ -153,16 +161,30 @@ export function useHistoryWithMelts(pageSize = 100) {
       });
     }
 
-    // Reference stability: if length and first/last entry IDs match, keep the old ref
+    // Reference stability: only return a new ref if entry contents that affect
+    // rendering have actually changed. Compare id + state pairwise — `state`
+    // is the only field that mutates after entry creation (UNPAID → PAID,
+    // prepared → pending → finalized, etc.) and is exactly what `<Transactions>`
+    // groups on (Transactions.tsx:258-261). The previous version compared only
+    // length + first/last id, so a mint quote transitioning UNPAID → PAID
+    // returned the stale `prev` ref and the home screen kept rendering it as
+    // pending until the component remounted (e.g. via "View all").
     const prev = prevMergedRef.current;
-    if (
-      prev.length === merged.length &&
-      prev.length > 0 &&
-      prev[0].id === merged[0].id &&
-      prev[prev.length - 1].id === merged[merged.length - 1].id
-    ) {
-      return prev;
+    let identical = prev.length === merged.length;
+    if (identical) {
+      for (let i = 0; i < prev.length; i++) {
+        const p = prev[i];
+        const m = merged[i];
+        if (
+          p.id !== m.id ||
+          (p as { state?: string }).state !== (m as { state?: string }).state
+        ) {
+          identical = false;
+          break;
+        }
+      }
     }
+    if (identical) return prev;
     prevMergedRef.current = merged;
     return merged;
   }, [paginatedResult.history, meltEntries]);

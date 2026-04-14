@@ -348,8 +348,8 @@ export function useScreenActions(
       getBtcPrice: () => getBtcPriceRef.current?.() ?? 0,
       offlineOptimization: isEcashSend,
       unit: flowCtx.unit,
-      fiatCurrency: isSend ? dc?.code : undefined,
-      fiatSymbol: isSend ? dc?.symbol : undefined,
+      fiatCurrency: dc?.code,
+      fiatSymbol: dc?.symbol,
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

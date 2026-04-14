@@ -4,7 +4,6 @@ import { Text as DefaultText, TextStyle, ColorValue, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 
-import { Skeleton } from 'heroui-native/skeleton';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -212,8 +211,8 @@ export function Text({ loading, size = 14, italic = false, ...props }: CustomTex
 
   if (showSkeleton) {
     return (
-      <View style={skeletonWrapperStyle}>
-        <Skeleton isLoading className="rounded-sm" style={skeletonInsetStyle} />
+      <View pointerEvents="none" style={skeletonWrapperStyle}>
+        <View className="bg-skeleton" style={[skeletonInsetStyle, { borderRadius: 4 }]} />
         <UntranslatedText
           size={size}
           italic={italic}

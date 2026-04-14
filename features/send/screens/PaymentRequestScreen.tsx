@@ -83,6 +83,7 @@ export function PaymentRequestScreen({
         <ButtonHandler
           buttons={[
             {
+              testID: 'payment-request-confirm',
               text: actions.confirm.loading ? 'Sending...' : 'Confirm',
               icon: actions.confirm.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
               variant: 'primary',
@@ -94,6 +95,7 @@ export function PaymentRequestScreen({
               disabled: anyLoading,
             },
             {
+              testID: 'payment-request-cancel',
               text: actions.cancel.loading ? 'Cancelling...' : 'Cancel',
               icon: actions.cancel.loading ? 'ri:loader-line' : 'ri:close-circle-line',
               variant: 'secondary',

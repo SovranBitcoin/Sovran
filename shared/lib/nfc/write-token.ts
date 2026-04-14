@@ -32,6 +32,15 @@ export async function writeTokenToNFC(token: string): Promise<NfcTokenWriteResul
   }
 
   try {
+    // Cancel any stale NFC session from a previous attempt that wasn't
+    // cleaned up (e.g. the sheet dismiss animation blocked the native
+    // NFC modal from appearing and the user never got to cancel it).
+    try {
+      await NfcManager.cancelTechnologyRequest();
+    } catch {
+      // No active session — expected path.
+    }
+
     await NfcManager.requestTechnology(NfcTech.IsoDep);
     nfcLog.info('nfc.write.isodep_acquired');
 

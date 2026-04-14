@@ -21,6 +21,7 @@ import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
   HistoryEntryTimeline,
+  TransactionLocationSection,
   useBip321Info,
   Bip321MethodIcons,
 } from '@/features/transactions';
@@ -29,6 +30,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { View } from 'react-native';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { formatAmount } from '@/shared/lib/currency';
@@ -80,6 +82,7 @@ export function MeltQuoteScreen({
         <ButtonHandler
           buttons={[
             {
+              testID: 'melt-close',
               text: 'Close',
               icon: 'ri:close-circle-line',
               variant: 'secondary',
@@ -87,6 +90,7 @@ export function MeltQuoteScreen({
               condition: entry.state === 'PAID',
             },
             {
+              testID: 'melt-pay',
               text: actions.pay.loading ? 'Sending...' : 'Pay',
               icon: actions.pay.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
               variant: 'primary',
@@ -98,6 +102,7 @@ export function MeltQuoteScreen({
               disabled: anyLoading,
             },
             {
+              testID: 'melt-cancel',
               text: actions.cancel.loading ? 'Cancelling...' : 'Cancel',
               icon: actions.cancel.loading ? 'ri:loader-line' : 'ri:close-circle-line',
               variant: 'secondary',
@@ -118,8 +123,11 @@ export function MeltQuoteScreen({
   return (
     <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
       <Screen name="MeltQuoteScreen">
+        <View testID={`melt-quote-id-${entry.id}`}>
         <VStack gap={12}>
           <HistoryEntryHeader historyEntry={entry} />
+
+          {entry.state === 'PAID' && <TransactionLocationSection transactionId={entry.id} />}
 
           {entry.state === 'UNPAID' ? (
             <MintSelector
@@ -155,6 +163,7 @@ export function MeltQuoteScreen({
             ].flatMap((item) => (item ? [item] : []))}
           />
         </VStack>
+        </View>
       </Screen>
     </ModalLayoutWrapper>
   );

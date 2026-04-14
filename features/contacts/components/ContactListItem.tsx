@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
+import { View, Pressable, StyleSheet, Keyboard } from 'react-native';
 import { router } from 'expo-router';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
@@ -19,6 +19,7 @@ type ContactListItemProps = {
   subtitle?: string;
   type?: 'contact' | 'mint';
   mintInfo?: { icon_url?: string; name?: string };
+  mintUrl?: string;
   isLoadingProfile?: boolean;
 };
 
@@ -28,6 +29,7 @@ export const ContactListItem = ({
   subtitle,
   type = 'contact',
   mintInfo,
+  mintUrl,
   isLoadingProfile = false,
 }: ContactListItemProps) => {
   const [foreground, surfaceSecondary] = useThemeColor([
@@ -37,24 +39,26 @@ export const ContactListItem = ({
 
   const pubkeyStr = pubkey ?? '';
   const displayName = useMemo(() => {
-    if (type === 'mint' && mintInfo?.name) return mintInfo.name;
     return (
       profile?.displayName ||
       profile?.display_name ||
       profile?.name ||
+      (type === 'mint' && mintInfo?.name) ||
       pubkeyStr.slice(0, 12) + '...'
     );
   }, [profile, pubkeyStr, type, mintInfo]);
 
-  const avatarUrl = type === 'mint' ? mintInfo?.icon_url : profile?.picture;
+  // Always prefer nostr profile picture; fall back to mint icon when unavailable
+  const avatarUrl = profile?.picture || mintInfo?.icon_url;
   const displaySubtitle = subtitle || profile?.nip05 || pubkeyStr.slice(0, 16) + '...';
 
   const handlePress = () => {
+    Keyboard.dismiss();
     if (!pubkeyStr) return;
     paymentLog.info('contact.item.press', { pubkey: pubkeyStr, type });
     router.navigate({
       pathname: '/(user-flow)/profile' as any,
-      params: { pubkey: pubkeyStr },
+      params: { pubkey: pubkeyStr, ...(mintUrl ? { mintUrl } : {}) },
     });
   };
 

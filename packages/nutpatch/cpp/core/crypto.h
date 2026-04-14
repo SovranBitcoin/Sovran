@@ -54,6 +54,32 @@ crypto_err_t create_dleq_proof(const uint8_t *B_33, const uint8_t *a32,
                                 uint8_t *s_out32, uint8_t *e_out32);
 
 /**
+ * Batch-blind multiple messages in a single call.
+ * Reduces JS↔native boundary crossings from N to 1.
+ *
+ * @param msgs      Concatenated messages (variable length)
+ * @param msg_lens  Array of per-message lengths
+ * @param rs        Blinding factors: count * 32 bytes
+ * @param count     Number of messages
+ * @param out       Output: count * 33 bytes (compressed points)
+ */
+crypto_err_t batch_blind(const uint8_t *msgs, const size_t *msg_lens,
+                          const uint8_t *rs, size_t count, uint8_t *out);
+
+/**
+ * Batch-unblind multiple signatures in a single call.
+ * All signatures use the same mint pubkey A.
+ *
+ * @param C_s   Blinded signatures: count * 33 bytes
+ * @param rs    Blinding factors: count * 32 bytes
+ * @param A_33  Mint public key (33 bytes, same for all)
+ * @param count Number of signatures
+ * @param out   Output: count * 33 bytes (unblinded points)
+ */
+crypto_err_t batch_unblind(const uint8_t *C_s, const uint8_t *rs,
+                            const uint8_t *A_33, size_t count, uint8_t *out);
+
+/**
  * Batch-derive NUT-13 legacy keyset secrets and blinding factors.
  *
  * Derives BIP32 path: m/129372'/0'/{keyset_id_int}'/{counter}'/{0 or 1}

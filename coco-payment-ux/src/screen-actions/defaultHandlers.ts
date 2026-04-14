@@ -131,6 +131,17 @@ export function createDefaultScreenActionHandlers(
         const unit = getString(entry, 'unit') ?? 'sat';
         const id = getString(entry, 'id') ?? 'unknown';
 
+        // Capture the original raw scanned/pasted/NFC/deeplink input from the
+        // active flow context. encodeToken(entry) and entry.metadata.rawToken
+        // are both re-encoded V4 forms that may differ byte-for-byte from
+        // what the user actually entered, breaking the `processed === raw`
+        // lookup in the wallet's scan history store. flowCtx.rawInput is the
+        // canonical string that was originally recorded by addScan().
+        const flowCtx = getMachine()?.getContext?.() as
+          | { rawInput?: string; source?: string }
+          | undefined;
+        const scannedRawInput = flowCtx?.rawInput;
+
         const tokenString = encodeToken(entry);
         if (!tokenString || !mintUrl) return;
 
@@ -180,11 +191,17 @@ export function createDefaultScreenActionHandlers(
               console.info('[receiveToken.redeem] Updating screen entry | id:', realEntry.id, '| type:', realEntry.type, '| amount:', realEntry.amount);
               setEntry(realEntry);
 
-              // Link transaction for scan history
+              // Link transaction for scan history. Prefer the original raw
+              // input captured from flowCtx so the wallet's scan store can
+              // match by `processed === raw`. Fall back to the entry's
+              // metadata.rawToken (re-encoded form) only if flowCtx.rawInput
+              // is missing (e.g. NPC/non-scan flows).
               if (ops.linkTransaction && realEntry.id) {
-                const rawToken =
-                  getString(getMetadata(entry), 'rawToken') ?? tokenString;
-                ops.linkTransaction(rawToken, realEntry.id);
+                const linkInput =
+                  scannedRawInput ??
+                  getString(getMetadata(entry), 'rawToken') ??
+                  tokenString;
+                ops.linkTransaction(linkInput, realEntry.id);
               }
             } catch (e) {
               console.warn('[receiveToken] History entry parse failed:', e instanceof Error ? e.message : e);
@@ -210,6 +227,8 @@ export function createDefaultScreenActionHandlers(
                 mintUrl,
                 amount: amount ?? 0,
                 unit,
+                rawInput: scannedRawInput,
+                source: flowCtx?.source,
               });
             }
           } catch { /* ignore parse errors */ }

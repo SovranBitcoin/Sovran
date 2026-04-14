@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, View, StyleSheet } from 'react-native';
 import FilterItem from '@/features/contacts/components/search/SearchFilterItem';
 import { SEARCH_FILTERS_HEIGHT } from '@/features/contacts/lib/constants/styles';
@@ -25,13 +25,11 @@ export const FeedFilters = ({ isSearching, onFilterChange }: FeedFiltersProps) =
   const flatListRef = useRef<FlatList<string>>(null);
 
   // Reset to first filter when switching modes
-  const prevIsSearching = useRef(isSearching);
-  if (prevIsSearching.current !== isSearching) {
-    prevIsSearching.current = isSearching;
+  useEffect(() => {
     const defaultFilter = filters[0];
     setActiveFilterItem(defaultFilter);
     onFilterChange?.(defaultFilter);
-  }
+  }, [isSearching]);
 
   const handleFilterChange = (filter: string) => {
     feedLog.info('feed.filter.change', { filter, isSearching });

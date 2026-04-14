@@ -1071,6 +1071,41 @@ interface LogProps {
   logger?: Logger;
   /** Style for a wrapper View. Only renders a View when provided. */
   style?: any;
+  /**
+   * Optional testID for the screen container. When omitted and `name`
+   * ends with `Screen`, a `screen-<kebab>` testID is auto-derived (e.g.
+   * `MintQuoteScreen` → `screen-mint-quote`). The testID is rendered as
+   * a hidden 1×1 transparent <Text> element in the AX tree so log-doctor
+   * can target it via `wait for screen #screen-mint-quote` etc. without
+   * any layout impact.
+   */
+  testID?: string;
+}
+
+/**
+ * Convert a `<Log name="...">` value to a screen-* testID. Returns
+ * undefined when the name doesn't look like a screen — we don't want
+ * to pollute the AX tree with `screen-background-view` etc. for the
+ * non-screen Log usages.
+ *
+ *   MintQuoteScreen   → screen-mint-quote
+ *   SettingsRecovery  → screen-settings-recovery (Screen suffix optional)
+ *   BackgroundView    → undefined (no Screen suffix, not a screen)
+ *
+ * Heuristic: name ends with `Screen`, or is a single capitalized word
+ * followed by an uppercase letter (e.g. `WalletScreen`). The trailing
+ * `Screen` token is dropped before kebab-casing.
+ */
+function deriveScreenTestID(name: string): string | undefined {
+  if (!name.endsWith('Screen')) return undefined;
+  const stem = name.slice(0, -'Screen'.length);
+  if (stem.length === 0) return undefined;
+  // PascalCase → kebab-case: insert dash between lower→upper transitions.
+  const kebab = stem
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase();
+  return `screen-${kebab}`;
 }
 
 /**
@@ -1083,7 +1118,13 @@ interface LogProps {
  * - Without style: layout-invisible (just a context provider). Safe inside
  *   ScrollViews, ModalLayoutWrappers, etc.
  */
-export function Log({ name, children, logger: _logger, style }: LogProps): React.ReactElement {
+export function Log({
+  name,
+  children,
+  logger: _logger,
+  style,
+  testID,
+}: LogProps): React.ReactElement {
   const parentPath = useContext(UIPathContext);
   const path = parentPath ? `${parentPath}/${name}` : name;
   const screenLogger = _logger ?? log;
@@ -1114,6 +1155,41 @@ export function Log({ name, children, logger: _logger, style }: LogProps): React
     }
   });
 
+  // Resolve the screen-container testID: explicit prop wins, otherwise
+  // auto-derive from the name. Non-Screen Logs get nothing.
+  const resolvedTestID = testID ?? deriveScreenTestID(name);
+
+  // When a testID is set, wrap children in a View carrying the testID.
+  // The View becomes the SCREEN CONTAINER in the AX tree — log-doctor's
+  // snapshot machinery can root subtree captures there, which keeps
+  // `assert screen eq` stable across navigation contexts (e.g. opening
+  // the same MintQuoteScreen from the receive flow vs from the
+  // transaction history puts it inside different parent modals; we want
+  // the body comparison to ignore that surrounding chrome).
+  //
+  // Default style is `{ flex: 1 }` so the wrapper fills its parent and
+  // doesn't shrink-wrap content. If the caller passes their own `style`
+  // we use that instead so the wrapper participates in the existing
+  // layout exactly the same as before.
+  if (resolvedTestID) {
+    const { View } = require('react-native');
+    return React.createElement(
+      UIPathContext.Provider,
+      { value: path },
+      React.createElement(
+        View,
+        {
+          testID: resolvedTestID,
+          accessible: false, // children handle their own AX
+          style: style ?? { flex: 1 },
+        },
+        children
+      )
+    );
+  }
+
+  // Non-screen Logs (no testID, no style) stay as a pure context provider
+  // — zero layout impact, preserves the original Log behaviour.
   if (style) {
     const { View } = require('react-native');
     return React.createElement(

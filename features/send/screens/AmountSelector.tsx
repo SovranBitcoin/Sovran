@@ -197,6 +197,7 @@ export function AmountSelector({
     const buttons: ButtonHandlerProps['buttons'] = [];
     if (actions.paste.available) {
       buttons.push({
+        testID: 'amount-paste',
         text: 'Paste',
         icon: 'lets-icons:copy',
         variant: 'secondary',
@@ -209,6 +210,7 @@ export function AmountSelector({
     }
     if (actions.scanQr.available) {
       buttons.push({
+        testID: 'amount-scan-qr',
         text: 'Scan QR',
         icon: 'stash:qr-code',
         variant: 'secondary',
@@ -272,9 +274,19 @@ export function AmountSelector({
             {suggestions.map((s) => {
               const isPrimary = s.inputMode === 'fiat';
               const isSendAll = !!s.sendAll;
+              // testID convention:
+              //   #amount-chip-send-all               — the "Send all" chip
+              //   #amount-chip-<satoshis>              — fixed-amount chips
+              //   #amount-chip-fiat-<satoshis>         — fiat-valued chips
+              // Stable across copy changes and theme tweaks; tests drive the
+              // matrix via these ids rather than matching on the visible label.
+              const chipTestID = isSendAll
+                ? 'amount-chip-send-all'
+                : `amount-chip-${isPrimary ? 'fiat-' : ''}${s.satoshis}`;
               return (
                 <Pressable
                   key={isSendAll ? 'send-all' : s.satoshis}
+                  testID={chipTestID}
                   onPress={() => handleSuggestionTap(s)}
                   style={({ pressed }) => ({
                     paddingHorizontal: 14,
@@ -325,6 +337,7 @@ export function AmountSelector({
           <ButtonHandler
             buttons={[
               {
+                testID: 'amount-next',
                 text: 'Next',
                 icon: 'lucide:arrow-right',
                 variant: 'primary',

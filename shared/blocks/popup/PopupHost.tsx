@@ -735,6 +735,7 @@ function SheetPopup() {
       <BottomSheet.Portal>
         <BottomSheet.Overlay isCloseOnPress={standardPayload?.dismissable ?? true} />
         <BottomSheet.Content
+          accessible={false}
           detached={!isCustom}
           bottomInset={isCustom ? undefined : insets.bottom}
           snapPoints={isCustom ? customSnapPoints : undefined}

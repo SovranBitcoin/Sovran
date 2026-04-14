@@ -16,6 +16,8 @@ export interface CapsuleButtonProps {
   onPress: () => void;
   color?: string;
   height?: number;
+  /** Stable accessibility identifier for log-doctor / WDA targeting. */
+  testID?: string;
 }
 
 const DEFAULT_HEIGHT = 46;
@@ -23,12 +25,12 @@ const INVISIBLE_TITLE = '\u2007'.repeat(12);
 
 export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
   const foreground = useThemeColor('foreground');
-  const { label, icon, onPress, color = foreground, height = DEFAULT_HEIGHT } = props;
+  const { label, icon, onPress, color = foreground, height = DEFAULT_HEIGHT, testID } = props;
 
   if (hasAndroidLiquidButtonView()) {
     return (
       <Log name="CapsuleButton">
-        <View className="w-full" style={{ height }}>
+        <View testID={testID} className="w-full" style={{ height }}>
           <LiquidButtonView
             title={INVISIBLE_TITLE}
             enabled
@@ -54,6 +56,7 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
   return (
     <Log name="CapsuleButton">
       <Button
+        testID={testID}
         text={label}
         icon={<Icon name={icon} size={16} color={color} />}
         onPress={onPress}

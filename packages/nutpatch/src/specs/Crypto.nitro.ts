@@ -31,6 +31,22 @@ export interface Crypto extends HybridObject<{
   createDleqProof(B_: ArrayBuffer, seckey: ArrayBuffer): ArrayBuffer
 
   /**
+   * Batch-unblind multiple signatures in a single native call.
+   * Reduces JS↔native boundary crossings from N to 1.
+   * All signatures use the same mint pubkey A.
+   *
+   * @param blindedSignatures Array of 33-byte compressed points (C_)
+   * @param blindingFactors Array of 32-byte scalars (r)
+   * @param mintPubkey 33-byte compressed mint public key (A, same for all)
+   * @returns (count * 33) bytes: unblinded points C = C_ - r*A
+   */
+  batchUnblind(
+    blindedSignatures: ArrayBuffer[],
+    blindingFactors: ArrayBuffer[],
+    mintPubkey: ArrayBuffer
+  ): ArrayBuffer
+
+  /**
    * Batch-derive NUT-13 legacy keyset secrets and blinding factors.
    * Path: m/129372'/0'/{keysetIdInt}'/{counter}'/{0|1}
    *

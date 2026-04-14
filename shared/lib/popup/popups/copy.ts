@@ -1,5 +1,5 @@
 import { popup } from '../engine';
-import type { BaseOverrides } from './types';
+import type { PopupOverrides } from './types';
 
 const COPY_CONFIGS = {
   token: {
@@ -54,7 +54,7 @@ const COPY_CONFIGS = {
 
 export type CopyTarget = keyof typeof COPY_CONFIGS;
 
-export function copyPopup(target: CopyTarget, overrides?: BaseOverrides): void {
+export function copyPopup(target: CopyTarget, overrides?: PopupOverrides): void {
   const config = COPY_CONFIGS[target];
   popup({ message: config.title, text: config.text, type: 'success', ...overrides });
 }

@@ -1,4 +1,3 @@
-import { Skeleton } from 'heroui-native/skeleton';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
@@ -122,43 +121,36 @@ export const Avatar = ({
     <FallbackContent gradientTheme={gradientTheme} borderRadius={borderRadius} />
   );
 
-  const SkeletonOverlay = (
-    <Skeleton
-      isLoading
-      className="bg-skeleton rounded-full"
-      style={[StyleSheet.absoluteFillObject, avatarStyle]}
-    />
-  );
-
-  // 1. Skeleton only — parent loading and no picture yet (nothing to load)
+  // 1. Loading and no picture — show gradient fallback
   if (loading && !hasPicture) {
     return (
-      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
-        <Skeleton isLoading className="bg-skeleton rounded-full" style={avatarStyle} />
+      <View style={fallbackContainerStyle} accessibilityRole="image">
+        {fallbackContent}
         {StatusBadgeWrapper}
-      </VStack>
+      </View>
     );
   }
 
   const defaultAlt = 'Avatar';
   const imageAlt = alt || defaultAlt;
 
-  // 2. Picture loading — skeleton + hidden Image. Never render HeroAvatar here so we avoid
-  //    its initial status='error' which would flash the fallback for one frame.
+  // 2. Picture loading — gradient fallback + hidden Image loading underneath.
   if (hasPicture && showSkeleton) {
     return (
-      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+      <View style={{ position: 'relative' as const, overflow: 'hidden' as const }}>
+        <View style={fallbackContainerStyle}>
+          {fallbackContent}
+        </View>
         <ExpoImage
           source={{ uri: picture }}
           cachePolicy="memory-disk"
-          style={[avatarStyle, { opacity: 0 }]}
+          style={[StyleSheet.absoluteFillObject, avatarStyle, { opacity: 0 }]}
           accessibilityLabel={imageAlt}
           onLoad={handleImageLoad}
           onError={handleImageError}
         />
-        {SkeletonOverlay}
         {StatusBadgeWrapper}
-      </VStack>
+      </View>
     );
   }
 

@@ -6,15 +6,23 @@
 #include "crypto.h"
 
 #include <stdexcept>
+#include <mutex>
+#include <cstring>
 
 namespace margelo::nitro::nutpatch {
 
+static std::once_flag crypto_init_flag;
+static std::atomic<int> instance_count{0};
+
 HybridCashuCrypto::HybridCashuCrypto() : HybridObject(TAG) {
-    crypto_init();
+    std::call_once(crypto_init_flag, []() { crypto_init(); });
+    instance_count++;
 }
 
 HybridCashuCrypto::~HybridCashuCrypto() {
-    crypto_free();
+    // Don't destroy context — it's shared and created once via call_once
+    // crypto_free() would invalidate the context for other instances
+    instance_count--;
 }
 
 // Helpers
@@ -79,13 +87,12 @@ std::shared_ptr<ArrayBuffer> HybridCashuCrypto::computeSha256(
 std::shared_ptr<ArrayBuffer> HybridCashuCrypto::hashE(
     const std::vector<std::shared_ptr<ArrayBuffer>>& pubkeys) {
 
-    // flatten: each pubkey must be 33 bytes
-    std::vector<uint8_t> flat;
-    flat.reserve(pubkeys.size() * 33);
-    for (const auto& pk : pubkeys) {
-        if (pk->size() != 33)
+    // flatten: each pubkey must be 33 bytes — use direct memcpy, no vector::insert
+    std::vector<uint8_t> flat(pubkeys.size() * 33);
+    for (size_t i = 0; i < pubkeys.size(); i++) {
+        if (pubkeys[i]->size() != 33)
             throw std::invalid_argument("hashE: each pubkey must be 33 bytes");
-        flat.insert(flat.end(), pk->data(), pk->data() + 33);
+        std::memcpy(flat.data() + i * 33, pubkeys[i]->data(), 33);
     }
 
     auto out = makeBuffer(32);
@@ -191,6 +198,36 @@ std::shared_ptr<ArrayBuffer> HybridCashuCrypto::batchDeriveLegacy(
     auto out = makeBuffer(static_cast<size_t>(cnt) * 64);
     checkErr(::batch_derive_legacy(seed->data(), seed->size(), kid, ctr, cnt, out->data()),
              "batchDeriveLegacy failed");
+    return out;
+}
+
+std::shared_ptr<ArrayBuffer> HybridCashuCrypto::batchUnblind(
+    const std::vector<std::shared_ptr<ArrayBuffer>>& blindedSignatures,
+    const std::vector<std::shared_ptr<ArrayBuffer>>& blindingFactors,
+    const std::shared_ptr<ArrayBuffer>& mintPubkey) {
+
+    size_t n = blindedSignatures.size();
+    if (n != blindingFactors.size())
+        throw std::invalid_argument("batchUnblind: arrays must be same length");
+    if (n == 0) return makeBuffer(0);
+    if (mintPubkey->size() != 33)
+        throw std::invalid_argument("batchUnblind: mintPubkey must be 33 bytes");
+
+    // Flatten inputs
+    std::vector<uint8_t> C_flat(n * 33);
+    std::vector<uint8_t> r_flat(n * 32);
+    for (size_t i = 0; i < n; i++) {
+        if (blindedSignatures[i]->size() != 33)
+            throw std::invalid_argument("batchUnblind: each signature must be 33 bytes");
+        if (blindingFactors[i]->size() != 32)
+            throw std::invalid_argument("batchUnblind: each factor must be 32 bytes");
+        std::memcpy(C_flat.data() + i * 33, blindedSignatures[i]->data(), 33);
+        std::memcpy(r_flat.data() + i * 32, blindingFactors[i]->data(), 32);
+    }
+
+    auto out = makeBuffer(n * 33);
+    checkErr(::batch_unblind(C_flat.data(), r_flat.data(), mintPubkey->data(), n, out->data()),
+             "batchUnblind failed");
     return out;
 }
 

@@ -49,6 +49,11 @@ public:
                                                     double keysetIdInt,
                                                     double startCounter,
                                                     double count) override;
+
+    std::shared_ptr<ArrayBuffer> batchUnblind(
+        const std::vector<std::shared_ptr<ArrayBuffer>>& blindedSignatures,
+        const std::vector<std::shared_ptr<ArrayBuffer>>& blindingFactors,
+        const std::shared_ptr<ArrayBuffer>& mintPubkey);
 };
 
 } // namespace margelo::nitro::nutpatch

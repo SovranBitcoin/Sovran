@@ -13,6 +13,14 @@ import type { CapsuleButtonProps } from './CapsuleButton';
 
 const DEFAULT_HEIGHT = 48;
 
+// Note on testID: SwiftUI Buttons inside a Host don't accept a React testID
+// prop, and a wrapper RN View with pointerEvents="box-none" can leak touches
+// to siblings instead of routing them through the SwiftUI Button. The clean
+// path is to set the testID on the EXISTING parent View at the call site
+// (e.g. the `<View className="flex-1">` wrapper in AccountPagerViewLayout).
+// That parent View already routes touches correctly through to the Host.
+// We accept and ignore the testID prop here so the type stays uniform with
+// the iOS / Android variants.
 export function CapsuleButtonLiquid({
   label,
   systemIcon,

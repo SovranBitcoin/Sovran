@@ -1,9 +1,10 @@
 import React, { memo, useCallback, useEffect, useRef } from 'react';
-import { InteractionManager } from 'react-native';
-import { Input, TextField } from 'heroui-native';
+import { TextInput, StyleSheet } from 'react-native';
 
 import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import opacity from 'hex-color-opacity';
 import type { GlassSearchBarProps } from './types';
 
 export const GlassSearchBar = memo(function GlassSearchBar({
@@ -15,6 +16,10 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   autoFocus,
   debounceMs,
 }: GlassSearchBarProps) {
+  const [foreground, surfaceSecondary] = useThemeColor([
+    'foreground',
+    'surface-secondary',
+  ] as const);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onChangeTextRef = useRef(onChangeText);
   const latestTextRef = useRef('');
@@ -44,9 +49,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
       latestTextRef.current = text;
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        InteractionManager.runAfterInteractions(() => {
-          onChangeTextRef.current(latestTextRef.current);
-        });
+        onChangeTextRef.current(latestTextRef.current);
       }, debounceMs);
     },
     [debounceMs]
@@ -55,18 +58,32 @@ export const GlassSearchBar = memo(function GlassSearchBar({
   return (
     <Log name="GlassSearchBar">
       <View style={{ alignItems: 'center', ...(width != null ? { width } : { flex: 1 }) }}>
-        <TextField key={clearKey} className="w-full">
-          <Input
-            defaultValue=""
-            placeholder={placeholder}
-            onChangeText={handleTextChange}
-            keyboardType={keyboardType}
-            autoCorrect={false}
-            autoFocus={autoFocus}
-            className="bg-surface-secondary text-foreground h-11 w-full rounded-xl border-0 px-3"
-          />
-        </TextField>
+        <TextInput
+          key={clearKey}
+          defaultValue=""
+          placeholder={placeholder}
+          placeholderTextColor={opacity(foreground, 0.33)}
+          onChangeText={handleTextChange}
+          keyboardType={keyboardType}
+          autoCorrect={false}
+          autoFocus={autoFocus}
+          style={[
+            styles.input,
+            { backgroundColor: surfaceSecondary, color: foreground },
+          ]}
+        />
       </View>
     </Log>
   );
+});
+
+const styles = StyleSheet.create({
+  input: {
+    height: 44,
+    width: '100%',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    borderWidth: 0,
+  },
 });
