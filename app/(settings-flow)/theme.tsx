@@ -1,3 +1,3 @@
-import { SettingsThemeScreen } from '@/features/settings';
+import { WallpaperBrowseScreen } from '@/features/settings';
 
-export default SettingsThemeScreen;
+export default WallpaperBrowseScreen;

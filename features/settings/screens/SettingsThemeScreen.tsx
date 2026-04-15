@@ -15,8 +15,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   backgroundImageThemes,
   backgroundThemeDisplayNames,
-  BACKGROUND_THEME_NAMES,
+  backgroundThemeDominantColors,
   backgroundThemeGradientColors,
+  BACKGROUND_THEME_NAMES,
 } from 'config/backgroundImageThemes';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -51,11 +52,13 @@ const baseThemeDisplayNames: Record<string, string> = {
   'velvet-emerald': 'Velvet Emerald',
 };
 
-// Combined display names (base + background themes from config)
-const themeNameMap: Record<string, string> = {
-  ...baseThemeDisplayNames,
-  ...backgroundThemeDisplayNames,
-};
+// Shade order for palette display (dark to light)
+const PALETTE_SHADES = ['950', '900', '800', '700', '600', '500', '400', '300', '200', '100', '50', '0'] as const;
+
+// Look up display name dynamically (handles downloaded themes registered at runtime)
+function getDisplayName(themeName: string): string {
+  return baseThemeDisplayNames[themeName] || backgroundThemeDisplayNames[themeName] || themeName;
+}
 
 interface ThemeCardProps {
   themeName: string;
@@ -63,7 +66,6 @@ interface ThemeCardProps {
   onPress: () => void;
   isBackgroundTheme: boolean;
   cardWidth: number;
-  cardHeight: number;
 }
 
 const ThemeCard = React.memo(
@@ -73,126 +75,157 @@ const ThemeCard = React.memo(
     onPress,
     isBackgroundTheme,
     cardWidth,
-    cardHeight,
   }: ThemeCardProps) => {
-    const displayName = themeNameMap[themeName] || themeName;
+    const displayName = getDisplayName(themeName);
+    const themeColors = THEMES[themeName as keyof typeof THEMES] as Record<string, string> | undefined;
+    const dominantColors = backgroundThemeDominantColors[themeName];
+    const gradientColors = backgroundThemeGradientColors[themeName];
 
-    // Get colors for this specific theme
-    const themeColors = THEMES[themeName as keyof typeof THEMES];
-
-    // Get gradient colors for background themes
-    const gradientColors = isBackgroundTheme
-      ? backgroundThemeGradientColors[themeName]?.map((c) => c.hex) || ['#000', '#000', '#000']
+    const bgGradient = isBackgroundTheme
+      ? gradientColors?.map((c) => c.hex) || ['#000', '#000', '#000']
       : null;
+
+    // Circle size scales with card width
+    const circleSize = Math.max(10, Math.floor((cardWidth - 24 - 5 * 3) / 6));
+    const smallCircle = Math.max(8, circleSize - 2);
 
     return (
       <PressableFeedback
         onPress={onPress}
         animation={false}
         className="overflow-hidden rounded-2xl"
-        style={{ width: cardWidth, height: cardHeight }}>
-        <PressableFeedback.Scale className="h-full w-full">
+        style={{ width: cardWidth }}>
+        <PressableFeedback.Scale className="w-full">
           <View
             className={isSelected ? 'border-muted border-2' : ''}
-            style={[styles.cardInner, { width: cardWidth, height: cardHeight }]}>
-            {/* Background */}
-            {isBackgroundTheme && backgroundImageThemes[themeName] ? (
-              <Image
-                source={backgroundImageThemes[themeName]}
-                style={StyleSheet.absoluteFillObject}
-              />
-            ) : gradientColors ? (
-              <LinearGradient
-                colors={gradientColors as [string, string, ...string[]]}
-                style={StyleSheet.absoluteFillObject}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
-            ) : themeColors ? (
-              <LinearGradient
-                colors={[
-                  (themeColors as Record<string, string>)['800'] || '#1a1a1a',
-                  (themeColors as Record<string, string>)['900'] || '#0d0d0d',
-                  (themeColors as Record<string, string>)['950'] || '#000000',
-                ]}
-                style={StyleSheet.absoluteFillObject}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              />
-            ) : (
-              <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1a1a1a' }]} />
-            )}
+            style={[styles.cardInner, { width: cardWidth }]}>
+            {/* Image / gradient preview */}
+            <View style={{ width: cardWidth, height: cardWidth * 0.75, position: 'relative' }}>
+              {isBackgroundTheme && backgroundImageThemes[themeName] ? (
+                <Image
+                  source={backgroundImageThemes[themeName]}
+                  style={StyleSheet.absoluteFillObject}
+                />
+              ) : bgGradient ? (
+                <LinearGradient
+                  colors={bgGradient as [string, string, ...string[]]}
+                  style={StyleSheet.absoluteFillObject}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                />
+              ) : themeColors ? (
+                <LinearGradient
+                  colors={[
+                    themeColors['800'] || '#1a1a1a',
+                    themeColors['900'] || '#0d0d0d',
+                    themeColors['950'] || '#000000',
+                  ]}
+                  style={StyleSheet.absoluteFillObject}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                />
+              ) : (
+                <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1a1a1a' }]} />
+              )}
 
-            <PressableFeedback.Ripple
-              animation={{
-                backgroundColor: { value: '#ffffff' },
-                opacity: { value: [0, 0.18, 0] },
-              }}
-            />
+              <PressableFeedback.Ripple
+                animation={{
+                  backgroundColor: { value: '#ffffff' },
+                  opacity: { value: [0, 0.18, 0] },
+                }}
+              />
 
-            {/* Color palette preview for base themes */}
-            {!isBackgroundTheme && themeColors && (
-              <View style={styles.paletteContainer}>
-                <HStack spacing={4}>
-                  {['400', '500', '600', '700'].map((shade) => (
+              {/* Name overlay */}
+              {isBackgroundTheme ? (
+                <MaskedView
+                  style={styles.textOverlay}
+                  maskElement={
+                    <LinearGradient
+                      colors={['transparent', 'black']}
+                      locations={[0, 0.6]}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                  }>
+                  <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
+                </MaskedView>
+              ) : (
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.7)']}
+                  style={styles.textOverlay}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                />
+              )}
+
+              <View style={styles.labelContainer}>
+                <Text size={13} bold style={styles.themeName} numberOfLines={1}>
+                  {displayName}
+                </Text>
+                {isSelected && (
+                  <View style={styles.checkmark}>
+                    <Icon name="mdi:check-circle" size={14} color="#fff" />
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Color palette section */}
+            <View style={styles.colorSection}>
+              {/* Full 12-shade palette in 2 rows */}
+              {themeColors && (
+                <>
+                  <View style={styles.colorRow}>
+                    {PALETTE_SHADES.slice(0, 6).map((shade) => (
+                      <View
+                        key={shade}
+                        style={[
+                          styles.colorDot,
+                          { width: circleSize, height: circleSize, borderRadius: circleSize / 2, backgroundColor: themeColors[shade] || '#333' },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <View style={styles.colorRow}>
+                    {PALETTE_SHADES.slice(6).map((shade) => (
+                      <View
+                        key={shade}
+                        style={[
+                          styles.colorDot,
+                          { width: circleSize, height: circleSize, borderRadius: circleSize / 2, backgroundColor: themeColors[shade] || '#333' },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                </>
+              )}
+
+              {/* Dominant colors (wallpaper themes) */}
+              {isBackgroundTheme && dominantColors && dominantColors.length > 0 && (
+                <View style={styles.colorRow}>
+                  {dominantColors.map((c, i) => (
                     <View
-                      key={shade}
+                      key={`d${i}`}
                       style={[
-                        styles.paletteCircle,
-                        {
-                          backgroundColor: (themeColors as Record<string, string>)[shade] || '#333',
-                        },
+                        styles.colorDot,
+                        { width: smallCircle, height: smallCircle, borderRadius: smallCircle / 2, backgroundColor: c.hex },
                       ]}
                     />
                   ))}
-                </HStack>
-              </View>
-            )}
+                </View>
+              )}
 
-            {/* Gradient colors for wallpaper themes */}
-            {isBackgroundTheme && backgroundThemeGradientColors[themeName] && (
-              <View style={styles.paletteContainer}>
-                <HStack spacing={4}>
-                  {backgroundThemeGradientColors[themeName].map((color, index) => (
+              {/* Gradient colors (wallpaper themes) */}
+              {isBackgroundTheme && gradientColors && gradientColors.length > 0 && (
+                <View style={styles.colorRow}>
+                  {gradientColors.map((c, i) => (
                     <View
-                      key={index}
-                      style={[styles.paletteCircle, { backgroundColor: color.hex }]}
+                      key={`g${i}`}
+                      style={[
+                        styles.colorDot,
+                        { width: smallCircle, height: smallCircle, borderRadius: smallCircle / 2, backgroundColor: c.hex },
+                      ]}
                     />
                   ))}
-                </HStack>
-              </View>
-            )}
-
-            {/* Overlay for text readability - gradient blur for wallpapers, simple gradient for color themes */}
-            {isBackgroundTheme ? (
-              <MaskedView
-                style={styles.textOverlay}
-                maskElement={
-                  <LinearGradient
-                    colors={['transparent', 'black']}
-                    locations={[0, 0.6]}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                }>
-                <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFillObject} />
-              </MaskedView>
-            ) : (
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.7)']}
-                style={styles.textOverlay}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-              />
-            )}
-
-            {/* Theme name */}
-            <View style={styles.labelContainer}>
-              <Text size={14} bold style={styles.themeName} numberOfLines={1}>
-                {displayName}
-              </Text>
-              {isSelected && (
-                <View style={styles.checkmark}>
-                  <Icon name="mdi:check-circle" size={14} color="#fff" />
                 </View>
               )}
             </View>
@@ -215,9 +248,7 @@ export function SettingsThemeScreen() {
   const currentTheme = useSettingsStore((state) => state.getTheme());
   const setTheme = useSettingsStore((state) => state.setTheme);
 
-  // Calculate card dimensions based on screen width
   const cardWidth = (screenWidth - HORIZONTAL_PADDING * 2 - CARD_GAP) / 2;
-  const cardHeight = cardWidth * 1.2;
 
   const handleThemePress = useCallback(
     (themeName: string) => {
@@ -232,9 +263,9 @@ export function SettingsThemeScreen() {
   const filteredBaseThemes = useMemo(
     () =>
       baseThemes.filter((theme) => {
-        const displayName = themeNameMap[theme] || theme;
+        const name = getDisplayName(theme);
         return (
-          displayName.toLowerCase().includes(searchText.toLowerCase()) ||
+          name.toLowerCase().includes(searchText.toLowerCase()) ||
           theme.toLowerCase().includes(searchText.toLowerCase())
         );
       }),
@@ -244,9 +275,9 @@ export function SettingsThemeScreen() {
   const filteredBackgroundThemes = useMemo(
     () =>
       BACKGROUND_THEME_NAMES.filter((theme) => {
-        const displayName = themeNameMap[theme] || theme;
+        const name = getDisplayName(theme);
         return (
-          displayName.toLowerCase().includes(searchText.toLowerCase()) ||
+          name.toLowerCase().includes(searchText.toLowerCase()) ||
           theme.toLowerCase().includes(searchText.toLowerCase())
         );
       }),
@@ -261,7 +292,7 @@ export function SettingsThemeScreen() {
       }
 
       return rows.map((row, rowIndex) => (
-        <HStack key={`row-${rowIndex}`} spacing={CARD_GAP} style={styles.row}>
+        <HStack key={`row-${rowIndex}`} spacing={CARD_GAP} style={[styles.row, { alignItems: 'flex-start' }]}>
           {row.map((themeName) => (
             <ThemeCard
               key={themeName}
@@ -270,15 +301,13 @@ export function SettingsThemeScreen() {
               onPress={() => handleThemePress(themeName)}
               isBackgroundTheme={isBackgroundTheme}
               cardWidth={cardWidth}
-              cardHeight={cardHeight}
             />
           ))}
-          {/* Fill empty space if odd number */}
           {row.length === 1 && <View style={{ width: cardWidth }} />}
         </HStack>
       ));
     },
-    [currentTheme, handleThemePress, cardWidth, cardHeight]
+    [currentTheme, handleThemePress, cardWidth]
   );
 
   const hasResults = filteredBaseThemes.length > 0 || filteredBackgroundThemes.length > 0;
@@ -369,33 +398,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
-  paletteContainer: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    right: 12,
-  },
-  paletteCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
   textOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 60,
+    height: 50,
   },
   labelContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -408,12 +424,27 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   checkmark: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  colorSection: {
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    gap: 4,
+  },
+  colorRow: {
+    flexDirection: 'row',
+    gap: 3,
+    flexWrap: 'wrap',
+  },
+  colorDot: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   emptyState: {
     alignItems: 'center',

@@ -26,6 +26,9 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="storage" options={{ title: 'Storage Inventory' }} />
       <Stack.Screen name="recovery" options={{ title: 'Recover Wallet' }} />
       <Stack.Screen name="delete" options={{ title: 'Delete Account' }} />
+      <Stack.Screen name="wallpapers" options={{ title: 'Wallpapers' }} />
+      <Stack.Screen name="wallpaper-album" options={{ title: '' }} />
+      <Stack.Screen name="wallpaper-preview" options={{ title: '', headerShown: false }} />
     </Stack>
   );
 }

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
 import { log } from '@/shared/lib/logger';
 import { themeVariables, getThemeVariables } from '@/shared/lib/themeEngine';
@@ -19,9 +20,15 @@ const ThemeContext = createContext<ThemeContextValue>({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const wallpaperHydrated = useWallpaperStore((s) => s._hasHydrated);
   const theme = useSettingsStore((state) => state.getTheme());
   const setThemeStore = useSettingsStore((state) => state.setTheme);
   const [currentTheme, setCurrentTheme] = useState(theme || 'dark');
+
+  // Wait for wallpaper store to rehydrate and register downloaded themes
+  // before rendering — prevents race condition where a downloaded theme
+  // is the active theme but hasn't been registered in THEMES yet.
+  if (!wallpaperHydrated) return null;
 
   useEffect(() => {
     if (theme) setCurrentTheme(theme);
@@ -59,7 +66,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [currentTheme]);
 
   return (
-    <ThemeContext.Provider value={{ currentTheme, setTheme, availableThemes: THEME_NAMES }}>
+    <ThemeContext.Provider value={{ currentTheme, setTheme, availableThemes: Object.keys(THEMES) as ThemeName[] }}>
       <View className="flex-1">{children}</View>
     </ThemeContext.Provider>
   );

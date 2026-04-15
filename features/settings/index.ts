@@ -15,3 +15,6 @@ export { SettingsRoutingScreen } from './screens/SettingsRoutingScreen';
 export { SettingsStorageScreen } from './screens/SettingsStorageScreen';
 export { SettingsThemeScreen } from './screens/SettingsThemeScreen';
 export { DeleteScreen } from './screens/DeleteScreen';
+export { WallpaperBrowseScreen } from './screens/WallpaperBrowseScreen';
+export { WallpaperAlbumScreen } from './screens/WallpaperAlbumScreen';
+export { WallpaperPreviewScreen } from './screens/WallpaperPreviewScreen';

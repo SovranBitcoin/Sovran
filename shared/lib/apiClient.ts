@@ -257,3 +257,16 @@ export interface TopFollower {
 
 export const fetchNostrProfile = (pubkey: string) =>
   safeFetch<NostrProfileResponse>(`${BASE_URL}/nostr/profile?pubkey=${pubkey}`);
+
+// ---------------------------------------------------------------------------
+// Wallpapers
+// ---------------------------------------------------------------------------
+
+export interface WallpaperCatalogResponse {
+  wallpapers: any[];
+  albums: any[];
+  lastUpdated: number;
+}
+
+export const fetchWallpaperCatalog = () =>
+  safeFetch<WallpaperCatalogResponse>(`${BASE_URL}/wallpapers/catalog`);

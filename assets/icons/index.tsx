@@ -320,6 +320,12 @@ export const icons: string[] = [
   'ri:robot-fill',
   'ri:send-plane-2-fill',
   'solar:wallet-bold',
+  // Wallpaper screens
+  'mdi:download',
+  'mdi:cloud-download-outline',
+  'mdi:delete-outline',
+  'mdi:sync',
+  'mdi:brush',
 ];
 
 export function BitcoinMaskIcon() {

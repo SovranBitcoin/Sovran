@@ -1135,6 +1135,31 @@ module.exports = {
     "width": 16,
     "height": 16
   },
+  "mdi:download": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M5 20h14v-2H5m14-9h-4V3H9v6H5l7 7z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:cloud-download-outline": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M6.5 20q-2.28 0-3.89-1.57Q1 16.85 1 14.58q0-1.95 1.17-3.48q1.18-1.53 3.08-1.95q.43-1.8 2.13-3.42Q9.07 4.1 11 4.1q.83 0 1.41.59q.59.59.59 1.41v6.05l1.6-1.55L16 12l-4 4l-4-4l1.4-1.4l1.6 1.55V6.1q-1.9.35-2.95 1.84T7 11h-.5q-1.45 0-2.47 1.03Q3 13.05 3 14.5T4.03 17q1.02 1 2.47 1h12q1.05 0 1.77-.73q.73-.72.73-1.77t-.73-1.77Q19.55 13 18.5 13H17v-2q0-1.2-.55-2.24Q15.9 7.73 15 7V4.68q1.85.87 2.93 2.58Q19 9 19 11q1.73.2 2.86 1.5q1.14 1.28 1.14 3q0 1.88-1.31 3.19T18.5 20M12 11.05\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:delete-outline": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM8 9h8v10H8zm7.5-5l-1-1h-5l-1 1H5v2h14V4z\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:sync": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"M12 18a6 6 0 0 1-6-6c0-1 .25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12a8 8 0 0 0 8 8v3l4-4l-4-4m0-11V1L8 5l4 4V6a6 6 0 0 1 6 6c0 1-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12a8 8 0 0 0-8-8\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
+  "mdi:brush": {
+    "svg": "<svg viewBox=\"0 0 24 24\" width=\"1em\" height=\"1em\" ><path fill=\"currentColor\" d=\"m20.71 4.63l-1.34-1.34c-.37-.39-1.02-.39-1.41 0L9 12.25L11.75 15l8.96-8.96c.39-.39.39-1.04 0-1.41M7 14a3 3 0 0 0-3 3c0 1.31-1.16 2-2 2c.92 1.22 2.5 2 4 2a4 4 0 0 0 4-4a3 3 0 0 0-3-3\"/></svg>",
+    "width": 16,
+    "height": 16
+  },
   "circle-flags:aa": {
     "svg": "<svg viewBox=\"0 0 512 512\" width=\"1em\" height=\"1em\" ><mask id=\"circleFlagsAa0\"><circle cx=\"256\" cy=\"256\" r=\"256\" fill=\"#fff\"/></mask><g mask=\"url(#circleFlagsAa0)\"><path fill=\"#eee\" d=\"m0 160l256-32l256 32v192l-256 32L0 352Z\"/><path fill=\"#0052b4\" d=\"M0 0h512v160H0Z\"/><path fill=\"#496e2d\" d=\"M0 352h512v160H0Z\"/><path fill=\"#d80027\" d=\"M0 0v512l256-256z\"/><path fill=\"#ff9811\" d=\"m345 229l-12 11l40 40l-40 40l11 11l40-40l40 40l11-11l-40-40l40-40l-11-11l-40 40z\"/><path fill=\"#d80027\" d=\"m384 181l21 62l-54-38h66l-53 39z\"/></g></svg>",
     "width": 16,

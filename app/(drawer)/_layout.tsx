@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import {
   GestureHandlerRootView,
@@ -7,10 +7,15 @@ import {
 import { StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { router, usePathname } from 'expo-router';
 import { DrawerContentComponentProps } from '@react-navigation/drawer';
-import { LinearGradient } from 'expo-linear-gradient';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
+import {
+  AnimatedBackgroundView,
+  ScrollableGradientOverlay,
+} from '@/shared/ui/composed/BackgroundView';
+import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
+import { BackgroundProvider, useBackgroundContext } from '@/shared/providers/BackgroundProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -207,7 +212,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
 
 function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
   const { keys: nostrKeys } = useNostrKeysContext();
-  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
+  const foreground = useThemeColor('foreground');
   const insets = useSafeAreaInsets();
   const { displayName, picture } = useProfileDisplay(nostrKeys?.pubkey || '');
   const { isOffline } = useOfflineStatus();
@@ -225,11 +230,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
   }, [nostrKeys, closeDrawer]);
 
   return (
-    <LinearGradient
-      colors={[surface, surface, surface, surface, surface, surface, opacity(surface, 0)]}
-      style={[styles.gradientContainer, { paddingTop: isOffline ? 0 : insets.top }]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}>
+    <View style={[styles.gradientContainer, { paddingTop: isOffline ? 0 : insets.top }]}>
       <View style={styles.headerContent}>
         <ProfileSelector closeDrawer={closeDrawer} />
         <TouchableOpacity style={styles.profileTouchable} onPress={handlePress}>
@@ -247,7 +248,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
         </TouchableOpacity>
       </View>
       <Spacer size={58} />
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -262,20 +263,14 @@ function MenuButton({
   onPress: () => void;
   isActive: boolean;
 }) {
-  const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
+  const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
 
   return (
     <GesturePressable
       disabled={isActive}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.menuButton,
-        isActive && {
-          backgroundColor: opacity(surfaceTertiary, 0.72),
-        },
-        pressed && { opacity: 0.6 },
-      ]}>
-      <HStack align="center" spacing={12}>
+      style={({ pressed }) => [styles.menuButton, pressed && { opacity: 0.6 }]}>
+      <HStack align="center" spacing={12} style={styles.menuButtonContent}>
         <Icon name={icon} color={isActive ? foreground : opacity(foreground, 0.5)} size={24} />
         <Text size={18} bold style={{ color: isActive ? foreground : opacity(foreground, 0.5) }}>
           {label}
@@ -286,7 +281,6 @@ function MenuButton({
 }
 
 function CustomDrawerContent(props: DrawerContentComponentProps) {
-  const surface = useThemeColor('surface');
   const pathname = usePathname();
   const navInProgressRef = useRef(false);
 
@@ -340,30 +334,71 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
   );
 
   return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={{ backgroundColor: surface, flex: 1 }}
-      contentContainerStyle={styles.scrollContent}>
-      <ProfileHeader closeDrawer={() => props.navigation.closeDrawer()} />
-      <VStack spacing={0} style={{ marginTop: -16 }}>
-        {MENU_ITEMS.map((item, index) => (
-          <MenuButton
-            key={index}
-            icon={item.icon}
-            label={item.label}
-            onPress={() => handleNavigation(item.route)}
-            isActive={isRouteActive(item.route)}
-          />
-        ))}
-      </VStack>
-      <Spacer size={48} />
-    </ScrollView>
+    <BackgroundProvider>
+      <DrawerContentInner
+        closeDrawer={() => props.navigation.closeDrawer()}
+        isRouteActive={isRouteActive}
+        handleNavigation={handleNavigation}
+      />
+    </BackgroundProvider>
+  );
+}
+
+/** Inner component so useBackgroundContext can read the provider above. */
+function DrawerContentInner({
+  closeDrawer,
+  isRouteActive,
+  handleNavigation,
+}: {
+  closeDrawer: () => void;
+  isRouteActive: (route: string) => boolean;
+  handleNavigation: (route: string) => void;
+}) {
+  const { setConfig } = useBackgroundContext();
+  const muted = useThemeColor('muted');
+  const [contentHeight, setContentHeight] = useState(0);
+
+  useEffect(() => {
+    setConfig({ blurMode: 'full' });
+  }, [setConfig]);
+
+  const onContentSizeChange = useCallback((_width: number, height: number) => {
+    setContentHeight(height);
+  }, []);
+
+  return (
+    <AnimatedBackgroundView>
+      <ScrollableGradientOverlay contentHeight={contentHeight} />
+      <View style={[styles.drawerCardBorder, { borderColor: opacity(muted, 0.3) }]}>
+        <View style={styles.drawerCardClip}>
+          <BlurCardFrame accentColor={muted} variant="right">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ flex: 1, zIndex: 1 }}
+              contentContainerStyle={styles.scrollContent}
+              onContentSizeChange={onContentSizeChange}>
+              <ProfileHeader closeDrawer={closeDrawer} />
+              <VStack spacing={0} style={{ marginTop: -16 }}>
+                {MENU_ITEMS.map((item, index) => (
+                  <MenuButton
+                    key={index}
+                    icon={item.icon}
+                    label={item.label}
+                    onPress={() => handleNavigation(item.route)}
+                    isActive={isRouteActive(item.route)}
+                  />
+                ))}
+              </VStack>
+              <Spacer size={48} />
+            </ScrollView>
+          </BlurCardFrame>
+        </View>
+      </View>
+    </AnimatedBackgroundView>
   );
 }
 
 export default function DrawerLayout() {
-  const surface = useThemeColor('surface');
-
   return (
     <GestureHandlerRootView style={styles.container}>
       <Drawer
@@ -372,9 +407,15 @@ export default function DrawerLayout() {
           drawerType: 'slide',
           drawerStyle: {
             width: DRAWER_WIDTH,
-            backgroundColor: surface,
-            borderTopRightRadius: 24,
-            borderBottomRightRadius: 24,
+            backgroundColor: 'transparent',
+            borderTopRightRadius: 20,
+            borderBottomRightRadius: 20,
+            overflow: 'hidden',
+          },
+          sceneStyle: {
+            borderTopLeftRadius: 20,
+            borderBottomLeftRadius: 20,
+            overflow: 'hidden',
           },
           overlayColor: 'rgba(0,0,0,0.6)',
           swipeEdgeWidth: 40,
@@ -427,14 +468,26 @@ const styles = StyleSheet.create({
   profileTouchable: {
     alignItems: 'center',
   },
-  menuButton: {
-    padding: 18,
-    paddingHorizontal: 24,
-    borderRadius: 14,
+  drawerCardBorder: {
+    flex: 1,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
+    borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: 'transparent',
-    marginHorizontal: 8,
-    marginVertical: 4,
+  },
+  drawerCardClip: {
+    flex: 1,
+    borderTopRightRadius: 19,
+    borderBottomRightRadius: 19,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+  },
+  menuButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+  },
+  menuButtonContent: {
+    // intentionally empty — kept for the HStack wrapper
   },
   scrollContent: {
     flexGrow: 1,
