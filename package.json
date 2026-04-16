@@ -32,7 +32,7 @@
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
     "pretty:check": "prettier --check \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
     "knip": "npx knip",
-    "postinstall": "patch-package",
+    "postinstall": "patch-package && node modules/bitchat-module/scripts/patch-bitchat-imports.js",
     "prebuild": "expo prebuild --clean",
     "maestro": "maestro test ./.maestro",
     "build:themes": "node scripts/build-background-themes.js",
@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "@babel/runtime": "^7.28.0",
+    "bitchat-module": "file:./modules/bitchat-module",
     "@bacons/apple-targets": "^4.0.6",
     "@cashu/cashu-ts": "^3.5.0",
     "@cashu/coco-core": "1.0.0-rc.0",

@@ -13,6 +13,8 @@
       "userInterfaceStyle": "dark",
       "infoPlist": {
         "NSCameraUsageDescription": "Sovran will use your camera to scan QR codes to make it easier to send and receive payments.",
+        "NSBluetoothAlwaysUsageDescription": "Sovran uses Bluetooth to chat with nearby devices through the BitChat mesh, so you can send messages even when you're offline.",
+        "NSBluetoothPeripheralUsageDescription": "Sovran advertises over Bluetooth so nearby devices in the BitChat mesh can find you.",
         "ITSAppUsesNonExemptEncryption": false,
         "UISupportedInterfaceOrientations~ipad": [
           "UIInterfaceOrientationPortrait",
@@ -80,7 +82,7 @@
           }
         }
       ],
-      "expo-build-properties",
+      ["expo-build-properties", { "ios": { "deploymentTarget": "18.0" } }],
       "expo-font",
       "expo-router",
       "expo-localization",

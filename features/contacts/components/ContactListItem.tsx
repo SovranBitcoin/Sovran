@@ -1,11 +1,9 @@
 import React, { useMemo } from 'react';
-import { View, Pressable, StyleSheet, Keyboard } from 'react-native';
+import { Keyboard } from 'react-native';
 import { router } from 'expo-router';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Text } from '@/shared/ui/primitives/Text';
+
 import { paymentLog, Log } from '@/shared/lib/logger';
+import { ListRow } from '@/shared/ui/composed/ListRow';
 
 type ContactListItemProps = {
   pubkey: string | null;
@@ -32,12 +30,8 @@ export const ContactListItem = ({
   mintUrl,
   isLoadingProfile = false,
 }: ContactListItemProps) => {
-  const [foreground, surfaceSecondary] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-  ] as const);
-
   const pubkeyStr = pubkey ?? '';
+
   const displayName = useMemo(() => {
     return (
       profile?.displayName ||
@@ -48,7 +42,7 @@ export const ContactListItem = ({
     );
   }, [profile, pubkeyStr, type, mintInfo]);
 
-  // Always prefer nostr profile picture; fall back to mint icon when unavailable
+  // Always prefer nostr profile picture; fall back to mint icon when unavailable.
   const avatarUrl = profile?.picture || mintInfo?.icon_url;
   const displaySubtitle = subtitle || profile?.nip05 || pubkeyStr.slice(0, 16) + '...';
 
@@ -64,57 +58,21 @@ export const ContactListItem = ({
 
   return (
     <Log name="ContactListItem">
-      <Pressable
-        onPress={handlePress}
-        style={({ pressed }) => [
-          styles.container,
-          pressed && { backgroundColor: surfaceSecondary },
-        ]}>
-        <Avatar
-          picture={avatarUrl}
-          name={displayName}
-          seed={pubkeyStr}
-          size={44}
-          loading={isLoadingProfile}
-        />
-        <View style={styles.info}>
-          <Text
-            loading={isLoadingProfile}
-            placeholder="Display Name"
-            style={[styles.name, { color: foreground }]}
-            numberOfLines={1}>
-            {displayName}
-          </Text>
-          <Text
-            loading={isLoadingProfile}
-            placeholder="user@relay.example"
-            style={[styles.handle, { color: opacity(foreground, 0.5) }]}
-            numberOfLines={1}>
-            {displaySubtitle}
-          </Text>
-        </View>
-      </Pressable>
+      <ListRow
+        avatar={{
+          picture: avatarUrl,
+          name: displayName,
+          seed: pubkeyStr,
+          size: 44,
+          loading: isLoadingProfile,
+        }}
+        title={displayName}
+        subtitle={displaySubtitle}
+        onPress={pubkeyStr ? handlePress : undefined}
+        loading={isLoadingProfile}
+        titlePlaceholder="Display Name"
+        subtitlePlaceholder="user@relay.example"
+      />
     </Log>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  info: {
-    flex: 1,
-    gap: 2,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  handle: {
-    fontSize: 14,
-  },
-});

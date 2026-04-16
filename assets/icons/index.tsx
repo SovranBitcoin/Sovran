@@ -320,6 +320,14 @@ export const icons: string[] = [
   'ri:robot-fill',
   'ri:send-plane-2-fill',
   'solar:wallet-bold',
+  // BitChat / Group Chats
+  'mdi:bluetooth',
+  'mdi:map',
+  'mdi:compass',
+  'mdi:earth',
+  'mdi:pound',
+  'mdi:home',
+
   // Wallpaper screens
   'mdi:download',
   'mdi:cloud-download-outline',
