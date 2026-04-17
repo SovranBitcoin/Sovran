@@ -71,7 +71,7 @@ const ReviewItem = React.memo(function ReviewItem({
     <View className="py-4">
       <HStack align="flex-start" gap={12}>
         <View className="shrink-0">
-          <Avatar seed={review.pubkey} name={displayName} size={40} />
+          <Avatar state="fallback" seed={review.pubkey} name={displayName} size={40} />
         </View>
 
         <View style={{ flex: 1, minWidth: 0 }}>

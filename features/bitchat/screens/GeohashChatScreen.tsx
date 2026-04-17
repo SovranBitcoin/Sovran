@@ -104,6 +104,7 @@ function GeohashMessageBubble({ message, isFirstInGroup, isLastInGroup }: Geohas
         {!message.isOwn && (
           showAvatar ? (
             <Avatar
+              state="fallback"
               size={32}
               seed={message.senderPubkey}
               name={message.sender}
@@ -168,7 +169,18 @@ function GeohashMessageBubble({ message, isFirstInGroup, isLastInGroup }: Geohas
 export interface GeohashChatScreenProps {
   geohash: string;
   tierLabel?: string;
-  transport?: 'nostr' | 'ble';
+  /**
+   * Transport mode:
+   *  - `'nostr'` / `'ble'` — public geohash / BLE mesh chat (default).
+   *  - `'nostr-dm'` / `'ble-dm'` — 1:1 private chat. Requires `dmPeerID`.
+   *    For `'nostr-dm'` the peerID is the per-geohash Nostr pubkey; for
+   *    `'ble-dm'` it's the 16-hex bitchat PeerID.
+   */
+  transport?: 'nostr' | 'ble' | 'nostr-dm' | 'ble-dm';
+  /** Target peer for DM transports. Ignored in public mode. */
+  dmPeerID?: string;
+  /** Display name for the DM peer. Used in the header title. */
+  dmNickname?: string;
   onBack?: () => void;
 }
 
@@ -176,6 +188,8 @@ export function GeohashChatScreen({
   geohash,
   tierLabel,
   transport = 'nostr',
+  dmPeerID,
+  dmNickname,
   onBack,
 }: GeohashChatScreenProps) {
   useLifecycleLogger('GeohashChatScreen');
@@ -208,7 +222,11 @@ export function GeohashChatScreen({
   const [messageText, setMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  const { messages, isConnected, sendMessage } = useBitChat(geohash, transport);
+  const { messages, isConnected, sendMessage } = useBitChat(
+    geohash,
+    transport,
+    dmPeerID ? { dm: { peerID: dmPeerID, nickname: dmNickname } } : undefined
+  );
   // Always call; the hook is safe when BLE isn't running (getBLEPeers returns
   // empty, event listener no-ops). We only render the peer count on the mesh
   // tier below.
@@ -263,7 +281,13 @@ export function GeohashChatScreen({
     }
   }, [onBack]);
 
-  const title = tierLabel ? `${tierLabel} Chat` : `#${geohash}`;
+  // DM transports show the peer name; public transports show the tier.
+  const isDM = transport === 'ble-dm' || transport === 'nostr-dm';
+  const title = isDM
+    ? dmNickname || (dmPeerID ? dmPeerID.slice(0, 12) : 'Direct message')
+    : tierLabel
+      ? `${tierLabel} Chat`
+      : `#${geohash}`;
 
   return (
     <KeyboardAvoidingView
@@ -286,7 +310,8 @@ export function GeohashChatScreen({
               </Pressable>
             ),
             headerRight: () =>
-              transport === 'ble' ? (
+              // DM transports own their own header space — no peer pill.
+              isDM ? null : transport === 'ble' ? (
                 // Tappable peer-count pill for the mesh chat. Mirrors
                 // upstream bitchat's header icon+count affordance that
                 // opens the Network sheet.
@@ -371,20 +396,30 @@ export function GeohashChatScreen({
             keyboardDismissMode="on-drag"
             ListEmptyComponent={
               <VStack align="center" spacing={12}>
-                <Icon name="mdi:map-marker-radius" size={32} color={shade400} />
+                <Icon
+                  name={isDM ? 'mdi:account-group' : 'mdi:map-marker-radius'}
+                  size={32}
+                  color={shade400}
+                />
                 <Text size={16} style={{ color: shade400, textAlign: 'center' }}>
                   {isConnected
-                    ? 'No messages yet. Start the conversation!'
-                    : transport === 'ble'
+                    ? isDM
+                      ? `No messages yet. Say hi to ${title}!`
+                      : 'No messages yet. Start the conversation!'
+                    : transport === 'ble' || transport === 'ble-dm'
                       ? 'Scanning for nearby devices...'
                       : 'Connecting to relays...'}
                 </Text>
                 <Text size={13} style={{ color: shade500, textAlign: 'center' }}>
-                  {transport === 'ble'
-                    ? 'Chat with people nearby via Bluetooth mesh'
-                    : tierLabel
-                      ? `Chat with people in your ${tierLabel.toLowerCase()}`
-                      : `Geohash channel #${geohash}`}
+                  {transport === 'ble-dm'
+                    ? 'Private chat over encrypted Bluetooth mesh'
+                    : transport === 'nostr-dm'
+                      ? 'Private chat over Nostr gift-wrap (NIP-17)'
+                      : transport === 'ble'
+                        ? 'Chat with people nearby via Bluetooth mesh'
+                        : tierLabel
+                          ? `Chat with people in your ${tierLabel.toLowerCase()}`
+                          : `Geohash channel #${geohash}`}
                 </Text>
               </VStack>
             }

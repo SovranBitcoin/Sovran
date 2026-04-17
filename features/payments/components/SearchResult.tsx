@@ -19,15 +19,12 @@ interface SearchResultProps {
 
 export function SearchResult({ result, onPress, loading }: SearchResultProps) {
   const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
-  const title =
-    result.profile?.displayName ||
-    result.profile?.name ||
-    (result.profile?.npub
-      ? `${result.profile.npub.slice(0, 12)}…`
-      : `${result.pubkey.slice(0, 12)}…`);
-  if (loading) {
-    return <HStack spacing={8} align="center"></HStack>;
-  }
+  // Real display name only — the abbreviated pubkey/npub is passed to Text's
+  // `fallback` prop so the UI never flashes loading → pubkey → real name.
+  const title = result.profile?.displayName || result.profile?.name;
+  const nameFallback = result.profile?.npub
+    ? `${result.profile.npub.slice(0, 12)}…`
+    : `${result.pubkey.slice(0, 12)}…`;
   return (
     <Log name="SearchResult">
       <PressableFeedback
@@ -43,6 +40,7 @@ export function SearchResult({ result, onPress, loading }: SearchResultProps) {
             <Text
               loading={loading}
               placeholder="Display Name"
+              fallback={nameFallback}
               bold
               size={16}
               color={opacity(foreground, 0.9)}>

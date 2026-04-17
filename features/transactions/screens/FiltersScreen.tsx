@@ -102,7 +102,15 @@ const MintSelectorChip: React.FC<{
           borderColor: isSelected ? opacity(foreground, 0.25) : opacity(foreground, 0.08),
         },
       ]}>
-      {showIcon ? <Avatar picture={iconUrl} size={22} name={name} alt={`${name} icon`} /> : null}
+      {showIcon ? (
+        <Avatar
+          state={iconUrl ? 'image' : 'fallback'}
+          picture={iconUrl}
+          size={22}
+          name={name}
+          alt={`${name} icon`}
+        />
+      ) : null}
       <Text
         size={13}
         numberOfLines={1}

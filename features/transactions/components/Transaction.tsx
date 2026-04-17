@@ -12,7 +12,7 @@ import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import TransactionIcon from '@/features/transactions/components/TransactionIcon';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { UntranslatedText, Text } from '@/shared/ui/primitives/Text';
+import { UntranslatedText } from '@/shared/ui/primitives/Text';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -226,7 +226,6 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
         className="flex-row items-center justify-between bg-transparent px-4 py-5"
         style={isRolledBack ? { opacity: 0.33 } : undefined}
         onPress={handlePress}>
-        <Text>{historyEntry?.id}</Text>
         <HStack spacing={12} flex={1}>
           <TransactionIcon historyEntry={historyEntry} isLoading={isLoading} />
 

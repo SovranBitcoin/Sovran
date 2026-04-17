@@ -41,6 +41,7 @@ import { persistor, store } from '@/redux/store/store.deprecated';
 import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
+import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
 import { WalletContextProvider } from '@/shared/providers/WalletContextProvider';
 import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { CocoPaymentUXProvider } from '@/features/send/providers/CocoPaymentUX';
@@ -109,6 +110,12 @@ function AccountScopedProviders({
         CocoPaymentUXProvider,
         ActionSheetProvider,
         PricelistProvider,
+        // Starts the bitchat BLE mesh once per account scope so peers
+        // populate app-wide (Split Bill picker, future "who's nearby?"
+        // surfaces) without needing a chat screen open to keep the mesh
+        // running. Mounted after keys/NDK so the advertised nickname is
+        // derived from the active profile.
+        BitchatBLEProvider,
         PasscodeGate,
         AppGate,
       ]),

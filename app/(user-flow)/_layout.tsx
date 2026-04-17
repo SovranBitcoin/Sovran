@@ -26,6 +26,8 @@ export default function UserFlowLayout() {
       <Stack.Screen name="thread" options={{ title: 'Thread' }} />
       <Stack.Screen name="geohashChat" options={{ headerShown: false }} />
       <Stack.Screen name="bitchatNetwork" options={{ headerShown: false }} />
+      <Stack.Screen name="bitchatDM" options={{ headerShown: false }} />
+      <Stack.Screen name="splitBill" options={{ headerShown: false }} />
     </Stack>
   );
 }

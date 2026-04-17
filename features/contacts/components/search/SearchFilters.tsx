@@ -1,46 +1,29 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { FlatList, View, StyleSheet } from 'react-native';
 import FilterItem from './SearchFilterItem';
 import { SEARCH_FILTERS_HEIGHT } from '../../lib/constants/styles';
 import { Log } from '@/shared/lib/logger';
 
-const BASE_FILTERS = ['All', 'Recent', 'Mints'] as const;
-const SEARCH_FILTERS = ['All', 'Recent', 'Mints', 'Groups'] as const;
+export const BASE_FILTERS = ['All', 'Recent', 'Mints'] as const;
+export const SEARCH_FILTERS = ['All', 'Recent', 'Mints', 'Groups'] as const;
 
 type SearchFiltersProps = {
-  onFilterChange?: (filter: string) => void;
+  activeFilter: string;
+  onFilterChange: (filter: string) => void;
   /**
-   * When true, include the `Groups` pill at the end. Groups is only a
-   * meaningful scope during an active search — outside of that it lives
-   * as the outer Contacts/Groups tab.
+   * Filters to display, in order. Defaults to the base set.
+   * The parent owns visibility rules — during search it can narrow this
+   * list to only pills that have matches for the current query.
    */
-  showGroups?: boolean;
+  filters?: readonly string[];
 };
 
-export const SearchFilters = ({ onFilterChange, showGroups = false }: SearchFiltersProps) => {
-  const [activeFilterItem, setActiveFilterItem] = useState<string>('All');
+export const SearchFilters = ({
+  activeFilter,
+  onFilterChange,
+  filters = BASE_FILTERS,
+}: SearchFiltersProps) => {
   const flatListRef = useRef<FlatList<string>>(null);
-
-  const filters = useMemo<readonly string[]>(
-    () => (showGroups ? SEARCH_FILTERS : BASE_FILTERS),
-    [showGroups]
-  );
-
-  // If Groups pill was active and then disappears (search closed), fall back
-  // to All internally so the active highlight doesn't point at a hidden pill.
-  // Deliberately do NOT call `onFilterChange` here — the parent watches for
-  // the last-active filter to drive "close-search-on-Groups-pill → switch to
-  // Groups tab" behaviour, and firing a reset here would clobber that.
-  useEffect(() => {
-    if (!showGroups && activeFilterItem === 'Groups') {
-      setActiveFilterItem('All');
-    }
-  }, [showGroups, activeFilterItem]);
-
-  const handleFilterChange = (filter: string) => {
-    setActiveFilterItem(filter);
-    onFilterChange?.(filter);
-  };
 
   return (
     <Log name="SearchFilters">
@@ -54,8 +37,8 @@ export const SearchFilters = ({ onFilterChange, showGroups = false }: SearchFilt
               item={item}
               index={index}
               flatListRef={flatListRef}
-              activeFilterItem={activeFilterItem}
-              setActiveFilterItem={handleFilterChange}
+              activeFilterItem={activeFilter}
+              setActiveFilterItem={onFilterChange}
             />
           )}
           horizontal

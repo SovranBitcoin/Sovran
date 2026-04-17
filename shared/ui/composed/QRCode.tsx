@@ -57,6 +57,14 @@ interface AnimatedQRCodeProps {
   intervalMs?: number;
   /** Override UR fragment size (bytes). Controlled externally by QRSpeedControls. */
   fragmentSize?: number;
+  /**
+   * Override the outer width of the QR block (gradient included). When
+   * omitted, the component fills the screen width (classic receive-screen
+   * behaviour). When provided, the centered currency logo is scaled
+   * proportionally so it never occupies more than ~18% of the QR area —
+   * keeping scans reliable at default (M) error correction.
+   */
+  size?: number;
 }
 
 /**
@@ -74,6 +82,7 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   variant: _variant = 'primary',
   intervalMs,
   fragmentSize,
+  size,
 }: AnimatedQRCodeProps) {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
   const { width: screenWidth } = useWindowDimensions();
@@ -172,10 +181,16 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
   const canRenderQR = !showLoading && !showError && qrData && qrData.length <= MAX_QR_DATA_LENGTH;
   const isAnimating = needsAnimation && parts.length > 1;
 
-  const width = Math.min(screenWidth, 600);
+  const width = size ?? Math.min(screenWidth, 600);
   const isLocationUnit = unit.startsWith('circle-flags');
   const gradientColors = [foreground, foreground] as const;
   const qrSize = width - 2 * padding;
+  // When the caller sizes the block explicitly (e.g. a card deck), scale
+  // the centered logo with it so the logo-to-QR ratio stays scan-safe
+  // (~18% of the QR area). Default (no `size`) preserves the original
+  // 54 px receive-screen logo.
+  const logoSize = size != null ? Math.max(20, Math.round(qrSize * 0.18)) : LOGO_SIZE;
+  const circleSize = logoSize + 8;
 
   // Log render state for debugging
   const renderState = showLoading
@@ -255,16 +270,16 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
               position: 'absolute',
               alignItems: 'center',
               justifyContent: 'center',
-              width: CIRCLE_SIZE,
-              height: CIRCLE_SIZE,
-              borderRadius: CIRCLE_SIZE / 2,
+              width: circleSize,
+              height: circleSize,
+              borderRadius: circleSize / 2,
               backgroundColor: foreground,
             }}>
             {isLocationUnit ? (
-              <Icon name={unit} size={LOGO_SIZE} />
+              <Icon name={unit} size={logoSize} />
             ) : (
               <CurrencyIcon
-                width={LOGO_SIZE}
+                width={logoSize}
                 currency={unit}
                 colors={[foreground, foreground, foreground]}
                 iconColor={surfaceTertiary}

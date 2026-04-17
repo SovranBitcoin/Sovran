@@ -9,10 +9,13 @@ export {
   startBLE,
   stopBLE,
   sendBLEMessage,
+  startBLEPrivateChat,
+  sendBLEPrivateMessage,
   getBLEPeers,
   getBLEState,
   getBLEDiagnostics,
   addBLEMessageListener,
+  addBLEPrivateMessageListener,
   addBLEPeerListener,
   addBLEStateListener,
   // Nostr (native)
@@ -21,7 +24,9 @@ export {
   joinGeohash,
   leaveGeohash,
   sendGeohashMessage,
+  sendGeohashPrivateMessage,
   addNostrMessageListener,
+  addNostrPrivateMessageListener,
 } from './src/BitChatModule';
 
 export type { BLEPeer, BLEMessageEvent, BLEDiagnostics } from './src/BitChatModule';
@@ -34,5 +39,7 @@ export type {
   RelayStatus,
   LocationTier,
   NostrMessageEvent,
+  BLEPrivateMessageEvent,
+  NostrPrivateMessageEvent,
   BitChatEventMap,
 } from './src/types';

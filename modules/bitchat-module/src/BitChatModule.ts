@@ -1,5 +1,9 @@
 import { requireNativeModule, type EventSubscription } from 'expo-modules-core';
-import type { NostrMessageEvent } from './types';
+import type {
+  NostrMessageEvent,
+  BLEPrivateMessageEvent,
+  NostrPrivateMessageEvent,
+} from './types';
 
 const NativeModule = requireNativeModule<BitChatNativeModule>('BitChat');
 
@@ -14,6 +18,8 @@ interface BitChatNativeModule {
   startBLE(nickname: string): Promise<void>;
   stopBLE(): Promise<void>;
   sendBLEMessage(content: string): Promise<void>;
+  startBLEPrivateChat(peerID: string): Promise<void>;
+  sendBLEPrivateMessage(peerID: string, content: string, nickname: string): Promise<void>;
   getBLEPeers(): BLEPeer[];
   getBLEState(): string;
   getBLEDiagnostics(): BLEDiagnostics;
@@ -23,6 +29,7 @@ interface BitChatNativeModule {
   joinGeohash(hash: string): Promise<void>;
   leaveGeohash(): Promise<void>;
   sendGeohashMessage(content: string, nickname: string): Promise<void>;
+  sendGeohashPrivateMessage(recipientPubkey: string, content: string): Promise<void>;
   // Events
   addListener(eventName: string, listener: (event: any) => void): EventSubscription;
   removeListeners(count: number): void;
@@ -85,6 +92,26 @@ export interface BLEDiagnostics {
   announceSigFailCount: number;
   announceUnverifiedCount: number;
   announceAcceptedCount: number;
+  /**
+   * DM pipeline counters. Ticks when we hand a DM off to BLEService for
+   * encryption/broadcast. Non-zero on sender + zero on recipient ⇒ send
+   * reached the native layer but never reached the peer (handshake stuck,
+   * peer not directly connected, etc.).
+   */
+  sentPrivateMessageCount: number;
+  /**
+   * Ticks on every decrypted inbound Noise payload regardless of type. Zero
+   * here when the peer is sending you DMs means either no packet arrived
+   * or upstream's `handleNoiseEncrypted` couldn't decrypt it (session not
+   * established, nonce mismatch).
+   */
+  receivedNoisePayloadCount: number;
+  /**
+   * Ticks only for `.privateMessage` typed Noise payloads that decoded
+   * successfully. If this stays 0 while `receivedNoisePayloadCount` climbs,
+   * the payload shape diverged (wrong NoisePayloadType or TLV decode fail).
+   */
+  receivedPrivateMessageCount: number;
 }
 
 export interface BLEMessageEvent {
@@ -130,6 +157,34 @@ export function stopBLE(): Promise<void> {
 
 export function sendBLEMessage(content: string): Promise<void> {
   return NativeModule.sendBLEMessage(content);
+}
+
+/**
+ * Prepare a BLE private chat. Triggers the Noise XX handshake if no session
+ * exists yet. Safe to call repeatedly — no-op once a session is established.
+ */
+export function startBLEPrivateChat(peerID: string): Promise<void> {
+  return NativeModule.startBLEPrivateChat(peerID);
+}
+
+/**
+ * Send a Noise-encrypted 1:1 message over BLE mesh. If no session exists,
+ * upstream bitchat queues the message and triggers a handshake automatically.
+ * `nickname` is OUR nickname — upstream stamps it into the message for the
+ * recipient's display.
+ */
+export function sendBLEPrivateMessage(
+  peerID: string,
+  content: string,
+  nickname: string
+): Promise<void> {
+  return NativeModule.sendBLEPrivateMessage(peerID, content, nickname);
+}
+
+export function addBLEPrivateMessageListener(
+  listener: (event: BLEPrivateMessageEvent) => void
+): EventSubscription {
+  return NativeModule.addListener('onBLEPrivateMessage', listener);
 }
 
 export function getBLEPeers(): BLEPeer[] {
@@ -178,8 +233,27 @@ export function sendGeohashMessage(content: string, nickname: string): Promise<v
   return NativeModule.sendGeohashMessage(content, nickname);
 }
 
+/**
+ * Send a NIP-17 gift-wrapped DM to another participant in the currently-
+ * joined geohash. The recipient is addressed by the Nostr hex pubkey
+ * observed on their public geohash messages (`senderPubkey` from
+ * `onNostrMessage` events).
+ */
+export function sendGeohashPrivateMessage(
+  recipientPubkey: string,
+  content: string
+): Promise<void> {
+  return NativeModule.sendGeohashPrivateMessage(recipientPubkey, content);
+}
+
 export function addNostrMessageListener(
   listener: (event: NostrMessageEvent) => void
 ): EventSubscription {
   return NativeModule.addListener('onNostrMessage', listener);
+}
+
+export function addNostrPrivateMessageListener(
+  listener: (event: NostrPrivateMessageEvent) => void
+): EventSubscription {
+  return NativeModule.addListener('onNostrPrivateMessage', listener);
 }

@@ -61,6 +61,7 @@ const ProfileButton = () => {
           <ListGroup.Item disabled>
             <ListGroup.ItemPrefix>
               <Avatar
+                state={picture ? 'image' : 'fallback'}
                 seed={nostrKeys?.pubkey || ''}
                 picture={picture}
                 name={displayName}

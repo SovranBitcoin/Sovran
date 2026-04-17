@@ -119,6 +119,7 @@ const AnimatedSegment: React.FC<SegmentProps> = ({
         {showAvatar && (
           <View className="items-center justify-center">
             <Avatar
+              state={mintIcon ? 'image' : 'fallback'}
               picture={mintIcon}
               size={AVATAR_SIZE}
               name={mintName}

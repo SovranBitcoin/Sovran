@@ -102,6 +102,7 @@ function AnimatedMintTab({
         <View style={[styles.tabContent, { gap: LARGE_GAP }]}>
           <View style={styles.iconContainer}>
             <Avatar
+              state={mint.mintInfo?.icon_url ? 'image' : 'fallback'}
               picture={mint.mintInfo?.icon_url || undefined}
               size={LARGE_ICON_SIZE}
               name={displayName}

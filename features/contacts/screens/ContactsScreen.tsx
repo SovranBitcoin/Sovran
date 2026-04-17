@@ -133,26 +133,74 @@ export const ContactsScreen = () => {
     prefetchImages(Array.from(profilesMap.values()).map((p: any) => p?.picture));
   }, [profilesMap]);
 
+  const trimmedQuery = searchQuery.trim();
+  const lowerQuery = trimmedQuery.toLowerCase();
+
+  // Match a query against human-readable nostr profile text. Deliberately
+  // excludes the raw hex pubkey — those are 64-char hex and would false-match
+  // any short alphanumeric query ("abc", "face", "123", …).
+  const matchesProfileQuery = useCallback(
+    (profile: any): boolean => {
+      if (!lowerQuery) return true;
+      if (!profile) return false;
+      const candidates = [profile.name, profile.display_name, profile.displayName, profile.nip05];
+      return candidates.some(
+        (v) => typeof v === 'string' && v.toLowerCase().includes(lowerQuery)
+      );
+    },
+    [lowerQuery]
+  );
+
+  const filteredDisplayContacts = useMemo(() => {
+    if (!lowerQuery) return displayContacts;
+    return displayContacts.filter((c: any) => {
+      const profile = c.pubkey ? profilesMap.get(c.pubkey) : undefined;
+      return matchesProfileQuery(profile);
+    });
+  }, [displayContacts, profilesMap, lowerQuery, matchesProfileQuery]);
+
+  // Extract a mint URL's hostname for matching. Falls back to the raw string
+  // on parse failure so a mint isn't accidentally unsearchable.
+  const mintHost = (url: string | undefined): string => {
+    if (!url) return '';
+    try {
+      return new URL(url).hostname.toLowerCase();
+    } catch {
+      return url.toLowerCase();
+    }
+  };
+
+  const filteredDisplayMints = useMemo(() => {
+    if (!lowerQuery) return displayMints;
+    return displayMints.filter((m: any) => {
+      const name = m.mintInfo?.name;
+      if (typeof name === 'string' && name.toLowerCase().includes(lowerQuery)) return true;
+      if (mintHost(m.mint?.mintUrl).includes(lowerQuery)) return true;
+      const profile = m.pubkey ? profilesMap.get(m.pubkey) : undefined;
+      return matchesProfileQuery(profile);
+    });
+  }, [displayMints, profilesMap, lowerQuery, matchesProfileQuery]);
+
   const currentListData = useMemo(() => {
     switch (activeFilter) {
       case 'Recent':
-        return displayContacts;
+        return filteredDisplayContacts;
       case 'Mints':
-        return displayMints;
+        return filteredDisplayMints;
       default: {
         const byKey = new Map<string, any>();
-        for (const item of displayContacts) {
+        for (const item of filteredDisplayContacts) {
           const key = item.pubkey || item.mint?.mintUrl;
           if (key) byKey.set(key, item);
         }
-        for (const item of displayMints) {
+        for (const item of filteredDisplayMints) {
           const key = item.pubkey || item.mint?.mintUrl;
           if (key) byKey.set(key, item);
         }
         return Array.from(byKey.values());
       }
     }
-  }, [activeFilter, displayContacts, displayMints]);
+  }, [activeFilter, filteredDisplayContacts, filteredDisplayMints]);
 
   const handleFilterChange = useCallback((filter: string) => {
     log.debug('contacts.filter_changed', { filter });
@@ -202,9 +250,6 @@ export const ContactsScreen = () => {
     );
   }, [foreground, activeFilter, mintInfoLoading]);
 
-  const trimmedQuery = searchQuery.trim();
-  const lowerQuery = trimmedQuery.toLowerCase();
-
   // Groups pill: filter tiers by label (e.g. "Province") or reverse-geocoded
   // displayName (e.g. "United Kingdom"). Case-insensitive prefix/substring.
   // (Mirrors the matching in `useAllSearchResults` so Groups pill and All pill
@@ -226,6 +271,37 @@ export const ContactsScreen = () => {
     () => parseGeohashQuery(trimmedQuery),
     [trimmedQuery]
   );
+
+  // Pill visibility:
+  //   • No active search → base pills (Groups lives in the outer tab bar).
+  //   • Search open, empty query → all pills so the user can pick a scope.
+  //   • Search open with a query → only pills that have at least one match.
+  const visibleFilters = useMemo<readonly string[]>(() => {
+    if (!isSearching) return ['All', 'Recent', 'Mints'];
+    if (!lowerQuery) return ['All', 'Recent', 'Mints', 'Groups'];
+    const list: string[] = ['All'];
+    if (filteredDisplayContacts.length > 0) list.push('Recent');
+    if (filteredDisplayMints.length > 0) list.push('Mints');
+    if (matchingTiers.length > 0 || groupsGeohashQuery) list.push('Groups');
+    return list;
+  }, [
+    isSearching,
+    lowerQuery,
+    filteredDisplayContacts,
+    filteredDisplayMints,
+    matchingTiers,
+    groupsGeohashQuery,
+  ]);
+
+  // When the active pill drops out of the visible set (e.g. query narrows
+  // past its matches), silently fall back to 'All'. Intentionally bypass
+  // `handleFilterChange` so `lastSearchFilterRef` is left alone — that ref
+  // drives the Groups-tab switch when the search bar closes.
+  useEffect(() => {
+    if (!visibleFilters.includes(activeFilter)) {
+      setActiveFilter('All');
+    }
+  }, [visibleFilters, activeFilter]);
 
   // ===========================
   // TOP TABS (hidden while searching)
@@ -352,8 +428,9 @@ export const ContactsScreen = () => {
             },
           ]}>
           <SearchFilters
+            activeFilter={activeFilter}
             onFilterChange={handleFilterChange}
-            showGroups={isSearching}
+            filters={visibleFilters}
           />
         </Animated.View>
       )}

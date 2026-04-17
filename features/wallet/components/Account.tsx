@@ -42,8 +42,16 @@ export function Account({ accounts, account, pagerHeight }: AccountProps): React
       <NonGestureView
         key={account.unit}
         style={{ overflow: 'hidden', zIndex: 10, height: pagerHeight, width: '100%' }}>
+        {/*
+         * Weighted fillers: top flex:2, bottom flex:1 pushes the primary
+         * balance + dots closer to the bottom edge of the pager so the
+         * secondary action row below (Split Bill / Soon / Soon in
+         * AccountPagerViewLayout) sits right under the balance instead of
+         * floating in empty space. Centred (flex:1/flex:1) felt too lonely
+         * after `pagerHeight` was tightened.
+         */}
         <VStack style={{ flex: 1 }}>
-          <View style={{ flex: 1 }} />
+          <View style={{ flex: 2 }} />
 
           <VStack align="center" gap={8}>
             <PrimaryBalance account={account} />

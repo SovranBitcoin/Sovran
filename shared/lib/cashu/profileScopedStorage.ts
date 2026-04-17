@@ -106,6 +106,7 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'scan-history-store',
   'search-history-store',
   'swap-transactions-store',
+  'split-bill-transactions-store',
   'transaction-location-store',
   'transaction-distribution-store',
   'nostr-social-store',

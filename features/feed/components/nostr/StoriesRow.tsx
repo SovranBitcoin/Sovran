@@ -274,6 +274,7 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
                 onPress={() => handleStoryPress(index)}>
                 <GradientRing>
                   <Avatar
+                    state={user.profile?.picture ? 'image' : 'fallback'}
                     picture={user.profile?.picture}
                     seed={user.pubkey}
                     name={user.profile?.name}

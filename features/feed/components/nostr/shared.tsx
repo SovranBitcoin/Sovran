@@ -950,7 +950,13 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
           { backgroundColor: surface, borderColor: surfaceTertiary },
         ]}>
         <HStack align="center" gap={8} style={sharedStyles.mb6}>
-          <Avatar picture={profile?.picture} seed={event.pubkey} size={24} name={displayName} />
+          <Avatar
+            state={profile?.picture ? 'image' : 'fallback'}
+            picture={profile?.picture}
+            seed={event.pubkey}
+            size={24}
+            name={displayName}
+          />
           <Text
             bold
             size={13}

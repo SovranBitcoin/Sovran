@@ -235,7 +235,12 @@ export function AndroidLiquidHeaderTitleButton({
       <View pointerEvents="none" style={[styles.titleContent, { elevation: 1 }]}>
         <View style={styles.titleRow}>
           <View style={styles.titleAvatarWrap}>
-            <Avatar size={20} name={avatarName} picture={avatarPicture} />
+            <Avatar
+              state={avatarPicture ? 'image' : 'fallback'}
+              size={20}
+              name={avatarName}
+              picture={avatarPicture}
+            />
           </View>
           <View style={styles.titleTextGroup}>
             <Text numberOfLines={1} style={styles.titleTextPrimary}>

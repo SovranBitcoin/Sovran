@@ -2,24 +2,28 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { prefetchImage } from '@/shared/lib/imageCache';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Badge } from './Badge';
 
+export type AvatarState = 'loading' | 'fallback' | 'image';
+
 interface AvatarProps {
+  state: AvatarState;
   picture?: string;
   size?: number;
   alt?: string;
   name?: string;
   status?: string;
   seed?: string;
-  loading?: boolean;
 }
 
-type ImageStatus = 'idle' | 'loading' | 'loaded' | 'failed';
+type ImageStatus = 'loading' | 'loaded' | 'failed';
 
 function FallbackContent({
   gradientTheme,
@@ -46,23 +50,27 @@ function FallbackContent({
   );
 }
 
-export const Avatar = ({
-  picture,
-  size = 48,
-  alt,
-  name,
-  status,
-  seed,
-  loading = false,
-}: AvatarProps) => {
+function LoadingContent({ borderRadius, color }: { borderRadius: number; color: string }) {
+  return (
+    <View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFillObject, { borderRadius, backgroundColor: color }]}
+    />
+  );
+}
+
+export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: AvatarProps) => {
+  const foreground = useThemeColor('foreground');
+  const loadingColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
+
   useEffect(() => {
     prefetchImage(picture);
   }, [picture]);
 
-  const [imageStatus, setImageStatus] = useState<ImageStatus>(() => (picture ? 'loading' : 'idle'));
+  const [imageStatus, setImageStatus] = useState<ImageStatus>('loading');
 
   useEffect(() => {
-    setImageStatus(picture ? 'loading' : 'idle');
+    setImageStatus('loading');
   }, [picture]);
 
   const handleImageLoad = useCallback(() => setImageStatus('loaded'), []);
@@ -91,10 +99,6 @@ export const Avatar = ({
     return statusConfig[status] ?? null;
   }, [status]);
 
-  const showSkeleton =
-    loading || (!!picture && imageStatus !== 'loaded' && imageStatus !== 'failed');
-  const hasPicture = !!picture;
-
   const StatusBadgeWrapper = statusBadge ? (
     <VStack
       style={{
@@ -111,35 +115,73 @@ export const Avatar = ({
     </VStack>
   ) : null;
 
-  const fallbackContainerStyle = {
+  const containerStyle = {
     ...avatarStyle,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
   };
 
-  const fallbackContent = (
-    <FallbackContent gradientTheme={gradientTheme} borderRadius={borderRadius} />
-  );
+  const defaultAlt = 'Avatar';
+  const imageAlt = alt || defaultAlt;
 
-  // 1. Loading and no picture — show gradient fallback
-  if (loading && !hasPicture) {
+  // 1. Loading state — 50% foreground fill, no image, no gradient.
+  if (state === 'loading') {
     return (
-      <View style={fallbackContainerStyle} accessibilityRole="image">
-        {fallbackContent}
+      <View style={containerStyle} accessibilityRole="image">
+        <LoadingContent borderRadius={borderRadius} color={loadingColor} />
         {StatusBadgeWrapper}
       </View>
     );
   }
 
-  const defaultAlt = 'Avatar';
-  const imageAlt = alt || defaultAlt;
-
-  // 2. Picture loading — gradient fallback + hidden Image loading underneath.
-  if (hasPicture && showSkeleton) {
+  // 2. Fallback state — seeded gradient.
+  if (state === 'fallback') {
     return (
-      <View style={{ position: 'relative' as const, overflow: 'hidden' as const }}>
-        <View style={fallbackContainerStyle}>
-          {fallbackContent}
+      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+        <View
+          style={containerStyle}
+          accessibilityRole="image"
+          accessibilityLabel={imageAlt}>
+          <FallbackContent gradientTheme={gradientTheme} borderRadius={borderRadius} />
+        </View>
+        {StatusBadgeWrapper}
+      </VStack>
+    );
+  }
+
+  // 3. Image state — dev misuse without picture, fall back safely.
+  if (!picture) {
+    if (__DEV__) {
+      console.warn('[Avatar] state="image" but picture is missing — falling back to gradient');
+    }
+    return (
+      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+        <View style={containerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>
+          <FallbackContent gradientTheme={gradientTheme} borderRadius={borderRadius} />
+        </View>
+        {StatusBadgeWrapper}
+      </VStack>
+    );
+  }
+
+  // 4. Image state — image failed to load → gradient fallback.
+  if (imageStatus === 'failed') {
+    return (
+      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
+        <View style={containerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>
+          <FallbackContent gradientTheme={gradientTheme} borderRadius={borderRadius} />
+        </View>
+        {StatusBadgeWrapper}
+      </VStack>
+    );
+  }
+
+  // 5. Image state — image still loading → show loading state with invisible image underneath.
+  if (imageStatus !== 'loaded') {
+    return (
+      <View style={{ position: 'relative', overflow: 'hidden' }}>
+        <View style={containerStyle}>
+          <LoadingContent borderRadius={borderRadius} color={loadingColor} />
         </View>
         <ExpoImage
           source={{ uri: picture }}
@@ -154,27 +196,16 @@ export const Avatar = ({
     );
   }
 
-  // 3. Image loaded — show the image
-  if (hasPicture && imageStatus === 'loaded') {
-    return (
-      <VStack style={{ position: 'relative', overflow: 'hidden' }}>
-        <ExpoImage
-          source={{ uri: picture }}
-          cachePolicy="memory-disk"
-          style={avatarStyle}
-          accessibilityLabel={imageAlt}
-        />
-        {StatusBadgeWrapper}
-      </VStack>
-    );
-  }
-
-  // 4. Fallback — no picture or image failed to load
+  // 6. Image state — loaded → show the image.
   return (
     <VStack style={{ position: 'relative', overflow: 'hidden' }}>
-      <View style={fallbackContainerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>
-        {fallbackContent}
-      </View>
+      <ExpoImage
+        source={{ uri: picture }}
+        cachePolicy="memory-disk"
+        style={avatarStyle}
+        accessibilityLabel={imageAlt}
+        onError={handleImageError}
+      />
       {StatusBadgeWrapper}
     </VStack>
   );

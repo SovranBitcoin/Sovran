@@ -615,11 +615,13 @@ function MessageBubble({
         style={{ width: '100%' }}>
         {!isMe && (
           <Avatar
+            state={
+              isLoadingMetadata ? 'loading' : userPicture ? 'image' : 'fallback'
+            }
             size={32}
             picture={userPicture}
             seed={message.pubkey}
             name={isMe ? myName : userName}
-            loading={isLoadingMetadata}
           />
         )}
 
@@ -759,7 +761,7 @@ function MessageBubble({
           </HStack>
         </VStack>
 
-        {isMe && <Avatar size={32} seed={message.pubkey} name={myName} />}
+        {isMe && <Avatar state="fallback" size={32} seed={message.pubkey} name={myName} />}
       </HStack>
     </VStack>
   );
@@ -2164,11 +2166,17 @@ export function UserMessagesScreen({
                           height: '100%',
                         }}>
                         <Avatar
+                          state={
+                            shouldShowAvatarLoading
+                              ? 'loading'
+                              : userPicture
+                                ? 'image'
+                                : 'fallback'
+                          }
                           size={40}
                           picture={userPicture}
                           seed={pubkey}
                           name={displayName}
-                          loading={shouldShowAvatarLoading}
                         />
                         <View
                           style={{
@@ -2230,11 +2238,17 @@ export function UserMessagesScreen({
                     height: 48,
                   }}>
                   <Avatar
+                    state={
+                      shouldShowAvatarLoading
+                        ? 'loading'
+                        : userPicture
+                          ? 'image'
+                          : 'fallback'
+                    }
                     size={40}
                     picture={userPicture}
                     seed={pubkey}
                     name={displayName}
-                    loading={shouldShowAvatarLoading}
                   />
                   <VStack
                     spacing={2}
@@ -2570,6 +2584,7 @@ export function UserMessagesScreen({
                 </Pressable>
               ) : (
                 <Avatar
+                  state={myProfile.picture ? 'image' : 'fallback'}
                   size={40}
                   seed={nostrKeys?.pubkey}
                   picture={myProfile.picture}

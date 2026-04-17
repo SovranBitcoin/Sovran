@@ -5,7 +5,14 @@ public class BitChatModule: Module {
         Name("BitChat")
 
         // --- Events emitted to JS ---
-        Events("onBLEMessage", "onBLEPeerUpdate", "onBLEStateChanged", "onNostrMessage")
+        Events(
+            "onBLEMessage",
+            "onBLEPrivateMessage",
+            "onBLEPeerUpdate",
+            "onBLEStateChanged",
+            "onNostrMessage",
+            "onNostrPrivateMessage"
+        )
 
         OnCreate {
             BitChatBLEBridge.shared.attach(module: self)
@@ -62,6 +69,20 @@ public class BitChatModule: Module {
             try BitChatBLEBridge.shared.sendMessage(content)
         }
 
+        /// Establishes the Noise session (lazy handshake) with a peer
+        /// before the user's first DM. Safe to call repeatedly.
+        AsyncFunction("startBLEPrivateChat") { (peerID: String) in
+            try BitChatBLEBridge.shared.startPrivateChat(peerID)
+        }
+
+        /// Send a Noise-encrypted DM. `nickname` is our own nickname, passed
+        /// through so upstream can stamp the recipientNickname field on the
+        /// persisted message (used for UI rendering + delivery receipts).
+        AsyncFunction("sendBLEPrivateMessage") {
+            (peerID: String, content: String, nickname: String) in
+            try BitChatBLEBridge.shared.sendPrivateMessage(content, to: peerID, nickname: nickname)
+        }
+
         Function("getBLEPeers") { () -> [[String: Any]] in
             return BitChatBLEBridge.shared.getPeers()
         }
@@ -104,6 +125,17 @@ public class BitChatModule: Module {
             let nick: String? = nickname.isEmpty ? nil : nickname
             try await MainActor.run {
                 try BitChatNostrBridge.shared.sendMessage(content, nickname: nick)
+            }
+        }
+
+        /// Send a NIP-17 gift-wrapped DM to another participant in the
+        /// currently-joined geohash. `recipientPubkey` is the hex Nostr
+        /// pubkey observed on the other user's public geohash messages
+        /// (via `onNostrMessage` → `senderPubkey`).
+        AsyncFunction("sendGeohashPrivateMessage") {
+            (recipientPubkey: String, content: String) in
+            try await MainActor.run {
+                try BitChatNostrBridge.shared.sendPrivateMessage(to: recipientPubkey, content: content)
             }
         }
     }

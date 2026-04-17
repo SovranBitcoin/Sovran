@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Image, Pressable, StyleSheet } from 'react-native';
+import { View, Pressable, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import type { DisplayResult } from '@/features/payments/hooks/useContactSearch';
@@ -15,18 +15,17 @@ type Props = {
 };
 
 export const ContactSearchResultItem = ({ result, loading }: Props) => {
-  const [foreground, surfaceSecondary, surfaceTertiary] = useThemeColor([
+  const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
     'surface-secondary',
-    'surface-tertiary',
   ] as const);
 
   const isLoading = loading || !result.profile;
   const profile = result.profile;
   const pubkey = result.pubkey;
-  const displayName = profile
-    ? profile.displayName || profile.name || pubkey.slice(0, 12) + '...'
-    : '';
+  // Real display name only — no inline pubkey fallback (Text's `fallback`
+  // prop owns that so we don't flash loading → pubkey → real name).
+  const displayName = profile?.displayName || profile?.name;
   const hasNip05 = Boolean(profile?.nip05);
 
   const handlePress = () => {
@@ -45,19 +44,18 @@ export const ContactSearchResultItem = ({ result, loading }: Props) => {
         styles.container,
         pressed && !isLoading && { backgroundColor: surfaceSecondary },
       ]}>
-      {isLoading ? (
-        <Avatar seed={pubkey} size={44} loading />
-      ) : profile?.picture ? (
-        <Image source={{ uri: profile.picture }} style={styles.avatar} />
-      ) : (
-        <View style={[styles.avatar, { backgroundColor: surfaceTertiary }]}>
-          <Feather name="user" size={20} color={opacity(foreground, 0.5)} />
-        </View>
-      )}
+      <Avatar
+        state={isLoading ? 'loading' : profile?.picture ? 'image' : 'fallback'}
+        picture={profile?.picture}
+        seed={pubkey}
+        size={44}
+        name={displayName}
+      />
       <View style={styles.info}>
         <Text
           loading={isLoading}
           placeholder="Display Name"
+          fallback={pubkey.slice(0, 12) + '...'}
           style={[styles.name, { color: foreground }]}
           numberOfLines={1}>
           {displayName}
@@ -96,14 +94,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     gap: 12,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
   },
   info: {
     flex: 1,

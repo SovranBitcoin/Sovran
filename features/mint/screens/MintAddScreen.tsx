@@ -274,6 +274,7 @@ const MintItem = memo(function MintItem({
       disabled={globalLoading}>
       <HStack align="center" gap={12}>
         <Avatar
+          state={mint.mintInfo?.icon_url ? 'image' : 'fallback'}
           picture={mint.mintInfo?.icon_url || undefined}
           size={44}
           name={displayName}

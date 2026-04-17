@@ -46,11 +46,27 @@ function PeerRow({ peer }: PeerRowProps) {
     ? `#${peer.peerID.slice(0, 8)} · connected`
     : `#${peer.peerID.slice(0, 8)} · seen ${formatLastSeen(peer.lastSeen)}`;
 
+  const openDM = () => {
+    // Replace the Network sheet with the DM screen. Using `replace` instead
+    // of `push` so the back button from DM returns to the chat, not to the
+    // peer list — matches upstream bitchat's UX where the peer list is a
+    // sidebar that dismisses on tap.
+    router.replace({
+      pathname: '/(user-flow)/bitchatDM',
+      params: {
+        transport: 'ble-dm',
+        peerID: peer.peerID,
+        nickname: displayName,
+      },
+    } as any);
+  };
+
   return (
     <ListRow
       avatar={{ seed: peer.peerID, name: displayName }}
       title={displayName}
       subtitle={subtitle}
+      onPress={openDM}
       trailing={
         <Icon
           name={peer.isConnected ? 'mdi:broadcast' : 'mdi:clock-outline'}

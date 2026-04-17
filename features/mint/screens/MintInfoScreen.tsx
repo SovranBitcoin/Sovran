@@ -135,7 +135,13 @@ function AnimatedAvatarComponent({
 
   return (
     <View className="relative">
-      <Avatar picture={picture} size={size} name={name} alt={alt} loading={isLoading} />
+      <Avatar
+        state={isLoading ? 'loading' : picture ? 'image' : 'fallback'}
+        picture={picture}
+        size={size}
+        name={name}
+        alt={alt}
+      />
       {statusBadge && (
         <Animated.View
           style={{

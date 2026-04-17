@@ -186,6 +186,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
                 },
               ]}>
               <Avatar
+                state={profile.cachedPicture ? 'image' : 'fallback'}
                 seed={profile.pubkey}
                 picture={profile.cachedPicture}
                 name={profile.cachedDisplayName || getUsername(profile.pubkey)}
@@ -236,7 +237,13 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
         <TouchableOpacity style={styles.profileTouchable} onPress={handlePress}>
           {nostrKeys?.pubkey && (
             <VStack align="center" spacing={16}>
-              <Avatar seed={nostrKeys?.pubkey} picture={picture} name={displayName} size={64} />
+              <Avatar
+                state={picture ? 'image' : 'fallback'}
+                seed={nostrKeys?.pubkey}
+                picture={picture}
+                name={displayName}
+                size={64}
+              />
               <VStack align="center" spacing={8}>
                 <Text bold size={20} style={{ textAlign: 'center', color: foreground }}>
                   {displayName}

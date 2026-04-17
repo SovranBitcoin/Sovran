@@ -43,6 +43,7 @@ export function ProfileList({ payload, close }: ProfileListProps) {
       <ListGroup.Item disabled>
         <ListGroup.ItemPrefix>
           <Avatar
+            state={profile.cachedPicture ? 'image' : 'fallback'}
             seed={profile.pubkey}
             picture={profile.cachedPicture}
             name={displayName}

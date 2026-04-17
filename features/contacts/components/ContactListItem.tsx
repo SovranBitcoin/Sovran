@@ -32,19 +32,24 @@ export const ContactListItem = ({
 }: ContactListItemProps) => {
   const pubkeyStr = pubkey ?? '';
 
+  // Real display name only — no inline pubkey fallback. `titleFallback`
+  // carries the abbreviated pubkey so the Text primitive swaps cleanly
+  // between loading bar and real content without the pubkey flashing.
   const displayName = useMemo(() => {
     return (
       profile?.displayName ||
       profile?.display_name ||
       profile?.name ||
-      (type === 'mint' && mintInfo?.name) ||
-      pubkeyStr.slice(0, 12) + '...'
+      (type === 'mint' && mintInfo?.name ? mintInfo.name : undefined)
     );
-  }, [profile, pubkeyStr, type, mintInfo]);
+  }, [profile, type, mintInfo]);
 
   // Always prefer nostr profile picture; fall back to mint icon when unavailable.
   const avatarUrl = profile?.picture || mintInfo?.icon_url;
-  const displaySubtitle = subtitle || profile?.nip05 || pubkeyStr.slice(0, 16) + '...';
+  const displaySubtitle = subtitle || profile?.nip05;
+
+  const titleFallback = pubkeyStr.slice(0, 12) + '...';
+  const subtitleFallback = pubkeyStr.slice(0, 16) + '...';
 
   const handlePress = () => {
     Keyboard.dismiss();
@@ -60,14 +65,16 @@ export const ContactListItem = ({
     <Log name="ContactListItem">
       <ListRow
         avatar={{
+          state: isLoadingProfile ? 'loading' : avatarUrl ? 'image' : 'fallback',
           picture: avatarUrl,
           name: displayName,
           seed: pubkeyStr,
           size: 44,
-          loading: isLoadingProfile,
         }}
         title={displayName}
+        titleFallback={titleFallback}
         subtitle={displaySubtitle}
+        subtitleFallback={subtitleFallback}
         onPress={pubkeyStr ? handlePress : undefined}
         loading={isLoadingProfile}
         titlePlaceholder="Display Name"

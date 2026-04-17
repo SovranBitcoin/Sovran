@@ -23,7 +23,7 @@ import React, { ReactNode } from 'react';
 import { Pressable, View, StyleProp, ViewStyle, StyleSheet } from 'react-native';
 import opacity from 'hex-color-opacity';
 
-import { Avatar } from '@/shared/ui/primitives/Avatar';
+import { Avatar, AvatarState } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -33,11 +33,13 @@ import Icon from 'assets/icons';
 // ---------------------------------------------------------------------------
 
 export interface ListRowAvatar {
+  /** Explicit avatar state. When omitted, ListRow derives it from the row-level
+   *  `loading` prop and the presence of `picture`. */
+  state?: AvatarState;
   picture?: string;
   seed?: string;
   name?: string;
   size?: 40 | 44;
-  loading?: boolean;
 }
 
 export interface ListRowIconCircle {
@@ -53,8 +55,10 @@ export interface ListRowProps {
   iconCircle?: ListRowIconCircle;
   leading?: ReactNode;
 
-  /** Primary line. String → 16/600 ellipsize. ReactNode → caller owns layout. */
-  title: string | ReactNode;
+  /** Primary line. String → 16/600 ellipsize. ReactNode → caller owns layout.
+   *  May be nullish when `titleFallback` is provided (so Text can render the
+   *  fallback). */
+  title?: string | ReactNode;
 
   /** Secondary line. String → 14 @ 0.5 opacity ellipsize. */
   subtitle?: string | ReactNode;
@@ -67,12 +71,16 @@ export interface ListRowProps {
 
   onPress?: () => void;
   disabled?: boolean;
-  /** When true, render skeleton placeholders for string title/subtitle. */
+  /** When true, render loading placeholders for string title/subtitle. */
   loading?: boolean;
-  /** Title placeholder text (invisible) that sizes the skeleton. Defaults to a generic label. */
+  /** Title placeholder text (invisible) that sizes the loading bar. Defaults to a generic label. */
   titlePlaceholder?: string;
-  /** Subtitle placeholder text for skeleton sizing. */
+  /** Subtitle placeholder text for loading-bar sizing. */
   subtitlePlaceholder?: string;
+  /** Fallback rendered in the title slot when title is nullish and not loading. */
+  titleFallback?: ReactNode;
+  /** Fallback rendered in the subtitle slot when subtitle is nullish and not loading. */
+  subtitleFallback?: ReactNode;
 
   testID?: string;
 
@@ -105,6 +113,8 @@ export function ListRow({
   loading = false,
   titlePlaceholder = 'Display name',
   subtitlePlaceholder = 'Secondary line',
+  titleFallback,
+  subtitleFallback,
   testID,
   padding = 'default',
   style,
@@ -139,49 +149,54 @@ export function ListRow({
       </View>
     );
   } else if (avatar) {
+    const derivedState: AvatarState =
+      avatar.state ?? (loading ? 'loading' : avatar.picture ? 'image' : 'fallback');
     leadingEl = (
       <Avatar
+        state={derivedState}
         picture={avatar.picture}
         seed={avatar.seed}
         name={avatar.name}
         size={avatar.size ?? DEFAULT_AVATAR_SIZE}
-        loading={avatar.loading ?? loading}
       />
     );
   }
 
   // ----- Title / subtitle rendering — strings get default styling, ReactNode is passthrough -----
 
-  const titleEl =
-    typeof title === 'string' ? (
-      <Text
-        size={16}
-        bold
-        numberOfLines={1}
-        color={foreground}
-        loading={loading}
-        placeholder={titlePlaceholder}>
-        {title}
-      </Text>
-    ) : (
-      title
-    );
+  const titleIsNode = typeof title !== 'string' && title != null;
+  const titleEl = titleIsNode ? (
+    title
+  ) : (
+    <Text
+      size={16}
+      bold
+      numberOfLines={1}
+      color={foreground}
+      loading={loading}
+      placeholder={titlePlaceholder}
+      fallback={titleFallback}>
+      {title as string | undefined}
+    </Text>
+  );
 
+  const subtitleIsNode = typeof subtitle !== 'string' && subtitle != null;
   const subtitleEl =
-    subtitle == null
+    subtitle == null && subtitleFallback == null && !loading
       ? null
-      : typeof subtitle === 'string'
-        ? (
+      : subtitleIsNode
+        ? subtitle
+        : (
           <Text
             size={14}
             numberOfLines={1}
             color={opacity(foreground, 0.5)}
             loading={loading}
-            placeholder={subtitlePlaceholder}>
-            {subtitle}
+            placeholder={subtitlePlaceholder}
+            fallback={subtitleFallback}>
+            {subtitle as string | undefined}
           </Text>
-        )
-        : subtitle;
+        );
 
   // ----- Row content -----
 

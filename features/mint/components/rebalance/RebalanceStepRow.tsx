@@ -165,6 +165,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                         gap={3}
                         className={`min-w-0 shrink ${!isActiveNode ? 'opacity-40' : ''}`}>
                         <Avatar
+                          state={info?.icon_url ? 'image' : 'fallback'}
                           picture={info?.icon_url}
                           size={20}
                           name={name}

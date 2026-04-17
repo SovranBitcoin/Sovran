@@ -522,7 +522,12 @@ export const SettingsRecoveryScreen: React.FC = () => {
             const displayName = mint.mintInfo?.name || tryHostname(mint.mintUrl);
             return (
               <HStack key={mint.mintUrl} spacing={12} className="items-center">
-                <Avatar picture={mint.mintInfo?.icon_url} name={displayName} size={36} />
+                <Avatar
+                  state={mint.mintInfo?.icon_url ? 'image' : 'fallback'}
+                  picture={mint.mintInfo?.icon_url}
+                  name={displayName}
+                  size={36}
+                />
                 <Text size={14} bold numberOfLines={1} style={{ color: foreground, flex: 1 }}>
                   {displayName}
                 </Text>
@@ -760,7 +765,12 @@ export const SettingsRecoveryScreen: React.FC = () => {
                     const displayName = mint?.mintInfo?.name || tryHostname(result.mint);
                     return (
                       <HStack key={index} spacing={12} className="items-center">
-                        <Avatar picture={mint?.mintInfo?.icon_url} name={displayName} size={36} />
+                        <Avatar
+                          state={mint?.mintInfo?.icon_url ? 'image' : 'fallback'}
+                          picture={mint?.mintInfo?.icon_url}
+                          name={displayName}
+                          size={36}
+                        />
                         <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
                           <Text size={14} bold numberOfLines={1} style={{ color: foreground }}>
                             {displayName}
@@ -853,7 +863,12 @@ const MintRecoveryRow: React.FC<{
 
   return (
     <HStack spacing={12} className="items-center">
-      <Avatar picture={mint?.mintInfo?.icon_url} name={displayName} size={36} />
+      <Avatar
+        state={mint?.mintInfo?.icon_url ? 'image' : 'fallback'}
+        picture={mint?.mintInfo?.icon_url}
+        name={displayName}
+        size={36}
+      />
       <VStack spacing={2} style={{ flex: 1, minWidth: 0 }}>
         <Text
           size={14}

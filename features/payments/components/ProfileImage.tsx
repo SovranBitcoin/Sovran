@@ -11,11 +11,11 @@ export function ProfileImage({ profile, loading }: ProfileImageProps) {
   return (
     <Log name="ProfileImage">
       <Avatar
+        state={loading ? 'loading' : profile?.picture ? 'image' : 'fallback'}
         picture={profile?.picture}
         size={48}
         alt={profile?.name || 'User'}
         name={profile?.name}
-        loading={loading}
       />
     </Log>
   );
