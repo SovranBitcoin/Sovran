@@ -1,7 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef } from 'react';
 import { View } from 'react-native';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
+import { useThemeStore, type ThemeMode } from '@/shared/stores/profile/themeStore';
 import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
 import { log } from '@/shared/lib/logger';
 import { themeVariables, getThemeVariables } from '@/shared/lib/themeEngine';
@@ -9,64 +9,72 @@ import { Uniwind } from 'uniwind';
 
 interface ThemeContextValue {
   currentTheme: string;
-  setTheme: (themeName: string) => void;
+  mode: ThemeMode;
   availableThemes: ThemeName[];
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
   currentTheme: 'dark',
-  setTheme: () => {},
+  mode: 'dark',
   availableThemes: THEME_NAMES,
 });
 
+/**
+ * Resolves the chrome theme for the whole app from the profile-scoped
+ * `themeStore`: walks the resolver fallback chain and returns a theme name
+ * that exists in THEMES. Gates first render on both the wallpaper store
+ * (downloaded themes registered) and the theme store (profile overrides
+ * loaded) — missing either would flash the built-in fallback.
+ */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  // Only gate on wallpaperStore — it's a global store and always hydrates.
+  // themeStore is profile-scoped and its hydration is gated on
+  // `_migrationGate`, which signals AFTER AccountScopedProviders mounts
+  // lower in the tree. Gating ThemeProvider on themeStore._hasHydrated
+  // here would deadlock the splash screen.
   const wallpaperHydrated = useWallpaperStore((s) => s._hasHydrated);
-  const theme = useSettingsStore((state) => state.getTheme());
-  const setThemeStore = useSettingsStore((state) => state.setTheme);
-  const [currentTheme, setCurrentTheme] = useState(theme || 'dark');
+  const unitWallpapers = useThemeStore((s) => s.unitWallpapers);
+  const activeAlbumSlug = useThemeStore((s) => s.activeAlbumSlug);
+  const mode = useThemeStore((s) => s.mode);
+  const getUnitWallpaper = useThemeStore((s) => s.getUnitWallpaper);
 
-  // Wait for wallpaper store to rehydrate and register downloaded themes
-  // before rendering — prevents race condition where a downloaded theme
-  // is the active theme but hasn't been registered in THEMES yet.
-  if (!wallpaperHydrated) return null;
+  // Chrome theme = resolver with no unit id (walks fallback chain).
+  // Re-runs whenever per-unit map or active album changes.
+  const currentTheme = useMemo(
+    () => getUnitWallpaper(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getUnitWallpaper, unitWallpapers, activeAlbumSlug],
+  );
+
+  const lastApplied = useRef<string | null>(null);
 
   useEffect(() => {
-    if (theme) setCurrentTheme(theme);
-  }, [theme]);
+    if (!THEMES[currentTheme as ThemeName]) {
+      log.warn('theme.not_found', { themeName: currentTheme });
+      return;
+    }
+    if (lastApplied.current === currentTheme) return;
 
-  const applyCSSVars = (themeName: string) => {
     const t0 = performance.now();
-    const vars = themeVariables[themeName] ?? getThemeVariables(themeName);
+    const vars = themeVariables[currentTheme] ?? getThemeVariables(currentTheme);
     Uniwind.updateCSSVariables('light', vars);
     Uniwind.updateCSSVariables('dark', vars);
     const duration_ms = Math.round((performance.now() - t0) * 100) / 100;
+    lastApplied.current = currentTheme;
     log.info('theme.css_vars.applied', {
-      theme: themeName,
+      theme: currentTheme,
       varCount: Object.keys(vars).length,
       duration_ms,
     });
-  };
-
-  const setTheme = (themeName: string) => {
-    if (THEMES[themeName as ThemeName]) {
-      // Apply CSS vars synchronously BEFORE state update propagates —
-      // prevents a 1+ second window where components render with the new
-      // background image but old color tokens.
-      applyCSSVars(themeName);
-      setCurrentTheme(themeName);
-      setThemeStore(themeName);
-    } else {
-      log.warn('theme.not_found', { themeName });
-    }
-  };
-
-  // Also apply on mount and when store-driven theme changes (e.g. rehydration)
-  useEffect(() => {
-    applyCSSVars(currentTheme);
   }, [currentTheme]);
 
+  // Wait for the wallpaper store to finish registering downloaded themes —
+  // without this the first paint would render against unregistered THEMES
+  // and flash the built-in fallback.
+  if (!wallpaperHydrated) return null;
+
   return (
-    <ThemeContext.Provider value={{ currentTheme, setTheme, availableThemes: Object.keys(THEMES) as ThemeName[] }}>
+    <ThemeContext.Provider value={{ currentTheme, mode, availableThemes: Object.keys(THEMES) as ThemeName[] }}>
       <View className="flex-1">{children}</View>
     </ThemeContext.Provider>
   );

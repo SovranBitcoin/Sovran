@@ -6,7 +6,7 @@ import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
 import React, { memo, ReactNode, useMemo } from 'react';
 import { Dimensions, StyleSheet, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useTheme } from '@/shared/providers/ThemeProvider';
 import { isBackgroundImageTheme, getGradientColorScale } from '@/config/backgroundImageThemes';
 import AnimatedSpriteBackground from './SpriteView';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -108,7 +108,7 @@ function ScrollableGradientOverlayComponent({
   const viewportHeight = Dimensions.get('window').height;
 
   // Get gradient colors for background image themes
-  const currentTheme = useSettingsStore((state) => state.getTheme());
+  const { currentTheme } = useTheme();
   const gradientColors = useMemo(() => {
     if (isBackgroundImageTheme(currentTheme)) {
       return getGradientColorScale(currentTheme);
@@ -245,7 +245,7 @@ function AnimatedBackgroundViewComponent({
   const surface = useThemeColor('surface');
 
   // Get gradient colors for background image themes
-  const currentTheme = useSettingsStore((state) => state.getTheme());
+  const { currentTheme } = useTheme();
   const gradientColors = useMemo(() => {
     if (isBackgroundImageTheme(currentTheme)) {
       return getGradientColorScale(currentTheme);

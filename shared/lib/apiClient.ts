@@ -1,192 +1,197 @@
 import { GetInfoResponse } from '@cashu/cashu-ts';
 import { ok, err, Result } from 'neverthrow';
 import { apiLog } from './logger';
+import {
+  AuditMintResponse,
+  CatalogResponse,
+  LatestVersionResponse,
+  MintReviewsResponse,
+  MintSearchResponse,
+  NostrProfileResponse,
+  SearchUsersResponse,
+  loggableIssues,
+  parseWith,
+  type AuditMintResponse as AuditMintResponseType,
+  type CatalogResponse as CatalogResponseType,
+  type LatestVersionResponse as LatestVersionResponseType,
+  type MintRecommendation,
+  type MintReviewsResponse as MintReviewsResponseType,
+  type MintSearchResponse as MintSearchResponseType,
+  type MintSearchResult,
+  type NostrProfileResponse as NostrProfileResponseType,
+  type ParseError,
+  type SearchUsersResponse as SearchUsersResponseType,
+  type TopFollower,
+  type UserProfile,
+} from '@sovranbitcoin/schemas';
+
 const BASE_URL = 'https://api.sovran.money/api';
 
 export const PRICELIST_URL = `wss://ws.sovran.money`;
 
-interface UserStats {
-  pubkey: string;
-  follows_count: number;
-  followers_count: number;
-  note_count: number;
-  long_form_note_count: number;
-  reply_count: number;
-  time_joined: number;
-  relay_count: number;
-  total_zap_count: number;
-  total_satszapped: number;
-  media_count: number;
-  content_zap_count: number;
+// Re-export schema-derived types for backwards compatibility with legacy
+// interface names used across the app.
+export type {
+  AuditMintResponseType as AuditMintResponse,
+  CatalogResponseType as WallpaperCatalogResponse,
+  LatestVersionResponseType as LatestVersionResponse,
+  MintRecommendation,
+  MintReviewsResponseType as MintReviewsResponse,
+  MintSearchResult,
+  MintSearchResponseType as MintSearchResponse,
+  NostrProfileResponseType as NostrProfileResponse,
+  SearchUsersResponseType as SearchUsersResponse,
+  TopFollower,
+  UserProfile,
+};
+
+type FetchOrParseError = Error | ParseError;
+
+function toError(e: FetchOrParseError): Error {
+  if (e instanceof Error) return e;
+  if ((e as ParseError).type === 'schema/zod') {
+    const issues = (e as ParseError).issues.length;
+    return new Error(`${(e as ParseError).where}: ${issues} schema issue(s)`);
+  }
+  return new Error('unknown error');
 }
 
-export interface UserProfile {
-  profileEvent?: string;
-  name?: string;
-  displayName?: string;
-  about?: string;
-  banner?: string;
-  picture?: string;
-  image?: string;
-  website?: string;
-  lud16?: string;
-  lud06?: string;
-  nip05?: string;
-  nip05Valid?: boolean;
-  hasNip05Conflict?: boolean;
-  created_at?: number;
-  pubkey: string;
-  npub?: string;
-  reactions?: boolean;
-  userStats?: UserStats;
-}
-
-interface SearchUsersResponse {
-  query: string;
-  limit: number;
-  sort: string;
-  results: UserProfile[];
-  fromCache: boolean;
-}
-
-const safeFetch = async <T = any>(url: string): Promise<Result<T, Error>> => {
+/**
+ * Core fetch-parse helper. Network or HTTP errors surface as `Error`;
+ * shape validation failures are logged with paths+codes (never raw input)
+ * and collapsed into `Error` to preserve the existing caller signature.
+ */
+async function fetchParsed<T>(
+  url: string,
+  parser: (input: unknown) => Result<T, ParseError>,
+  where: string,
+  init?: RequestInit,
+): Promise<Result<T, Error>> {
   try {
     apiLog.debug('api.fetch', { url });
-    const res = await fetch(url);
+    const res = await fetch(url, init);
     if (!res.ok) {
       apiLog.warn('api.fetch_error', { url, status: res.status });
       return err(new Error(`Fetch error: ${res.status} ${res.statusText}`));
     }
-    const data = await res.json();
-    return ok(data as T);
+    const raw = await res.json();
+    const parsed = parser(raw);
+    if (parsed.isErr()) {
+      apiLog.warn('api.parse_failed', { where, issues: loggableIssues(parsed.error) });
+      return err(toError(parsed.error));
+    }
+    return ok(parsed.value);
   } catch (e) {
     apiLog.error('api.fetch_failed', { url, error: e });
     return err(e instanceof Error ? e : new Error('Unknown error'));
   }
-};
+}
 
-const safePost = async <T = any>(url: string, body: any): Promise<Result<T, Error>> => {
-  try {
-    apiLog.debug('api.post', { url });
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      apiLog.warn('api.post_error', { url, status: res.status });
-      return err(new Error(`Post error: ${res.status} ${res.statusText}`));
-    }
-    const data = await res.json();
-    return ok(data as T);
-  } catch (e) {
-    apiLog.error('api.post_failed', { url, error: e });
-    return err(e instanceof Error ? e : new Error('Unknown error'));
-  }
-};
+// ---------------------------------------------------------------------------
+// Parsers — hoisted to module scope to avoid Zod v4 JIT cost on each call.
+// ---------------------------------------------------------------------------
+
+const parseSearchUsers = parseWith(SearchUsersResponse, 'nostr/search');
+const parseAuditMint = parseWith(AuditMintResponse, 'cashu/mint/audit');
+const parseMintReviews = parseWith(MintReviewsResponse, 'cashu/mint/reviews');
+const parseMintSearch = parseWith(MintSearchResponse, 'cashu/mints/search');
+const parseNostrProfile = parseWith(NostrProfileResponse, 'nostr/profile');
+const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
+const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
+
+// ---------------------------------------------------------------------------
+// Public API client functions
+// ---------------------------------------------------------------------------
 
 export const searchUsers = ({ query, limit = 10 }: { query: string; limit?: number }) => {
-  const params = new URLSearchParams({ query });
-  return safeFetch<SearchUsersResponse>(`${BASE_URL}/nostr/search?${params}`);
+  const params = new URLSearchParams({ query, limit: String(limit) });
+  return fetchParsed(
+    `${BASE_URL}/nostr/search?${params}`,
+    parseSearchUsers,
+    'nostr/search',
+  );
 };
 
-export interface AuditMintResponse {
-  id: number;
-  url: string;
-  info: GetInfoResponse;
-  name: string;
-  balance: number;
-  sum_donations: number;
-  updated_at: string;
-  next_update: string;
-  state: string;
-  n_errors: number;
-  n_mints: number;
-  n_melts: number;
-  swaps: {
-    id: number;
-    from_id: number;
-    to_id: number;
-    from_url: string;
-    to_url: string;
-    amount: number;
-    fee: number;
-    created_at: string;
-    time_taken: number;
-    state: string;
-    error: string | null;
-  }[];
-}
-
 export const auditMint = ({ mintUrl }: { mintUrl: string }) =>
-  safeFetch<AuditMintResponse>(`${BASE_URL}/cashu/mint/audit?mintUrl=${mintUrl}`);
-
-export interface MintRecommendation {
-  score: number;
-  comment: string;
-  pubkey: string;
-  eventId: string;
-  created_at: number;
-}
-
-export interface MintReviewsResponse {
-  mintUrl: string;
-  score: number | null;
-  recommendations: MintRecommendation[];
-  lastUpdated: number | null;
-  fromCache: boolean;
-}
+  fetchParsed(
+    `${BASE_URL}/cashu/mint/audit?mintUrl=${encodeURIComponent(mintUrl)}`,
+    parseAuditMint,
+    'cashu/mint/audit',
+  );
 
 export const reviewMint = ({ mintUrl }: { mintUrl: string }) =>
-  safeFetch<MintReviewsResponse>(`${BASE_URL}/cashu/mint/reviews?mintUrl=${mintUrl}`);
+  fetchParsed(
+    `${BASE_URL}/cashu/mint/reviews?mintUrl=${encodeURIComponent(mintUrl)}`,
+    parseMintReviews,
+    'cashu/mint/reviews',
+  );
 
-export interface MintSearchResult {
-  url: string;
-  /** Mint name (always present, derived from /v1/info or audit fallback) */
-  name: string;
-  supported_units: string[];
-  state: string;
-  n_mints: number;
-  n_melts: number;
-  n_errors: number;
-  /** KYM review score (0-5 average), null if no reviews */
-  review_score: number | null;
-  /** Number of KYM reviews */
-  review_count: number;
-  /** Projected /v1/info fields — shape depends on `fields` param */
-  info?: any;
-}
-
-export interface MintSearchResponse {
-  results: MintSearchResult[];
-  total: number;
-}
-
-export const searchMints = ({ query, currency, limit, fields }: {
+export const searchMints = ({
+  query,
+  currency,
+  limit,
+  fields,
+}: {
   query?: string;
   currency?: string;
   limit?: number;
   /** Comma-separated dot paths for /v1/info projection, e.g. "nuts.4,contact" or "*" */
   fields?: string;
 }) =>
-  safeFetch<MintSearchResponse>(
+  fetchParsed(
     `${BASE_URL}/cashu/mints/search?${new URLSearchParams({
       ...(query && { q: query }),
       ...(currency && currency !== 'ALL' && { currency }),
       ...(limit && { limit: String(limit) }),
       ...(fields && { fields }),
-    })}`
+    })}`,
+    parseMintSearch,
+    'cashu/mints/search',
   );
 
 export const getLatestVersion = ({
   storage,
 }: {
-  storage: {
-    version: string;
-  };
-}) => safePost<{ version: string }>(`${BASE_URL}/app/latest-version`, storage);
+  storage: { version: string };
+}) =>
+  fetchParsed(
+    `${BASE_URL}/app/latest-version`,
+    parseLatestVersion,
+    'app/latest-version',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storage }),
+    },
+  );
+
+export const fetchNostrProfile = (pubkey: string) =>
+  fetchParsed(
+    `${BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}`,
+    parseNostrProfile,
+    'nostr/profile',
+  );
+
+/**
+ * Fetches the wallpaper catalog and validates it against the shared Zod schema.
+ * Unknown top-level fields are silently dropped (Postel's Law); a malformed
+ * envelope is coerced into an `Error` with the parse-issue count for the
+ * UI layer and the detail is logged via `loggableIssues`.
+ */
+export const fetchWallpaperCatalog = () =>
+  fetchParsed(
+    `${BASE_URL}/wallpapers/catalog`,
+    parseCatalog,
+    'wallpapers/catalog',
+  );
+
+// ---------------------------------------------------------------------------
+// Mint `/v1/info` — upstream Cashu shape, owned by `@cashu/cashu-ts`
+//
+// We deliberately don't validate this with a local Zod schema: the contract
+// belongs to the cashu-ts library and we want their types to drive ours.
+// Kept as a plain fetch + type-cast — callers treat it as `GetInfoResponse`.
+// ---------------------------------------------------------------------------
 
 export const fetchMintInfo = async (mintUrl: string): Promise<Result<GetInfoResponse, Error>> => {
   const normalizedUrl = mintUrl.endsWith('/') ? mintUrl : `${mintUrl}/`;
@@ -225,48 +230,3 @@ export const fetchMintInfo = async (mintUrl: string): Promise<Result<GetInfoResp
     );
   }
 };
-
-export interface NostrProfileResponse {
-  pubkey: string;
-  npub: string;
-  rank: number;
-  followers: number;
-  follows: number;
-  score: number;
-  topFollowers: TopFollower[];
-  created_at: number;
-  fromCache: boolean;
-  mintUrl?: string;
-}
-
-export interface TopFollower {
-  pubkey: string;
-  npub: string;
-  rank: number;
-  name?: string;
-  displayName?: string;
-  picture?: string;
-  image?: string;
-  banner?: string;
-  about?: string;
-  nip05?: string;
-  nip05Valid?: boolean;
-  website?: string;
-  lud16?: string;
-}
-
-export const fetchNostrProfile = (pubkey: string) =>
-  safeFetch<NostrProfileResponse>(`${BASE_URL}/nostr/profile?pubkey=${pubkey}`);
-
-// ---------------------------------------------------------------------------
-// Wallpapers
-// ---------------------------------------------------------------------------
-
-export interface WallpaperCatalogResponse {
-  wallpapers: any[];
-  albums: any[];
-  lastUpdated: number;
-}
-
-export const fetchWallpaperCatalog = () =>
-  safeFetch<WallpaperCatalogResponse>(`${BASE_URL}/wallpapers/catalog`);

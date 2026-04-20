@@ -83,7 +83,11 @@ export async function refreshCatalog(): Promise<boolean> {
   }
 
   const { wallpapers, albums } = result.value;
-  useWallpaperStore.getState().setCatalog(wallpapers, albums);
+  // Schema palette is typed as Record<string, string>; the app's WallpaperCatalogEntry
+  // narrows it to the specific shade-keyed ThemePalette. JSON shape matches.
+  useWallpaperStore
+    .getState()
+    .setCatalog(wallpapers as WallpaperCatalogEntry[], albums);
   return true;
 }
 

@@ -14,6 +14,16 @@ const FONTS = {
   OverpassBold: require('assets/fonts/Overpass/overpass-bold.otf'),
   OverpassExtrabold: require('assets/fonts/Overpass/overpass-extrabold.otf'),
   OverpassHeavy: require('assets/fonts/Overpass/overpass-heavy.otf'),
+  // Keyed by PostScript name so the native liquid-glass-text module
+  // (which calls UIFont(name:)) can resolve these without any alias
+  // mapping. See modules/liquid-glass-text/ios/LiquidGlassTextSwiftUI.swift.
+  'MonaSans-Light': require('assets/fonts/MonaSans/MonaSans-Light.ttf'),
+  'MonaSans-Regular': require('assets/fonts/MonaSans/MonaSans-Regular.ttf'),
+  'MonaSans-Medium': require('assets/fonts/MonaSans/MonaSans-Medium.ttf'),
+  'MonaSans-SemiBold': require('assets/fonts/MonaSans/MonaSans-SemiBold.ttf'),
+  'MonaSans-Bold': require('assets/fonts/MonaSans/MonaSans-Bold.ttf'),
+  'MonaSans-ExtraBold': require('assets/fonts/MonaSans/MonaSans-ExtraBold.ttf'),
+  'MonaSans-Black': require('assets/fonts/MonaSans/MonaSans-Black.ttf'),
 };
 
 export function useFonts() {

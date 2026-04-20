@@ -21,40 +21,25 @@ import {
   getWallpaperUri,
   cleanupOrphanedFiles,
 } from '@/shared/lib/wallpaperStorage';
-import { useSettingsStore } from './settingsStore';
+import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import type { ThemePalette } from '@/themes';
+import {
+  DEFAULT_TOPIC,
+  type WallpaperCatalogEntry as SchemaWallpaperEntry,
+  type AlbumMeta as SchemaAlbumMeta,
+} from '@sovranbitcoin/schemas';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface DominantColor {
-  hex: string;
-  hue: number;
-  saturation: number;
-  lightness: number;
-}
-
-interface GradientColor {
-  hex: string;
-  position: 'light' | 'mid' | 'dark';
-  hsb: { hue: number; saturation: number; brightness: number };
-}
-
-export interface WallpaperCatalogEntry {
-  eventId: string;
-  themeName: string;
-  displayName: string;
-  blossomUrl: string;
-  thumbUrl: string;
-  sha256: string;
-  fileSize: number;
-  dimensions: string;
-  albumSlug: string;
+/**
+ * Runtime type for catalog entries. Structurally compatible with
+ * `@sovranbitcoin/schemas`' `WallpaperCatalogEntry` — palette is typed more strictly
+ * here (the app's `ThemePalette` shade keys) since consumers rely on it.
+ */
+export interface WallpaperCatalogEntry extends Omit<SchemaWallpaperEntry, 'palette'> {
   palette: ThemePalette;
-  dominantColors: DominantColor[];
-  gradientColors: GradientColor[];
-  createdAt: number;
 }
 
 export interface DownloadedWallpaper extends WallpaperCatalogEntry {
@@ -62,12 +47,15 @@ export interface DownloadedWallpaper extends WallpaperCatalogEntry {
   downloadedAt: number;
 }
 
-interface AlbumMeta {
-  slug: string;
-  displayName: string;
-  description: string;
-  sortOrder: number;
-  author?: { pubkey: string; displayName: string; picture: string; followers?: number } | null;
+/**
+ * Album metadata with required `topic` (defaulted at ingest to
+ * `DEFAULT_TOPIC`) and optional `coverThemeName`. Publishers set `topic` via
+ * the admin panel; absent values become `'Other'` so Gallery grouping can
+ * rely on the field at the type level.
+ */
+export interface AlbumMeta extends Omit<SchemaAlbumMeta, 'topic' | 'coverThemeName'> {
+  topic: string;
+  coverThemeName?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,14 +99,20 @@ export const useWallpaperStore = create<WallpaperState>()(
       activeDownloads: {},
 
       setCatalog: (wallpapers, albums) => {
+        // Publishers may omit `topic`; default at ingest so downstream
+        // grouping code can treat it as required.
+        const normalizedAlbums = albums.map((a) => ({
+          ...a,
+          topic: a.topic?.trim() || DEFAULT_TOPIC,
+        }));
         set({
           catalog: wallpapers,
-          albums,
+          albums: normalizedAlbums,
           catalogLastFetched: Date.now(),
         });
         log.info('wallpaper.catalog.updated', {
           count: wallpapers.length,
-          albums: albums.length,
+          albums: normalizedAlbums.length,
         });
       },
 
@@ -183,11 +177,22 @@ export const useWallpaperStore = create<WallpaperState>()(
       },
 
       removeDownloaded: async (themeName) => {
-        // Active theme protection
-        const currentTheme = useSettingsStore.getState().getTheme();
-        if (currentTheme === themeName) {
-          useSettingsStore.getState().setTheme('dark');
-          // Wait a tick for theme change to propagate
+        // Active theme protection for the current profile: any unit that was
+        // using this wallpaper needs to be cleared from the per-unit override
+        // map so the resolver falls through to the album default or
+        // FALLBACK_THEME. Other profiles heal lazily on next load.
+        const themeState = useThemeStore.getState();
+        const affectedUnits = Object.entries(themeState.unitWallpapers)
+          .filter(([, theme]) => theme === themeName)
+          .map(([unitId]) => unitId);
+
+        if (affectedUnits.length > 0) {
+          useThemeStore.setState((prev) => {
+            const next = { ...prev.unitWallpapers };
+            for (const unitId of affectedUnits) delete next[unitId];
+            return { unitWallpapers: next };
+          });
+          // Wait a tick for state change to propagate to subscribers
           await new Promise((r) => setTimeout(r, 50));
         }
 
@@ -229,10 +234,22 @@ export const useWallpaperStore = create<WallpaperState>()(
         }
 
         if (orphans.length > 0) {
-          // Check if active theme is orphaned
-          const currentTheme = useSettingsStore.getState().getTheme();
-          if (orphans.includes(currentTheme)) {
-            useSettingsStore.getState().setTheme('dark');
+          // Current-profile-only active-theme protection: drop any per-unit
+          // overrides pointing at an orphaned theme. Other profiles recover
+          // lazily on next load via the resolver fallback.
+          const orphanSet = new Set(orphans);
+          const themeState = useThemeStore.getState();
+          const hasAffected = Object.values(themeState.unitWallpapers).some((t) =>
+            orphanSet.has(t),
+          );
+          if (hasAffected) {
+            useThemeStore.setState((prev) => {
+              const next: Record<string, string> = {};
+              for (const [unitId, theme] of Object.entries(prev.unitWallpapers)) {
+                if (!orphanSet.has(theme)) next[unitId] = theme;
+              }
+              return { unitWallpapers: next };
+            });
           }
 
           // Remove orphans from store

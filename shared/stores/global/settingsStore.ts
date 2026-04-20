@@ -32,7 +32,6 @@ export interface MiddlemanRoutingSettings {
 }
 
 interface SettingsState {
-  theme: string;
   language: string;
   displayBtc: number;
   displayCurrency: DisplayCurrency;
@@ -63,7 +62,6 @@ const DEFAULT_MIDDLEMAN_ROUTING: MiddlemanRoutingSettings = {
 
 /** Default settings used for initialization and reset. Passcode excluded (never persisted). */
 const DEFAULT_SETTINGS: Omit<SettingsState, 'passcode'> = {
-  theme: 'dark',
   language: 'en',
   displayBtc: 3,
   displayCurrency: 'usd',
@@ -83,9 +81,6 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'passcode'> = {
 };
 
 interface SettingsActions {
-  // Theme management (unified theme and background image)
-  setTheme: (theme: string) => void;
-  getTheme: () => string;
 
   // Language management
   setLanguage: (language: string) => void;
@@ -159,13 +154,6 @@ export const useSettingsStore = create<SettingsStore>()(
     (set, get) => ({
       ...DEFAULT_SETTINGS,
       passcode: '',
-
-      // Theme
-      setTheme: (theme: string) => {
-        storeLog.info('store.settings.set_theme', { theme });
-        set({ theme });
-      },
-      getTheme: () => get().theme,
 
       // Language
       setLanguage: (language: string) => {
@@ -310,7 +298,6 @@ export const useSettingsStore = create<SettingsStore>()(
       name: 'settings-store',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
-        theme: state.theme,
         language: state.language,
         displayBtc: state.displayBtc,
         displayCurrency: state.displayCurrency,

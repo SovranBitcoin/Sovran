@@ -83,7 +83,20 @@
         }
       ],
       ["expo-build-properties", { "ios": { "deploymentTarget": "18.0" } }],
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/MonaSans/MonaSans-Light.ttf",
+            "./assets/fonts/MonaSans/MonaSans-Regular.ttf",
+            "./assets/fonts/MonaSans/MonaSans-Medium.ttf",
+            "./assets/fonts/MonaSans/MonaSans-SemiBold.ttf",
+            "./assets/fonts/MonaSans/MonaSans-Bold.ttf",
+            "./assets/fonts/MonaSans/MonaSans-ExtraBold.ttf",
+            "./assets/fonts/MonaSans/MonaSans-Black.ttf"
+          ]
+        }
+      ],
       "expo-router",
       "expo-localization",
       "expo-video",

@@ -8,7 +8,8 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from '@/features/wallet/components/PrimaryBalance';
 
-import { useSettingsStore, isBackgroundImageTheme } from '@/shared/stores/global/settingsStore';
+import { isBackgroundImageTheme } from '@/shared/stores/global/settingsStore';
+import { useUnitWallpaper } from '@/shared/providers/ProfileWallpaperProvider';
 import { NonGestureView } from './NonGestureView';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
@@ -32,7 +33,7 @@ const CURRENCY_ICONS: Record<string, React.FC> = {
 
 export function Account({ accounts, account, pagerHeight }: AccountProps): React.ReactElement {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
-  const theme = useSettingsStore((state) => state.getTheme());
+  const theme = useUnitWallpaper(account.unit);
   const hasBackgroundImage = isBackgroundImageTheme(theme);
 
   const CurrencyIcon = CURRENCY_ICONS[account.unit];

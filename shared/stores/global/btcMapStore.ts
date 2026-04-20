@@ -2,6 +2,12 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { log, storeLog } from '@/shared/lib/logger';
+import {
+  BtcMapPlaceDetails as BtcMapPlaceDetailsSchema,
+  BtcMapPlacesResponse,
+  loggableIssues,
+  parseWith,
+} from '@sovranbitcoin/schemas';
 
 interface BTCMapPlace {
   id: number;
@@ -79,6 +85,9 @@ function isCacheExpired(timestamp: number, ttl: number): boolean {
   return Date.now() - timestamp > ttl;
 }
 
+const parsePlaces = parseWith(BtcMapPlacesResponse, 'btcmap/places');
+const parsePlaceDetails = parseWith(BtcMapPlaceDetailsSchema, 'btcmap/places/:id');
+
 interface BTCMapState {
   placesCache: PlacesCache | null;
   placeDetailsCache: PlaceDetailsCache;
@@ -135,7 +144,15 @@ export const useBTCMapStore = create<BTCMapStore>()(
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
 
-          const data: BTCMapPlace[] = await response.json();
+          const raw = await response.json();
+          const parsed = parsePlaces(raw);
+          if (parsed.isErr()) {
+            storeLog.warn('store.btc_map.places.parse_failed', {
+              issues: loggableIssues(parsed.error),
+            });
+            throw new Error('Invalid BTCMap places response');
+          }
+          const data = parsed.value as BTCMapPlace[];
           storeLog.info('store.btc_map.fetch_places.success', {
             count: data.length,
             duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
@@ -190,7 +207,16 @@ export const useBTCMapStore = create<BTCMapStore>()(
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
 
-          const data: BTCMapPlaceDetails = await response.json();
+          const raw = await response.json();
+          const parsed = parsePlaceDetails(raw);
+          if (parsed.isErr()) {
+            storeLog.warn('store.btc_map.details.parse_failed', {
+              id,
+              issues: loggableIssues(parsed.error),
+            });
+            throw new Error('Invalid BTCMap place details response');
+          }
+          const data = parsed.value as BTCMapPlaceDetails;
           storeLog.info('store.btc_map.fetch_details.success', {
             id,
             duration_ms: Math.round((performance.now() - startTime) * 100) / 100,

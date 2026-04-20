@@ -96,15 +96,22 @@ export async function retrieveMnemonic(): Promise<string | null> {
 }
 
 /**
- * Generates a new 12-word mnemonic phrase
- * @returns Promise<string> The generated mnemonic phrase
+ * Source of a generated mnemonic — used by ensureMnemonicExists to decide
+ * whether the seed was actually created by this app installation (`fresh`)
+ * or injected from outside (`debug`, simulating an existing user).
  */
-async function generateMnemonic(): Promise<string> {
+type GeneratedMnemonic = { mnemonic: string; source: 'fresh' | 'debug' };
+
+/**
+ * Generates a new 12-word mnemonic phrase
+ * @returns Promise<GeneratedMnemonic> The generated mnemonic and its source
+ */
+async function generateMnemonic(): Promise<GeneratedMnemonic> {
   try {
     const debugMnemonic = getDebugMnemonicOverride();
     if (debugMnemonic) {
       log.debug('nostr.secure.using_debug_mnemonic');
-      return debugMnemonic;
+      return { mnemonic: debugMnemonic, source: 'debug' };
     }
 
     // Generate 128 bits of entropy (16 bytes) for a 12-word mnemonic
@@ -115,7 +122,7 @@ async function generateMnemonic(): Promise<string> {
     const mnemonic = bip39.entropyToMnemonic(entropy, wordlist);
 
     log.info('nostr.secure.mnemonic_generated');
-    return mnemonic;
+    return { mnemonic, source: 'fresh' };
   } catch (error) {
     log.error('nostr.secure.generate_mnemonic_failed', { error });
     throw new Error('Failed to generate mnemonic');
@@ -137,17 +144,37 @@ export async function ensureMnemonicExists(): Promise<string | null> {
 
     // Generate new mnemonic
     log.info('nostr.secure.generating_mnemonic');
-    const newMnemonic = await generateMnemonic();
+    const generated = await generateMnemonic();
 
     // Store the new mnemonic
-    const stored = await storeMnemonic(newMnemonic);
+    const stored = await storeMnemonic(generated.mnemonic);
     if (!stored) {
       log.error('nostr.secure.store_new_mnemonic_failed');
       return null;
     }
 
-    log.info('nostr.secure.mnemonic_stored');
-    return newMnemonic;
+    log.info('nostr.secure.mnemonic_stored', { source: generated.source });
+
+    // Only mark seedCreatedAt for *fresh* seeds (real user fresh-install path).
+    // Debug-injected seeds via EXPO_PUBLIC_DEBUG_MNEMONIC must look like a
+    // pre-existing seed so the dev environment can exercise the restore-gate
+    // flow on every clean install — same code path a production user hits
+    // after reinstall / iCloud restore / profile reset.
+    if (generated.source === 'fresh') {
+      try {
+        const { useWalletLifecycleStore } = await import(
+          '@/shared/stores/global/walletLifecycleStore'
+        );
+        useWalletLifecycleStore.getState().markSeedCreatedNow();
+      } catch (markError) {
+        log.warn('nostr.secure.mark_seed_created_failed', { error: markError });
+      }
+    } else {
+      log.info('nostr.secure.skip_mark_seed_created', {
+        reason: 'debug_mnemonic_treated_as_pre_existing',
+      });
+    }
+    return generated.mnemonic;
   } catch (error) {
     log.error('nostr.secure.ensure_mnemonic_failed', { error });
     return null;

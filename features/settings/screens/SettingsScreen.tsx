@@ -279,8 +279,6 @@ export const SettingsScreen = () => {
           </Section>
           <Section title="Preferences">
             <ListGroup variant="secondary">
-              <SettingsListLinkItem href="/(settings-flow)/theme" title="Theme" />
-              <Separator className="mx-4" />
               <SettingsListLinkItem href="/(settings-flow)/routing" title="Swap Routing" />
             </ListGroup>
           </Section>

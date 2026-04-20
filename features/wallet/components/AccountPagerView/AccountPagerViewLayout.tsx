@@ -95,11 +95,14 @@ export function AccountPagerViewLayout({
           }}
         />
         <CircleActionButton
-          icon="tabler:dots"
-          systemIcon="ellipsis"
-          label="Soon"
-          disabled
-          testID="wallet-action-placeholder-1"
+          icon="mdi:palette"
+          systemIcon="paintpalette"
+          label="Theme"
+          testID="wallet-action-theme"
+          onPress={() => {
+            walletLog.info('wallet.theme.tap');
+            router.push('/(settings-flow)/theme/preview' as any);
+          }}
         />
       </HStack>
 

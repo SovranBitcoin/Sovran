@@ -5,7 +5,12 @@ import { TermsAndConditionsScreen } from '@/features/onboarding/screens/TermsAnd
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import OnboardingScreen from '@/features/onboarding/components/OnboardingScreen';
 import { log, Log, useLifecycleLogger } from '@/shared/lib/logger';
-import { retrieveCashuSeed } from '@/shared/lib/nostr/secureStorage';
+import { retrieveCashuSeed, retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
+import {
+  useWalletLifecycleStore,
+  useWalletLifecycleHydrated,
+} from '@/shared/stores/global/walletLifecycleStore';
+import { SettingsRecoveryScreen } from '@/features/settings/screens/SettingsRecoveryScreen';
 
 type ReinstallState = 'checking' | 'none' | 'detected';
 
@@ -115,8 +120,98 @@ const AppGate: React.FC<AppGateProps> = ({ children }) => {
     return null;
   }
 
+  return (
+    <Log name="AppGate">
+      <RestoreGate>{children}</RestoreGate>
+    </Log>
+  );
+};
+
+/**
+ * Once keys are ready, evaluates whether a NUT-13 wallet restore must run
+ * before the app proceeds. Mnemonic exists in keychain but our lifecycle store
+ * has no `seedCreatedAt` ⇒ this app installation didn't generate the seed
+ * (reinstall, profile reset, iCloud restore, manual import). Block the app
+ * behind /restore until that's resolved.
+ */
+const RestoreGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const hydrated = useWalletLifecycleHydrated();
+  const restoreStatus = useWalletLifecycleStore((s) => s.restoreStatus);
+  const seedCreatedAt = useWalletLifecycleStore((s) => s.seedCreatedAt);
+  const setRestoreStatus = useWalletLifecycleStore((s) => s.setRestoreStatus);
+  const [evaluated, setEvaluated] = useState(false);
+
+  useEffect(() => {
+    // CRITICAL: wait for AsyncStorage hydration before reading lifecycle
+    // state. Pre-hydration the store returns its in-memory initial values
+    // (restoreStatus='unknown', seedCreatedAt=null) which would falsely
+    // trigger a redirect for existing users on every boot.
+    if (!hydrated) return;
+    if (restoreStatus === 'complete' || restoreStatus === 'not-needed') {
+      setEvaluated(true);
+      return;
+    }
+    if (restoreStatus === 'pending' || restoreStatus === 'in-progress') {
+      // Already decided in a previous boot — the screen will pick it up.
+      setEvaluated(true);
+      return;
+    }
+    // restoreStatus === 'unknown' or 'failed' → resolve now.
+    let cancelled = false;
+    (async () => {
+      try {
+        const mnemonic = await retrieveMnemonic();
+        if (cancelled) return;
+        if (!mnemonic) {
+          // No seed yet (brand new install). ensureMnemonicExists will mark
+          // seedCreatedAt when it generates one — leave restoreStatus alone.
+          setEvaluated(true);
+          return;
+        }
+        if (seedCreatedAt == null) {
+          log.info('gate.restore.needed', { reason: 'seed_pre_existed' });
+          setRestoreStatus('pending');
+        } else {
+          log.debug('gate.restore.skip', { seedCreatedAt });
+          setRestoreStatus('not-needed');
+        }
+      } finally {
+        if (!cancelled) setEvaluated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, restoreStatus, seedCreatedAt, setRestoreStatus]);
+
+  if (!hydrated || !evaluated) {
+    log.debug('gate.restore.evaluating', { hydrated, evaluated });
+    return null;
+  }
+
+  if (
+    restoreStatus === 'pending' ||
+    restoreStatus === 'in-progress' ||
+    restoreStatus === 'failed'
+  ) {
+    log.debug('gate.restore.blocked', { restoreStatus });
+    return (
+      <SettingsRecoveryScreen
+        gateMode
+        onComplete={() => {
+          // Mark seedCreatedAt + restoreStatus complete so on next render
+          // RestoreGate falls through to children. The Continue button only
+          // appears in the `complete` state, which happens after recovery
+          // succeeds — so this is the user's confirmation to proceed.
+          useWalletLifecycleStore.getState().markSeedCreatedNow();
+          useWalletLifecycleStore.getState().markRestoreComplete();
+        }}
+      />
+    );
+  }
+
   log.debug('gate.app.ready');
-  return <Log name="AppGate">{children}</Log>;
+  return <>{children}</>;
 };
 
 export default AppGate;

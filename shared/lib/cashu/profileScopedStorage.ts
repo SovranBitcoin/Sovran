@@ -110,6 +110,7 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'transaction-location-store',
   'transaction-distribution-store',
   'nostr-social-store',
+  'theme-store',
 ];
 
 /**
@@ -139,6 +140,7 @@ async function rehydrateProfileStores(): Promise<void> {
     await import('@/shared/stores/profile/transactionDistributionStore');
   const { useNostrSocialStore } = await import('@/shared/stores/profile/nostrSocialStore');
   const { useNpcMintStore } = await import('@/shared/stores/profile/npcMintStore');
+  const { useThemeStore } = await import('@/shared/stores/profile/themeStore');
 
   // Reset each store to its initial state. Batched to reduce re-render cascade.
   // Skip persist writes so the empty reset state doesn't overwrite
@@ -181,6 +183,11 @@ async function rehydrateProfileStores(): Promise<void> {
         optimisticLikesByEventId: {},
         optimisticRepostsByEventId: {},
       });
+      useThemeStore.setState({
+        _hasHydrated: false,
+        activeAlbumSlug: null,
+        unitWallpapers: {},
+      });
     });
   } finally {
     _skipPersistWrite = false;
@@ -198,6 +205,7 @@ async function rehydrateProfileStores(): Promise<void> {
     useTransactionDistributionStore.persist.rehydrate(),
     useNpcMintStore.persist.rehydrate(),
     useNostrSocialStore.persist.rehydrate(),
+    useThemeStore.persist.rehydrate(),
   ]);
 
   log.info('cashu.storage.rehydrated');

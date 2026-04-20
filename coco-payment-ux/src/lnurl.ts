@@ -8,6 +8,14 @@
 // a lightning address or lnurlp URL into a bolt11 invoice for melt.
 // ---------------------------------------------------------------------------
 
+import {
+  LnurlInvoiceCallback,
+  LnurlPayParams as LnurlPayParamsSchema,
+  parseWith,
+  loggableIssues,
+  type LnurlPayParams,
+} from '@sovranbitcoin/schemas';
+
 const LN_ADDRESS_REGEX =
   /^((?:[^<>()[\]\\.,;:\s@"]+(?:\.[^<>()[\]\\.,;:\s@"]+)*)|(?:".+"))@((?:\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(?:(?:[a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
 
@@ -18,12 +26,8 @@ interface LightningAddress {
   domain: string;
 }
 
-interface LnUrlPayParams {
-  callback: string;
-  minSendable: number;
-  maxSendable: number;
-  tag: string;
-}
+const parsePayParams = parseWith(LnurlPayParamsSchema, 'lnurl/pay-params');
+const parseInvoiceCallback = parseWith(LnurlInvoiceCallback, 'lnurl/invoice-callback');
 
 export function parseLightningAddress(address: string): LightningAddress | null {
   if (!address) return null;
@@ -55,13 +59,24 @@ export function decodeUrlOrAddress(meltTarget: string): string | null {
   return parseLnurlp(meltTarget);
 }
 
-export async function getLnurlPayParams(meltTarget: string): Promise<LnUrlPayParams | null> {
+export async function getLnurlPayParams(meltTarget: string): Promise<LnurlPayParams | null> {
   const url = decodeUrlOrAddress(meltTarget);
   if (!url) return null;
 
   const response = await fetch(url);
-  const data = await response.json();
-  return data as LnUrlPayParams;
+  if (!response.ok) {
+    console.warn('[LNURL] HTTP error fetching pay params:', response.status, response.statusText);
+    return null;
+  }
+  const raw = await response.json();
+  const parsed = parsePayParams(raw);
+  if (parsed.isErr()) {
+    console.warn('[LNURL] Invalid pay params shape', {
+      issues: loggableIssues(parsed.error),
+    });
+    return null;
+  }
+  return parsed.value;
 }
 
 export async function requestInvoiceFromLnurl(
@@ -85,15 +100,18 @@ export async function requestInvoiceFromLnurl(
   }
 
   const response = await fetch(`${params.callback}?amount=${amountMsats}`);
-  const data = await response.json();
-
-  if (!data.pr) {
-    console.warn('[LNURL] No invoice returned | callback:', params.callback, '| response:', JSON.stringify(data).slice(0, 200));
+  const raw = await response.json();
+  const parsed = parseInvoiceCallback(raw);
+  if (parsed.isErr()) {
+    console.warn('[LNURL] Invalid invoice callback shape', {
+      callback: params.callback,
+      issues: loggableIssues(parsed.error),
+    });
     throw new Error('No invoice returned from LNURL endpoint');
   }
 
-  console.info('[LNURL] Invoice received | length:', data.pr.length);
-  return data.pr;
+  console.info('[LNURL] Invoice received | length:', parsed.value.pr.length);
+  return parsed.value.pr;
 }
 
 export function isLightningInvoiceBolt11(invoice: string): boolean {

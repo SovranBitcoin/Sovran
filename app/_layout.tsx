@@ -32,6 +32,7 @@ import { NostrKeysProvider, useNostrKeysContext } from '@/shared/providers/Nostr
 import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
 import { PricelistProvider } from '@/shared/providers/PricelistProvider';
 import { ThemeProvider, useTheme } from '@/shared/providers/ThemeProvider';
+import { ProfileWallpaperProvider } from '@/shared/providers/ProfileWallpaperProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -103,6 +104,7 @@ function AccountScopedProviders({
     () =>
       compose([
         MigrationGate,
+        ProfileWallpaperProvider,
         [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
         [NostrNDKProvider, { accountIndex }],
         CocoProvider,

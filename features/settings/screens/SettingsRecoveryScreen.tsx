@@ -330,7 +330,26 @@ const styles = StyleSheet.create({
 
 // ─── Main screen ────────────────────────────────────────────────────────────
 
-export const SettingsRecoveryScreen: React.FC = () => {
+export interface SettingsRecoveryScreenProps {
+  /**
+   * When true, renders without the Cancel button and without manipulating
+   * navigation options — the screen is a forced gate (rendered inline by
+   * AppGate when `seedCreatedAt` is null), not a route the user can dismiss.
+   */
+  gateMode?: boolean;
+  /**
+   * Fires when recovery transitions to `complete`. In `gateMode`, AppGate
+   * uses this to mark `restoreStatus = 'complete'` so the gate falls through
+   * and the rest of the app mounts. In normal usage this is undefined and
+   * the screen falls back to `router.back()` via its own Close button.
+   */
+  onComplete?: () => void;
+}
+
+export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
+  gateMode = false,
+  onComplete,
+}) => {
   useLifecycleLogger('SettingsRecoveryScreen');
   const [foreground, green400, red400, surfaceSecondary] = useThemeColor([
     'foreground',
@@ -369,8 +388,12 @@ export const SettingsRecoveryScreen: React.FC = () => {
     };
   }, [deepProbe, mints]);
 
-  // Lock navigation when recovery is in progress
+  // Lock navigation when recovery is in progress.
+  // Skipped in gateMode — the screen isn't mounted as a route at all, so
+  // touching navigation options would target the wrong screen and the
+  // beforeRemove listener has no event to prevent.
   useEffect(() => {
+    if (gateMode) return;
     const isLocked = recoveryState === 'recovering';
     navigation.setOptions({
       gestureEnabled: !isLocked,
@@ -381,7 +404,15 @@ export const SettingsRecoveryScreen: React.FC = () => {
       if (isLocked) e.preventDefault();
     });
     return unsubscribe;
-  }, [recoveryState, navigation]);
+  }, [recoveryState, navigation, gateMode]);
+
+  // In gateMode, surface the `complete` state to AppGate so it can mark
+  // restoreStatus + seedCreatedAt and let the rest of the app mount.
+  useEffect(() => {
+    if (gateMode && recoveryState === 'complete' && onComplete) {
+      onComplete();
+    }
+  }, [gateMode, recoveryState, onComplete]);
 
   const handleStartRecovery = useCallback(async () => {
     // Build the full list of mint URLs to restore
@@ -466,6 +497,49 @@ export const SettingsRecoveryScreen: React.FC = () => {
 
       setCurrentMintIndex(-1);
       await Promise.allSettled(allMintUrls.map((url, i) => restoreOneUrl(url, i)));
+
+      // Clean up stuck pending mint operations from before the restore.
+      // These were queued (typically by NPC sync) when the wallet's
+      // deterministic counter was out of sync with the mint, so their
+      // outputData was generated against a counter the mint had already
+      // signed. They will fail forever with `outputs already signed` and
+      // re-loop via the operation watcher. The proofs themselves were
+      // recovered by batchRestore above, so dropping these stale operations
+      // is non-destructive.
+      try {
+        const pendingOps = await manager.ops.mint.listPending();
+        if (pendingOps.length > 0) {
+          // Coco doesn't expose a public abandon API for pending operations,
+          // so reach into the private repository — same pattern this manager
+          // already uses for proofRepository / proofService elsewhere.
+          const repo = (manager as unknown as {
+            mintOperationRepository?: { delete(id: string): Promise<void> };
+          }).mintOperationRepository;
+          if (repo?.delete) {
+            for (const op of pendingOps) {
+              await repo.delete(op.id).catch((e) =>
+                cashuLog.warn('recovery.cleanup.delete_failed', {
+                  operationId: op.id,
+                  mintUrl: op.mintUrl,
+                  error: (e as Error)?.message,
+                })
+              );
+            }
+            cashuLog.info('recovery.cleanup.dropped_stuck_pending_ops', {
+              count: pendingOps.length,
+              operationIds: pendingOps.map((o) => o.id),
+            });
+          } else {
+            cashuLog.warn('recovery.cleanup.no_repo_access', {
+              pendingOpCount: pendingOps.length,
+            });
+          }
+        }
+      } catch (cleanupErr) {
+        cashuLog.warn('recovery.cleanup.failed', {
+          error: (cleanupErr as Error)?.message,
+        });
+      }
 
       await loadMints();
       const totalMs = Math.round((performance.now() - t0) * 100) / 100;
@@ -587,9 +661,11 @@ export const SettingsRecoveryScreen: React.FC = () => {
           textColor={foreground}
           iconColor={surfaceSecondary}
         />
-        <Button variant="secondary" className="w-full" onPress={handleClose}>
-          <Button.Label>Cancel</Button.Label>
-        </Button>
+        {!gateMode && (
+          <Button variant="secondary" className="w-full" onPress={handleClose}>
+            <Button.Label>Cancel</Button.Label>
+          </Button>
+        )}
       </VStack>
     </VStack>
   );
@@ -677,8 +753,11 @@ export const SettingsRecoveryScreen: React.FC = () => {
       </VStack>
 
       <VStack spacing={12} className="w-full pb-6">
-        <Button variant="primary" className="w-full" onPress={handleClose}>
-          <Button.Label>Close</Button.Label>
+        <Button
+          variant="primary"
+          className="w-full"
+          onPress={gateMode ? onComplete : handleClose}>
+          <Button.Label>{gateMode ? 'Continue' : 'Close'}</Button.Label>
         </Button>
       </VStack>
     </VStack>
@@ -805,9 +884,11 @@ export const SettingsRecoveryScreen: React.FC = () => {
             textColor={foreground}
             iconColor={surfaceSecondary}
           />
-          <Button variant="secondary" className="w-full" onPress={handleClose}>
-            <Button.Label>Close</Button.Label>
-          </Button>
+          {!gateMode && (
+            <Button variant="secondary" className="w-full" onPress={handleClose}>
+              <Button.Label>Close</Button.Label>
+            </Button>
+          )}
         </VStack>
       </VStack>
     );

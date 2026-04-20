@@ -6,6 +6,29 @@ import { useInitializationStage } from '@/shared/providers/InitializationProvide
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { log, initLog, deferWork } from '@/shared/lib/logger';
+import {
+  useWalletLifecycleStore,
+  type RestoreStatus,
+} from '@/shared/stores/global/walletLifecycleStore';
+
+/**
+ * Resolves once the wallet-lifecycle restoreStatus is 'complete' or 'not-needed'
+ * — the safe-to-mint signal. Used to gate NPC sync + the mint-operation
+ * processor so they don't fire on a counter the mint already signed.
+ */
+function awaitRestoreReady(): Promise<void> {
+  const isReady = (s: RestoreStatus) => s === 'complete' || s === 'not-needed';
+  const initial = useWalletLifecycleStore.getState().restoreStatus;
+  if (isReady(initial)) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const unsubscribe = useWalletLifecycleStore.subscribe((state, prev) => {
+      if (state.restoreStatus !== prev.restoreStatus && isReady(state.restoreStatus)) {
+        unsubscribe();
+        resolve();
+      }
+    });
+  });
+}
 
 interface CocoContextValue {
   manager: Manager | null;
@@ -156,10 +179,11 @@ export function CocoProvider({ children }: CocoProviderProps) {
       try {
         initLog('Coco-bg', 'Phase 2 starting');
 
-        // Enable watchers/processors/NPC sync (was previously blocking init)
-        initLog('Coco-bg', 'enabling watchers and NPC sync...');
-        await CocoManager.enableWatchersAndSync();
-        initLog('Coco-bg', 'watchers and sync done');
+        // Safe to enable observe-only watchers and pre-warm the seed cache
+        // immediately — neither uses the deterministic counter.
+        initLog('Coco-bg', 'enabling safe watchers...');
+        await CocoManager.enableSafeWatchers();
+        initLog('Coco-bg', 'safe watchers done');
 
         const currentPubkey = keys?.pubkey;
         bgStage.log('Initializing default mints...');
@@ -167,6 +191,17 @@ export function CocoProvider({ children }: CocoProviderProps) {
         const currentSetSelectedMint = useMintStore.getState().setSelectedMint;
         await initializeDefaultMints(manager, currentPubkey, currentSetSelectedMint);
         initLog('Coco-bg', 'initializeDefaultMints done');
+
+        // Block NPC sync + the mint-operation processor until the wallet
+        // has restored its NUT-13 counter (or proven restore isn't needed).
+        // RestoreGate routes the user to /restore when this is pending.
+        initLog('Coco-bg', 'awaiting restore-ready signal before NPC sync...');
+        bgStage.log('Waiting for wallet restore...');
+        await awaitRestoreReady();
+        initLog('Coco-bg', 'restore-ready, starting NPC sync + processor...');
+        bgStage.log('Starting NPC sync...');
+        await CocoManager.enableNpcSyncAndProcessor();
+        initLog('Coco-bg', 'NPC sync + processor done');
 
         try {
           bgStage.log('Recovering pending operations...');

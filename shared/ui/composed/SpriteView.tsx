@@ -7,7 +7,20 @@ import { backgroundImageThemes } from 'config/backgroundImageThemes';
 import { useTheme } from '@/shared/providers/ThemeProvider';
 import { Log, log } from '@/shared/lib/logger';
 
-const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string }) => {
+interface AnimatedSpriteBackgroundProps {
+  backgroundColor: string;
+  /**
+   * Theme to render. When omitted, falls back to the global theme context
+   * (preserves behaviour of existing callsites that haven't migrated to
+   * passing per-unit wallpapers explicitly).
+   */
+  themeName?: string;
+}
+
+const AnimatedSpriteBackground = ({
+  backgroundColor,
+  themeName,
+}: AnimatedSpriteBackgroundProps) => {
   const motion = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   useEffect(() => {
@@ -33,12 +46,12 @@ const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string
     };
   }, [motion]);
 
-  const theme = useTheme();
-
-  const backgroundImageSource = backgroundImageThemes[theme.currentTheme];
+  const ctxTheme = useTheme();
+  const activeTheme = themeName ?? ctxTheme.currentTheme;
+  const backgroundImageSource = backgroundImageThemes[activeTheme];
 
   if (!backgroundImageSource) {
-    log.debug('bg.sprite.render', { theme: theme.currentTheme, hasImage: false });
+    log.debug('bg.sprite.render', { theme: activeTheme, hasImage: false });
     return (
       <Log name="SpriteView">
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor }]}></View>
@@ -46,7 +59,7 @@ const AnimatedSpriteBackground = ({ backgroundColor }: { backgroundColor: string
     );
   }
 
-  log.debug('bg.sprite.render', { theme: theme.currentTheme, hasImage: true });
+  log.debug('bg.sprite.render', { theme: activeTheme, hasImage: true });
 
   return (
     <Log name="SpriteView">
