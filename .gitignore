@@ -6,19 +6,21 @@ log.txt
 # WebDriverAgent bring-up log (start-wda.sh)
 wda.log
 
-# Phone-test runner artefacts (log-doctor phone test)
-#
-# Layout:
-#   tests/.screenshots/  — per-step PNGs. Binary, noisy. Gitignored.
-#   tests/.snapshots/    — per-step pruned AX-tree .snap files.
-#                          COMMITTED — drift shows up in PR diffs.
-#   tests/.diffs/        — failed-diff dumps written when `stable ... across`
-#                          or `assert screen eq` fails. Local-only, gitignored.
-#   tests/.test-runs/    — sidecar transcripts from the TTY reporter. Gitignored.
+# Phone-test runner, artefacts, DSL, and related scripts — all local-only
 .screenshots/
-tests/.screenshots/
-tests/.diffs/
-tests/.test-runs/
+tests/
+.test-drafts/
+scripts/test-dsl/
+scripts/start-wda.sh
+scripts/dev.sh
+docs/device-automation.md
+
+# BitChat / BLE local identity (contains a private key — never commit)
+selfIdentity.plist
+
+# Local scratch working dirs
+__audits__/
+__research__/
 
 # dependencies
 node_modules/
