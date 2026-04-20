@@ -63,7 +63,7 @@ const LIQUID_GLASS_BALANCE_VARIANT: GlassVariant = 'clear';
 // lets the frosted refraction/specular come through. `opacity()` emits
 // `#RRGGBBAA` and the native module parses the alpha channel
 // (see LiquidGlassTextView.color(hex:)).
-const LIQUID_GLASS_BALANCE_TINT_ALPHA = 0.5;
+const LIQUID_GLASS_BALANCE_TINT_ALPHA = 0.75;
 
 // Tap target for the balance. Explicit dimensions are necessary because:
 //   1. The parent VStack uses `align="center"` → children shrink to content.

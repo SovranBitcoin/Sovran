@@ -234,18 +234,14 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
               <UntranslatedText color={foreground} bold size={14}>
                 {displayLabel}
               </UntranslatedText>
-              <HStack align="center" spacing={0}>
-                <UntranslatedText overpass color={isSend ? danger : success} bold size={16}>
-                  {isSend ? '- ' : isReceive ? '+ ' : ''}
-                </UntranslatedText>
-                <AmountFormatter
-                  amount={historyEntry.amount}
-                  unit={historyEntry.unit}
-                  size={16}
-                  weight="heavy"
-                  color={isSend ? danger : success}
-                />
-              </HStack>
+              <AmountFormatter
+                amount={historyEntry.amount}
+                unit={historyEntry.unit}
+                size={16}
+                weight="heavy"
+                color={isSend ? danger : success}
+                sign={isSend ? '-' : isReceive ? '+' : null}
+              />
             </HStack>
 
             <HStack justify="space-between" align="center">

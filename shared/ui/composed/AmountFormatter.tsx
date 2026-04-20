@@ -53,6 +53,14 @@ interface AmountFormatterProps {
   liquid?: boolean;
   /** `regular` = frosted, `clear` = fully transparent. Only used when liquid. */
   glassVariant?: GlassVariant;
+  /**
+   * Prepends a direction glyph to the amount, rendered inside the same text
+   * node so it shares font metrics, color, and (when enabled) the Liquid
+   * Glass surface. Pass `null`/omit for unsigned amounts. The primitive
+   * does not infer a sign from the numeric value — the caller owns direction
+   * semantics (send/receive) and passes an unsigned `amount`.
+   */
+  sign?: '+' | '-' | null;
 }
 
 /**
@@ -77,15 +85,17 @@ export function AmountFormatter({
   transactionType = 'send',
   liquid = false,
   glassVariant = 'regular',
+  sign,
 }: AmountFormatterProps) {
   const [foreground, danger] = useThemeColor(['foreground', 'danger'] as const);
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
 
-  const text = decorate(
+  const decorated = decorate(
     formatAmount({ amount, unit }, { useUserPreference: true }),
     unit,
     displayBtc
   );
+  const text = sign ? `${sign} ${decorated}` : decorated;
 
   const resolvedColor = resolveColor({
     color,

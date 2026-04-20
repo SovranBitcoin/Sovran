@@ -101,15 +101,13 @@ export const TransferEntryRow = React.memo(
               {mintName}
             </UntranslatedText>
             <HStack align="center" spacing={0}>
-              <UntranslatedText overpass color={amountColor} bold size={16}>
-                {isSend ? '- ' : '+ '}
-              </UntranslatedText>
               <AmountFormatter
                 amount={amount}
                 unit={unit}
                 size={16}
                 weight="heavy"
                 color={amountColor}
+                sign={isSend ? '-' : '+'}
               />
               {statusIcon ? <View style={styles.statusIconSlot}>{statusIcon}</View> : null}
             </HStack>
