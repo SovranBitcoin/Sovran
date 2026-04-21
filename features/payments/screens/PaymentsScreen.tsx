@@ -215,4 +215,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     zIndex: 1,
   },
+  hidden: {
+    display: 'none' as const,
+  },
 });

@@ -98,6 +98,15 @@ const useBip321Options = (transactionId: string): string[] | null => {
   });
 };
 
+/** Returns BIP321 option kinds for a transaction, or null if not BIP321. */
+const useBip321Options = (transactionId: string): string[] | null => {
+  return useScanHistoryStore((state) => {
+    const entry = state.entries.find((e) => e.transactionId === transactionId);
+    if (entry?.container !== 'bip321' || !entry.optionKinds?.length) return null;
+    return entry.optionKinds;
+  });
+};
+
 const useHistoryEntry = (historyEntry: HistoryEntry) => {
   const isSend = isOutgoingTransaction(historyEntry);
   const isReceive = !isSend;

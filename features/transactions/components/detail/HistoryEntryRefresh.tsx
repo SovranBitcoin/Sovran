@@ -43,6 +43,7 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
           size={40}
           name={mintInfo?.name}
           alt={`${mintInfo?.name || 'Mint'} icon`}
+          loading={loading}
         />
       </ListGroup.ItemPrefix>
       <ListGroup.ItemContent>

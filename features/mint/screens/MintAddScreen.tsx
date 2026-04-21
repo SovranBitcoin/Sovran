@@ -385,6 +385,16 @@ export function MintAddScreen() {
   // Server-side mint search
   const { results: searchResults, loading: searchLoading } = useMintSearch(searchQuery, selectedCurrency);
 
+  // Hold a skeleton until the discovered list stops changing for 500ms.
+  // Individual fetchMintInfo calls resolve at different times, causing the list
+  // to shift as mints pop in one-by-one. This waits for them to settle.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    setSettled(false);
+    const timer = setTimeout(() => setSettled(true), 500);
+    return () => clearTimeout(timer);
+  }, [discoveredMints]);
+
   const { mints: knownMints } = useMintManagement();
 
   // Adapt server results to display format, filter out already-known mints
