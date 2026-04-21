@@ -215,29 +215,6 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     }
   });
 
-  // Log render state for debugging
-  const renderState = showLoading
-    ? 'loading'
-    : showError
-      ? 'error'
-      : canRenderQR
-        ? 'rendered'
-        : 'fallback';
-  const prevRenderRef = useRef('');
-  useEffect(() => {
-    if (renderState !== prevRenderRef.current) {
-      prevRenderRef.current = renderState;
-      log.debug('ui.qrcode.render', {
-        state: renderState,
-        animated: needsAnimation,
-        partCount: parts.length,
-        frameIndex: needsAnimation ? index : undefined,
-        dataLength: qrData?.length ?? 0,
-        unit,
-      });
-    }
-  });
-
   return (
     <Log name="AnimatedQRCode">
       <View style={{ alignItems: 'center' }}>

@@ -393,7 +393,7 @@ export function MintAddScreen() {
     setSettled(false);
     const timer = setTimeout(() => setSettled(true), 500);
     return () => clearTimeout(timer);
-  }, [discoveredMints]);
+  }, [searchResults]);
 
   const { mints: knownMints } = useMintManagement();
 
