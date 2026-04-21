@@ -44,11 +44,9 @@ export const migrateSettingsFromRedux = async (reduxState?: any) => {
     // Migrate the settings
     const zustandStore = useSettingsStore.getState();
 
-    // Set theme (unified with background image)
-    if (settings.theme) {
-      log.debug('settings.migration.theme', { theme: settings.theme });
-      zustandStore.setTheme(settings.theme);
-    }
+    // Note: Legacy Redux `settings.theme` is intentionally dropped —
+    // theme is now profile-scoped in `themeStore`. Any existing settings
+    // under the legacy Zustand key are migrated by `globalMigrations.ts`.
 
     // Set language
     if (settings.lang) {

@@ -71,6 +71,7 @@ export function HistoryEntryHeader({
       return (
         <View className="relative">
           <Avatar
+            state={recipientProfile.picture ? 'image' : 'fallback'}
             picture={recipientProfile.picture}
             seed={recipientProfile.pubkey}
             size={avatarSize}

@@ -80,7 +80,12 @@ export const TransferEntryRow = React.memo(
       <HStack spacing={12} flex={1}>
         {/* Avatar with small arrow overlay */}
         <View style={styles.avatarWrapper}>
-          <Avatar picture={mintIconUrl} size={36} name={mintName} />
+          <Avatar
+            state={mintIconUrl ? 'image' : 'fallback'}
+            picture={mintIconUrl}
+            size={36}
+            name={mintName}
+          />
           <View style={[styles.arrowBadge, { backgroundColor: surfaceSecondary }]}>
             <Icon
               name={isSend ? 'fluent:arrow-upload-16-filled' : 'fluent:arrow-download-16-filled'}
@@ -96,15 +101,13 @@ export const TransferEntryRow = React.memo(
               {mintName}
             </UntranslatedText>
             <HStack align="center" spacing={0}>
-              <UntranslatedText overpass color={amountColor} bold size={16}>
-                {isSend ? '- ' : '+ '}
-              </UntranslatedText>
               <AmountFormatter
                 amount={amount}
                 unit={unit}
                 size={16}
                 weight="heavy"
                 color={amountColor}
+                sign={isSend ? '-' : '+'}
               />
               {statusIcon ? <View style={styles.statusIconSlot}>{statusIcon}</View> : null}
             </HStack>

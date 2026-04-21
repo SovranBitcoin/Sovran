@@ -1,4 +1,5 @@
 import { Manager } from '@cashu/coco-core';
+import { initNativeCrypto } from './nativeCrypto';
 import { CocoLogger } from './cocoLogger';
 import { ExpoSqliteRepositories } from '@cashu/coco-expo-sqlite';
 import * as SQLite from 'expo-sqlite';
@@ -108,6 +109,10 @@ export class CocoManager {
    * to start watchers, processors, and the initial NPC sync.
    */
   static async initialize(): Promise<Manager> {
+    // Activate native crypto (nutpatch) — must run after cashu-ts is imported
+    // so that __CASHU_NATIVE global exists from the patch. No-op if unavailable.
+    initNativeCrypto();
+
     // If a cleanup() call is still running (e.g. fire-and-forget from CocoProvider
     // unmount during hot reload), wait for it to finish before we decide whether
     // to return the existing instance or start a fresh one.
@@ -235,28 +240,17 @@ export class CocoManager {
   }
 
   /**
-   * Enable watchers, processors, and run initial NPC sync.
-   * Safe to call from a non-blocking background phase — these involve
-   * network I/O and DB transactions that don't need to block app startup.
+   * Enable observe-only watchers and pre-warm the seed cache. Safe to call
+   * before NUT-13 wallet restore has completed — does not start any operation
+   * that uses the deterministic counter.
    */
-  static async enableWatchersAndSync(): Promise<void> {
+  static async enableSafeWatchers(): Promise<void> {
     if (!this.instance) {
       throw new Error('Manager not initialized. Call initialize() first.');
     }
     this.isBackgroundRunning = true;
-    const syncStart = performance.now();
-    cashuLog.info('cashu.manager.watchers_sync.start');
-
-    // Start NPC sync first (dispatches native HTTP), then pre-warm seed.
-    // The synchronous PBKDF2 (~2.5s) runs while the native layer handles NPC HTTP I/O,
-    // so the seed is cached before recovery needs it — no JS thread freeze during usage.
-    const npcPromise = this.npcPlugin
-      ? this.npcPlugin.sync().then(
-          () => initLog('CocoManager', 'NPC sync done'),
-          (error) => cashuLog.warn('cashu.manager.npc_sync_failed', { error })
-        )
-      : Promise.resolve();
-    initLog('CocoManager', 'NPC sync starting...');
+    const t0 = performance.now();
+    cashuLog.info('cashu.manager.safe_watchers.start');
 
     if (this.seedGetter) {
       initLog('CocoManager', 'pre-warming seed cache...');
@@ -264,32 +258,6 @@ export class CocoManager {
       initLog('CocoManager', 'seed cache warmed');
     }
 
-    await npcPromise;
-
-    // Mint quote watcher
-    try {
-      initLog('CocoManager', 'enabling mint quote watcher...');
-      await this.instance.enableMintOperationWatcher({ watchExistingPendingOnStart: true });
-      initLog('CocoManager', 'mint quote watcher enabled');
-    } catch (error) {
-      cashuLog.warn('cashu.manager.quote_watcher_failed', { error });
-    }
-
-    // Mint quote processor
-    try {
-      initLog('CocoManager', 'enabling mint quote processor...');
-      await this.instance.enableMintOperationProcessor({
-        processIntervalMs: 5000,
-        maxRetries: 3,
-        baseRetryDelayMs: 1000,
-        initialEnqueueDelayMs: 2000,
-      });
-      initLog('CocoManager', 'mint quote processor enabled');
-    } catch (error) {
-      cashuLog.warn('cashu.manager.quote_processor_failed', { error });
-    }
-
-    // Proof state watcher
     try {
       initLog('CocoManager', 'enabling proof state watcher...');
       await this.instance.enableProofStateWatcher();
@@ -305,10 +273,74 @@ export class CocoManager {
       }
     }
 
-    this.isBackgroundRunning = false;
-    cashuLog.info('cashu.manager.watchers_sync.done', {
-      duration_ms: Math.round((performance.now() - syncStart) * 100) / 100,
+    cashuLog.info('cashu.manager.safe_watchers.done', {
+      duration_ms: Math.round((performance.now() - t0) * 100) / 100,
     });
+  }
+
+  /**
+   * Start NPC sync, the mint-operation watcher (with `watchExistingPendingOnStart`),
+   * and the mint-operation processor. **Must NOT be called until the wallet
+   * has restored its NUT-13 deterministic counter from the mint** — otherwise
+   * any minting from a paid quote will use a counter the mint already signed,
+   * triggering an `outputs already signed` rejection that retries forever
+   * (see walletLifecycleStore + AppGate's RestoreGate).
+   */
+  static async enableNpcSyncAndProcessor(): Promise<void> {
+    if (!this.instance) {
+      throw new Error('Manager not initialized. Call initialize() first.');
+    }
+    const t0 = performance.now();
+    cashuLog.info('cashu.manager.npc_sync_and_processor.start');
+
+    const npcPromise = this.npcPlugin
+      ? this.npcPlugin.sync().then(
+          () => initLog('CocoManager', 'NPC sync done'),
+          (error) => cashuLog.warn('cashu.manager.npc_sync_failed', { error })
+        )
+      : Promise.resolve();
+    initLog('CocoManager', 'NPC sync starting...');
+
+    await npcPromise;
+
+    try {
+      initLog('CocoManager', 'enabling mint quote watcher...');
+      await this.instance.enableMintOperationWatcher({ watchExistingPendingOnStart: true });
+      initLog('CocoManager', 'mint quote watcher enabled');
+    } catch (error) {
+      cashuLog.warn('cashu.manager.quote_watcher_failed', { error });
+    }
+
+    try {
+      initLog('CocoManager', 'enabling mint quote processor...');
+      await this.instance.enableMintOperationProcessor({
+        processIntervalMs: 5000,
+        maxRetries: 3,
+        baseRetryDelayMs: 1000,
+        initialEnqueueDelayMs: 2000,
+      });
+      initLog('CocoManager', 'mint quote processor enabled');
+    } catch (error) {
+      cashuLog.warn('cashu.manager.quote_processor_failed', { error });
+    }
+
+    this.isBackgroundRunning = false;
+    cashuLog.info('cashu.manager.npc_sync_and_processor.done', {
+      duration_ms: Math.round((performance.now() - t0) * 100) / 100,
+    });
+  }
+
+  /**
+   * Convenience wrapper preserving the previous one-call behaviour for any
+   * code path that doesn't gate on restore. New callers should prefer
+   * {@link enableSafeWatchers} + {@link enableNpcSyncAndProcessor} so NPC
+   * sync can be deferred until after a NUT-13 wallet restore.
+   *
+   * @deprecated Prefer the split methods so NPC sync stays gated on restore.
+   */
+  static async enableWatchersAndSync(): Promise<void> {
+    await this.enableSafeWatchers();
+    await this.enableNpcSyncAndProcessor();
   }
 
   /**

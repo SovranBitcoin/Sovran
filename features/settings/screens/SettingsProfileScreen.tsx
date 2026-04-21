@@ -137,6 +137,7 @@ export const SettingsProfileScreen = () => {
           <Card variant="secondary" className="mb-4">
             <Card.Body className="items-center py-5">
               <Avatar
+                state={profilePicture ? 'image' : 'fallback'}
                 seed={nostrKeys?.pubkey || ''}
                 picture={profilePicture}
                 name={username}

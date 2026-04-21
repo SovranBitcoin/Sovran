@@ -379,7 +379,13 @@ const UserStoriesItem: FC<UserItemProps> = ({
           ))}
         </View>
         <View style={styles.profileRow} pointerEvents="box-none">
-          <Avatar picture={profilePicture} seed={user.pubkey} name={profileName} size={36} />
+          <Avatar
+            state={profilePicture ? 'image' : 'fallback'}
+            picture={profilePicture}
+            seed={user.pubkey}
+            name={profileName}
+            size={36}
+          />
           <Text size={14} bold style={[styles.profileName, styles.flex1]} numberOfLines={1}>
             {profileName}
           </Text>

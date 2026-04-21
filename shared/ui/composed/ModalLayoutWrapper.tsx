@@ -80,6 +80,8 @@ export interface ModalLayoutWrapperProps {
   onHeaderHeightChange?: (height: number) => void;
   /** Insets for the scroll indicator (e.g., to offset below a sticky header overlay) */
   scrollIndicatorInsets?: { top?: number; right?: number; bottom?: number; left?: number };
+  /** Override the default background color (defaults to theme 'background') */
+  bgColor?: string;
 }
 
 export function ModalLayoutWrapper({
@@ -98,10 +100,12 @@ export function ModalLayoutWrapper({
   useCustomScrollView = false,
   onHeaderHeightChange,
   scrollIndicatorInsets,
+  bgColor,
 }: ModalLayoutWrapperProps) {
   const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
-  const background = useThemeColor('background');
+  const themeBackground = useThemeColor('background');
+  const background = bgColor ?? themeBackground;
 
   const [adjustedInsets, setAdjustedInsets] = useState({ top: 0, bottom: 0, left: 0, right: 0 });
 

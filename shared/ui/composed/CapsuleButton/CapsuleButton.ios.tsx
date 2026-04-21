@@ -20,13 +20,15 @@ export interface CapsuleButtonProps {
   onPress: () => void;
   color?: string;
   height?: number;
+  /** Stable accessibility identifier for log-doctor / WDA targeting. */
+  testID?: string;
 }
 
 const DEFAULT_HEIGHT = 46;
 
 export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
   const [foreground, muted] = useThemeColor(['foreground', 'muted'] as const);
-  const { label, icon, onPress, color = foreground, height = DEFAULT_HEIGHT } = props;
+  const { label, icon, onPress, color = foreground, height = DEFAULT_HEIGHT, testID } = props;
 
   if (supportsLiquidGlass()) {
     return (
@@ -39,6 +41,7 @@ export function CapsuleButton(props: CapsuleButtonProps): React.ReactElement {
   return (
     <Log name="CapsuleButton">
       <View
+        testID={testID}
         style={[
           styles.card,
           {

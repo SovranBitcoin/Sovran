@@ -17,6 +17,7 @@ import opacity from 'hex-color-opacity';
 import { prefetchImages } from '@/shared/lib/imageCache';
 import { Tabs } from '@/shared/ui/composed/Tabs';
 import { DraggableContactsList } from '../components/DraggableContactsList';
+import { router } from 'expo-router';
 import { useContactSearch, type DisplayResult } from '../hooks/useContactSearch';
 import { useRecentContacts } from '../hooks/useRecentContacts';
 import { useMintContacts } from '../hooks/useMintContacts';
@@ -69,8 +70,19 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
     getMintInfo,
     dmEvents
   );
-  const { displayResults, searchLoading, hasSearched, showNoResults, handleSearchResultPress } =
+  const { displayResults, searchLoading, hasSearched, showNoResults } =
     useContactSearch(searchQuery);
+
+  const handleSearchResultPress = useCallback(
+    (result: DisplayResult) => {
+      if (!result.profile) return;
+      router.navigate({
+        pathname: '/(user-flow)/profile' as any,
+        params: { pubkey: result.pubkey },
+      });
+    },
+    []
+  );
 
   // Profile subscription
   const profileFilters = useMemo(() => {
@@ -141,33 +153,34 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
                   </BlurCardFrame>
                 </View>
               </ScrollView>
-            ) : null}
-            <View style={[styles.flex1, isSearching && styles.hidden]}>
-              <View style={styles.tabsContainer}>
-                <Tabs
-                  tabs={TABS}
-                  selectedTab={selectedTab}
-                  handleTabPress={handleTabPress}
-                  amounts={[String(displayContacts.length), String(displayMints.length)]}
-                />
+            ) : (
+              <View style={styles.flex1}>
+                <View style={styles.tabsContainer}>
+                  <Tabs
+                    tabs={TABS}
+                    selectedTab={selectedTab}
+                    handleTabPress={handleTabPress}
+                    amounts={[String(displayContacts.length), String(displayMints.length)]}
+                  />
+                </View>
+                {selectedTab === 'Recent activity' ? (
+                  <DraggableContactsList
+                    data={displayContacts}
+                    profilesMap={profilesMap}
+                    isLoadingProfiles={isLoadingProfiles}
+                    emptyMessage="No recent conversations found"
+                  />
+                ) : (
+                  <DraggableContactsList
+                    data={displayMints}
+                    profilesMap={profilesMap}
+                    loading={mintInfoLoading}
+                    isLoadingProfiles={isLoadingProfiles}
+                    emptyMessage="No mints with nostr contacts found"
+                  />
+                )}
               </View>
-              {selectedTab === 'Recent activity' ? (
-                <DraggableContactsList
-                  data={displayContacts}
-                  profilesMap={profilesMap}
-                  isLoadingProfiles={isLoadingProfiles}
-                  emptyMessage="No recent conversations found"
-                />
-              ) : (
-                <DraggableContactsList
-                  data={displayMints}
-                  profilesMap={profilesMap}
-                  loading={mintInfoLoading}
-                  isLoadingProfiles={isLoadingProfiles}
-                  emptyMessage="No mints with nostr contacts found"
-                />
-              )}
-            </View>
+            )}
           </View>
         </SafeAreaView>
       </Screen>

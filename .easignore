@@ -25,8 +25,8 @@ yarn-error.*
 *.tsbuildinfo
 expo-env.d.ts
 .vscode
-android/
-ios/
+/android/
+/ios/
 sovran.money/
 .cursor/skills/
 targets/widget/generated.entitlements

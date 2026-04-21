@@ -59,7 +59,7 @@ export const MintListScreen = memo(function MintListScreen({
 }: MintListScreenProps) {
   useLifecycleLogger('MintListScreen', cashuLog);
 
-  const foreground = useThemeColor('foreground');
+  const [foreground, surface] = useThemeColor(['foreground', 'surface'] as const);
   const scrollY = useSharedValue(0);
   const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
   const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
@@ -180,7 +180,8 @@ export const MintListScreen = memo(function MintListScreen({
       stickyContentHeight={CURRENCY_TABS_HEIGHT}
       useCustomScrollView
       onHeaderHeightChange={setTotalHeaderHeight}
-      bottomContent={bottomButtons}>
+      bottomContent={bottomButtons}
+      bgColor={surface}>
       <Screen name="MintListScreen">
         <LegendList
           data={filteredItems}
@@ -190,7 +191,7 @@ export const MintListScreen = memo(function MintListScreen({
           estimatedItemSize={120}
           drawDistance={300}
           style={{ flex: 1, height: 0 }}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}
+          contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 }}
           ListHeaderComponent={listHeader}
           ListEmptyComponent={emptyComponent}
           onScroll={handleScroll}

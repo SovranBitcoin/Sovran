@@ -38,6 +38,7 @@
  *   ws           WebSocket connection health, subscription analysis, message rates
  *   gc           Hermes memory trend, GC pressure, JS thread blocks, leak detection
  *   budget       Token cost meta-analysis — shows which modes fit in which context windows
+ *   phone        Drive a real iPhone via WebDriverAgent (subcommands: tap, tap-id, tree, shot, …)
  *
  * OPTIONS:
  *   --threshold <ms>    Duration threshold for 'slow' mode (default: 500)
@@ -55,8 +56,35 @@
  */
 
 /* eslint-disable @typescript-eslint/no-var-requires */
-const fs = require('fs') as typeof import('fs');
-const nodePath = require('path') as typeof import('path');
+import * as fs from 'fs';
+import * as nodePath from 'path';
+import * as url from 'url';
+import { spawn, spawnSync } from 'child_process';
+// js-yaml ships without types in this workspace; declare a minimal shape so
+// TypeScript doesn't complain about an implicit any on a default import.
+// @ts-ignore — module has no .d.ts in node_modules
+import * as yaml from 'js-yaml';
+
+// Test DSL — parser, executor, discovery, verification metadata writer.
+// These power the `phone test ...` subcommand. The import is renamed to
+// `formatDslTestList` so it doesn't collide with the legacy YAML helper of
+// the same name still living lower in this file (slated for deletion once
+// the migration is complete).
+import {
+  discoverTests,
+  findMatrix,
+  findTest,
+  formatTestList as formatDslTestList,
+} from './test-dsl/discovery';
+import type { RunnerEvent } from './test-dsl/events';
+import { executeMatrix, executeTest } from './test-dsl/executor';
+import { parseSuite } from './test-dsl/parser';
+import {
+  createTtyReporter,
+  isInteractiveTty,
+  type TtyReporter,
+} from './test-dsl/tty-reporter';
+import { writeMatrixResultTable, writeVerifiedComment } from './test-dsl/verification';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -88,6 +116,8 @@ interface Options {
   format: 'json' | 'yaml' | 'md';
   /** Max approximate token budget. Output is pruned to fit. null = unlimited. */
   tokenBudget: number | null;
+  /** Positional args after the mode name. Used by `phone` mode for subcommands. */
+  restArgs: string[];
 }
 
 // ─── Parse CLI args ──────────────────────────────────────────────────────────
@@ -108,12 +138,16 @@ function parseArgs(argv: string[]): Options {
     latest: false,
     format: 'json',
     tokenBudget: null,
+    restArgs: [],
   };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (!arg.startsWith('--') && i === 0) {
       opts.mode = arg;
+    } else if (!arg.startsWith('--')) {
+      // Positional after the mode — collected for subcommand-style modes (phone).
+      opts.restArgs.push(arg);
     } else if (arg === '--threshold' && args[i + 1]) {
       opts.threshold = parseInt(args[++i], 10);
     } else if (arg === '--context' && args[i + 1]) {
@@ -139,6 +173,10 @@ function parseArgs(argv: string[]): Options {
       if (f === 'yaml' || f === 'md' || f === 'json') opts.format = f;
     } else if (arg === '--token-budget' && args[i + 1]) {
       opts.tokenBudget = parseInt(args[++i], 10);
+    } else {
+      // Unknown flag — pass through to subcommand-style modes (phone test ...).
+      // Subcommand parsers (e.g. parseSaveArgs) decide what to do with it.
+      opts.restArgs.push(arg);
     }
   }
 
@@ -1665,6 +1703,272 @@ function modeGC(entries: LogEntry[], _opts: Options): string {
   return lines.join('\n');
 }
 
+// ─── Mode: crypto ───────────────────────────────────────────────────────────
+
+function modeCrypto(entries: LogEntry[], opts: Options): string {
+  // Crypto ops come from __CASHU_PERF or native_crypto events
+  const cryptoOps = [
+    'hashToCurve', 'hash_e', 'blindMessage', 'unblind', 'constructProof',
+    'schnorr.sign', 'schnorr.verify', 'dleq.verify', 'dleq.verifyReblind',
+    'derive_deprecated', 'deriveBoth', 'createDeterministicData_batch',
+    'createRandomData', 'createSingleRandomData', 'outputData.toProof',
+    'encodeToken', 'decodeToken', 'wallet.checkProofsStates',
+  ];
+
+  // Find cashu.native_crypto events
+  const nativeCryptoEntries = entries.filter(
+    (e) => e.event === 'cashu.native_crypto.enabled'
+  );
+
+  // Find coco perf entries with crypto timing
+  const perfEntries = entries.filter((e) => {
+    const params = e.params as Record<string, unknown> | undefined;
+    return params?._perf === true && typeof params?.ms === 'number';
+  });
+
+  // Find entries that match our crypto operations by event name patterns
+  const cryptoEntries = entries.filter((e) => {
+    return (
+      cryptoOps.some((op) => e.event.includes(op)) ||
+      e.event.includes('native_crypto') ||
+      e.event.includes('hashToCurve') ||
+      e.event.includes('blind') ||
+      e.event.includes('unblind')
+    );
+  });
+
+  const lines: string[] = [];
+  lines.push('=== CRYPTO OPERATIONS ANALYSIS ===');
+  lines.push('');
+
+  // Native crypto status
+  if (nativeCryptoEntries.length > 0) {
+    const lastEntry = nativeCryptoEntries[nativeCryptoEntries.length - 1];
+    const funcs = (lastEntry.params as Record<string, unknown>)?.functions;
+    lines.push(`Native crypto: ENABLED`);
+    lines.push(`  Functions: ${JSON.stringify(funcs)}`);
+  } else {
+    lines.push('Native crypto: NOT DETECTED (JS fallback)');
+  }
+  lines.push('');
+
+  // Aggregate perf entries by operation type
+  const byOp = new Map<string, { count: number; totalMs: number; minMs: number; maxMs: number; native: number; jsCount: number }>();
+  for (const e of perfEntries) {
+    const params = e.params as Record<string, unknown>;
+    // Try to extract op from event name
+    let op = e.event;
+    if (op.startsWith('coco.')) op = op.replace('coco.', '');
+
+    const ms = params.ms as number;
+    const isNative = params.native === true;
+    const existing = byOp.get(op) ?? { count: 0, totalMs: 0, minMs: Infinity, maxMs: 0, native: 0, jsCount: 0 };
+    existing.count++;
+    existing.totalMs += ms;
+    existing.minMs = Math.min(existing.minMs, ms);
+    existing.maxMs = Math.max(existing.maxMs, ms);
+    if (isNative) existing.native++;
+    else existing.jsCount++;
+    byOp.set(op, existing);
+  }
+
+  if (byOp.size > 0) {
+    lines.push('PERF-TAGGED OPERATIONS:');
+    lines.push('');
+    lines.push('  Operation                          Count   Total ms   Avg ms   Min      Max');
+    lines.push('  ' + '-'.repeat(85));
+    for (const [op, stats] of [...byOp.entries()].sort((a, b) => b[1].totalMs - a[1].totalMs)) {
+      const avg = stats.totalMs / stats.count;
+      const nativeTag = stats.native > 0 ? ` [${stats.native} native]` : '';
+      lines.push(
+        `  ${op.padEnd(35)} ${String(stats.count).padStart(5)}   ${stats.totalMs.toFixed(1).padStart(8)}   ${avg.toFixed(2).padStart(6)}   ${stats.minMs.toFixed(2).padStart(6)}   ${stats.maxMs.toFixed(2).padStart(6)}${nativeTag}`
+      );
+    }
+    lines.push('');
+  }
+
+  // Show timeline of crypto events
+  if (cryptoEntries.length > 0) {
+    lines.push(`CRYPTO EVENT TIMELINE (${cryptoEntries.length} entries):`);
+    lines.push('');
+    const { page, footer } = paginate(cryptoEntries, opts);
+    let prevT: number | null = null;
+    for (const e of page) {
+      const t = e._t ?? 0;
+      const delta = prevT !== null ? t - prevT : 0;
+      prevT = t;
+      const params = e.params as Record<string, unknown> | undefined;
+      const ms = params?.ms as number | undefined;
+      const msStr = ms !== undefined ? `${ms.toFixed(2)}ms` : '';
+      lines.push(
+        `${formatDelta(delta)} ${levelIcon(e.level)} ${e.event.padEnd(40).slice(0, 40)} ${msStr}`
+      );
+    }
+    lines.push(footer);
+  }
+
+  return lines.join('\n');
+}
+
+// ─── Mode: ops ──────────────────────────────────────────────────────────────
+
+function modeOps(entries: LogEntry[], opts: Options): string {
+  // Operation phase tracking for mint/melt/send/receive flows
+  const opPatterns = [
+    { prefix: 'coco.mint.', name: 'Mint' },
+    { prefix: 'coco.melt.', name: 'Melt' },
+    { prefix: 'coco.send.', name: 'Send' },
+    { prefix: 'coco.receive.', name: 'Receive' },
+    { prefix: 'coco.restore.', name: 'Restore' },
+    { prefix: 'coco.proof.', name: 'Proof' },
+    { prefix: 'coco.wallet.', name: 'Wallet' },
+  ];
+
+  const lines: string[] = [];
+  lines.push('=== OPERATION PHASE ANALYSIS ===');
+  lines.push('');
+
+  for (const pattern of opPatterns) {
+    const opEntries = entries.filter((e) => e.event.startsWith(pattern.prefix));
+    if (opEntries.length === 0) continue;
+
+    lines.push(`${pattern.name.toUpperCase()} OPERATIONS (${opEntries.length} events):`);
+    lines.push('');
+
+    // Group by sub-event (prepare, execute, etc.)
+    const byPhase = new Map<string, { count: number; totalMs: number; entries: LogEntry[] }>();
+    for (const e of opEntries) {
+      const phase = e.event.replace(pattern.prefix, '');
+      const params = e.params as Record<string, unknown> | undefined;
+      const ms = (params?.ms as number) ?? 0;
+      const existing = byPhase.get(phase) ?? { count: 0, totalMs: 0, entries: [] };
+      existing.count++;
+      existing.totalMs += ms;
+      existing.entries.push(e);
+      byPhase.set(phase, existing);
+    }
+
+    for (const [phase, stats] of [...byPhase.entries()].sort((a, b) => b[1].totalMs - a[1].totalMs)) {
+      const avg = stats.count > 0 ? stats.totalMs / stats.count : 0;
+      const msStr = stats.totalMs > 0 ? ` (${stats.totalMs.toFixed(1)}ms total, ${avg.toFixed(1)}ms avg)` : '';
+      lines.push(`  ${phase.padEnd(25)} ${String(stats.count).padStart(3)}x${msStr}`);
+    }
+    lines.push('');
+  }
+
+  // Show wallet-level operations (wallet.send, wallet.receive, etc. from cashu-ts __CASHU_PERF)
+  const walletOps = entries.filter((e) => {
+    return e.event.startsWith('wallet.action.') || e.event.startsWith('payment.step.') || e.event.startsWith('payment.processing');
+  });
+  if (walletOps.length > 0) {
+    lines.push('WALLET ACTIONS:');
+    lines.push('');
+    const { page, footer } = paginate(walletOps, opts);
+    let prevT: number | null = null;
+    for (const e of page) {
+      const t = e._t ?? 0;
+      const delta = prevT !== null ? t - prevT : 0;
+      prevT = t;
+      const params = e.params as Record<string, unknown> | undefined;
+      const paramsStr = params ? Object.entries(params).filter(([k]) => k !== '_t' && k !== '_dedup').map(([k, v]) => `${k}=${v}`).join(' ') : '';
+      lines.push(`${formatDelta(delta)} ${levelIcon(e.level)} ${e.event.padEnd(35).slice(0, 35)} ${paramsStr}`);
+    }
+    lines.push(footer);
+  }
+
+  return lines.join('\n');
+}
+
+// ─── Mode: perf ─────────────────────────────────────────────────────────────
+
+function modePerf(entries: LogEntry[], _opts: Options): string {
+  // Aggregate all entries with _perf: true or ms field
+  const perfEntries = entries.filter((e) => {
+    const params = e.params as Record<string, unknown> | undefined;
+    return (params?._perf === true || params?.ms !== undefined) && typeof params?.ms === 'number';
+  });
+
+  if (perfEntries.length === 0)
+    return 'No performance-tagged events found. Ensure patches are applied and operations have been performed.';
+
+  const lines: string[] = [];
+  lines.push('=== PERFORMANCE SUMMARY ===');
+  lines.push('');
+
+  // Aggregate by event name
+  const byEvent = new Map<
+    string,
+    { count: number; totalMs: number; minMs: number; maxMs: number; samples: number[] }
+  >();
+  for (const e of perfEntries) {
+    const ms = (e.params as Record<string, unknown>).ms as number;
+    const existing = byEvent.get(e.event) ?? { count: 0, totalMs: 0, minMs: Infinity, maxMs: 0, samples: [] };
+    existing.count++;
+    existing.totalMs += ms;
+    existing.minMs = Math.min(existing.minMs, ms);
+    existing.maxMs = Math.max(existing.maxMs, ms);
+    existing.samples.push(ms);
+    byEvent.set(e.event, existing);
+  }
+
+  // Sort by total time (biggest bottlenecks first)
+  const sorted = [...byEvent.entries()].sort((a, b) => b[1].totalMs - a[1].totalMs);
+
+  lines.push('BOTTLENECK RANKING (by total time):');
+  lines.push('');
+  lines.push('  Event                                  Count   Total ms   Avg ms   Min ms   Max ms   P95 ms');
+  lines.push('  ' + '-'.repeat(100));
+
+  for (const [event, stats] of sorted) {
+    const avg = stats.totalMs / stats.count;
+    const sorted95 = [...stats.samples].sort((a, b) => a - b);
+    const p95 = sorted95[Math.floor(sorted95.length * 0.95)] ?? stats.maxMs;
+    lines.push(
+      `  ${event.padEnd(40).slice(0, 40)} ${String(stats.count).padStart(5)}   ${stats.totalMs.toFixed(1).padStart(8)}   ${avg.toFixed(1).padStart(6)}   ${stats.minMs.toFixed(1).padStart(6)}   ${stats.maxMs.toFixed(1).padStart(6)}   ${p95.toFixed(1).padStart(6)}`
+    );
+  }
+  lines.push('');
+
+  // Show entries with ms > 500 (slow operations)
+  const slowOps = perfEntries.filter((e) => ((e.params as Record<string, unknown>).ms as number) > 500);
+  if (slowOps.length > 0) {
+    lines.push(`SLOW OPERATIONS (>500ms): ${slowOps.length}`);
+    lines.push('');
+    for (const e of slowOps.sort((a, b) => ((b.params as any).ms as number) - ((a.params as any).ms as number)).slice(0, 20)) {
+      const params = e.params as Record<string, unknown>;
+      const ms = params.ms as number;
+      const extra = Object.entries(params)
+        .filter(([k]) => !['ms', '_perf', '_t', '_dedup'].includes(k))
+        .map(([k, v]) => `${k}=${typeof v === 'string' ? v.slice(0, 30) : v}`)
+        .join(' ');
+      lines.push(`  ${ms.toFixed(1).padStart(8)}ms  ${e.event.padEnd(35).slice(0, 35)} ${extra}`);
+    }
+    lines.push('');
+  }
+
+  // Network vs compute breakdown
+  const withNetwork = perfEntries.filter((e) => (e.params as Record<string, unknown>).networkMs !== undefined);
+  if (withNetwork.length > 0) {
+    lines.push('NETWORK vs COMPUTE BREAKDOWN:');
+    lines.push('');
+    let totalCompute = 0;
+    let totalNetwork = 0;
+    for (const e of withNetwork) {
+      const params = e.params as Record<string, unknown>;
+      const total = params.ms as number;
+      const network = params.networkMs as number;
+      totalNetwork += network;
+      totalCompute += total - network;
+    }
+    const pctNetwork = ((totalNetwork / (totalNetwork + totalCompute)) * 100).toFixed(1);
+    lines.push(`  Total compute: ${totalCompute.toFixed(1)}ms`);
+    lines.push(`  Total network: ${totalNetwork.toFixed(1)}ms (${pctNetwork}%)`);
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
 // ─── Mode: budget ───────────────────────────────────────────────────────────
 // Meta-analysis: shows token cost of each mode to help pick the right one.
 
@@ -1791,10 +2095,3030 @@ function applyTokenBudget(output: string, budget: number): string {
   return truncated;
 }
 
+// ─── Phone mode (drive a real iOS device via WebDriverAgent) ────────────────
+//
+// Talks to a WebDriverAgent REST server on localhost:8100 (forwarded by go-ios).
+// Designed to coexist peacefully with mobile-mcp (https://github.com/mobile-next/
+// mobile-mcp), which uses the same WDA. To avoid stealing each other's session,
+// this CLI:
+//
+//   - Reads via the SESSIONLESS endpoints `/source` and `/screenshot` — no
+//     session needed for tree dumps or screenshots.
+//   - Walks the tree itself to locate elements by testID or visible text, then
+//     creates a SHORT-LIVED session JUST for the tap and tears it down.
+//
+// Targeting priority is testID-first:
+//
+//   1. `phone tap-id <testID>`        (preferred — stable across copy/i18n)
+//   2. `phone tap "<visible text>"`   (fallback — emits a nudge if matched
+//                                       element has no testID, telling the
+//                                       agent to add one)
+//   3. `phone tap-xy <x> <y>`         (last resort — always emits a nudge)
+//
+// See `docs/device-automation.md` for the full one-time setup. `npm run dev`
+// brings WDA up automatically alongside Metro.
+
+const WDA_BASE = process.env.WDA_BASE_URL || 'http://localhost:8100';
+
+export interface AXNode {
+  type?: string;
+  label?: string | null;
+  name?: string | null;
+  value?: string | null;
+  rawIdentifier?: string | null;
+  identifier?: string | null;
+  rect?: { x: number; y: number; width: number; height: number };
+  isVisible?: boolean | string;
+  isEnabled?: boolean | string;
+  children?: AXNode[];
+}
+
+export interface FlatNode {
+  type: string;
+  label: string;
+  name: string;
+  identifier: string;
+  rect: { x: number; y: number; width: number; height: number } | null;
+  centerX: number;
+  centerY: number;
+  hasIdent: boolean;
+  hasText: boolean;
+}
+
+/**
+ * Optional sink for WDA recovery / bring-up log lines. When the TTY
+ * reporter is active, it registers a sink that commits each line into
+ * scrollback via the reporter's `commit()` path. Without the sink,
+ * every `▸ WDA ...` / `[wda] ...` line was written directly to
+ * `process.stderr`, which collided with the reporter's live-area
+ * cursor math and corrupted the progress footer with duplicated
+ * headers and bleed-through text. Routing through a sink keeps the
+ * reporter in charge of its own cursor state.
+ *
+ * Default is null → lines fall through to `process.stderr.write` so
+ * non-reporter callers (plain piped output, CI) see the same output
+ * they did before.
+ */
+let recoveryLogSink: ((line: string) => void) | null = null;
+export function setRecoveryLogSink(sink: ((line: string) => void) | null): void {
+  recoveryLogSink = sink;
+}
+/**
+ * Emit a single line of recovery/bring-up progress. Lines land in the
+ * reporter's scrollback when a sink is registered, and on stderr
+ * otherwise. Multi-line input is split so each line is committed
+ * atomically through the sink — the reporter assumes one line per
+ * call, and a single sink invocation with embedded newlines would
+ * break its paint math.
+ */
+function emitRecoveryLine(line: string): void {
+  // Strip a single trailing newline so callers that follow the
+  // `stream.write('foo\n')` convention and callers that don't both
+  // produce the same result.
+  const normalized = line.endsWith('\n') ? line.slice(0, -1) : line;
+  if (normalized.length === 0) return;
+  if (recoveryLogSink) {
+    for (const sub of normalized.split('\n')) recoveryLogSink(sub);
+  } else {
+    process.stderr.write(normalized + '\n');
+  }
+}
+
+/**
+ * Shared recovery promise. When a wdaRequest hits a transport-level
+ * failure (tunnel dropped, forwarder died, port unbound), it triggers
+ * an `ensureWDAReady()` pass. If another request is already running
+ * that pass, it joins the in-flight promise instead of kicking off a
+ * second parallel bring-up — parallel bring-ups race the pkill
+ * cleanup and stomp on each other's tunnels.
+ *
+ * Reset to null once the promise settles so the NEXT drop (hours
+ * later in a long test run) can trigger a fresh bring-up.
+ */
+let wdaRecoveryPromise: Promise<void> | null = null;
+async function recoverWDA(): Promise<void> {
+  // Any cached session is stale after a WDA restart.
+  invalidateCachedSession();
+  if (wdaRecoveryPromise) return wdaRecoveryPromise;
+  wdaRecoveryPromise = (async () => {
+    try {
+      await ensureWDAReady();
+    } finally {
+      wdaRecoveryPromise = null;
+    }
+  })();
+  return wdaRecoveryPromise;
+}
+
+async function wdaRequest(
+  method: 'GET' | 'POST' | 'DELETE',
+  path: string,
+  body?: unknown
+): Promise<any> {
+  const url = `${WDA_BASE}${path}`;
+  const init: RequestInit = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (body !== undefined) init.body = JSON.stringify(body);
+
+  // Transport-level retry with auto-recovery. WDA's userspace tunnel
+  // and port forwarder are fragile on long runs — the forwarder can
+  // die after minutes of traffic, leaving `localhost:8100` with
+  // nothing listening. Every in-flight `wdaRequest` then fails with
+  // `fetch failed`, the test runner tears down a cell, and all the
+  // downstream cells also fail because nothing brought WDA back.
+  //
+  // Recovery strategy: on the first `fetch` throw, call `recoverWDA`
+  // (which serialises through `ensureWDAReady` — the same bring-up
+  // path the runner uses at startup) and retry the request once.
+  // Only transport failures retry; HTTP-level errors (4xx/5xx from
+  // a live WDA) surface immediately — they mean the request was
+  // malformed or the target element is gone, not that the tunnel
+  // died, and retrying would just mask the real cause.
+  //
+  // The retry is bounded at one attempt so a genuinely dead device
+  // fails fast after ~180s (the ensureWDAReady budget) instead of
+  // looping forever.
+  let res: Response | null = null;
+  let transportErr: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      res = await fetch(url, init);
+      break;
+    } catch (err) {
+      transportErr = err;
+      if (attempt === 0) {
+        emitRecoveryLine(
+          `▸ WDA request failed (${(err as Error).message}) — attempting recovery…`
+        );
+        try {
+          await recoverWDA();
+          emitRecoveryLine(`▸ WDA recovered, retrying ${method} ${path}`);
+        } catch (recoveryErr) {
+          // Recovery itself failed — surface the original transport
+          // error wrapped with the usual recovery hint, since that's
+          // the most actionable message the user will see.
+          throw new Error(
+            `WDA unreachable at ${WDA_BASE} and recovery bring-up failed.\n` +
+              `\n` +
+              `Bring it up with:\n` +
+              `  npm run dev          # Metro + WDA in one shot\n` +
+              `  scripts/start-wda.sh # WDA only\n` +
+              `\n` +
+              `See docs/device-automation.md for the full setup.\n` +
+              `Transport error: ${(err as Error).message}\n` +
+              `Recovery error:  ${(recoveryErr as Error).message}`
+          );
+        }
+        continue;
+      }
+      // Second attempt — give up with the original-looking message.
+      throw new Error(
+        `WDA unreachable at ${WDA_BASE}.\n` +
+          `\n` +
+          `Bring it up with:\n` +
+          `  npm run dev          # Metro + WDA in one shot\n` +
+          `  scripts/start-wda.sh # WDA only\n` +
+          `\n` +
+          `See docs/device-automation.md for the full setup.\n` +
+          `Underlying error: ${(err as Error).message}`
+      );
+    }
+  }
+  if (!res) {
+    // Unreachable because either `break` ran (res set) or the loop
+    // threw — but TS needs a narrowing for the block below.
+    throw new Error(
+      `WDA unreachable at ${WDA_BASE}: ${transportErr instanceof Error ? transportErr.message : 'unknown'}`
+    );
+  }
+
+  const text = await res.text();
+  let parsed: any;
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(`WDA returned non-JSON ${res.status} for ${method} ${path}: ${text.slice(0, 200)}`);
+  }
+  if (!res.ok) {
+    const value = (parsed as { value?: { message?: string } }).value;
+    throw new Error(
+      `WDA ${res.status} ${method} ${path}: ${value?.message || JSON.stringify(parsed).slice(0, 300)}`
+    );
+  }
+  return parsed;
+}
+
+/** Get the current accessibility tree without creating a session. */
+export async function getCurrentTree(): Promise<AXNode> {
+  const res = await wdaRequest('GET', '/source?format=json');
+  if (!res.value) throw new Error('WDA /source returned no value');
+  return res.value as AXNode;
+}
+
+export function flattenAll(node: AXNode, out: FlatNode[] = []): FlatNode[] {
+  const rect = node.rect ?? null;
+  const label = node.label || '';
+  const name = node.name || '';
+  const ident = node.rawIdentifier || node.identifier || '';
+  out.push({
+    type: node.type || '',
+    label,
+    name,
+    identifier: ident,
+    rect,
+    centerX: rect ? Math.round(rect.x + rect.width / 2) : 0,
+    centerY: rect ? Math.round(rect.y + rect.height / 2) : 0,
+    hasIdent: !!ident,
+    hasText: !!(label || name),
+  });
+  if (node.children) for (const c of node.children) flattenAll(c, out);
+  return out;
+}
+
+/**
+ * Find the back button of the topmost (most recently rendered) navigation
+ * bar. iOS Stack screens render their back button as the FIRST Button
+ * descendant of an `XCUIElementTypeNavigationBar`. When multiple modals are
+ * stacked (e.g. wallet home + a presented modal), both nav bars are in the
+ * tree — we want the LAST one, which corresponds to the topmost modal.
+ *
+ * Returns null when there's no nav bar with a back button (e.g. on the
+ * root screen with no presented modal).
+ */
+function findFirstButtonDescendant(node: AXNode): AXNode | null {
+  if (node.type === 'XCUIElementTypeButton') return node;
+  if (node.children) {
+    for (const c of node.children) {
+      const found = findFirstButtonDescendant(c);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function countDescendantButtons(node: AXNode): number {
+  let n = node.type === 'XCUIElementTypeButton' ? 1 : 0;
+  if (node.children) for (const c of node.children) n += countDescendantButtons(c);
+  return n;
+}
+
+interface NavBackHit {
+  button: AXNode;
+  centerX: number;
+  centerY: number;
+}
+
+export function findTopmostNavBackButton(tree: AXNode): NavBackHit | null {
+  let last: NavBackHit | null = null;
+  function walk(node: AXNode): void {
+    if (node.type === 'XCUIElementTypeNavigationBar' && node.children) {
+      const button = findFirstButtonDescendant(node);
+      if (button && button.rect && button.rect.width > 0 && button.rect.height > 0) {
+        last = {
+          button,
+          centerX: Math.round(button.rect.x + button.rect.width / 2),
+          centerY: Math.round(button.rect.y + button.rect.height / 2),
+        };
+      }
+    }
+    if (node.children) for (const c of node.children) walk(c);
+  }
+  walk(tree);
+  return last;
+}
+
+function ellipsis(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + '…' : s;
+}
+
+function formatNodeLine(n: FlatNode): string {
+  const t = (n.type || '').replace('XCUIElementType', '').padEnd(12);
+  const id = n.identifier ? `[${n.identifier}] ` : '';
+  const labelOrName = n.label || n.name || '';
+  const text = labelOrName ? `"${ellipsis(labelOrName, 60)}" ` : '';
+  const at = n.rect
+    ? `@${n.centerX},${n.centerY} ${n.rect.width}x${n.rect.height}`
+    : '';
+  return `${t} ${id}${text}${at}`.trimEnd();
+}
+
+function formatTreeOutput(nodes: FlatNode[], showAll: boolean): string {
+  // testID-first sort: nodes with rawIdentifier come first, then text-only nodes,
+  // then everything else (only when --all). Within each bucket, sort by visual
+  // position (top-down, left-right).
+  const withId = nodes.filter((n) => n.hasIdent);
+  const withText = nodes.filter((n) => !n.hasIdent && n.hasText);
+  const rest = nodes.filter((n) => !n.hasIdent && !n.hasText);
+  const positionSort = (a: FlatNode, b: FlatNode) =>
+    a.centerY - b.centerY || a.centerX - b.centerX;
+  withId.sort(positionSort);
+  withText.sort(positionSort);
+  rest.sort(positionSort);
+
+  const sections: string[] = [];
+  if (withId.length > 0) {
+    sections.push('# testID-targetable (preferred)');
+    sections.push(...withId.map(formatNodeLine));
+  } else {
+    sections.push('# testID-targetable (preferred)');
+    sections.push('  (none — none of the visible elements have a testID set)');
+  }
+  if (withText.length > 0) {
+    sections.push('');
+    sections.push('# text-only (fallback — fragile to copy/i18n)');
+    sections.push(...withText.map(formatNodeLine));
+  }
+  if (showAll && rest.length > 0) {
+    sections.push('');
+    sections.push(`# unlabeled containers (--all, ${rest.length} nodes)`);
+    sections.push(...rest.slice(0, 200).map(formatNodeLine));
+    if (rest.length > 200) sections.push(`  …and ${rest.length - 200} more`);
+  }
+  return sections.join('\n');
+}
+
+export function findByTestID(nodes: FlatNode[], id: string): FlatNode | null {
+  return nodes.find((n) => n.identifier === id) || null;
+}
+
+interface TextMatch {
+  node: FlatNode;
+  matchKind: 'exact' | 'substring';
+}
+
+export function findByText(nodes: FlatNode[], text: string): TextMatch | null {
+  const exact = nodes.find(
+    (n) =>
+      n.rect && // must be tappable (has a rect)
+      (n.label === text || n.name === text)
+  );
+  if (exact) return { node: exact, matchKind: 'exact' };
+  const lower = text.toLowerCase();
+  const sub = nodes.find(
+    (n) =>
+      n.rect &&
+      ((n.label && n.label.toLowerCase().includes(lower)) ||
+        (n.name && n.name.toLowerCase().includes(lower)))
+  );
+  if (sub) return { node: sub, matchKind: 'substring' };
+  return null;
+}
+
+// ─── Cached WDA session for fast element queries ────────────────────────────
+//
+// `waitForID` and `waitForText` poll for element appearance. The old approach
+// fetched the full accessibility tree (`GET /source?format=json`) each poll —
+// fast on simple screens, but **seconds** on dense ones (~130 transaction
+// rows). WDA's W3C `POST /session/{sid}/element` finds a single element by
+// accessibility id WITHOUT serialising the whole tree, bringing per-poll cost
+// from seconds down to ~20-80ms.
+//
+// The session is created lazily on first use, reused across all fast-path
+// calls, and invalidated on any error that suggests staleness.
+
+let _cachedSessionId: string | null = null;
+let _sessionCreating: Promise<string> | null = null;
+
+async function getCachedSession(): Promise<string> {
+  if (_cachedSessionId) return _cachedSessionId;
+  // Dedup concurrent callers — don't create N sessions in parallel.
+  if (_sessionCreating) return _sessionCreating;
+  _sessionCreating = (async () => {
+    const created = await wdaRequest('POST', '/session', {
+      capabilities: { alwaysMatch: { platformName: 'iOS' } },
+    });
+    const sid: string | undefined = created.sessionId || created.value?.sessionId;
+    if (!sid) throw new Error('WDA POST /session did not return a sessionId');
+    _cachedSessionId = sid;
+    return sid;
+  })();
+  try {
+    return await _sessionCreating;
+  } finally {
+    _sessionCreating = null;
+  }
+}
+
+function invalidateCachedSession(): void {
+  const old = _cachedSessionId;
+  _cachedSessionId = null;
+  if (old) {
+    // Best-effort cleanup in the background — don't block the caller.
+    wdaRequest('DELETE', `/session/${old}`).catch(() => {});
+  }
+}
+
+export async function destroyCachedSession(): Promise<void> {
+  const old = _cachedSessionId;
+  _cachedSessionId = null;
+  if (old) {
+    await wdaRequest('DELETE', `/session/${old}`).catch(() => {});
+  }
+}
+
+// ─── Fast element finders ───────────────────────────────────────────────────
+//
+// These use the W3C WebDriver `POST /session/{sid}/element` endpoint which
+// resolves a single element without serialising the full tree. Returns true
+// if the element exists, false if WDA reports "no such element", and throws
+// on session-level errors so the caller can invalidate and fall back.
+
+async function fastFindByID(sid: string, accessibilityId: string): Promise<boolean> {
+  try {
+    await wdaRequest('POST', `/session/${sid}/element`, {
+      using: 'accessibility id',
+      value: accessibilityId,
+    });
+    return true;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // WDA returns status 7 (NoSuchElement) or a 404 when the element
+    // isn't in the tree — that's a normal "not found", not an error.
+    if (/no such element|NoSuchElement/i.test(msg) || msg.includes('404')) {
+      return false;
+    }
+    throw err; // session-level error — propagate
+  }
+}
+
+async function fastFindByText(sid: string, text: string): Promise<boolean> {
+  const escaped = text.replace(/'/g, "\\'");
+  try {
+    await wdaRequest('POST', `/session/${sid}/element`, {
+      using: '-ios predicate string',
+      value: `label == '${escaped}' OR name == '${escaped}'`,
+    });
+    return true;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/no such element|NoSuchElement/i.test(msg) || msg.includes('404')) {
+      return false;
+    }
+    throw err;
+  }
+}
+
+async function ephemeralSession<T>(fn: (sessionId: string) => Promise<T>): Promise<T> {
+  const created = await wdaRequest('POST', '/session', {
+    capabilities: { alwaysMatch: { platformName: 'iOS' } },
+  });
+  const sessionId: string | undefined = created.sessionId || created.value?.sessionId;
+  if (!sessionId) {
+    throw new Error(`WDA POST /session did not return a sessionId: ${JSON.stringify(created)}`);
+  }
+  try {
+    return await fn(sessionId);
+  } finally {
+    try {
+      await wdaRequest('DELETE', `/session/${sessionId}`);
+    } catch {
+      /* best effort */
+    }
+  }
+}
+
+export async function tapXY(x: number, y: number): Promise<void> {
+  await ephemeralSession((sid) => wdaRequest('POST', `/session/${sid}/wda/tap`, { x, y }));
+}
+
+/**
+ * Cached logical window size from WDA `GET /window/size`. Cached because the
+ * iPhone's logical bounds don't change between steps and the round-trip is
+ * non-trivial — we typically only need it for swipe coordinate math.
+ */
+let cachedWindowSize: { width: number; height: number } | null = null;
+async function getWindowSize(): Promise<{ width: number; height: number }> {
+  if (cachedWindowSize) return cachedWindowSize;
+  const size = await ephemeralSession(async (sid) => {
+    const res = await wdaRequest('GET', `/session/${sid}/window/size`);
+    const value = (res.value || res) as { width?: number; height?: number };
+    if (typeof value.width !== 'number' || typeof value.height !== 'number') {
+      throw new Error(`WDA /window/size returned unexpected payload: ${JSON.stringify(res)}`);
+    }
+    return { width: value.width, height: value.height };
+  });
+  cachedWindowSize = size;
+  return size;
+}
+
+/**
+ * Perform a flick (fast swipe with velocity) from one logical screen point to
+ * another via WDA's W3C `POST /session/{sid}/actions` endpoint.
+ *
+ * `wda/dragfromtoforduration` is a press-and-hold-then-drag — it doesn't
+ * impart velocity, so iOS treats it as a slow drag rather than a flick.
+ * That's the wrong gesture for sheet dismissal: iOS snaps the sheet back
+ * unless EITHER the drag passes the dismissal threshold OR the release
+ * velocity is high enough. We use the W3C action sequence to control the
+ * exact pointer-move timing, giving a clean flick that iOS recognises.
+ *
+ * `moveDurationMs` is the duration of the pointerMove from `from` to `to`.
+ * Shorter = higher velocity = more flick-like. ~120ms is a good default.
+ */
+async function flickFromTo(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  moveDurationMs: number = 120
+): Promise<void> {
+  await ephemeralSession((sid) =>
+    wdaRequest('POST', `/session/${sid}/actions`, {
+      actions: [
+        {
+          type: 'pointer',
+          id: 'finger1',
+          parameters: { pointerType: 'touch' },
+          actions: [
+            { type: 'pointerMove', duration: 0, x: fromX, y: fromY },
+            { type: 'pointerDown', button: 0 },
+            { type: 'pause', duration: 30 },
+            { type: 'pointerMove', duration: moveDurationMs, x: toX, y: toY },
+            { type: 'pointerUp', button: 0 },
+          ],
+        },
+      ],
+    })
+  );
+}
+
+/**
+ * Perform a directional swipe across the screen.
+ *
+ * Logical coordinates are taken from `getWindowSize()` so the gesture works
+ * the same on every device. The swipe spans 70% of the relevant axis with a
+ * brisk 0.35s duration — long enough to register as a flick but short enough
+ * to feel natural.
+ */
+export async function swipe(direction: 'up' | 'down' | 'left' | 'right'): Promise<void> {
+  const { width, height } = await getWindowSize();
+  const cx = width / 2;
+  const cy = height / 2;
+  const span = (axis: number) => axis * 0.35; // half of the 70% travel
+  let from: { x: number; y: number };
+  let to: { x: number; y: number };
+  switch (direction) {
+    case 'down':
+      from = { x: cx, y: cy - span(height) };
+      to = { x: cx, y: cy + span(height) };
+      break;
+    case 'up':
+      from = { x: cx, y: cy + span(height) };
+      to = { x: cx, y: cy - span(height) };
+      break;
+    case 'left':
+      from = { x: cx + span(width), y: cy };
+      to = { x: cx - span(width), y: cy };
+      break;
+    case 'right':
+      from = { x: cx - span(width), y: cy };
+      to = { x: cx + span(width), y: cy };
+      break;
+  }
+  await flickFromTo(from.x, from.y, to.x, to.y, 120);
+}
+
+/**
+ * Dismiss the topmost iOS modal sheet by performing the native swipe-down
+ * gesture from the navigation bar area to the bottom of the screen.
+ *
+ * Used as a fast alternative to `relaunch-app` when a test wants to return
+ * to the root screen after pushing through a modal stack (e.g. receive-flow,
+ * send-flow). The gesture has to start in a non-scrollable region near the
+ * top — the nav bar at y≈80–110 logical points is the most reliable spot.
+ *
+ * iOS dismisses a sheet when EITHER:
+ *   - the drag passes ~50% of the modal height, OR
+ *   - the release velocity is high enough to be a flick.
+ *
+ * We use a long, brisk drag (top → 90% of screen, 0.4s) so we hit both
+ * conditions and dismiss reliably across screen sizes.
+ */
+export async function dismissModal(): Promise<void> {
+  const { width, height } = await getWindowSize();
+  // Start the swipe BELOW the iOS notification banner zone (~y=0-110)
+  // and BELOW the modal nav bar (which can be obscured by a banner).
+  // y≈130 lands in the top of the modal's content area: when the scroll
+  // is at the top (true after every navigation in our tests), iOS treats
+  // the downward drag as a sheet-dismiss gesture rather than a scroll.
+  // This avoids the gesture being intercepted by an arriving push
+  // notification banner.
+  const fromX = Math.round(width / 2);
+  const fromY = Math.round(Math.min(130, height * 0.16));
+  const toX = fromX;
+  const toY = Math.round(height * 0.92);
+  // 100ms move duration → ~7000 pts/sec on a 850-tall device — well above
+  // iOS's flick-velocity threshold so the sheet dismisses on release rather
+  // than snapping back.
+  await flickFromTo(fromX, fromY, toX, toY, 100);
+  // Settle the dismissal animation so subsequent waits see the destination.
+  await sleep(500);
+}
+
+export async function typeKeys(text: string): Promise<void> {
+  await ephemeralSession((sid) =>
+    wdaRequest('POST', `/session/${sid}/wda/keys`, { value: text.split('') })
+  );
+}
+
+export async function pressHome(): Promise<void> {
+  await ephemeralSession((sid) => wdaRequest('POST', `/session/${sid}/wda/homescreen`));
+}
+
+export async function relaunchApp(bundleId: string): Promise<void> {
+  await ephemeralSession(async (sid) => {
+    try {
+      await wdaRequest('POST', `/session/${sid}/wda/apps/terminate`, { bundleId });
+    } catch {
+      /* may not be running */
+    }
+    await wdaRequest('POST', `/session/${sid}/wda/apps/launch`, { bundleId });
+  });
+  // Expo dev clients show a "Dev tools" menu sheet on launch that can render
+  // anywhere from 0 to ~15 seconds after the process starts, and sometimes
+  // re-renders right after dismissal. Poll aggressively: every 400ms for
+  // 15 seconds, dismissing every xmark we find. After a successful dismiss,
+  // do an extra 2-second confirmation pass to catch a delayed second
+  // instance. Soft-fails if the menu never appears (production builds).
+  await dismissDevMenuRepeatedly(15_000);
+}
+
+/**
+ * Repeatedly poll for the Expo dev menu [xmark] close button and tap it
+ * whenever it appears. After the first successful dismiss, we run an
+ * extra confirmation window because the dev menu can re-render moments
+ * after the initial dismissal animation completes.
+ *
+ * Used by `relaunchApp` (long initial window) and by the test executor's
+ * pre-tap pre-flight (short window — see preflightDismissDevMenu).
+ */
+export async function dismissDevMenuRepeatedly(totalMs: number): Promise<void> {
+  const start = Date.now();
+  let dismissedAt = 0;
+  while (Date.now() - start < totalMs) {
+    try {
+      const tree = await getCurrentTree();
+      const flat = flattenAll(tree);
+      const xmark = findByTestID(flat, 'xmark');
+      if (xmark && xmark.rect) {
+        await tapXY(xmark.centerX, xmark.centerY);
+        await sleep(400);
+        dismissedAt = Date.now();
+        continue; // immediately recheck — sometimes a second sheet renders
+      }
+      // No xmark right now. If we already dismissed once, give the dev
+      // menu a 2-second grace window to re-render. Otherwise keep polling.
+      if (dismissedAt && Date.now() - dismissedAt > 2000) return;
+    } catch {
+      /* WDA may briefly drop the source while the app is restarting */
+    }
+    await sleep(400);
+  }
+}
+
+/**
+ * Quick (single-shot) check for the dev menu, used by the test executor
+ * before each tap. Bounded at ~600ms total so it doesn't slow down clean
+ * runs. The full retry behaviour stays in `dismissDevMenuRepeatedly`.
+ */
+export async function preflightDismissDevMenu(): Promise<void> {
+  // Loop the recovery logic up to 3 times. Why: several obstructions
+  // can coexist (e.g. a notification banner sitting on top of the app
+  // switcher, because a background coco-created payment notification
+  // arrived after an earlier gesture pushed Sovran into the switcher).
+  // A one-shot preflight handles the first-matched condition and
+  // returns; the next step then re-fetches the tree, finds the SECOND
+  // condition still present, and fails before another preflight runs.
+  // Iterating here keeps the whole recovery bounded to one step entry
+  // but lets multiple obstructions drain in a single pass.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const tree = await getCurrentTree();
+      const flat = flattenAll(tree);
+
+      // ── 0. iOS paste permission dialog — HIGHEST PRIORITY ──
+      // This system alert can overlay both the app AND the app switcher,
+      // blocking all interaction underneath. Must be dismissed first.
+      const allowPaste = flat.find(
+        (n) =>
+          (n.label === 'Allow Paste' || n.name === 'Allow Paste') &&
+          n.rect && n.rect.width > 30
+      );
+      if (allowPaste && allowPaste.rect) {
+        await tapXY(allowPaste.centerX, allowPaste.centerY);
+        await sleep(400);
+        continue;
+      }
+
+      // ── 1. iOS App Switcher (Sovran is in background) — HIGHEST PRIORITY ──
+      // Detected via SBSwitcherWindow / AppSwitcherContentView in the
+      // tree. If this is present, nothing else matters — taps into the
+      // app will just land on the switcher background. Bring the app
+      // back to foreground FIRST, then re-check for notifications or
+      // dev menus on the next iteration.
+      //
+      // The card has a stable testID
+      // `card:com.sovranbitcoin.dev:sceneID:com.sovranbitcoin.dev-default`.
+      const switcher = flat.find((n) => n.identifier === 'SBSwitcherWindow:Main');
+      if (switcher) {
+        const card = flat.find(
+          (n) =>
+            n.identifier &&
+            n.identifier.startsWith('card:com.sovranbitcoin.dev:sceneID')
+        );
+        if (card && card.rect) {
+          await tapXY(card.centerX, card.centerY);
+          await sleep(600);
+          continue; // recheck — a banner may still be on top
+        }
+        // No card visible — fall back to terminate + relaunch to bail
+        // out of whatever switcher state we're stuck in.
+        await relaunchApp('com.sovranbitcoin.dev');
+        continue;
+      }
+
+      // ── 2. iOS notification banner ──
+      // Detected via NotificationShortLookView (iOS 16+) or
+      // ShortLook.Platter (iOS 15). The banner overlays the top portion
+      // of the screen and absorbs taps beneath it.
+      //
+      // IMPORTANT: the previous implementation did a fast 200pt upward
+      // flick starting at the banner's centre. On a tall modern iPhone
+      // a fast upward flick anywhere near the top of the screen can
+      // race iOS's edge-gesture recogniser and trigger the app
+      // switcher, which is exactly what broke the downstream tests.
+      //
+      // Safer approach: swipe upward ONLY within the banner's own rect
+      // — start at the banner's bottom edge, end just above its top —
+      // and use a slower move duration so iOS recognises it as a
+      // standard banner dismiss drag, not a system-edge flick.
+      const notification = flat.find(
+        (n) =>
+          n.identifier === 'NotificationShortLookView' ||
+          n.identifier === 'ShortLook.Platter'
+      );
+      if (notification && notification.rect) {
+        const r = notification.rect;
+        const cx = Math.round(r.x + r.width / 2);
+        const bottom = Math.round(r.y + r.height * 0.85);
+        const top = Math.round(Math.max(10, r.y + r.height * 0.1));
+        // 300ms move duration over ~50-80pt — inside-banner drag, not a
+        // fast system flick.
+        await flickFromTo(cx, bottom, cx, top, 300);
+        await sleep(500);
+        continue; // re-check: dismissing the banner may have revealed a dev menu
+      }
+
+      // ── 3. Expo dev menu (xmark close button) ──
+      const xmark = findByTestID(flat, 'xmark');
+      if (xmark && xmark.rect) {
+        await tapXY(xmark.centerX, xmark.centerY);
+        await sleep(400);
+        continue;
+      }
+
+      // Nothing to recover from — we're clean.
+      return;
+    } catch {
+      /* best effort — WDA may briefly drop the source; retry */
+    }
+  }
+}
+
+export function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+export async function takeScreenshot(outPath?: string): Promise<string> {
+  // Sessionless screenshot endpoint.
+  const res = await wdaRequest('GET', '/screenshot');
+  if (!res.value) throw new Error('WDA /screenshot returned no value');
+  const target = outPath || nodePath.join(process.cwd(), `wda-${Date.now()}.png`);
+  fs.writeFileSync(target, Buffer.from(res.value, 'base64'));
+  return target;
+}
+
+/** Build the "you used a fallback — add a testID" nudge for an agent. */
+function buildAddTestIDNudge(node: FlatNode, calledAs: string): string {
+  const labelOrName = node.label || node.name || '(unlabeled)';
+  const grepTerm = labelOrName.replace(/"/g, '\\"');
+  const suggestedID = labelOrName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return [
+    '',
+    '⚠  TAPPED BY VISIBLE TEXT — please add a testID',
+    '',
+    `   You ran:  ${calledAs}`,
+    `   Element:  ${node.type.replace('XCUIElementType', '')} "${labelOrName}" @(${node.centerX},${node.centerY})`,
+    '',
+    '   This match is fragile to copy or i18n changes. To make future taps',
+    '   stable, add a testID to the source component:',
+    '',
+    `     1) Find it:  rg -n '${grepTerm}' --type tsx --type ts`,
+    `     2) Add prop: testID="${suggestedID}"`,
+    '        (on the <Pressable>, <Button>, or ButtonHandlerButton config)',
+    '     3) Save — Metro hot-reloads the dev client automatically.',
+    `     4) Next time:  npm run log-doctor -- phone tap-id ${suggestedID}`,
+    '',
+    '   Sovran convention: kebab-case `<screen>-<action>`, e.g.',
+    '   `receive-fixed-amount`, `send-confirm`, `mint-add`.',
+  ].join('\n');
+}
+
+function buildCoordTapNudge(x: number, y: number): string {
+  return [
+    '',
+    '⚠  COORDINATE-BASED TAP — brittle, please switch to a testID',
+    '',
+    `   You ran:  phone tap-xy ${x} ${y}`,
+    '',
+    '   Coordinates break on screen-size, layout, or theme changes. Replace',
+    '   this with a testID-based tap:',
+    '',
+    '     1) Inspect the screen:  npm run log-doctor -- phone tree',
+    '     2) If the target element has a `[testID]` listed → use it:',
+    '          npm run log-doctor -- phone tap-id <testID>',
+    '     3) If it does NOT have one → add one in the source component',
+    '        (kebab-case, e.g. `receive-fixed-amount`) and use tap-id after',
+    '        Metro hot-reloads.',
+  ].join('\n');
+}
+
+// ─── Test runner (`phone test …`) ──────────────────────────────────────────
+//
+// TESTS.yml at the repo root holds verified end-to-end flows. The runner
+// supports two modes:
+//
+//   phone test <name>          — re-run an existing test
+//   phone test --list          — list registered tests
+//   phone test all             — run every registered test
+//   phone test save <name>     — record a NEW test (executes steps live, only
+//                                writes to TESTS.yml if every step passes)
+//
+// `save` is the only path that mutates TESTS.yml — there is no way to add a
+// test without it actually running first. See TESTS.yml header for the rules.
+
+/**
+ * A step is a single-key YAML object whose value is either a primitive
+ * (string/number/boolean) for simple step kinds or a nested object for
+ * step kinds that take multiple parameters (e.g. `capture-id-suffix`,
+ * `assert-starts-with`).
+ */
+type TestStep = { [k: string]: unknown };
+
+/** Step kinds that take a primitive arg (string most of the time). */
+const PRIMITIVE_STEP_KINDS = [
+  'tap-id', 'tap-text', 'tap-id-if-present', 'tap-text-if-present',
+  'wait-for', 'wait-for-text', 'wait-for-id-prefix',
+  'assert-id', 'assert-text', 'assert-id-prefix',
+  'type', 'keypad',
+  'home', 'relaunch-app', 'dismiss-dev-menu', 'screenshot',
+  'capture-clipboard',
+  'tap-back', 'dismiss-modal', 'swipe',
+] as const;
+
+/** Step kinds that take a nested object arg with multiple keys. */
+const OBJECT_STEP_KINDS = [
+  'capture-id-suffix',  // { prefix: string, as: string }
+  'capture-id-label',   // { id: string, as: string }
+  'assert-starts-with', // { var: string, prefix: string } | { value: string, prefix: string }
+  'assert-contains',    // { var: string, needle: string } | { value: string, needle: string }
+  'assert-eq',          // { a: string, b: string }
+] as const;
+
+interface TestVerified {
+  date: string;
+  by: string;
+  device?: string;
+  'last-run'?: string;
+}
+
+interface TestEntry {
+  description?: string;
+  steps: TestStep[];
+  verified?: TestVerified;
+}
+
+interface TestsRules {
+  forbidden_step_kinds?: string[];
+  forbidden_target_patterns?: string[];
+}
+
+interface TestsDocument {
+  rules?: TestsRules;
+  tests?: Record<string, TestEntry>;
+}
+
+const TESTS_PATH = nodePath.resolve(process.cwd(), 'TESTS.yml');
+const STEP_TIMEOUT_MS = 90_000;
+
+function loadTestsDoc(): TestsDocument {
+  if (!fs.existsSync(TESTS_PATH)) {
+    throw new Error(
+      `TESTS.yml not found at ${TESTS_PATH}.\n` +
+        'Create it with the rules header (see existing template) or cd to the repo root.'
+    );
+  }
+  const doc = yaml.load(fs.readFileSync(TESTS_PATH, 'utf-8')) as TestsDocument;
+  return doc || { tests: {} };
+}
+
+/**
+ * Normalize a YAML list item to a single-key TestStep object. js-yaml parses
+ * a bare list item like `- dismiss-dev-menu` as the string "dismiss-dev-menu",
+ * not an object — convert those into `{ "dismiss-dev-menu": true }` so the
+ * step interpreter handles them uniformly.
+ */
+function normalizeStep(raw: unknown): TestStep {
+  if (typeof raw === 'string') {
+    return { [raw]: true } as TestStep;
+  }
+  return raw as TestStep;
+}
+
+function stepKind(step: TestStep): string {
+  const keys = Object.keys(step);
+  if (keys.length !== 1) {
+    throw new Error(`Step must have exactly one key, got: ${JSON.stringify(step)}`);
+  }
+  return keys[0];
+}
+
+function stepArg(step: TestStep): string | undefined {
+  const k = stepKind(step);
+  const v = step[k];
+  if (v === undefined || v === null || typeof v === 'boolean') return undefined;
+  if (typeof v === 'object') return undefined;
+  return String(v);
+}
+
+function stepArgObj(step: TestStep): Record<string, unknown> | undefined {
+  const k = stepKind(step);
+  const v = step[k];
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    return v as Record<string, unknown>;
+  }
+  return undefined;
+}
+
+/**
+ * Replace `${name}` references in a string with the matching value from
+ * `vars`. Throws if a referenced var is undefined. Recurses into nested
+ * objects/arrays so step args declared as objects also get interpolated.
+ */
+function interpolate(value: unknown, vars: Record<string, string>): unknown {
+  if (typeof value === 'string') {
+    return value.replace(/\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, (_match, name) => {
+      if (!(name in vars)) {
+        throw new Error(`undefined variable '${name}' (defined: ${Object.keys(vars).join(', ') || 'none'})`);
+      }
+      return vars[name];
+    });
+  }
+  if (Array.isArray(value)) return value.map((v) => interpolate(v, vars));
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(value)) {
+      out[k] = interpolate((value as Record<string, unknown>)[k], vars);
+    }
+    return out;
+  }
+  return value;
+}
+
+function previewValue(s: string, max = 60): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1) + '…';
+}
+
+/**
+ * Read the iOS clipboard via WDA. iOS 14+ blocks pasteboard reads from
+ * background apps, so we have to briefly bring the WDA runner to the
+ * foreground, read, and then re-activate the target app. The user sees a
+ * brief visual flicker between WDA and Sovran — that's expected.
+ */
+export async function readClipboard(targetBundleId = 'com.sovranbitcoin.dev'): Promise<string> {
+  return await ephemeralSession(async (sid) => {
+    // Step 1: bring the WDA runner to the foreground so iOS allows the read.
+    const wdaBundle = 'com.kelbie.WebDriverAgentRunner.xctrunner';
+    try {
+      await wdaRequest('POST', `/session/${sid}/wda/apps/activate`, { bundleId: wdaBundle });
+      // Brief settle so foreground state actually flips before the read.
+      await sleep(400);
+    } catch {
+      /* if activation fails, attempt the read anyway */
+    }
+
+    // Step 2: read the pasteboard.
+    let text = '';
+    try {
+      const res = await wdaRequest('POST', `/session/${sid}/wda/getPasteboard`, {
+        contentType: 'plaintext',
+      });
+      const b64 = res.value;
+      if (typeof b64 === 'string') {
+        text = Buffer.from(b64, 'base64').toString('utf-8');
+      }
+    } finally {
+      // Step 3: bring the target app back to the foreground regardless of
+      // whether the read succeeded, so subsequent steps see the right
+      // screen. Note: NO explicit post-activate sleep — the next step's
+      // own preflight (tap, keypad, capture all call
+      // `preflightDismissDevMenu` first, which always fetches the tree)
+      // naturally gives the target app time to return to foreground.
+      // The old `await sleep(400)` here added 400ms of dead time to
+      // every clipboard read and wasn't load-bearing in practice.
+      try {
+        await wdaRequest('POST', `/session/${sid}/wda/apps/activate`, {
+          bundleId: targetBundleId,
+        });
+      } catch {
+        /* best effort */
+      }
+    }
+    return text;
+  });
+}
+
+/**
+ * Write to the iOS clipboard via WDA. Same foreground dance as
+ * readClipboard — iOS blocks pasteboard writes from background apps.
+ */
+/**
+ * Set by writeClipboard, cleared after the next alert/accept succeeds.
+ * Tells the fast-path polling to check for the iOS paste dialog.
+ */
+export let _clipboardWritePending = false;
+
+export async function writeClipboard(
+  text: string,
+  targetBundleId = 'com.sovranbitcoin.dev'
+): Promise<void> {
+  await ephemeralSession(async (sid) => {
+    const wdaBundle = 'com.kelbie.WebDriverAgentRunner.xctrunner';
+    try {
+      await wdaRequest('POST', `/session/${sid}/wda/apps/activate`, { bundleId: wdaBundle });
+      await sleep(400);
+    } catch {
+      /* if activation fails, attempt the write anyway */
+    }
+
+    try {
+      const b64 = Buffer.from(text, 'utf-8').toString('base64');
+      await wdaRequest('POST', `/session/${sid}/wda/setPasteboard`, {
+        content: b64,
+        contentType: 'plaintext',
+      });
+      _clipboardWritePending = true;
+    } finally {
+      try {
+        await wdaRequest('POST', `/session/${sid}/wda/apps/activate`, {
+          bundleId: targetBundleId,
+        });
+      } catch {
+        /* best effort */
+      }
+    }
+  });
+}
+
+function validateStep(step: TestStep, rules: TestsRules | undefined): void {
+  const kind = stepKind(step);
+  if (rules?.forbidden_step_kinds?.includes(kind)) {
+    throw new Error(
+      `Step kind '${kind}' is forbidden by TESTS.yml rules. ` +
+        `Add a testID to the target component and use 'tap-id' instead.`
+    );
+  }
+  const arg = stepArg(step);
+  if (arg && rules?.forbidden_target_patterns) {
+    for (const pat of rules.forbidden_target_patterns) {
+      if (new RegExp(pat).test(arg)) {
+        throw new Error(
+          `Step target "${arg}" matches forbidden pattern /${pat}/. ` +
+            `Session-variable data (amounts, dates, IDs) MUST NOT appear in test steps.`
+        );
+      }
+    }
+  }
+  // Step shape sanity
+  const validKinds: readonly string[] = [...PRIMITIVE_STEP_KINDS, ...OBJECT_STEP_KINDS];
+  if (!validKinds.includes(kind)) {
+    throw new Error(`Unknown step kind: '${kind}'. Valid kinds: ${validKinds.join(', ')}`);
+  }
+}
+
+async function pollFor<T>(
+  fn: () => Promise<T | null>,
+  timeoutMs: number,
+  intervalMs = 400
+): Promise<T> {
+  const start = Date.now();
+  let last: T | null = null;
+  while (Date.now() - start < timeoutMs) {
+    last = await fn();
+    if (last) return last;
+    await sleep(intervalMs);
+  }
+  throw new Error(`timeout after ${timeoutMs}ms`);
+}
+
+/**
+ * Read an element's label/name via the cached WDA session. Returns the
+ * label string or null if not found. Used by capture steps to avoid
+ * the full tree fetch (~15-30s) when only one element's text is needed.
+ */
+export async function captureElementLabel(accessibilityId: string): Promise<string | null> {
+  try {
+    const sid = await getCachedSession();
+    const findRes = await wdaRequest('POST', `/session/${sid}/element`, {
+      using: 'accessibility id',
+      value: accessibilityId,
+    });
+    const eid: string | undefined =
+      findRes.value?.ELEMENT || findRes.value?.element;
+    if (!eid) return null;
+    // Try label first, then name.
+    for (const attr of ['label', 'name']) {
+      const res = await wdaRequest('GET', `/session/${sid}/element/${eid}/attribute/${attr}`);
+      if (typeof res.value === 'string' && res.value.length > 0) {
+        return res.value;
+      }
+    }
+    return null;
+  } catch {
+    invalidateCachedSession();
+    return null;
+  }
+}
+
+export async function tapByID(id: string): Promise<void> {
+  // ── Fast path: session-based element find + rect ──
+  // Avoids the full tree serialisation (seconds on dense screens) by
+  // using two lightweight session calls: POST /element → GET /element/{eid}/rect.
+  try {
+    const sid = await getCachedSession();
+    const findRes = await wdaRequest('POST', `/session/${sid}/element`, {
+      using: 'accessibility id',
+      value: id,
+    });
+    const eid: string | undefined =
+      findRes.value?.ELEMENT || findRes.value?.element;
+    if (eid) {
+      const rectRes = await wdaRequest('GET', `/session/${sid}/element/${eid}/rect`);
+      const r = rectRes.value;
+      if (r && typeof r.x === 'number') {
+        const cx = Math.round(r.x + r.width / 2);
+        const cy = Math.round(r.y + r.height / 2);
+        // Off-screen guard (same logic as the full-tree path).
+        const { width, height } = await getWindowSize();
+        if (cx >= 0 && cx <= width && cy >= 0 && cy <= height) {
+          await tapXY(cx, cy);
+          return;
+        }
+        throw new Error(
+          `element [${id}] is off-screen (center ${cx},${cy} outside ${width}x${height} viewport). ` +
+            `Use \`scroll until #${id} visible\` before tapping.`
+        );
+      }
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Off-screen errors should propagate, not fall through.
+    if (msg.includes('is off-screen')) throw err;
+    // "No such element" or session errors → fall through to full-tree path.
+    if (!/no such element|NoSuchElement/i.test(msg) && !msg.includes('404')) {
+      invalidateCachedSession();
+    }
+  }
+
+  // ── Full-tree fallback ──
+  const tree = await getCurrentTree();
+  const flat = flattenAll(tree);
+  const node = findByTestID(flat, id);
+  if (!node) {
+    const visible = flat
+      .filter((n) => n.hasIdent)
+      .map((n) => `  ${n.identifier}`)
+      .slice(0, 20)
+      .join('\n');
+    throw new Error(
+      `no element with testID="${id}" on the current screen.\n` +
+        (visible ? `visible testIDs:\n${visible}` : '(no testIDs visible)')
+    );
+  }
+  if (!node.rect) throw new Error(`element [${id}] has no rect`);
+
+  const { width, height } = await getWindowSize();
+  if (
+    node.centerX < 0 ||
+    node.centerX > width ||
+    node.centerY < 0 ||
+    node.centerY > height
+  ) {
+    throw new Error(
+      `element [${id}] is off-screen (center ${node.centerX},${node.centerY} outside ${width}x${height} viewport). ` +
+        `Use \`scroll until #${id} visible\` before tapping — XCUITest will otherwise route the injected touch to whatever's at the visible edge.`
+    );
+  }
+
+  await tapXY(node.centerX, node.centerY);
+}
+
+/**
+ * Scroll the screen in `direction` (`up` = swipe finger up = content
+ * moves up = later items come into view) until the node identified by
+ * `predicate` is FULLY inside the current viewport, or until the
+ * timeout expires.
+ *
+ * "Fully inside" means the whole `rect` — top, bottom, left, right —
+ * is within the window bounds, with a small inset so the target isn't
+ * flush against the status bar or home-indicator area (both of which
+ * absorb taps). Short, repeated flicks (not one big swipe) because
+ * iOS's scroll inertia + XCUITest's tree-refresh latency make it
+ * trivial to overshoot on a big flick.
+ *
+ * The predicate is a function that inspects the current tree and
+ * returns the target node (or null if it can't be found yet). That
+ * way this helper works for both `#foo` exact matches and
+ * `#foo-prefix*` wildcards — the executor passes the appropriate
+ * lookup function.
+ *
+ * Returns the final matched node on success; throws on timeout with
+ * a message listing what *was* found, to help the user figure out
+ * whether they mistyped the selector or whether the list just didn't
+ * contain what they expected.
+ */
+export async function scrollUntilVisible(
+  predicate: (flat: FlatNode[]) => FlatNode | null,
+  // Direction is a *hint*, used only when the target can't be found in
+  // the tree at all. When the target IS found, we compute the direction
+  // from its actual rect — scrolling the opposite way wastes iterations
+  // and misleads the error message on timeout. `up` = swipe finger up
+  // = content moves up = reveal rows below the current viewport.
+  hintDirection: 'up' | 'down',
+  label: string,
+  // Scroll-until gets its own, longer timeout by default because each
+  // iteration pulls a full `/source?format=json` tree from WDA, which
+  // can take several seconds on a dense screen (e.g. the wallet home
+  // with a loaded transaction list). 90s gives enough iterations to
+  // scroll a long list without being so permissive that a stuck test
+  // hangs the runner indefinitely.
+  timeoutMs: number = STEP_TIMEOUT_MS
+): Promise<FlatNode> {
+  const { width, height } = await getWindowSize();
+  // Vertical safe-area insets — the home indicator at the bottom of
+  // modern iPhones overlaps the last ~34pt of the window and any tap
+  // within it is routed to the system gesture recognizer, not the app.
+  // The notch area at the top is less of a concern (most scroll
+  // containers start below the nav bar) but we pad both sides for
+  // symmetry.
+  const SAFE_TOP = 60;
+  const SAFE_BOTTOM = 60;
+  const viewportTop = SAFE_TOP;
+  const viewportBottom = height - SAFE_BOTTOM;
+
+  const isFullyVisible = (node: FlatNode): boolean => {
+    if (!node.rect) return false;
+    const r = node.rect;
+    return (
+      r.x >= 0 &&
+      r.y >= viewportTop &&
+      r.x + r.width <= width &&
+      r.y + r.height <= viewportBottom
+    );
+  };
+
+  // ADAPTIVE flicks anchored in the LOWER half of the screen. The
+  // geometry has to respect three simultaneous constraints:
+  //
+  //   1. **Tree-fetch cost dominates.** Each iteration pulls a full
+  //      `/source?format=json` tree from WDA. On a dense wallet home
+  //      (~130 transaction rows mounted because `showMore=true` uses
+  //      a flat VStack, not a virtualized list), that fetch runs
+  //      several seconds. Every wasted iteration blows ~10% of the
+  //      60s budget — the loop can't afford to iterate 20 times.
+  //
+  //   2. **Monotonic convergence, not ping-pong.** A fixed 50%-span
+  //      flick that misses the target's viewport gap by even one flick
+  //      puts the target ABOVE the viewport the next iteration, then
+  //      the direction flips and the next flick overshoots the other
+  //      way. A big-enough list + bad-enough timing produces infinite
+  //      oscillation. The fix: AIM at the viewport CENTER, not at the
+  //      opposite side. On each iteration, compute the delta between
+  //      the target's centre-y and the viewport's centre-y, and flick
+  //      by exactly that distance (clamped).
+  //
+  //   3. **Don't land inside the AccountPagerView Swiper.** The
+  //      wallet home's top ~36% is a horizontal
+  //      react-native-web-infinite-swiper that absorbs vertical
+  //      gestures originating inside its hit region. Every flick
+  //      must START below it (flickLowY anchored at ~82% of screen),
+  //      and the upper end must stay above the bottom home-indicator
+  //      region (y ≥ 15% of screen). Since we clamp flickDist at
+  //      ≤35% of viewport, the finger never crosses into the Swiper
+  //      zone during a flick.
+  const flickDurationMs = 300;
+  const cx = Math.round(width / 2);
+  const flickLowY = Math.round(height * 0.82);
+  const viewportCenterY = Math.round(viewportTop + (viewportBottom - viewportTop) / 2);
+  // Max usable flick span — stays well above the Swiper region and
+  // below the home indicator.
+  const flickMax = Math.round(height * 0.35);
+  // Min flick span — below this, iOS rubber-band damping eats the
+  // gesture and `node.rect.y` moves by sub-pixel amounts that would
+  // spuriously trip the stall detector.
+  const flickMin = Math.round(height * 0.15);
+  // Default push when the target isn't in the tree yet — a medium
+  // distance that makes visible progress without overshooting a
+  // just-about-to-appear row.
+  const flickHint = Math.round(height * 0.3);
+
+  /**
+   * Execute a single flick of `flickDist` logical points in `dir`.
+   * `up` means "finger moves up, content shifts up, rows below
+   * viewport come into view". Finger always originates at flickLowY
+   * (below the Swiper) and the other end of the drag is computed
+   * from the requested distance so bigger flicks reach higher on the
+   * screen but never crest the bottom-of-Swiper line.
+   */
+  const doFlick = async (dir: 'up' | 'down', flickDist: number): Promise<void> => {
+    const span = Math.max(flickMin, Math.min(flickMax, Math.round(flickDist)));
+    // The high end of the flick — always above flickLowY by `span` pts.
+    const topY = Math.max(Math.round(height * 0.15), flickLowY - span);
+    if (dir === 'up') {
+      await flickFromTo(cx, flickLowY, cx, topY, flickDurationMs);
+    } else {
+      await flickFromTo(cx, topY, cx, flickLowY, flickDurationMs);
+    }
+  };
+
+  /**
+   * Cheap fingerprint of the current flat tree used to decide whether
+   * the scroll view actually moved / changed between iterations. We
+   * only need enough entropy to detect "exact same tree" vs "some
+   * change"; full hashing is overkill and the `flat.length` + outer
+   * identifiers are stable enough to flag a truly-stuck screen.
+   */
+  const fingerprint = (flat: FlatNode[]): string =>
+    `${flat.length}:${flat[0]?.identifier ?? ''}:${flat[flat.length - 1]?.identifier ?? ''}`;
+
+  const startedAt = Date.now();
+  const deadline = startedAt + timeoutMs;
+  let iterations = 0;
+  // Stall detection: if the node's y stops changing between flicks,
+  // we've hit the end of the scroll view and further scrolling won't
+  // help — bail out early with a useful message instead of timing out.
+  let lastY: number | null = null;
+  let stallCount = 0;
+  // Null-node stall: when the target selector matches zero nodes AND
+  // the tree hasn't changed for several iterations, the list simply
+  // doesn't contain the element. Fail fast with a precise error
+  // instead of flicking for the full 60s budget.
+  let lastFingerprint: string | null = null;
+  let nullStreak = 0;
+
+  while (Date.now() < deadline) {
+    const tree = await getCurrentTree();
+    const flat = flattenAll(tree);
+    const node = predicate(flat);
+
+    if (node && isFullyVisible(node)) {
+      return node;
+    }
+
+    // Obstruction recovery: if the tree now contains a notification
+    // banner, app switcher, or dev menu, we've been pushed out of the
+    // app mid-scroll. Without this, scroll-until burns its 60s budget
+    // flicking a scroll view it can't reach and fails with a confusing
+    // "timed out" message. With it, a Signal banner arriving 20s into
+    // the scroll is dismissed and the loop continues.
+    //
+    // Cheap check: we already have the flat tree for this iteration —
+    // look for the obstruction markers before issuing another fetch.
+    // If found, call preflight (which will do its own fetch + recover)
+    // and restart the iteration so the next pass sees the recovered
+    // tree.
+    const obstructed = flat.some(
+      (n) =>
+        n.identifier === 'SBSwitcherWindow:Main' ||
+        n.identifier === 'NotificationShortLookView' ||
+        n.identifier === 'ShortLook.Platter' ||
+        n.identifier === 'xmark'
+    );
+    if (obstructed) {
+      await preflightDismissDevMenu();
+      // Reset trackers — the obstructed iteration's lastY and tree
+      // fingerprint are not meaningful comparisons against post-recovery.
+      lastY = null;
+      stallCount = 0;
+      lastFingerprint = null;
+      nullStreak = 0;
+      continue;
+    }
+
+    // Pick the scroll direction AND distance for THIS iteration.
+    let dir: 'up' | 'down' = hintDirection;
+    let flickDist = flickHint;
+
+    if (node && node.rect) {
+      // Target IS in the tree. Compute the gap between its centre and
+      // the viewport centre, and flick exactly that much in the sign
+      // direction — clamped so a single flick can't overshoot the
+      // opposite edge.
+      const nodeCenterY = node.rect.y + node.rect.height / 2;
+      const delta = nodeCenterY - viewportCenterY;
+      dir = delta > 0 ? 'up' : 'down';
+      flickDist = Math.min(flickMax, Math.abs(delta));
+
+      // Stall detection on y — if the rect barely moved between flicks
+      // we're pinned against a scroll edge. Bail out cleanly.
+      if (lastY !== null && Math.abs(node.rect.y - lastY) < 8) {
+        stallCount++;
+        if (stallCount >= 3) {
+          throw new Error(
+            `scroll until ${label} visible: scrolled to the edge of the list but target is still outside the viewport (y=${Math.round(node.rect.y)}, viewport ${viewportTop}..${viewportBottom}). The element may be inside a fixed-height container or overlapped by the home indicator.`
+          );
+        }
+      } else {
+        stallCount = 0;
+      }
+      lastY = node.rect.y;
+      // Reset the null-streak tracker — we DID find the node this iter.
+      lastFingerprint = null;
+      nullStreak = 0;
+    } else {
+      // Target NOT in the tree. Track how many iterations in a row this
+      // persists WITH the tree unchanged — indicates the list simply
+      // doesn't contain the selector, not that we're still scrolling
+      // toward it. Fail fast after 5 such iterations (at ~8s per fetch
+      // on a dense wallet home, that's ~40s, well inside the budget).
+      const fp = fingerprint(flat);
+      if (fp === lastFingerprint) {
+        nullStreak++;
+        if (nullStreak >= 5) {
+          throw new Error(
+            `scroll until ${label} visible: selector matched zero nodes across 5 iterations and the tree is not changing — check the testID or confirm the list actually contains this entry`
+          );
+        }
+      } else {
+        nullStreak = 0;
+      }
+      lastFingerprint = fp;
+      // Target-less iterations use the hint direction and a medium
+      // flick — enough progress to keep moving, but not so much we
+      // blow past a row that's about to mount.
+      dir = hintDirection;
+      flickDist = flickHint;
+    }
+
+    await doFlick(dir, flickDist);
+    // Tiny settle after the flick so the next tree-read sees the new
+    // scroll offset. 150ms is a compromise between letting iOS's
+    // post-drag animation settle and keeping iterations fast.
+    await sleep(150);
+    iterations++;
+
+    // Safety valve — even without a stall, don't scroll forever.
+    // 40 flicks at up to ~35% viewport each is ~14 screens of scroll,
+    // comfortably more than any realistic list we target.
+    if (iterations > 40) {
+      break;
+    }
+  }
+
+  throw new Error(
+    `scroll until ${label} visible: timed out after ${Date.now() - startedAt}ms (${iterations} flicks)`
+  );
+}
+
+export async function tapByText(text: string): Promise<{ node: FlatNode; nudge: boolean }> {
+  // ── Fast path: session-based predicate find + rect ──
+  try {
+    const sid = await getCachedSession();
+    const escaped = text.replace(/'/g, "\\'");
+    const findRes = await wdaRequest('POST', `/session/${sid}/element`, {
+      using: '-ios predicate string',
+      value: `label == '${escaped}' OR name == '${escaped}'`,
+    });
+    const eid: string | undefined =
+      findRes.value?.ELEMENT || findRes.value?.element;
+    if (eid) {
+      const rectRes = await wdaRequest('GET', `/session/${sid}/element/${eid}/rect`);
+      const r = rectRes.value;
+      if (r && typeof r.x === 'number') {
+        const cx = Math.round(r.x + r.width / 2);
+        const cy = Math.round(r.y + r.height / 2);
+        await tapXY(cx, cy);
+        // Can't determine nudge without the full tree — assume no nudge
+        // on the fast path (the element was found by text, so it likely
+        // lacks a testID, but we skip the nudge to avoid the tree fetch).
+        return { node: { identifier: '', label: text, name: text, type: '', rect: r, centerX: cx, centerY: cy, hasIdent: false }, nudge: true };
+      }
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!/no such element|NoSuchElement/i.test(msg) && !msg.includes('404')) {
+      invalidateCachedSession();
+    }
+  }
+
+  // ── Full-tree fallback ──
+  const tree = await getCurrentTree();
+  const flat = flattenAll(tree);
+  const match = findByText(flat, text);
+  if (!match) throw new Error(`no element matches text "${text}" on the current screen`);
+  await tapXY(match.node.centerX, match.node.centerY);
+  return { node: match.node, nudge: !match.node.hasIdent };
+}
+
+export async function tapKeypadDigit(digit: string): Promise<void> {
+  if (!/^[0-9]$/.test(digit)) {
+    throw new Error(`keypad arg must be a single digit 0-9, got "${digit}"`);
+  }
+  // Pre-flight: dismiss any dev menu, notification banner, or app
+  // switcher obstruction before looking for the keypad. `execStep`'s
+  // `keypad` case calls this helper directly rather than going
+  // through `performTap`, so without this call the keypad path
+  // bypasses the recovery logic every other tap gets. Cell 1/4 of
+  // the send-token coverage matrix failed because of exactly this:
+  // a notification banner arrived between `wait for #amount-next`
+  // and `keypad 1`, the keypad was still on screen under the banner,
+  // but `findByTestID` on the banner-containing tree couldn't see
+  // the digit.
+  await preflightDismissDevMenu();
+  // Small settle: when called immediately after a navigation, the keypad
+  // can be in the tree but not yet ready to receive taps (its underlying
+  // gesture handler is still attaching). 200ms is enough to clear that
+  // race in practice.
+  await sleep(200);
+  const tree = await getCurrentTree();
+  const flat = flattenAll(tree);
+  // Keypad digits are sized buttons (~60x60). Filter to nodes whose label/name
+  // is exactly the digit AND have a sizeable rect, to avoid hitting a static
+  // text "1" elsewhere on screen.
+  const candidates = flat.filter(
+    (n) =>
+      n.rect &&
+      (n.label === digit || n.name === digit) &&
+      n.rect.width >= 40 &&
+      n.rect.height >= 40
+  );
+  if (candidates.length === 0) {
+    throw new Error(
+      `no keypad digit "${digit}" visible. ` +
+        `Either the keypad isn't on screen, or its digits aren't sized as expected (>=40px).`
+    );
+  }
+  // Pick the largest match (the keypad button, not any incidental text).
+  candidates.sort((a, b) => (b.rect!.width * b.rect!.height) - (a.rect!.width * a.rect!.height));
+  await tapXY(candidates[0].centerX, candidates[0].centerY);
+  // Tiny post-tap settle so subsequent steps see the updated amount/state.
+  await sleep(150);
+}
+
+/**
+ * Detect whether a freshly-flattened tree is showing an obstruction
+ * that will prevent the app's own testIDs from ever matching — an
+ * iOS notification banner, the app switcher, or the Expo dev menu.
+ *
+ * Used by the wait/scroll/tap helpers to drive an in-loop call to
+ * `preflightDismissDevMenu` when an obstruction is noticed mid-poll.
+ * Without this, a banner sliding in during a 10s wait makes the
+ * whole poll window useless — none of the app's testIDs are in the
+ * Springboard-rooted tree the query returns, and the caller times
+ * out on an element that was always there underneath.
+ */
+function treeHasObstruction(flat: FlatNode[]): boolean {
+  return flat.some(
+    (n) =>
+      n.identifier === 'SBSwitcherWindow:Main' ||
+      n.identifier === 'NotificationShortLookView' ||
+      n.identifier === 'ShortLook.Platter' ||
+      n.identifier === 'xmark' ||
+      n.label === 'Allow Paste' || n.name === 'Allow Paste'
+  );
+}
+
+export async function waitForID(id: string, timeoutMs: number = STEP_TIMEOUT_MS): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  const FAST_POLL_MS = 80;
+  const OBSTRUCTION_INTERVAL_MS = 2_000;
+  let lastObstructionCheck = Date.now();
+  let fastPathFailed = false;
+
+  while (Date.now() < deadline) {
+    const now = Date.now();
+
+    // ── Periodic full-tree check for obstructions ──
+    // Every ~2s (and on the very first iteration) we fall back to the
+    // full tree fetch so we can detect dev-menu overlays, notification
+    // banners, and the iOS app switcher. While we have the tree, we
+    // also check for the element itself — it's free at that point.
+    if (now - lastObstructionCheck >= OBSTRUCTION_INTERVAL_MS) {
+      lastObstructionCheck = now;
+      try {
+        const tree = await getCurrentTree();
+        const flat = flattenAll(tree);
+        if (findByTestID(flat, id)) return;
+        if (treeHasObstruction(flat)) {
+          await preflightDismissDevMenu();
+          invalidateCachedSession();
+          continue;
+        }
+      } catch {
+        // Tree fetch failed — try fast path anyway.
+      }
+    }
+
+    // ── Fast path: session-based POST /element ──
+    if (!fastPathFailed) {
+      try {
+        const sid = await getCachedSession();
+        if (await fastFindByID(sid, id)) return;
+        // Check for iOS paste permission dialog. GET /alert/text is fast
+        // (~20ms, 404 when no alert). If a paste dialog is showing, find
+        // the "Allow Paste" button via session element find and tap it
+        // directly — don't use /alert/accept which might hit "Don't Allow".
+        try {
+          const alertRes = await wdaRequest('GET', `/session/${sid}/alert/text`);
+          const alertText: string = alertRes.value || '';
+          if (/paste/i.test(alertText)) {
+            try {
+              const btnRes = await wdaRequest('POST', `/session/${sid}/element`, {
+                using: '-ios predicate string',
+                value: `label == 'Allow Paste'`,
+              });
+              const btnEid: string | undefined =
+                btnRes.value?.ELEMENT || btnRes.value?.element;
+              if (btnEid) {
+                const rectRes = await wdaRequest('GET', `/session/${sid}/element/${btnEid}/rect`);
+                const r = rectRes.value;
+                if (r && typeof r.x === 'number') {
+                  await tapXY(
+                    Math.round(r.x + r.width / 2),
+                    Math.round(r.y + r.height / 2)
+                  );
+                }
+              }
+            } catch {
+              // Button find failed — do NOT fall back to /alert/accept
+              // which taps the default button ("Don't Allow Paste").
+            }
+            await sleep(500);
+            lastObstructionCheck = Date.now();
+            continue;
+          }
+        } catch {
+          // "no such alert" — continue polling.
+        }
+      } catch {
+        // Session error — invalidate and fall back to slow path.
+        invalidateCachedSession();
+        fastPathFailed = true;
+        continue;
+      }
+      await sleep(FAST_POLL_MS);
+      continue;
+    }
+
+    // ── Slow fallback (only if fast path errored out) ──
+    const tree = await getCurrentTree();
+    const flat = flattenAll(tree);
+    if (findByTestID(flat, id)) return;
+    if (treeHasObstruction(flat)) {
+      await preflightDismissDevMenu();
+      continue;
+    }
+    await sleep(400);
+  }
+
+  throw new Error(
+    `timeout after ${timeoutMs}ms\n` +
+    `Verify the testID "${id}" exists in the app:\n` +
+    `  rg 'testID.*${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\|name=.*${id.replace('screen-', '').split('-').map(w => w[0].toUpperCase() + w.slice(1)).join('')}' --type tsx --type ts`
+  );
+}
+
+export async function waitForText(text: string, timeoutMs: number = STEP_TIMEOUT_MS): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  const FAST_POLL_MS = 80;
+  const OBSTRUCTION_INTERVAL_MS = 2_000;
+  let lastObstructionCheck = Date.now();
+  let fastPathFailed = false;
+
+  while (Date.now() < deadline) {
+    const now = Date.now();
+
+    if (now - lastObstructionCheck >= OBSTRUCTION_INTERVAL_MS) {
+      lastObstructionCheck = now;
+      try {
+        const tree = await getCurrentTree();
+        const flat = flattenAll(tree);
+        if (findByText(flat, text)) return;
+        if (treeHasObstruction(flat)) {
+          await preflightDismissDevMenu();
+          invalidateCachedSession();
+          continue;
+        }
+      } catch {
+        // Tree fetch failed — try fast path anyway.
+      }
+    }
+
+    if (!fastPathFailed) {
+      try {
+        const sid = await getCachedSession();
+        if (await fastFindByText(sid, text)) return;
+        // Fast paste-dialog dismissal (same as waitForID).
+        try {
+          const alertRes = await wdaRequest('GET', `/session/${sid}/alert/text`);
+          if (/paste/i.test(alertRes.value || '')) {
+            try {
+              const btnRes = await wdaRequest('POST', `/session/${sid}/element`, {
+                using: '-ios predicate string',
+                value: `label == 'Allow Paste'`,
+              });
+              const btnEid: string | undefined =
+                btnRes.value?.ELEMENT || btnRes.value?.element;
+              if (btnEid) {
+                const rectRes = await wdaRequest('GET', `/session/${sid}/element/${btnEid}/rect`);
+                const r = rectRes.value;
+                if (r && typeof r.x === 'number') {
+                  await tapXY(
+                    Math.round(r.x + r.width / 2),
+                    Math.round(r.y + r.height / 2)
+                  );
+                }
+              }
+            } catch {
+              try { await wdaRequest('POST', `/session/${sid}/alert/accept`); } catch {}
+            }
+            await sleep(500);
+            lastObstructionCheck = Date.now();
+            continue;
+          }
+        } catch {
+          // No alert — continue polling.
+        }
+      } catch {
+        invalidateCachedSession();
+        fastPathFailed = true;
+        continue;
+      }
+      await sleep(FAST_POLL_MS);
+      continue;
+    }
+
+    // Slow fallback.
+    const tree = await getCurrentTree();
+    const flat = flattenAll(tree);
+    if (findByText(flat, text)) return;
+    if (treeHasObstruction(flat)) {
+      await preflightDismissDevMenu();
+      continue;
+    }
+    await sleep(400);
+  }
+
+  throw new Error(`timeout after ${timeoutMs}ms`);
+}
+
+/**
+ * Find the topmost matching node by testID prefix. Prefers in-viewport
+ * matches: list-style screens often have testIDs in the AX tree for rows
+ * that are scrolled off-screen, and tapping their off-screen coordinates
+ * just hits whatever's at the bottom edge of the visible viewport. By
+ * filtering to nodes with reasonable on-screen rects we avoid that
+ * footgun. Falls back to any match if nothing in-viewport matches.
+ */
+export function findByTestIDPrefix(nodes: FlatNode[], prefix: string): FlatNode | null {
+  const all = nodes.filter((n) => n.identifier.startsWith(prefix));
+  if (all.length === 0) return null;
+  // Prefer matches that are visible in a reasonable viewport (the iPhone
+  // logical screen is ~390×844 on iPhone 12-15, larger on Pro Max). We
+  // accept y in [0, 900] as "visible enough" — anything beyond that is
+  // almost certainly off-screen in the scroll view.
+  const visible = all.filter(
+    (n) => n.rect && n.rect.y >= 0 && n.rect.y < 900 && n.rect.height > 0
+  );
+  if (visible.length > 0) {
+    // Return the visually topmost (lowest y) — for date-sorted lists
+    // this is the newest entry.
+    visible.sort((a, b) => a.rect!.y - b.rect!.y);
+    return visible[0];
+  }
+  return all[0];
+}
+
+export function findAllByTestIDPrefix(nodes: FlatNode[], prefix: string): FlatNode[] {
+  return nodes.filter((n) => n.identifier.startsWith(prefix));
+}
+
+/**
+ * Find the first node whose testID starts with `prefix` in tree
+ * traversal order, skipping nodes with a zero-sized rect (which are
+ * unrenderable and would never be tappable anyway).
+ *
+ * Contrast with `findByTestIDPrefix`, which filters to in-viewport
+ * nodes and then sorts by `y` to pick the visually topmost match.
+ * That heuristic is fine for a vertical list like the wallet's
+ * transaction rows, where topmost-visible == newest, but it's
+ * y-unstable for siblings on the same horizontal row (the amount
+ * suggestion chips all sit at identical y values, so the topmost
+ * sort collapses to insertion order anyway — and becomes subtly
+ * broken any time the sort is unstable or a chip's rect glitches).
+ *
+ * `first` is the explicit version: the FIRST-mounted matching node
+ * in `flattenAll`'s document order. Because `flattenAll` does a
+ * pre-order traversal of the WDA `/source` tree and React/Expo
+ * renders children in JSX order, that's always the same element
+ * the test author would point at when they say "the first chip".
+ * The `rect.width > 0 && rect.height > 0` filter drops placeholder
+ * / off-screen-but-in-tree siblings that would otherwise win the
+ * race for position 0.
+ */
+export function findByTestIDPrefixFirst(nodes: FlatNode[], prefix: string): FlatNode | null {
+  for (const n of nodes) {
+    if (
+      n.identifier.startsWith(prefix) &&
+      n.rect &&
+      n.rect.width > 0 &&
+      n.rect.height > 0
+    ) {
+      return n;
+    }
+  }
+  return null;
+}
+
+export async function waitForIDPrefix(prefix: string): Promise<FlatNode> {
+  return await pollFor(async () => {
+    const tree = await getCurrentTree();
+    const flat = flattenAll(tree);
+    return findByTestIDPrefix(flat, prefix);
+  }, STEP_TIMEOUT_MS);
+}
+
+export async function assertID(id: string): Promise<void> {
+  const tree = await getCurrentTree();
+  const flat = flattenAll(tree);
+  if (!findByTestID(flat, id)) {
+    throw new Error(`assert-id failed: testID="${id}" not on screen`);
+  }
+}
+
+export async function assertText(text: string): Promise<void> {
+  const tree = await getCurrentTree();
+  const flat = flattenAll(tree);
+  if (!findByText(flat, text)) {
+    throw new Error(`assert-text failed: "${text}" not on screen`);
+  }
+}
+
+export async function assertIDPrefix(prefix: string): Promise<FlatNode> {
+  const tree = await getCurrentTree();
+  const flat = flattenAll(tree);
+  const node = findByTestIDPrefix(flat, prefix);
+  if (!node) {
+    const visible = flat
+      .filter((n) => n.hasIdent)
+      .map((n) => `  ${n.identifier}`)
+      .slice(0, 30)
+      .join('\n');
+    throw new Error(
+      `assert-id-prefix failed: no element with testID starting "${prefix}" on screen.\n` +
+        (visible ? `visible testIDs:\n${visible}` : '(no testIDs visible)')
+    );
+  }
+  return node;
+}
+
+async function executeStep(
+  step: TestStep,
+  rules: TestsRules | undefined,
+  vars: Record<string, string>
+): Promise<string> {
+  validateStep(step, rules);
+  const kind = stepKind(step);
+  // Interpolate ${var} in the step's value before dispatching to the handler.
+  const interpolatedStep: TestStep = { [kind]: interpolate((step as Record<string, unknown>)[kind], vars) };
+  const arg = stepArg(interpolatedStep);
+  const obj = stepArgObj(interpolatedStep);
+  switch (kind) {
+    case 'tap-id':
+      await tapByID(arg!);
+      return `tap-id: ${arg}`;
+    case 'tap-text': {
+      const { nudge } = await tapByText(arg!);
+      return nudge
+        ? `tap-text: ${arg}  ⚠ no testID on target — consider adding one`
+        : `tap-text: ${arg}`;
+    }
+    case 'tap-id-if-present': {
+      const tree = await getCurrentTree();
+      const flat = flattenAll(tree);
+      const node = findByTestID(flat, arg!);
+      if (!node || !node.rect) return `tap-id-if-present: ${arg} — not present, skipped`;
+      await tapXY(node.centerX, node.centerY);
+      return `tap-id-if-present: ${arg} — tapped`;
+    }
+    case 'tap-text-if-present': {
+      const tree = await getCurrentTree();
+      const flat = flattenAll(tree);
+      const match = findByText(flat, arg!);
+      if (!match) return `tap-text-if-present: ${arg} — not present, skipped`;
+      await tapXY(match.node.centerX, match.node.centerY);
+      return `tap-text-if-present: ${arg} — tapped`;
+    }
+    case 'wait-for':
+      await waitForID(arg!);
+      return `wait-for: ${arg} ✓`;
+    case 'wait-for-text':
+      await waitForText(arg!);
+      return `wait-for-text: ${arg} ✓`;
+    case 'wait-for-id-prefix': {
+      const node = await waitForIDPrefix(arg!);
+      return `wait-for-id-prefix: ${arg} ✓ (matched ${node.identifier})`;
+    }
+    case 'assert-id':
+      await assertID(arg!);
+      return `assert-id: ${arg} ✓`;
+    case 'assert-text':
+      await assertText(arg!);
+      return `assert-text: ${arg} ✓`;
+    case 'assert-id-prefix': {
+      const node = await assertIDPrefix(arg!);
+      return `assert-id-prefix: ${arg} ✓ (matched ${node.identifier})`;
+    }
+    case 'type':
+      await typeKeys(arg!);
+      return `type: ${arg}`;
+    case 'keypad':
+      await tapKeypadDigit(arg!);
+      return `keypad: ${arg}`;
+    case 'home':
+      await pressHome();
+      return 'home';
+    case 'tap-back': {
+      // Tap the back button on the topmost iOS navigation bar. Walks the
+      // accessibility tree (parent-child preserved) to find the first
+      // XCUIElementTypeButton descendant of the LAST XCUIElementTypeNavigationBar
+      // — that's the iOS native back arrow on a presented modal/Stack screen.
+      // No source changes needed (works without a testID on the back button).
+      const tree = await getCurrentTree();
+      const hit = findTopmostNavBackButton(tree);
+      if (!hit) {
+        // Help the test author diagnose: show what nav bars ARE on the screen.
+        const navBars: string[] = [];
+        const walk = (node: AXNode): void => {
+          if (node.type === 'XCUIElementTypeNavigationBar') {
+            const id = node.rawIdentifier || node.identifier || node.label || node.name || '(unlabeled)';
+            const buttonCount = countDescendantButtons(node);
+            navBars.push(`  - [${id}] (${buttonCount} button${buttonCount === 1 ? '' : 's'})`);
+          }
+          if (node.children) for (const c of node.children) walk(c);
+        };
+        walk(tree);
+        throw new Error(
+          'tap-back: no navigation bar with a tappable back button on the current screen.\n' +
+            (navBars.length === 0
+              ? 'No XCUIElementTypeNavigationBar in the tree at all.'
+              : `Nav bars present:\n${navBars.join('\n')}\n` +
+                '(Are you on the root screen? Stack/modal pushes typically expose a back button.)')
+        );
+      }
+      await tapXY(hit.centerX, hit.centerY);
+      return `tap-back: tapped nav back button at (${hit.centerX},${hit.centerY})`;
+    }
+    case 'relaunch-app':
+      await relaunchApp(arg || 'com.sovranbitcoin.dev');
+      return `relaunch-app: ${arg || 'com.sovranbitcoin.dev'}`;
+    case 'dismiss-modal': {
+      // Native iOS swipe-to-dismiss for the topmost modal sheet. Replaces
+      // `relaunch-app` when a test only needs to return to the root screen
+      // — far faster than a terminate+launch and avoids the dev-menu race.
+      await dismissModal();
+      return 'dismiss-modal: swiped down to dismiss topmost modal';
+    }
+    case 'swipe': {
+      // Generic directional swipe — `swipe: down|up|left|right`. Useful for
+      // dismissing modals (`down`), revealing content, or driving custom
+      // gesture-based UI. Coords are computed from the live window size.
+      const dir = String(arg || '').toLowerCase();
+      if (dir !== 'up' && dir !== 'down' && dir !== 'left' && dir !== 'right') {
+        throw new Error(
+          `swipe: direction must be one of up|down|left|right (got "${arg}")`
+        );
+      }
+      await swipe(dir);
+      return `swipe: ${dir}`;
+    }
+    case 'dismiss-dev-menu': {
+      // Polls for the Expo dev menu's [xmark] close button for up to 3
+      // seconds and dismisses it if found. Soft-fails (returns success even
+      // if the menu never appears) — used after `relaunch-app` to handle
+      // the race where the dev menu sometimes renders 0–2 seconds late.
+      const start = Date.now();
+      while (Date.now() - start < 3000) {
+        const tree = await getCurrentTree();
+        const flat = flattenAll(tree);
+        const node = findByTestID(flat, 'xmark');
+        if (node && node.rect) {
+          await tapXY(node.centerX, node.centerY);
+          // Brief settle so subsequent steps see the dismissed state.
+          await sleep(300);
+          return 'dismiss-dev-menu — dismissed';
+        }
+        await sleep(300);
+      }
+      return 'dismiss-dev-menu — no menu, skipped';
+    }
+    case 'screenshot': {
+      const dir = nodePath.resolve(process.cwd(), SCREENSHOTS_DIR, 'manual');
+      fs.mkdirSync(dir, { recursive: true });
+      const out = await takeScreenshot(
+        nodePath.join(dir, `${sanitizeForFile(arg || String(Date.now()))}.png`)
+      );
+      return `screenshot: ${nodePath.relative(process.cwd(), out)}`;
+    }
+
+    // ─── Variables: capture ─────────────────────────────────────────────
+    case 'capture-clipboard': {
+      // arg is the variable name to bind the clipboard value to.
+      const varName = arg;
+      if (!varName) throw new Error('capture-clipboard requires a variable name as its arg');
+      const text = await readClipboard();
+      vars[varName] = text;
+      return `capture-clipboard: $${varName} = "${previewValue(text)}" (${text.length} chars)`;
+    }
+    case 'capture-id-suffix': {
+      // { prefix: <testid prefix>, as: <var name> }
+      if (!obj) throw new Error('capture-id-suffix requires {prefix, as} object args');
+      const prefix = String(obj.prefix || '');
+      const varName = String(obj.as || '');
+      if (!prefix || !varName) {
+        throw new Error('capture-id-suffix requires both `prefix` and `as` keys');
+      }
+      const tree = await getCurrentTree();
+      const flat = flattenAll(tree);
+      const node = findByTestIDPrefix(flat, prefix);
+      if (!node) {
+        throw new Error(
+          `capture-id-suffix: no testID matching prefix "${prefix}" on the current screen`
+        );
+      }
+      const suffix = node.identifier.slice(prefix.length);
+      vars[varName] = suffix;
+      return `capture-id-suffix: $${varName} = "${suffix}" (full id ${node.identifier})`;
+    }
+    case 'capture-id-label': {
+      // { id: <testID>, as: <var name> }
+      // Reads the accessibility label of the element with the given testID
+      // straight from the AX tree. Use this for surfacing in-app values
+      // (tokens, addresses, invoices) into test variables WITHOUT touching
+      // the iOS pasteboard — no app foregrounding, no visual flicker.
+      // The element should set `accessibilityLabel={value}` in the source.
+      if (!obj) throw new Error('capture-id-label requires {id, as} object args');
+      const id = String(obj.id || '');
+      const varName = String(obj.as || '');
+      if (!id || !varName) {
+        throw new Error('capture-id-label requires both `id` and `as` keys');
+      }
+      const tree = await getCurrentTree();
+      const flat = flattenAll(tree);
+      const node = findByTestID(flat, id);
+      if (!node) {
+        const available = flat
+          .filter((n) => n.hasIdent)
+          .map((n) => `  ${n.identifier}`)
+          .slice(0, 30)
+          .join('\n');
+        throw new Error(
+          `capture-id-label: no element with testID="${id}" on the current screen.\n` +
+            (available
+              ? `Available testIDs:\n${available}`
+              : '(no testIDs are present on this screen)')
+        );
+      }
+      const value = node.label || node.name || '';
+      if (!value) {
+        throw new Error(
+          `capture-id-label: element [${id}] has no accessibility label/name. ` +
+            `Set \`accessibilityLabel={value}\` in the source component.`
+        );
+      }
+      vars[varName] = value;
+      return `capture-id-label: $${varName} = "${previewValue(value)}" (${value.length} chars)`;
+    }
+
+    // ─── Variables: assert ──────────────────────────────────────────────
+    case 'assert-starts-with': {
+      // { var: <name> | value: <literal>, prefix: <expected> }
+      if (!obj) throw new Error('assert-starts-with requires object args');
+      const value =
+        obj.var !== undefined
+          ? vars[String(obj.var)]
+          : obj.value !== undefined
+            ? String(obj.value)
+            : undefined;
+      if (value === undefined) {
+        throw new Error('assert-starts-with requires either `var` or `value`');
+      }
+      const prefix = String(obj.prefix || '');
+      if (!prefix) throw new Error('assert-starts-with requires `prefix`');
+      if (!value.startsWith(prefix)) {
+        throw new Error(
+          `assert-starts-with failed: "${previewValue(value)}" does not start with "${prefix}"`
+        );
+      }
+      return `assert-starts-with: "${previewValue(value, 30)}" startsWith "${prefix}" ✓`;
+    }
+    case 'assert-contains': {
+      // { var: <name> | value: <literal>, needle: <expected substring> }
+      if (!obj) throw new Error('assert-contains requires object args');
+      const value =
+        obj.var !== undefined
+          ? vars[String(obj.var)]
+          : obj.value !== undefined
+            ? String(obj.value)
+            : undefined;
+      if (value === undefined) {
+        throw new Error('assert-contains requires either `var` or `value`');
+      }
+      const needle = String(obj.needle || '');
+      if (!needle) throw new Error('assert-contains requires `needle`');
+      if (!value.includes(needle)) {
+        throw new Error(
+          `assert-contains failed: "${previewValue(value)}" does not contain "${needle}"`
+        );
+      }
+      return `assert-contains: "${previewValue(value, 30)}" contains "${needle}" ✓`;
+    }
+    case 'assert-eq': {
+      // { a: <var or literal>, b: <var or literal> }
+      // Both a and b have already been ${var}-interpolated above.
+      if (!obj) throw new Error('assert-eq requires object args');
+      const a = obj.a !== undefined ? String(obj.a) : '';
+      const b = obj.b !== undefined ? String(obj.b) : '';
+      if (a !== b) {
+        throw new Error(
+          `assert-eq failed: "${previewValue(a)}" !== "${previewValue(b)}"`
+        );
+      }
+      return `assert-eq: "${previewValue(a, 30)}" === "${previewValue(b, 30)}" ✓`;
+    }
+
+    default:
+      throw new Error(`unhandled step kind: ${kind}`);
+  }
+}
+
+/**
+ * Sanitize a string for use as a filename component:
+ *   "tap-id-if-present"  → "tap-id-if-present"
+ *   "tap-text:Receive"   → "tap-text-Receive"
+ *   "wait-for: amount-x" → "wait-for-amount-x"
+ */
+function sanitizeForFile(s: string): string {
+  return s
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
+const SCREENSHOTS_DIR = '.screenshots';
+
+function prepareScreenshotsDir(testName: string): string {
+  const dir = nodePath.resolve(process.cwd(), SCREENSHOTS_DIR, sanitizeForFile(testName));
+  // Clear any prior run for this test so the folder always reflects the
+  // most recent execution.
+  if (fs.existsSync(dir)) {
+    for (const f of fs.readdirSync(dir)) {
+      try {
+        fs.unlinkSync(nodePath.join(dir, f));
+      } catch {
+        /* ignore */
+      }
+    }
+  } else {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+
+function screenshotPath(dir: string, index: number, label: string, suffix = ''): string {
+  const idx = String(index).padStart(2, '0');
+  return nodePath.join(dir, `${idx}-${sanitizeForFile(label)}${suffix}.png`);
+}
+
+async function runTestSteps(
+  name: string,
+  test: TestEntry,
+  rules: TestsRules | undefined
+): Promise<{ ok: boolean; log: string[] }> {
+  const log: string[] = [`▶ test: ${name}${test.description ? '  — ' + test.description : ''}`];
+  const shotDir = prepareScreenshotsDir(name);
+  log.push(`  screenshots → ${nodePath.relative(process.cwd(), shotDir)}/`);
+
+  // Per-run variables — populated by capture-* steps and consumed via ${name}
+  // interpolation in subsequent string args.
+  const vars: Record<string, string> = {};
+
+  // 00 — capture the starting state before any step runs.
+  try {
+    await takeScreenshot(screenshotPath(shotDir, 0, 'start'));
+  } catch {
+    /* WDA may not be ready before relaunch — best effort */
+  }
+
+  // Normalize bare-string YAML items into single-key objects.
+  const steps = test.steps.map(normalizeStep);
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const idx = i + 1;
+    try {
+      const result = await executeStep(step, rules, vars);
+      log.push(`  [${idx}/${test.steps.length}] ${result}`);
+      // Capture state AFTER the step has run. Brief settle for nav animations.
+      await sleep(150);
+      try {
+        await takeScreenshot(screenshotPath(shotDir, idx, stepKind(step)));
+      } catch {
+        /* best effort */
+      }
+    } catch (err) {
+      const msg = (err as Error).message;
+      log.push(`  [${idx}/${test.steps.length}] ✗ ${stepKind(step)}: ${msg}`);
+      // Save a failure screenshot in the same folder as the rest of the run.
+      try {
+        const failPath = screenshotPath(shotDir, idx, stepKind(step), '-FAIL');
+        await takeScreenshot(failPath);
+        log.push(`        screenshot: ${nodePath.relative(process.cwd(), failPath)}`);
+      } catch {
+        /* best effort */
+      }
+      return { ok: false, log };
+    }
+  }
+  log.push(`✓ ${name} PASSED (${test.steps.length} steps)`);
+  return { ok: true, log };
+}
+
+function parseSaveArgs(args: string[]): {
+  name: string;
+  description: string;
+  steps: TestStep[];
+} {
+  if (args.length === 0) {
+    throw new Error(
+      'Usage: phone test save <name> [--desc "..."] --step <kind>:<arg> [--step ...]\n' +
+        '\n' +
+        'Example:\n' +
+        '  phone test save create-mint-quote --desc "Open mint quote entry" \\\n' +
+        '    --step tap-text:Receive \\\n' +
+        '    --step wait-for:receive-fixed-amount \\\n' +
+        '    --step tap-id:receive-fixed-amount \\\n' +
+        '    --step wait-for:amount-next'
+    );
+  }
+  const name = args[0];
+  let description = '';
+  let steps: TestStep[] = [];
+  let stepsFile: string | undefined;
+  // Helper: split `--key=value` into `[--key, value]`. npm strips shell quoting,
+  // so callers must either use a single-word value or the `=` form.
+  const norm: string[] = [];
+  for (const a of args.slice(1)) {
+    const eq = a.indexOf('=');
+    if (a.startsWith('--') && eq > 0) {
+      norm.push(a.slice(0, eq), a.slice(eq + 1));
+    } else {
+      norm.push(a);
+    }
+  }
+  for (let i = 0; i < norm.length; i++) {
+    if (norm[i] === '--desc' && norm[i + 1] !== undefined) {
+      description = norm[++i];
+    } else if (norm[i] === '--steps-file' && norm[i + 1] !== undefined) {
+      stepsFile = norm[++i];
+    } else if (norm[i] === '--step' && norm[i + 1] !== undefined) {
+      const raw = norm[++i];
+      const colonIdx = raw.indexOf(':');
+      if (colonIdx === -1) {
+        // boolean step like 'home'
+        steps.push({ [raw]: true } as TestStep);
+      } else {
+        const kind = raw.slice(0, colonIdx);
+        const arg = raw.slice(colonIdx + 1);
+        steps.push({ [kind]: arg } as TestStep);
+      }
+    } else {
+      throw new Error(`unexpected arg: ${norm[i]}`);
+    }
+  }
+
+  // --steps-file takes precedence and is the recommended path: it sidesteps
+  // npm's shell-quote stripping by reading the test definition from a YAML
+  // file. The file may contain `description` and `steps` keys.
+  if (stepsFile) {
+    const filePath = nodePath.resolve(process.cwd(), stepsFile);
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`--steps-file not found: ${filePath}`);
+    }
+    const parsed = yaml.load(fs.readFileSync(filePath, 'utf-8')) as {
+      description?: string;
+      steps?: TestStep[];
+    };
+    if (!parsed || !Array.isArray(parsed.steps) || parsed.steps.length === 0) {
+      throw new Error(`--steps-file must contain a non-empty 'steps' array`);
+    }
+    if (!description && parsed.description) description = parsed.description;
+    steps = parsed.steps;
+  }
+
+  if (steps.length === 0) {
+    throw new Error('at least one --step (or --steps-file) is required');
+  }
+  return { name, description, steps };
+}
+
+function dumpTestsYaml(doc: TestsDocument): string {
+  // Preserve the comment header by re-reading and re-writing only the
+  // tests block. We re-emit the entire doc; the comment header at the top
+  // of the file is preserved by writeTestsDoc().
+  return yaml.dump(doc, { lineWidth: 100, noRefs: true, sortKeys: false });
+}
+
+function writeTestsDoc(doc: TestsDocument): void {
+  // Preserve everything ABOVE the `# tests:  (empty until ...` marker line, then
+  // re-emit `tests:` from the doc. This keeps the rules header + comments intact.
+  const raw = fs.readFileSync(TESTS_PATH, 'utf-8');
+  const marker = '# tests:';
+  const markerIdx = raw.indexOf(marker);
+  let header: string;
+  if (markerIdx === -1) {
+    // First time — keep the whole file as header and append.
+    header = raw.replace(/\ntests:\s*\{\s*\}\s*$/m, '\n').trimEnd() + '\n\n';
+  } else {
+    // Cut at the marker line, keep everything above + the marker line itself.
+    const lineEnd = raw.indexOf('\n', markerIdx);
+    header = raw.slice(0, lineEnd + 1);
+  }
+  const testsBlock = yaml.dump(
+    { tests: doc.tests || {} },
+    { lineWidth: 100, noRefs: true, sortKeys: false }
+  );
+  fs.writeFileSync(TESTS_PATH, header + testsBlock);
+}
+
+function formatTestList(doc: TestsDocument): string {
+  const tests = doc.tests || {};
+  const names = Object.keys(tests);
+  if (names.length === 0) {
+    return '(no tests registered yet — record one with `phone test save <name> --step ...`)';
+  }
+  return names
+    .map((n) => {
+      const t = tests[n];
+      const v = t.verified;
+      const stamp = v ? `verified ${v.date} by ${v.by}` : 'UNVERIFIED';
+      const last = v?.['last-run'] ? `, last run ${v['last-run']}` : '';
+      return `  ${n.padEnd(28)} ${stamp}${last}\n      ${t.description || ''}`;
+    })
+    .join('\n');
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function nowISO(): string {
+  return new Date().toISOString().replace('T', ' ').slice(0, 19);
+}
+
+export async function detectDeviceLabel(): Promise<string> {
+  try {
+    const status = await wdaRequest('GET', '/status');
+    const os = status.value?.os;
+    return os ? `${status.value?.device || 'iphone'} (${os.name} ${os.version})` : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
+ * Single-shot health probe for WDA. 2-second timeout so it doesn't block
+ * the runner if the daemon is dead but the port is bound by a stale forwarder.
+ */
+async function isWDAReady(): Promise<boolean> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2000);
+    const res = await fetch('http://localhost:8100/status', { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) return false;
+    const json = (await res.json()) as { value?: { ready?: boolean } };
+    return json?.value?.ready === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ensure WDA is up and answering HTTP before the test runner does anything
+ * that needs it. The strategy is fail-fast: ONE bring-up attempt, single
+ * 90-second budget, every `[wda]`/`[wda:runner]` line streamed live to
+ * the user's terminal so they see what's happening as it happens.
+ *
+ * If the bring-up fails we dump the tail of `wda.log` so the actual
+ * underlying error (testmanagerd dropping the connection, signing issue,
+ * etc.) is visible without the user having to open the log file. Then we
+ * surface the recovery steps — replug, toggle Developer Mode, restart
+ * phone. Retrying inside the runner doesn't help when the device-side
+ * handshake is dead; the user has to do device-level recovery first.
+ *
+ * Set `LOG_DOCTOR_SKIP_WDA_BRINGUP=1` to bypass this check (useful when
+ * debugging WDA issues by hand or when the daemon is being managed
+ * outside the runner).
+ */
+async function ensureWDAReady(): Promise<void> {
+  if (await isWDAReady()) return;
+
+  if (process.env.LOG_DOCTOR_SKIP_WDA_BRINGUP === '1') {
+    throw new Error(
+      'WDA not reachable at http://localhost:8100 and LOG_DOCTOR_SKIP_WDA_BRINGUP=1 is set.\n' +
+        'Bring it up manually with: npm run dev:wda'
+    );
+  }
+
+  emitRecoveryLine('▸ WDA not reachable. Bringing it up via scripts/start-wda.sh…');
+
+  // Best-effort cleanup of any leaked ios processes from a previous
+  // failed bring-up. Otherwise the new tunnel/forwarder collides with
+  // the stale one bound to port 8100.
+  spawnSync('pkill', ['-9', '-f', 'ios tunnel'], { stdio: 'ignore' });
+  spawnSync('pkill', ['-9', '-f', 'ios runwda'], { stdio: 'ignore' });
+  spawnSync('pkill', ['-9', '-f', 'ios forward'], { stdio: 'ignore' });
+  spawnSync('pkill', ['-9', '-f', 'start-wda'], { stdio: 'ignore' });
+  await new Promise((r) => setTimeout(r, 1000));
+
+  // Spawn start-wda.sh detached so WDA stays alive after the runner
+  // exits — subsequent test runs reuse it and skip this whole path.
+  // Output goes to wda.log (append); we tail it for live progress.
+  const logFd = fs.openSync(nodePath.resolve(process.cwd(), 'wda.log'), 'a');
+  const child = spawn('bash', ['scripts/start-wda.sh'], {
+    detached: true,
+    stdio: ['ignore', logFd, logFd],
+    cwd: process.cwd(),
+  });
+  child.unref();
+  const startedAt = Date.now();
+  let logCursor = fs.fstatSync(logFd).size;
+  fs.closeSync(logFd);
+
+  // 180-second budget: 120s WDA-HTTP wait inside the script + ~30s of
+  // tunnel/forwarder setup + ~30s slack for forwarder restarts. If it's
+  // not up by then it's not coming up without device recovery.
+  const BUDGET_MS = 180_000;
+  let failureLineSeen = false;
+  while (Date.now() - startedAt < BUDGET_MS) {
+    if (await isWDAReady()) {
+      emitRecoveryLine('▸ WDA READY ✓');
+      return;
+    }
+    try {
+      const stat = fs.statSync('wda.log');
+      if (stat.size > logCursor) {
+        const fd = fs.openSync('wda.log', 'r');
+        const buf = Buffer.alloc(stat.size - logCursor);
+        fs.readSync(fd, buf, 0, buf.length, logCursor);
+        fs.closeSync(fd);
+        logCursor = stat.size;
+        const chunk = buf.toString('utf-8');
+        // Surface every wda log line live — no filtering. Users want to
+        // see what's happening, especially when it's not happening.
+        for (const line of chunk.split('\n')) {
+          if (line.startsWith('[wda]') || line.startsWith('[wda:runner]') || line.startsWith('[wda:tunnel]')) {
+            emitRecoveryLine(`  ${line}`);
+          }
+        }
+        if (chunk.includes('did not become ready')) {
+          failureLineSeen = true;
+          break;
+        }
+      }
+    } catch {
+      /* wda.log may not exist yet */
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  // Build the error message — include the tail of wda.log so the user
+  // sees the actual underlying cause (e.g. "lost connection to
+  // testmanagerd") without having to open the log file.
+  let logTail = '';
+  try {
+    const all = fs.readFileSync('wda.log', 'utf-8').split('\n');
+    logTail = all.slice(-30).join('\n');
+  } catch {
+    /* ignore */
+  }
+
+  throw new Error(
+    `WDA bring-up ${failureLineSeen ? 'failed' : 'timed out'} after ${Math.floor((Date.now() - startedAt) / 1000)}s.\n` +
+      '\n' +
+      '──── tail of wda.log ────\n' +
+      logTail +
+      '\n──── recovery steps ────\n' +
+      '\n' +
+      "If you see 'lost connection to testmanagerd' or 'conn1 closed unexpectedly'\n" +
+      'above, the device side has rejected the test runner. Try in order:\n' +
+      '\n' +
+      '  1. Replug the iPhone via USB\n' +
+      '  2. Settings → Privacy & Security → Developer Mode → toggle off,\n' +
+      '     restart phone, on, re-trust the Mac when prompted\n' +
+      '  3. Restart the iPhone if (1) and (2) don’t help\n' +
+      '  4. Reinstall WebDriverAgent — see docs/device-automation.md\n' +
+      '\n' +
+      'Set LOG_DOCTOR_SKIP_WDA_BRINGUP=1 to bypass this check while debugging.\n' +
+      '\n' +
+      'After recovery, re-run: npm run log-doctor -- phone test all'
+  );
+}
+
+async function modePhoneTest(args: string[]): Promise<string> {
+  // ── Discovery / list ──
+  if (args.length === 0 || args[0] === '--list' || args[0] === 'list') {
+    const result = discoverTests();
+    return formatDslTestList(result);
+  }
+
+  // ── Help ──
+  if (args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
+    return phoneTestHelp();
+  }
+
+  // ── Parse-only debug (no device required) ──
+  if (args[0] === 'parse') {
+    const file = args[1];
+    if (!file) throw new Error('Usage: phone test parse <file>');
+    const path = nodePath.resolve(process.cwd(), file);
+    const source = fs.readFileSync(path, 'utf-8');
+    const suite = parseSuite(source, path);
+    const out: string[] = [
+      `${nodePath.relative(process.cwd(), path)}`,
+      `  defines:  ${suite.defines.size}`,
+      `  tests:    ${suite.tests.length}`,
+      ...suite.tests.map((t) => `    - "${t.name}" (${t.body.length} steps)`),
+      `  matrices: ${suite.matrices.length}`,
+    ];
+    for (const m of suite.matrices) {
+      const cells = m.stages.reduce(
+        (n, stage) => n * (stage.variantKind === 'bundleOf' ? 1 : stage.variants.length),
+        1
+      );
+      out.push(
+        `    - "${m.title}" (${m.mode}, ${m.stages.length} stage${m.stages.length === 1 ? '' : 's'}, ~${cells} cell${cells === 1 ? '' : 's'})`
+      );
+      for (const stage of m.stages) {
+        out.push(
+          `        · stage ${stage.name} (${stage.variantKind}): ${stage.variants.length} variant${stage.variants.length === 1 ? '' : 's'}`
+        );
+      }
+    }
+    return out.join('\n');
+  }
+
+  // UI mode selection. Default to the rich TTY reporter when stdout
+  // is an interactive terminal and the user didn't explicitly opt out
+  // with `--no-ui`. CI / piped output falls back to the flat streaming
+  // log which is the only thing that works without cursor control.
+  const disableUi = args.includes('--no-ui') || process.env.LOG_DOCTOR_FLAT === '1';
+  const useTtyReporter = !disableUi && isInteractiveTty();
+  // Pass our local `setRecoveryLogSink` through so the reporter can
+  // plug its own `commit()` into the recovery log path without having
+  // to import from log-doctor (which would create a circular module
+  // dependency — log-doctor already imports createTtyReporter). The
+  // reporter's `finish()` unregisters the sink by calling us with
+  // `null`, restoring the default stderr fallback for any late calls.
+  const reporter: TtyReporter | null = useTtyReporter
+    ? createTtyReporter({ setRecoveryLogSink })
+    : null;
+
+  // Streaming log sink used when the rich UI is disabled. Each log
+  // line fires through this as the executor emits it, so long
+  // operations (wallet send, wait for, swap retries) show up live
+  // instead of appearing only when the whole test finishes. Returning
+  // '' from the handler prevents the outer `console.log(output)` in
+  // main() from re-printing the buffered transcript.
+  const streamLog = reporter
+    ? reporter.onLog // tees into the sidecar log, doesn't touch stdout
+    : (line: string): void => {
+        // eslint-disable-next-line no-console
+        console.log(line);
+      };
+
+  // Structured event sink — wired only when the reporter is active.
+  // Executor emits events alongside log strings so both can coexist
+  // without double-printing.
+  const streamEvent: ((event: RunnerEvent) => void) | undefined = reporter
+    ? reporter.onEvent
+    : undefined;
+
+  // ── Run all ──
+  if (args[0] === 'all') {
+    const result = discoverTests();
+    if (result.tests.size === 0 && result.matrices.size === 0) {
+      return '(no tests to run — create one in tests/*.sov)';
+    }
+    await ensureWDAReady();
+    const totalUnits =
+      result.tests.size +
+      Array.from(result.matrices.values()).reduce(
+        (n, m) =>
+          n +
+          m.matrix.stages.reduce(
+            (k, stage) => k * (stage.variantKind === 'bundleOf' ? 1 : stage.variants.length),
+            1
+          ),
+        0
+      );
+    streamEvent?.({
+      type: 'run.begin',
+      t: Date.now(),
+      kind: 'all',
+      title: 'all tests',
+      totalUnits,
+    });
+    let pass = 0;
+    let fail = 0;
+    // Run plain tests first, then matrices. Matrices tend to be much
+    // longer so surfacing their failures at the bottom makes the
+    // terminal scrollback easier to read.
+    for (const [name, found] of result.tests) {
+      const execOpts: Parameters<typeof executeTest>[1] = {
+        testName: name,
+        suite: found.suite,
+        globalDefines: result.globalDefines,
+        onLog: streamLog,
+      };
+      if (streamEvent) execOpts.onEvent = streamEvent;
+      const exec = await executeTest(found.test, execOpts);
+      if (exec.ok) {
+        pass++;
+        try {
+          writeVerifiedComment(found.file, found.test, { label: await detectDeviceLabel() });
+        } catch {
+          /* best effort — verification metadata write is non-fatal */
+        }
+      } else {
+        fail++;
+      }
+      streamLog('');
+    }
+    for (const [, foundMatrix] of result.matrices) {
+      const matrixOpts: Parameters<typeof executeMatrix>[1] = {
+        suite: foundMatrix.suite,
+        globalDefines: result.globalDefines,
+        onLog: streamLog,
+      };
+      if (streamEvent) matrixOpts.onEvent = streamEvent;
+      const matrixResult = await executeMatrix(foundMatrix.matrix, matrixOpts);
+      if (matrixResult.ok) pass++;
+      else fail++;
+      try {
+        writeMatrixResultTable(
+          foundMatrix.file,
+          foundMatrix.matrix,
+          matrixResult,
+          { label: await detectDeviceLabel() }
+        );
+      } catch {
+        /* best effort */
+      }
+      streamLog('');
+    }
+    streamLog(`──── summary: ${pass} passed, ${fail} failed ────`);
+    streamEvent?.({
+      type: 'run.end',
+      t: Date.now(),
+      ok: fail === 0,
+      passed: pass,
+      failed: fail,
+    });
+    reporter?.finish();
+    return '';
+  }
+
+  // ── Run single (also handles `save` as a force-run) ──
+  const name = args[0] === 'save' ? args[1] : args[0];
+  if (!name) throw new Error('Usage: phone test <name>');
+  const result = discoverTests();
+  const found = findTest(result, name);
+  if (found) {
+    await ensureWDAReady();
+    streamEvent?.({
+      type: 'run.begin',
+      t: Date.now(),
+      kind: 'test',
+      title: found.test.name,
+      totalUnits: 1,
+    });
+    const execOpts: Parameters<typeof executeTest>[1] = {
+      testName: name,
+      suite: found.suite,
+      globalDefines: result.globalDefines,
+      onLog: streamLog,
+    };
+    if (streamEvent) execOpts.onEvent = streamEvent;
+    const exec = await executeTest(found.test, execOpts);
+    if (exec.ok) {
+      try {
+        writeVerifiedComment(found.file, found.test, { label: await detectDeviceLabel() });
+      } catch {
+        /* best effort */
+      }
+    }
+    streamEvent?.({
+      type: 'run.end',
+      t: Date.now(),
+      ok: exec.ok,
+      passed: exec.ok ? 1 : 0,
+      failed: exec.ok ? 0 : 1,
+    });
+    reporter?.finish();
+    return '';
+  }
+
+  // Fall back to matrix lookup — matrices share the display-name
+  // namespace with tests, and the discovery collision logic guarantees
+  // a given key resolves to exactly one runnable.
+  const foundMatrix = findMatrix(result, name);
+  if (!foundMatrix) {
+    throw new Error(
+      `no test or matrix named '${name}'.\n\nAvailable:\n${formatDslTestList(result)}`
+    );
+  }
+  await ensureWDAReady();
+  const cellCount = foundMatrix.matrix.stages.reduce(
+    (k, stage) => k * (stage.variantKind === 'bundleOf' ? 1 : stage.variants.length),
+    1
+  );
+  streamEvent?.({
+    type: 'run.begin',
+    t: Date.now(),
+    kind: 'matrix',
+    title: foundMatrix.matrix.title,
+    totalUnits: cellCount,
+  });
+  const matrixOpts: Parameters<typeof executeMatrix>[1] = {
+    suite: foundMatrix.suite,
+    globalDefines: result.globalDefines,
+    onLog: streamLog,
+  };
+  if (streamEvent) matrixOpts.onEvent = streamEvent;
+  const matrixResult = await executeMatrix(foundMatrix.matrix, matrixOpts);
+  try {
+    writeMatrixResultTable(
+      foundMatrix.file,
+      foundMatrix.matrix,
+      matrixResult,
+      { label: await detectDeviceLabel() }
+    );
+  } catch {
+    /* best effort */
+  }
+  streamEvent?.({
+    type: 'run.end',
+    t: Date.now(),
+    ok: matrixResult.ok,
+    passed: matrixResult.cells.filter((c) => c.ok).length,
+    failed: matrixResult.cells.filter((c) => !c.ok).length,
+  });
+  reporter?.finish();
+  return '';
+}
+
+function phoneTestHelp(): string {
+  return [
+    'phone test — run verified end-to-end flows from tests/*.sov',
+    '',
+    'Usage:',
+    '  phone test                  # list discovered tests',
+    '  phone test <name>           # run a single test (kebab-case of test name)',
+    '  phone test all              # run every test',
+    '  phone test parse <file>     # parse-only debug — prints AST summary',
+    '',
+    'Flags:',
+    '  --no-ui                     # disable the rich terminal reporter',
+    '                                (also: set LOG_DOCTOR_FLAT=1 in the env)',
+    '                                falls back to flat streaming log',
+    '',
+    'Test files live in <repo>/tests/*.sov and use the line-oriented Sovran',
+    'Test DSL. See tests/README.md for the language reference. Quick examples:',
+    '',
+    '  test "Example"',
+    '    launch com.sovranbitcoin.dev',
+    '    tap #wallet-receive when visible',
+    '    keypad 1',
+    '    tap #amount-next',
+    '    wait for screen #screen-mint-quote',
+    '    capture #payment-info-token-data as $token',
+    '    assert $token starts-with "cashuB"',
+    '    dismiss',
+    '    wait for screen #screen-wallet',
+    '  end',
+    '',
+    'Selectors:',
+    '  #testID         exact match (PREFERRED)',
+    '  "visible text"  fallback by label',
+    '  #prefix*        wildcard match (for dynamic IDs like transaction-mint-*)',
+    '',
+    'On a passing run, the # verified: line inside the test block is updated',
+    'in place with the current date and device label.',
+  ].join('\n');
+}
+
+async function modePhone(args: string[]): Promise<string> {
+  const [sub, ...rest] = args;
+  if (!sub || sub === 'help' || sub === '-h' || sub === '--help') {
+    return [
+      'phone — drive a physical iPhone via WebDriverAgent (localhost:8100)',
+      '',
+      'Reads via sessionless WDA endpoints, taps via short-lived sessions —',
+      'safe to run alongside mobile-mcp (Claude Code MCP server).',
+      '',
+      'Subcommands:',
+      '  status              Probe WDA health',
+      '  tree [--all]        Print accessibility tree (testID-targetable first,',
+      '                      then text-only fallbacks; --all also shows unlabeled',
+      '                      containers)',
+      '  tap-id <testID>     Tap by accessibility identifier (PREFERRED)',
+      '  tap "<text>"        Tap by visible label (FALLBACK — emits a nudge to',
+      '                      add a testID if matched element has none)',
+      '  tap-xy <x> <y>      Tap at screen coordinate (LAST RESORT — always nudges)',
+      '  text "<input>"      Type into the focused field',
+      '  shot [path]         Save a PNG screenshot (default: ./wda-<ts>.png)',
+      '  home                Press the home button',
+      '  dismiss-modal       Swipe down to dismiss the topmost iOS modal sheet',
+      '                      (use this instead of `relaunch-app` to return to root)',
+      '  swipe <direction>   Swipe up|down|left|right across the screen',
+      '  test [...]          Run/record verified end-to-end tests from TESTS.yml',
+      '                      (`phone test help` for the test sub-DSL)',
+      '',
+      'Env:',
+      '  WDA_BASE_URL        WDA base URL (default: http://localhost:8100)',
+      '',
+      'Setup: see docs/device-automation.md.',
+      'Daily bring-up: `npm run dev` (starts Metro + WDA together).',
+    ].join('\n');
+  }
+
+  if (sub === 'status') {
+    const status = await wdaRequest('GET', '/status');
+    const ready = status.value?.ready;
+    return `WDA at ${WDA_BASE}: ${ready ? 'READY ✓' : 'NOT READY'}\n${JSON.stringify(status, null, 2)}`;
+  }
+
+  if (sub === 'tree') {
+    const showAll = rest.includes('--all');
+    const tree = await getCurrentTree();
+    const flat = flattenAll(tree);
+    return formatTreeOutput(flat, showAll);
+  }
+
+  if (sub === 'tap-id') {
+    const id = rest[0];
+    if (!id) throw new Error('Usage: phone tap-id <testID>');
+    const tree = await getCurrentTree();
+    const flat = flattenAll(tree);
+    const node = findByTestID(flat, id);
+    if (!node) {
+      const available = flat
+        .filter((n) => n.hasIdent)
+        .map((n) => `  ${n.identifier}`)
+        .slice(0, 30)
+        .join('\n');
+      throw new Error(
+        `No element with testID="${id}" on the current screen.\n` +
+          (available
+            ? `Available testIDs on this screen:\n${available}`
+            : '(no elements with testIDs are present — add some, then try again)')
+      );
+    }
+    if (!node.rect) throw new Error(`Element [${id}] has no rect — cannot tap.`);
+    await tapXY(node.centerX, node.centerY);
+    return `Tapped [${id}] at (${node.centerX},${node.centerY})`;
+  }
+
+  if (sub === 'tap') {
+    const text = rest.join(' ');
+    if (!text) throw new Error('Usage: phone tap "<text>"');
+    const tree = await getCurrentTree();
+    const flat = flattenAll(tree);
+    const match = findByText(flat, text);
+    if (!match) {
+      throw new Error(
+        `No element matches "${text}" on the current screen.\n` +
+          'Try `phone tree` to see what is targetable, or use `phone tap-xy` as a last resort.'
+      );
+    }
+    const { node, matchKind } = match;
+    await tapXY(node.centerX, node.centerY);
+    const summary =
+      `Tapped "${text}"${matchKind === 'substring' ? ' (substring match)' : ''}` +
+      ` at (${node.centerX},${node.centerY})`;
+    if (node.hasIdent) {
+      // Element does have a testID — gently steer toward using it.
+      return (
+        `${summary}\n\n` +
+        `✓  This element has a testID. For stability, prefer:\n` +
+        `     npm run log-doctor -- phone tap-id ${node.identifier}`
+      );
+    }
+    // Fallback path — emit the loud nudge.
+    return summary + '\n' + buildAddTestIDNudge(node, `phone tap "${text}"`);
+  }
+
+  if (sub === 'tap-xy') {
+    const x = Number(rest[0]);
+    const y = Number(rest[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new Error('Usage: phone tap-xy <x> <y>');
+    }
+    await tapXY(x, y);
+    return `Tapped (${x},${y})` + '\n' + buildCoordTapNudge(x, y);
+  }
+
+  if (sub === 'text') {
+    const text = rest.join(' ');
+    if (!text) throw new Error('Usage: phone text "<input>"');
+    await typeKeys(text);
+    return `Typed: ${text}`;
+  }
+
+  if (sub === 'shot') {
+    const out = rest[0];
+    const saved = await takeScreenshot(out);
+    return `Screenshot saved: ${saved}`;
+  }
+
+  if (sub === 'home') {
+    await pressHome();
+    return 'Pressed home';
+  }
+
+  if (sub === 'dismiss-modal') {
+    await dismissModal();
+    return 'Swiped down to dismiss topmost modal';
+  }
+
+  if (sub === 'swipe') {
+    const dir = (rest[0] || '').toLowerCase();
+    if (dir !== 'up' && dir !== 'down' && dir !== 'left' && dir !== 'right') {
+      throw new Error('Usage: phone swipe <up|down|left|right>');
+    }
+    await swipe(dir);
+    return `Swiped ${dir}`;
+  }
+
+  if (sub === 'test') {
+    return await modePhoneTest(rest);
+  }
+
+  if (sub === 'reset-session') {
+    // Kept for backward-compat — phone mode no longer caches sessions.
+    return '(reset-session is a no-op now — phone mode uses ephemeral sessions)';
+  }
+
+  throw new Error(`Unknown phone subcommand: ${sub}\nRun \`log-doctor phone help\` for usage.`);
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-function main() {
+async function main() {
   const opts = parseArgs(process.argv);
+
+  // `phone` mode talks to the device, not to log files — short-circuit before
+  // we try to read log.txt or stdin.
+  if (opts.mode === 'phone') {
+    try {
+      const output = await modePhone(opts.restArgs);
+      // Some sub-modes (notably `phone test`) stream output live via a
+      // logger callback and return '' to avoid double-printing. Only
+      // echo the buffered return value when it's non-empty.
+      if (output.length > 0) console.log(output);
+      return;
+    } catch (err) {
+      console.error((err as Error).message);
+      process.exit(1);
+    }
+  }
 
   // Read from log.txt (default) or stdin if piped
   let raw: string;
@@ -1818,7 +5142,7 @@ function main() {
     console.error('  2. Pipe logs: cat logs.jsonl | npm run log-doctor -- stats');
     console.error('');
     console.error(
-      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget'
+      'Modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget, phone'
     );
     process.exit(1);
   }
@@ -1889,10 +5213,19 @@ function main() {
     case 'budget':
       output = modeBudget(entries, opts);
       break;
+    case 'crypto':
+      output = modeCrypto(entries, opts);
+      break;
+    case 'ops':
+      output = modeOps(entries, opts);
+      break;
+    case 'perf':
+      output = modePerf(entries, opts);
+      break;
     default:
       console.error(`Unknown mode: ${opts.mode}`);
       console.error(
-        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget'
+        'Valid modes: stats, timeline, errors, slow, renders, screens, startup, coco, network, full, diff, flows, ws, gc, budget, crypto, ops, perf, phone'
       );
       process.exit(1);
   }
@@ -1905,4 +5238,16 @@ function main() {
   console.log(output);
 }
 
-main();
+// Only run main() when invoked directly as a CLI — not when imported as a
+// module by the test-dsl executor (or any other consumer). ESM-equivalent
+// of `require.main === module`: compare the script file URL to the entry
+// point passed in argv[1].
+const __thisFile = url.fileURLToPath(import.meta.url);
+if (process.argv[1] === __thisFile) {
+  // Best-effort cleanup of the cached WDA session on exit.
+  process.on('exit', () => { invalidateCachedSession(); });
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.stack || err.message : String(err));
+    process.exit(1);
+  });
+}

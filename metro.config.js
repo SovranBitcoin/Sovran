@@ -4,6 +4,26 @@ const { withUniwindConfig } = require('uniwind/metro');
 
 const config = getDefaultConfig(__dirname);
 
+// `@sovranbitcoin/schemas` lives as a sibling repo and is wired in via
+// `file:../sovran-schemas`. Metro needs the linked target in `watchFolders`
+// so transform/resolve can walk its source files; otherwise the `node_modules`
+// symlink resolves but the target falls outside Metro's project roots.
+// `extraNodeModules` pins the schemas package's peer-deps (zod, neverthrow)
+// to the app's own copies so we don't ship two realms of ZodObject.
+const sovranSchemasPath = path.resolve(__dirname, '..', 'sovran-schemas');
+const appNodeModules = path.resolve(__dirname, 'node_modules');
+config.watchFolders = [...(config.watchFolders ?? []), sovranSchemasPath];
+config.resolver = {
+  ...config.resolver,
+  unstable_enableSymlinks: true,
+  nodeModulesPaths: [...(config.resolver?.nodeModulesPaths ?? []), appNodeModules],
+  extraNodeModules: {
+    ...(config.resolver?.extraNodeModules ?? {}),
+    zod: path.resolve(appNodeModules, 'zod'),
+    neverthrow: path.resolve(appNodeModules, 'neverthrow'),
+  },
+};
+
 // Enable source maps for better debugging
 config.transformer = {
   ...config.transformer,

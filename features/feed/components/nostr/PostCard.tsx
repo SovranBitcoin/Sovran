@@ -96,7 +96,10 @@ export const PostCard = React.memo(function PostCard({
   const [foreground, defaultColor] = useThemeColor(['foreground', 'default'] as const);
 
   const profile = profiles.get(event.pubkey);
-  const displayName = profile?.name || `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
+  // Real display name only. The abbreviated npub fallback is passed as Text's
+  // `fallback` prop so the name never flashes through a pubkey placeholder.
+  const displayName = profile?.name;
+  const nameFallback = `${tryNpubEncode(event.pubkey).slice(0, 12)}…`;
   const shortTime = event.created_at ? formatTimestamp(event.created_at) : '';
 
   const isTarget = variant === 'thread-target';
@@ -192,13 +195,14 @@ export const PostCard = React.memo(function PostCard({
               onPress={navigateToProfile}>
               <HStack align="center" gap={10} style={sharedStyles.mb6}>
                 <Avatar
+                  state={profile?.picture ? 'image' : 'fallback'}
                   picture={profile?.picture}
                   seed={event.pubkey}
                   size={AVATAR_SIZE}
                   name={displayName}
                 />
                 <VStack style={sharedStyles.flex1}>
-                  <Text bold size={15} style={textPrimary} numberOfLines={1}>
+                  <Text bold size={15} style={textPrimary} numberOfLines={1} fallback={nameFallback}>
                     {displayName}
                   </Text>
                   <Text semibold size={13} style={textMuted}>
@@ -264,6 +268,7 @@ export const PostCard = React.memo(function PostCard({
           onPressOut={handleNestedPressOut}
           onPress={navigateToProfile}>
           <Avatar
+            state={profile?.picture ? 'image' : 'fallback'}
             picture={profile?.picture}
             seed={event.pubkey}
             size={AVATAR_SIZE}
@@ -281,7 +286,12 @@ export const PostCard = React.memo(function PostCard({
             onPressIn={handleNestedPressIn}
             onPressOut={handleNestedPressOut}
             onPress={navigateToProfile}>
-            <Text bold size={14} style={textPrimary} numberOfLines={isThread ? 1 : undefined}>
+            <Text
+              bold
+              size={14}
+              style={textPrimary}
+              numberOfLines={isThread ? 1 : undefined}
+              fallback={nameFallback}>
               {displayName}
             </Text>
           </Pressable>

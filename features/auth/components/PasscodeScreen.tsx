@@ -113,6 +113,7 @@ const PasscodeScreen: React.FC<Props> = ({ passcode, onSuccess }) => {
 
             <View style={AVATAR_SHADOW}>
               <Avatar
+                state={profileDisplay.picture ? 'image' : 'fallback'}
                 seed={nostrKeys?.pubkey}
                 picture={profileDisplay.picture}
                 name={profileDisplay.displayName}

@@ -1,10 +1,10 @@
 import React from 'react';
 import { Text as DefaultText, TextStyle, ColorValue, View } from 'react-native';
+import opacity from 'hex-color-opacity';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
 
-import { Skeleton } from 'heroui-native/skeleton';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -121,8 +121,11 @@ export interface CustomTextProps extends TextProps {
   className?: string;
   testID?: string;
   loading?: boolean;
-  /** Invisible text rendered to size the skeleton when children is nullish. */
+  /** Invisible text rendered to size the loading bar when children is nullish. */
   placeholder?: string;
+  /** Rendered when not loading and children is nullish. Styled identically to
+   *  children so swapping to real content produces no visual jump. */
+  fallback?: React.ReactNode;
   color?: string;
 }
 
@@ -196,32 +199,44 @@ export function UntranslatedText({ size = 14, italic = false, ...props }: Custom
  * Primary text component. Defaults to Oxygen (Light / Regular / Bold).
  * Pass `overpass` for balance / amount / monetary displays.
  *
- * Skeleton behaviour:
- * - `loading={true}`  → always show skeleton (use when data exists but is stale)
- * - `loading={false}` → never show skeleton (explicit opt-out)
- * - `loading` omitted  → auto-skeleton when `children` is null / undefined
+ * State resolution (three states, no flash-through):
+ * - `loading === true`                → loading bar (50% foreground fill)
+ * - `!loading` && children != null    → content (children)
+ * - `!loading` && children == null && fallback != null → fallback (styled as content)
+ * - `!loading` && both nullish        → empty (NBSP for layout stability)
  *
- * Pass `placeholder` to control the skeleton width when children is nullish.
- * The placeholder string is rendered invisibly so its text metrics size the
- * skeleton naturally (e.g. `placeholder="Username"` ≈ name-length skeleton).
+ * Pass `placeholder` to size the loading bar when children / fallback are
+ * unavailable (e.g. `placeholder="Username"` ≈ name-length bar).
  */
 export function Text({ loading, size = 14, italic = false, ...props }: CustomTextProps) {
-  const { children, placeholder, ...otherProps } = props;
+  const { children, placeholder, fallback, ...otherProps } = props;
+  const foreground = useThemeColor('foreground');
+  const loadingColor = opacity(foreground, 0.5);
 
-  const showSkeleton = loading ?? children == null;
-
-  if (showSkeleton) {
+  if (loading) {
     return (
-      <View style={skeletonWrapperStyle}>
-        <Skeleton isLoading className="rounded-sm" style={skeletonInsetStyle} />
+      <View pointerEvents="none" style={loadingWrapperStyle}>
+        <View
+          style={[loadingInsetStyle, { borderRadius: 4, backgroundColor: loadingColor }]}
+        />
         <UntranslatedText
           size={size}
           italic={italic}
           {...otherProps}
           style={[otherProps.style, hiddenTextStyle]}>
-          {placeholder ?? children ?? '\u00A0'}
+          {placeholder ?? children ?? (typeof fallback === 'string' ? fallback : '\u00A0')}
         </UntranslatedText>
       </View>
+    );
+  }
+
+  if (children == null && fallback != null) {
+    // Fallback rendered as a child of UntranslatedText so it inherits the
+    // same font family / size / weight / color as content would have.
+    return (
+      <UntranslatedText size={size} italic={italic} {...otherProps}>
+        {fallback}
+      </UntranslatedText>
     );
   }
 
@@ -232,19 +247,19 @@ export function Text({ loading, size = 14, italic = false, ...props }: CustomTex
   );
 }
 
-const skeletonWrapperStyle = {
+const loadingWrapperStyle = {
   position: 'relative' as const,
   overflow: 'hidden' as const,
   alignSelf: 'flex-start' as const,
 };
 const hiddenTextStyle = { opacity: 0 };
 
-/** Inset the skeleton to ~90% height, vertically centered, to account for glyph padding. */
-const SKELETON_INSET = '5%' as unknown as number;
-const skeletonInsetStyle = {
+/** Inset the loading bar to ~90% height, vertically centered, to account for glyph padding. */
+const LOADING_INSET = '5%' as unknown as number;
+const loadingInsetStyle = {
   position: 'absolute' as const,
-  top: SKELETON_INSET,
-  bottom: SKELETON_INSET,
+  top: LOADING_INSET,
+  bottom: LOADING_INSET,
   left: 0,
   right: 0,
 };

@@ -37,7 +37,10 @@ export function useAccountPagerView({
   account,
 }: AccountPagerViewProps): AccountPagerViewShared {
   const { height: windowHeight } = useWindowDimensions();
-  const pagerHeight = Math.max(windowHeight * 0.3, 250);
+  // Tighter than the original 0.30/250 — trims the vertical dead space
+  // between the header and the secondary action row while still leaving
+  // enough headroom for the primary balance + account dots.
+  const pagerHeight = Math.max(windowHeight * 0.22, 200);
 
   const { handlePermission } = useHandleCameraPermission();
   const walletContext = useWalletContext();

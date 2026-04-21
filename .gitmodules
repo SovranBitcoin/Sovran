@@ -2,3 +2,7 @@
 	path = coco
 	url = https://github.com/cashubtc/coco
 	branch = master
+[submodule "modules/bitchat-module/ios/BitChatVendor"]
+	path = modules/bitchat-module/ios/BitChatVendor
+	url = https://github.com/permissionlesstech/bitchat.git
+	ignore = dirty

@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
+import type { GlassVariant } from 'liquid-glass-text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useSettingsStore, DisplayCurrency } from '@/shared/stores/global/settingsStore';
@@ -48,6 +49,31 @@ const CURRENCY_CONFIG: Record<DisplayCurrency, { symbol: string; label: string }
   eur: { symbol: '€', label: 'EUR' },
   gbp: { symbol: '£', label: 'GBP' },
 };
+
+// Liquid-glass balance rendering: flip to `'clear'` for the fully transparent
+// variant (edge highlight only, refraction through the background). The
+// `'regular'` frosted material is what ships by default — matches the glass
+// config used by our Split Bill / Receive buttons
+// (`variant: 'regular', interactive`).
+const LIQUID_GLASS_BALANCE_VARIANT: GlassVariant = 'clear';
+
+// Alpha applied to the theme foreground to produce the glass tint. Using the
+// foreground (same colour as the Send/Receive/Pending pill labels) keeps the
+// balance visually part of the same text layer across themes; the 0.5 alpha
+// lets the frosted refraction/specular come through. `opacity()` emits
+// `#RRGGBBAA` and the native module parses the alpha channel
+// (see LiquidGlassTextView.color(hex:)).
+const LIQUID_GLASS_BALANCE_TINT_ALPHA = 0.75;
+
+// Tap target for the balance. Explicit dimensions are necessary because:
+//   1. The parent VStack uses `align="center"` → children shrink to content.
+//   2. The native liquid-glass view sizes to intrinsic glyph bounds — the
+//      tight path around the digits — so a TouchableOpacity that hugs it
+//      only fires on taps that land on the rendered glyph pixels.
+// Stretching the touchable to fill the row and giving it a comfortable min
+// height makes the whole balance area tap-to-cycle-unit again, matching
+// the old behaviour before we switched to liquid glass.
+const BALANCE_TAP_HEIGHT = 48;
 
 // ---------------------------------------------------------------------------
 // Shared ecash status pill (pending / reserved / etc.)
@@ -162,7 +188,8 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
 
   const currencyConfig = CURRENCY_CONFIG[displayCurrency];
   const fiatValue = btcPrice ? ((btcPrice / 100_000_000) * balance).toFixed(2) : '0.00';
-  const warning = useThemeColor('warning');
+  const [foreground, warning] = useThemeColor(['foreground', 'warning'] as const);
+  const balanceTint = opacity(foreground, LIQUID_GLASS_BALANCE_TINT_ALPHA);
   const { reservedTotal } = useReservedProofs();
   const pendingSends = history.filter(
     (entry): entry is SendHistoryEntry =>
@@ -223,8 +250,22 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     <Log name="PrimaryBalance">
       <VStack align="center" gap={8} className="z-9">
         <FiatCurrencyPill displayText={displayText} textSize={12} />
-        <TouchableOpacity onPress={toggleUnit} className="flex-col items-center">
-          <AmountFormatter weight="heavy" amount={balance} unit={account.unit} />
+        <TouchableOpacity
+          onPress={toggleUnit}
+          style={{
+            alignSelf: 'stretch',
+            height: BALANCE_TAP_HEIGHT,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <AmountFormatter
+            amount={balance}
+            unit={account.unit}
+            weight="heavy"
+            liquid
+            glassVariant={LIQUID_GLASS_BALANCE_VARIANT}
+            color={balanceTint}
+          />
         </TouchableOpacity>
         <EcashStatusPill
           label="PENDING"

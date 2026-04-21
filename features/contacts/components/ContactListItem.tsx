@@ -1,11 +1,9 @@
 import React, { useMemo } from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
+import { Keyboard } from 'react-native';
 import { router } from 'expo-router';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Text } from '@/shared/ui/primitives/Text';
+
 import { paymentLog, Log } from '@/shared/lib/logger';
+import { ListRow } from '@/shared/ui/composed/ListRow';
 
 type ContactListItemProps = {
   pubkey: string | null;
@@ -19,6 +17,7 @@ type ContactListItemProps = {
   subtitle?: string;
   type?: 'contact' | 'mint';
   mintInfo?: { icon_url?: string; name?: string };
+  mintUrl?: string;
   isLoadingProfile?: boolean;
 };
 
@@ -28,89 +27,59 @@ export const ContactListItem = ({
   subtitle,
   type = 'contact',
   mintInfo,
+  mintUrl,
   isLoadingProfile = false,
 }: ContactListItemProps) => {
-  const [foreground, surfaceSecondary] = useThemeColor([
-    'foreground',
-    'surface-secondary',
-  ] as const);
-
   const pubkeyStr = pubkey ?? '';
+
+  // Real display name only — no inline pubkey fallback. `titleFallback`
+  // carries the abbreviated pubkey so the Text primitive swaps cleanly
+  // between loading bar and real content without the pubkey flashing.
   const displayName = useMemo(() => {
-    if (type === 'mint' && mintInfo?.name) return mintInfo.name;
     return (
       profile?.displayName ||
       profile?.display_name ||
       profile?.name ||
-      pubkeyStr.slice(0, 12) + '...'
+      (type === 'mint' && mintInfo?.name ? mintInfo.name : undefined)
     );
-  }, [profile, pubkeyStr, type, mintInfo]);
+  }, [profile, type, mintInfo]);
 
-  const avatarUrl = type === 'mint' ? mintInfo?.icon_url : profile?.picture;
-  const displaySubtitle = subtitle || profile?.nip05 || pubkeyStr.slice(0, 16) + '...';
+  // Always prefer nostr profile picture; fall back to mint icon when unavailable.
+  const avatarUrl = profile?.picture || mintInfo?.icon_url;
+  const displaySubtitle = subtitle || profile?.nip05;
+
+  const titleFallback = pubkeyStr.slice(0, 12) + '...';
+  const subtitleFallback = pubkeyStr.slice(0, 16) + '...';
 
   const handlePress = () => {
+    Keyboard.dismiss();
     if (!pubkeyStr) return;
     paymentLog.info('contact.item.press', { pubkey: pubkeyStr, type });
     router.navigate({
       pathname: '/(user-flow)/profile' as any,
-      params: { pubkey: pubkeyStr },
+      params: { pubkey: pubkeyStr, ...(mintUrl ? { mintUrl } : {}) },
     });
   };
 
   return (
     <Log name="ContactListItem">
-      <Pressable
-        onPress={handlePress}
-        style={({ pressed }) => [
-          styles.container,
-          pressed && { backgroundColor: surfaceSecondary },
-        ]}>
-        <Avatar
-          picture={avatarUrl}
-          name={displayName}
-          seed={pubkeyStr}
-          size={44}
-          loading={isLoadingProfile}
-        />
-        <View style={styles.info}>
-          <Text
-            loading={isLoadingProfile}
-            placeholder="Display Name"
-            style={[styles.name, { color: foreground }]}
-            numberOfLines={1}>
-            {displayName}
-          </Text>
-          <Text
-            loading={isLoadingProfile}
-            placeholder="user@relay.example"
-            style={[styles.handle, { color: opacity(foreground, 0.5) }]}
-            numberOfLines={1}>
-            {displaySubtitle}
-          </Text>
-        </View>
-      </Pressable>
+      <ListRow
+        avatar={{
+          state: isLoadingProfile ? 'loading' : avatarUrl ? 'image' : 'fallback',
+          picture: avatarUrl,
+          name: displayName,
+          seed: pubkeyStr,
+          size: 44,
+        }}
+        title={displayName}
+        titleFallback={titleFallback}
+        subtitle={displaySubtitle}
+        subtitleFallback={subtitleFallback}
+        onPress={pubkeyStr ? handlePress : undefined}
+        loading={isLoadingProfile}
+        titlePlaceholder="Display Name"
+        subtitlePlaceholder="user@relay.example"
+      />
     </Log>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  info: {
-    flex: 1,
-    gap: 2,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  handle: {
-    fontSize: 14,
-  },
-});

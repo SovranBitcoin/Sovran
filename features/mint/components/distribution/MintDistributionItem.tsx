@@ -212,6 +212,7 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
         <HStack align="center" justify="space-between" className="mb-3">
           <HStack align="center" gap={12} className="mr-3 flex-1">
             <Avatar
+              state={mintInfo?.icon_url ? 'image' : 'fallback'}
               picture={mintInfo?.icon_url}
               size={40}
               name={displayName}

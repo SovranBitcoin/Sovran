@@ -6,9 +6,10 @@
  * via buildMintListItems so MintListScreen stays hook-free.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
 import { TouchableOpacity } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { useBalanceContext, useMints } from '@cashu/coco-react';
 import type { MintAvailability } from 'coco-payment-ux';
@@ -35,6 +36,10 @@ function MintListRoute() {
   const { trustedMints } = useMints();
   const { balance: mintBalances } = useBalanceContext();
 
+  // Force list rebuild when this screen regains focus (e.g. after adding a mint)
+  const [focusKey, setFocusKey] = useState(0);
+  useFocusEffect(useCallback(() => { setFocusKey((k) => k + 1); }, []));
+
   // Build a neutral availability array (all mints available, no flow constraints).
   const availability = useMemo<MintAvailability[]>(
     () =>
@@ -50,7 +55,8 @@ function MintListRoute() {
 
   const items = useMemo(
     () => buildMintListItems(trustedMints, availability),
-    [trustedMints, availability]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [trustedMints, availability, focusKey]
   );
 
   return (

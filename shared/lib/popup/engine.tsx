@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { showToast, showSheet, type ToastConfig, type SheetConfig } from './bridge';
 import type { LiveSheetConfig } from './liveSheetTypes';
 import type { PopupIcon } from './icons';
+import { resolvePopupIcon } from './icons';
 import type { PopupTextSegment } from './format';
 import { flattenSegments } from './format';
 
@@ -160,11 +161,13 @@ export const popup = (config: popupConfig | string) => {
   }
 
   const description = resolveToastDescription(text);
+  const toastIcon = options.icon ? resolvePopupIcon(options.icon, 28) : undefined;
 
   const toastConfig: ToastConfig = {
     variant: TOAST_VARIANT_MAP[messageType] || 'default',
     label: messageConfig.title,
     description,
+    icon: toastIcon,
     duration: options.duration,
     onShow: options.onOpen,
     onHide: options.onClose ? () => options.onClose!({ reason: 'dismiss' }) : undefined,

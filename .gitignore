@@ -3,11 +3,30 @@
 # log-doctor working file
 log.txt
 
+# WebDriverAgent bring-up log (start-wda.sh)
+wda.log
+
+# Phone-test runner, artefacts, DSL, and related scripts — all local-only
+.screenshots/
+tests/
+.test-drafts/
+scripts/test-dsl/
+scripts/start-wda.sh
+scripts/dev.sh
+docs/device-automation.md
+
+# BitChat / BLE local identity (contains a private key — never commit)
+selfIdentity.plist
+
+# Local scratch working dirs
+__audits__/
+__research__/
+
 # dependencies
 node_modules/
 
 # build
-android/
+/android/
 
 # Expo
 .expo/
@@ -47,7 +66,7 @@ expo-env.d.ts
 # @end expo-cli
 .env.local
 
-android/
+/android/
 
 .vscode
 .env
@@ -60,8 +79,8 @@ android/
 # *.png
 # *.mp4
 
-ios
-android
+/ios
+/android
 # Expo
 .expo
 dist/

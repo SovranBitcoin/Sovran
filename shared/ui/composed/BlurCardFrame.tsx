@@ -22,7 +22,7 @@ const LOCATIONS: [number, number, number] = [
   pxToLocation(GLOW_END_PX),
 ];
 
-type GlowVariant = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | 'diagonal';
+type GlowVariant = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | 'diagonal' | 'right';
 
 interface BlurCardFrameProps {
   /** Accent color for the corner highlights */
@@ -36,6 +36,7 @@ interface BlurCardFrameProps {
    * - 'bottomLeft': Primary glow in bottom-left corner
    * - 'bottomRight': Primary glow in bottom-right corner
    * - 'diagonal': Subtle glows on opposite corners (default)
+   * - 'right': Glows on the two right corners only
    */
   variant?: GlowVariant;
 }
@@ -66,7 +67,7 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
         />
       )}
 
-      {(variant === 'topRight' || variant === 'diagonal') && (
+      {(variant === 'topRight' || variant === 'diagonal' || variant === 'right') && (
         <LinearGradient
           colors={[opacity(accentColor, 0.6), opacity(accentColor, 0.15), 'transparent']}
           locations={LOCATIONS}
@@ -88,7 +89,7 @@ export function BlurCardFrame({ accentColor, children, variant = 'diagonal' }: B
         />
       )}
 
-      {(variant === 'bottomRight' || variant === 'diagonal') && (
+      {(variant === 'bottomRight' || variant === 'diagonal' || variant === 'right') && (
         <LinearGradient
           colors={[opacity(accentColor, 0.45), opacity(accentColor, 0.12), 'transparent']}
           locations={LOCATIONS}

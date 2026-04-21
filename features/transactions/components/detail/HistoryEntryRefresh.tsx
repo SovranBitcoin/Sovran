@@ -38,11 +38,11 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
     <ListGroup.Item disabled>
       <ListGroup.ItemPrefix>
         <Avatar
+          state={loading ? 'loading' : mintInfo?.icon_url ? 'image' : 'fallback'}
           picture={mintInfo?.icon_url || undefined}
           size={40}
           name={mintInfo?.name}
           alt={`${mintInfo?.name || 'Mint'} icon`}
-          loading={loading}
         />
       </ListGroup.ItemPrefix>
       <ListGroup.ItemContent>

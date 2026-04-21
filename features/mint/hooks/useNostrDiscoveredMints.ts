@@ -13,7 +13,7 @@ import {
 } from '@/shared/lib/nostr/client';
 import { normalizeMintUrlKey, normalizeUrlForApi } from '@/shared/lib/url';
 
-import type { MintRecommendation } from './useKYMMints';
+import type { MintRecommendation } from '@/shared/lib/apiClient';
 import { useMintManagement } from './useMintManagement';
 
 interface NostrDiscoveredMintData {

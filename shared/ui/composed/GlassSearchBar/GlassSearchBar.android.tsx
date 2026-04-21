@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useRef } from 'react';
-import { TextInput, InteractionManager } from 'react-native';
+import { TextInput } from 'react-native';
 import opacity from 'hex-color-opacity';
 
 import { Log } from '@/shared/lib/logger';
@@ -43,9 +43,7 @@ export const GlassSearchBar = memo(function GlassSearchBar({
       latestTextRef.current = text;
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
-        InteractionManager.runAfterInteractions(() => {
-          onChangeTextRef.current(latestTextRef.current);
-        });
+        onChangeTextRef.current(latestTextRef.current);
       }, debounceMs);
     },
     [debounceMs]

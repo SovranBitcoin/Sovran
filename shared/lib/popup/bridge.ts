@@ -27,6 +27,7 @@ export type ToastConfig = {
   variant: ToastVariant;
   label: string;
   description?: string;
+  icon?: React.ReactNode;
   duration?: number | 'persistent';
   onShow?: () => void;
   onHide?: () => void;
@@ -65,6 +66,7 @@ export function showToast(config: ToastConfig) {
         variant: config.variant,
         label: config.label,
         description: config.description,
+        icon: config.icon,
       }),
     duration: config.duration,
     onShow: config.onShow,

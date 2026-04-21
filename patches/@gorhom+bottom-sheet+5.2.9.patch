@@ -1,0 +1,79 @@
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheet/constants.js b/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheet/constants.js
+index 4cbf8e1..89dad05 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheet/constants.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheet/constants.js
+@@ -28,7 +28,7 @@ const INITIAL_SNAP_POINT = exports.INITIAL_SNAP_POINT = -999;
+ const INITIAL_POSITION = exports.INITIAL_POSITION = _constants.SCREEN_HEIGHT;
+ 
+ // accessibility
+-const DEFAULT_ACCESSIBLE = exports.DEFAULT_ACCESSIBLE = true;
++const DEFAULT_ACCESSIBLE = exports.DEFAULT_ACCESSIBLE = false;
+ const DEFAULT_ACCESSIBILITY_LABEL = exports.DEFAULT_ACCESSIBILITY_LABEL = 'Bottom Sheet';
+ const DEFAULT_ACCESSIBILITY_ROLE = exports.DEFAULT_ACCESSIBILITY_ROLE = 'adjustable';
+ //# sourceMappingURL=constants.js.map
+\ No newline at end of file
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetBackdrop/constants.js b/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetBackdrop/constants.js
+index 4ab272e..3b8fed3 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetBackdrop/constants.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/commonjs/components/bottomSheetBackdrop/constants.js
+@@ -9,7 +9,7 @@ const DEFAULT_APPEARS_ON_INDEX = exports.DEFAULT_APPEARS_ON_INDEX = 1;
+ const DEFAULT_DISAPPEARS_ON_INDEX = exports.DEFAULT_DISAPPEARS_ON_INDEX = 0;
+ const DEFAULT_ENABLE_TOUCH_THROUGH = exports.DEFAULT_ENABLE_TOUCH_THROUGH = false;
+ const DEFAULT_PRESS_BEHAVIOR = exports.DEFAULT_PRESS_BEHAVIOR = 'close';
+-const DEFAULT_ACCESSIBLE = exports.DEFAULT_ACCESSIBLE = true;
++const DEFAULT_ACCESSIBLE = exports.DEFAULT_ACCESSIBLE = false;
+ const DEFAULT_ACCESSIBILITY_ROLE = exports.DEFAULT_ACCESSIBILITY_ROLE = 'button';
+ const DEFAULT_ACCESSIBILITY_LABEL = exports.DEFAULT_ACCESSIBILITY_LABEL = 'Bottom sheet backdrop';
+ const DEFAULT_ACCESSIBILITY_HINT = exports.DEFAULT_ACCESSIBILITY_HINT = 'Tap to close the bottom sheet';
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheet/constants.js b/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheet/constants.js
+index d6ddc94..6545a45 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheet/constants.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheet/constants.js
+@@ -25,7 +25,7 @@ const INITIAL_SNAP_POINT = -999;
+ const INITIAL_POSITION = SCREEN_HEIGHT;
+ 
+ // accessibility
+-const DEFAULT_ACCESSIBLE = true;
++const DEFAULT_ACCESSIBLE = false;
+ const DEFAULT_ACCESSIBILITY_LABEL = 'Bottom Sheet';
+ const DEFAULT_ACCESSIBILITY_ROLE = 'adjustable';
+ export { DEFAULT_HANDLE_HEIGHT, DEFAULT_OVER_DRAG_RESISTANCE_FACTOR, DEFAULT_ENABLE_CONTENT_PANNING_GESTURE, DEFAULT_ENABLE_HANDLE_PANNING_GESTURE, DEFAULT_ENABLE_OVER_DRAG, DEFAULT_ENABLE_PAN_DOWN_TO_CLOSE, DEFAULT_DYNAMIC_SIZING, DEFAULT_ANIMATE_ON_MOUNT,
+diff --git a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetBackdrop/constants.js b/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetBackdrop/constants.js
+index 47b70bd..8768fb3 100644
+--- a/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetBackdrop/constants.js
++++ b/node_modules/@gorhom/bottom-sheet/lib/module/components/bottomSheetBackdrop/constants.js
+@@ -5,7 +5,7 @@ const DEFAULT_APPEARS_ON_INDEX = 1;
+ const DEFAULT_DISAPPEARS_ON_INDEX = 0;
+ const DEFAULT_ENABLE_TOUCH_THROUGH = false;
+ const DEFAULT_PRESS_BEHAVIOR = 'close';
+-const DEFAULT_ACCESSIBLE = true;
++const DEFAULT_ACCESSIBLE = false;
+ const DEFAULT_ACCESSIBILITY_ROLE = 'button';
+ const DEFAULT_ACCESSIBILITY_LABEL = 'Bottom sheet backdrop';
+ const DEFAULT_ACCESSIBILITY_HINT = 'Tap to close the bottom sheet';
+diff --git a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheet/constants.ts b/node_modules/@gorhom/bottom-sheet/src/components/bottomSheet/constants.ts
+index 5aa7e07..3afc4fd 100644
+--- a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheet/constants.ts
++++ b/node_modules/@gorhom/bottom-sheet/src/components/bottomSheet/constants.ts
+@@ -28,7 +28,7 @@ const INITIAL_SNAP_POINT = -999;
+ const INITIAL_POSITION = SCREEN_HEIGHT;
+ 
+ // accessibility
+-const DEFAULT_ACCESSIBLE = true;
++const DEFAULT_ACCESSIBLE = false;
+ const DEFAULT_ACCESSIBILITY_LABEL = 'Bottom Sheet';
+ const DEFAULT_ACCESSIBILITY_ROLE = 'adjustable';
+ 
+diff --git a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetBackdrop/constants.ts b/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetBackdrop/constants.ts
+index bf6f23d..b7139cc 100644
+--- a/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetBackdrop/constants.ts
++++ b/node_modules/@gorhom/bottom-sheet/src/components/bottomSheetBackdrop/constants.ts
+@@ -4,7 +4,7 @@ const DEFAULT_DISAPPEARS_ON_INDEX = 0;
+ const DEFAULT_ENABLE_TOUCH_THROUGH = false;
+ const DEFAULT_PRESS_BEHAVIOR = 'close' as const;
+ 
+-const DEFAULT_ACCESSIBLE = true;
++const DEFAULT_ACCESSIBLE = false;
+ const DEFAULT_ACCESSIBILITY_ROLE = 'button';
+ const DEFAULT_ACCESSIBILITY_LABEL = 'Bottom sheet backdrop';
+ const DEFAULT_ACCESSIBILITY_HINT = 'Tap to close the bottom sheet';

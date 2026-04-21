@@ -62,7 +62,9 @@ export const ContactItem = React.memo(function ContactItem({
 }: ContactItemProps) {
   const router = useRouter();
   const foreground = useThemeColor('foreground');
-  // Get display info
+  // Get display info. Note: `name` is only the *real* display name — never the
+  // abbreviated pubkey. The pubkey fallback is handled separately by Text's
+  // `fallback` prop so it doesn't flash while loading → name resolves.
   const displayInfo = useMemo(() => {
     if (item.type === 'mint') {
       return {
@@ -73,17 +75,19 @@ export const ContactItem = React.memo(function ContactItem({
       };
     }
 
-    const displayName = profile?.display_name || profile?.name || item.pubkey.slice(0, 16) + '...';
+    const realDisplayName = profile?.display_name || profile?.name;
     const lastMessage =
       item.dmEvent === undefined ? undefined : item.dmEvent?.content || 'No messages';
 
     return {
-      name: displayName,
+      name: realDisplayName,
       picture: profile?.picture,
       subtitle: lastMessage,
       isMint: false,
     };
   }, [item.type, item.mint?.mintUrl, item.mintInfo, item.pubkey, item.dmEvent, profile]);
+
+  const nameFallback = displayInfo.isMint ? undefined : item.pubkey.slice(0, 16) + '...';
 
   useEffect(() => {
     prefetchImage(displayInfo.picture);
@@ -96,6 +100,9 @@ export const ContactItem = React.memo(function ContactItem({
       <HStack align="center">
         <VStack style={{ marginRight: 8 }}>
           <Avatar
+            state={
+              isLoadingProfile ? 'loading' : displayInfo.picture ? 'image' : 'fallback'
+            }
             picture={displayInfo.picture}
             seed={item.pubkey}
             status={
@@ -105,13 +112,13 @@ export const ContactItem = React.memo(function ContactItem({
             }
             size={48}
             name={displayInfo.name}
-            loading={isLoadingProfile}
           />
         </VStack>
         <VStack style={styles.textContainer}>
           <Text
             loading={isLoadingProfile}
             placeholder="Contact Name"
+            fallback={nameFallback}
             style={styles.profileName}
             className="text-foreground">
             {displayInfo.name}

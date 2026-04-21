@@ -276,7 +276,7 @@ export const icons: string[] = [
 
   // Icons discovered in codebase but previously missing from array
   'fluent:circle-16-filled',
-  'fluent:error-16-filled',
+  'fluent:error-circle-16-filled',
   'fluent:split-vertical-24-filled',
   'lucide:clipboard-paste',
   'lucide:link',
@@ -302,21 +302,38 @@ export const icons: string[] = [
   'mdi:refresh',
   'mdi:send',
   'mdi:broadcast',
+  'mdi:shield',
   'mdi:shield-check',
   'mdi:shield-refresh',
+  'mdi:shield-remove',
   'mdi:skip-next',
   'mdi:swap-horizontal',
   'mdi:ticket-percent',
   'mdi:volume-high',
   'mdi:volume-off',
+  'mingcute:search-3-fill',
   'mingcute:search-3-line',
   'ri:arrow-left-line',
   'ri:close-circle-line',
   'ri:error-warning-line',
   'ri:loader-line',
-  'ri:robot',
+  'ri:robot-fill',
   'ri:send-plane-2-fill',
   'solar:wallet-bold',
+  // BitChat / Group Chats
+  'mdi:bluetooth',
+  'mdi:map',
+  'mdi:compass',
+  'mdi:earth',
+  'mdi:pound',
+  'mdi:home',
+
+  // Wallpaper screens
+  'mdi:download',
+  'mdi:cloud-download-outline',
+  'mdi:delete-outline',
+  'mdi:sync',
+  'mdi:brush',
 ];
 
 export function BitcoinMaskIcon() {

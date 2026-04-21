@@ -1,38 +1,44 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { FlatList, View, StyleSheet } from 'react-native';
 import FilterItem from './SearchFilterItem';
 import { SEARCH_FILTERS_HEIGHT } from '../../lib/constants/styles';
 import { Log } from '@/shared/lib/logger';
 
-const FILTERS = ['All', 'Recent', 'Mints'] as const;
+export const BASE_FILTERS = ['All', 'Recent', 'Mints'] as const;
+export const SEARCH_FILTERS = ['All', 'Recent', 'Mints', 'Groups'] as const;
 
 type SearchFiltersProps = {
-  onFilterChange?: (filter: string) => void;
+  activeFilter: string;
+  onFilterChange: (filter: string) => void;
+  /**
+   * Filters to display, in order. Defaults to the base set.
+   * The parent owns visibility rules — during search it can narrow this
+   * list to only pills that have matches for the current query.
+   */
+  filters?: readonly string[];
 };
 
-export const SearchFilters = ({ onFilterChange }: SearchFiltersProps) => {
-  const [activeFilterItem, setActiveFilterItem] = useState<string>('All');
+export const SearchFilters = ({
+  activeFilter,
+  onFilterChange,
+  filters = BASE_FILTERS,
+}: SearchFiltersProps) => {
   const flatListRef = useRef<FlatList<string>>(null);
-
-  const handleFilterChange = (filter: string) => {
-    setActiveFilterItem(filter);
-    onFilterChange?.(filter);
-  };
 
   return (
     <Log name="SearchFilters">
       <View style={styles.container}>
         <FlatList
           ref={flatListRef}
-          data={FILTERS as unknown as string[]}
+          data={filters as unknown as string[]}
           keyExtractor={(item) => item}
           renderItem={({ item, index }) => (
             <FilterItem
               item={item}
               index={index}
               flatListRef={flatListRef}
-              activeFilterItem={activeFilterItem}
-              setActiveFilterItem={handleFilterChange}
+              activeFilterItem={activeFilter}
+              setActiveFilterItem={onFilterChange}
             />
           )}
           horizontal

@@ -46,10 +46,10 @@ const MintBalanceDisplay: React.FC<MintBalanceDisplayProps> = ({
         <HStack align="center">
           <View className="mr-1">
             <Avatar
+              state={isLoading ? 'loading' : mintIconUrl ? 'image' : 'fallback'}
               picture={mintIconUrl}
               size={32}
               name={mintName}
-              loading={isLoading}
               alt={`${mintName || 'Mint'} icon`}
             />
           </View>

@@ -76,7 +76,10 @@ export function useMintSelector({
 
   const mintName = mintUrl ? getMintDisplayName(mintUrl, { name: mintInfo?.name }) : undefined;
   const mintIconUrl = mintInfo?.icon_url;
-  const isLoading = Boolean(isMintsLoading || (mintUrl && !mintData));
+  // Only show skeleton when we have a selected mint but its data hasn't loaded yet.
+  // Don't show skeleton when no mint is selected (fresh install) or mints are still loading
+  // with no selection — in those cases the component shows a "Select Mint" placeholder.
+  const isLoading = Boolean(mintUrl && !mintData && isMintsLoading);
 
   const { width: windowWidth } = useWindowDimensions();
 

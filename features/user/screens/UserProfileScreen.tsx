@@ -283,6 +283,7 @@ function TopFollowersComponent({
       onPress={() => handleFollowerPress(follower)}
       activeOpacity={0.7}>
       <Avatar
+        state={getFollowerPicture(follower) ? 'image' : 'fallback'}
         picture={getFollowerPicture(follower)}
         seed={follower.pubkey}
         size={avatarSize}
@@ -381,13 +382,25 @@ function BannerWithAvatarComponent({
     'background',
   ] as const);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const [bannerError, setBannerError] = useState(false);
+  const [bannerStatus, setBannerStatus] = useState<'loading' | 'loaded' | 'failed'>('loading');
 
   const fallbackIndex = useMemo(
     () => (pubkey ? parseInt(pubkey.slice(0, 8), 16) % 8 : 0),
     [pubkey]
   );
+  const bannerError = bannerStatus === 'failed';
   const hasBannerImage = Boolean(bannerUrl && !bannerError);
+  // Mirror Avatar's state model for the banner:
+  //   - 'loading'  → metadata still resolving, OR we have a bannerUrl that hasn't finished loading
+  //   - 'image'    → bannerUrl resolved and loaded
+  //   - 'fallback' → metadata resolved with no banner, OR banner load failed
+  const bannerState: 'loading' | 'image' | 'fallback' = isLoading
+    ? 'loading'
+    : hasBannerImage
+      ? bannerStatus === 'loaded'
+        ? 'image'
+        : 'loading'
+      : 'fallback';
   const pfpColors = useDominantColor(pictureUrl, fallbackIndex);
   const bannerColors = useDominantColor(
     !pictureUrl && hasBannerImage ? bannerUrl : undefined,
@@ -418,7 +431,7 @@ function BannerWithAvatarComponent({
   }, [gradientSource, pfpColors.baseColor, bannerColors.baseColor]);
 
   useEffect(() => {
-    setBannerError(false);
+    setBannerStatus('loading');
   }, [bannerUrl]);
 
   useEffect(() => {
@@ -433,11 +446,11 @@ function BannerWithAvatarComponent({
   const avatarContent = (
     <View style={[styles.avatarBorder, { borderColor: background, backgroundColor: background }]}>
       <Avatar
+        state={isLoading ? 'loading' : pictureUrl ? 'image' : 'fallback'}
         picture={pictureUrl}
         seed={pubkey}
         size={AVATAR_SIZE}
         name={displayName}
-        loading={isLoading}
       />
     </View>
   );
@@ -463,12 +476,29 @@ function BannerWithAvatarComponent({
     <View>
       {/* Banner */}
       <View style={[styles.bannerContainer, { backgroundColor: surfaceSecondary }]}>
-        {isLoading ? (
-          <Skeleton
-            style={[StyleSheet.absoluteFill, { height: BANNER_HEIGHT, borderRadius: 0 }]}
-            className="w-full"
-          />
-        ) : hasBannerImage ? (
+        {bannerState === 'loading' ? (
+          <>
+            {/* Keep the image mounted (invisibly) while it loads so onLoad fires
+                and we can transition loading → image without a gradient flash. */}
+            {hasBannerImage ? (
+              <ExpoImage
+                source={{ uri: bannerUrl }}
+                style={[StyleSheet.absoluteFill, { opacity: 0 }]}
+                contentFit="cover"
+                cachePolicy="disk"
+                recyclingKey={bannerUrl}
+                onLoad={() => setBannerStatus('loaded')}
+                onError={() => setBannerStatus('failed')}
+              />
+            ) : null}
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: opacity(foreground, 0.5) },
+              ]}
+            />
+          </>
+        ) : bannerState === 'image' ? (
           <>
             <ExpoImage
               source={{ uri: bannerUrl }}
@@ -476,8 +506,7 @@ function BannerWithAvatarComponent({
               contentFit="cover"
               cachePolicy="disk"
               recyclingKey={bannerUrl}
-              transition={300}
-              onError={() => setBannerError(true)}
+              onError={() => setBannerStatus('failed')}
             />
             {imageGradientColors ? (
               <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -620,9 +649,10 @@ export function UserProfileScreen() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
-  const { npub: npubParam, pubkey: pubkeyParam } = useLocalSearchParams<{
+  const { npub: npubParam, pubkey: pubkeyParam, mintUrl: mintUrlParam } = useLocalSearchParams<{
     npub?: string;
     pubkey?: string;
+    mintUrl?: string;
   }>();
 
   const pubkey = useMemo(() => {
@@ -922,12 +952,12 @@ export function UserProfileScreen() {
           title: isMetadataLoading ? 'Profile' : displayName,
           headerRight: () => (
             <HStack gap={4}>
-              {profileData?.mintUrl && (
+              {(profileData?.mintUrl || mintUrlParam) && (
                 <Link
                   href={{
                     pathname: '/(mint-flow)/info' as any,
                     params: {
-                      mintInfoEntry: JSON.stringify({ mintUrl: profileData.mintUrl }),
+                      mintInfoEntry: JSON.stringify({ mintUrl: profileData?.mintUrl || mintUrlParam }),
                     },
                   }}
                   asChild>

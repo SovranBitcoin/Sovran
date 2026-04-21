@@ -2,6 +2,9 @@ import React, { useEffect, createContext } from 'react';
 import { usePricelistStore, BitcoinPrices } from '@/shared/stores/global/pricelistStore';
 import { PRICELIST_URL } from '@/shared/lib/apiClient';
 import { log } from '@/shared/lib/logger';
+import { PricelistWsMessage, loggableIssues, parseWith } from '@sovranbitcoin/schemas';
+
+const parsePricelistWs = parseWith(PricelistWsMessage, 'pricelist.ws');
 
 interface PricelistContextType {
   btcPrice?: number;
@@ -17,7 +20,6 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
     pricelist,
     isLoading,
     error,
-    setBtcPrice,
     setBtcPrices,
     setLoading,
     setError,
@@ -49,34 +51,23 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
         };
 
         ws.onmessage = (event) => {
+          let raw: unknown;
           try {
-            const data = JSON.parse(event.data);
-            log.debug('pricelist.ws.data', { data });
-
-            // Handle multi-currency format: { btcPrices: { USD, GBP, EUR } }
-            if (data?.btcPrices && typeof data.btcPrices === 'object') {
-              const prices = data.btcPrices as BitcoinPrices;
-              if (
-                typeof prices.USD === 'number' &&
-                typeof prices.GBP === 'number' &&
-                typeof prices.EUR === 'number'
-              ) {
-                setBtcPrices(prices);
-                return;
-              }
-            }
-
-            // Legacy: single price format
-            if (typeof data?.btcPrice === 'number') {
-              setBtcPrice(data.btcPrice);
-            } else if (data?.usd?.btc) {
-              // Handle different data formats
-              setBtcPrice(data.usd.btc);
-            }
+            raw = JSON.parse(event.data);
           } catch (err) {
-            log.error('pricelist.ws.parse_error', { error: err });
-            setError('Failed to parse price data');
+            log.error('pricelist.ws.json_error', { error: err });
+            return; // Keep socket open; ignore malformed frame.
           }
+          const parsed = parsePricelistWs(raw);
+          if (parsed.isErr()) {
+            log.warn('pricelist.ws.parse_rejected', {
+              issues: loggableIssues(parsed.error),
+            });
+            // Drop unknown-shape frames silently — price UI keeps its
+            // last-valid value rather than surfacing an error.
+            return;
+          }
+          setBtcPrices(parsed.value.btcPrices as BitcoinPrices);
         };
 
         ws.onerror = (err) => {
@@ -126,7 +117,7 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
         ws.close();
       }
     };
-  }, [setBtcPrice, setBtcPrices, setLoading, setError]);
+  }, [setBtcPrices, setLoading, setError]);
 
   const contextValue: PricelistContextType = {
     btcPrice: pricelist?.usd?.btc,

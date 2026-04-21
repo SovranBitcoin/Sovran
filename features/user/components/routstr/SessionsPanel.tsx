@@ -466,11 +466,17 @@ export const SessionsPanel: React.FC<SessionsPanelProps> = ({
                     }}>
                     <HStack align="center" spacing={12}>
                       <Avatar
+                        state={
+                          isMetadataLoading
+                            ? 'loading'
+                            : userPicture
+                              ? 'image'
+                              : 'fallback'
+                        }
                         size={40}
                         picture={userPicture}
                         seed={userPubkey}
                         name={username}
-                        loading={isMetadataLoading}
                       />
                       <VStack spacing={2} className="min-w-0 flex-1">
                         <Text

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sovran",
     "slug": "sovran",
-    "version": "0.0.62",
+    "version": "0.0.63",
     "orientation": "portrait",
     "scheme": ["sovran", "cashu"],
     "userInterfaceStyle": "dark",
@@ -13,6 +13,8 @@
       "userInterfaceStyle": "dark",
       "infoPlist": {
         "NSCameraUsageDescription": "Sovran will use your camera to scan QR codes to make it easier to send and receive payments.",
+        "NSBluetoothAlwaysUsageDescription": "Sovran uses Bluetooth to chat with nearby devices through the BitChat mesh, so you can send messages even when you're offline.",
+        "NSBluetoothPeripheralUsageDescription": "Sovran advertises over Bluetooth so nearby devices in the BitChat mesh can find you.",
         "ITSAppUsesNonExemptEncryption": false,
         "UISupportedInterfaceOrientations~ipad": [
           "UIInterfaceOrientationPortrait",
@@ -80,8 +82,21 @@
           }
         }
       ],
-      "expo-build-properties",
-      "expo-font",
+      ["expo-build-properties", { "ios": { "deploymentTarget": "18.0" } }],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/MonaSans/MonaSans-Light.ttf",
+            "./assets/fonts/MonaSans/MonaSans-Regular.ttf",
+            "./assets/fonts/MonaSans/MonaSans-Medium.ttf",
+            "./assets/fonts/MonaSans/MonaSans-SemiBold.ttf",
+            "./assets/fonts/MonaSans/MonaSans-Bold.ttf",
+            "./assets/fonts/MonaSans/MonaSans-ExtraBold.ttf",
+            "./assets/fonts/MonaSans/MonaSans-Black.ttf"
+          ]
+        }
+      ],
       "expo-router",
       "expo-localization",
       "expo-video",

@@ -1,0 +1,730 @@
+diff --git a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
+index 6480cbd..d33811d 100644
+--- a/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
++++ b/node_modules/@cashu/cashu-ts/lib/cashu-ts.es.js
+@@ -615,12 +615,52 @@ function hs(s, t, e) {
+   throw new Error(`Unknown simple or float value: ${e}`);
+ }
+ const ls = De("Secp256k1_HashToCurve_Cashu_");
++/* --- sovran perf: global timing accumulator --- */
++if (typeof globalThis !== "undefined" && !globalThis.__CASHU_PERF) {
++  globalThis.__CASHU_PERF = { enabled: false, log: [], _seq: 0,
++    enable() { this.enabled = true; this.log = []; this._seq = 0; },
++    disable() { this.enabled = false; },
++    push(e) { if (this.enabled) { e._seq = ++this._seq; e._t = performance.now(); this.log.push(e); } },
++    dump() { return this.log; },
++    summary() {
++      var m = {}; this.log.forEach(function(e) {
++        if (!m[e.op]) m[e.op] = { count: 0, totalMs: 0, min: Infinity, max: 0 };
++        if (e.ms !== undefined) { m[e.op].count++; m[e.op].totalMs += e.ms; m[e.op].min = Math.min(m[e.op].min, e.ms); m[e.op].max = Math.max(m[e.op].max, e.ms); }
++      }); return m;
++    },
++    report() {
++      var s = this.summary(), lines = ["=== cashu-ts perf report ==="];
++      Object.keys(s).forEach(function(k) { var v = s[k]; lines.push(k + ": " + v.count + " calls, " + v.totalMs.toFixed(1) + "ms total, " + (v.totalMs/v.count).toFixed(2) + " ms/op, min=" + v.min.toFixed(2) + " max=" + v.max.toFixed(2)); });
++      return lines.join("\n");
++    }
++  };
++}
++/* --- sovran perf: native crypto bridge (nutpatch) --- */
++if (typeof globalThis !== "undefined" && !globalThis.__CASHU_NATIVE) {
++  globalThis.__CASHU_NATIVE = {
++    crypto: null,
++    active: false,
++    init: function(cryptoInstance) { this.crypto = cryptoInstance; this.active = true; },
++    _toBuffer: function(u8) { return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength); },
++    _bigintToBuf: function(n) { var buf = new Uint8Array(32); for (var i = 31; i >= 0; i--) { buf[i] = Number(n & 0xffn); n >>= 8n; } return buf.buffer; },
++    _toPoint: function(buf) { return k.Point.fromHex(I(new Uint8Array(buf))); }
++  };
++}
+ function pt(s) {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var _cn = globalThis.__CASHU_NATIVE;
++  if (_cn && _cn.active) {
++    var result = _cn._toPoint(_cn.crypto.hashToCurve(_cn._toBuffer(s)));
++    if (_p && _p.enabled) _p.push({ op: "hashToCurve", ms: performance.now() - _t0, native: true });
++    return result;
++  }
+   const t = B(w.concat(ls, s)), e = new Uint32Array(1), n = 2 ** 16;
+   for (let r = 0; r < n; r++) {
+     const i = new Uint8Array(e.buffer), o = B(w.concat(t, i));
+     try {
+-      return Y(I(w.concat(new Uint8Array([2]), o)));
++      var result = Y(I(w.concat(new Uint8Array([2]), o)));
++      if (_p && _p.enabled) _p.push({ op: "hashToCurve", ms: performance.now() - _t0, native: false });
++      return result;
+     } catch {
+       e[0]++;
+     }
+@@ -628,8 +668,18 @@ function pt(s) {
+   throw new Error("No valid point found");
+ }
+ function He(s) {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var _cn = globalThis.__CASHU_NATIVE;
++  if (_cn && _cn.active && typeof _cn.crypto.hashE === "function") {
++    var bufs = s.map(function(p) { return _cn._toBuffer(p.toBytes(true)); });
++    var result = new Uint8Array(_cn.crypto.hashE(bufs));
++    if (_p && _p.enabled) _p.push({ op: "hash_e", ms: performance.now() - _t0, pointCount: s.length, native: true });
++    return result;
++  }
+   const e = s.map((n) => n.toHex(!1)).join("");
+-  return B(new TextEncoder().encode(e));
++  var result = B(new TextEncoder().encode(e));
++  if (_p && _p.enabled) _p.push({ op: "hash_e", ms: performance.now() - _t0, pointCount: s.length, native: false });
++  return result;
+ }
+ function Fr(s) {
+   return k.Point.fromHex(I(s));
+@@ -656,22 +706,45 @@ function fs() {
+   return yt(t);
+ }
+ function yt(s, t) {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var _cn = globalThis.__CASHU_NATIVE;
++  if (_cn && _cn.active) {
++    t || (t = k.Point.Fn.fromBytes(ne()));
++    var B_ = _cn._toPoint(_cn.crypto.blind(_cn._toBuffer(s), _cn._bigintToBuf(t)));
++    if (_p && _p.enabled) _p.push({ op: "blindMessage", ms: performance.now() - _t0, native: true });
++    return { B_: B_, r: t, secret: s };
++  }
+   const e = pt(s);
++  var _t1 = _p && _p.enabled ? performance.now() : 0;
+   t || (t = k.Point.Fn.fromBytes(ne()));
+   const n = k.Point.BASE.multiply(t);
+-  return { B_: e.add(n), r: t, secret: s };
++  var result = { B_: e.add(n), r: t, secret: s };
++  if (_p && _p.enabled) _p.push({ op: "blindMessage", ms: performance.now() - _t0, hashToCurveMs: _t1 - _t0, native: false });
++  return result;
+ }
+ function ps(s, t, e) {
+-  return s.subtract(e.multiply(t));
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var _cn = globalThis.__CASHU_NATIVE;
++  if (_cn && _cn.active) {
++    var result = _cn._toPoint(_cn.crypto.unblind(_cn._toBuffer(s.toBytes(true)), _cn._bigintToBuf(t), _cn._toBuffer(e.toBytes(true))));
++    if (_p && _p.enabled) _p.push({ op: "unblind", ms: performance.now() - _t0, native: true });
++    return result;
++  }
++  var result = s.subtract(e.multiply(t));
++  if (_p && _p.enabled) _p.push({ op: "unblind", ms: performance.now() - _t0, native: false });
++  return result;
+ }
+ function gs(s, t, e, n) {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+   const r = n, i = ps(s.C_, t, r);
+-  return {
++  var result = {
+     id: s.id,
+     amount: s.amount,
+     secret: e,
+     C: i
+   };
++  if (_p && _p.enabled) _p.push({ op: "constructProof", ms: performance.now() - _t0 });
++  return result;
+ }
+ const ms = (s) => ({
+   amount: s.amount,
+@@ -686,13 +759,19 @@ const ms = (s) => ({
+   secret: new TextEncoder().encode(s.secret),
+   witness: s.witness ? JSON.parse(s.witness) : void 0
+ }), We = (s, t) => {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+   const e = B(new TextEncoder().encode(s)), n = typeof t == "string" ? T(t) : t, r = ft.sign(e, n);
++  if (_p && _p.enabled) _p.push({ op: "schnorr.sign", ms: performance.now() - _t0 });
+   return I(r);
+ }, Bt = (s, t, e, n = !1) => {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+   try {
+     const r = B(new TextEncoder().encode(t)), i = e.length === 66 ? e.slice(2) : e;
+-    return ft.verify(T(s), r, T(i));
++    var _result = ft.verify(T(s), r, T(i));
++    if (_p && _p.enabled) _p.push({ op: "schnorr.verify", ms: performance.now() - _t0, valid: _result });
++    return _result;
+   } catch (r) {
++    if (_p && _p.enabled) _p.push({ op: "schnorr.verify", ms: performance.now() - _t0, valid: false, error: true });
+     if (n)
+       throw r;
+   }
+@@ -1075,12 +1154,18 @@ function xs(s, t) {
+   return !0;
+ }
+ const Bs = (s, t, e, n) => {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+   const r = k.Point.Fn.fromBytes(s.s), i = k.Point.Fn.fromBytes(s.e), o = k.Point.BASE.multiply(r), a = n.multiply(i), c = t.multiply(r), h = e.multiply(i), u = o.subtract(a), l = c.subtract(h), d = He([u, l, n, e]);
+-  return xs(d, s.e);
++  var _result = xs(d, s.e);
++  if (_p && _p.enabled) _p.push({ op: "dleq.verify", ms: performance.now() - _t0, valid: _result });
++  return _result;
+ }, Os = (s, t, e, n) => {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+   if (t.r === void 0) throw new Error("verifyDLEQProof_reblind: Undefined blinding factor");
+   const r = pt(s), i = e.add(n.multiply(t.r)), o = k.Point.BASE.multiply(t.r), a = r.add(o);
+-  return Bs(t, a, i, n);
++  var _result = Bs(t, a, i, n);
++  if (_p && _p.enabled) _p.push({ op: "dleq.verifyReblind", ms: performance.now() - _t0, valid: _result });
++  return _result;
+ }, ti = (s, t) => {
+   const e = k.Point.Fn.fromBytes(ne()), n = k.Point.BASE.multiply(e), r = s.multiply(e), i = k.Point.Fn.fromBytes(t), o = s.multiply(i), a = k.Point.BASE.multiply(i), c = He([n, r, a, o]), h = k.Point.Fn.fromBytes(c), u = k.Point.Fn.add(e, k.Point.Fn.mul(h, i));
+   return { s: Nn(u, 32), e: c };
+@@ -1145,11 +1230,34 @@ const Bs = (s, t, e, n) => {
+     return i;
+   }
+   return i;
+-}, St = (s, t, e, n) => {
+-  const r = Ne.fromMasterSeed(s), i = ds(t), o = `${Ks}/${i}'/${e}'/${n}`, a = r.derive(o);
++},
++_masterCache = new WeakMap(),
++_keysetCache = new Map(),
++St = (s, t, e, n) => {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var mk = _masterCache.get(s);
++  if (!mk) { mk = Ne.fromMasterSeed(s); _masterCache.set(s, mk); }
++  var ki = ds(t), ck = I(s) + ":" + t, pk = _keysetCache.get(ck);
++  if (!pk) { pk = mk.derive(Ks + "/" + ki + "'"); _keysetCache.set(ck, pk); }
++  var a = pk.deriveChild(e + 0x80000000).deriveChild(n);
+   if (a.privateKey === null)
+     throw new Error("Could not derive private key");
++  if (_p && _p.enabled) _p.push({ op: "derive_deprecated", ms: performance.now() - _t0, counter: e });
+   return a.privateKey;
++},
++_deriveBoth = (s, t, e) => {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var mk = _masterCache.get(s);
++  if (!mk) { mk = Ne.fromMasterSeed(s); _masterCache.set(s, mk); }
++  var ki = ds(t), ck = I(s) + ":" + t, pk = _keysetCache.get(ck);
++  if (!pk) { pk = mk.derive(Ks + "/" + ki + "'"); _keysetCache.set(ck, pk); }
++  var counterKey = pk.deriveChild(e + 0x80000000);
++  var sec = counterKey.deriveChild(0);
++  var bf = counterKey.deriveChild(1);
++  if (sec.privateKey === null || bf.privateKey === null)
++    throw new Error("Could not derive private key");
++  if (_p && _p.enabled) _p.push({ op: "deriveBoth", ms: performance.now() - _t0, counter: e });
++  return { secret: sec.privateKey, blinding: bf.privateKey };
+ };
+ function ei(s, t) {
+   return je("HTLC", s, t);
+@@ -1695,12 +1803,17 @@ function Pn(s) {
+   });
+ }
+ function ai(s, t) {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++  var _result;
+   if (le(s.proofs) || t?.version === 3) {
+     if (t?.version === 4)
+       throw new Error("can not encode to v4 token if proofs contain non-hex keyset id");
+-    return ir(s, t?.removeDleq);
++    _result = ir(s, t?.removeDleq);
++  } else {
++    _result = or(s, t?.removeDleq);
+   }
+-  return or(s, t?.removeDleq);
++  if (_p && _p.enabled) _p.push({ op: "encodeToken", ms: performance.now() - _t0, version: le(s.proofs) || t?.version === 3 ? 3 : 4, proofCount: s.proofs?.length, tokenLength: _result.length });
++  return _result;
+ }
+ function or(s, t) {
+   if (t && (s.proofs = Cn(s.proofs)), s.proofs.forEach((c) => {
+@@ -1786,8 +1899,11 @@ function En(s) {
+   return s.d && (e.memo = s.d), e;
+ }
+ function ar(s, t) {
++  var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+   const e = (t ?? []).map((i) => typeof i == "string" ? i : i.id), n = Bn(s), r = In(n);
+-  return r.proofs = lr(r.proofs, e), r;
++  r.proofs = lr(r.proofs, e);
++  if (_p && _p.enabled) _p.push({ op: "decodeToken", ms: performance.now() - _t0, proofCount: r.proofs?.length, mint: r.mint?.slice(0, 40), tokenLength: s.length });
++  return r;
+ }
+ function ci(s) {
+   s = Bn(s);
+@@ -2757,6 +2873,7 @@ class ge {
+    * @returns Signed outputs.
+    */
+   async swap(t, e) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     const n = await this.requestWithAuth(
+       "POST",
+       "/v1/swap",
+@@ -2765,6 +2882,7 @@ class ge {
+     );
+     if (!U(n) || !Array.isArray(n?.signatures))
+       throw this._logger.error("Invalid response from mint...", { data: n, op: "swap" }), new Error("Invalid response from mint");
++    if (_p && _p.enabled) _p.push({ op: "mint.swap", ms: performance.now() - _t0, inputs: t.inputs?.length, outputs: t.outputs?.length, signatures: n.signatures?.length });
+     return n;
+   }
+   /**
+@@ -2828,6 +2946,7 @@ class ge {
+    * @returns Serialized blinded signatures.
+    */
+   async mintBolt11(t, e) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     const n = await this.requestWithAuth(
+       "POST",
+       "/v1/mint/bolt11",
+@@ -2836,6 +2955,7 @@ class ge {
+     );
+     if (!U(n) || !Array.isArray(n?.signatures))
+       throw this._logger.error("Invalid response from mint...", { data: n, op: "mintBolt11" }), new Error("Invalid response from mint");
++    if (_p && _p.enabled) _p.push({ op: "mint.mintBolt11", ms: performance.now() - _t0, outputs: t.outputs?.length, signatures: n.signatures?.length });
+     return n;
+   }
+   /**
+@@ -2961,9 +3081,11 @@ class ge {
+    * @returns The melt response.
+    */
+   async meltBolt11(t, e) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     const n = await this.melt("bolt11", t, e), r = Lt(n, this._logger);
+     if (!U(r) || typeof r?.state != "string" || !Object.values(dt).includes(r.state))
+       throw this._logger.error("Invalid response from mint...", { data: r, op: "meltBolt11" }), new Error("Invalid response from mint");
++    if (_p && _p.enabled) _p.push({ op: "mint.meltBolt11", ms: performance.now() - _t0, inputs: t.inputs?.length, state: r.state, changeCount: r.change?.length || 0 });
+     return r;
+   }
+   /**
+@@ -3097,17 +3219,20 @@ class ge {
+     return this._logger.error("Blind Authentication Token...", { bat: r }), r;
+   }
+   async requestWithAuth(t, e, n = {}, r) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     const i = r ?? this._request, o = await this.handleBlindAuth(t, e), a = await this.handleClearAuth(t, e), c = {
+       ...n.headers ?? {},
+       ...o ? { "Blind-auth": o } : {},
+       ...a ? { "Clear-auth": a } : {}
+     };
+-    return i({
++    var _result = await i({
+       ...n,
+       endpoint: R(this._mintUrl, e),
+       method: t,
+       headers: c
+     });
++    if (_p && _p.enabled) _p.push({ op: "mint.http", ms: performance.now() - _t0, method: t, path: e });
++    return _result;
+   }
+   isValidMethodString(t) {
+     return !!(typeof t == "string" && /^[a-z0-9_-]+$/.test(t));
+@@ -3515,6 +3640,7 @@ class D {
+     this.secret = n, this.blindingFactor = e, this.blindedMessage = t;
+   }
+   toProof(t, e) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     let n;
+     t.dleq && (n = {
+       s: z(t.dleq.s),
+@@ -3535,7 +3661,9 @@ class D {
+         }
+       }
+     }, c = wr(this);
+-    return c && (a.p2pk_e = c), a;
++    c && (a.p2pk_e = c);
++    if (_p && _p.enabled) _p.push({ op: "outputData.toProof", ms: performance.now() - _t0, amount: t.amount, hasDleq: !!t.dleq });
++    return a;
+   }
+   static createP2PKData(t, e, n, r) {
+     return Q(e, n.keys, r).map((o) => this.createSingleP2PKData(t, o, n.id));
+@@ -3576,20 +3704,61 @@ class D {
+     return t.blindKeys && d && yr(Z, d), Z;
+   }
+   static createRandomData(t, e, n) {
+-    return Q(t, e.keys, n).map((i) => this.createSingleRandomData(i, e.id));
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++    var result = Q(t, e.keys, n).map((i) => this.createSingleRandomData(i, e.id));
++    if (_p && _p.enabled) _p.push({ op: "createRandomData", ms: performance.now() - _t0, count: result.length });
++    return result;
+   }
+   static createSingleRandomData(t, e) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     const n = W(_e(32)), r = new TextEncoder().encode(n), { r: i, B_: o } = yt(r);
+-    return new D(
++    var result = new D(
+       new Ut(t, o, e).getSerializedBlindedMessage(),
+       i,
+       r
+     );
++    if (_p && _p.enabled) _p.push({ op: "createSingleRandomData", ms: performance.now() - _t0, amount: t });
++    return result;
+   }
+   static createDeterministicData(t, e, n, r, i) {
+-    return Q(t, r.keys, i).map(
+-      (a, c) => this.createSingleDeterministicData(a, e, n + c, r.id)
+-    );
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++    var amounts = Q(t, r.keys, i);
++    var rid = r.id;
++    var isLegacy = /^[a-fA-F0-9]+$/.test(rid) ? rid.startsWith("00") : true;
++    var results;
++    var _cn = globalThis.__CASHU_NATIVE;
++    /* --- sovran perf: native batch derive for legacy keysets --- */
++    if (isLegacy && _cn && _cn.active && typeof _cn.crypto.batchDeriveLegacy === "function") {
++      var kidInt = Number(ds(rid));
++      var seedBuf = e.buffer.slice(e.byteOffset, e.byteOffset + e.byteLength);
++      var raw = new Uint8Array(_cn.crypto.batchDeriveLegacy(seedBuf, kidInt, n, amounts.length));
++      results = amounts.map(function(a, c) {
++        var off = c * 64;
++        var secBytes = raw.subarray(off, off + 32);
++        var bfBytes = raw.subarray(off + 32, off + 64);
++        var secHex = W(secBytes);
++        var secUtf8 = new TextEncoder().encode(secHex);
++        var rVal = w.toBigInt(bfBytes);
++        var bm = yt(secUtf8, rVal);
++        return new D(new Ut(a, bm.B_, rid).getSerializedBlindedMessage(), bm.r, secUtf8);
++      });
++    } else if (isLegacy && typeof _deriveBoth === "function") {
++      results = amounts.map(function(a, c) {
++        var ctr = n + c;
++        var both = _deriveBoth(e, rid, ctr);
++        var secHex = W(both.secret);
++        var secUtf8 = new TextEncoder().encode(secHex);
++        var rVal = w.toBigInt(both.blinding);
++        var bm = yt(secUtf8, rVal);
++        return new D(new Ut(a, bm.B_, rid).getSerializedBlindedMessage(), bm.r, secUtf8);
++      });
++    } else {
++      results = amounts.map(
++        (a, c) => this.createSingleDeterministicData(a, e, n + c, rid)
++      );
++    }
++    if (_p && _p.enabled) _p.push({ op: "createDeterministicData_batch", count: amounts.length, ms: performance.now() - _t0, keysetId: rid, startCounter: n, isLegacy: isLegacy, native: !!(isLegacy && _cn && _cn.active && typeof _cn.crypto.batchDeriveLegacy === "function") });
++    return results;
+   }
+   /**
+    * @throws May throw if blinding factor is out of range. Caller should catch, increment counter,
+@@ -5040,10 +5209,12 @@ class me {
+    * @throws If fetching mint info, keysets, or keys fails.
+    */
+   async loadMint(t) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     const e = [];
+     (!this._mintInfo || t) && e.push(
+       this.mint.getInfo().then((n) => (this._mintInfo = new Et(n), null))
+     ), e.push(this._keyChain.init(t)), await Promise.all(e), this.finishInit();
++    if (_p && _p.enabled) _p.push({ op: "wallet.loadMint", ms: performance.now() - _t0, mintUrl: this.mint._mintUrl?.slice(0, 40) });
+   }
+   /**
+    * Load mint information, keysets, and keys from cached data.
+@@ -5437,7 +5608,9 @@ class me {
+    * @returns Newly minted proofs.
+    */
+   async receive(t, e, n) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     const r = await this.prepareSwapToReceive(t, e, n), { keep: i } = await this.completeSwap(r, e?.privkey);
++    if (_p && _p.enabled) _p.push({ op: "wallet.receive", ms: performance.now() - _t0, proofCount: i.length });
+     return i;
+   }
+   /**
+@@ -5463,6 +5636,7 @@ class me {
+    * @returns SwapPreview with metadata for swap transaction.
+    */
+   async prepareSwapToReceive(t, e, n) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     const { keysetId: r, requireDleq: i, proofsWeHave: o, onCountersReserved: a } = e || {};
+     n = n ?? this.defaultOutputType();
+     const c = typeof t == "string" ? this.decodeToken(t) : t, h = Mn(c.mint);
+@@ -5495,6 +5669,7 @@ class me {
+     const b = await this.addCountersToOutputTypes(d.id, m);
+     [m] = b.outputTypes, b.used && this.safeCallback(a, b.used, { op: "receive" }), this._logger.debug("receive counter", { counter: b.used, receiveOT: m });
+     const S = this.createOutputData(this.preparedTotal(m), d, m);
++    if (_p && _p.enabled) _p.push({ op: "wallet.prepareSwapToReceive", ms: performance.now() - _t0, amount: p, fee: f, inputProofs: u.length, outputCount: S.length });
+     return {
+       amount: p,
+       fees: f,
+@@ -5550,6 +5725,7 @@ class me {
+    * @throws Throws if the send cannot be completed offline or if funds are insufficient.
+    */
+   async send(t, e, n, r) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     this.assertAmount(t, "send");
+     const { keysetId: i, includeFees: o = !1 } = n || {};
+     r = r ?? {
+@@ -5568,14 +5744,18 @@ class me {
+         requireDleq: !1
+         // safety
+       }), d = o ? this.getFeesForProofs(l) : 0;
+-      if (nt(l) === t + d)
++      if (nt(l) === t + d) {
++        if (_p && _p.enabled) _p.push({ op: "wallet.send", ms: performance.now() - _t0, amount: t, proofCount: e.length, exactMatch: true });
+         return this._logger.info("Successful exactMatch offline selection!"), { keep: u, send: l };
++      }
+     } catch (c) {
+       const h = c instanceof Error ? c.message : "Unknown error";
+       this._logger.debug("ExactMatch offline selection failed.", { e: h });
+     }
+     const a = await this.prepareSwapToSend(t, e, n, r);
+-    return await this.completeSwap(a, n?.privkey);
++    var _result = await this.completeSwap(a, n?.privkey);
++    if (_p && _p.enabled) _p.push({ op: "wallet.send", ms: performance.now() - _t0, amount: t, proofCount: e.length, exactMatch: false, sendCount: _result.send.length, keepCount: _result.keep.length });
++    return _result;
+   }
+   /**
+    * Prepare A Send Transaction.
+@@ -5601,6 +5781,7 @@ class me {
+    * @throws Throws if the send cannot be completed offline or if funds are insufficient.
+    */
+   async prepareSwapToSend(t, e, n, r) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     const { keysetId: i, includeFees: o = !1, onCountersReserved: a } = n || {};
+     r = r ?? {
+       send: this.defaultOutputType(),
+@@ -5638,6 +5819,7 @@ class me {
+     const S = this.preparedTotal(b), v = await this.addCountersToOutputTypes(c.id, h, b);
+     [h, b] = v.outputTypes, v.used && this.safeCallback(a, v.used, { op: "send" }), this._logger.debug("send counters", { counter: v.used, sendOT: h, keepOT: b });
+     const O = this.createOutputData(u, c, h), at = this.createOutputData(S, c, b);
++    if (_p && _p.enabled) _p.push({ op: "wallet.prepareSwapToSend", ms: performance.now() - _t0, amount: t, inputCount: d.length, sendOutputs: O.length, keepOutputs: at.length, fees: p });
+     return {
+       amount: t,
+       fees: p,
+@@ -5666,6 +5848,7 @@ class me {
+    * @returns SendResponse with keep/send proofs.
+    */
+   async completeSwap(t, e) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     const n = t?.keepOutputs ? t.keepOutputs : [], r = t.sendOutputs ? t.sendOutputs : [], i = t.unselectedProofs ? t.unselectedProofs : [];
+     e && (t.inputs = this.signP2PKProofs(t.inputs, e, [
+       ...n,
+@@ -5675,7 +5858,10 @@ class me {
+       t.inputs,
+       n,
+       r
+-    ), { signatures: a } = await this.mint.swap(o.payload);
++    );
++    var _tNet = _p && _p.enabled ? performance.now() : 0;
++    const { signatures: a } = await this.mint.swap(o.payload);
++    var _tNetEnd = _p && _p.enabled ? performance.now() : 0;
+     this.failIf(
+       a.length < o.outputData.length,
+       `Mint returned ${a.length} signatures, expected ${o.outputData.length}`
+@@ -5685,13 +5871,16 @@ class me {
+       l[p] = o.keepVector[m], u[p] = h[m];
+     });
+     const d = [], f = [];
+-    return u.forEach((p, m) => {
++    u.forEach((p, m) => {
+       l[m] ? d.push(p) : f.push(p);
+-    }), this._logger.debug("SEND COMPLETED", {
++    });
++    if (_p && _p.enabled) _p.push({ op: "wallet.completeSwap", ms: performance.now() - _t0, networkMs: _tNetEnd - _tNet, proofCount: h.length, keepCount: d.length, sendCount: f.length });
++    this._logger.debug("SEND COMPLETED", {
+       unselectedProofs: i.map((p) => p.amount),
+       keepProofs: d.map((p) => p.amount),
+       sendProofs: f.map((p) => p.amount)
+-    }), {
++    });
++    return {
+       keep: [...d, ...i],
+       send: f
+     };
+@@ -5714,6 +5903,7 @@ class me {
+    * @see https://crypto.ethz.ch/publications/files/Przyda02.pdf
+    */
+   selectProofsToSend(t, e, n = !1, r = !1) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     this.assertAmount(e, "selectProofsToSend");
+     const { keep: i, send: o } = this._selectProofs(
+       t,
+@@ -5722,6 +5912,7 @@ class me {
+       n,
+       r
+     );
++    if (_p && _p.enabled) _p.push({ op: "wallet.selectProofs", ms: performance.now() - _t0, inputCount: t.length, selectedCount: o.length, includeFees: n, exactMatch: r });
+     return { keep: i, send: o };
+   }
+   /**
+@@ -5838,12 +6029,20 @@ class me {
+    *   default one will be used.
+    */
+   async batchRestore(t = 300, e = 100, n = 0, r) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++    if (_p && _p.enabled) _p.push({ op: "batchRestore.start", gapLimit: t, batchSize: e, startCounter: n, keysetId: r });
+     const i = Math.ceil(t / e), o = [];
+     let a, c = 0;
++    var _batchNum = 0;
+     for (; c < i; ) {
++      _batchNum++;
++      if (_batchNum > 1) await new Promise(function(res) { setTimeout(res, 0); });
++      var _bt0 = _p && _p.enabled ? performance.now() : 0;
+       const h = await this.restore(n, e, { keysetId: r });
++      if (_p && _p.enabled) _p.push({ op: "batchRestore.batch", batchNum: _batchNum, counter: n, batchSize: e, proofsFound: h.proofs.length, ms: performance.now() - _bt0 });
+       h.proofs.length > 0 ? (c = 0, o.push(...h.proofs), a = h.lastCounterWithSignature) : c++, n += e;
+     }
++    if (_p && _p.enabled) _p.push({ op: "batchRestore.end", totalBatches: _batchNum, totalProofs: o.length, ms: performance.now() - _t0 });
+     return { proofs: o, lastCounterWithSignature: a };
+   }
+   /**
+@@ -5854,12 +6053,27 @@ class me {
+    * @param options.keysetId Set a custom keysetId to restore from. @see `keyChain)`
+    */
+   async restore(t, e, n) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     this.failIfNullish(this._seed, "Cashu Wallet must be initialized with a seed to use restore");
+     const { keysetId: r } = n || {};
+     await this._keyChain.ensureKeysetKeys(r ?? this.keysetId);
+-    const i = this.getKeyset(r), o = Array(e).fill(0), a = D.createDeterministicData(0, this._seed, t, i, o), { outputs: c, signatures: h } = await this.mint.restore({
++    const i = this.getKeyset(r);
++    var _rcfg = typeof globalThis !== "undefined" && globalThis.__CASHU_RECOVERY_CONFIG || {};
++    var _CHUNK = _rcfg.chunkSize || 8;
++    var a = [];
++    for (var _off = 0; _off < e; _off += _CHUNK) {
++      var _cs = Math.min(_CHUNK, e - _off);
++      var _cz = Array(_cs).fill(0);
++      var _co = D.createDeterministicData(0, this._seed, t + _off, i, _cz);
++      a.push.apply(a, _co);
++      if (_off + _CHUNK < e) await new Promise(function(r) { setTimeout(r, 0); });
++    }
++    var _t_outputs = _p && _p.enabled ? performance.now() : 0;
++    const { outputs: c, signatures: h } = await this.mint.restore({
+       outputs: a.map((f) => f.blindedMessage)
+-    }), u = {};
++    });
++    var _t_network = _p && _p.enabled ? performance.now() : 0;
++    const u = {};
+     c.forEach((f, p) => u[f.B_] = h[p]);
+     const l = [];
+     let d;
+@@ -5867,6 +6081,7 @@ class me {
+       const p = u[a[f].blindedMessage.B_];
+       p && (d = t + f, a[f].blindedMessage.amount = p.amount, l.push(a[f].toProof(p, i)));
+     }
++    if (_p && _p.enabled) _p.push({ op: "restore", start: t, count: e, chunkSize: _CHUNK, keysetId: r || i.id, ms: performance.now() - _t0, outputGenMs: _t_outputs - _t0, networkMs: _t_network - _t_outputs, proofsFound: l.length });
+     return {
+       proofs: l,
+       lastCounterWithSignature: d
+@@ -5892,12 +6107,14 @@ class me {
+    *   specified amount and unit.
+    */
+   async createMintQuoteBolt11(t, e) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     this.assertAmount(t, "createMintQuoteBolt11"), e && (this.getMintInfo().supportsNut04Description("bolt11", this._unit) || this.fail("Mint does not support description for bolt11"));
+     const n = {
+       unit: this._unit,
+       amount: t,
+       description: e
+     }, r = await this.mint.createMintQuoteBolt11(n);
++    if (_p && _p.enabled) _p.push({ op: "wallet.createMintQuote", ms: performance.now() - _t0, amount: t });
+     return { ...r, amount: r.amount || t, unit: r.unit || this._unit };
+   }
+   /**
+@@ -6027,6 +6244,7 @@ class me {
+    * @throws If params are invalid or mint returns errors.
+    */
+   async _mintProofs(t, e, n, r, i) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     this.assertAmount(e, `_mintProofs: ${t}`), i = i ?? this.defaultOutputType();
+     const { privkey: o, keysetId: a, proofsWeHave: c, onCountersReserved: h } = r ?? {}, u = this.getKeyset(a);
+     let l = this.configureOutputs(
+@@ -6039,20 +6257,28 @@ class me {
+     );
+     const d = this.preparedTotal(l), f = await this.addCountersToOutputTypes(u.id, l);
+     [l] = f.outputTypes, f.used && this.safeCallback(h, f.used, { op: "mintProofs" }), this._logger.debug("mint counter", { counter: f.used, mintOT: l });
++    var _tOutputs = _p && _p.enabled ? performance.now() : 0;
+     const p = this.createOutputData(d, u, l), m = p.map((v) => v.blindedMessage), b = {
+       outputs: m,
+       quote: typeof n == "string" ? n : n.quote
+     };
++    var _tOutputsDone = _p && _p.enabled ? performance.now() : 0;
+     if (typeof n != "string" && n.pubkey) {
+       this.failIf(!o, "Can not sign locked quote without private key");
+       const v = Rs(o, n.quote, m);
+       b.signature = v;
+     }
+     let S;
+-    return t === "bolt12" ? { signatures: S } = await this.mint.mintBolt12(b) : { signatures: S } = await this.mint.mintBolt11(b), this.failIf(
++    var _tNet = _p && _p.enabled ? performance.now() : 0;
++    t === "bolt12" ? { signatures: S } = await this.mint.mintBolt12(b) : { signatures: S } = await this.mint.mintBolt11(b);
++    var _tNetDone = _p && _p.enabled ? performance.now() : 0;
++    this.failIf(
+       S.length !== p.length,
+       `Mint returned ${S.length} signatures, expected ${p.length}`
+-    ), this._logger.debug("MINT COMPLETED", { amounts: p.map((v) => v.blindedMessage.amount) }), p.map((v, O) => v.toProof(S[O], u));
++    ), this._logger.debug("MINT COMPLETED", { amounts: p.map((v) => v.blindedMessage.amount) });
++    var _result = p.map((v, O) => v.toProof(S[O], u));
++    if (_p && _p.enabled) _p.push({ op: "wallet.mintProofs", ms: performance.now() - _t0, method: t, amount: e, outputCount: p.length, outputMs: _tOutputsDone - _tOutputs, networkMs: _tNetDone - _tNet });
++    return _result;
+   }
+   // -----------------------------------------------------------------
+   // Section: Create Melt Quote
+@@ -6074,6 +6300,7 @@ class me {
+    *   reserve.
+    */
+   async createMeltQuoteBolt11(t, e) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     e !== void 0 && (this.failIf(
+       fr(t),
+       "amountMsat supplied but invoice already contains an amount. Leave amountMsat undefined for non-zero invoices."
+@@ -6089,6 +6316,7 @@ class me {
+         }
+       } : {}
+     }, i = await this.mint.createMeltQuoteBolt11(r);
++    if (_p && _p.enabled) _p.push({ op: "wallet.createMeltQuote", ms: performance.now() - _t0, amount: i.amount, fee_reserve: i.fee_reserve });
+     return {
+       ...i,
+       unit: i.unit || this._unit,
+@@ -6227,6 +6455,7 @@ class me {
+    * @see https://github.com/cashubtc/nuts/blob/main/08.md.
+    */
+   async prepareMelt(t, e, n, r, i) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     i = i ?? this.defaultOutputType();
+     const { keysetId: o, onChangeOutputsCreated: a, onCountersReserved: c } = r || {}, h = this.getKeyset(o), u = nt(n), l = u - e.amount;
+     let d = [];
+@@ -6268,6 +6497,7 @@ class me {
+       };
+       this.safeCallback(a, p, { op: "meltProofs" }), this.on._emitMeltBlanksCreated(p);
+     }
++    if (_p && _p.enabled) _p.push({ op: "wallet.prepareMelt", ms: performance.now() - _t0, method: t, quoteAmount: e.amount, fee_reserve: l, inputProofs: n.length, changeOutputs: d.length });
+     return f;
+   }
+   /**
+@@ -6284,6 +6514,7 @@ class me {
+    * @throws If melt fails or signatures don't match output count.
+    */
+   async completeMelt(t, e, n) {
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
+     t = this.maybeConvertMeltBlanks(t);
+     let r = t.inputs;
+     const i = t.outputData.map((d) => d.blindedMessage), o = t.quote.quote, a = this.getKeyset(t.keysetId);
+@@ -6293,13 +6524,18 @@ class me {
+       inputs: r,
+       outputs: i,
+       ...n ? { prefer_async: !0 } : {}
+-    }, h = t.method === "bolt11" ? await this.mint.meltBolt11(c) : await this.mint.melt(t.method, c);
++    };
++    var _tNet = _p && _p.enabled ? performance.now() : 0;
++    const h = t.method === "bolt11" ? await this.mint.meltBolt11(c) : await this.mint.melt(t.method, c);
++    var _tNetDone = _p && _p.enabled ? performance.now() : 0;
+     this.failIf(
+       (h.change?.length ?? 0) > t.outputData.length,
+       `Mint returned ${h.change?.length ?? 0} signatures, but only ${t.outputData.length} blanks were provided`
+     );
+     const u = h.change?.map((d, f) => t.outputData[f].toProof(d, a)) ?? [];
+-    return n ? this._logger.debug("ASYNC MELT REQUESTED", h) : this._logger.debug("MELT COMPLETED", { changeAmounts: u.map((d) => d.amount) }), { quote: {
++    if (_p && _p.enabled) _p.push({ op: "wallet.completeMelt", ms: performance.now() - _t0, networkMs: _tNetDone - _tNet, changeCount: u.length, paid: !!h.paid });
++    n ? this._logger.debug("ASYNC MELT REQUESTED", h) : this._logger.debug("MELT COMPLETED", { changeAmounts: u.map((d) => d.amount) });
++    return { quote: {
+       ...t.quote,
+       ...h
+     }, change: u };
+@@ -6332,9 +6568,14 @@ class me {
+    * @returns NUT-07 state for each proof, in same order.
+    */
+   async checkProofsStates(t) {
+-    const e = new TextEncoder(), n = t.map(
++    var _p = globalThis.__CASHU_PERF, _t0 = _p && _p.enabled ? performance.now() : 0;
++    const e = new TextEncoder();
++    var _tHash0 = _p && _p.enabled ? performance.now() : 0;
++    const n = t.map(
+       (o) => pt(e.encode(o.secret)).toHex(!0)
+-    ), r = 100, i = [];
++    );
++    var _tHashDone = _p && _p.enabled ? performance.now() : 0;
++    const r = 100, i = [];
+     for (let o = 0; o < n.length; o += r) {
+       const a = n.slice(o, o + r), { states: c } = await this.mint.check({
+         Ys: a
+@@ -6347,6 +6588,7 @@ class me {
+         this.failIfNullish(l, "Could not find state for proof with Y: " + a[u]), i.push(l);
+       }
+     }
++    if (_p && _p.enabled) _p.push({ op: "wallet.checkProofsStates", ms: performance.now() - _t0, hashMs: _tHashDone - _tHash0, proofCount: t.length, batches: Math.ceil(n.length / r) });
+     return i;
+   }
+   /**

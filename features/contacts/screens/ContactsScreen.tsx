@@ -1,39 +1,94 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeOut, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { LegendList } from '@legendapp/list';
+import Icon from 'assets/icons';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
+import { useRouter } from 'expo-router';
+import opacity from 'hex-color-opacity';
+
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintManagement } from '@/features/mint';
 import { useRecentContacts } from '@/features/payments/hooks/useRecentContacts';
 import { useMintContacts } from '@/features/payments/hooks/useMintContacts';
-import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/useContactSearch';
 import { prefetchImages } from '@/shared/lib/imageCache';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
-import { useContactsSearch } from '@/app/(drawer)/(tabs)/contacts/_layout';
+import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
 import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { SearchResultsList } from '@/shared/ui/composed/SearchResultsList';
+import { ListRow } from '@/shared/ui/composed/ListRow';
 import { ScreenContainer } from '../components/ScreenContainer';
 import { ContactListItem } from '../components/ContactListItem';
-import { ContactSearchResultItem } from '../components/ContactSearchResultItem';
+import { LocationTierItem } from '../components/LocationTierItem';
 import { SearchFilters } from '../components/search/SearchFilters';
-import { NoResultsFound } from '@/features/payments/components/NoResultsFound';
 import { SEARCH_FILTERS_HEIGHT } from '../lib/constants/styles';
-import { HEADER_SPRING_CONFIG } from '../lib/constants/animation-configs';
+import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
+import { isValidGeohash } from 'bitchat-module';
+
+type TopTab = 'contacts' | 'groups';
+
+/**
+ * Bare geohash detection for the Groups pill header.
+ * (All pill's geohash handling lives in `useAllSearchResults` + `SearchResultsList`.)
+ */
+function parseGeohashQuery(trimmed: string): string | null {
+  if (!trimmed) return null;
+  const hash = trimmed.startsWith('#')
+    ? trimmed.slice(1).toLowerCase()
+    : trimmed.toLowerCase();
+  if (hash.length < 2) return null;
+  if (!isValidGeohash(hash)) return null;
+  if (!trimmed.startsWith('#') && /\s/.test(trimmed)) return null;
+  return hash;
+}
+
+function GeohashJumpRow({ geohash }: { geohash: string }) {
+  const router = useRouter();
+  const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
+  return (
+    <ListRow
+      iconCircle={{
+        icon: 'mdi:pound',
+        color: accent,
+        size: 44,
+        backgroundColor: opacity(accent, 0.12),
+      }}
+      title={`Go to #${geohash}`}
+      subtitle="Open geohash chat channel"
+      trailing={
+        <Icon name="mdi:arrow-right" size={18} color={opacity(foreground, 0.35)} />
+      }
+      onPress={() => {
+        router.push({
+          pathname: '/(user-flow)/geohashChat',
+          params: { geohash },
+        } as any);
+      }}
+    />
+  );
+}
 
 export const ContactsScreen = () => {
   useLifecycleLogger('ContactsScreen');
-  const { isSearching, searchQuery } = useContactsSearch();
+  const { isSearching, searchQuery } = useSearchContext();
+  const [activeTab, setActiveTab] = useState<TopTab>('contacts');
   const [activeFilter, setActiveFilter] = useState('All');
-  const [foreground, surface, separator] = useThemeColor([
+  const lastSearchFilterRef = useRef<string>('All');
+  const [foreground, surface, separator, accent] = useThemeColor([
     'foreground',
     'surface',
     'separator-secondary',
+    'accent',
   ] as const);
+  const { tiers: locationTiers } = useLocationTiers();
 
-  // Reset filter when leaving search
+  // When the search closes, restore the outer tab. If the user was on the
+  // "Groups" pill, surface the groups list they were browsing.
   useEffect(() => {
     if (!isSearching) {
+      if (lastSearchFilterRef.current === 'Groups') {
+        setActiveTab('groups');
+      }
       setActiveFilter('All');
     }
   }, [isSearching]);
@@ -41,7 +96,6 @@ export const ContactsScreen = () => {
   const { keys: nostrKeys } = useNostrKeysContext();
   const { mints, getMintInfo } = useMintManagement();
 
-  // Real data hooks (same as payments)
   const { displayContacts, contactPubkeys, dmEvents } = useRecentContacts(nostrKeys);
   const { displayMints, mintPubkeys, mintInfoLoading } = useMintContacts(
     nostrKeys,
@@ -49,19 +103,14 @@ export const ContactsScreen = () => {
     getMintInfo,
     dmEvents
   );
-  const { displayResults, searchLoading, hasSearched, showNoResults, handleSearchResultPress } =
-    useContactSearch(searchQuery);
 
-  // Profile subscription for avatars/names
   const profileFilters = useMemo(() => {
     const allPubkeys = [...new Set([...contactPubkeys, ...mintPubkeys])];
     if (allPubkeys.length === 0) return null;
     return [{ kinds: [0], authors: allPubkeys }];
   }, [contactPubkeys, mintPubkeys]);
 
-  const { events: profileEvents } = useSubscribe({
-    filters: profileFilters,
-  });
+  const { events: profileEvents } = useSubscribe({ filters: profileFilters });
 
   const profilesMap = useMemo(() => {
     const t0 = performance.now();
@@ -84,40 +133,86 @@ export const ContactsScreen = () => {
     prefetchImages(Array.from(profilesMap.values()).map((p: any) => p?.picture));
   }, [profilesMap]);
 
-  // Determine which list to show based on active filter
+  const trimmedQuery = searchQuery.trim();
+  const lowerQuery = trimmedQuery.toLowerCase();
+
+  // Match a query against human-readable nostr profile text. Deliberately
+  // excludes the raw hex pubkey — those are 64-char hex and would false-match
+  // any short alphanumeric query ("abc", "face", "123", …).
+  const matchesProfileQuery = useCallback(
+    (profile: any): boolean => {
+      if (!lowerQuery) return true;
+      if (!profile) return false;
+      const candidates = [profile.name, profile.display_name, profile.displayName, profile.nip05];
+      return candidates.some(
+        (v) => typeof v === 'string' && v.toLowerCase().includes(lowerQuery)
+      );
+    },
+    [lowerQuery]
+  );
+
+  const filteredDisplayContacts = useMemo(() => {
+    if (!lowerQuery) return displayContacts;
+    return displayContacts.filter((c: any) => {
+      const profile = c.pubkey ? profilesMap.get(c.pubkey) : undefined;
+      return matchesProfileQuery(profile);
+    });
+  }, [displayContacts, profilesMap, lowerQuery, matchesProfileQuery]);
+
+  // Extract a mint URL's hostname for matching. Falls back to the raw string
+  // on parse failure so a mint isn't accidentally unsearchable.
+  const mintHost = (url: string | undefined): string => {
+    if (!url) return '';
+    try {
+      return new URL(url).hostname.toLowerCase();
+    } catch {
+      return url.toLowerCase();
+    }
+  };
+
+  const filteredDisplayMints = useMemo(() => {
+    if (!lowerQuery) return displayMints;
+    return displayMints.filter((m: any) => {
+      const name = m.mintInfo?.name;
+      if (typeof name === 'string' && name.toLowerCase().includes(lowerQuery)) return true;
+      if (mintHost(m.mint?.mintUrl).includes(lowerQuery)) return true;
+      const profile = m.pubkey ? profilesMap.get(m.pubkey) : undefined;
+      return matchesProfileQuery(profile);
+    });
+  }, [displayMints, profilesMap, lowerQuery, matchesProfileQuery]);
+
   const currentListData = useMemo(() => {
     switch (activeFilter) {
       case 'Recent':
-        return displayContacts;
+        return filteredDisplayContacts;
       case 'Mints':
-        return displayMints;
-      default:
-        // "All" — merge recent + mints, deduplicated by pubkey (or mintUrl for mints without pubkey)
-        const seen = new Set<string>();
-        const merged: any[] = [];
-        for (const item of [...displayContacts, ...displayMints]) {
+        return filteredDisplayMints;
+      default: {
+        const byKey = new Map<string, any>();
+        for (const item of filteredDisplayContacts) {
           const key = item.pubkey || item.mint?.mintUrl;
-          if (key && !seen.has(key)) {
-            seen.add(key);
-            merged.push(item);
-          }
+          if (key) byKey.set(key, item);
         }
-        return merged;
+        for (const item of filteredDisplayMints) {
+          const key = item.pubkey || item.mint?.mintUrl;
+          if (key) byKey.set(key, item);
+        }
+        return Array.from(byKey.values());
+      }
     }
-  }, [activeFilter, displayContacts, displayMints]);
+  }, [activeFilter, filteredDisplayContacts, filteredDisplayMints]);
 
   const handleFilterChange = useCallback((filter: string) => {
     log.debug('contacts.filter_changed', { filter });
     setActiveFilter(filter);
+    lastSearchFilterRef.current = filter;
   }, []);
 
-  // Render a contact/mint item from the real data
   const renderContactItem = useCallback(
     ({ item }: { item: any }) => {
       const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
       const lastMessage = item.dmEvent?.content;
       const isLoadingProfile = item.pubkey !== undefined && profile === undefined;
-
       return (
         <ContactListItem
           pubkey={item.pubkey}
@@ -125,6 +220,7 @@ export const ContactsScreen = () => {
           subtitle={lastMessage}
           type={item.type}
           mintInfo={item.mintInfo}
+          mintUrl={item.mint?.mintUrl}
           isLoadingProfile={isLoadingProfile}
         />
       );
@@ -132,23 +228,7 @@ export const ContactsScreen = () => {
     [profilesMap]
   );
 
-  // Render a search result item
-  const renderSearchResult = useCallback(
-    ({ item }: { item: DisplayResult }) => (
-      <ContactSearchResultItem
-        result={item}
-        loading={searchLoading || !hasSearched}
-        onPress={handleSearchResultPress}
-      />
-    ),
-    [searchLoading, hasSearched, handleSearchResultPress]
-  );
-
   const renderEmpty = useCallback(() => {
-    if (isSearching && showNoResults) {
-      return <NoResultsFound />;
-    }
-
     if (activeFilter === 'Mints' && mintInfoLoading) {
       return (
         <View style={styles.emptyContainer}>
@@ -158,10 +238,9 @@ export const ContactsScreen = () => {
         </View>
       );
     }
-
     return (
       <View style={styles.emptyContainer}>
-        <Feather name="users" size={30} color={opacity(foreground, 0.3)} />
+        <Icon name="mdi:account-group" size={30} color={opacity(foreground, 0.3)} />
         <Text style={[styles.emptyText, { color: opacity(foreground, 0.4) }]}>
           {activeFilter === 'Mints'
             ? 'No mints with nostr contacts found'
@@ -169,62 +248,199 @@ export const ContactsScreen = () => {
         </Text>
       </View>
     );
-  }, [isSearching, showNoResults, foreground, activeFilter, mintInfoLoading]);
+  }, [foreground, activeFilter, mintInfoLoading]);
 
-  // Show API search results only when there's a typed query and "All" filter is active
-  const showSearchResults = isSearching && searchQuery.trim().length > 0 && activeFilter === 'All';
+  // Groups pill: filter tiers by label (e.g. "Province") or reverse-geocoded
+  // displayName (e.g. "United Kingdom"). Case-insensitive prefix/substring.
+  // (Mirrors the matching in `useAllSearchResults` so Groups pill and All pill
+  // stay consistent for tier hits.)
+  const matchingTiers = useMemo(() => {
+    if (!lowerQuery) return [];
+    return locationTiers.filter((tier: TierEntry) => {
+      if (tier.transport === 'ble') {
+        return tier.label.toLowerCase().startsWith(lowerQuery) && lowerQuery.length >= 3;
+      }
+      if (tier.label.toLowerCase().startsWith(lowerQuery)) return true;
+      if (tier.displayName?.toLowerCase().includes(lowerQuery)) return true;
+      return false;
+    });
+  }, [lowerQuery, locationTiers]);
 
-  // Animated spacer — pushes ScreenContainer down when filters strip appears
-  const rTopStyle = useAnimatedStyle(() => ({
-    height: withSpring(isSearching ? SEARCH_FILTERS_HEIGHT : 0, HEADER_SPRING_CONFIG),
-  }));
+  // Groups pill still surfaces the geohash jump row as a list header.
+  const groupsGeohashQuery = useMemo(
+    () => parseGeohashQuery(trimmedQuery),
+    [trimmedQuery]
+  );
+
+  // Pill visibility:
+  //   • No active search → base pills (Groups lives in the outer tab bar).
+  //   • Search open, empty query → all pills so the user can pick a scope.
+  //   • Search open with a query → only pills that have at least one match.
+  const visibleFilters = useMemo<readonly string[]>(() => {
+    if (!isSearching) return ['All', 'Recent', 'Mints'];
+    if (!lowerQuery) return ['All', 'Recent', 'Mints', 'Groups'];
+    const list: string[] = ['All'];
+    if (filteredDisplayContacts.length > 0) list.push('Recent');
+    if (filteredDisplayMints.length > 0) list.push('Mints');
+    if (matchingTiers.length > 0 || groupsGeohashQuery) list.push('Groups');
+    return list;
+  }, [
+    isSearching,
+    lowerQuery,
+    filteredDisplayContacts,
+    filteredDisplayMints,
+    matchingTiers,
+    groupsGeohashQuery,
+  ]);
+
+  // When the active pill drops out of the visible set (e.g. query narrows
+  // past its matches), silently fall back to 'All'. Intentionally bypass
+  // `handleFilterChange` so `lastSearchFilterRef` is left alone — that ref
+  // drives the Groups-tab switch when the search bar closes.
+  useEffect(() => {
+    if (!visibleFilters.includes(activeFilter)) {
+      setActiveFilter('All');
+    }
+  }, [visibleFilters, activeFilter]);
+
+  // ===========================
+  // TOP TABS (hidden while searching)
+  // ===========================
+
+  const renderTab = useCallback(
+    (tab: TopTab, label: string) => {
+      const isActive = activeTab === tab;
+      return (
+        <Pressable
+          key={tab}
+          onPress={() => setActiveTab(tab)}
+          style={[
+            styles.tab,
+            isActive && { borderBottomColor: accent, borderBottomWidth: 2 },
+          ]}>
+          <Text
+            style={[
+              styles.tabLabel,
+              { color: isActive ? foreground : opacity(foreground, 0.4) },
+              isActive && styles.tabLabelActive,
+            ]}>
+            {label}
+          </Text>
+        </Pressable>
+      );
+    },
+    [activeTab, foreground, accent]
+  );
+
+  // --- Render helpers ---
+
+  const renderContactsList = () => (
+    <LegendList
+      data={currentListData}
+      extraData={profilesMap.size}
+      estimatedItemSize={68}
+      keyExtractor={(item, index) => item.pubkey || item.mint?.mintUrl || `contact-${index}`}
+      renderItem={renderContactItem}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="always"
+      ListEmptyComponent={renderEmpty}
+      contentContainerStyle={currentListData.length === 0 ? styles.emptyList : undefined}
+    />
+  );
+
+  // Groups view — used both by the outer Groups tab and by the `Groups`
+  // filter pill inside the Contacts tab (during search). Same data, same
+  // rendering, geohash header when a bare geohash is typed.
+  const renderGroupsList = () => {
+    const tierData = isSearching && trimmedQuery ? matchingTiers : locationTiers;
+    return (
+      <LegendList
+        data={tierData}
+        estimatedItemSize={68}
+        keyExtractor={(item) => item.key}
+        renderItem={({ item }) => <LocationTierItem tier={item} />}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="always"
+        ListHeaderComponent={
+          groupsGeohashQuery ? <GeohashJumpRow geohash={groupsGeohashQuery} /> : null
+        }
+        ListEmptyComponent={
+          !groupsGeohashQuery ? (
+            <View style={styles.emptyContainer}>
+              <Icon name="mdi:map-marker-radius" size={30} color={opacity(foreground, 0.3)} />
+              <Text style={[styles.emptyText, { color: opacity(foreground, 0.4) }]}>
+                {trimmedQuery ? 'No matching groups' : 'Getting your location...'}
+              </Text>
+            </View>
+          ) : null
+        }
+        contentContainerStyle={
+          tierData.length === 0 && !groupsGeohashQuery ? styles.emptyList : undefined
+        }
+      />
+    );
+  };
+
+  // Decide which body to render. Groups view wins if either the outer tab
+  // is Groups OR the Contacts-tab filter pill is 'Groups' (which is only
+  // selectable during search). Otherwise on Contacts tab: All-search when
+  // there's a query, otherwise the filtered local list.
+  const showGroupsBody =
+    activeTab === 'groups' || (activeTab === 'contacts' && activeFilter === 'Groups');
+
+  const showAllSearch =
+    activeTab === 'contacts' &&
+    activeFilter === 'All' &&
+    isSearching &&
+    trimmedQuery.length > 0;
 
   return (
     <Screen name="ContactsScreen" style={styles.root}>
-      {/* Spacer that animates to push content below the transparent header + filters */}
-      <Animated.View style={rTopStyle} />
+      {/* Outer tabs — hidden while searching; search scope is the pill bar below. */}
+      {!isSearching && (
+        <View
+          style={[
+            styles.tabBar,
+            {
+              backgroundColor: surface,
+              borderBottomWidth: 0.5,
+              borderBottomColor: separator,
+            },
+          ]}>
+          {renderTab('contacts', 'Contacts')}
+          {renderTab('groups', 'Groups')}
+        </View>
+      )}
 
-      {/* Filters strip — floats above ScreenContainer, fades in/out */}
-      {isSearching && (
+      {/* Pill bar — only on Contacts tab. Groups tab owns its own filtering
+          (matching tiers + geohash header) without needing pills.
+          The `Groups` pill is added to the SearchFilters only while searching. */}
+      {activeTab === 'contacts' && (
         <Animated.View
           entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
           style={[
             styles.filtersRow,
             {
-              top: 0,
               backgroundColor: surface,
               paddingHorizontal: 20,
               borderBottomWidth: 0.5,
               borderBottomColor: separator,
             },
           ]}>
-          <SearchFilters onFilterChange={handleFilterChange} />
+          <SearchFilters
+            activeFilter={activeFilter}
+            onFilterChange={handleFilterChange}
+            filters={visibleFilters}
+          />
         </Animated.View>
       )}
 
       <ScreenContainer>
-        {showSearchResults ? (
-          <FlatList
-            data={showNoResults ? [] : displayResults}
-            keyExtractor={(item) => item.pubkey}
-            renderItem={renderSearchResult}
-            keyboardDismissMode="on-drag"
-            keyboardShouldPersistTaps="handled"
-            ListEmptyComponent={renderEmpty}
-            contentContainerStyle={showNoResults ? styles.emptyList : undefined}
-          />
-        ) : (
-          <FlatList
-            data={currentListData}
-            keyExtractor={(item, index) => item.pubkey || item.mint?.mintUrl || `contact-${index}`}
-            renderItem={renderContactItem}
-            keyboardDismissMode="on-drag"
-            keyboardShouldPersistTaps="handled"
-            ListEmptyComponent={renderEmpty}
-            contentContainerStyle={currentListData.length === 0 ? styles.emptyList : undefined}
-          />
-        )}
+        {showGroupsBody
+          ? renderGroupsList()
+          : showAllSearch
+            ? <SearchResultsList searchQuery={searchQuery} />
+            : renderContactsList()}
       </ScreenContainer>
     </Screen>
   );
@@ -234,11 +450,23 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
+  tabBar: {
+    flexDirection: 'row',
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabLabel: {
+    fontSize: 16,
+  },
+  tabLabelActive: {
+    fontWeight: '600',
+  },
   filtersRow: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 10,
     height: SEARCH_FILTERS_HEIGHT,
   },
   emptyContainer: {

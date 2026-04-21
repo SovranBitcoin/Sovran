@@ -17,7 +17,7 @@ import { URDecoder } from '@gandlaf21/bc-ur';
 
 import { useManager } from '@cashu/coco-react';
 
-import type { MeltOperationLike, NavigationCallbacks } from 'coco-payment-ux';
+import type { MachineOperations, MeltOperationLike, NavigationCallbacks } from 'coco-payment-ux';
 import {
   createCocoPaymentUX,
   meltOperationToScreenActionEntry,
@@ -34,6 +34,8 @@ import {
 import { log } from '@/shared/lib/logger';
 import { useReceivePaymentUXExtras } from '@/features/receive/providers/ReceivePaymentUXExtras';
 import {
+  createSovranExecuteMintQuote,
+  createSovranExecuteReceive,
   createSovranHandlers,
   createSovranNotifications,
   createSovranScanSources,
@@ -46,10 +48,11 @@ import { useOfflineStatus } from '@/shared/providers/OfflineProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNpcMintStore } from '@/shared/stores/profile/npcMintStore';
 import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
+import { useTransactionDistributionStore } from '@/shared/stores/profile/transactionDistributionStore';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
-import { fetchNostrProfile } from '@/shared/lib/apiClient';
+import { auditMint, reviewMint, fetchNostrProfile } from '@/shared/lib/apiClient';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -172,6 +175,36 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
               .catch(() => {});
           }
         },
+        fetchMintAuditData: (mintUrls) => {
+          for (const mintUrl of mintUrls) {
+            const store = useAuditMintStore.getState();
+            if (!store.isStale(mintUrl)) continue;
+            auditMint({ mintUrl })
+              .then((result) => {
+                if (result.isOk()) {
+                  useAuditMintStore.getState().setCached(mintUrl, result.value, result.value.info);
+                }
+              })
+              .catch(() => {});
+          }
+        },
+        fetchMintReviewData: (mintUrls) => {
+          for (const mintUrl of mintUrls) {
+            const store = useKYMMintStore.getState();
+            if (!store.isStale(mintUrl)) continue;
+            reviewMint({ mintUrl })
+              .then((result) => {
+                if (result.isOk() && result.value.score !== null) {
+                  useKYMMintStore.getState().setCached(
+                    mintUrl,
+                    result.value.score,
+                    result.value.recommendations
+                  );
+                }
+              })
+              .catch(() => {});
+          }
+        },
         shouldMockFailPaymentRequest: () => useSettingsStore.getState().mockFailPaymentRequest,
       }),
     [manager, nfcAdapter, getOffline, getBtcPrice, getDisplayCurrency]
@@ -180,6 +213,64 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     return () => instance.dispose();
   }, [instance]);
+
+  // Mint-quote distribution source: when a Lightning mint quote transitions
+  // to PAID/ISSUED, infer 'displayed' as the source if no explicit copy/share
+  // action was recorded. The first-write-wins guard in the distribution store
+  // ensures this is a no-op when copy/share/airdrop was already recorded by
+  // the mintQuote.copy or mintQuote.share screen-action overrides.
+  //
+  // We key the distribution write by `payload.quoteId` (NOT a looked-up
+  // historyEntry.id). quoteId is the deterministic identifier carried by
+  // the lightning quote — it's identical no matter which path resolves it,
+  // so the first-write-wins guard correctly engages whether we wrote 'copy'
+  // first from the screen action or 'displayed' from this subscription.
+  useEffect(() => {
+    if (!manager) return;
+    const handler = (payload: {
+      mintUrl: string;
+      operationId: string;
+      quoteId: string;
+      state: string;
+    }) => {
+      if (payload.state !== 'PAID' && payload.state !== 'ISSUED') return;
+      if (!payload.quoteId) {
+        log.warn('payment.mint_quote.displayed_inference.no_quote_id', {
+          operationId: payload.operationId,
+          state: payload.state,
+        });
+        return;
+      }
+      useTransactionDistributionStore
+        .getState()
+        .setDistribution(payload.quoteId, 'displayed');
+      log.debug('payment.mint_quote.displayed_inference.applied', {
+        quoteId: payload.quoteId,
+        operationId: payload.operationId,
+        state: payload.state,
+      });
+    };
+    const unsub = manager.on('mint-op:quote-state-changed', handler);
+    return unsub;
+  }, [manager]);
+
+  // Override coco-payment-ux's default executeReceive and executeMintQuote so
+  // they always return entries with coco's REAL persisted history ids — never
+  // synthesized fallbacks (`redeemed-${Date.now()}`) or unverified operation
+  // ids. This guarantees the location stamp + scan-history link captured
+  // downstream are keyed to the same id `usePaginatedHistory` returns later,
+  // so reopening the transaction from the list resolves them correctly.
+  // See sovranPaymentConfig.createSovranExecuteReceive / createSovranExecuteMintQuote
+  // for the full rationale. Spreading instance.operations preserves all other defaults.
+  const operationsOverride = useMemo<MachineOperations>(
+    () =>
+      ({
+        ...instance.operations,
+        executeReceive: createSovranExecuteReceive(() => manager),
+        executeMintQuote: createSovranExecuteMintQuote(() => manager),
+      }) as MachineOperations,
+    [instance, manager]
+  );
 
   const actions = useMemo(() => createSovranScreenActionHandlers(), []);
 
@@ -270,6 +361,29 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           unsubscribes.push(subscribeMeltOperation('melt-op:prepared'));
           unsubscribes.push(subscribeMeltOperation('melt-op:pending'));
           unsubscribes.push(subscribeMeltOperation('melt-op:finalized'));
+        }
+
+        if (screenType === 'mintQuote') {
+          // Subscribe to mint operation state changes (UNPAID → PAID → ISSUED).
+          // Must include type:'mint' so defaultShouldApply can match by type+quoteId.
+          unsubscribes.push(
+            manager.on(
+              'mint-op:quote-state-changed',
+              ({ operationId, quoteId, state }: { mintUrl: string; operationId: string; quoteId: string; state: string }) => {
+                log.info('send.mint_quote_state_changed', { screenType, operationId, quoteId, state });
+                callback({ type: 'mint', quoteId, state, operationId } as unknown as EntryRecord);
+              }
+            )
+          );
+          unsubscribes.push(
+            manager.on(
+              'mint-op:finalized',
+              ({ operationId }: { mintUrl: string; operationId: string }) => {
+                log.info('send.mint_op_finalized', { screenType, operationId });
+                callback({ type: 'mint', operationId, state: 'ISSUED' } as unknown as EntryRecord);
+              }
+            )
+          );
         }
 
         if (screenType === 'receive') {
@@ -461,26 +575,50 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
       getLocale: () => useSettingsStore.getState().language || 'en',
       subscribeGlobalScreenActions: (listener) => {
         const unScan = useScanHistoryStore.subscribe(listener);
+        const unDistribution = useTransactionDistributionStore.subscribe(listener);
         const unSettings = useSettingsStore.subscribe(listener);
         return () => {
           unScan();
+          unDistribution();
           unSettings();
         };
       },
       getSourceLabel: (entry) => {
         const entryId = entry && typeof entry.id === 'string' ? entry.id : undefined;
         if (!entryId) return null;
+        // Inbound source (scan history) takes precedence — those are user
+        // actions that brought data INTO the wallet. Outbound distribution
+        // is the fallback for transactions where the user shared data OUT
+        // (currently only Lightning mint quotes).
         const scan = useScanHistoryStore
           .getState()
           .entries.find((e) => e.transactionId === entryId);
-        if (!scan?.source) return null;
+        // Distribution store is keyed by `quoteId` for mint entries (the
+        // deterministic identifier from the lightning quote) and by entry.id
+        // for everything else. Mirror this in `useTransactionSource` in
+        // Transaction.tsx — both readers must use the same key.
+        const distKey =
+          entry?.type === 'mint' && typeof entry?.quoteId === 'string'
+            ? (entry.quoteId as string)
+            : entryId;
+        const distribution = useTransactionDistributionStore
+          .getState()
+          .distributions[distKey];
+        const source = scan?.source ?? distribution?.source ?? null;
+        if (!source) return null;
         const labels: Record<string, string> = {
+          // Inbound (scan history)
           qr: 'QR Code',
           nfc: 'NFC',
           paste: 'Clipboard',
           deeplink: 'Deep Link',
+          // Outbound (transaction distribution)
+          copy: 'Copied',
+          share: 'Shared',
+          airdrop: 'AirDrop',
+          displayed: 'QR Code',
         };
-        return labels[scan.source] ?? null;
+        return labels[source] ?? null;
       },
     };
   }, [manager, receiveExtras?.requestCameraPermission]);
@@ -488,6 +626,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   return (
     <PaymentUXProviderBase
       instance={instance}
+      operations={operationsOverride}
       handlers={(machine, refs) =>
         createSovranHandlers({
           machine,

@@ -56,6 +56,17 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
 
   const canSendOffline = typeof entry?.canSendOffline === 'boolean' ? entry.canSendOffline : null;
 
+  // Diagnostic: trace suggestions and offline data flow
+  log.debug('amount.flow.state', {
+    destination: entry?.destination,
+    mintUrl,
+    canSendOffline,
+    suggestionsCount: suggestions?.length ?? 0,
+    hasMintUrl: !!mintUrl,
+    proofAmountsKeys: Object.keys(walletContext.proofAmounts ?? {}),
+    proofCount: mintUrl ? walletContext.proofAmounts?.[mintUrl]?.length ?? 0 : 0,
+  });
+
   if (error) {
     return null;
   }
@@ -81,12 +92,13 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
           ),
           headerTintColor: foreground,
           headerRight:
-            canSendOffline !== null
+            isSendOperation && mintUrl
               ? () => (
                   <IconSymbol
-                    name={canSendOffline ? 'airplane' : 'wifi'}
+                    name={canSendOffline === true ? 'airplane' : 'wifi'}
                     size={18}
                     color={foreground}
+                    style={{ opacity: canSendOffline === null ? 0.3 : 1 }}
                   />
                 )
               : undefined,

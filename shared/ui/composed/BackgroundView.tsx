@@ -6,7 +6,7 @@ import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
 import React, { memo, ReactNode, useMemo } from 'react';
 import { Dimensions, StyleSheet, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
-import { useSettingsStore } from '@/shared/stores/global/settingsStore';
+import { useTheme } from '@/shared/providers/ThemeProvider';
 import { isBackgroundImageTheme, getGradientColorScale } from '@/config/backgroundImageThemes';
 import AnimatedSpriteBackground from './SpriteView';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -108,7 +108,7 @@ function ScrollableGradientOverlayComponent({
   const viewportHeight = Dimensions.get('window').height;
 
   // Get gradient colors for background image themes
-  const currentTheme = useSettingsStore((state) => state.getTheme());
+  const { currentTheme } = useTheme();
   const gradientColors = useMemo(() => {
     if (isBackgroundImageTheme(currentTheme)) {
       return getGradientColorScale(currentTheme);
@@ -202,6 +202,21 @@ interface AnimatedBackgroundViewProps {
    * Additional style for the container
    */
   style?: ViewStyle;
+  /**
+   * When set, applies a static full-screen blur at this intensity
+   * instead of using the animated context-driven blur.
+   */
+  staticBlurIntensity?: number;
+  /**
+   * Opacity for the gradient overlay at the top edge (0-1).
+   * @default 0 (transparent at top, matching the default behaviour)
+   */
+  gradientTopOpacity?: number;
+  /**
+   * Override the gradient overlay color. Defaults to the theme's
+   * gradient dark color (scale '300').
+   */
+  gradientColor?: string;
 }
 
 /**
@@ -222,12 +237,15 @@ function AnimatedBackgroundViewComponent({
   children,
   blurTint = 'dark',
   style,
+  staticBlurIntensity,
+  gradientTopOpacity = 0,
+  gradientColor,
 }: AnimatedBackgroundViewProps) {
   useRenderLogger('AnimatedBackgroundView');
   const surface = useThemeColor('surface');
 
   // Get gradient colors for background image themes
-  const currentTheme = useSettingsStore((state) => state.getTheme());
+  const { currentTheme } = useTheme();
   const gradientColors = useMemo(() => {
     if (isBackgroundImageTheme(currentTheme)) {
       return getGradientColorScale(currentTheme);
@@ -279,9 +297,12 @@ function AnimatedBackgroundViewComponent({
           <AnimatedSpriteBackground backgroundColor={surface} />
 
           {/* Gradient overlay for image themes */}
-          {gradientColors && (
+          {(gradientColors || gradientColor) && (
             <LinearGradient
-              colors={[opacity(gradientColors['300'], 0), opacity(gradientColors['300'], 1)]}
+              colors={[
+                opacity(gradientColor || gradientColors!['300'], gradientTopOpacity),
+                opacity(gradientColor || gradientColors!['300'], 1),
+              ]}
               locations={[0, 1]}
               style={StyleSheet.absoluteFillObject}
               pointerEvents="none"
@@ -289,8 +310,17 @@ function AnimatedBackgroundViewComponent({
           )}
         </Animated.View>
 
+        {/* Static full blur — used by contexts like the drawer that don't need animated transitions */}
+        {staticBlurIntensity != null && blurSupported && (
+          <BlurView
+            intensity={staticBlurIntensity}
+            tint={blurTint}
+            style={StyleSheet.absoluteFillObject}
+          />
+        )}
+
         {/* Partial blur overlay (bottom half) - animated opacity */}
-        {blurSupported && (
+        {staticBlurIntensity == null && blurSupported && (
           <Animated.View
             style={[
               StyleSheet.absoluteFillObject,
@@ -313,7 +343,7 @@ function AnimatedBackgroundViewComponent({
         )}
 
         {/* Full blur overlay - animated opacity */}
-        {blurSupported && (
+        {staticBlurIntensity == null && blurSupported && (
           <Animated.View
             style={[StyleSheet.absoluteFillObject, fullBlurAnimatedStyle]}
             pointerEvents="none">

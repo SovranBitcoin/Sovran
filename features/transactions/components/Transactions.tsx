@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 
 import { LegendList } from '@legendapp/list';
@@ -10,6 +10,7 @@ import { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-co
 
 import Icon from 'assets/icons';
 import { SwapTransactionRow } from '@/features/transactions/components/SwapTransactionRow';
+import { SplitBillTransactionRow } from '@/features/transactions/components/SplitBillTransactionRow';
 import { Transaction } from '@/features/transactions/components/Transaction';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -21,17 +22,26 @@ import { formatDate } from '@/shared/lib/time';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
 import {
   useSwapTransactionsStore,
   type SwapGroup,
 } from '@/shared/stores/profile/swapTransactionsStore';
+import {
+  useSplitBillTransactionsStore,
+  type SplitBillGroup,
+} from '@/shared/stores/profile/splitBillTransactionsStore';
+import { useTransactionLocationStore } from '@/shared/stores/profile/transactionLocationStore';
 
 // ---------------------------------------------------------------------------
 // Timeline item: a discriminated union so transactions and swap groups can
 // live in the same sorted list.
 // ---------------------------------------------------------------------------
 
-type TimelineItem = { kind: 'transaction'; data: HistoryEntry } | { kind: 'swap'; data: SwapGroup };
+type TimelineItem =
+  | { kind: 'transaction'; data: HistoryEntry }
+  | { kind: 'swap'; data: SwapGroup }
+  | { kind: 'split-bill'; data: SplitBillGroup };
 
 function getTimelineCreatedAt(item: TimelineItem): number {
   return item.data.createdAt;
@@ -39,6 +49,7 @@ function getTimelineCreatedAt(item: TimelineItem): number {
 
 function getTimelineKey(item: TimelineItem): string {
   if (item.kind === 'swap') return `swap-${item.data.id}`;
+  if (item.kind === 'split-bill') return `split-bill-${item.data.id}`;
   const entry = item.data;
   if (entry.id) return entry.id;
   if ('token' in entry && entry.token)
@@ -108,14 +119,45 @@ export const Transactions = React.memo(
   }: Props) => {
     const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
 
+    // DIAGNOSTIC: dump both lookup stores once when the transactions list mounts.
+    // Remove after investigating why old transactions show no location/source.
+    useEffect(() => {
+      const locationState = useTransactionLocationStore.getState();
+      const scanState = useScanHistoryStore.getState();
+      log.info('tx.stores.dump', {
+        locationCount: Object.keys(locationState.locations).length,
+        locations: locationState.locations,
+        scanCount: scanState.entries.length,
+        scanEntries: scanState.entries,
+        visibleHistoryCount: history.length,
+        visibleHistorySample: history.slice(0, 20).map((h) => ({
+          id: h.id,
+          type: h.type,
+          createdAt: h.createdAt,
+          mintUrl: h.mintUrl,
+        })),
+      });
+      // Intentionally empty deps — one-shot dump per mount.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
     const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
+    const quoteIdToSplitBill = useSplitBillTransactionsStore(
+      (state) => state.quoteIdToSplitBill
+    );
+    const splitBillGroupsById = useSplitBillTransactionsStore((state) => state.groups);
 
     const swapGroups = useMemo(() => {
       if (account.unit === 'all') return Object.values(swapGroupsById);
       return Object.values(swapGroupsById).filter((g) => g.unit === account.unit);
     }, [swapGroupsById, account.unit]);
+
+    const splitBillGroups = useMemo(() => {
+      if (account.unit === 'all') return Object.values(splitBillGroupsById);
+      return Object.values(splitBillGroupsById).filter((g) => g.unit === account.unit);
+    }, [splitBillGroupsById, account.unit]);
 
     const HEADER_HEIGHT = 30;
     const ITEM_HEIGHT = 69;
@@ -129,6 +171,9 @@ export const Transactions = React.memo(
         if (historyEntry.type === 'mint' || historyEntry.type === 'melt') {
           const quoteId = (historyEntry as MintHistoryEntry | MeltHistoryEntry).quoteId;
           if (quoteId && quoteIdToGroup[quoteId]) return false;
+          // Also hide individual mint entries that belong to a split-bill
+          // group — they're surfaced through the meta-row instead.
+          if (quoteId && quoteIdToSplitBill[quoteId]) return false;
         }
 
         if (
@@ -189,6 +234,7 @@ export const Transactions = React.memo(
       hideExpired,
       selectedMonth,
       quoteIdToGroup,
+      quoteIdToSplitBill,
     ]);
 
     // Build unified timeline: mix history entries + swap groups chronologically
@@ -201,22 +247,31 @@ export const Transactions = React.memo(
       // Only include swap items when showing all filters / types
       if (filter !== 'all' || type !== 'all') return txItems;
 
+      const monthFilter = (createdAt: number) => {
+        if (!selectedMonth) return true;
+        const [yearStr, monthStr] = selectedMonth.split('-');
+        const filterYear = parseInt(yearStr, 10);
+        const filterMonthNum = parseInt(monthStr, 10) - 1;
+        const date = new Date(createdAt);
+        return date.getFullYear() === filterYear && date.getMonth() === filterMonthNum;
+      };
+
       const swapItems: TimelineItem[] = swapGroups
-        .filter((group) => {
-          if (!selectedMonth) return true;
-          const [yearStr, monthStr] = selectedMonth.split('-');
-          const filterYear = parseInt(yearStr, 10);
-          const filterMonthNum = parseInt(monthStr, 10) - 1;
-          const date = new Date(group.createdAt);
-          return date.getFullYear() === filterYear && date.getMonth() === filterMonthNum;
-        })
+        .filter((group) => monthFilter(group.createdAt))
         .map((group) => ({
           kind: 'swap' as const,
           data: group,
         }));
 
-      return [...txItems, ...swapItems];
-    }, [filteredHistory, swapGroups, filter, type, selectedMonth]);
+      const splitBillItems: TimelineItem[] = splitBillGroups
+        .filter((group) => monthFilter(group.createdAt))
+        .map((group) => ({
+          kind: 'split-bill' as const,
+          data: group,
+        }));
+
+      return [...txItems, ...swapItems, ...splitBillItems];
+    }, [filteredHistory, swapGroups, splitBillGroups, filter, type, selectedMonth]);
 
     const sortedTimeline = useMemo(
       () => _.orderBy(timelineItems, [(item) => getTimelineCreatedAt(item)], ['desc']),
@@ -228,6 +283,13 @@ export const Transactions = React.memo(
         _.groupBy(sortedTimeline, (item: TimelineItem) => {
           // Swap items are always "confirmed"
           if (item.kind === 'swap') return 'confirmed';
+          if (item.kind === 'split-bill') {
+            // Bucket split-bill groups into pending until fully paid.
+            if (item.data.state === 'paid') return 'confirmed';
+            if (item.data.state === 'expired' || item.data.state === 'cancelled')
+              return 'expired';
+            return 'pending';
+          }
 
           const historyEntry = item.data;
           const isPending =
@@ -320,6 +382,9 @@ export const Transactions = React.memo(
         const key = getTimelineKey(item);
         if (item.kind === 'swap') {
           return <SwapTransactionRow key={key} group={item.data} />;
+        }
+        if (item.kind === 'split-bill') {
+          return <SplitBillTransactionRow key={key} group={item.data} />;
         }
         return <Transaction key={key} historyEntry={item.data} onPress={onTransactionPress} />;
       },

@@ -8,7 +8,8 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'assets/icons';
 import { PrimaryBalance } from '@/features/wallet/components/PrimaryBalance';
 
-import { useSettingsStore, isBackgroundImageTheme } from '@/shared/stores/global/settingsStore';
+import { isBackgroundImageTheme } from '@/shared/stores/global/settingsStore';
+import { useUnitWallpaper } from '@/shared/providers/ProfileWallpaperProvider';
 import { NonGestureView } from './NonGestureView';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
@@ -32,7 +33,7 @@ const CURRENCY_ICONS: Record<string, React.FC> = {
 
 export function Account({ accounts, account, pagerHeight }: AccountProps): React.ReactElement {
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
-  const theme = useSettingsStore((state) => state.getTheme());
+  const theme = useUnitWallpaper(account.unit);
   const hasBackgroundImage = isBackgroundImageTheme(theme);
 
   const CurrencyIcon = CURRENCY_ICONS[account.unit];
@@ -42,8 +43,16 @@ export function Account({ accounts, account, pagerHeight }: AccountProps): React
       <NonGestureView
         key={account.unit}
         style={{ overflow: 'hidden', zIndex: 10, height: pagerHeight, width: '100%' }}>
+        {/*
+         * Weighted fillers: top flex:2, bottom flex:1 pushes the primary
+         * balance + dots closer to the bottom edge of the pager so the
+         * secondary action row below (Split Bill / Soon / Soon in
+         * AccountPagerViewLayout) sits right under the balance instead of
+         * floating in empty space. Centred (flex:1/flex:1) felt too lonely
+         * after `pagerHeight` was tightened.
+         */}
         <VStack style={{ flex: 1 }}>
-          <View style={{ flex: 1 }} />
+          <View style={{ flex: 2 }} />
 
           <VStack align="center" gap={8}>
             <PrimaryBalance account={account} />
