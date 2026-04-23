@@ -19,14 +19,33 @@ const PLACEHOLDER_RESULTS: PlaceholderResult[] = Array.from({ length: 6 }, (_, i
   pubkey: `placeholder-${i}`,
 }));
 
+// Keystrokes under this threshold don't hit the API. Matches the perceptual
+// pause between typed characters for a normal typing cadence — long enough
+// to coalesce a burst, short enough that a deliberate pause feels responsive.
+const SEARCH_DEBOUNCE_MS = 250;
+
 export function useContactSearch(searchQuery: string) {
   const addSearchToHistory = useSearchHistoryStore((state) => state.addSearch);
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
   const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Debounce the query: every keystroke resets the timer, only the last one
+  // in a burst flows through to the effect below. Short queries skip the
+  // wait because they'll be rejected by the length guard anyway.
   useEffect(() => {
     const trimmed = searchQuery.trim();
+    if (!trimmed || trimmed.length < 2) {
+      setDebouncedQuery(searchQuery);
+      return;
+    }
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const trimmed = debouncedQuery.trim();
     if (!trimmed || trimmed.length < 2) {
       setHasSearched(false);
       setSearchResults([]);
@@ -40,8 +59,8 @@ export function useContactSearch(searchQuery: string) {
 
     const search = async () => {
       try {
-        paymentLog.debug('payment.contacts.search', { query: searchQuery, limit: 10 });
-        const result = await apiSearchUsers({ query: searchQuery, limit: 10 });
+        paymentLog.debug('payment.contacts.search', { query: debouncedQuery, limit: 10 });
+        const result = await apiSearchUsers({ query: debouncedQuery, limit: 10 });
         if (cancelled) return;
         if (result.isOk()) {
           const data = result.value;
@@ -62,11 +81,11 @@ export function useContactSearch(searchQuery: string) {
               };
             });
             paymentLog.info('payment.contacts.search.results', {
-              query: searchQuery,
+              query: debouncedQuery,
               resultCount: formatted.length,
             });
             setSearchResults(formatted);
-            if (formatted.length > 0) addSearchToHistory(searchQuery, 'payments');
+            if (formatted.length > 0) addSearchToHistory(debouncedQuery, 'payments');
           } else {
             setSearchResults([]);
           }
@@ -76,7 +95,7 @@ export function useContactSearch(searchQuery: string) {
       } catch (err) {
         if (cancelled) return;
         paymentLog.error('payment.contacts.search.error', {
-          query: searchQuery,
+          query: debouncedQuery,
           error: err instanceof Error ? err : new Error(String(err)),
         });
         setSearchResults([]);
@@ -87,15 +106,20 @@ export function useContactSearch(searchQuery: string) {
 
     search();
     return () => { cancelled = true; };
-  }, [searchQuery, addSearchToHistory]);
+  }, [debouncedQuery, addSearchToHistory]);
 
+  // Stale-while-revalidate: once the first response has landed we keep
+  // showing those results while the next query is in flight. Skeletons
+  // only appear on the very first search of a session — avoids the
+  // per-keystroke flash that makes results look like they never change.
   const displayResults: DisplayResult[] = useMemo(() => {
-    if (searchLoading || !hasSearched) return PLACEHOLDER_RESULTS;
+    if (!hasSearched) return PLACEHOLDER_RESULTS;
+    if (searchLoading && searchResults.length === 0) return PLACEHOLDER_RESULTS;
     return searchResults;
   }, [hasSearched, searchLoading, searchResults]);
 
   const showNoResults =
-    searchQuery.trim().length > 0 && hasSearched && !searchLoading && searchResults.length === 0;
+    debouncedQuery.trim().length > 0 && hasSearched && !searchLoading && searchResults.length === 0;
 
   return {
     displayResults,

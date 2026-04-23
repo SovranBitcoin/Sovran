@@ -9,10 +9,11 @@
  * detail screen (same view, reached via Transactions).
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useHeaderHeight } from '@react-navigation/elements';
 import opacity from 'hex-color-opacity';
 
 import {
@@ -26,12 +27,12 @@ import {
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler, type ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
+import { HistoryEntryHeader } from '@/features/transactions';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import Icon from 'assets/icons';
-import { Screen, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
+import { Screen, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
-import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -80,6 +81,9 @@ function participantSubtitle(p: SplitBillParticipant): string {
 
 export default function SplitBillSummaryScreen() {
   useLifecycleLogger('SplitBillSummaryScreen', walletLog);
+  // Summary stays mounted through the whole confirm + watcher cycle; expect
+  // one render per delivery + one per payment flip. Warn past 60.
+  useRenderLogger('SplitBillSummaryScreen', 60, walletLog);
   const router = useRouter();
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const [foreground, background, danger, success] = useThemeColor([
@@ -88,19 +92,46 @@ export default function SplitBillSummaryScreen() {
     'danger',
     'success',
   ] as const);
+  const headerHeight = useHeaderHeight();
 
-  const group = useSplitBillTransactionsStore((s) =>
-    groupId ? s.groups[groupId] : undefined
-  );
+  const group = useSplitBillTransactionsStore((s) => (groupId ? s.groups[groupId] : undefined));
   const { confirm } = useSplitBillOrchestrator();
   useSplitBillPaymentWatcher(groupId);
 
   const [confirming, setConfirming] = useState(false);
   const hasStarted = group ? group.state !== 'draft' : false;
 
-  const paidCount = group
-    ? group.participants.filter((p) => p.paymentState === 'paid').length
-    : 0;
+  const paidCount = group ? group.participants.filter((p) => p.paymentState === 'paid').length : 0;
+
+  // Group-state transitions (draft → awaiting → finalized). One event per
+  // transition so log-doctor timelines can correlate orchestrator events
+  // with the UI view.
+  const prevGroupState = useRef<string | undefined>(group?.state);
+  useEffect(() => {
+    if (group && prevGroupState.current !== group.state) {
+      walletLog.info('split_bill.summary.state_transition', {
+        groupId: group.id,
+        from: prevGroupState.current,
+        to: group.state,
+        participants: group.participants.length,
+      });
+      prevGroupState.current = group.state;
+    }
+  }, [group?.id, group?.state, group?.participants.length, group]);
+
+  // Payment-progress transitions (paidCount flips).
+  const prevPaidCount = useRef(paidCount);
+  useEffect(() => {
+    if (group && prevPaidCount.current !== paidCount) {
+      walletLog.info('split_bill.summary.paid_count', {
+        groupId: group.id,
+        paid: paidCount,
+        total: group.participants.length,
+        delta: paidCount - prevPaidCount.current,
+      });
+      prevPaidCount.current = paidCount;
+    }
+  }, [paidCount, group]);
 
   const handleConfirm = useCallback(async () => {
     if (!groupId || confirming) return;
@@ -133,24 +164,20 @@ export default function SplitBillSummaryScreen() {
 
   return (
     <Screen name="SplitBillSummaryScreen" style={{ flex: 1, backgroundColor: background }}>
-      <View style={{ flex: 1 }}>
-        <VStack align="center" spacing={4} style={styles.headerBlock}>
+      <View style={{ flex: 1, paddingTop: headerHeight }}>
+        {/* Shared amount header — same component used by Mint/Melt/Send/ReceiveToken. */}
+        <HistoryEntryHeader
+          pendingData={{ amount: group.totalAmount, unit: group.unit, type: 'receive' }}
+        />
+
+        {/* Status caption — participant count before confirm, paid-count after. */}
+        <View style={styles.statusCaption}>
           <Text size={13} style={{ color: opacity(foreground, 0.5) }}>
-            Total bill
-          </Text>
-          <AmountFormatter
-            amount={group.totalAmount}
-            unit={group.unit}
-            size={30}
-            weight="heavy"
-            centered
-          />
-          <Text size={13} style={{ color: opacity(foreground, 0.6), marginTop: 4 }}>
             {hasStarted
               ? `${paidCount} / ${group.participants.length} paid · ${group.state}`
               : `${group.participants.length} participants`}
           </Text>
-        </VStack>
+        </View>
 
         <LegendList
           data={group.participants}
@@ -180,12 +207,7 @@ export default function SplitBillSummaryScreen() {
               title={p.nickname ?? p.pubkey?.slice(0, 12) ?? p.peerID ?? 'Participant'}
               subtitle={participantSubtitle(p)}
               accent={
-                <AmountFormatter
-                  amount={p.amount}
-                  unit={group.unit}
-                  size={13}
-                  weight="heavy"
-                />
+                <AmountFormatter amount={p.amount} unit={group.unit} size={13} weight="heavy" />
               }
               trailing={
                 <ParticipantStatusIcon
@@ -236,8 +258,9 @@ export default function SplitBillSummaryScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerBlock: {
-    paddingTop: 16,
+  statusCaption: {
+    paddingHorizontal: 20,
+    paddingTop: 4,
     paddingBottom: 12,
   },
   emptyCenter: {

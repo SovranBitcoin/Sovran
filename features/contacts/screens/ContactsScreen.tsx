@@ -16,10 +16,15 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
 import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { SearchResultsList } from '@/shared/ui/composed/SearchResultsList';
-import { ListRow } from '@/shared/ui/composed/ListRow';
+import {
+  ContactRow,
+  geohashIdentity,
+  mintIdentity,
+  nostrIdentity,
+  type Identity,
+} from '@/shared/ui/composed/ContactRow';
 import { ScreenContainer } from '../components/ScreenContainer';
-import { ContactListItem } from '../components/ContactListItem';
-import { LocationTierItem } from '../components/LocationTierItem';
+import { navigateToContact } from '../lib/navigateToProfile';
 import { SearchFilters } from '../components/search/SearchFilters';
 import { SEARCH_FILTERS_HEIGHT } from '../lib/constants/styles';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
@@ -44,26 +49,48 @@ function parseGeohashQuery(trimmed: string): string | null {
 
 function GeohashJumpRow({ geohash }: { geohash: string }) {
   const router = useRouter();
-  const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
   return (
-    <ListRow
-      iconCircle={{
+    <ContactRow
+      identity={geohashIdentity(geohash, {
+        label: `Go to #${geohash}`,
+        transport: 'geohash',
         icon: 'mdi:pound',
-        color: accent,
-        size: 44,
-        backgroundColor: opacity(accent, 0.12),
-      }}
-      title={`Go to #${geohash}`}
+      })}
       subtitle="Open geohash chat channel"
-      trailing={
-        <Icon name="mdi:arrow-right" size={18} color={opacity(foreground, 0.35)} />
-      }
+      trailingVariant="chevron"
       onPress={() => {
         router.push({
           pathname: '/(user-flow)/geohashChat',
           params: { geohash },
         } as any);
       }}
+      testID={`contact-row:geohash:${geohash}`}
+    />
+  );
+}
+
+function GroupsTierRow({ tier }: { tier: TierEntry }) {
+  const router = useRouter();
+  return (
+    <ContactRow
+      identity={geohashIdentity(tier.geohash, {
+        label: tier.label,
+        displayName: tier.displayName,
+        transport: tier.transport,
+        icon: tier.icon,
+      })}
+      trailingVariant="chevron"
+      onPress={() => {
+        router.push({
+          pathname: '/(user-flow)/geohashChat',
+          params: {
+            geohash: tier.geohash,
+            tierLabel: tier.label,
+            transport: tier.transport,
+          },
+        } as any);
+      }}
+      testID={`contact-row:geohash:${tier.geohash}`}
     />
   );
 }
@@ -170,16 +197,26 @@ export const ContactsScreen = () => {
     }
   };
 
+  // Only surface mints whose nostr-contact kind-0 profile has actually landed.
+  // A mint with a valid npub but no profile metadata yet renders as a bare
+  // URL with no picture / nip05 / reputation — reads as "no contact info" to
+  // the user. The row reappears automatically when the kind-0 event arrives
+  // (this memo depends on `profilesMap`).
+  const mintsWithProfile = useMemo(
+    () => displayMints.filter((m: any) => m.pubkey && profilesMap.has(m.pubkey)),
+    [displayMints, profilesMap],
+  );
+
   const filteredDisplayMints = useMemo(() => {
-    if (!lowerQuery) return displayMints;
-    return displayMints.filter((m: any) => {
+    if (!lowerQuery) return mintsWithProfile;
+    return mintsWithProfile.filter((m: any) => {
       const name = m.mintInfo?.name;
       if (typeof name === 'string' && name.toLowerCase().includes(lowerQuery)) return true;
       if (mintHost(m.mint?.mintUrl).includes(lowerQuery)) return true;
       const profile = m.pubkey ? profilesMap.get(m.pubkey) : undefined;
       return matchesProfileQuery(profile);
     });
-  }, [displayMints, profilesMap, lowerQuery, matchesProfileQuery]);
+  }, [mintsWithProfile, profilesMap, lowerQuery, matchesProfileQuery]);
 
   const currentListData = useMemo(() => {
     switch (activeFilter) {
@@ -211,17 +248,38 @@ export const ContactsScreen = () => {
   const renderContactItem = useCallback(
     ({ item }: { item: any }) => {
       const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
-      const lastMessage = item.dmEvent?.content;
+      const lastMessage = item.dmEvent?.content as string | undefined;
       const isLoadingProfile = item.pubkey !== undefined && profile === undefined;
+      const mintUrl: string | undefined = item.mint?.mintUrl;
+
+      // Layered identity: mint-type items also have a nostr contact key
+      // (NIP-87 / NUT-06), so render the mint avatar/name with the nostr
+      // reputation pills + NIP-05 badge on the accent row.
+      const identity: Identity[] = [];
+      if (item.type === 'mint' && mintUrl) {
+        identity.push(
+          mintIdentity({
+            mintUrl,
+            displayName: item.mintInfo?.name ?? mintUrl,
+            iconUrl: item.mintInfo?.icon_url,
+          }),
+        );
+      }
+      if (item.pubkey) {
+        identity.push(nostrIdentity(item.pubkey, profile, { isLoadingProfile }));
+      }
+
+      // Replies mode: a last-message preview takes the subtitle slot and
+      // suppresses metadata — the pill row would read as noise next to a
+      // human sentence. Contacts without a last message fall back to
+      // the default nostr subtitle (empty, NIP-05 lives in the accent).
       return (
-        <ContactListItem
-          pubkey={item.pubkey}
-          profile={profile}
+        <ContactRow
+          identity={identity}
           subtitle={lastMessage}
-          type={item.type}
-          mintInfo={item.mintInfo}
-          mintUrl={item.mint?.mintUrl}
-          isLoadingProfile={isLoadingProfile}
+          hideMetadata={!!lastMessage}
+          onPress={() => navigateToContact(item.pubkey, mintUrl)}
+          testID={`contact-row:nostr:${item.pubkey}`}
         />
       );
     },
@@ -358,7 +416,7 @@ export const ContactsScreen = () => {
         data={tierData}
         estimatedItemSize={68}
         keyExtractor={(item) => item.key}
-        renderItem={({ item }) => <LocationTierItem tier={item} />}
+        renderItem={({ item }) => <GroupsTierRow tier={item} />}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
         ListHeaderComponent={

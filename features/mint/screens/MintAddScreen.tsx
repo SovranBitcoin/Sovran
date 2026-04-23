@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import {
-  TouchableOpacity,
   ActivityIndicator,
   Pressable,
   Platform,
@@ -10,7 +9,6 @@ import {
 import { useSharedValue } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -35,14 +33,12 @@ import {
 } from '@/shared/lib/popup';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
+import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
-import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { Checkbox } from '@/shared/ui/primitives/Checkbox';
 import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
-import Icon from 'assets/icons';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import opacity from 'hex-color-opacity';
@@ -220,7 +216,8 @@ const LoadingMintsList = memo(function LoadingMintsList({ count = 5 }: { count?:
   );
 });
 
-// Optimized Mint item component - receives all data as props (no hooks inside)
+// Pre-baked mint row — deferred to the shared `ContactRow` so search results
+// here visually match the mint list, contacts tab, and split-bill picker.
 const MintItem = memo(function MintItem({
   mint,
   selected,
@@ -232,93 +229,55 @@ const MintItem = memo(function MintItem({
   onToggle: (url: string) => void;
   globalLoading: boolean;
 }) {
-  const foreground = useThemeColor('foreground');
-  const [warning, success] = useThemeColor(['yellow-300', 'success'] as const);
-
   const displayName = useMemo(
     () => getMintDisplayName(mint.url, mint.mintInfo),
     [mint.url, mint.mintInfo]
   );
 
-  const onPress = useCallback(() => {
-    onToggle(mint.url);
-  }, [onToggle, mint.url]);
-
-  // Build inline stats: "<icon> value • <icon> value • ..."
-  const statItems = useMemo(() => {
-    const items: { icon: string; value: string; color: string }[] = [];
-    if ('reviewScore' in mint && typeof mint.reviewScore === 'number') {
-      const display = mint.reviewScore % 1 === 0 ? mint.reviewScore.toString() : mint.reviewScore.toFixed(1);
-      items.push({ icon: 'ic:round-star', value: display, color: warning });
-    }
-    if ('serverStats' in mint && mint.serverStats) {
-      const { n_mints, n_melts, n_errors } = mint.serverStats;
-      const totalOps = n_mints + n_melts;
-      if (totalOps > 0) {
-        const rate = Math.round((1 - n_errors / totalOps) * 100);
-        const isError = 'auditState' in mint && mint.auditState === 'ERROR';
-        items.push({ icon: 'lucide:activity', value: `${rate}%`, color: isError ? '#EF4444' : success });
-      }
-    }
-    if ('contactReputation' in mint && mint.contactReputation)
-      items.push({ icon: 'mdi:shield-check', value: `${mint.contactReputation}`, color: '#3B82F6' });
-    if ('contactFollowers' in mint && mint.contactFollowers)
-      items.push({ icon: 'mdi:account-group', value: mint.contactFollowers.toLocaleString(), color: '#3B82F6' });
-    return items;
-  }, [mint, warning, success]);
+  // Translate server-side `serverStats` (mint/melt ops + error count) into
+  // the 0–5 audit-score scale `ContactRow` expects, so the audit pill
+  // renders identically whether the signal came from a `MintListItem` or
+  // from the Mint Add search enrichment.
+  const auditScore = useMemo<number | undefined>(() => {
+    if (!('serverStats' in mint) || !mint.serverStats) return undefined;
+    const { n_mints, n_melts, n_errors } = mint.serverStats;
+    const totalOps = n_mints + n_melts;
+    if (totalOps <= 0) return undefined;
+    const successRate = 1 - n_errors / totalOps; // 0..1
+    return successRate * 5; // 0..5
+  }, [mint]);
 
   return (
-    <TouchableOpacity
-      style={{ paddingHorizontal: 20, paddingVertical: 12 }}
-      onPress={onPress}
-      disabled={globalLoading}>
-      <HStack align="center" gap={12}>
-        <Avatar
-          state={mint.mintInfo?.icon_url ? 'image' : 'fallback'}
-          picture={mint.mintInfo?.icon_url || undefined}
-          size={44}
-          name={displayName}
-          alt={`${displayName} mint`}
-        />
-
-        <VStack flex={1} style={{ gap: 2 }}>
-          <Text className="text-foreground" size={16} bold>
-            {displayName}
-          </Text>
-
-          <Text heavy size={14} style={{ color: opacity(foreground, 0.5) }}>
-            {extractDomain(mint.url)}
-          </Text>
-
-          {statItems.length > 0 && (
-            <HStack align="center" style={{ gap: 4, marginTop: 2 }}>
-              {statItems.map((stat, i) => (
-                <React.Fragment key={stat.icon}>
-                  {i > 0 && (
-                    <Text size={9} color={opacity(foreground, 0.15)}>
-                      {'•'}
-                    </Text>
-                  )}
-                  <HStack align="center" style={{ gap: 3 }}>
-                    <Icon name={stat.icon} size={12} color={stat.color} />
-                    <Text size={12} bold color={stat.color}>
-                      {stat.value}
-                    </Text>
-                  </HStack>
-                </React.Fragment>
-              ))}
-            </HStack>
-          )}
-        </VStack>
-
-        <Checkbox
-          checked={selected}
-          onCheckedChange={() => onToggle(mint.url)}
-          size={24}
-          variant="default"
-        />
-      </HStack>
-    </TouchableOpacity>
+    <ContactRow
+      identity={mintIdentity({
+        mintUrl: mint.url,
+        displayName,
+        iconUrl: mint.mintInfo?.icon_url ?? undefined,
+        stats: {
+          kymScore:
+            'reviewScore' in mint && typeof mint.reviewScore === 'number'
+              ? mint.reviewScore
+              : undefined,
+          reviewCount:
+            'reviewCount' in mint && typeof mint.reviewCount === 'number'
+              ? mint.reviewCount
+              : undefined,
+          auditScore,
+          auditState: 'auditState' in mint ? mint.auditState : undefined,
+          contactReputation:
+            'contactReputation' in mint ? mint.contactReputation : undefined,
+          contactFollowers:
+            'contactFollowers' in mint ? mint.contactFollowers : undefined,
+        },
+      })}
+      subtitle={extractDomain(mint.url)}
+      selectable
+      selected={selected}
+      onToggle={() => onToggle(mint.url)}
+      selectionVariant="checkbox"
+      disabled={globalLoading}
+      testID={`contact-row:mint:${mint.url}`}
+    />
   );
 });
 

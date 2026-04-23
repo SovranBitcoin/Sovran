@@ -17,7 +17,7 @@ import type { MintListItem } from 'coco-payment-ux';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import opacity from 'hex-color-opacity';
-import { MintItem } from '@/features/mint/components/MintItem';
+import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -160,14 +160,16 @@ export const MintListScreen = memo(function MintListScreen({
 
   const renderItem = useCallback(
     ({ item }: { item: MintListItem }) => (
-      <MintItem
-        item={item}
-        isLoading={false}
-        globalLoading={isExecuting}
-        showDetailsButton={showDetailsButton}
-        disabledReason={getMintDisabledReasonLabel(item.reason)}
+      <ContactRow
+        identity={mintIdentity(item)}
+        disabled={isExecuting || item.status !== 'available'}
+        disabledReason={getMintDisabledReasonLabel(item.reason) ?? undefined}
+        trailingVariant={showDetailsButton ? undefined : 'none'}
         onPress={() => handleMintPress(item)}
-        onInspectPress={onInspectMint ? () => onInspectMint(item.mintUrl) : undefined}
+        onInspectPress={
+          showDetailsButton && onInspectMint ? () => onInspectMint(item.mintUrl) : undefined
+        }
+        testID={`contact-row:mint:${item.mintUrl}`}
       />
     ),
     [isExecuting, showDetailsButton, handleMintPress, onInspectMint]

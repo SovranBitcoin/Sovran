@@ -15,18 +15,15 @@ import React, { useCallback, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import { router } from 'expo-router';
-import opacity from 'hex-color-opacity';
 
 import {
   useAllSearchResults,
   type AllSearchResult,
 } from '@/features/contacts/hooks/useAllSearchResults';
-import { ContactListItem } from '@/features/contacts/components/ContactListItem';
-import { LocationTierItem } from '@/features/contacts/components/LocationTierItem';
-import { ListRow } from '@/shared/ui/composed/ListRow';
+import { ContactRow, geohashIdentity, nostrIdentity } from '@/shared/ui/composed/ContactRow';
+import { navigateToContact } from '@/features/contacts/lib/navigateToProfile';
 import { NoResultsFound } from '@/features/payments/components/NoResultsFound';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import Icon from 'assets/icons';
+import type { TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
 
 type SearchResultsListProps = {
   searchQuery: string;
@@ -36,26 +33,47 @@ type SearchResultsListProps = {
 const keyExtractor = (item: AllSearchResult) => item.id;
 
 function GeohashJumpRow({ geohash }: { geohash: string }) {
-  const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
   return (
-    <ListRow
-      iconCircle={{
+    <ContactRow
+      identity={geohashIdentity(geohash, {
+        label: `Go to #${geohash}`,
+        transport: 'geohash',
         icon: 'mdi:pound',
-        color: accent,
-        size: 44,
-        backgroundColor: opacity(accent, 0.12),
-      }}
-      title={`Go to #${geohash}`}
+      })}
       subtitle="Open geohash chat channel"
-      trailing={
-        <Icon name="mdi:arrow-right" size={18} color={opacity(foreground, 0.35)} />
-      }
+      trailingVariant="chevron"
       onPress={() => {
         router.push({
           pathname: '/(user-flow)/geohashChat',
           params: { geohash },
         } as any);
       }}
+      testID={`contact-row:geohash:${geohash}`}
+    />
+  );
+}
+
+function TierRow({ tier }: { tier: TierEntry }) {
+  return (
+    <ContactRow
+      identity={geohashIdentity(tier.geohash, {
+        label: tier.label,
+        displayName: tier.displayName,
+        transport: tier.transport,
+        icon: tier.icon,
+      })}
+      trailingVariant="chevron"
+      onPress={() => {
+        router.push({
+          pathname: '/(user-flow)/geohashChat',
+          params: {
+            geohash: tier.geohash,
+            tierLabel: tier.label,
+            transport: tier.transport,
+          },
+        } as any);
+      }}
+      testID={`contact-row:geohash:${tier.geohash}`}
     />
   );
 }
@@ -80,13 +98,15 @@ export function SearchResultsList({
       case 'geohash':
         return <GeohashJumpRow geohash={item.geohash} />;
       case 'tier':
-        return <LocationTierItem tier={item.tier} />;
+        return <TierRow tier={item.tier} />;
       case 'contact':
         return (
-          <ContactListItem
-            pubkey={item.pubkey}
-            profile={item.profile}
-            isLoadingProfile={item.isLoadingProfile}
+          <ContactRow
+            identity={nostrIdentity(item.pubkey, item.profile, {
+              isLoadingProfile: item.isLoadingProfile,
+            })}
+            onPress={() => navigateToContact(item.pubkey)}
+            testID={`contact-row:nostr:${item.pubkey}`}
           />
         );
     }
@@ -97,10 +117,28 @@ export function SearchResultsList({
     return null;
   }, [showNoResults, ListEmptyComponent]);
 
+  // While the Nostr search is in flight and we have nothing yet, render
+  // skeleton placeholder rows so the feed doesn't look empty. `ContactRow`
+  // treats `isLoadingProfile: true` as the skeleton trigger, so we reuse
+  // the regular render path instead of a parallel loader component.
+  const showPlaceholders = loading && results.length === 0 && searchQuery.trim().length >= 2;
+  const placeholderData = useMemo<AllSearchResult[]>(
+    () =>
+      Array.from({ length: 4 }, (_, i) => ({
+        type: 'contact' as const,
+        id: `placeholder-${i}`,
+        pubkey: `placeholder-${i}`,
+        profile: undefined,
+        isLoadingProfile: true,
+        score: 0,
+      })),
+    [],
+  );
+
   return (
     <View style={styles.container}>
       <LegendList
-        data={showNoResults ? [] : results}
+        data={showPlaceholders ? placeholderData : showNoResults ? [] : results}
         estimatedItemSize={68}
         keyExtractor={keyExtractor}
         renderItem={renderItem}

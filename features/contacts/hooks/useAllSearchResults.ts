@@ -93,12 +93,17 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
       : null;
 
     // --- contacts (REST API, score preserves API order) ---
+    // `isLoadingProfile` reflects whether *this row's* profile is absent —
+    // not whether *some* query is in flight. `useContactSearch` keeps the
+    // prior results visible during a new query (stale-while-revalidate), so
+    // flagging every row loading on every keystroke would re-skeleton real
+    // results and cause the jarring flash we see on rapid typing.
     const contactRows: AllSearchResult[] = displayResults.map((r: DisplayResult, i) => ({
       type: 'contact' as const,
       id: `contact:${r.pubkey}`,
       pubkey: r.pubkey,
       profile: r.profile,
-      isLoadingProfile: searchLoading || !hasSearched || !r.profile,
+      isLoadingProfile: !hasSearched || !r.profile,
       score: SCORE_CONTACT_BASE - i, // preserve order from API
     }));
 

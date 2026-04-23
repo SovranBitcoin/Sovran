@@ -10,7 +10,7 @@ export interface TierEntry extends LocationTier {
    * Reverse-geocoded friendly name for this tier, e.g. "United Kingdom" for
    * region, "London" for city. Undefined if reverse geocoding failed or the
    * tier is the Bluetooth entry. Rendered as `~{displayName}` by
-   * LocationTierItem, matching upstream bitchat's convention.
+   * ContactRow's geohash identity, matching upstream bitchat's convention.
    */
   displayName?: string;
 }

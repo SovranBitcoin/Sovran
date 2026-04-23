@@ -194,10 +194,100 @@ read-only: it describes problems and proposed fixes, but never emits patches inl
        begins with `{` and ends with `}` and contains no `// ` or `/*` tokens.
 </audit_storage>
 
+<entry_autoselection>
+  When the user hands the auditor no ENTRY, the auditor synthesises one rather
+  than asking. The goal is to surface NEW problems — so the chosen ENTRY
+  maximises distance from every prior audit recorded in
+  `sovran-app/__audits__/`. Autoselection runs before Pass 1 and replaces the
+  raw user ENTRY for the rest of the workflow.
+
+  Protocol:
+
+  1. Build the covered set. Read every `__audits__/*.json` already loaded per
+     `&lt;audit_storage&gt;`. From each, collect:
+       - `audit.entry_point` (raw string — may be a path, dir, or slug).
+       - The depth-2 path slice (e.g. `sovran-app/shared/lib/apiClient.ts` →
+         `shared/lib`; `features/send/screens/AmountSelector.tsx` →
+         `features/send`; `app/(user-flow)/splitBill/amount.tsx` →
+         `app/(user-flow)/splitBill`; `api.sovran.money/src/nostr.ts` →
+         `src/nostr.ts`).
+       - Every `findings[].path` on Critical and High findings — their blast
+         radius is effectively re-audited even if the next audit never opens
+         them.
+       - The set of `dimensions` marked `"pass"` per audit.
+     Union into `covered_slices`, `covered_paths`, and `covered_dimensions`.
+
+  2. Enumerate candidate subtrees. Walk one level deep under each primary-repo
+     root (never into upstream read-only repos):
+       sovran-app/{app,features,shared,modules,scripts,sheets,navigation,themes},
+       api.sovran.money/src/,
+       sovran.money/src/,
+       sovran-admin-panel/src/.
+     Each immediate child is a candidate. Exclude `node_modules`, `dist`,
+     `build`, `.expo`, `__snapshots__`, `__audits__`, `__research__`,
+     generated output, and barrels (index.ts-only folders).
+
+  3. Score each candidate by DISTANCE from the covered set (higher is better):
+       +3  candidate's depth-2 slice is absent from `covered_slices`.
+       +2  candidate's feature/domain name never appears as a substring of any
+           covered_paths entry.
+       +1  candidate's natural review dimensions (inferred from role — native
+           module → 4, 9; store → 3, 6; API route → 2, 6, 10; sheet → 5, 8;
+           gesture/animation dir → 4, 7; auth/crypto → 2, 6) overlap &lt; 50%
+           with the union of `covered_dimensions` across the two most recent
+           audits.
+       +1  `git log --since='90 days ago' --name-only -- &lt;subtree&gt;` shows
+           ≥ 5 commits (recent churn correlates with recent bugs).
+       −2  candidate is a pure barrel / index-export surface (≥ 80% of files
+           are `index.ts` re-exports).
+       −1  candidate contains &lt; 3 source files (too small for a
+           refactor-grade audit).
+       −3  candidate path appears verbatim in `covered_paths` — a sibling to
+           that file is allowed, but re-entering the exact file is not.
+
+  4. Tie-break on: (a) most recent commit touching the subtree, then
+     (b) largest LOC from `npm run analyze-structure -- &lt;subtree&gt; --loc`.
+
+  5. Within the chosen subtree, pick the concrete ENTRY file. Prefer the file
+     with the highest fan-in per `analyze-structure`, skipping any file that
+     already appears as a `findings[].path` in any prior audit. If every file
+     in the top subtree has been cited before, fall back to the second-place
+     subtree and repeat.
+
+  6. Announce the choice to the user before Pass 1 so it can be vetoed:
+       `Autoselected ENTRY: &lt;path&gt; — &lt;one-line rationale, naming the
+       top two disqualified candidates and the distance score&gt;. Reply with a
+       different ENTRY to override; otherwise the audit continues.`
+     Proceed with Pass 1 after emitting this line. A user reply within the
+     same turn overrides; silence does not block.
+
+  7. Record the autoselection in the final JSON:
+       `audit.entry_point` is the chosen path.
+       `audit.entry_point_autoselected` is `true`.
+       `audit.entry_point_selection_rationale` is a single sentence naming
+         the winning score, the top two disqualified candidates with their
+         scores, and the covered slice the ENTRY is farthest from.
+     The markdown "Entry point" section opens with `Autoselected — ...` and
+     lists the top three candidates considered.
+
+  Fallback: when `__audits__/` is empty or missing, skip steps 1 and 3's
+  distance bonuses and pick the highest-churn, highest-fan-in candidate
+  from step 2. Set `entry_point_autoselected: true` and record
+  `"no prior audits — picked by churn+fan-in"` as the rationale.
+
+  Autoselection never targets upstream read-only repos (coco/, cashu-ts/,
+  nuts/, nips/, luds/, coco-cashu-plugin-npc/) — they are out of scope per
+  `&lt;ground_rules&gt;`. It never re-picks an ENTRY whose exact path
+  appears in `covered_paths`; a diversity floor (−3 above) enforces this.
+</entry_autoselection>
+
 <entry_point_workflow>
-  The auditor is handed ENTRY = &lt;file | directory | feature slug&gt;. It walks five
-  passes in sequence; findings from any pass land in a single shared list and are
-  emitted only at Phase C.
+  The auditor is handed ENTRY = &lt;file | directory | feature slug&gt;. If ENTRY is
+  empty, missing, `"auto"`, `"find something"`, or an obvious placeholder, the
+  auditor first runs `&lt;entry_autoselection&gt;` to synthesise one — it does NOT
+  ask the user to pick. Once ENTRY is resolved, it walks five passes in
+  sequence; findings from any pass land in a single shared list and are emitted
+  only at Phase C.
 
   Pass 1 — Map the blast radius.
     Read ENTRY fully, with ~50 lines of surrounding context. Enumerate imports and
@@ -1203,6 +1293,8 @@ read-only: it describes problems and proposed fixes, but never emits patches inl
         "date": "YYYY-MM-DD",
         "commit": "&lt;short or full sha&gt;",
         "entry_point": "&lt;path or slug&gt;",
+        "entry_point_autoselected": false,
+        "entry_point_selection_rationale": null,
         "repos_touched": ["sovran-app"],
         "prior_audits_consulted": ["01.json"],
         "sov_specs_consulted": ["docs/SOV-00.md"],
@@ -1257,13 +1349,15 @@ read-only: it describes problems and proposed fixes, but never emits patches inl
     }
 
   Enum values (any other value is a self-check failure):
-    severity:            "Critical" | "High" | "Medium" | "Low" | "Nit"
-    dimension:           integer 1..10
-    dimensions value:    "pass" | "partial" | "skipped"
-    refactor_plan.type:  "consolidate" | "relocate" | "dead-code" | "log-helper" | "research-note"
-    confidence:          decimal in [0.0, 1.0]
-    line:                positive integer
-    prior_audit_id:      string (e.g., "F-004@02.json") or null
+    severity:                          "Critical" | "High" | "Medium" | "Low" | "Nit"
+    dimension:                         integer 1..10
+    dimensions value:                  "pass" | "partial" | "skipped"
+    refactor_plan.type:                "consolidate" | "relocate" | "dead-code" | "log-helper" | "research-note"
+    confidence:                        decimal in [0.0, 1.0]
+    line:                              positive integer
+    prior_audit_id:                    string (e.g., "F-004@02.json") or null
+    entry_point_autoselected:          boolean (true only when `&lt;entry_autoselection&gt;` ran)
+    entry_point_selection_rationale:   string (when autoselected) or null (when user-supplied)
 
   References field conventions (free-form strings, but follow these prefixes so
   downstream tooling can classify them):
@@ -1340,6 +1434,12 @@ read-only: it describes problems and proposed fixes, but never emits patches inl
        `audit.research_consulted`. No research note was used to justify a
        Critical or High severity on its own — those severities are anchored in
        code, spec, or log-doctor evidence per `&lt;research_integration&gt;`.
+   19. When `audit.entry_point_autoselected` is `true`, the chosen `entry_point`
+       path does NOT appear verbatim in any prior audit's `audit.entry_point`
+       (step 3's −3 penalty), the rationale names at least one disqualified
+       candidate with its score, and the markdown "Entry point" section opens
+       with `Autoselected — …` and lists the top three candidates considered.
+       When `false`, `entry_point_selection_rationale` is `null`.
 </self_check>
 
 <style>

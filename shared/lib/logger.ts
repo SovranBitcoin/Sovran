@@ -42,7 +42,7 @@ import { Platform } from 'react-native';
 // When true, all log output (console + ring buffer) is active.
 // Tied to __DEV__ by default so dev builds always have logging.
 // Set to false manually to silence ALL output (useful when profiling overhead).
-const SHOW_LOGS = typeof __DEV__ !== 'undefined' ? __DEV__ : true;
+const SHOW_LOGS = false
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

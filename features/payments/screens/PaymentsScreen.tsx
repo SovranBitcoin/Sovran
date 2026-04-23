@@ -1,5 +1,6 @@
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { SearchResult, NoResultsFound } from '@/features/payments';
+import { NoResultsFound } from '@/features/payments';
+import { ContactRow, nostrIdentity } from '@/shared/ui/composed/ContactRow';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -26,18 +27,29 @@ import { Screen, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 const SearchResultItem = React.memo(
   ({
     result,
-    loading,
     onPress,
   }: {
     result: DisplayResult;
-    loading: boolean;
     onPress: (result: DisplayResult) => void;
   }) => {
     const handlePress = useCallback(() => {
       onPress(result);
     }, [result, onPress]);
 
-    return <SearchResult loading={loading} result={result} onPress={handlePress} />;
+    // Only placeholder rows (no profile) render as skeletons.
+    // `useContactSearch` keeps prior real results visible while a new query
+    // is in flight (stale-while-revalidate), so we no longer gate on a
+    // coarse `loading` flag — that would re-skeleton real rows on every
+    // keystroke.
+    return (
+      <ContactRow
+        identity={nostrIdentity(result.pubkey, result.profile, {
+          isLoadingProfile: !result.profile,
+        })}
+        onPress={handlePress}
+        testID={`contact-row:nostr:${result.pubkey}`}
+      />
+    );
   }
 );
 
@@ -70,12 +82,12 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
     getMintInfo,
     dmEvents
   );
-  const { displayResults, searchLoading, hasSearched, showNoResults } =
-    useContactSearch(searchQuery);
+  const { displayResults, showNoResults } = useContactSearch(searchQuery);
 
   const handleSearchResultPress = useCallback(
     (result: DisplayResult) => {
       if (!result.profile) return;
+      paymentLog.info('payment.search.result.press', { pubkey: result.pubkey });
       router.navigate({
         pathname: '/(user-flow)/profile' as any,
         params: { pubkey: result.pubkey },
@@ -145,7 +157,6 @@ export function PaymentsScreen({ searchQuery, isSearching }: PaymentsScreenProps
                         <SearchResultItem
                           key={item.pubkey}
                           result={item}
-                          loading={searchLoading || !hasSearched}
                           onPress={handleSearchResultPress}
                         />
                       ))

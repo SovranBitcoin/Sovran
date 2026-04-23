@@ -33,11 +33,7 @@ interface Props {
 }
 
 export const SplitBillTransactionRow = React.memo(({ group }: Props) => {
-  const [foreground, danger, success] = useThemeColor([
-    'foreground',
-    'danger',
-    'success',
-  ] as const);
+  const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
 
   const aggregate = useMemo(() => {
     const total = group.participants.length;
@@ -45,7 +41,11 @@ export const SplitBillTransactionRow = React.memo(({ group }: Props) => {
     const failed = group.participants.filter((p) => p.deliveryState === 'failed').length;
 
     if (group.state === 'cancelled') {
-      return { text: 'Cancelled', color: opacity(foreground, 0.5), counter: `${paid}/${total} paid` };
+      return {
+        text: 'Cancelled',
+        color: opacity(foreground, 0.5),
+        counter: `${paid}/${total} paid`,
+      };
     }
     if (group.state === 'paid' || paid === total) {
       return { text: 'Complete', color: success, counter: `${total}/${total} paid` };
@@ -81,7 +81,7 @@ export const SplitBillTransactionRow = React.memo(({ group }: Props) => {
       participants: group.participants.length,
     });
     router.navigate({
-      pathname: '/(user-flow)/splitBill/detail' as any,
+      pathname: '/(split-bill-flow)/detail' as any,
       params: { groupId: group.id },
     });
   }, [group.id, group.state, group.participants.length]);
@@ -93,11 +93,7 @@ export const SplitBillTransactionRow = React.memo(({ group }: Props) => {
         onPress={handlePress}>
         <HStack spacing={12} flex={1}>
           <View className="relative h-7 w-7 items-center justify-center bg-transparent">
-            <Icon
-              name="mdi:silverware-fork-knife"
-              color={opacity(foreground, 0.9)}
-              size={26}
-            />
+            <Icon name="mdi:silverware-fork-knife" color={opacity(foreground, 0.9)} size={26} />
           </View>
 
           <VStack spacing={0} flex={1}>

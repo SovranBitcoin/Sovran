@@ -13,10 +13,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
-import MaskedView from '@react-native-masked-view/masked-view';
 
+import { ScrollEdgeFade } from './ScrollEdgeFade';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -155,26 +153,7 @@ export function ModalLayoutWrapper({
         />
 
         {headerGradient && (
-          <View
-            style={[styles.headerGradientContainer, { height: gradientHeight * 2 }]}
-            pointerEvents="none">
-            <MaskedView
-              style={StyleSheet.absoluteFill}
-              maskElement={
-                <LinearGradient
-                  colors={['black', 'black', 'transparent']}
-                  locations={[0, 0.5, 1]}
-                  style={StyleSheet.absoluteFill}
-                />
-              }>
-              <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
-              <LinearGradient
-                colors={[background, 'transparent']}
-                locations={[0.5, 1]}
-                style={StyleSheet.absoluteFill}
-              />
-            </MaskedView>
-          </View>
+          <ScrollEdgeFade edge="top" height={gradientHeight * 2} color={background} />
         )}
 
         {stickyContent && (
@@ -284,13 +263,6 @@ export function ModalLayoutWrapper({
 }
 
 const styles = StyleSheet.create({
-  headerGradientContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 50,
-  },
   stickyContainer: {
     position: 'absolute',
     left: 0,

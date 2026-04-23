@@ -99,9 +99,7 @@ export default function SplitBillDetailScreen() {
   // inset, so there's no need to add `insets.top` on top of it.
   const headerHeight = useHeaderHeight();
 
-  const group = useSplitBillTransactionsStore((s) =>
-    groupId ? s.groups[groupId] : undefined
-  );
+  const group = useSplitBillTransactionsStore((s) => (groupId ? s.groups[groupId] : undefined));
   const { retryDelivery } = useSplitBillOrchestrator();
   useSplitBillPaymentWatcher(groupId);
 
@@ -153,7 +151,7 @@ export default function SplitBillDetailScreen() {
       const p = group.participants.find((x) => x.id === participantId);
       if (!p?.mintQuoteId) return;
       try {
-        const history: Array<Record<string, unknown>> =
+        const history: Record<string, unknown>[] =
           (await (manager as any).history?.getPaginatedHistory?.(0, 200)) ?? [];
         const entry = history.find(
           (h) =>
@@ -186,8 +184,7 @@ export default function SplitBillDetailScreen() {
   );
 
   const listRowBgFor = useCallback(
-    (isFocused: boolean) =>
-      isFocused ? opacity(foreground, 0.06) : 'transparent',
+    (isFocused: boolean) => (isFocused ? opacity(foreground, 0.06) : 'transparent'),
     [foreground]
   );
 
