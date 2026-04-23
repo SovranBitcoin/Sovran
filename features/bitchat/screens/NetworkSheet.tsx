@@ -20,37 +20,21 @@ import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
 import type { BLEPeer } from 'bitchat-module';
 
-import { ListRow } from '@/shared/ui/composed/ListRow';
+import { ContactRow, bleIdentity } from '@/shared/ui/composed/ContactRow';
 import { useBLEPeers } from '../hooks/useBLEPeers';
-
-function formatLastSeen(timestampMs: number): string {
-  const diffMs = Date.now() - timestampMs;
-  if (diffMs < 0 || diffMs < 60_000) return 'just now';
-  const minutes = Math.floor(diffMs / 60_000);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
 
 interface PeerRowProps {
   peer: BLEPeer;
 }
 
 function PeerRow({ peer }: PeerRowProps) {
-  const [shade400] = useThemeColor(['shade-400'] as const);
-
   const displayName = peer.nickname?.trim() || peer.peerID.slice(0, 12);
-  const subtitle = peer.isConnected
-    ? `#${peer.peerID.slice(0, 8)} · connected`
-    : `#${peer.peerID.slice(0, 8)} · seen ${formatLastSeen(peer.lastSeen)}`;
 
   const openDM = () => {
-    // Replace the Network sheet with the DM screen. Using `replace` instead
-    // of `push` so the back button from DM returns to the chat, not to the
-    // peer list — matches upstream bitchat's UX where the peer list is a
-    // sidebar that dismisses on tap.
+    // Replace the Network sheet with the DM screen. `replace` (not `push`)
+    // so back from DM returns to the chat, not to the peer list — matches
+    // upstream bitchat's UX where the peer list is a sidebar that dismisses
+    // on tap.
     router.replace({
       pathname: '/(user-flow)/bitchatDM',
       params: {
@@ -62,18 +46,10 @@ function PeerRow({ peer }: PeerRowProps) {
   };
 
   return (
-    <ListRow
-      avatar={{ seed: peer.peerID, name: displayName }}
-      title={displayName}
-      subtitle={subtitle}
+    <ContactRow
+      identity={bleIdentity(peer)}
       onPress={openDM}
-      trailing={
-        <Icon
-          name={peer.isConnected ? 'mdi:broadcast' : 'mdi:clock-outline'}
-          size={20}
-          color={peer.isConnected ? '#34C759' : shade400}
-        />
-      }
+      testID={`contact-row:ble:${peer.peerID}`}
     />
   );
 }

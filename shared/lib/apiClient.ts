@@ -7,7 +7,7 @@ import {
   LatestVersionResponse,
   MintReviewsResponse,
   MintSearchResponse,
-  NostrProfileResponse,
+  NostrProfileFull,
   SearchUsersResponse,
   loggableIssues,
   parseWith,
@@ -18,11 +18,11 @@ import {
   type MintReviewsResponse as MintReviewsResponseType,
   type MintSearchResponse as MintSearchResponseType,
   type MintSearchResult,
-  type NostrProfileResponse as NostrProfileResponseType,
+  type NostrProfileFull as NostrProfileFullType,
+  type NostrSearchResult,
   type ParseError,
   type SearchUsersResponse as SearchUsersResponseType,
   type TopFollower,
-  type UserProfile,
 } from '@sovranbitcoin/schemas';
 
 const BASE_URL = 'https://api.sovran.money/api';
@@ -30,7 +30,9 @@ const BASE_URL = 'https://api.sovran.money/api';
 export const PRICELIST_URL = `wss://ws.sovran.money`;
 
 // Re-export schema-derived types for backwards compatibility with legacy
-// interface names used across the app.
+// interface names used across the app. NostrProfileResponse / UserProfile
+// are kept as aliases for the renamed NostrProfileFull / NostrSearchResult
+// so downstream consumers don't need to churn their imports.
 export type {
   AuditMintResponseType as AuditMintResponse,
   CatalogResponseType as WallpaperCatalogResponse,
@@ -39,10 +41,10 @@ export type {
   MintReviewsResponseType as MintReviewsResponse,
   MintSearchResult,
   MintSearchResponseType as MintSearchResponse,
-  NostrProfileResponseType as NostrProfileResponse,
+  NostrProfileFullType as NostrProfileResponse,
+  NostrSearchResult as UserProfile,
   SearchUsersResponseType as SearchUsersResponse,
   TopFollower,
-  UserProfile,
 };
 
 type FetchOrParseError = Error | ParseError;
@@ -95,7 +97,7 @@ const parseSearchUsers = parseWith(SearchUsersResponse, 'nostr/search');
 const parseAuditMint = parseWith(AuditMintResponse, 'cashu/mint/audit');
 const parseMintReviews = parseWith(MintReviewsResponse, 'cashu/mint/reviews');
 const parseMintSearch = parseWith(MintSearchResponse, 'cashu/mints/search');
-const parseNostrProfile = parseWith(NostrProfileResponse, 'nostr/profile');
+const parseNostrProfile = parseWith(NostrProfileFull, 'nostr/profile');
 const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
 const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
 

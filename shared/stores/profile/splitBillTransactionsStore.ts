@@ -32,10 +32,10 @@ const profileStorage = createProfileScopedStorage();
 // ---------------------------------------------------------------------------
 
 /** Where this participant came from in the picker. Determines default channel. */
-export type SplitBillParticipantSource = 'nostr' | 'ble' | 'search';
+export type SplitBillParticipantSource = 'nostr' | 'ble' | 'search' | 'self';
 
 /** Which channel the orchestrator should use to deliver the BOLT11. */
-export type SplitBillDeliveryChannel = 'nostr-dm' | 'ble-dm' | 'qr-only';
+export type SplitBillDeliveryChannel = 'nostr-dm' | 'ble-dm' | 'qr-only' | 'self';
 
 /** Delivery status per participant. */
 export type SplitBillDeliveryState = 'pending' | 'sent' | 'failed';
@@ -94,10 +94,7 @@ export interface SplitBillGroup {
 /** Reverse index: mint quote id → (groupId, participantId). Lets the
  *  Transactions list hide individual mint entries that belong to a group
  *  by filtering on quoteId, same pattern as `swapTransactionsStore`. */
-export type QuoteIdToSplitBillIndex = Record<
-  string,
-  { groupId: string; participantId: string }
->;
+export type QuoteIdToSplitBillIndex = Record<string, { groupId: string; participantId: string }>;
 
 // ---------------------------------------------------------------------------
 // Store
@@ -113,20 +110,18 @@ interface StartGroupInput {
   mintUrl: string;
   totalAmount: number;
   title?: string;
-  participants: Array<
-    Omit<
-      SplitBillParticipant,
-      | 'id'
-      | 'mintQuoteId'
-      | 'bolt11'
-      | 'expiresAt'
-      | 'deliveryState'
-      | 'deliveryError'
-      | 'paymentState'
-    > & {
-      id?: string;
-    }
-  >;
+  participants: (Omit<
+    SplitBillParticipant,
+    | 'id'
+    | 'mintQuoteId'
+    | 'bolt11'
+    | 'expiresAt'
+    | 'deliveryState'
+    | 'deliveryError'
+    | 'paymentState'
+  > & {
+    id?: string;
+  })[];
 }
 
 interface SplitBillStoreActions {
@@ -139,16 +134,18 @@ interface SplitBillStoreActions {
     params: { mintQuoteId: string; bolt11?: string; expiresAt?: number }
   ) => void;
 
-  markDelivered: (
-    groupId: string,
-    participantId: string,
-    ok: boolean,
-    error?: string
-  ) => void;
+  markDelivered: (groupId: string, participantId: string, ok: boolean, error?: string) => void;
 
   /** Called when a mint quote flips to PAID (or ISSUED) in coco history. */
   markPaymentPaidByQuoteId: (quoteId: string) => void;
   markPaymentExpiredByQuoteId: (quoteId: string) => void;
+
+  /**
+   * Mark a participant paid by id rather than by quoteId. Used for
+   * self-source participants that never hold a `mintQuoteId` — their
+   * share of the split is already covered by virtue of being the user.
+   */
+  markPaymentPaid: (groupId: string, participantId: string) => void;
 
   finalizeGroup: (groupId: string) => void;
   cancelGroup: (groupId: string) => void;
@@ -161,10 +158,8 @@ interface SplitBillStoreActions {
 
 export type SplitBillStore = SplitBillStoreState & SplitBillStoreActions;
 
-const generateGroupId = () =>
-  `sb-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-const generateParticipantId = () =>
-  `p-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+const generateGroupId = () => `sb-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+const generateParticipantId = () => `p-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 // ---------------------------------------------------------------------------
 
@@ -203,7 +198,9 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
           unit,
           mintUrl,
           totalAmount,
-          title: title ?? `Split bill — ${participants.length} participant${participants.length === 1 ? '' : 's'}`,
+          title:
+            title ??
+            `Split bill — ${participants.length} participant${participants.length === 1 ? '' : 's'}`,
           createdAt: Date.now(),
           state: 'draft',
           participants: participants.map((p) => ({
@@ -332,6 +329,29 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
           return {
             ...state,
             groups: { ...state.groups, [entry.groupId]: next },
+          };
+        });
+      },
+
+      markPaymentPaid: (groupId, participantId) => {
+        storeLog.info('store.split_bill.payment_paid_by_id', {
+          groupId,
+          participantId,
+        });
+
+        set((state) => {
+          const group = state.groups[groupId];
+          if (!group) return state;
+
+          const participants = group.participants.map((p) =>
+            p.id === participantId ? { ...p, paymentState: 'paid' as const } : p
+          );
+          const next = { ...group, participants };
+          next.state = deriveGroupState(next);
+
+          return {
+            ...state,
+            groups: { ...state.groups, [groupId]: next },
           };
         });
       },

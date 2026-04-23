@@ -1,5 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleProp, Text as RNText, TextStyle, ViewStyle } from 'react-native';
+import {
+  Animated,
+  StyleProp,
+  StyleSheet,
+  Text as RNText,
+  TextStyle,
+  ViewStyle,
+} from 'react-native';
 
 import opacity from 'hex-color-opacity';
 import { LiquidGlassText } from 'liquid-glass-text';
@@ -114,14 +121,31 @@ export function AmountFormatter({
       <View className={cn(containerClass, className)} style={style}>
         <ScaleWrapper animated={animated} text={text}>
           {useGlass ? (
-            <LiquidGlassText
-              text={text}
-              fontName={FONT_FAMILY[weight]}
-              fontSize={size}
-              fontWeight={weight}
-              tint={resolvedColor}
-              glassVariant={glassVariant}
-            />
+            // Overlay pattern: a transparent RNText drives the Yoga
+            // measurement so adjacent inline glass nodes lay out correctly;
+            // the visible glass view sits on top via absolute-fill.
+            // LiquidGlassText's native intrinsicContentSize doesn't
+            // reliably flow to Yoga in horizontal flows, so without the
+            // backing text two glass amounts next to each other collapse.
+            <View>
+              <RNText
+                allowFontScaling={false}
+                style={[plainTextStyle(size, weight, null, centered), { color: 'transparent' }]}>
+                {text}
+              </RNText>
+              <LiquidGlassText
+                text={text}
+                fontName={FONT_FAMILY[weight]}
+                fontSize={size}
+                fontWeight={weight}
+                tint={resolvedColor}
+                glassVariant={glassVariant}
+                style={[
+                  StyleSheet.absoluteFill,
+                  { alignItems: 'center', justifyContent: 'center' },
+                ]}
+              />
+            </View>
           ) : (
             <RNText
               allowFontScaling={false}

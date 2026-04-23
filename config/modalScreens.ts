@@ -101,6 +101,7 @@ const flowGroups = [
   '(mint-flow)',
   '(filter-flow)',
   '(map-flow)',
+  '(split-bill-flow)',
 ].map(modalFlow);
 
 const standaloneScreens: ModalConfig[] = [

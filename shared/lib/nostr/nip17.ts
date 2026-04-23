@@ -137,6 +137,12 @@ function createWrap(seal: VerifiedEvent, recipientPublicKey: string): VerifiedEv
  * `p` tag) must be sealed and wrapped individually for each target.  This
  * ensures the sender can later retrieve their own sent messages and that the
  * inner rumor correctly identifies the conversation partner.
+ *
+ * NOTE: each gift-wrap does 1 Schnorr signature + 1 NIP-44 encrypt (≈ 500ms
+ * on Hermes on a mid-range device). Building BOTH pair members back-to-back
+ * blocks the JS thread for ~1s per recipient. When responsiveness matters,
+ * use `buildRecipientGiftWrap` for the critical path and
+ * `buildSenderSelfCopyWrap` for an off-thread/deferred self-copy instead.
  */
 export function buildGiftWrappedDMPair(params: {
   content: string;
@@ -144,15 +150,36 @@ export function buildGiftWrappedDMPair(params: {
   recipientPublicKey: string;
   extraTags?: string[][];
 }): { recipientWrap: VerifiedEvent; senderWrap: VerifiedEvent } {
+  const { rumor, recipientWrap } = buildRecipientGiftWrap(params);
+  const senderWrap = buildSenderSelfCopyWrap({
+    rumor,
+    senderPrivateKey: params.senderPrivateKey,
+  });
+  return { recipientWrap, senderWrap };
+}
+
+/**
+ * Build only the recipient-facing gift-wrap (rumor + kind-13 seal +
+ * kind-1059 wrap). Returns the rumor too so `buildSenderSelfCopyWrap` can
+ * reuse it for the sender's self-copy wrap — the NIP-17 spec mandates the
+ * same rumor flows to both targets.
+ *
+ * Use this on the critical path when you need the fastest possible publish
+ * of the recipient's DM; defer `buildSenderSelfCopyWrap` to a background
+ * task so its Schnorr + NIP-44 work doesn't block the JS thread.
+ */
+export function buildRecipientGiftWrap(params: {
+  content: string;
+  senderPrivateKey: Uint8Array;
+  recipientPublicKey: string;
+  extraTags?: string[][];
+}): { rumor: Rumor; recipientWrap: VerifiedEvent } {
   const { content, senderPrivateKey, recipientPublicKey, extraTags } = params;
-  const senderPublicKey = getPublicKey(senderPrivateKey);
-  nostrLog.info('nostr.nip17.build_gift_wrapped_dm_pair', {
+  nostrLog.info('nostr.nip17.build_recipient_wrap', {
     contentLen: content.length,
     recipientPrefix: recipientPublicKey.slice(0, 8),
-    senderPrefix: senderPublicKey.slice(0, 8),
   });
 
-  // 1. Rumor (kind 14 – unsigned) – shared across both wraps
   const rumor = createRumor(
     {
       kind: 14,
@@ -162,15 +189,28 @@ export function buildGiftWrappedDMPair(params: {
     senderPrivateKey
   );
 
-  // 2a. Wrap for the recipient
   const recipientSeal = createSeal(rumor, senderPrivateKey, recipientPublicKey);
   const recipientWrap = createWrap(recipientSeal, recipientPublicKey);
+  return { rumor, recipientWrap };
+}
 
-  // 2b. Wrap for the sender (self-copy – same rumor, encrypted to self)
+/**
+ * Build only the sender self-copy gift-wrap, reusing the rumor returned by
+ * `buildRecipientGiftWrap`. Designed to be called from a background task
+ * (setTimeout, InteractionManager, microtask) so the Schnorr + NIP-44 work
+ * doesn't delay the caller's primary delivery.
+ */
+export function buildSenderSelfCopyWrap(params: {
+  rumor: Rumor;
+  senderPrivateKey: Uint8Array;
+}): VerifiedEvent {
+  const { rumor, senderPrivateKey } = params;
+  const senderPublicKey = getPublicKey(senderPrivateKey);
+  nostrLog.info('nostr.nip17.build_sender_wrap', {
+    senderPrefix: senderPublicKey.slice(0, 8),
+  });
   const senderSeal = createSeal(rumor, senderPrivateKey, senderPublicKey);
-  const senderWrap = createWrap(senderSeal, senderPublicKey);
-
-  return { recipientWrap, senderWrap };
+  return createWrap(senderSeal, senderPublicKey);
 }
 
 // ---------------------------------------------------------------------------

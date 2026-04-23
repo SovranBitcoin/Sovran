@@ -86,8 +86,11 @@ export interface ButtonHandlerButton {
   variant: 'primary' | 'secondary' | 'dangerous';
   /** Icon name for the button (optional) */
   icon?: string;
-  /** Text content for the button */
-  text: string;
+  /** Text content for the button. Accepts a plain string (rendered in
+   *  the button's default OxygenBold 14 wrapper) or a ReactNode (rendered
+   *  inline — use this to compose primitives like `AmountFormatter`
+   *  alongside static text). */
+  text: string | React.ReactNode;
   /** Press event handler with close function parameter */
   onPress?: (close: (event: GestureResponderEvent) => void) => Promise<void>;
   /** Optional nested action-sheet target for custom sheet navigation */

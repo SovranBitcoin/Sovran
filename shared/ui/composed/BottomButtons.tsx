@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import { LayoutChangeEvent, StyleSheet, ViewStyle, StyleProp } from 'react-native';
 import { Log } from '@/shared/lib/logger';
 import { View } from '@/shared/ui/primitives/View/View';
 
@@ -9,16 +9,28 @@ interface BottomButtonsProps {
   paddingBottom?: number;
   /** Additional styles for the container */
   style?: StyleProp<ViewStyle>;
+  /**
+   * Fires when the container is laid out — callers use this to size
+   * sibling overlays (e.g. a `ScrollEdgeFade` that sits directly above
+   * the bar) to the rendered height.
+   */
+  onLayout?: (event: LayoutChangeEvent) => void;
 }
 
 /**
  * A lightweight wrapper for positioning buttons at the bottom of a screen.
  * Handles safe area insets and absolute positioning automatically.
  */
-export function BottomButtons({ children, paddingBottom = 0, style }: BottomButtonsProps) {
+export function BottomButtons({
+  children,
+  paddingBottom = 0,
+  style,
+  onLayout,
+}: BottomButtonsProps) {
   return (
     <Log name="BottomButtons">
       <View
+        onLayout={onLayout}
         style={[
           styles.container,
           {

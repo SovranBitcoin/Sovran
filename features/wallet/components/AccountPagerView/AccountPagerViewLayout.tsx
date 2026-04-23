@@ -78,7 +78,7 @@ export function AccountPagerViewLayout({
           testID="wallet-split-bill"
           onPress={() => {
             walletLog.info('wallet.split_bill.tap');
-            router.push('/(user-flow)/splitBill/amount' as any);
+            router.push('/(split-bill-flow)/amount' as any);
           }}
         />
         <CircleActionButton

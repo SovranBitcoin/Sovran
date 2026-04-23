@@ -640,19 +640,25 @@ export const Button = ({
             <>
               {/* Icon content */}
               {icon}
-              {/* Text content with proper styling */}
-              {text && (
-                <Text
-                  style={{
-                    color: getTextColor(),
-                    fontFamily: 'OxygenBold',
-                    paddingVertical: 12, // py-3
-                    textAlign: 'center',
-                  }}
-                  size={14}>
-                  {text}
-                </Text>
-              )}
+              {/* Text content — string gets the default OxygenBold wrapper;
+                  ReactNode renders inline so callers can drop in custom
+                  primitives like AmountFormatter without triggering a
+                  View-in-Text nesting error on Android. */}
+              {text &&
+                (typeof text === 'string' ? (
+                  <Text
+                    style={{
+                      color: getTextColor(),
+                      fontFamily: 'OxygenBold',
+                      paddingVertical: 12,
+                      textAlign: 'center',
+                    }}
+                    size={14}>
+                    {text}
+                  </Text>
+                ) : (
+                  <View style={{ paddingVertical: 12 }}>{text}</View>
+                ))}
             </>
           )}
         </HStack>
