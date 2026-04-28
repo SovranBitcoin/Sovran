@@ -54,6 +54,44 @@ public:
         const std::vector<std::shared_ptr<ArrayBuffer>>& blindedSignatures,
         const std::vector<std::shared_ptr<ArrayBuffer>>& blindingFactors,
         const std::shared_ptr<ArrayBuffer>& mintPubkey);
+
+    // NIP-44 v2 raw-X ECDH — used by Nostr's NIP-44/NIP-17 message
+    // encryption to derive the conversation key. See `crypto.h` for the
+    // motivation behind exposing a non-default ECDH variant. NOTE: these
+    // overrides depend on the Crypto.nitro.ts spec being regenerated via
+    // `bun nitrogen` so HybridCryptoSpec exposes the matching pure-virtual
+    // declarations — without that step the build will fail with "marked
+    // override but does not override".
+    std::shared_ptr<ArrayBuffer> ecdhNip44(const std::shared_ptr<ArrayBuffer>& seckey,
+                                            const std::shared_ptr<ArrayBuffer>& xonlyPubkey) override;
+
+    std::shared_ptr<ArrayBuffer> batchEcdhNip44(
+        const std::shared_ptr<ArrayBuffer>& seckey,
+        const std::vector<std::shared_ptr<ArrayBuffer>>& xonlyPubkeys) override;
+
+    // Symmetric primitives for NIP-44 v2 — chacha20 cipher and HMAC-SHA256
+    // for authentication / HKDF. JS layers HKDF-expand and the full
+    // NIP-44 v2 decrypt orchestration on top of these. See
+    // `shared/lib/nostr/nip44Native.ts` for the consumer.
+    std::shared_ptr<ArrayBuffer> chacha20Ietf(
+        const std::shared_ptr<ArrayBuffer>& key,
+        const std::shared_ptr<ArrayBuffer>& nonce,
+        double counter,
+        const std::shared_ptr<ArrayBuffer>& data) override;
+
+    std::shared_ptr<ArrayBuffer> hmacSha256(
+        const std::shared_ptr<ArrayBuffer>& key,
+        const std::shared_ptr<ArrayBuffer>& data) override;
+
+    // PBKDF2-HMAC-SHA512 — drives BIP-39 mnemonicToSeed (c=2048, dkLen=64).
+    // Pure-JS PBKDF2-SHA512 takes ~3 s on Hermes per cold-boot profile load;
+    // native drops it below 50 ms. See `shared/lib/nostr/keyDerivation.ts`
+    // for the consumer.
+    std::shared_ptr<ArrayBuffer> pbkdf2HmacSha512(
+        const std::shared_ptr<ArrayBuffer>& password,
+        const std::shared_ptr<ArrayBuffer>& salt,
+        double iterations,
+        double dkLen) override;
 };
 
 } // namespace margelo::nitro::nutpatch

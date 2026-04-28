@@ -26,11 +26,11 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { finalizeEvent } from 'nostr-tools';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
@@ -444,29 +444,28 @@ export function ClaimUsernameScreen() {
   );
 
   return (
-    <Screen name="ClaimUsernameScreen">
-      <>
-        <Stack.Screen
-          options={{
-            presentation: 'card',
-            animation: 'fade',
-            headerShown: true,
-            headerTitle: '',
-            headerTintColor: foreground,
-            headerLeft: CloseButton,
-            headerTransparent: true,
-            headerBlurEffect: 'none',
-            headerBackground: () => null,
-            headerShadowVisible: false,
-          }}
-        />
-        <ModalLayoutWrapper
-          contentPadding={0}
-          bottomPadding={120}
-          bottomContent={bottomButtons}
-          useAnimatedScroll
-          scrollY={scrollY}
-          disableHeaderSpacer>
+    <>
+      <Stack.Screen
+        options={{
+          presentation: 'card',
+          animation: 'fade',
+          headerShown: true,
+          headerTitle: '',
+          headerTintColor: foreground,
+          headerLeft: CloseButton,
+          headerTransparent: true,
+          headerBlurEffect: 'none',
+          headerBackground: () => null,
+          headerShadowVisible: false,
+        }}
+      />
+      <Screen
+        name="ClaimUsernameScreen"
+        contentPadding={0}
+        footer={bottomButtons}
+        scroll="animated"
+        scrollY={scrollY}
+        disableHeaderSpacer>
           <VStack style={{ paddingBottom: 24 }}>
             <RNView
               ref={heroRef}
@@ -604,10 +603,9 @@ export function ClaimUsernameScreen() {
                 )}
               </View>
             </Animated.View>
-          </VStack>
-        </ModalLayoutWrapper>
-      </>
-    </Screen>
+        </VStack>
+      </Screen>
+    </>
   );
 }
 

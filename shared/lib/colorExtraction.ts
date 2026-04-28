@@ -98,7 +98,7 @@ function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: n
 }
 
 /** Perceived luminance (0-1) using ITU-R BT.601 weights. */
-function getLuminance(hex: string): number {
+export function getLuminance(hex: string): number {
   const { r, g, b } = hexToRgb(hex);
   return 0.299 * (r / 255) + 0.587 * (g / 255) + 0.114 * (b / 255);
 }

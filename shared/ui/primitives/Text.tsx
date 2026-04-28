@@ -211,7 +211,11 @@ export function UntranslatedText({ size = 14, italic = false, ...props }: Custom
 export function Text({ loading, size = 14, italic = false, ...props }: CustomTextProps) {
   const { children, placeholder, fallback, ...otherProps } = props;
   const foreground = useThemeColor('foreground');
-  const loadingColor = opacity(foreground, 0.5);
+  // Skeleton fill — kept low-opacity so a list of placeholders reads as
+  // ambient "stuff is loading" rather than a row of bold rectangles. The
+  // foreground color (theme-aware) ensures it remains visible on any
+  // background tint.
+  const loadingColor = opacity(foreground, 0.15);
 
   if (loading) {
     return (

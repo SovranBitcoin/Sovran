@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, Text as RNText, View } from 'react-native';
 import { Button, Toast } from 'heroui-native';
 import Animated, {
   Easing,
@@ -9,20 +9,66 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
+import opacity from 'hex-color-opacity';
 import { log } from '../logger';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { blendColors, sanitizeColor } from '@/shared/lib/colorExtraction';
+import { BlurView } from '@/shared/ui/primitives/BlurView';
+import { supportsBlur } from '@/shared/lib/version';
+import { formatAmount } from '@/shared/lib/currency';
+import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { TOAST_COPY } from '@/shared/lib/paymentCopy';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { PaymentStatusIcon } from './PaymentStatusIcon';
 import { fmt, isAmountSegment, type PopupTextSegment } from './format';
-import { Text } from '@/shared/ui/primitives/Text';
-import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { useToastSurface } from './useToastSurface';
 
 type PaymentStatusToastVariant = 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
 
 const ICON_SIZE = 32;
+const SEGMENT_FONT_SIZE = 13;
+const BLUR_INTENSITY = 60;
+const TINT_ALPHA = 0.3;
+// Mirrors the timeline checkpoint dot pattern (AnimatedCheckpointDot): the
+// "dark" variant is the surface, the bright theme `success`/`danger` token
+// is the foreground (icon/text). Hardcoded since the toast is
+// theme-invariant — these values match `--success-foreground` /
+// `--danger-foreground` in the light-theme palette (themeEngine.ts).
+const SUCCESS_DARK_BG = '#089A2C';
+const DANGER_DARK_BG = '#9A082E';
+
+/**
+ * Inline amount renderer. The shared `AmountFormatter` is overkill for the
+ * toast — we just need formatted text in the same font with the toast's
+ * static foreground color (text colors don't animate; only the bg/icon
+ * react to confirmation/failure).
+ */
+function ToastAmountText({
+  amount,
+  unit,
+  color,
+}: {
+  amount: number;
+  unit: string;
+  color: string;
+}) {
+  const displayBtc = useSettingsStore((s) => s.getDisplayBtc());
+  const formatted = formatAmount({ amount, unit }, { useUserPreference: true });
+  // Mirrors `decorate` in AmountFormatter.tsx — only sat amounts get a
+  // ₿ prefix or ⚡︎ suffix, depending on the user's display preference.
+  const decorated =
+    unit !== 'sat'
+      ? formatted
+      : displayBtc === 0 || displayBtc === 3
+        ? `₿ ${formatted}`
+        : displayBtc === 1
+          ? `${formatted} ⚡︎`
+          : formatted;
+  return (
+    <RNText style={{ fontFamily: 'MonaSans-Black', fontSize: SEGMENT_FONT_SIZE, color }}>
+      {decorated}
+    </RNText>
+  );
+}
 
 const CASES = {
   receive: {
@@ -132,15 +178,13 @@ export function PaymentStatusToast({
           : confirmedSubmessage;
 
   // --- Animated colors ---
-  const [foreground, overlay, success, danger] = useThemeColor([
-    'foreground',
-    'overlay',
-    'success',
-    'danger',
-  ] as const);
-  const overlayColor = sanitizeColor(String(overlay));
-  const successMutedColor = blendColors(overlay, success, 0.15);
-  const dangerMutedColor = blendColors(overlay, danger, 0.15);
+  // Frosted-glass slab: BlurView at the back, an animated semi-transparent
+  // tint above it, content on top. On confirmation/failure ONLY the tint
+  // bg and the PaymentStatusIcon react — text colors stay constant on the
+  // toast surface so the readout doesn't reflow under the user.
+  const { bg: surfaceBg, fg: surfaceFg } = useToastSurface();
+  const blurSupported = supportsBlur();
+  const surfaceBgTint = blurSupported ? opacity(surfaceBg, TINT_ALPHA) : surfaceBg;
 
   const confirmedProgress = useSharedValue(isConfirmed || isFailed ? 1 : 0);
 
@@ -157,19 +201,15 @@ export function PaymentStatusToast({
     return () => clearTimeout(timer);
   }, [isConfirmed, isFailed, hide]);
 
-  const targetColor = isFailed ? danger : success;
-  const targetMutedColor = isFailed ? dangerMutedColor : successMutedColor;
+  const targetBgColor = isFailed ? DANGER_DARK_BG : SUCCESS_DARK_BG;
+  const targetBgTint = blurSupported ? opacity(targetBgColor, TINT_ALPHA) : targetBgColor;
 
   const backgroundStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
       confirmedProgress.get(),
       [0, 1],
-      [overlayColor, targetMutedColor]
+      [surfaceBgTint, targetBgTint]
     ),
-  }));
-
-  const textColorStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(confirmedProgress.get(), [0, 1], [foreground, targetColor]),
   }));
 
   const onPressViewTransaction = async () => {
@@ -218,62 +258,73 @@ export function PaymentStatusToast({
   return (
     <Toast
       placement="top"
-      className="overflow-hidden p-0"
+      className="overflow-hidden p-0 bg-transparent"
       isAnimatedStyleActive={false}
       {...(toastProps as any)}>
-      <Animated.View
-        style={[
-          {
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 16,
-            paddingVertical: 14,
-            gap: 12,
-          },
-          backgroundStyle,
-        ]}>
-        {/* Icon */}
-        <PaymentStatusIcon size={ICON_SIZE} status={status} />
+      {blurSupported && (
+        <BlurView intensity={BLUR_INTENSITY} tint="dark" style={StyleSheet.absoluteFill} />
+      )}
+      <Animated.View style={[StyleSheet.absoluteFill, backgroundStyle]} />
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          gap: 12,
+        }}>
+        {/* Icon — base color tracks the toast surface foreground so the
+            initial pre-confirmation render reads on the dark slab. */}
+        <PaymentStatusIcon size={ICON_SIZE} status={status} baseColor={surfaceFg} />
 
-        {/* Title + Subtitle */}
+        {/* Title + Subtitle — colors stay constant; only bg + icon react
+            to confirmation/failure. */}
         <View style={{ flex: 1, gap: 2 }}>
-          <Animated.Text
-            style={[{ fontSize: 15, fontWeight: '600' }, textColorStyle]}
+          <RNText
+            style={{ fontSize: 15, fontWeight: '600', color: surfaceFg }}
             numberOfLines={1}>
             {config.message}
-          </Animated.Text>
+          </RNText>
           {typeof submessage === 'string' ? (
-            <Animated.Text style={[{ fontSize: 13 }, textColorStyle]} numberOfLines={1}>
+            <RNText style={{ fontSize: 13, color: surfaceFg }} numberOfLines={1}>
               {submessage}
-            </Animated.Text>
+            </RNText>
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               {(submessage as PopupTextSegment[]).map((segment, i) =>
                 isAmountSegment(segment) ? (
-                  <AmountFormatter
+                  <ToastAmountText
                     key={i}
-                    size={11}
-                    weight="heavy"
                     amount={segment.amount}
                     unit={segment.unit}
+                    color={surfaceFg}
                   />
                 ) : (
-                  <Text key={i} size={11} weight="heavy">
-                    {segment}
-                  </Text>
+                  <RNText
+                    key={i}
+                    style={{
+                      fontFamily: 'MonaSans-Black',
+                      fontSize: SEGMENT_FONT_SIZE,
+                      color: surfaceFg,
+                    }}>
+                    {segment as string}
+                  </RNText>
                 )
               )}
             </View>
           )}
         </View>
 
-        {/* Action button — shown only when confirmed (not when failed) */}
+        {/* Action button — shown only when confirmed (not when failed).
+            Uses the neutral toast surface inverse (light pill, dark label)
+            so it stays theme-tinted instead of taking on the success
+            green wash. */}
         {isConfirmed && !isFailed && (
-          <Toast.Action className="bg-foreground" onPress={onPressViewTransaction}>
-            <Button.Label className="text-overlay">View</Button.Label>
+          <Toast.Action style={{ backgroundColor: surfaceFg }} onPress={onPressViewTransaction}>
+            <Button.Label style={{ color: surfaceBg }}>View</Button.Label>
           </Toast.Action>
         )}
-      </Animated.View>
+      </View>
     </Toast>
   );
 }

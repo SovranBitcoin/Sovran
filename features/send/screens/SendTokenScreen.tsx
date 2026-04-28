@@ -6,12 +6,13 @@
  * only renders UI and wires buttons.
  */
 
-import React from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 
-import { Alert } from 'heroui-native';
+import { Alert, Menu, type MenuTriggerRef } from 'heroui-native';
 import type { SendHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import type { ActionVariant } from 'coco-payment-ux';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
@@ -22,7 +23,7 @@ import {
 } from '@/features/transactions';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -32,6 +33,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
+import Icon from 'assets/icons';
 
 interface SendTokenScreenProps {
   sendHistoryEntry?: SendHistoryEntry | string;
@@ -52,6 +54,45 @@ export function SendTokenScreen({
   const mintInfo = useMintInfo(entry?.mintUrl);
   const bip321 = useBip321Info(entry?.id);
 
+  // NOTE: All hook calls must run on every render. Early returns for
+  // error / loading states live below these hooks to respect the Rules of
+  // Hooks — before this, `entry` flipping from undefined → defined would
+  // add new hook calls mid-lifecycle and trigger "Rendered more hooks than
+  // during the previous render".
+  const copyVariants: ActionVariant[] = useMemo(
+    () =>
+      actions.copy.variants ?? [
+        {
+          id: 'text',
+          label: 'as Text',
+          description: 'Copy the token string',
+          icon: 'lets-icons:copy',
+          available: actions.copy.available,
+        },
+        {
+          id: 'emoji',
+          label: 'as Emoji',
+          description: 'Copy as an emoji-packed string',
+          icon: 'fluent:emoji-24-filled',
+          available: actions.copyAsEmoji.available,
+        },
+      ],
+    [actions.copy.variants, actions.copy.available, actions.copyAsEmoji.available]
+  );
+
+  const copyMenuTriggerRef = useRef<MenuTriggerRef>(null);
+  const handleCopyVariant = useCallback(
+    (variantId: string) => {
+      void actions.copy.execute({ variantId });
+    },
+    [actions.copy]
+  );
+  const openCopyMenu = useCallback(() => {
+    // Defer to the next tick so the ButtonHandler's sheet-close / press-in
+    // animation doesn't race with the menu's trigger-position measure call.
+    setTimeout(() => copyMenuTriggerRef.current?.open(), 0);
+  }, []);
+
   if (error) {
     log.warn('send.token.error', { error });
     return <ScreenErrorState message={error} onGoBack={onNavigateBack} />;
@@ -69,6 +110,48 @@ export function SendTokenScreen({
 
   const bottomButtons = (
     <BottomButtons>
+      {/*
+       * Bottom-sheet Menu opened imperatively from the Copy button's onPress
+       * via the trigger ref's `.open()`. We keep the Trigger because heroui's
+       * imperative API requires one, but its position is irrelevant for
+       * bottom-sheet presentation — the sheet slides up from the bottom
+       * regardless.
+       */}
+      <Menu presentation="bottom-sheet">
+        <Menu.Trigger
+          ref={copyMenuTriggerRef}
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+          <View style={{ width: 1, height: 1 }} />
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Overlay />
+          <Menu.Content presentation="bottom-sheet">
+            <Menu.Label className="text-lg font-bold text-foreground ml-3 -mt-2 mb-2">
+              Copy token
+            </Menu.Label>
+            {copyVariants.map((v) => (
+              <Menu.Item
+                key={v.id}
+                testID={`send-token-copy-menu-${v.id}`}
+                isDisabled={!v.available}
+                onPress={() => handleCopyVariant(v.id)}>
+                <HStack align="center" gap={10} style={{ flex: 1 }}>
+                  {v.icon ? <Icon name={v.icon} size={18} /> : null}
+                  <View style={{ flex: 1 }}>
+                    <Menu.ItemTitle>{v.label}</Menu.ItemTitle>
+                    {(v.description || (!v.available && v.reason)) && (
+                      <Menu.ItemDescription>
+                        {!v.available && v.reason ? v.reason : v.description}
+                      </Menu.ItemDescription>
+                    )}
+                  </View>
+                </HStack>
+              </Menu.Item>
+            ))}
+          </Menu.Content>
+        </Menu.Portal>
+      </Menu>
+
       <HStack justify="center" align="center">
         <ButtonHandler
           buttons={[
@@ -78,8 +161,8 @@ export function SendTokenScreen({
               icon: 'lets-icons:copy',
               variant: 'primary',
               onPress: async (close: any) => {
-                await actions.copy.execute();
                 close({});
+                openCopyMenu();
               },
               condition: actions.copy.available,
             },
@@ -97,6 +180,7 @@ export function SendTokenScreen({
             {
               testID: 'send-token-nfc',
               text: 'NFC',
+              description: 'Transmit to a nearby phone',
               icon: 'lucide:nfc',
               variant: 'secondary',
               onPress: async (close: any) => {
@@ -107,18 +191,9 @@ export function SendTokenScreen({
               condition: actions.nfc.available,
             },
             {
-              testID: 'send-token-copy-emoji',
-              text: 'Copy as Emoji',
-              icon: 'fluent:emoji-24-filled',
-              variant: 'primary',
-              onPress: async (close: any) => {
-                await actions.copyAsEmoji.execute();
-              },
-              condition: actions.copyAsEmoji.available,
-            },
-            {
               testID: 'send-token-check-status',
               text: actions.checkStatus.loading ? 'Checking...' : 'Check Status',
+              description: 'Refresh the pending state',
               icon: 'mdi:refresh',
               variant: 'secondary',
               onPress: async (close: any) => {
@@ -130,6 +205,7 @@ export function SendTokenScreen({
             {
               testID: 'send-token-cancel-transaction',
               text: 'Cancel Transaction',
+              description: 'Reclaim proofs and void this token',
               icon: 'mdi:cancel',
               variant: 'dangerous',
               onPress: async (close: any) => {
@@ -145,8 +221,7 @@ export function SendTokenScreen({
   );
 
   return (
-    <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
-      <Screen name="SendTokenScreen">
+    <Screen name="SendTokenScreen" contentPadding={0} footer={bottomButtons}>
         {/*
          * Id marker wraps the screen body — lets `phone test` capture
          * the entry id of the send currently being viewed via
@@ -217,7 +292,6 @@ export function SendTokenScreen({
             />
           </VStack>
         </View>
-      </Screen>
-    </ModalLayoutWrapper>
+    </Screen>
   );
 }

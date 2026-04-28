@@ -15,7 +15,7 @@ export function mintsAddedPopup(
   } else {
     popup({
       message: `Successfully added ${params.added} mint(s)`,
-      icon: 'icon:mdi:bank-check',
+      icon: 'icon:mdi:bank',
       type: 'success',
       ...overrides,
     });
@@ -23,7 +23,7 @@ export function mintsAddedPopup(
 }
 
 export function noMintSelectedPopup(overrides?: BaseOverrides): void {
-  popup({ message: 'No mint selected', icon: 'icon:mdi:bank-off', type: 'error', ...overrides });
+  popup({ message: 'No mint selected', icon: 'icon:mdi:bank', type: 'error', ...overrides });
 }
 
 /** For coco-payment-ux NO_VALID_MINT — no mint supports this payment. */
@@ -31,7 +31,7 @@ export function noValidMintPopup(overrides?: TextOverrides): void {
   popup({
     message: 'No Valid Mint',
     text: 'No mint is available for this payment.',
-    icon: 'icon:mdi:bank-off',
+    icon: 'icon:mdi:bank',
     type: 'error',
     ...overrides,
   });
@@ -40,7 +40,7 @@ export function noValidMintPopup(overrides?: TextOverrides): void {
 export function noMintsSelectedPopup(): void {
   popup({
     message: 'Please select at least one mint to add',
-    icon: 'icon:mdi:bank-off',
+    icon: 'icon:mdi:bank',
     type: 'warning',
   });
 }
@@ -48,7 +48,7 @@ export function noMintsSelectedPopup(): void {
 export function mintsAddFailedPopup(overrides?: BaseOverrides): void {
   popup({
     message: 'Failed to add mints',
-    icon: 'icon:mdi:bank-remove',
+    icon: 'icon:mdi:bank',
     type: 'error',
     ...overrides,
   });
@@ -83,7 +83,7 @@ export function recoveryPartialPopup(
   popup({
     message: 'Recovery Partial',
     text: `Recovered from ${params.successCount}, failed for ${params.failureCount}.`,
-    icon: 'icon:mdi:shield-alert',
+    icon: 'icon:mdi:shield',
     type: 'warning',
     ...overrides,
   });

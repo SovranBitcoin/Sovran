@@ -15,7 +15,7 @@ import type { SendHistoryEntry } from '@cashu/coco-core';
 import { isPaymentRequestPreview } from 'coco-payment-ux';
 import { useScreenActions } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
 import {
@@ -29,7 +29,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
@@ -114,9 +114,8 @@ export function PaymentRequestScreen({
   );
 
   return (
-    <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
-      <Screen name="PaymentRequestScreen">
-        <VStack gap={12}>
+    <Screen name="PaymentRequestScreen" contentPadding={0} footer={bottomButtons}>
+      <VStack gap={12}>
           <HistoryEntryHeader
             pendingData={{ amount: entry.amount, unit: entry.unit, type: 'send' }}
           />
@@ -164,8 +163,7 @@ export function PaymentRequestScreen({
               mintUrl ? { title: 'Mint', value: truncateMiddle(mintUrl, 12) } : null,
             ].flatMap((item) => (item ? [item] : []))}
           />
-        </VStack>
-      </Screen>
-    </ModalLayoutWrapper>
+      </VStack>
+    </Screen>
   );
 }

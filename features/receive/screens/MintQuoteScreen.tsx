@@ -11,7 +11,7 @@ import { router } from 'expo-router';
 
 import type { MintHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 import { MintSelector } from '@/features/wallet';
 import { formatAmount } from '@/shared/lib/currency';
@@ -30,7 +30,7 @@ import type { ButtonHandlerButton } from '@/shared/ui/composed/ButtonHandler';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { Card } from '@/shared/ui/composed/Card';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -108,9 +108,8 @@ export function MintQuoteScreen({
   );
 
   return (
-    <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
-      <Screen name="MintQuoteScreen">
-        {/*
+    <Screen name="MintQuoteScreen" contentPadding={0} footer={bottomButtons}>
+      {/*
          * Id marker wraps the screen body — lets `phone test` capture
          * the entry id of the mint currently being viewed via
          * `capture #mint-quote-id-* suffix`. Without this, tests have
@@ -124,63 +123,62 @@ export function MintQuoteScreen({
          * this screen to itself within the same run see the same id on
          * both sides so snapshot equality holds.
          */}
-        <View testID={`mint-quote-id-${entry.id}`}>
-          <VStack gap={12}>
-            <HistoryEntryHeader historyEntry={entry} />
-            {!isPaid && (
-              <PaymentInfo
-                data={[{ name: 'Lightning', value: entry.paymentRequest }]}
-                unit={entry.unit}
-                copyTarget="paymentRequest"
-              />
-            )}
-
-            {isPaid && <TransactionLocationSection transactionId={entry.id} />}
-
-            {!isPaid ? (
-              <MintSelector
-                width={280}
-                unit={entry.unit}
-                selectedMintUrl={mintUrl}
-                onMintSelected={onMintSelected ?? (() => {})}
-                onRequestMintList={onRequestMintList ?? (() => {})}
-              />
-            ) : mintInfo ? (
-              <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
-            ) : null}
-
-            {entry.metadata?.memo && <Card message={entry.metadata.memo} variant="info" />}
-
-            <HistoryEntryTimeline historyEntry={entry} />
-
-            <DetailsSection
-              items={[
-                entry.id && { title: 'ID', value: entry.id },
-                source && { title: 'Source', value: source },
-                bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
-                bip321.optionKinds && {
-                  title: 'Payment Methods',
-                  value: (
-                    <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />
-                  ),
-                },
-                { title: 'Date', value: entry.createdAt.datetime },
-                {
-                  title: 'Amount',
-                  value: formatAmount({ amount: entry.amount, unit: entry.unit }),
-                },
-                { title: 'State', value: entry.state },
-                entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
-                mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
-                {
-                  title: 'Invoice',
-                  value: truncateMiddle(entry.paymentRequest, 10),
-                },
-              ].flatMap((item) => (item ? [item] : []))}
+      <View testID={`mint-quote-id-${entry.id}`}>
+        <VStack gap={12}>
+          <HistoryEntryHeader historyEntry={entry} />
+          {!isPaid && (
+            <PaymentInfo
+              data={[{ name: 'Lightning', value: entry.paymentRequest }]}
+              unit={entry.unit}
+              copyTarget="paymentRequest"
             />
-          </VStack>
-        </View>
-      </Screen>
-    </ModalLayoutWrapper>
+          )}
+
+          {isPaid && <TransactionLocationSection transactionId={entry.id} />}
+
+          {!isPaid ? (
+            <MintSelector
+              width={280}
+              unit={entry.unit}
+              selectedMintUrl={mintUrl}
+              onMintSelected={onMintSelected ?? (() => {})}
+              onRequestMintList={onRequestMintList ?? (() => {})}
+            />
+          ) : mintInfo ? (
+            <HistoryEntryRefresh mintInfo={mintInfo} historyEntry={entry} />
+          ) : null}
+
+          {entry.metadata?.memo && <Card message={entry.metadata.memo} variant="info" />}
+
+          <HistoryEntryTimeline historyEntry={entry} />
+
+          <DetailsSection
+            items={[
+              entry.id && { title: 'ID', value: entry.id },
+              source && { title: 'Source', value: source },
+              bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
+              bip321.optionKinds && {
+                title: 'Payment Methods',
+                value: (
+                  <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />
+                ),
+              },
+              { title: 'Date', value: entry.createdAt.datetime },
+              {
+                title: 'Amount',
+                value: formatAmount({ amount: entry.amount, unit: entry.unit }),
+              },
+              { title: 'State', value: entry.state },
+              entry.quoteId && { title: 'Quote ID', value: truncateMiddle(entry.quoteId, 7) },
+              mintUrl && { title: 'Mint', value: truncateMiddle(mintUrl, 12) },
+              {
+                title: 'Invoice',
+                value: truncateMiddle(entry.paymentRequest, 10),
+              },
+            ].flatMap((item) => (item ? [item] : []))}
+          />
+        </VStack>
+      </View>
+    </Screen>
   );
 }

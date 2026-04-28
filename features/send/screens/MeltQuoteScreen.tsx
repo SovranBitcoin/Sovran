@@ -16,7 +16,7 @@ import React from 'react';
 import type { MeltHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
 import { MintSelector } from '@/features/wallet';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
@@ -29,7 +29,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { View } from 'react-native';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -121,9 +121,8 @@ export function MeltQuoteScreen({
   );
 
   return (
-    <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
-      <Screen name="MeltQuoteScreen">
-        <View testID={`melt-quote-id-${entry.id}`}>
+    <Screen name="MeltQuoteScreen" contentPadding={0} footer={bottomButtons}>
+      <View testID={`melt-quote-id-${entry.id}`}>
         <VStack gap={12}>
           <HistoryEntryHeader historyEntry={entry} />
 
@@ -163,8 +162,7 @@ export function MeltQuoteScreen({
             ].flatMap((item) => (item ? [item] : []))}
           />
         </VStack>
-        </View>
-      </Screen>
-    </ModalLayoutWrapper>
+      </View>
+    </Screen>
   );
 }

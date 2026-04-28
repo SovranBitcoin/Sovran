@@ -181,13 +181,13 @@ export function mintIdentity(
     | { mintUrl: string; displayName: string; iconUrl?: string; stats?: MintStatFields },
 ): MintIdentity {
   if ('balance' in input) {
-    const { mintUrl, displayName, iconUrl, balance, unit, status, kymScore, auditScore, auditState, worksOffline, contactFollowers, contactReputation } = input;
+    const { mintUrl, displayName, iconUrl, balance, unit, status, kymScore, reviewCount, auditScore, auditState, worksOffline, contactFollowers, contactReputation } = input;
     return {
       kind: 'mint',
       mintUrl,
       displayName,
       iconUrl,
-      stats: { balance, unit, status, kymScore, auditScore, auditState, worksOffline, contactFollowers, contactReputation },
+      stats: { balance, unit, status, kymScore, reviewCount, auditScore, auditState, worksOffline, contactFollowers, contactReputation },
     };
   }
   return { kind: 'mint', ...input };
@@ -284,6 +284,50 @@ export interface ContactRowProps {
 const BLUETOOTH_ACCENT = '#0A84FF';
 const CONNECTED_ACCENT = '#34C759';
 const AVATAR_SIZE = 44;
+
+/**
+ * Deterministic skeleton-width sets. Each entry is an invisible string
+ * passed to `<Text loading placeholder>` to size the loading bar — its
+ * actual characters never render, only the width matters. Real names and
+ * NIP-05 handles vary in length, so picking from a few realistic widths
+ * per row makes a list of skeletons feel like a real list rather than a
+ * row of identical bars.
+ */
+const TITLE_PLACEHOLDER_WIDTHS = [
+  'NameNm', // ~6 chars
+  'Username', // ~8 chars
+  'Casual Name', // ~11 chars
+  'A longer display name', // ~21 chars
+  'Twelve chars', // ~12 chars
+  'Short ID', // ~8 chars
+  'A medium length nm', // ~18 chars
+] as const;
+
+const SUBTITLE_PLACEHOLDER_WIDTHS = [
+  'name@relay.example',
+  'short note',
+  'medium length subtitle text',
+  'twentyfour char subtitle',
+  'a longer last-message preview line',
+  'short@nip05',
+  'a NIP-05-ish handle@relay.example.com',
+] as const;
+
+/** Cheap, stable, non-cryptographic hash for picking deterministic skeleton
+ *  widths from a seed (pubkey, mintUrl, etc.). Same seed → same widths
+ *  across re-renders, so the skeletons don't flicker between sizes. */
+function hashSeed(seed: string): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h * 31 + seed.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function pickPlaceholder(seed: string | undefined, options: ReadonlyArray<string>): string {
+  if (!seed || options.length === 0) return options[0] ?? '';
+  return options[hashSeed(seed) % options.length];
+}
 
 const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], ReadonlyArray<StatKey>> = {
   // `following` is intentionally absent: the count lands in a narrow accent
@@ -396,7 +440,7 @@ function buildStats(
       case 'balance':
         if (typeof mintStats?.balance === 'number' && mintStats.balance > 0) {
           out.push({
-            icon: 'mdi:wallet-outline',
+            icon: 'solar:wallet-bold',
             value: formatCompact(mintStats.balance),
             color: STAT_COLOR_SOCIAL,
           });
@@ -609,7 +653,7 @@ export function ContactRow({
 
   const nip05 =
     showNip05 && !hideMetadata && !resolvedLoading && nostr?.profile?.nip05
-      ? { handle: nostr.profile.nip05, valid: nostr.profile.nip05Valid }
+      ? { handle: nostr.profile.nip05 }
       : undefined;
 
   const accentNode = <RowStatsAccent stats={statList} note={disabledReason} nip05={nip05} />;
@@ -688,14 +732,28 @@ export function ContactRow({
 
   const effectivePress = onPress ?? (selectable ? () => onToggle?.() : undefined);
 
+  // ---- Skeleton width variation ----------------------------------------
+  // When the row is in its loading state, pick deterministic title /
+  // subtitle widths from the seed (pubkey / mintUrl / etc.) so a list of
+  // pending rows reads as a list rather than a stamped grid. The chosen
+  // string is invisible — only its rendered width matters.
+  const titlePlaceholder = resolvedLoading
+    ? pickPlaceholder(seed, TITLE_PLACEHOLDER_WIDTHS)
+    : undefined;
+  const subtitlePlaceholder = resolvedLoading
+    ? pickPlaceholder(seed, SUBTITLE_PLACEHOLDER_WIDTHS)
+    : undefined;
+
   return (
     <ListRow
       leading={leadingNode}
       avatar={leadingNode ? undefined : avatarProp}
       iconCircle={leadingNode ? undefined : iconCircleProp}
       title={titleNode}
+      titlePlaceholder={titlePlaceholder}
       titleFallback={titleFallback}
       subtitle={subtitleNode}
+      subtitlePlaceholder={subtitlePlaceholder}
       accent={accentNode}
       trailing={trailingNode}
       onPress={effectivePress}

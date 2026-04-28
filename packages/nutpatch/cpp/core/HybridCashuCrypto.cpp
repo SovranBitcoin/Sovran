@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <mutex>
 #include <cstring>
+#include <cmath>
 
 namespace margelo::nitro::nutpatch {
 
@@ -228,6 +229,108 @@ std::shared_ptr<ArrayBuffer> HybridCashuCrypto::batchUnblind(
     auto out = makeBuffer(n * 33);
     checkErr(::batch_unblind(C_flat.data(), r_flat.data(), mintPubkey->data(), n, out->data()),
              "batchUnblind failed");
+    return out;
+}
+
+std::shared_ptr<ArrayBuffer> HybridCashuCrypto::ecdhNip44(
+    const std::shared_ptr<ArrayBuffer>& seckey,
+    const std::shared_ptr<ArrayBuffer>& xonlyPubkey) {
+
+    if (seckey->size() != 32)
+        throw std::invalid_argument("ecdhNip44: seckey must be 32 bytes");
+    if (xonlyPubkey->size() != 32)
+        throw std::invalid_argument("ecdhNip44: xonlyPubkey must be 32 bytes");
+
+    auto out = makeBuffer(32);
+    checkErr(::ecdh_nip44(seckey->data(), xonlyPubkey->data(), out->data()),
+             "ecdhNip44 failed");
+    return out;
+}
+
+std::shared_ptr<ArrayBuffer> HybridCashuCrypto::batchEcdhNip44(
+    const std::shared_ptr<ArrayBuffer>& seckey,
+    const std::vector<std::shared_ptr<ArrayBuffer>>& xonlyPubkeys) {
+
+    if (seckey->size() != 32)
+        throw std::invalid_argument("batchEcdhNip44: seckey must be 32 bytes");
+
+    size_t n = xonlyPubkeys.size();
+    if (n == 0) return makeBuffer(0);
+
+    // Flatten inputs into a single contiguous block — one allocation,
+    // one pass through the C layer, instead of N JS↔native crossings.
+    std::vector<uint8_t> pubkeys_flat(n * 32);
+    for (size_t i = 0; i < n; i++) {
+        if (xonlyPubkeys[i]->size() != 32)
+            throw std::invalid_argument("batchEcdhNip44: each pubkey must be 32 bytes");
+        std::memcpy(pubkeys_flat.data() + i * 32, xonlyPubkeys[i]->data(), 32);
+    }
+
+    auto out = makeBuffer(n * 32);
+    checkErr(::batch_ecdh_nip44(seckey->data(), pubkeys_flat.data(), n, out->data()),
+             "batchEcdhNip44 failed");
+    return out;
+}
+
+std::shared_ptr<ArrayBuffer> HybridCashuCrypto::chacha20Ietf(
+    const std::shared_ptr<ArrayBuffer>& key,
+    const std::shared_ptr<ArrayBuffer>& nonce,
+    double counter,
+    const std::shared_ptr<ArrayBuffer>& data) {
+
+    if (key->size() != 32)
+        throw std::invalid_argument("chacha20Ietf: key must be 32 bytes");
+    if (nonce->size() != 12)
+        throw std::invalid_argument("chacha20Ietf: nonce must be 12 bytes");
+    if (counter < 0 || counter > 0xFFFFFFFFu)
+        throw std::invalid_argument("chacha20Ietf: counter out of uint32 range");
+
+    auto out = makeBuffer(data->size());
+    checkErr(::chacha20_ietf(key->data(),
+                              nonce->data(),
+                              static_cast<uint32_t>(counter),
+                              data->data(),
+                              data->size(),
+                              out->data()),
+             "chacha20Ietf failed");
+    return out;
+}
+
+std::shared_ptr<ArrayBuffer> HybridCashuCrypto::hmacSha256(
+    const std::shared_ptr<ArrayBuffer>& key,
+    const std::shared_ptr<ArrayBuffer>& data) {
+
+    auto out = makeBuffer(32);
+    checkErr(::hmac_sha256(key->data(), key->size(),
+                            data->data(), data->size(),
+                            out->data()),
+             "hmacSha256 failed");
+    return out;
+}
+
+std::shared_ptr<ArrayBuffer> HybridCashuCrypto::pbkdf2HmacSha512(
+    const std::shared_ptr<ArrayBuffer>& password,
+    const std::shared_ptr<ArrayBuffer>& salt,
+    double iterations,
+    double dkLen) {
+
+    // Validate at the bridge boundary so the C side can assume a
+    // sane envelope. BIP-39 uses (2048, 64); the upper bounds here
+    // are deliberately generous but still guard against accidental
+    // huge values that would peg the JS thread.
+    if (!std::isfinite(iterations) || iterations < 1.0 || iterations > 10000000.0)
+        throw std::invalid_argument("pbkdf2HmacSha512: iterations out of range");
+    if (!std::isfinite(dkLen) || dkLen < 1.0 || dkLen > 4096.0)
+        throw std::invalid_argument("pbkdf2HmacSha512: dkLen out of range");
+
+    auto iter32 = static_cast<uint32_t>(iterations);
+    auto dk32   = static_cast<uint32_t>(dkLen);
+
+    auto out = makeBuffer(dk32);
+    checkErr(::pbkdf2_hmac_sha512(password->data(), password->size(),
+                                   salt->data(), salt->size(),
+                                   iter32, dk32, out->data()),
+             "pbkdf2HmacSha512 failed");
     return out;
 }
 

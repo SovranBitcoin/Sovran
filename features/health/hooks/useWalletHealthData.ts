@@ -18,7 +18,14 @@ const EMPTY_DISTRIBUTION: Record<string, number> = {};
  */
 export function useWalletHealthData(unit: string) {
   const { trustedMints } = useMints();
-  const { balance: rawBalance } = useBalanceContext();
+  const { balances: rawBalanceCtx } = useBalanceContext();
+  const rawBalance = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(rawBalanceCtx.byMint).map(([url, snap]) => [url, snap.total])
+      ) as Record<string, number>,
+    [rawBalanceCtx]
+  );
   const { history } = usePaginatedHistory();
 
   const normalizedUnit = unit.toLowerCase();

@@ -16,14 +16,14 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { Text } from '@/shared/ui/primitives/Text';
-import Container from '@/shared/ui/composed/Container';
+import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Switch, Button, Card } from 'heroui-native';
-import { cashuLog, Screen, useLifecycleLogger } from '@/shared/lib/logger';
+import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useMintManagement } from '@/features/mint';
 import { useNavigation, router } from 'expo-router';
@@ -471,8 +471,10 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           });
         }
         // Check if funds were actually recovered regardless of whether restore threw
-        const balances = await manager.wallet.getBalances().catch(() => ({}));
-        const mintBalance = (balances as Record<string, number>)[mintUrl] ?? 0;
+        const balances = await manager.wallet.balances
+          .byMint()
+          .catch(() => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>);
+        const mintBalance = balances[mintUrl]?.total ?? 0;
         const fundsFound = mintBalance > 0;
         const mintMs = Math.round((performance.now() - mintT0) * 100) / 100;
 
@@ -484,14 +486,6 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           fundsFound,
         };
 
-        // Clean up discovered mints that had no funds
-        if (isDiscovered && !fundsFound) {
-          try {
-            await manager.mint.deleteMint(mintUrl);
-          } catch {
-            /* best effort */
-          }
-        }
         setResults([...recoveryResults]);
       };
 
@@ -710,102 +704,100 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
     );
   };
 
-  // ─── Complete state ─────────────────────────────────────────────────────
-
-  const renderCompleteState = () => (
-    <VStack spacing={24} className="flex-1 px-6 pt-12">
-      <VStack spacing={24} className="flex-1 items-center justify-center">
-        <View
-          className="h-24 w-24 items-center justify-center self-center rounded-full"
-          style={{ backgroundColor: surfaceSecondary }}>
-          <ShieldStatusIcon size={48} color={foreground} successColor={green400} errorColor={red400} status="success" />
-        </View>
-
-        <VStack spacing={8} className="items-center">
-          <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
-            Recovery Complete
-          </Text>
-          <Text
-            size={16}
-            style={{ color: opacity(foreground, 0.5), textAlign: 'center', lineHeight: 24 }}>
-            Successfully recovered from {visibleResults.filter((r) => r.success).length} mint
-            {visibleResults.filter((r) => r.success).length !== 1 ? 's' : ''}.
-          </Text>
-        </VStack>
-
-        <Card variant="secondary" className="w-full">
-          <Card.Body>
-            <VStack spacing={12}>
-              {visibleResults.map((r) => (
-                <MintRecoveryRow
-                  key={r.mint}
-                  mintUrl={r.mint}
-                  mint={mintsByUrl[r.mint]}
-                  index={results.indexOf(r)}
-                  currentIndex={results.length}
-                  result={r}
-                />
-              ))}
-              {renderProbeRow()}
-            </VStack>
-          </Card.Body>
-        </Card>
-      </VStack>
-
-      <VStack spacing={12} className="w-full pb-6">
-        <Button
-          variant="primary"
-          className="w-full"
-          onPress={gateMode ? onComplete : handleClose}>
-          <Button.Label>{gateMode ? 'Continue' : 'Close'}</Button.Label>
-        </Button>
-      </VStack>
-    </VStack>
-  );
-
-  // ─── Recovering state ───────────────────────────────────────────────────
-
   // Build lookup and filter: only show known mints + discovered mints that recovered funds
   const mintsByUrl = Object.fromEntries(mints.map((m) => [m.mintUrl, m]));
   const knownMintUrlSet = new Set(mints.map((m) => m.mintUrl));
   const visibleResults = results.filter((r) => !r.isDiscovered || r.fundsFound);
 
-  const renderRecoveringState = () => (
-    <VStack spacing={20} className="flex-1 items-center justify-center px-6">
-      <View
-        className="h-24 w-24 items-center justify-center self-center rounded-full"
-        style={{ backgroundColor: surfaceSecondary }}>
-        <ShieldStatusIcon size={48} color={foreground} successColor={green400} errorColor={red400} status="loading" />
-      </View>
+  // ─── Recovering + complete states (single tree) ──────────────────────────
+  //
+  // Rendered with one JSX structure so React reconciles instead of
+  // unmount/remount on the `recovering → complete` flip. That keeps:
+  //   - the in-flight per-row PaymentStatusIcon animations playing through
+  //     to their natural end instead of being killed mid-draw, and
+  //   - the top ShieldStatusIcon mounted across the transition so its
+  //     useEffect runs the proper `loading → success` animation (a fresh
+  //     mount with status='success' would early-return without animating
+  //     and leave the shield stuck in pending visuals).
+  //
+  // Differences between the two states are now expressed as prop/text
+  // toggles inside the same tree.
 
-      <VStack spacing={8} className="items-center">
-        <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
-          Recovering Wallet
-        </Text>
-        <Text size={14} style={{ color: opacity(foreground, 0.5), textAlign: 'center' }}>
-          Restoring ecash from your mints...
-        </Text>
-      </VStack>
+  const renderActiveOrCompleteState = () => {
+    const isComplete = recoveryState === 'complete';
+    const successMintCount = visibleResults.filter((r) => r.success).length;
+    return (
+      <VStack spacing={24} className="flex-1 px-6 pt-12">
+        <VStack spacing={24} className="flex-1 items-center justify-center">
+          <View
+            className="h-24 w-24 items-center justify-center self-center rounded-full"
+            style={{ backgroundColor: surfaceSecondary }}>
+            <ShieldStatusIcon
+              size={48}
+              color={foreground}
+              successColor={green400}
+              errorColor={red400}
+              status={isComplete ? 'success' : 'loading'}
+            />
+          </View>
 
-      <Card variant="secondary" className="w-full">
-        <Card.Body>
-          <VStack spacing={16}>
-            {visibleResults.map((r) => (
-              <MintRecoveryRow
-                key={r.mint}
-                mintUrl={r.mint}
-                mint={mintsByUrl[r.mint]}
-                index={results.indexOf(r)}
-                currentIndex={currentMintIndex}
-                result={r}
-              />
-            ))}
-            {renderProbeRow()}
+          <VStack spacing={8} className="items-center">
+            <Text size={24} bold style={{ color: foreground, textAlign: 'center' }}>
+              {isComplete ? 'Recovery Complete' : 'Recovering Wallet'}
+            </Text>
+            <Text
+              size={isComplete ? 16 : 14}
+              style={{
+                color: opacity(foreground, 0.5),
+                textAlign: 'center',
+                lineHeight: isComplete ? 24 : undefined,
+              }}>
+              {isComplete
+                ? `Successfully recovered from ${successMintCount} mint${
+                    successMintCount !== 1 ? 's' : ''
+                  }.`
+                : 'Restoring ecash from your mints...'}
+            </Text>
           </VStack>
-        </Card.Body>
-      </Card>
-    </VStack>
-  );
+
+          <Card variant="secondary" className="w-full">
+            <Card.Body>
+              <VStack spacing={12}>
+                {visibleResults.map((r) => (
+                  <MintRecoveryRow
+                    key={r.mint}
+                    mintUrl={r.mint}
+                    mint={mintsByUrl[r.mint]}
+                    index={results.indexOf(r)}
+                    // While recovering, currentMintIndex is -1 (allActive
+                    // mode in MintRecoveryRow). On `complete`, push it past
+                    // the last index so every row reports as done — but the
+                    // per-row PaymentStatusIcon already drives off the
+                    // result.success state, so this is just for the row's
+                    // text dimming.
+                    currentIndex={isComplete ? results.length : currentMintIndex}
+                    result={r}
+                  />
+                ))}
+                {renderProbeRow()}
+              </VStack>
+            </Card.Body>
+          </Card>
+        </VStack>
+
+        {isComplete && (
+          <VStack spacing={12} className="w-full pb-6">
+            <Button
+              variant="primary"
+              className="w-full"
+              onPress={gateMode ? onComplete : handleClose}>
+              <Button.Label>{gateMode ? 'Continue' : 'Close'}</Button.Label>
+            </Button>
+          </VStack>
+        )}
+      </VStack>
+    );
+  };
 
   // ─── Error state (retry available) ──────────────────────────────────────
 
@@ -895,19 +887,17 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
   };
 
   return (
-    <Container>
-      <Screen name="SettingsRecoveryScreen">
+    <ScreenWrapper name="SettingsRecoveryScreen" scroll="custom" safeArea>
         <ScrollView
           className="flex-1"
           contentContainerStyle={{ flexGrow: 1 }}
           scrollEnabled={recoveryState !== 'recovering'}>
           {recoveryState === 'idle' && renderIdleState()}
-          {recoveryState === 'recovering' && renderRecoveringState()}
-          {recoveryState === 'complete' && renderCompleteState()}
+          {(recoveryState === 'recovering' || recoveryState === 'complete') &&
+            renderActiveOrCompleteState()}
           {recoveryState === 'error' && renderErrorState()}
         </ScrollView>
-      </Screen>
-    </Container>
+    </ScreenWrapper>
   );
 };
 
@@ -931,8 +921,8 @@ const MintRecoveryRow: React.FC<{
     'green-400',
     'red-400',
   ] as const);
-  const { balance: liveBalances } = useBalanceContext();
-  const mintBalance = liveBalances[mintUrl] || 0;
+  const { balances: liveBalances } = useBalanceContext();
+  const mintBalance = liveBalances.byMint[mintUrl]?.total || 0;
 
   const allActive = currentIndex === -1;
   const hasResult = result?.durationMs != null;

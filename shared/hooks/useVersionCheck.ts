@@ -6,12 +6,20 @@ import semver from 'semver';
 import { getLatestVersion } from '@/shared/lib/apiClient';
 import { newVersionPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
+import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 
 /**
- * Checks for app updates on mount and shows a popup when a newer version exists.
+ * Checks for app updates and shows a popup when a newer version exists.
+ *
+ * Deferred until after the boot splash → QR-button morph completes so the
+ * version-check API call doesn't compete with first-paint network/CPU
+ * work. Holding the new-version popup 1–2 extra seconds while the wallet
+ * renders is fine.
  */
 export const useVersionCheck = () => {
+  const bootDone = useBootMorphCompleted();
   useEffect(() => {
+    if (!bootDone) return;
     const checkForUpdates = async () => {
       const currentVersion = Application.nativeApplicationVersion;
       if (!currentVersion) {
@@ -48,5 +56,5 @@ export const useVersionCheck = () => {
     };
 
     checkForUpdates();
-  }, []);
+  }, [bootDone]);
 };

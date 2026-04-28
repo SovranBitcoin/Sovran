@@ -3,10 +3,11 @@ import { ScrollView, View } from 'react-native';
 
 import { Button, Card, ControlField, Label } from 'heroui-native';
 
-import Container from '@/shared/ui/composed/Container';
+import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useLifecycleLogger } from '@/shared/lib/logger';
 
 const TERMS_TEXT = `IMPORTANT NOTICE: THESE TERMS OF SERVICE INCLUDE A MEDIATION-FIRST CLAUSE REQUIRING MEDIATION BEFORE ARBITRATION OR LITIGATION. PLEASE READ THESE TERMS CAREFULLY. IF YOU DO NOT AGREE, DO NOT USE SOVRAN.
 
@@ -155,10 +156,10 @@ export function TermsAndConditionsScreen({
 }: TermsAndConditionsScreenProps) {
   useLifecycleLogger('TermsAndConditionsScreen');
   const [isChecked, setIsChecked] = useState(false);
+  const surfaceColor = useThemeColor('surface');
 
   return (
-    <Container className="bg-surface">
-      <Screen name="TermsAndConditionsScreen">
+    <ScreenWrapper name="TermsAndConditionsScreen" scroll="custom" safeArea bgColor={surfaceColor}>
         <VStack spacing={16} flex={1} className="p-4">
           <Text bold size={32} className="text-foreground py-2 text-center">
             {title}
@@ -191,7 +192,6 @@ export function TermsAndConditionsScreen({
             </Button>
           </VStack>
         </VStack>
-      </Screen>
-    </Container>
+    </ScreenWrapper>
   );
 }

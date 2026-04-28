@@ -3,9 +3,9 @@ import { Alert, RefreshControl, ScrollView, Share } from 'react-native';
 
 import { Button, Card } from 'heroui-native';
 import * as Clipboard from 'expo-clipboard';
-import { log, Screen, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
-import Container from '@/shared/ui/composed/Container';
+import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import {
   getFullAsyncStorageDump,
   getStorageInventorySnapshot,
@@ -278,8 +278,7 @@ export const SettingsStorageScreen = () => {
   );
 
   return (
-    <Container>
-      <Screen name="SettingsStorageScreen">
+    <ScreenWrapper name="SettingsStorageScreen" scroll="custom" safeArea>
         <ScrollView
           className="px-4"
           refreshControl={
@@ -368,7 +367,6 @@ export const SettingsStorageScreen = () => {
             emptyLabel="No coco database files currently exist."
           />
         </ScrollView>
-      </Screen>
-    </Container>
+    </ScreenWrapper>
   );
 };

@@ -12,6 +12,7 @@ import opacity from 'hex-color-opacity';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
+import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { useShallow } from 'zustand/react/shallow';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
@@ -157,13 +158,21 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
     useShallow((s) => ({ placesCache: s.placesCache, fetchPlaces: s.fetchPlaces }))
   );
 
+  // Defer the BTCMap places fetch until *after* the boot splash has morphed
+  // into the QR button. Parsing the ~40k-place response takes 2–3 seconds of
+  // synchronous work on the JS thread, which previously blocked the morph
+  // animation from running. Once the morph is done the user is already on
+  // the wallet — running the fetch then just populates the map below the
+  // fold without affecting first paint.
+  const morphCompleted = useBootMorphCompleted();
   useEffect(() => {
+    if (!morphCompleted) return;
     fetchPlaces().catch((err) => {
       log.warn('bitcoin.nearby.fetch.error', {
         error: err instanceof Error ? err : new Error(String(err)),
       });
     });
-  }, [fetchPlaces]);
+  }, [morphCompleted, fetchPlaces]);
 
   const [coords, setCoords] = useState({
     latitude: mockMode ? MOCK_LAT : DEFAULT_LAT,

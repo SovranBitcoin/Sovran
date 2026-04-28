@@ -26,7 +26,9 @@
 import React, { useEffect } from 'react';
 import { startBLE } from 'bitchat-module';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
-import { log } from '@/shared/lib/logger';
+import { log, initLog, useInitMount } from '@/shared/lib/logger';
+
+initLog('Module', 'BitchatBLEProvider loaded');
 
 const bleLog = log.child({ module: 'bitchat' });
 
@@ -36,6 +38,7 @@ const bleLog = log.child({ module: 'bitchat' });
  * its own identity keys and therefore its own advertised peerID.
  */
 export function BitchatBLEProvider({ children }: { children: React.ReactNode }) {
+  useInitMount('BitchatBLEProvider');
   const nickname = useBitchatNickname();
 
   useEffect(() => {

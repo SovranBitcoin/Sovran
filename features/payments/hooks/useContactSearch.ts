@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { searchUsers as apiSearchUsers, type UserProfile } from '@/shared/lib/apiClient';
 import { paymentLog } from '@/shared/lib/logger';
 import { useSearchHistoryStore } from '@/shared/stores/profile/searchHistoryStore';
+import { useNostrMetadataCache } from '@/shared/stores/global/nostrMetadataCache';
 
 export interface SearchResultData {
   pubkey: string;
@@ -26,6 +27,7 @@ const SEARCH_DEBOUNCE_MS = 250;
 
 export function useContactSearch(searchQuery: string) {
   const addSearchToHistory = useSearchHistoryStore((state) => state.addSearch);
+  const seedFromSearchResults = useNostrMetadataCache((s) => s.seedFromSearchResults);
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
   const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -85,7 +87,10 @@ export function useContactSearch(searchQuery: string) {
               resultCount: formatted.length,
             });
             setSearchResults(formatted);
-            if (formatted.length > 0) addSearchToHistory(debouncedQuery, 'payments');
+            if (formatted.length > 0) {
+              seedFromSearchResults(formatted);
+              addSearchToHistory(debouncedQuery, 'payments');
+            }
           } else {
             setSearchResults([]);
           }
@@ -106,7 +111,7 @@ export function useContactSearch(searchQuery: string) {
 
     search();
     return () => { cancelled = true; };
-  }, [debouncedQuery, addSearchToHistory]);
+  }, [debouncedQuery, addSearchToHistory, seedFromSearchResults]);
 
   // Stale-while-revalidate: once the first response has landed we keep
   // showing those results while the next query is in flight. Skeletons

@@ -43,9 +43,9 @@ export function createWalletContextTracker(
     refreshing = true;
 
     try {
-      const [trustedMints, balances] = await Promise.all([
+      const [trustedMints, balancesByMint] = await Promise.all([
         manager.mint.getAllTrustedMints(),
-        manager.wallet.getBalances(),
+        manager.wallet.balances.byMint(),
       ]);
 
       const amounts: Record<string, number[]> = {};
@@ -71,7 +71,9 @@ export function createWalletContextTracker(
       }
 
       trustedMintUrls = trustedMints.map((m: any) => m.mintUrl);
-      mintBalances = balances;
+      mintBalances = Object.fromEntries(
+        Object.entries(balancesByMint).map(([url, snap]) => [url, snap.total])
+      );
       proofAmounts = amounts;
 
       emit();

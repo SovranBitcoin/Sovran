@@ -15,17 +15,19 @@ import { router } from 'expo-router';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 
 import { useScreenActions, type UseScreenActionsResult } from 'coco-payment-ux/react';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 import type { FormattedString } from 'coco-payment-ux';
 import { Section } from '@/features/settings';
+import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { HistoryEntryRefresh } from '@/features/transactions';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { useMintInfo } from '@/shared/hooks/useMintInfo';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { ModalScreenLayout } from '@/shared/ui/composed/ModalScreenLayout';
+import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
+import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { ScreenErrorState, ScreenLoadingState } from '@/shared/ui/composed/ScreenStates';
 import { Tabs } from '@/shared/ui/composed/Tabs';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
@@ -71,31 +73,33 @@ const ReceiveLightningTab = memo(function ReceiveLightningTab({
       {showLightningAddress && (
         <View className="mx-4">
           <Section title="RECEIVE ADDRESS">
-            <ListGroup variant="secondary">
-              <PressableFeedback
-                animation={false}
-                onPress={async () => {
-                  await EnhancedHaptics.copyHaptic();
-                  await actions.copy.execute({ source: 'npc' });
-                }}>
-                <PressableFeedback.Scale>
-                  <ListGroup.Item disabled>
-                    <ListGroup.ItemPrefix>
-                      <Icon name="mingcute:lightning-fill" size={20} color={muted} />
-                    </ListGroup.ItemPrefix>
-                    <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>
-                        {data.npcAddress?.truncate(6) ?? ''}
-                      </ListGroup.ItemTitle>
-                    </ListGroup.ItemContent>
-                    <ListGroup.ItemSuffix>
-                      <Icon name="lets-icons:copy" size={20} color={muted} />
-                    </ListGroup.ItemSuffix>
-                  </ListGroup.Item>
-                </PressableFeedback.Scale>
-                <PressableFeedback.Ripple />
-              </PressableFeedback>
-            </ListGroup>
+            <GradientCard>
+              <ListGroup variant="transparent">
+                <PressableFeedback
+                  animation={false}
+                  onPress={async () => {
+                    await EnhancedHaptics.copyHaptic();
+                    await actions.copy.execute({ source: 'npc' });
+                  }}>
+                  <PressableFeedback.Scale>
+                    <ListGroup.Item disabled>
+                      <ListGroup.ItemPrefix>
+                        <Icon name="mingcute:lightning-fill" size={20} color={muted} />
+                      </ListGroup.ItemPrefix>
+                      <ListGroup.ItemContent>
+                        <ListGroup.ItemTitle>
+                          {data.npcAddress?.truncate(6) ?? ''}
+                        </ListGroup.ItemTitle>
+                      </ListGroup.ItemContent>
+                      <ListGroup.ItemSuffix>
+                        <Icon name="lets-icons:copy" size={20} color={muted} />
+                      </ListGroup.ItemSuffix>
+                    </ListGroup.Item>
+                  </PressableFeedback.Scale>
+                  <PressableFeedback.Ripple />
+                </PressableFeedback>
+              </ListGroup>
+            </GradientCard>
           </Section>
         </View>
       )}
@@ -207,67 +211,69 @@ export function ReceiveScreen({ receiveEntry, unit }: ReceiveScreenProps) {
   }
 
   return (
-    <ModalScreenLayout
-      bottomButtons={
-        <ButtonHandler
-          buttons={[
-            {
-              testID: 'receive-paste',
-              text: actions.paste.loading ? 'Pasting...' : 'Paste',
-              icon: 'lets-icons:copy',
-              variant: 'primary',
-              onPress: async () => {
-                await actions.paste.execute();
+    <ScreenWrapper
+      name="ReceiveScreen"
+      contentPadding={0}
+      footer={
+        <BottomButtons>
+          <ButtonHandler
+            buttons={[
+              {
+                testID: 'receive-paste',
+                text: actions.paste.loading ? 'Pasting...' : 'Paste',
+                icon: 'lets-icons:copy',
+                variant: 'primary',
+                onPress: async () => {
+                  await actions.paste.execute();
+                },
+                loading: actions.paste.loading,
+                condition: actions.paste.available,
               },
-              loading: actions.paste.loading,
-              condition: actions.paste.available,
-            },
-            {
-              testID: 'receive-fixed-amount',
-              text: actions.fixedAmount.loading ? 'Opening...' : 'Fixed Amount',
-              icon: 'mdi:decimal',
-              variant: 'secondary',
-              onPress: async () => {
-                await actions.fixedAmount.execute();
+              {
+                testID: 'receive-fixed-amount',
+                text: actions.fixedAmount.loading ? 'Opening...' : 'Fixed Amount',
+                icon: 'mdi:decimal',
+                variant: 'secondary',
+                onPress: async () => {
+                  await actions.fixedAmount.execute();
+                },
+                loading: actions.fixedAmount.loading,
+                condition: actions.fixedAmount.available,
               },
-              loading: actions.fixedAmount.loading,
-              condition: actions.fixedAmount.available,
-            },
-            {
-              testID: 'receive-scan-qr',
-              text: actions.scanQr.loading ? 'Opening...' : 'Scan QR',
-              icon: 'stash:qr-code',
-              variant: 'secondary',
-              onPress: async () => {
-                await actions.scanQr.execute();
+              {
+                testID: 'receive-scan-qr',
+                text: actions.scanQr.loading ? 'Opening...' : 'Scan QR',
+                icon: 'stash:qr-code',
+                variant: 'secondary',
+                onPress: async () => {
+                  await actions.scanQr.execute();
+                },
+                loading: actions.scanQr.loading,
+                condition: actions.scanQr.available,
               },
-              loading: actions.scanQr.loading,
-              condition: actions.scanQr.available,
-            },
-          ]}
-        />
-      }>
-      <Screen name="ReceiveScreen">
-        {quickAccessP2PK && (
-          <View className="mx-4 mb-4">
-            <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={setSelectedTab} />
-          </View>
-        )}
-
-        {selectedTab === 'Lightning' ? (
-          <ReceiveLightningTab
-            data={receiveEntryData}
-            unit={unit}
-            mintInfo={mintInfo}
-            selectedMintUrl={mintUrl}
-            isNpcMintUpdating={isNpcMintUpdating}
-            actions={actions}
-            muted={muted}
+            ]}
           />
-        ) : (
-          <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
-        )}
-      </Screen>
-    </ModalScreenLayout>
+        </BottomButtons>
+      }>
+      {quickAccessP2PK && (
+        <View className="mx-4 mb-4">
+          <Tabs tabs={tabs} selectedTab={selectedTab} handleTabPress={setSelectedTab} />
+        </View>
+      )}
+
+      {selectedTab === 'Lightning' ? (
+        <ReceiveLightningTab
+          data={receiveEntryData}
+          unit={unit}
+          mintInfo={mintInfo}
+          selectedMintUrl={mintUrl}
+          isNpcMintUpdating={isNpcMintUpdating}
+          actions={actions}
+          muted={muted}
+        />
+      ) : (
+        <ReceiveP2pkTab data={receiveEntryData} actions={actions} muted={muted} />
+      )}
+    </ScreenWrapper>
   );
 }

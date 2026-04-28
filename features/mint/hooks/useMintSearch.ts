@@ -48,7 +48,7 @@ export function useMintSearch(query: string, currency: string): UseMintSearchRet
       searchMints({
         query: query.trim() || undefined,
         currency: currency !== 'ALL' ? currency : undefined,
-        fields: 'name,icon_url,description',
+        fields: 'name,icon_url,description,contact',
       })
         .then((res) => {
           if (cancelled) {

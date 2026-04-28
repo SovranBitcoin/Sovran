@@ -2,7 +2,9 @@ import React, { useState, useEffect, ReactNode, useRef } from 'react';
 import { store } from '@/redux/store/store.deprecated';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { isMigrationsComplete, setMigrationsComplete } from '@/shared/lib/nostr/secureStorage';
-import { initLog, log, Log, useLifecycleLogger } from '@/shared/lib/logger';
+import { initLog, log, Log, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
+
+initLog('Module', 'MigrationGate loaded');
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 
 interface MigrationGateProps {
@@ -21,6 +23,7 @@ interface MigrationGateProps {
  * GlobalMigrationGate (runs before AccountScopedProviders mount).
  */
 export default function MigrationGate({ children }: MigrationGateProps) {
+  useInitMount('MigrationGate');
   useLifecycleLogger('MigrationGate');
   const stage = useInitializationStage('migrations', {
     message: 'Running migrations...',

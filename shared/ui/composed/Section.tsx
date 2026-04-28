@@ -11,6 +11,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { truncateMiddle } from '@/shared/lib/strings';
+import { GradientCard } from '@/shared/ui/composed/GradientCard';
 
 interface ItemTitle {
   id?: string;
@@ -29,12 +30,43 @@ interface SectionProps {
   style?: ViewStyle;
   camera?: boolean;
   special?: boolean;
+  /** Render with the wallet's signature corner-gradient frame. */
+  gradient?: boolean;
 }
 
-export function Section({ items, style, camera = false, special }: SectionProps) {
+export function Section({ items, style, camera = false, special, gradient }: SectionProps) {
   const [foreground, shade300] = useThemeColor(['foreground', 'shade-300'] as const);
 
   const ContainerView = camera ? BlurView : View;
+
+  const rows = items.map((item, index) => {
+    const titleObj = typeof item.title === 'object' ? item.title : null;
+    const titleId = titleObj?.id;
+    const titleText = typeof item.title === 'string' ? item.title : (titleObj?.children ?? '');
+
+    return (
+      <HStack key={index} justify="space-between" className="p-2">
+        <Text id={titleId} heavy size={16} color={opacity(foreground, 0.9)}>
+          {titleText}
+        </Text>
+        {titleText !== '' && <Spacer size={8} />}
+
+        {renderValueContent(item, titleText, special)}
+      </HStack>
+    );
+  });
+
+  if (gradient) {
+    return (
+      <Log name="Section">
+        <GradientCard
+          style={{ marginHorizontal: 16, ...style }}
+          contentStyle={{ padding: 8 }}>
+          {rows}
+        </GradientCard>
+      </Log>
+    );
+  }
 
   return (
     <Log name="Section">
@@ -51,24 +83,7 @@ export function Section({ items, style, camera = false, special }: SectionProps)
             borderRadius: 8,
             padding: 8,
           }}>
-          {items.map((item, index) => {
-            // Extract title information safely
-            const titleObj = typeof item.title === 'object' ? item.title : null;
-            const titleId = titleObj?.id;
-            const titleText =
-              typeof item.title === 'string' ? item.title : (titleObj?.children ?? '');
-
-            return (
-              <HStack key={index} justify="space-between" className="p-2">
-                <Text id={titleId} heavy size={16} color={opacity(foreground, 0.9)}>
-                  {titleText}
-                </Text>
-                {titleText !== '' && <Spacer size={8} />}
-
-                {renderValueContent(item, titleText, special)}
-              </HStack>
-            );
-          })}
+          {rows}
         </VStack>
       </ContainerView>
     </Log>

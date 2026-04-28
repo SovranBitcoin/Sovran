@@ -24,7 +24,9 @@ import type { WalletContext } from 'coco-payment-ux';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useShallowMemo } from '@/shared/hooks/useShallowMemo';
-import { walletLog } from '@/shared/lib/logger';
+import { walletLog, initLog, useInitMount } from '@/shared/lib/logger';
+
+initLog('Module', 'WalletContextProvider loaded');
 
 const WalletContextCtx = createContext<WalletContext | null>(null);
 
@@ -51,8 +53,16 @@ export function useWalletContextWithOverride(preferredMintUrl?: string): WalletC
 }
 
 export function WalletContextProvider({ children }: { children: React.ReactNode }) {
+  useInitMount('WalletContextProvider');
   const { trustedMints: rawTrustedMints } = useMints();
-  const { balance: rawMintBalances } = useBalanceContext();
+  const { balances: rawBalanceCtx } = useBalanceContext();
+  const rawMintBalances = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(rawBalanceCtx.byMint).map(([url, snap]) => [url, snap.total])
+      ) as Record<string, number>,
+    [rawBalanceCtx]
+  );
   const manager = useManager();
   const { keys } = useNostrKeysContext();
   const pubkey = keys?.pubkey;
@@ -105,10 +115,9 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     fetchProofAmounts();
   }, [fetchProofAmounts]);
 
-  const mintBalancesOnly = useMemo(() => {
-    const { total: _total, ...rest } = mintBalances;
-    return rest as Record<string, number>;
-  }, [mintBalances]);
+  // RC4+ removed the legacy `total` injection into the per-mint map; mintBalances
+  // already contains only mint-keyed entries.
+  const mintBalancesOnly = mintBalances;
 
   const value = useMemo<WalletContext>(() => {
     walletLog.info('provider.wallet_context.value_updated', {

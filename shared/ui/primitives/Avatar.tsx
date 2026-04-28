@@ -61,7 +61,9 @@ function LoadingContent({ borderRadius, color }: { borderRadius: number; color: 
 
 export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: AvatarProps) => {
   const foreground = useThemeColor('foreground');
-  const loadingColor = useMemo(() => opacity(foreground, 0.5), [foreground]);
+  // Match the skeleton fill used by `Text` — low-opacity foreground reads
+  // as ambient "loading" rather than a solid silhouette.
+  const loadingColor = useMemo(() => opacity(foreground, 0.15), [foreground]);
 
   useEffect(() => {
     prefetchImage(picture);

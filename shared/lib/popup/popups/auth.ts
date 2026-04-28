@@ -13,7 +13,7 @@ export function keyGeneratedPopup(overrides?: BaseOverrides): void {
 export function keyGenerateFailedPopup(overrides?: BaseOverrides): void {
   popup({
     message: 'Failed to generate key',
-    icon: 'icon:mdi:key-alert',
+    icon: 'icon:solar:key-bold',
     type: 'error',
     ...overrides,
   });
@@ -22,7 +22,7 @@ export function keyGenerateFailedPopup(overrides?: BaseOverrides): void {
 export function keysLoadFailedPopup(overrides?: BaseOverrides): void {
   popup({
     message: 'Failed to load keys',
-    icon: 'icon:mdi:key-alert',
+    icon: 'icon:solar:key-bold',
     type: 'error',
     ...overrides,
   });
@@ -40,7 +40,7 @@ export function keyImportedPopup(overrides?: BaseOverrides): void {
 export function keyImportFailedPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Failed to import key',
-    icon: 'icon:mdi:key-remove',
+    icon: 'icon:solar:key-bold',
     type: 'error',
     ...overrides,
   });
@@ -50,7 +50,7 @@ export function invalidKeyFormatPopup(): void {
   popup({
     message: 'Invalid Key Format',
     text: 'Enter nsec or 64-character hex key.',
-    icon: 'icon:mdi:key-remove',
+    icon: 'icon:solar:key-bold',
     type: 'error',
   });
 }
@@ -59,7 +59,7 @@ export function passcodeNotMatchPopup(): void {
   popup({
     message: 'Passcode Not Match',
     text: 'The passcode does not match. Please try again.',
-    icon: 'icon:mdi:lock-alert',
+    icon: 'icon:mdi:shield',
     type: 'error',
   });
 }

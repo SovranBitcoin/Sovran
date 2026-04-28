@@ -1,33 +1,29 @@
 import type { Mint } from '@cashu/coco-core';
-import type { AuditMintResponse } from '@/shared/lib/apiClient';
-import { composeSatoshis, type MintAvailability, type MintListItem } from 'coco-payment-ux';
-import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
-import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
-import { getMintDisplayName, normalizeMintUrlKey } from '@/shared/lib/url';
+import {
+  composeSatoshis,
+  type MintAvailability,
+  type MintCatalogEntry,
+  type MintListItem,
+} from 'coco-payment-ux';
+
+import { getMintDisplayName } from '@/shared/lib/url';
 
 /**
- * Derives a 0-5 audit score from raw swap data.
- */
-function computeAuditScore(auditData: AuditMintResponse): number | undefined {
-  const swaps = auditData.swaps || [];
-  if (swaps.length === 0) return undefined;
-  const successCount = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
-  return (successCount / swaps.length) * 5;
-}
-
-/**
- * Builds a fully-resolved MintListItem[] from trusted mints and their computed
- * availability. KYM and audit scores are read synchronously from the Zustand cache.
+ * Builds a fully-resolved `MintListItem[]` from trusted mints, their availability,
+ * and a pre-fetched catalog (audit / KYM / operator profile data, keyed by
+ * mint URL).
  *
- * Safe to call in any context — all reads are synchronous `getState()` calls.
+ * The Mint Manager owns this path; `coco-payment-ux` has its own equivalent
+ * for Send / Receive Select Mint that pulls the same catalog via the
+ * `fetchMintCatalog` callback. Both surfaces consume identical fields, so the
+ * audit / score pills render the same regardless of entry point.
  */
 export function buildMintListItems(
   trustedMints: Mint[],
   availability: MintAvailability[],
+  catalog: Record<string, MintCatalogEntry> = {},
   offlineCheck?: { amount: number; proofAmounts: Record<string, number[]> }
 ): MintListItem[] {
-  const kymState = useKYMMintStore.getState();
-  const auditState = useAuditMintStore.getState();
   const availMap = new Map(availability.map((a) => [a.mintUrl, a]));
 
   const mintUrls = [
@@ -39,9 +35,7 @@ export function buildMintListItems(
     .map((mintUrl): MintListItem => {
       const mint = trustedMints.find((m) => m.mintUrl === mintUrl);
       const avail = availMap.get(mintUrl);
-      const normalizedUrl = normalizeMintUrlKey(mintUrl);
-      const kymCached = kymState.getCached(normalizedUrl);
-      const auditCached = auditState.getCached(mintUrl);
+      const entry = catalog[mintUrl] ?? {};
 
       const proofs = offlineCheck?.proofAmounts[mintUrl];
       const worksOffline =
@@ -58,9 +52,12 @@ export function buildMintListItems(
         status: avail?.status ?? 'available',
         reason: avail?.reason ?? null,
         isPreferred: avail?.isPreferred ?? false,
-        kymScore: kymCached?.score,
-        auditScore: auditCached ? computeAuditScore(auditCached.auditData) : undefined,
-        auditState: auditCached?.auditData?.state,
+        kymScore: entry.kymScore,
+        reviewCount: entry.reviewCount,
+        auditScore: entry.auditScore,
+        auditState: entry.auditState,
+        contactFollowers: entry.contactFollowers,
+        contactReputation: entry.contactReputation,
         worksOffline,
       };
     })

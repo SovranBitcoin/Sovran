@@ -19,11 +19,11 @@ import { Text } from '@/shared/ui/primitives/Text';
 import opacity from 'hex-color-opacity';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { cashuLog, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 const CURRENCY_TABS_HEIGHT = 48;
 
@@ -176,30 +176,29 @@ export const MintListScreen = memo(function MintListScreen({
   );
 
   return (
-    <ModalLayoutWrapper
+    <Screen
+      name="MintListScreen"
       headerGradient
       stickyContent={currencyTabs}
       stickyContentHeight={CURRENCY_TABS_HEIGHT}
-      useCustomScrollView
+      scroll="custom"
       onHeaderHeightChange={setTotalHeaderHeight}
-      bottomContent={bottomButtons}
+      footer={bottomButtons}
       bgColor={surface}>
-      <Screen name="MintListScreen">
-        <LegendList
-          data={filteredItems}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.mintUrl}
-          extraData={isExecuting}
-          estimatedItemSize={120}
-          drawDistance={300}
-          style={{ flex: 1, height: 0 }}
-          contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 }}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={emptyComponent}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-        />
-      </Screen>
-    </ModalLayoutWrapper>
+      <LegendList
+        data={filteredItems}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.mintUrl}
+        extraData={isExecuting}
+        estimatedItemSize={120}
+        drawDistance={300}
+        style={{ flex: 1, height: 0 }}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: 120 }}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={emptyComponent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      />
+    </Screen>
   );
 });

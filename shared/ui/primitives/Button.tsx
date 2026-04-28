@@ -74,6 +74,12 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { EnhancedHaptics } from './Haptics';
 
+// Buttons sit close to the bottom-bar gradient and the home indicator, where
+// off-by-a-few-pixel taps are common. An 8pt slop on every side is small
+// enough not to overlap adjacent buttons in the standard footer layout but
+// catches the misses that previously felt like "the button isn't pressing."
+const BUTTON_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+
 /**
  * Configuration for ripple effect animations
  *
@@ -551,6 +557,7 @@ export const Button = ({
         onPress={handlePress}
         onLayout={handleRippleLayout}
         onPressIn={handlePressIn}
+        hitSlop={BUTTON_HIT_SLOP}
         style={[getButtonStyles(), style]}>
         {/* Ripple effect overlay */}
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
@@ -579,7 +586,8 @@ export const Button = ({
         disabled={disabled || loading}
         onPress={handlePress}
         onLayout={handleRippleLayout}
-        onPressIn={handlePressIn}>
+        onPressIn={handlePressIn}
+        hitSlop={BUTTON_HIT_SLOP}>
         <View
           style={[getButtonStyles(), { width: 52, height: 52, position: 'relative' }, style]}
           blur={shouldUseBlur}
@@ -614,7 +622,8 @@ export const Button = ({
       disabled={disabled || loading}
       onPress={handlePress}
       onLayout={handleRippleLayout}
-      onPressIn={handlePressIn}>
+      onPressIn={handlePressIn}
+      hitSlop={BUTTON_HIT_SLOP}>
       <View
         style={[getButtonStyles(), { position: 'relative', minHeight: 48 }, style]}
         blur={shouldUseBlur}

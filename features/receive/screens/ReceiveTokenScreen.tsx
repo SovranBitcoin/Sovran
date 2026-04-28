@@ -10,7 +10,7 @@ import React from 'react';
 
 import type { ReceiveHistoryEntry } from '@cashu/coco-core';
 import { useScreenActions } from 'coco-payment-ux/react';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   HistoryEntryHeader,
   HistoryEntryRefresh,
@@ -21,7 +21,7 @@ import {
 } from '@/features/transactions';
 import { formatAmount } from '@/shared/lib/currency';
 import { truncateMiddle } from '@/shared/lib/strings';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { DetailsSection } from '@/shared/ui/composed/DetailsSection';
@@ -94,9 +94,8 @@ export function ReceiveTokenScreen({
   );
 
   return (
-    <ModalLayoutWrapper contentPadding={0} bottomContent={bottomButtons}>
-      <Screen name="ReceiveTokenScreen">
-        <View testID={`receive-token-id-${entry.id}`}>
+    <Screen name="ReceiveTokenScreen" contentPadding={0} footer={bottomButtons}>
+      <View testID={`receive-token-id-${entry.id}`}>
         <VStack gap={12}>
           <HistoryEntryHeader historyEntry={entry} />
 
@@ -106,7 +105,7 @@ export function ReceiveTokenScreen({
 
           <HistoryEntryTimeline
             historyEntry={
-              { ...entry, state: isRedeemed ? 'redeemed' : 'pending' } as ReceiveHistoryEntry
+              { ...entry, state: isRedeemed ? 'finalized' : 'prepared' } as ReceiveHistoryEntry
             }
           />
 
@@ -126,8 +125,7 @@ export function ReceiveTokenScreen({
             ].flatMap((item) => (item ? [item] : []))}
           />
         </VStack>
-        </View>
-      </Screen>
-    </ModalLayoutWrapper>
+      </View>
+    </Screen>
   );
 }

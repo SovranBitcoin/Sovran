@@ -74,6 +74,13 @@ export default Icon;
 // Common icon names for design showcase
 export const icons: string[] = [
   // Your existing icons array...
+  // Currency flag icons used by MintCurrencyTabs via a template literal —
+  // the monicon scanner can't follow the dynamic name, so list them here
+  // so regeneration of .monicon/icons.js keeps them.
+  'circle-flags:us',
+  'circle-flags:eu',
+  'circle-flags:gb',
+  'hugeicons:blockchain-01',
   'fluent:apps-16-filled',
   'ri:openai-fill', // Using robot as OpenAI icon
   'ri:anthropic-fill',

@@ -4,6 +4,15 @@ import type { Mint } from '@cashu/coco-core';
 import { useManager } from '@cashu/coco-react';
 import { log } from '@/shared/lib/logger';
 
+// Module-level in-flight dedupe. Multiple components that use this hook
+// (ContactsScreen, settings recovery, mint screens) each kick off their
+// own `getAllTrustedMints` on mount. When several of them mount in the
+// same tick (boot + tab eager-mount), they used to issue concurrent SQL
+// queries for identical data. Sharing the in-flight promise dedupes them
+// down to one call; each consumer still gets its own React state, but
+// reads from the shared result.
+let inflightLoad: Promise<Mint[]> | null = null;
+
 /**
  * Manages the trusted-mints list and common mint operations via the coco Manager.
  *
@@ -19,10 +28,20 @@ export function useMintManagement() {
   const loadMints = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    log.debug('mint.list.load.start');
 
     try {
-      const allMints = await manager.mint.getAllTrustedMints();
+      // Reuse an in-flight promise if another consumer is already loading.
+      const promise =
+        inflightLoad ??
+        (inflightLoad = (async () => {
+          log.debug('mint.list.load.start');
+          try {
+            return await manager.mint.getAllTrustedMints();
+          } finally {
+            inflightLoad = null;
+          }
+        })());
+      const allMints = await promise;
       setMints(allMints);
       log.info('mint.list.load.success', { count: allMints.length });
     } catch (err) {
@@ -89,9 +108,11 @@ export function useMintManagement() {
 
   const getBalances = useCallback(async () => {
     try {
-      const balances = await manager.wallet.getBalances();
+      const byMint = await manager.wallet.balances.byMint();
       log.debug('mint.balances.fetch.success');
-      return balances;
+      return Object.fromEntries(
+        Object.entries(byMint).map(([mintUrl, snapshot]) => [mintUrl, snapshot.total])
+      ) as Record<string, number>;
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to get balances');
       setError(error);
@@ -123,9 +144,32 @@ export function useMintManagement() {
   );
 
   useEffect(() => {
-    if (manager) {
+    if (!manager) return;
+    loadMints();
+
+    // Stay reactive to mint changes that happen outside this hook —
+    // notably during recovery, where the coco patch refreshes mint info
+    // (`mint:updated`), creates discovered mints (`mint:added`), and
+    // auto-trusts mints that recovered funds (`mint:trusted`). Without
+    // this subscription, `mints` is frozen to whatever was loaded on
+    // first mount, so consumers like SettingsRecoveryScreen render
+    // discovered-with-funds rows with `mint=undefined` (Avatar falls
+    // through to the gradient placeholder, which reads as "icon
+    // disappeared") and known mints keep stale mintInfo if it was
+    // refreshed under them.
+    const refresh = () => {
       loadMints();
-    }
+    };
+    manager.on('mint:added', refresh);
+    manager.on('mint:updated', refresh);
+    manager.on('mint:trusted', refresh);
+    manager.on('mint:untrusted', refresh);
+    return () => {
+      manager.off('mint:added', refresh);
+      manager.off('mint:updated', refresh);
+      manager.off('mint:trusted', refresh);
+      manager.off('mint:untrusted', refresh);
+    };
   }, [loadMints, manager]);
 
   const reset = useCallback(() => {

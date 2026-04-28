@@ -1,11 +1,12 @@
 /**
  * Custom sheet content components for action sheets.
  * Rendered by PopupHost when showActionSheet is called.
+ *
+ * Note: pick-one-of-N menus and input-form menus dispatch through
+ * `actionMenuPopup` (shared/lib/popup/popups/actionMenu.ts) and render on the
+ * shared heroui `Menu presentation="bottom-sheet"` surface via
+ * `<ActionMenuHost />`. Only layouts that surface can't express belong here
+ * (e.g. emoji-picker's search input + snapPoint height).
  */
 
-export { ProfileSwitcherContent } from './profile-switcher';
 export { EmojiPickerContent } from './emoji-picker';
-export { ProofSelectorContent } from './proof-selector/content';
-export { ButtonHandlerContent } from './button-handler';
-export { PaymentOptionsContent } from './payment-options/content';
-export { PaymentFallbackContent } from './payment-fallback/content';

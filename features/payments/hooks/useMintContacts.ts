@@ -118,7 +118,10 @@ export function useMintContacts(
         return;
       }
       try {
-        const results = await decryptNip04Events(mintsWithMetadata, nostrKeys.privateKey);
+        const results = await decryptNip04Events(mintsWithMetadata, {
+          privateKey: nostrKeys.privateKey,
+          recipientPubkey: nostrKeys.pubkey,
+        });
         paymentLog.debug('payment.mint.contacts.decrypt', { decryptedCount: results.length });
         if (!cancelled) setDecryptedMints(results);
       } catch (err) {

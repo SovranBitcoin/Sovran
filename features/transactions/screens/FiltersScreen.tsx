@@ -12,14 +12,15 @@ import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Text } from '@/shared/ui/primitives/Text';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { ModalScreenLayout } from '@/shared/ui/composed/ModalScreenLayout';
+import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
+import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { extractDomain } from '@/shared/lib/url';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
 import { useSwapTransactionsStore } from '@/shared/stores/profile/swapTransactionsStore';
 import opacity from 'hex-color-opacity';
-import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 type PaymentType = 'all' | 'lightning' | 'ecash';
 type Direction = 'all' | 'incoming' | 'outgoing';
@@ -263,19 +264,11 @@ export function FiltersScreen() {
   }, [currency, direction, history, mintUrl, paymentType, quoteIdToGroup, status, swapGroupsById]);
 
   return (
-    <ModalScreenLayout
-      bottomButtons={
-        <View style={styles.bottomArea}>
-          <ButtonHandler
-            style={{ paddingBottom: 0 }}
-            buttons={[
-              {
-                text: `Apply Filters (${resultCount})`,
-                variant: 'primary',
-                onPress: async () => handleApply(),
-              },
-            ]}
-          />
+    <ScreenWrapper
+      name="FiltersScreen"
+      contentPadding={0}
+      footer={
+        <BottomButtons>
           <Pressable
             onPress={handleReset}
             disabled={!hasActiveFilters}
@@ -284,10 +277,18 @@ export function FiltersScreen() {
               Reset
             </Text>
           </Pressable>
-        </View>
+          <ButtonHandler
+            buttons={[
+              {
+                text: `Apply Filters (${resultCount})`,
+                variant: 'primary',
+                onPress: async () => handleApply(),
+              },
+            ]}
+          />
+        </BottomButtons>
       }>
-      <Screen name="FiltersScreen">
-        <View style={styles.filterContent}>
+      <View style={styles.filterContent}>
           <Section title="Mint">
             <ScrollView
               horizontal
@@ -385,9 +386,8 @@ export function FiltersScreen() {
               onPress={() => setStatus('Expired')}
             />
           </Section>
-        </View>
-      </Screen>
-    </ModalScreenLayout>
+      </View>
+    </ScreenWrapper>
   );
 }
 
@@ -416,11 +416,9 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderWidth: 1,
   },
-  bottomArea: { paddingBottom: 8 },
   resetButton: {
     paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 8,
+    paddingVertical: 8,
     alignItems: 'center',
   },
 });

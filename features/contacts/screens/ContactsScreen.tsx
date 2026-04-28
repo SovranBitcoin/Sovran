@@ -3,7 +3,6 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import Icon from 'assets/icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { useRouter } from 'expo-router';
 import opacity from 'hex-color-opacity';
 
@@ -12,6 +11,7 @@ import { useMintManagement } from '@/features/mint';
 import { useRecentContacts } from '@/features/payments/hooks/useRecentContacts';
 import { useMintContacts } from '@/features/payments/hooks/useMintContacts';
 import { prefetchImages } from '@/shared/lib/imageCache';
+import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
 import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
@@ -131,33 +131,20 @@ export const ContactsScreen = () => {
     dmEvents
   );
 
-  const profileFilters = useMemo(() => {
-    const allPubkeys = [...new Set([...contactPubkeys, ...mintPubkeys])];
-    if (allPubkeys.length === 0) return null;
-    return [{ kinds: [0], authors: allPubkeys }];
-  }, [contactPubkeys, mintPubkeys]);
-
-  const { events: profileEvents } = useSubscribe({ filters: profileFilters });
-
-  const profilesMap = useMemo(() => {
-    const t0 = performance.now();
-    const map = new Map<string, any>();
-    profileEvents?.forEach((event) => {
-      try {
-        map.set(event.pubkey, JSON.parse(event.content));
-      } catch {
-        // Skip invalid profile JSON
-      }
-    });
-    const duration = Math.round((performance.now() - t0) * 100) / 100;
-    if (duration > 20) {
-      log.warn('contacts.profiles_parse.slow', { duration_ms: duration, count: map.size });
-    }
-    return map;
-  }, [profileEvents]);
+  // Profile metadata is served from the shared SWR cache. Cache hits
+  // paint immediately; misses/stale entries trigger one batched kind-0
+  // subscription with `authors: missingOrStale`. Other surfaces
+  // (UserMessagesScreen, UserProfileScreen, picker, search) populate
+  // and consume the same cache, so visiting Contacts after using any
+  // of them is essentially instant.
+  const allPubkeys = useMemo(
+    () => [...new Set([...contactPubkeys, ...mintPubkeys])],
+    [contactPubkeys, mintPubkeys],
+  );
+  const { metadata: profilesMap } = useNostrProfileMetadataMany(allPubkeys);
 
   useEffect(() => {
-    prefetchImages(Array.from(profilesMap.values()).map((p: any) => p?.picture));
+    prefetchImages(Array.from(profilesMap.values()).map((p) => p.picture));
   }, [profilesMap]);
 
   const trimmedQuery = searchQuery.trim();
@@ -170,7 +157,7 @@ export const ContactsScreen = () => {
     (profile: any): boolean => {
       if (!lowerQuery) return true;
       if (!profile) return false;
-      const candidates = [profile.name, profile.display_name, profile.displayName, profile.nip05];
+      const candidates = [profile.name, profile.displayName, profile.nip05];
       return candidates.some(
         (v) => typeof v === 'string' && v.toLowerCase().includes(lowerQuery)
       );

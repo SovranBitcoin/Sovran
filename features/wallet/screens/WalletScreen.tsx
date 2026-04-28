@@ -12,6 +12,7 @@ import { useVersionCheck } from '@/shared/hooks/useVersionCheck';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { AccountPagerView } from '@/features/wallet/components/AccountPagerView';
 import { BitcoinNearYou } from '@/features/wallet/components/BitcoinNearYou';
+import { BootEntrance } from '@/shared/ui/composed/BootEntrance';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
 import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -43,27 +44,29 @@ export function WalletScreen() {
   useVersionCheck();
 
   return (
-    <LayoutDebugWrapper
-      onContentSizeChange={onContentSizeChange}
-      refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}
-      contentContainerStyle={{ padding: 0, paddingTop: androidHeaderPadding }}>
-      <Screen name="WalletScreen">
-        <ScrollableGradientOverlay contentHeight={contentHeight} />
+    <BootEntrance>
+      <LayoutDebugWrapper
+        onContentSizeChange={onContentSizeChange}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}
+        contentContainerStyle={{ padding: 0, paddingTop: androidHeaderPadding }}>
+        <Screen name="WalletScreen">
+          <ScrollableGradientOverlay contentHeight={contentHeight} />
 
-        <AccountPagerView accounts={ACCOUNTS} setAccount={setAccount} account={account} />
+          <AccountPagerView accounts={ACCOUNTS} setAccount={setAccount} account={account} />
 
-        <View
-          className="p-4 pb-24 pt-4"
-          style={{
-            minHeight: windowHeight - windowHeight * 0.5 - 88,
-            gap: 16,
-          }}>
-          <Transactions account={account} showMore={true} history={history} hideExpired={true} />
-          <SpentThisMonth history={history} unit={account.unit} />
-          <ReceivedThisMonth history={history} unit={account.unit} />
-          <BitcoinNearYou />
-        </View>
-      </Screen>
-    </LayoutDebugWrapper>
+          <View
+            className="p-4 pb-24 pt-4"
+            style={{
+              minHeight: windowHeight - windowHeight * 0.5 - 88,
+              gap: 16,
+            }}>
+            <Transactions account={account} showMore={true} history={history} hideExpired={true} />
+            <SpentThisMonth history={history} unit={account.unit} />
+            <ReceivedThisMonth history={history} unit={account.unit} />
+            <BitcoinNearYou />
+          </View>
+        </Screen>
+      </LayoutDebugWrapper>
+    </BootEntrance>
   );
 }

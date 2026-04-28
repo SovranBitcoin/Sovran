@@ -16,12 +16,22 @@
  * share a single selection list + search state. Without this lift, the
  * modal would need its own picker instance and state would diverge.
  *
+ * To keep the keypad on `amount` responsive, the hook's expensive
+ * subscriptions (NDK relay subs, NIP-17 unwrap, NIP-04 decrypt, kind-0
+ * profile metadata, image prefetch) are gated behind an `enabled` flag
+ * derived from `useSegments`. The context provider is mounted
+ * unconditionally so consumers never see a null context — the hook
+ * just returns empty sections until activation. Activation is sticky:
+ * once the user first visits a picker-consuming route, the
+ * subscriptions stay live for the rest of the flow lifetime so
+ * navigating back to `amount` and forward again is instant.
+ *
  * Uses the shared flow layout helper so the header styling matches the
  * rest of the app (close on first screen, back on subsequent).
  */
 
-import { createContext, useContext } from 'react';
-import { Stack } from 'expo-router';
+import React, { createContext, useContext, useMemo, useState } from 'react';
+import { Stack, useSegments } from 'expo-router';
 
 import {
   useSplitBillParticipantPicker,
@@ -40,12 +50,30 @@ export function useSplitBillPickerContext(): UseSplitBillParticipantPickerResult
   return ctx;
 }
 
+/** Routes that consume picker state. Other routes mount with the picker
+ *  in dormant mode (no NDK subs, no decryption work). */
+const PICKER_ROUTES = new Set(['participants', 'search']);
+
 export default function SplitBillLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
-  // One picker instance for the whole flow — survives navigation between
-  // participants ↔ search, so selections made in the modal land back on
-  // the main screen without any cross-route plumbing.
-  const picker = useSplitBillParticipantPicker();
+  const segments = useSegments();
+  const needsPickerNow = useMemo(
+    () => segments.some((s) => PICKER_ROUTES.has(s)),
+    [segments]
+  );
+  // Sticky activation. Once the user first visits a picker-consuming
+  // route, the subscriptions stay live for the rest of the flow's
+  // lifetime — going back to `amount` and forward again doesn't tear
+  // them down. Set-state-during-render on the same component is
+  // officially supported and React resolves it before committing.
+  const [enabled, setEnabled] = useState(needsPickerNow);
+  if (needsPickerNow && !enabled) setEnabled(true);
+
+  // The picker hook always runs, but with `enabled=false` it skips all
+  // relay traffic / decryption / image prefetch and returns a stub
+  // result. That guarantees the context is always populated, so child
+  // screens that mount mid-transition never see a null context.
+  const picker = useSplitBillParticipantPicker({ enabled });
 
   return (
     <PickerContext.Provider value={picker}>

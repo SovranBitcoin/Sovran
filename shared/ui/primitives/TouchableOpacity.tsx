@@ -147,8 +147,11 @@ export const TouchableOpacity: FC<EnhancedTouchableOpacityProps> = ({
     const absX = Math.abs(initialPosition.pageX - pageX);
     const absY = Math.abs(initialPosition.pageY - pageY);
 
-    // Define a threshold for what constitutes a drag - currently set to 1px
-    const DRAG_THRESHOLD = 1;
+    // Threshold for what counts as a drag vs. a tap. 1px was too strict —
+    // normal finger jitter is 3–8px, so legitimate taps were silently
+    // cancelled and users had to press very deliberately. 8px aligns with
+    // RN's native PanResponder defaults and Apple's HIG hit-area guidance.
+    const DRAG_THRESHOLD = 8;
     const isDragged = absX > DRAG_THRESHOLD || absY > DRAG_THRESHOLD;
 
     if (!isDragged) {

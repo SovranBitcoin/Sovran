@@ -8,7 +8,9 @@ import React, {
   useRef,
   memo,
 } from 'react';
-import { initLog, log } from '@/shared/lib/logger';
+import { initLog, log, useInitMount } from '@/shared/lib/logger';
+
+initLog('Module', 'InitializationProvider loaded');
 import { Dimensions } from 'react-native';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -172,6 +174,7 @@ export function InitializationProvider({
   const [isTestMode, setIsTestMode] = useState(testMode);
   // When true, forces isInitializing=true until real stages register
   const [forceReinitialize, setForceReinitialize] = useState(false);
+  useInitMount('InitializationProvider');
   // When true, keeps the splash pinned even after stages re-register until explicitly released.
   const [holdSplashVisible, setHoldSplashVisible] = useState(false);
   // Synchronous map of stage id → blocking flag. Updated immediately in
@@ -181,6 +184,9 @@ export function InitializationProvider({
   const pendingLogUpdates = useRef<
     Map<string, { message: string; timeout: ReturnType<typeof setTimeout> }>
   >(new Map());
+  // Track when each stage first transitioned to 'loading' so we can log a
+  // duration when it reaches 'complete'.
+  const stageStartTimes = useRef<Map<string, number>>(new Map());
 
   const registerStage = useCallback((id: string, config: StageConfig) => {
     const isBlocking = config.blocking !== false;
@@ -217,6 +223,30 @@ export function InitializationProvider({
         const newStages = new Map(prev);
         const stage = newStages.get(id);
         if (stage) {
+          // Per-stage start→end duration: capture the first transition out
+          // of 'pending' as the start, then log when the stage reaches
+          // 'complete' or 'error'. Lets us see exactly how long each
+          // blocking step took, separate from time spent waiting on deps.
+          if (updates.status && updates.status !== stage.status) {
+            const nowMs = Date.now();
+            if (stage.status === 'pending' && !stageStartTimes.current.has(id)) {
+              stageStartTimes.current.set(id, nowMs);
+              initLog('stageStart', `${id} → ${updates.status}`);
+            }
+            if (updates.status === 'complete') {
+              const startedAt = stageStartTimes.current.get(id);
+              const durationMs = startedAt ? nowMs - startedAt : -1;
+              initLog('stageEnd', `${id} complete durationMs=${durationMs}`);
+            }
+            if (updates.status === 'error') {
+              const startedAt = stageStartTimes.current.get(id);
+              const durationMs = startedAt ? nowMs - startedAt : -1;
+              initLog(
+                'stageEnd',
+                `${id} error durationMs=${durationMs} msg=${updates.error ?? '-'}`
+              );
+            }
+          }
           const updatedStage = {
             ...stage,
             ...updates,

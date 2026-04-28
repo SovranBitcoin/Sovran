@@ -14,8 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PagerView from 'react-native-pager-view';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
-import { Screen, useLifecycleLogger, log } from '@/shared/lib/logger';
+import { Screen } from '@/shared/ui/composed/Screen';
+import { useLifecycleLogger, log } from '@/shared/lib/logger';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeDraft } from '@/features/theme/lib/themeDraft';
 import { useAlbumList } from '@/features/theme/lib/useAlbumList';
@@ -112,9 +112,9 @@ export function BackgroundScreen() {
     windowHeight - headerHeight - TABS_AREA_HEIGHT - insets.bottom - 8;
 
   return (
-    <Screen name="BackgroundScreen">
+    <>
       <Stack.Screen options={{ title: 'Background' }} />
-      <ModalLayoutWrapper useCustomScrollView>
+      <Screen name="BackgroundScreen" scroll="custom">
         <View style={{ flex: 1, paddingTop: headerHeight }}>
           <View style={styles.tabsWrap}>
             <AlbumPillTabs
@@ -150,8 +150,8 @@ export function BackgroundScreen() {
             </Text>
           )}
         </View>
-      </ModalLayoutWrapper>
-    </Screen>
+      </Screen>
+    </>
   );
 }
 

@@ -9,10 +9,14 @@ import 'intl/locale-data/jsonp/en';
 import 'react-native-reanimated';
 
 import { useFonts } from '@/shared/hooks/useFonts';
-import { initLog } from '@/shared/lib/logger';
+import { initLog, useInitMount } from '@/shared/lib/logger';
+
+initLog('Module', '_layout loaded');
 import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Image, LogBox, TouchableOpacity, Platform, View } from 'react-native';
+import { Dimensions, Image, LogBox, StyleSheet, TouchableOpacity, Platform, View } from 'react-native';
+import Animated, { cubicBezier } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 
 import AppGate from '@/shared/blocks/AppGate';
@@ -34,7 +38,7 @@ import { PricelistProvider } from '@/shared/providers/PricelistProvider';
 import { ThemeProvider, useTheme } from '@/shared/providers/ThemeProvider';
 import { ProfileWallpaperProvider } from '@/shared/providers/ProfileWallpaperProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
@@ -52,12 +56,21 @@ import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListene
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
+import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
 import { OfflineProvider } from '@/shared/providers/OfflineProvider';
 import {
   clearTransitionGuardOnStartup,
   registerTransitionControls,
   registerKeyDerivation,
 } from '@/shared/lib/profile/profileSessionOrchestrator';
+import {
+  getQRButtonAnchor,
+  requestQRButtonRemeasure,
+  setBootMorphCompleted,
+  setBootSplashHandoff,
+  subscribeQRButtonAnchor,
+  type QRButtonAnchor,
+} from '@/shared/lib/qrButtonAnchor';
 
 export const unstable_settings = {
   initialRouteName: '(drawer)',
@@ -68,10 +81,27 @@ SplashScreen.preventAutoHideAsync();
 
 initLog('_layout', 'module loaded — SplashScreen.preventAutoHideAsync called');
 
+// Log when redux-persist finishes rehydration. PersistGate doesn't expose
+// a callback through its composed form, so we subscribe directly. Handle
+// the race where persistor is already bootstrapped by the time we subscribe.
+{
+  const start = Date.now();
+  if (persistor.getState().bootstrapped) {
+    initLog('Persistor', 'already bootstrapped at module load');
+  } else {
+    const unsubscribe = persistor.subscribe(() => {
+      if (persistor.getState().bootstrapped) {
+        initLog('Persistor', `bootstrapped durationMs=${Date.now() - start}`);
+        unsubscribe();
+      }
+    });
+  }
+}
+
 LogBox.ignoreAllLogs();
 
 const IOS_SPLASH_IMAGE_WIDTH = 390;
-const REINIT_SPLASH_IMAGE = require('../assets/images/light-t.png');
+const REINIT_SPLASH_IMAGE = require('../assets/images/dark-t.png');
 const REINIT_SPLASH_IMAGE_SIZE = Image.resolveAssetSource(REINIT_SPLASH_IMAGE);
 const PROFILE_SWITCH_SPLASH_BOX_SIZE =
   REINIT_SPLASH_IMAGE_SIZE?.width && REINIT_SPLASH_IMAGE_SIZE?.height
@@ -99,6 +129,7 @@ function AccountScopedProviders({
   accountIndex: number;
   children: React.ReactNode;
 }) {
+  useInitMount('AccountScopedProviders');
   initLog('AccountScoped', `render — accountIndex=${accountIndex}`);
   const InnerProviders = useMemo(
     () =>
@@ -311,13 +342,57 @@ function RootLayoutContent() {
   );
 }
 
+const SCREEN = Dimensions.get('window');
+// Splash container is square (longest screen edge × longest screen edge),
+// centered. Width spills off-screen so it's invariant under uniform scale.
+const SPLASH_SQUARE = Math.max(SCREEN.width, SCREEN.height);
+const SPLASH_INITIAL_LEFT = (SCREEN.width - SPLASH_SQUARE) / 2;
+const SPLASH_INITIAL_TOP = (SCREEN.height - SPLASH_SQUARE) / 2;
+const MORPH_DURATION_MS = 750;
+// `easeOutExpo` — fast initial movement, long graceful settle. Feels more
+// deliberate than the default `ease-out` for the splash → QR-button morph.
+// (Material Design "decelerate" / iOS-style "snappy out".)
+const MORPH_TIMING = cubicBezier(0.16, 1, 0.3, 1);
+const MORPH_FALLBACK_TIMEOUT = 1500; // ms to wait for QR anchor before fading
+// Stability window for the QR-button anchor before kicking off the morph.
+// The morph effect re-arms this timer every time the anchor changes, so
+// the morph only fires once the position has been STABLE for this long.
+// Combined with the polling interval below, the morph will track late
+// layout shifts (iOS `contentInsetAdjustmentBehavior`, safe-area updates,
+// wallpaper image load) instead of locking to an early/wrong position.
+const LAYOUT_SETTLE_DELAY = 500;
+// Poll cadence for `measureInWindow` during the settle window. Cheap call —
+// the store dedupes redundant anchor publishes via field-level equality.
+const LAYOUT_POLL_INTERVAL = 100;
+
 function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
+  useInitMount('NativeSplashLayoutGate');
   const { isInitializing } = useInitializationState();
+  const [surfaceTertiary] = useThemeColor(['surface-tertiary'] as const);
   const hasRootLaidOut = useRef(false);
   const hasBeenInitializing = useRef(false);
-  const hasHiddenSplash = useRef(false);
-  const showReinitSplash =
-    INITIALIZATION_DISPLAY_TYPE === 'splash' && hasHiddenSplash.current && isInitializing;
+  const rootViewRef = useRef<View>(null);
+  const splashOverlayRef = useRef<View>(null);
+  const [hasHiddenSplash, setHasHiddenSplash] = useState(false);
+  const [overlayMounted, setOverlayMounted] = useState(true);
+  const [anchor, setAnchor] = useState<QRButtonAnchor | null>(getQRButtonAnchor());
+  // Window-relative offset of the splash overlay's parent View. The QRButton
+  // publishes its anchor in window coords (pageX/pageY); to position the
+  // overlay at that exact spot we need to subtract our own window offset
+  // (a parent View further up may not start at window (0,0)).
+  const [parentOffset, setParentOffset] = useState({ x: 0, y: 0 });
+  const [morphPhase, setMorphPhase] = useState<'idle' | 'morphing' | 'fading' | 'done'>(
+    'idle'
+  );
+  const showSplash = INITIALIZATION_DISPLAY_TYPE === 'splash' && overlayMounted;
+
+  useEffect(() => {
+    const unsub = subscribeQRButtonAnchor((next) => {
+      initLog('SplashMorph', `anchor published — ${next ? JSON.stringify(next) : 'null'}`);
+      setAnchor(next);
+    });
+    return unsub;
+  }, []);
 
   const maybeHideNativeSplash = useCallback(() => {
     if (INITIALIZATION_DISPLAY_TYPE !== 'splash') return;
@@ -325,17 +400,21 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
       isInitializing ||
       !hasBeenInitializing.current ||
       !hasRootLaidOut.current ||
-      hasHiddenSplash.current
+      hasHiddenSplash
     )
       return;
 
-    hasHiddenSplash.current = true;
+    setHasHiddenSplash(true);
     initLog('NativeSplashLayoutGate', 'root laid out + init complete — hiding native splash');
     SplashScreen.hideAsync();
-  }, [isInitializing]);
+  }, [isInitializing, hasHiddenSplash]);
 
   const onLayoutRootView = useCallback(() => {
     hasRootLaidOut.current = true;
+    rootViewRef.current?.measureInWindow((x, y) => {
+      setParentOffset((prev) => (prev.x === x && prev.y === y ? prev : { x, y }));
+      initLog('SplashMorph', `parent offset measured — x=${x} y=${y}`);
+    });
     maybeHideNativeSplash();
   }, [maybeHideNativeSplash]);
 
@@ -349,39 +428,282 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
     maybeHideNativeSplash();
   }, [maybeHideNativeSplash]);
 
+  // Reset state when init restarts (profile switch).
+  useEffect(() => {
+    if (!isInitializing) return;
+    setBootMorphCompleted(false);
+    setBootSplashHandoff(false);
+    setMorphPhase('idle');
+    setOverlayMounted(true);
+  }, [isInitializing]);
+
+  // Flip the global splash-handoff signal as soon as the morph (or fade)
+  // begins. Destination screens listen via `useBootSplashHandoff()` to
+  // time their entrance animation to overlap the splash retreat — without
+  // this, an entrance triggered earlier would complete behind the still-
+  // opaque splash and be invisible to the user.
+  useEffect(() => {
+    if (morphPhase === 'morphing' || morphPhase === 'fading') {
+      setBootSplashHandoff(true);
+    }
+  }, [morphPhase]);
+
+  // Kick off the morph once init is done + native splash hidden + anchor known.
+  useEffect(() => {
+    if (isInitializing || !hasHiddenSplash || morphPhase !== 'idle') return;
+
+    if (anchor) {
+      // Layout-settle gate: the QR button's WINDOW position changes
+      // asynchronously as ancestor layout settles (iOS `contentInset
+      // AdjustmentBehavior`, safe-area, wallpaper image load, etc.) — but
+      // its LOCAL layout doesn't, so `onLayout` never fires for those
+      // shifts. We've seen the real position arrive ~1s after the first
+      // anchor publish.
+      //
+      // Strategy: poll `measureInWindow` (via `requestQRButtonRemeasure`)
+      // every `LAYOUT_POLL_INTERVAL` ms. Each poll publishes a fresh
+      // anchor; if it differs, the store notifies, this effect re-runs,
+      // and the settle timer restarts. Once the position has been stable
+      // for `LAYOUT_SETTLE_DELAY` ms, fire the morph.
+      requestQRButtonRemeasure();
+      initLog(
+        'SplashMorph',
+        `morph start — target=${JSON.stringify(anchor)} screen=${SCREEN.width}x${SCREEN.height}`
+      );
+      const poll = setInterval(requestQRButtonRemeasure, LAYOUT_POLL_INTERVAL);
+      let raf = -1;
+      const settle = setTimeout(() => {
+        clearInterval(poll);
+        requestQRButtonRemeasure();
+        raf = requestAnimationFrame(() => setMorphPhase('morphing'));
+      }, LAYOUT_SETTLE_DELAY);
+      return () => {
+        clearInterval(poll);
+        clearTimeout(settle);
+        if (raf !== -1) cancelAnimationFrame(raf);
+      };
+    }
+
+    initLog(
+      'SplashMorph',
+      `init done but no anchor yet — waiting up to ${MORPH_FALLBACK_TIMEOUT}ms`
+    );
+    const fallback = setTimeout(() => {
+      const latest = getQRButtonAnchor();
+      if (latest) {
+        initLog('SplashMorph', `late anchor — morphing to ${JSON.stringify(latest)}`);
+        setAnchor(latest);
+        setMorphPhase('morphing');
+      } else {
+        initLog('SplashMorph', 'no anchor — fading out');
+        setMorphPhase('fading');
+      }
+    }, MORPH_FALLBACK_TIMEOUT);
+    return () => clearTimeout(fallback);
+  }, [isInitializing, hasHiddenSplash, anchor, morphPhase]);
+
+  // CSS transitions don't fire a callback in Reanimated 4 — time it off the
+  // same duration the transition uses. When the morph ends, reveal the
+  // QRButton (it fades in at the same position).
+  useEffect(() => {
+    if (morphPhase !== 'morphing' && morphPhase !== 'fading') return;
+    const id = setTimeout(() => {
+      // Measure where the splash overlay actually landed, in window coords,
+      // so we can compare against the QR button's measured position.
+      const node = splashOverlayRef.current as unknown as {
+        measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
+      } | null;
+      node?.measureInWindow?.((x, y, w, h) => {
+        initLog(
+          'SplashMorph',
+          `final overlay rect (window) — x=${x} y=${y} width=${w} height=${h}`
+        );
+      });
+      setBootMorphCompleted(true);
+      setMorphPhase('done');
+    }, MORPH_DURATION_MS + 30);
+    return () => clearTimeout(id);
+  }, [morphPhase]);
+
+  // Hold the splash overlay one short beat after the QRButton has faded in,
+  // then unmount it so the real button takes over.
+  useEffect(() => {
+    if (morphPhase !== 'done') return;
+    const id = setTimeout(() => setOverlayMounted(false), 200);
+    return () => clearTimeout(id);
+  }, [morphPhase]);
+
+  const isMorphing = morphPhase === 'morphing' || morphPhase === 'done';
+  const isFading = morphPhase === 'fading' || morphPhase === 'done';
+
+  // Build the splash container style. Reanimated 4 CSS Transitions tween the
+  // listed properties on the UI thread whenever their values change.
+  // The container stays opaque white throughout — only the logo/icon and the
+  // optional gradient layer cross-fade on top.
+  const overlayStyle = useMemo(() => {
+    const base = {
+      position: 'absolute' as const,
+      backgroundColor: '#FFFFFF',
+      // Match the QRButton's `borderCurve: 'continuous'` (squircle) so the
+      // morphed corners line up pixel-for-pixel with the real button at
+      // handoff. iOS-only — Android falls back to standard arc which the
+      // Android QRButton also uses.
+      borderCurve: 'continuous' as const,
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
+      overflow: 'hidden' as const,
+      zIndex: 9999,
+      transitionProperty: ['top', 'left', 'width', 'height', 'borderRadius', 'opacity'],
+      transitionDuration: `${MORPH_DURATION_MS}ms`,
+      transitionTimingFunction: MORPH_TIMING,
+    };
+
+    if (isMorphing && anchor) {
+      const finalTop = anchor.y - parentOffset.y;
+      const finalLeft = anchor.x - parentOffset.x;
+      initLog(
+        'SplashMorph',
+        `target rect (parent-local) — top=${finalTop} left=${finalLeft} width=${anchor.width} height=${anchor.height} borderRadius=${anchor.borderRadius} | anchor(window)={x:${anchor.x},y:${anchor.y}} parentOffset={x:${parentOffset.x},y:${parentOffset.y}}`
+      );
+      return {
+        ...base,
+        top: finalTop,
+        left: finalLeft,
+        width: anchor.width,
+        height: anchor.height,
+        borderRadius: anchor.borderRadius,
+        opacity: 1,
+      };
+    }
+    return {
+      ...base,
+      top: SPLASH_INITIAL_TOP - parentOffset.y,
+      left: SPLASH_INITIAL_LEFT - parentOffset.x,
+      width: SPLASH_SQUARE,
+      height: SPLASH_SQUARE,
+      borderRadius: 0,
+      opacity: isFading ? 0 : 1,
+    };
+  }, [isMorphing, isFading, anchor, parentOffset]);
+
+  // Logo: fades + scales down during the morph so it doesn't bulge out of the
+  // shrinking container. Lives inside the morph container, so it's already
+  // riding the transition; we just dial opacity + scale via CSS transitions.
+  const logoStyle = useMemo(
+    () => ({
+      width: PROFILE_SWITCH_SPLASH_BOX_SIZE,
+      height: PROFILE_SWITCH_SPLASH_BOX_SIZE,
+      opacity: isMorphing ? 0 : 1,
+      transform: [{ scale: isMorphing ? 0.18 : 1 }],
+      transitionProperty: ['opacity', 'transform'],
+      transitionDuration: `${MORPH_DURATION_MS * 0.7}ms`,
+      transitionTimingFunction: MORPH_TIMING,
+    }),
+    [isMorphing]
+  );
+
+  // Cross-fade layers — container stays solid white. A subtle white →
+  // off-white gradient overlay fades in during the morph so the bottom of
+  // the splash matches the QR button's slight downward shading. Logo fades
+  // out and the QR icon fades in (delayed) so the swap to the real button
+  // is invisible.
+  const gradientLayerStyle = useMemo(
+    () => ({
+      ...StyleSheet.absoluteFillObject,
+      opacity: isMorphing ? 1 : 0,
+      transitionProperty: ['opacity'],
+      transitionDuration: `${MORPH_DURATION_MS * 0.85}ms`,
+      transitionTimingFunction: MORPH_TIMING,
+    }),
+    [isMorphing]
+  );
+
+  const qrIconLayerStyle = useMemo(
+    () => ({
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
+      opacity: isMorphing ? 1 : 0,
+      transitionProperty: ['opacity'],
+      transitionDuration: `${MORPH_DURATION_MS * 0.6}ms`,
+      transitionDelay: `${MORPH_DURATION_MS * 0.35}ms`,
+      transitionTimingFunction: MORPH_TIMING,
+    }),
+    [isMorphing]
+  );
+
   return (
-    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+    <View
+      ref={rootViewRef}
+      collapsable={false}
+      style={{ flex: 1, overflow: 'hidden' }}
+      onLayout={onLayoutRootView}>
       {children}
-      {showReinitSplash ? (
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: '#030303',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 9999,
-          }}>
-          <Image
-            source={REINIT_SPLASH_IMAGE}
-            resizeMode="contain"
-            style={{
-              width: PROFILE_SWITCH_SPLASH_BOX_SIZE,
-              height: PROFILE_SWITCH_SPLASH_BOX_SIZE,
-            }}
-          />
-        </View>
+      {showSplash ? (
+        <Animated.View ref={splashOverlayRef} pointerEvents="none" style={overlayStyle}>
+          {/* QR-button look-alike layered background. Replicates the exact
+              stack the real QRButton uses (dark base + white-overlay + white
+              top-to-bottom gradient + faint white border) so when the splash
+              docks at the QR position and unmounts, the pixel handoff to
+              the real button is seamless.
+              Boot state: opacity 0 (the container's solid white shows through);
+              morph state: opacity 1 (matches the QR gradient). */}
+          <Animated.View pointerEvents="none" style={gradientLayerStyle}>
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0f0f12' }]} />
+            <View
+              style={[
+                StyleSheet.absoluteFillObject,
+                { backgroundColor: 'rgba(255,255,255,0.35)' },
+              ]}
+            />
+            <LinearGradient
+              colors={[
+                '#FFFFFF',
+                'rgba(255,255,255,0.8)',
+                'rgba(255,255,255,0.7)',
+                'rgba(255,255,255,0.6)',
+              ]}
+              locations={[0, 0.35, 0.6, 1]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View
+              style={[
+                StyleSheet.absoluteFillObject,
+                { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
+              ]}
+            />
+          </Animated.View>
+          {/* Splash logo. Fades + scales out during morph. */}
+          <Animated.Image source={REINIT_SPLASH_IMAGE} resizeMode="contain" style={logoStyle} />
+          {/* QR icon. Fades in (delayed) so it's visible by the time the
+              swap happens to the real button. */}
+          <Animated.View pointerEvents="none" style={qrIconLayerStyle}>
+            <Icon
+              name="stash:qr-code"
+              size={Platform.OS === 'ios' ? 38 : 24}
+              color={surfaceTertiary}
+            />
+          </Animated.View>
+        </Animated.View>
       ) : null}
     </View>
   );
 }
 
 export default function RootLayout() {
+  useInitMount('RootLayout');
   const [fontsLoaded, fontError] = useFonts();
   const activeAccountIndex = useProfileStore((s) => s.activeAccountIndex);
+
+  // Log the moment fonts finish loading — first-launch font-loading is a
+  // common contributor to time-to-first-paint.
+  const fontsReadyLogged = useRef(false);
+  if ((fontsLoaded || fontError) && !fontsReadyLogged.current) {
+    fontsReadyLogged.current = true;
+    initLog('Fonts', `loaded=${fontsLoaded} error=${!!fontError}`);
+  }
 
   initLog(
     'RootLayout',
@@ -418,6 +740,7 @@ export default function RootLayout() {
                 accountIndex={activeAccountIndex}>
                 <RootLayoutContent />
                 <PopupHost />
+                <ActionMenuHost />
               </AccountScopedProviders>
             </GlobalMigrationGate>
           </LegacyMigrationGate>

@@ -180,7 +180,7 @@ export function sendSuccessPopup(overrides?: PopupOverrides): void {
   popup({
     message: 'Funds Sent',
     text: 'Funds have been sent successfully.',
-    icon: 'icon:mdi:send-check',
+    icon: 'icon:mdi:send',
     type: 'success',
     ...overrides,
   });
@@ -193,7 +193,7 @@ export function receiveSuccessPopup(
   popup({
     message: 'Funds Received',
     text: `${params.amount} ${params.unit} has been added to your wallet.`,
-    icon: 'icon:mdi:call-received',
+    icon: 'icon:mdi:check-circle',
     type: 'success',
     ...overrides,
   });
@@ -202,7 +202,7 @@ export function receiveSuccessPopup(
 export function nostrPaymentSentPopup(overrides?: BaseOverrides): void {
   popup({
     message: 'Payment sent successfully via Nostr',
-    icon: 'icon:mdi:send-check',
+    icon: 'icon:mdi:send',
     type: 'success',
     ...overrides,
   });
@@ -211,7 +211,7 @@ export function nostrPaymentSentPopup(overrides?: BaseOverrides): void {
 export function paymentCancelledPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Payment cancelled',
-    icon: 'icon:mdi:close-circle-outline',
+    icon: 'icon:mdi:close-circle',
     type: 'success',
     text: 'Reserved proofs have been freed.',
     ...overrides,
@@ -222,7 +222,7 @@ export function nfcEcashSharedPopup(overrides?: BaseOverrides): void {
   popup({
     message: 'Ecash Token Shared via NFC',
     text: 'Ecash token has been shared via NFC.',
-    icon: 'icon:mdi:nfc',
+    icon: 'icon:lucide:nfc',
     type: 'success',
     ...overrides,
   });
@@ -231,7 +231,7 @@ export function nfcEcashSharedPopup(overrides?: BaseOverrides): void {
 export function nfcConnectionLostPopup(overrides?: BaseOverrides): void {
   popup({
     message: 'NFC connection lost. Send was rolled back.',
-    icon: 'icon:mdi:wifi-off',
+    icon: 'icon:feather:wifi',
     type: 'warning',
     ...overrides,
   });
@@ -241,7 +241,7 @@ export function nfcSendFailedPopup(options?: { text?: string; rollbackFailed?: b
   popup({
     message: options?.rollbackFailed ? 'NFC send failed and rollback failed' : 'NFC send failed',
     text: options?.text,
-    icon: 'icon:mdi:nfc-off',
+    icon: 'icon:lucide:nfc',
     type: 'error',
   });
 }

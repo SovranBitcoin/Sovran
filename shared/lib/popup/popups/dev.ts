@@ -16,7 +16,7 @@ export function testSheetPopup(overrides?: PopupOverrides): void {
 export function devModePopup(enabled: boolean): void {
   popup({
     message: enabled ? 'Developer mode enabled' : 'Developer mode disabled',
-    icon: 'icon:mdi:bug',
+    icon: 'icon:material-symbols:report-rounded',
     type: 'success',
   });
 }
@@ -24,7 +24,7 @@ export function devModePopup(enabled: boolean): void {
 export function deeplinkFailedPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Failed to process link',
-    icon: 'icon:mdi:link-off',
+    icon: 'icon:lucide:link',
     type: 'error',
     ...overrides,
   });

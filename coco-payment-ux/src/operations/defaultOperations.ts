@@ -8,13 +8,16 @@
 //
 // App-side operations (NOT included here, injected via enrichment callbacks):
 //   linkTransaction       — needs app-specific scan history store
-//   KYM/audit enrichment  — external APIs, injected via enrichMintListItem/enrichMintReviewInfo
+//   Mint catalog data     — bulk fetch (audit / KYM / operator profile),
+//                           injected via fetchMintCatalog
+//   Mint review detail    — per-mint enrichment for the trust review screen,
+//                           injected via enrichMintReviewInfo
 // ---------------------------------------------------------------------------
 
 import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
 import type { Manager } from '@cashu/coco-core';
 import type { MachineOperations, StepDataMap } from '../machine/types';
-import type { MintListItem, MintReviewInfo, PaymentRequestInfo } from '../types';
+import type { MintCatalogEntry, MintListItem, MintReviewInfo, PaymentRequestInfo } from '../types';
 import { defaultDetectors } from '../detectors';
 import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from '../lnurl';
 
@@ -136,28 +139,25 @@ export interface DefaultOperationsConfig {
   getPreferredMintUrl?: () => string | undefined;
   /** Required for Nostr payment request transport. Wallet wraps sendDirectMessageToRelays with the user's private key. */
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
-  /** Optional enrichment for mint list items (e.g. KYM/audit scores). */
-  enrichMintListItem?: (mintUrl: string) => Partial<MintListItem>;
-  /** Optional enrichment for mint review info (e.g. KYM/audit scores). */
+  /**
+   * Bulk catalog fetcher for mint list items. Awaited inside `buildMintListItems`
+   * before items are produced, so audit / KYM / operator-profile data flows
+   * straight into each row instead of arriving later through cache subscriptions.
+   *
+   * The wallet implements this with whatever bulk API it has (e.g. a single
+   * search-style endpoint that returns aggregates for every known mint). One
+   * call per list build, not one per mint.
+   *
+   * Mints not present in the returned record render with no catalog data — the
+   * row falls back to the mint URL / NUT-06 info already on screen.
+   */
+  fetchMintCatalog?: (mintUrls: string[]) => Promise<Record<string, MintCatalogEntry>>;
+  /**
+   * Optional per-mint enrichment for the trust-review screen. Synchronous,
+   * read from local caches the wallet already populated (e.g. a screen that
+   * needed the same audit data earlier in the session).
+   */
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
-  /**
-   * Fire-and-forget callback to populate profile data (followers/reputation)
-   * for mints that have Nostr operator contacts. Called with the mint info map
-   * after NUT-06 info is resolved; the wallet stores results for enrichment.
-   */
-  fetchMintProfiles?: (mintInfoMap: Map<string, any>) => void;
-  /**
-   * Fire-and-forget callback to populate audit data for mints during list build.
-   * Called with all trusted mint URLs; the wallet fetches missing/stale data
-   * and stores results for enrichment via store subscriptions.
-   */
-  fetchMintAuditData?: (mintUrls: string[]) => void;
-  /**
-   * Fire-and-forget callback to populate review/KYM data for mints during list build.
-   * Called with all trusted mint URLs; the wallet fetches missing/stale data
-   * and stores results for enrichment via store subscriptions.
-   */
-  fetchMintReviewData?: (mintUrls: string[]) => void;
   /** When true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
 }
@@ -316,10 +316,13 @@ export function createDefaultOperations(
         '| destination:',
         data.destination
       );
-      const [allTrustedMints, balances] = await Promise.all([
+      const [allTrustedMints, balancesByMint] = await Promise.all([
         mgr.mint.getAllTrustedMints(),
-        mgr.wallet.getBalances(),
+        mgr.wallet.balances.byMint(),
       ]);
+      const balances: Record<string, number> = Object.fromEntries(
+        Object.entries(balancesByMint).map(([url, snap]) => [url, snap.total])
+      );
 
       // Fetch NUT-06 mint info for each mint in parallel.
       // getAllTrustedMints() returns stored records without display metadata;
@@ -361,14 +364,21 @@ export function createDefaultOperations(
         'ms'
       );
 
-      // Trigger background profile fetch for mints with Nostr operator contacts
-      config.fetchMintProfiles?.(mintInfoMap);
-
-      // Trigger background audit data fetch for mints with stale/missing cache
-      config.fetchMintAuditData?.(allTrustedMints.map((m: any) => m.mintUrl));
-
-      // Trigger background review/KYM data fetch for mints with stale/missing cache
-      config.fetchMintReviewData?.(allTrustedMints.map((m: any) => m.mintUrl));
+      // One bulk fetch — the wallet returns audit / KYM / operator-profile
+      // data for every trusted mint in a single round-trip. Awaited so items
+      // ship to the screen with catalog fields already populated.
+      const mintUrls = allTrustedMints.map((m: any): string => m.mintUrl);
+      let catalog: Record<string, MintCatalogEntry> = {};
+      if (config.fetchMintCatalog) {
+        try {
+          catalog = await config.fetchMintCatalog(mintUrls);
+        } catch (e) {
+          console.warn(
+            '[buildMintListItems] fetchMintCatalog failed, continuing without catalog data:',
+            e instanceof Error ? e.message : e
+          );
+        }
+      }
 
       const supportedSet = data.supportedMintUrls ? new Set(data.supportedMintUrls) : null;
 
@@ -403,7 +413,7 @@ export function createDefaultOperations(
           reason = { code: 'NO_BALANCE', message: 'No balance' };
         }
 
-        const enrichment = config.enrichMintListItem?.(mintUrl) ?? {};
+        const entry = catalog[mintUrl] ?? {};
         return {
           mintUrl,
           displayName: info.name ?? mintUrl,
@@ -413,7 +423,12 @@ export function createDefaultOperations(
           status,
           reason,
           isPreferred: false,
-          ...enrichment,
+          kymScore: entry.kymScore,
+          reviewCount: entry.reviewCount,
+          auditScore: entry.auditScore,
+          auditState: entry.auditState,
+          contactFollowers: entry.contactFollowers,
+          contactReputation: entry.contactReputation,
         };
       });
 
@@ -591,9 +606,9 @@ export function createDefaultOperations(
       console.info('[rollbackMelt] Cancelled | operationId:', operationId);
     },
 
-    buildMintReviewInfo: async (mintUrl): Promise<MintReviewInfo> => {
+    buildMintReviewInfo: async (mintUrl, item): Promise<MintReviewInfo> => {
       const mgr = requireManager();
-      const [mintInfo, balances, isTrusted] = await Promise.all([
+      const [mintInfo, balancesByMint, isTrusted] = await Promise.all([
         mgr.mint.getMintInfo(mintUrl).catch((e) => {
           console.warn(
             '[buildMintReviewInfo] getMintInfo failed for',
@@ -602,7 +617,7 @@ export function createDefaultOperations(
           );
           return undefined;
         }),
-        mgr.wallet.getBalances(),
+        mgr.wallet.balances.byMint({ mintUrls: [mintUrl] }),
         mgr.mint.isTrustedMint(mintUrl),
       ]);
 
@@ -610,21 +625,43 @@ export function createDefaultOperations(
       const preferredMintUrl = config.getPreferredMintUrl?.();
       const enrichment = config.enrichMintReviewInfo?.(mintUrl) ?? {};
 
-      return {
+      // The Select Mint row already carries fresh catalog data from
+      // `fetchMintCatalog`; prefer it over `enrichMintReviewInfo`'s cache
+      // read so audit/score travel with the navigation rather than relying
+      // on a separately-warmed Zustand store.
+      const rowCatalog: Partial<MintReviewInfo> = {};
+      if (item) {
+        if (item.kymScore !== undefined) rowCatalog.kymScore = item.kymScore;
+        if (item.auditScore !== undefined) rowCatalog.auditScore = item.auditScore;
+        if (item.auditState !== undefined) rowCatalog.auditState = item.auditState;
+      }
+
+      const result: MintReviewInfo = {
         mintUrl,
-        displayName: info.name ?? mintUrl,
-        iconUrl: info.icon_url ?? undefined,
+        displayName: info.name ?? item?.displayName ?? mintUrl,
+        iconUrl: info.icon_url ?? item?.iconUrl,
         description: info.description ?? undefined,
         longDescription: info.description_long ?? undefined,
         motd: info.motd ?? undefined,
         contact: info.contact ?? undefined,
         nuts: info.nuts ? Object.keys(info.nuts).map(Number) : undefined,
-        balance: balances[mintUrl] ?? 0,
-        unit: 'sat',
-        isPreferred: mintUrl === preferredMintUrl,
+        balance: balancesByMint[mintUrl]?.total ?? item?.balance ?? 0,
+        unit: item?.unit ?? 'sat',
+        isPreferred: item?.isPreferred ?? mintUrl === preferredMintUrl,
         isTrusted,
         ...enrichment,
+        ...rowCatalog,
       };
+
+      // Detail metrics (avgTimeMs, swap counts, totals) only exist in the
+      // local cache; when the user came straight from the selector without a
+      // warm cache, fall back to the success rate implied by auditScore so
+      // the StatsGrid's headline number stays meaningful.
+      if (result.successRate === undefined && typeof result.auditScore === 'number') {
+        result.successRate = result.auditScore / 5;
+      }
+
+      return result;
     },
 
     executePaymentRequest: async (mintUrl, paymentRequest, amount, unit) => {

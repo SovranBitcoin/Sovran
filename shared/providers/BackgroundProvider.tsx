@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useCallback, ReactNode } from 'react';
 import { useSharedValue, withTiming, SharedValue, Easing } from 'react-native-reanimated';
 import { useFocusEffect } from 'expo-router';
-import { log } from '@/shared/lib/logger';
+import { log, initLog, useInitMount } from '@/shared/lib/logger';
+
+initLog('Module', 'BackgroundProvider loaded');
 
 /**
  * Blur mode options for background configuration
@@ -96,6 +98,7 @@ interface BackgroundProviderProps {
  * Provider component that manages shared background state across tabs
  */
 export function BackgroundProvider({ children }: BackgroundProviderProps) {
+  useInitMount('BackgroundProvider');
   // Shared values for animations
   const blurMode = useSharedValue(1); // Start with partial
   const blurIntensity = useSharedValue(200);

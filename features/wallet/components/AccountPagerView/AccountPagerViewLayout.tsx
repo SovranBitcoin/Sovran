@@ -11,7 +11,12 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Account } from '../Account';
-import { BUTTON_H, QR_SIZE, type AccountPagerViewShared } from './useAccountPagerView';
+import {
+  BUTTON_H,
+  QR_SIZE,
+  SECONDARY_ACTION_ROW_HEIGHT,
+  type AccountPagerViewShared,
+} from './useAccountPagerView';
 import { Log, walletLog } from '@/shared/lib/logger';
 
 const RECEIVE_SYSTEM_ICON = Platform.OS === 'ios' ? 'arrow.down.left' : undefined;
@@ -70,7 +75,9 @@ export function AccountPagerViewLayout({
        *   `HealthModalScreen.handleAction` routes to for `openBalanceSplit`.
        *   `tabler:dots` for the single remaining placeholder.
        */}
-      <HStack justify="space-around" style={{ marginTop: 4, paddingHorizontal: 32 }}>
+      <HStack
+        justify="space-around"
+        style={{ marginTop: 4, paddingHorizontal: 32, height: SECONDARY_ACTION_ROW_HEIGHT }}>
         <CircleActionButton
           icon="mdi:silverware-fork-knife"
           systemIcon="fork.knife"
@@ -101,7 +108,7 @@ export function AccountPagerViewLayout({
           testID="wallet-action-theme"
           onPress={() => {
             walletLog.info('wallet.theme.tap');
-            router.push('/(settings-flow)/theme/preview' as any);
+            router.push('/(theme-flow)/preview' as any);
           }}
         />
       </HStack>

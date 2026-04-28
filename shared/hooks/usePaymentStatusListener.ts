@@ -15,10 +15,10 @@ import { paymentStatusPopup } from '@/shared/lib/popup';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { paymentLog } from '@/shared/lib/logger';
 
-const NPC_RECEIVE_POPUP_MAX_AGE_MS = 2 * 60 * 1000;
+const NPC_RECEIVE_POPUP_MAX_AGE_MS = 5 * 60 * 1000;
 
-function getNpcQuoteTimestampMs(quote: Pick<RawMintQuote, 'paidAt' | 'createdAt'>): number | null {
-  const rawTimestamp = quote.paidAt ?? quote.createdAt;
+function getNpcQuoteTimestampMs(quote: Pick<RawMintQuote, 'paidAt'>): number | null {
+  const rawTimestamp = quote.paidAt;
   if (typeof rawTimestamp !== 'number' || !Number.isFinite(rawTimestamp) || rawTimestamp <= 0) {
     return null;
   }
@@ -26,12 +26,19 @@ function getNpcQuoteTimestampMs(quote: Pick<RawMintQuote, 'paidAt' | 'createdAt'
   return rawTimestamp * 1000;
 }
 
+/**
+ * Decide whether a `mint-op:pending` event with `state === 'PAID'` should surface
+ * a "Payment received" toast. Only NPC sync produces these events (live in-app
+ * mints emit pending with state 'UNPAID' and transition via quote-state-changed),
+ * so we treat anything older than the threshold — or with no `paidAt` at all —
+ * as a retroactive replay (recovery, cold-start sync) and stay silent.
+ */
 function shouldShowNpcReceivePopup(
-  quote: Pick<RawMintQuote, 'paidAt' | 'createdAt'>,
+  quote: Pick<RawMintQuote, 'paidAt'>,
   nowMs: number = Date.now()
 ): boolean {
   const quoteTimestampMs = getNpcQuoteTimestampMs(quote);
-  if (quoteTimestampMs === null) return true;
+  if (quoteTimestampMs === null) return false;
 
   return nowMs - quoteTimestampMs <= NPC_RECEIVE_POPUP_MAX_AGE_MS;
 }
@@ -41,7 +48,6 @@ type RawMintQuote = {
   amount?: number;
   unit?: string;
   paidAt?: number;
-  createdAt?: number;
 };
 
 export function usePaymentStatusListener(): void {
@@ -86,11 +92,16 @@ export function usePaymentStatusListener(): void {
         const amount = entry.amount ?? 0;
         const unit = entry.unit ?? 'sat';
 
+        const existingActive = usePaymentStatusStore.getState().active;
+        const isDuplicate =
+          existingActive?.variant === 'receive' && existingActive.id === quoteId;
+
         paymentLog.info('hook.payment_status.receive_processing', {
           quoteId,
           mintUrl,
           amount,
           unit,
+          isDuplicate,
         });
         usePaymentStatusStore.getState().setActive({
           variant: 'receive',
@@ -100,6 +111,15 @@ export function usePaymentStatusListener(): void {
           unit,
           state: 'processing',
         });
+
+        if (isDuplicate) {
+          paymentLog.info('hook.payment_status.receive_popup_suppressed', {
+            quoteId,
+            mintUrl,
+            reason: 'already_active',
+          });
+          return;
+        }
 
         paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
       }
@@ -117,26 +137,38 @@ export function usePaymentStatusListener(): void {
         operation: any;
       }) => {
         const op = operation as any;
-        const quoteId = op.quote?.quoteId ?? operationId;
-        const state = op.quote?.state ?? op.lastObservedRemoteState;
+        // PendingMintOperation is flat: read top-level fields; the legacy `op.quote.*`
+        // / `op.intent.*` namespaces never existed and silently fell back to defaults.
+        const quoteId = op.quoteId ?? op.quote?.quoteId ?? operationId;
+        const state = op.lastObservedRemoteState ?? op.quote?.state;
         paymentLog.debug('hook.payment_status.mint_quote_added', { quoteId, state, mintUrl });
         if (state !== 'PAID') return;
 
-        const paidAt = op.quote?.paidAt ?? op.updatedAt;
-        const createdAt = op.createdAt;
-        if (!shouldShowNpcReceivePopup({ paidAt, createdAt })) {
-          paymentLog.debug('hook.payment_status.npc_quote_too_old', { quoteId });
+        const paidAt = op.paidAt ?? op.quote?.paidAt;
+        if (!shouldShowNpcReceivePopup({ paidAt })) {
+          paymentLog.info('hook.payment_status.npc_quote_suppressed', {
+            quoteId,
+            mintUrl,
+            paidAt,
+            ageMs: typeof paidAt === 'number' ? Date.now() - paidAt * 1000 : null,
+            reason: paidAt == null ? 'no_paidAt' : 'too_old',
+          });
           return;
         }
 
-        const amount = op.intent?.amount ?? 0;
-        const unit = op.intent?.unit ?? 'sat';
+        const amount = op.amount ?? op.intent?.amount ?? 0;
+        const unit = op.unit ?? op.intent?.unit ?? 'sat';
+
+        const existingActive = usePaymentStatusStore.getState().active;
+        const isDuplicate =
+          existingActive?.variant === 'receive' && existingActive.id === quoteId;
 
         paymentLog.info('hook.payment_status.npc_receive_processing', {
           quoteId,
           mintUrl,
           amount,
           unit,
+          isDuplicate,
         });
         usePaymentStatusStore.getState().setActive({
           variant: 'receive',
@@ -146,6 +178,15 @@ export function usePaymentStatusListener(): void {
           unit,
           state: 'processing',
         });
+
+        if (isDuplicate) {
+          paymentLog.info('hook.payment_status.receive_popup_suppressed', {
+            quoteId,
+            mintUrl,
+            reason: 'already_active',
+          });
+          return;
+        }
 
         paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
       }
@@ -163,13 +204,13 @@ export function usePaymentStatusListener(): void {
     );
 
     const offReceiveCreated = manager.on(
-      'receive:created',
-      async ({ mintUrl, token }: { mintUrl: string; token: { proofs: { amount: number }[] } }) => {
-        const amount = token.proofs.reduce((acc, p) => acc + p.amount, 0);
+      'receive-op:finalized',
+      async ({ mintUrl, operation }) => {
+        const amount = operation.amount;
         paymentLog.info('hook.payment_status.receive_created', {
           mintUrl,
           amount,
-          proofCount: token.proofs.length,
+          operationId: operation.id,
         });
         const store = usePaymentStatusStore.getState();
         const hadPending =
@@ -178,7 +219,7 @@ export function usePaymentStatusListener(): void {
           store.active?.mintUrl === mintUrl;
 
         if (hadPending && store.active) {
-          // Brief delay so HistoryService.handleReceiveCreated can persist the entry
+          // Brief delay so HistoryService.handleReceiveOperationUpdated can persist the entry
           await new Promise((r) => setTimeout(r, 50));
           if (cancelledRef.current) return;
           const history = await manager.history.getPaginatedHistory(0, 20);

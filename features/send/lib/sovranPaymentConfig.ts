@@ -1075,6 +1075,38 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
         });
       },
 
+      /**
+       * Route text vs emoji copy on the sendToken screen. Split-menu UI
+       * (`ActionMenuButton`) calls `actions.copy.execute({ variantId })` with
+       * `'text'` or `'emoji'`. An omitted `variantId` (legacy callers) falls
+       * through to the text path, preserving prior behavior.
+       */
+      copy: async (rawCtx) => {
+        const { entry } = sendCtx(rawCtx);
+        if (!entry.token) return;
+        const variantId =
+          typeof (rawCtx as unknown as { variantId?: unknown }).variantId === 'string'
+            ? (rawCtx as unknown as { variantId: string }).variantId
+            : 'text';
+        if (variantId === 'emoji') {
+          emojiPickerPopup({ token: getEncodedTokenV4(entry.token) });
+          return;
+        }
+        // Default — text clipboard copy.
+        try {
+          await Clipboard.setStringAsync(getEncodedTokenV4(entry.token));
+          copyPopup('token');
+          paymentLog.info('payment.send_token.copy.text.success', { entryId: entry.id });
+        } catch (e) {
+          paymentLog.error('payment.send_token.copy.failed', {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      },
+      /**
+       * @deprecated — reach this via `copy({ variantId: 'emoji' })` now. The
+       * action name is retained for a release so any extant callers still work.
+       */
       copyAsEmoji: async (rawCtx) => {
         const { entry } = sendCtx(rawCtx);
         if (!entry.token) return;

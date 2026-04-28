@@ -11,7 +11,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { useMints, useBalanceContext, useManager } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { useLightningOperations } from '@/features/receive/hooks/useLightningOperations';
@@ -44,7 +44,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import Icon from 'assets/icons';
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
 import { extractDomain } from '@/shared/lib/url';
-import { log, Screen, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 // StepState is imported from components/blocks/rebalance (groupSteps.ts)
 
@@ -64,7 +64,8 @@ export function MintRebalancePlanScreen() {
   const unit = params.unit?.toLowerCase() || 'sat';
 
   const { trustedMints } = useMints();
-  const { balance: liveBalances } = useBalanceContext();
+  const { balances: liveBalanceCtx } = useBalanceContext();
+  const liveBalances = liveBalanceCtx.byMint;
   const { getMintInfo } = useMintManagement();
   const manager = useManager();
   const { requestLightningInvoice } = useLightningOperations();
@@ -111,7 +112,7 @@ export function MintRebalancePlanScreen() {
   const computedPlan = useMemo(() => {
     const mintBalances = mintUrls.map((mintUrl) => ({
       mintUrl,
-      balance: liveBalances[mintUrl] || 0,
+      balance: liveBalances[mintUrl]?.total || 0,
     }));
     return computeRebalancePlan(mintBalances, distribution, minTransferThreshold);
   }, [mintUrls, liveBalances, distribution, minTransferThreshold]);
@@ -264,14 +265,14 @@ export function MintRebalancePlanScreen() {
       // Get fresh balances directly from manager to avoid stale closure
       const getBalances = async () => {
         try {
-          return await manager.wallet.getBalances();
+          return await manager.wallet.balances.byMint();
         } catch {
           return {};
         }
       };
 
       const initialBalances = await getBalances();
-      const startBalance = initialBalances[mintUrl] || 0;
+      const startBalance = initialBalances[mintUrl]?.total || 0;
       const startTime = Date.now();
       const pollInterval = 1000; // Check every 1 second
 
@@ -279,7 +280,7 @@ export function MintRebalancePlanScreen() {
         await new Promise((resolve) => setTimeout(resolve, pollInterval));
 
         const currentBalances = await getBalances();
-        const currentBalance = currentBalances[mintUrl] || 0;
+        const currentBalance = currentBalances[mintUrl]?.total || 0;
 
         // Allow for some fee variance - consider success if balance increased
         if (currentBalance > startBalance) {
@@ -367,8 +368,8 @@ export function MintRebalancePlanScreen() {
 
       try {
         // Get fresh balances to check source mint
-        const currentBalances = await manager.wallet.getBalances();
-        const sourceBalance = currentBalances[fromMintUrl] || 0;
+        const currentBalances = await manager.wallet.balances.byMint();
+        const sourceBalance = currentBalances[fromMintUrl]?.total || 0;
 
         appendDebug({
           event: 'balances_fetched',
@@ -885,8 +886,8 @@ export function MintRebalancePlanScreen() {
                 });
 
                 // Get fresh balance for this hop's source
-                const hopBalances = await manager.wallet.getBalances();
-                const hopSourceBalance = hopBalances[hopFrom] || 0;
+                const hopBalances = await manager.wallet.balances.byMint();
+                const hopSourceBalance = hopBalances[hopFrom]?.total || 0;
 
                 // ── Per-hop dynamic fee headroom ──
                 // Each hop's source mint may have different input_fee_ppk, so
@@ -1118,11 +1119,11 @@ export function MintRebalancePlanScreen() {
             }
 
             // Untrust temporary intermediaries (if no funds remain)
-            const finalBals = await manager.wallet
-              .getBalances()
-              .catch(() => ({}) as Record<string, number>);
+            const finalBals = await manager.wallet.balances
+              .byMint()
+              .catch(() => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>);
             for (const url of temporarilyTrusted) {
-              const bal = finalBals[url] ?? 0;
+              const bal = finalBals[url]?.total ?? 0;
               if (bal > 0) {
                 log.warn('mint.rebalance.middleman_kept', { url, balance: bal });
                 continue;
@@ -1503,11 +1504,11 @@ export function MintRebalancePlanScreen() {
         // Only untrust intermediary mints whose balance is zero. If a chain
         // failed mid-way, the user may have ecash stranded on the intermediary;
         // keeping it trusted lets them recover those funds.
-        const balances = await manager.wallet
-          .getBalances()
-          .catch(() => ({}) as Record<string, number>);
+        const balances = await manager.wallet.balances
+          .byMint()
+          .catch(() => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>);
         for (const url of temporarilyTrusted) {
-          const bal = balances[url] ?? 0;
+          const bal = balances[url]?.total ?? 0;
           if (bal > 0) {
             log.warn('mint.rebalance.middleman_kept', { url, balance: bal });
             continue;
@@ -1629,7 +1630,11 @@ export function MintRebalancePlanScreen() {
   ]);
 
   return (
-    <Screen name="MintRebalancePlanScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Screen
+      name="MintRebalancePlanScreen"
+      footer={bottomButtons}
+      contentPadding={0}
+      bgColor={background}>
       <Stack.Screen
         options={{
           title: 'Rebalance Plan',
@@ -1637,7 +1642,6 @@ export function MintRebalancePlanScreen() {
         }}
       />
 
-      <ModalLayoutWrapper bottomContent={bottomButtons} contentPadding={0}>
         <View className="mx-4 my-2 rounded-2xl p-4" style={{ backgroundColor: surfaceSecondary }}>
           <VStack gap={8}>
             {runPlan && (
@@ -1816,7 +1820,6 @@ export function MintRebalancePlanScreen() {
             </TouchableOpacity>
           </View>
         )}
-      </ModalLayoutWrapper>
     </Screen>
   );
 }

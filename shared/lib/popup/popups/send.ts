@@ -2,13 +2,13 @@ import { popup } from '../engine';
 import type { BaseOverrides, TextOverrides } from './types';
 
 export function invalidPaymentRequestPopup(): void {
-  popup({ message: 'Invalid payment request', icon: 'icon:mdi:file-alert-outline', type: 'error' });
+  popup({ message: 'Invalid payment request', icon: 'icon:mdi:alert-circle-outline', type: 'error' });
 }
 
 export function sendPaymentFailedPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Failed to send payment',
-    icon: 'icon:mdi:send-clock',
+    icon: 'icon:mdi:send',
     type: 'error',
     ...overrides,
   });
@@ -17,7 +17,7 @@ export function sendPaymentFailedPopup(overrides?: TextOverrides): void {
 export function cancelTransactionFailedPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Failed to cancel transaction',
-    icon: 'icon:mdi:close-circle-outline',
+    icon: 'icon:mdi:close-circle',
     type: 'error',
     ...overrides,
   });
@@ -26,7 +26,7 @@ export function cancelTransactionFailedPopup(overrides?: TextOverrides): void {
 export function operationNotFoundPopup(overrides?: BaseOverrides): void {
   popup({
     message: 'Operation not found',
-    icon: 'icon:mdi:file-search-outline',
+    icon: 'icon:majesticons:search-line',
     type: 'error',
     ...overrides,
   });
@@ -36,7 +36,7 @@ export function mintUnreachablePopup(overrides?: TextOverrides): void {
   popup({
     message: 'Could not connect to mint',
     text: 'Check your connection or try again later.',
-    icon: 'icon:mdi:wifi-off',
+    icon: 'icon:feather:wifi',
     type: 'error',
     ...overrides,
   });
@@ -45,7 +45,7 @@ export function mintUnreachablePopup(overrides?: TextOverrides): void {
 export function couldNotCancelPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Could not cancel',
-    icon: 'icon:mdi:close-circle-outline',
+    icon: 'icon:mdi:close-circle',
     type: 'error',
     ...overrides,
   });
@@ -68,7 +68,7 @@ export function invalidNostrTransportPopup(): void {
   popup({
     message: 'Invalid payment request',
     text: 'No Nostr transport found.',
-    icon: 'icon:mdi:connection',
+    icon: 'icon:feather:wifi',
     type: 'error',
   });
 }
@@ -76,7 +76,7 @@ export function invalidNostrTransportPopup(): void {
 export function invalidRecipientPopup(): void {
   popup({
     message: 'Invalid recipient in payment request',
-    icon: 'icon:mdi:account-alert',
+    icon: 'icon:mdi:alert-circle',
     type: 'error',
   });
 }
@@ -92,7 +92,7 @@ export function noLightningAddressPopup(): void {
 export function quoteCreationFailedPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Failed to create quote',
-    icon: 'icon:mdi:file-alert-outline',
+    icon: 'icon:mdi:alert-circle-outline',
     type: 'error',
     ...overrides,
   });
@@ -101,7 +101,7 @@ export function quoteCreationFailedPopup(overrides?: TextOverrides): void {
 export function noPaymentRequestPopup(): void {
   popup({
     message: 'No payment request provided',
-    icon: 'icon:mdi:file-alert-outline',
+    icon: 'icon:mdi:alert-circle-outline',
     type: 'error',
   });
 }
@@ -122,7 +122,7 @@ export function unsupportedInputPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Unsupported Input',
     text: 'This input format is not supported.',
-    icon: 'icon:mdi:file-alert-outline',
+    icon: 'icon:mdi:alert-circle-outline',
     type: 'error',
     ...overrides,
   });

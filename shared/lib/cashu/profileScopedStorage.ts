@@ -110,6 +110,7 @@ export const PROFILE_SCOPED_STORE_KEYS = [
   'transaction-location-store',
   'transaction-distribution-store',
   'nostr-social-store',
+  'nostr-metadata-cache',
   'theme-store',
 ];
 

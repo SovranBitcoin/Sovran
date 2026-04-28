@@ -10,7 +10,6 @@
  */
 
 import React, { useEffect } from 'react';
-import { TouchableOpacity } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 
 import { useScreenActions } from 'coco-payment-ux/react';
@@ -19,13 +18,11 @@ import type { MintListItem } from 'coco-payment-ux';
 import { MintListScreen } from '@/features/mint';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
-import Icon from 'assets/icons';
 
 function ReceiveMintSelectRoute() {
   useLifecycleLogger('ReceiveMintSelectRoute');
-  const foreground = useThemeColor('foreground');
   const params = useLocalSearchParams<{ mintSelectorEntry?: string }>();
 
   const walletContext = useWalletContext();
@@ -62,9 +59,10 @@ function ReceiveMintSelectRoute() {
           title: 'Select Mint',
           headerRight: () =>
             actions.addMint.available ? (
-              <TouchableOpacity style={{ padding: 8 }} onPress={() => actions.addMint.execute()}>
-                <Icon name="fluent:add-24-filled" size={24} color={foreground} />
-              </TouchableOpacity>
+              <ScreenHeaderAction
+                icon="fluent:add-24-filled"
+                onPress={() => actions.addMint.execute()}
+              />
             ) : null,
         }}
       />
@@ -74,7 +72,13 @@ function ReceiveMintSelectRoute() {
         closeButtonLabel="Cancel"
         onMintSelect={(item) => actions.select.execute({ mintUrl: item.mintUrl })}
         onInspectMint={
-          actions.getInfo.available ? (url) => actions.getInfo.execute({ mintUrl: url }) : undefined
+          actions.getInfo.available
+            ? (url) =>
+                actions.getInfo.execute({
+                  mintUrl: url,
+                  item: items.find((i) => i.mintUrl === url),
+                })
+            : undefined
         }
         onClose={() => router.back()}
       />

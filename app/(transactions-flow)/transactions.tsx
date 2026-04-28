@@ -19,7 +19,11 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 
 function FilterButton() {
-  const [foreground, accent] = useThemeColor(['foreground', 'accent'] as const);
+  const [foreground, accent, accentForeground] = useThemeColor([
+    'foreground',
+    'accent',
+    'accent-foreground',
+  ] as const);
   const { openFilterSheet, hasActiveFilters, activeFilterCount } = useTransactionsFilter();
 
   return (
@@ -36,7 +40,7 @@ function FilterButton() {
           <Text
             size={10}
             style={{
-              color: foreground,
+              color: accentForeground,
               fontFamily: 'OxygenBold',
             }}>
             {activeFilterCount}

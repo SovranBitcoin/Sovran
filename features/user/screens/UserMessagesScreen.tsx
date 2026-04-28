@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import {
-  buttonHandlerPopup,
+  actionMenuPopup,
   invalidTokenPopup,
   balanceRefreshedPopup,
   balanceRefreshFailedPopup,
@@ -42,8 +42,15 @@ import {
   useNDK,
   useSubscribe,
 } from '@nostr-dev-kit/ndk-mobile';
-import { Metadata, EncryptedDirectMessage } from 'nostr-tools/kinds';
-import { buildGiftWrappedDMPair, unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
+import { EncryptedDirectMessage } from 'nostr-tools/kinds';
+import { buildGiftWrappedDMPair } from '@/shared/lib/nostr/nip17';
+import { unwrapGiftWrapCached } from '@/shared/lib/nostr/giftWrapCache';
+import {
+  getCachedNip04Plaintext,
+  isKnownFailedNip04,
+  markNip04Failed,
+  putNip04Plaintext,
+} from '@/shared/lib/nostr/nip04Cache';
 import { LegendList } from '@legendapp/list';
 
 // Custom hooks and providers
@@ -100,6 +107,7 @@ import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { getUsername } from '@/shared/lib/username';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
@@ -302,6 +310,7 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
       mintUrl,
       createdAt: Date.now(),
       metadata: {},
+      state: 'prepared',
       token: decodedToken,
     };
 
@@ -750,7 +759,7 @@ function MessageBubble({
             </Text>
             {isMe &&
               (message.isSending ? (
-                <Icon name="svg-spinners:90-ring-with-bg" size={14} color={shade500} />
+                <Icon name="ant-design:loading-outlined" size={14} color={shade500} />
               ) : (
                 <Icon
                   name={message.isRead ? 'ion:checkmark-done' : 'simple-line-icons:check'}
@@ -961,20 +970,15 @@ export function UserMessagesScreen({
   // ===========================
   // NOSTR SUBSCRIPTIONS
   // ===========================
-  const metadataFilters = useMemo(
-    () => [
-      {
-        authors: [pubkey],
-        kinds: [Metadata],
-        limit: 1,
-      },
-    ],
-    [pubkey]
-  );
-
-  const { events: metadataEvents, eose: metadataEose } = useSubscribe({
-    filters: metadataFilters,
-  });
+  // Counterparty kind-0 metadata is served from the shared SWR cache.
+  // First open of a conversation per session pays one round-trip; every
+  // subsequent open is instant because the cache is shared across
+  // surfaces (this screen, contact picker, feed reactions, etc.) and
+  // persists across app launches via profile-scoped AsyncStorage.
+  const {
+    metadata: counterpartyMetadata,
+    isLoading: isMetadataLoading,
+  } = useNostrProfileMetadata(pubkey);
 
   const dmFilters = useMemo(() => {
     if (isRoutstrMode || !nostrKeys?.pubkey) return null;
@@ -1009,19 +1013,18 @@ export function UserMessagesScreen({
 
   const { events: giftWrapEvents } = useSubscribe({ filters: giftWrapFilters });
 
-  // NIP-17: Unwrap gift-wrapped events and filter for this conversation
   const unwrappedGiftWrapMessages = useMemo(() => {
     if (!giftWrapEvents?.length || !nostrKeys?.privateKey || !nostrKeys?.pubkey) return [];
 
     return giftWrapEvents
       .map((event) => {
-        const unwrapped = unwrapGiftWrap(
-          { content: event.content, pubkey: event.pubkey },
+        const unwrapped = unwrapGiftWrapCached(
+          nostrKeys.pubkey,
+          event,
           nostrKeys.privateKey
         );
         if (!unwrapped) return null;
 
-        // Filter: only messages in this conversation (between us and pubkey)
         const isFromCounterparty =
           unwrapped.senderPubkey === pubkey &&
           unwrapped.recipientPubkeys.includes(nostrKeys.pubkey);
@@ -1042,16 +1045,17 @@ export function UserMessagesScreen({
   // ===========================
   // DERIVED STATE
   // ===========================
-  const userInfo = metadataEvents?.[0] ? JSON.parse(metadataEvents[0].content) : null;
   const displayName = isRoutstrMode
-    ? userInfo?.display_name || userInfo?.name || 'routstr'
-    : userInfo?.display_name || userInfo?.name || getUsername(pubkey);
-  const userPicture = userInfo?.picture;
-  const lud16 = userInfo?.lud16;
+    ? counterpartyMetadata?.displayName || counterpartyMetadata?.name || 'routstr'
+    : counterpartyMetadata?.displayName ||
+      counterpartyMetadata?.name ||
+      getUsername(pubkey);
+  const userPicture = counterpartyMetadata?.picture;
+  const lud16 = counterpartyMetadata?.lud16;
   const myProfile = useProfileDisplay(nostrKeys?.pubkey || '');
   const myName = myProfile.displayName;
-  const isMetadataLoading = !metadataEose;
-  const shouldShowAvatarLoading = !isRoutstrMode && isMetadataLoading && !userInfo;
+  const shouldShowAvatarLoading =
+    !isRoutstrMode && isMetadataLoading && !counterpartyMetadata;
 
   // Get unique providers from available models
   const uniqueProviders = useMemo(() => {
@@ -1284,14 +1288,27 @@ export function UserMessagesScreen({
     // Defer expensive decryption until after navigation completes
     const handle = InteractionManager.runAfterInteractions(async () => {
       try {
+        const myPubkey = nostrKeys.pubkey;
         const processedMessages = await Promise.all(
           newEvents.map(async (event) => {
             try {
-              const counterparty = new NDKUser({ pubkey: pubkey });
-              const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
-              await event.decrypt(counterparty, signer);
-              const isMe = event.pubkey === nostrKeys.pubkey;
-              const senderPubkey = isMe ? nostrKeys.pubkey : event.pubkey;
+              if (isKnownFailedNip04(myPubkey, event.id)) {
+                processedEventIds.current.add(event.id);
+                return null;
+              }
+              const cached = getCachedNip04Plaintext(myPubkey, event.id);
+              if (cached !== undefined) {
+                // Populate event.content so downstream code sees the
+                // same shape as a fresh `event.decrypt()`.
+                event.content = cached;
+              } else {
+                const counterparty = new NDKUser({ pubkey: pubkey });
+                const signer = new NDKPrivateKeySigner(nostrKeys.privateKey);
+                await event.decrypt(counterparty, signer);
+                putNip04Plaintext(myPubkey, event.id, event.content);
+              }
+              const isMe = event.pubkey === myPubkey;
+              const senderPubkey = isMe ? myPubkey : event.pubkey;
 
               processedEventIds.current.add(event.id);
 
@@ -1306,6 +1323,7 @@ export function UserMessagesScreen({
               };
             } catch (error) {
               log.error('user.messages.nip04_decrypt_failed', { error });
+              markNip04Failed(nostrKeys.pubkey, event.id);
               processedEventIds.current.add(event.id);
               return null;
             }
@@ -1759,19 +1777,14 @@ export function UserMessagesScreen({
           );
         }
 
-        buttonHandlerPopup({
+        actionMenuPopup({
           title: 'Insufficient balance',
-          description:
-            requiredSats > 0
-              ? `${modelName} requires ~${requiredSats} sats per message. You have ${availableSats} sats.`
-              : 'Your Routstr balance is too low for this model.',
           buttons: [
             {
               text: `Top Up (~${neededSats} sats)`,
               icon: 'solar:wallet-bold',
               variant: 'primary',
-              onPress: async (close: any) => {
-                close({} as any);
+              onPress: async () => {
                 await handleTopUp(userMessage);
               },
             },
@@ -1779,8 +1792,7 @@ export function UserMessagesScreen({
               text: 'Change Model',
               icon: 'mdi:swap-horizontal',
               variant: 'secondary',
-              onPress: async (close: any) => {
-                close({} as any);
+              onPress: () => {
                 setIsModelSwitchBottomSheetOpen(true);
               },
             },
@@ -1788,7 +1800,8 @@ export function UserMessagesScreen({
               text: 'Cancel',
               icon: 'mdi:close-circle',
               variant: 'secondary',
-              onPress: async (close: any) => close({} as any),
+              // Tapping Cancel just dismisses — the host closes the sheet.
+              onPress: () => {},
             },
           ],
         });
@@ -1954,48 +1967,30 @@ export function UserMessagesScreen({
   };
 
   const handleSendMoney = () => {
-    log.debug('user.messages.send_money', { lud16, userName: userInfo?.name });
-    if (!lud16 || !userInfo) return;
+    log.debug('user.messages.send_money', {
+      lud16,
+      userName: counterpartyMetadata?.name,
+    });
+    if (!lud16 || !counterpartyMetadata) return;
 
-    buttonHandlerPopup({
-      buttons: [
-        {
-          text: 'Send Ecash',
-          icon: 'ph:coins',
-          variant: 'primary' as const,
-          onPress: async (close: any) => {
-            const mint = nostrKeys?.pubkey
-              ? (useMintStore.getState().getSelectedMint(nostrKeys.pubkey) ?? '')
-              : '';
-            router.navigate({
-              pathname: '/(send-flow)/amount',
-              params: {
-                amountEntry: JSON.stringify({
-                  destination: 'sendEcash',
-                  unit: 'sat',
-                  selectedMintUrl: mint,
-                }),
-              },
-            });
-            close({} as any);
-          },
-        },
-        {
-          text: 'Send Lightning',
-          icon: 'mingcute:lightning-fill',
-          variant: 'primary' as const,
-          onPress: async (close: any) => {
-            router.navigate({
-              pathname: '/(send-flow)/amount',
-              params: {
-                destination: 'meltQuote',
-                meltTarget: lud16,
-              },
-            });
-            close({} as any);
-          },
-        },
-      ],
+    // The amount screen's Next button now exposes an ecash/lightning/onchain
+    // menu via coco-payment-ux amountEntry.next variants — so we skip the
+    // upfront choice popup and let the user pick at Next time. We default
+    // destination to sendEcash and pass meltTarget alongside so the Lightning
+    // variant is enabled on arrival.
+    const mint = nostrKeys?.pubkey
+      ? (useMintStore.getState().getSelectedMint(nostrKeys.pubkey) ?? '')
+      : '';
+    router.navigate({
+      pathname: '/(send-flow)/amount',
+      params: {
+        amountEntry: JSON.stringify({
+          destination: 'sendEcash',
+          unit: 'sat',
+          selectedMintUrl: mint,
+          meltTarget: lud16,
+        }),
+      },
     });
   };
 

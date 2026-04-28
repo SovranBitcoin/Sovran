@@ -1,12 +1,18 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
+import { Easing, LinearTransition } from 'react-native-reanimated';
 
-import { LegendList } from '@legendapp/list';
+import { AnimatedLegendList } from '@legendapp/list/reanimated';
 import { Link } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import _ from 'lodash';
 
-import { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
+import {
+  HistoryEntry,
+  MeltHistoryEntry,
+  MintHistoryEntry,
+  SendHistoryEntry,
+} from '@cashu/coco-core';
 
 import Icon from 'assets/icons';
 import { SwapTransactionRow } from '@/features/transactions/components/SwapTransactionRow';
@@ -20,9 +26,10 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { formatDate } from '@/shared/lib/time';
 import { mintHistoryEntryExpired } from '@/shared/lib/utils';
+import { isCancellablePendingEcash } from '@/shared/lib/cashu/utils';
 import { log, Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { useScanHistoryStore } from '@/shared/stores/profile/scanHistoryStore';
+import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 import {
   useSwapTransactionsStore,
   type SwapGroup,
@@ -31,7 +38,6 @@ import {
   useSplitBillTransactionsStore,
   type SplitBillGroup,
 } from '@/shared/stores/profile/splitBillTransactionsStore';
-import { useTransactionLocationStore } from '@/shared/stores/profile/transactionLocationStore';
 
 // ---------------------------------------------------------------------------
 // Timeline item: a discriminated union so transactions and swap groups can
@@ -96,6 +102,18 @@ interface Props {
    * Use when header spacing is handled externally (e.g., via ModalLayoutWrapper).
    */
   disableContentInsetAdjustment?: boolean;
+  /**
+   * Cancel a single pending ecash send. When provided, cancellable rows
+   * become left-swipeable; the swipe-commit handler calls this with the
+   * full SendHistoryEntry.
+   */
+  onCancelPendingEcash?: (entry: SendHistoryEntry) => void;
+  /**
+   * Reports the currently-visible (post-filter) pending ecash sends so a
+   * parent screen can show a "Cancel all" footer that respects active
+   * filters. Fires on every filter/history change.
+   */
+  onVisiblePendingEcashChange?: (entries: SendHistoryEntry[]) => void;
 }
 
 export const Transactions = React.memo(
@@ -116,37 +134,22 @@ export const Transactions = React.memo(
     onTransactionPress,
     onScroll,
     disableContentInsetAdjustment = false,
+    onCancelPendingEcash,
+    onVisiblePendingEcashChange,
   }: Props) => {
     const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
 
-    // DIAGNOSTIC: dump both lookup stores once when the transactions list mounts.
-    // Remove after investigating why old transactions show no location/source.
-    useEffect(() => {
-      const locationState = useTransactionLocationStore.getState();
-      const scanState = useScanHistoryStore.getState();
-      log.info('tx.stores.dump', {
-        locationCount: Object.keys(locationState.locations).length,
-        locations: locationState.locations,
-        scanCount: scanState.entries.length,
-        scanEntries: scanState.entries,
-        visibleHistoryCount: history.length,
-        visibleHistorySample: history.slice(0, 20).map((h) => ({
-          id: h.id,
-          type: h.type,
-          createdAt: h.createdAt,
-          mintUrl: h.mintUrl,
-        })),
-      });
-      // Intentionally empty deps — one-shot dump per mount.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    // Operation ids that are still showing the post-success collapse
+    // animation. Keeping them pinned in the Pending bucket gives the
+    // Transaction row time to play its height-collapse before unmount —
+    // without this, the LegendList virtualizer recycles the view as soon as
+    // its state flips to `rolledBack`, killing the animation mid-frame.
+    const collapsing = useRollbackStore((s) => s.collapsing);
 
     const borderColor = useMemo(() => opacity(muted, 0.3), [muted]);
     const quoteIdToGroup = useSwapTransactionsStore((state) => state.quoteIdToGroup);
     const swapGroupsById = useSwapTransactionsStore((state) => state.groups);
-    const quoteIdToSplitBill = useSplitBillTransactionsStore(
-      (state) => state.quoteIdToSplitBill
-    );
+    const quoteIdToSplitBill = useSplitBillTransactionsStore((state) => state.quoteIdToSplitBill);
     const splitBillGroupsById = useSplitBillTransactionsStore((state) => state.groups);
 
     const swapGroups = useMemo(() => {
@@ -286,17 +289,19 @@ export const Transactions = React.memo(
           if (item.kind === 'split-bill') {
             // Bucket split-bill groups into pending until fully paid.
             if (item.data.state === 'paid') return 'confirmed';
-            if (item.data.state === 'expired' || item.data.state === 'cancelled')
-              return 'expired';
+            if (item.data.state === 'expired' || item.data.state === 'cancelled') return 'expired';
             return 'pending';
           }
 
           const historyEntry = item.data;
+          const isCollapsingGhost =
+            historyEntry.type === 'send' &&
+            collapsing.has((historyEntry as SendHistoryEntry).operationId);
           const isPending =
             (historyEntry.type === 'mint' && historyEntry.state === 'UNPAID') ||
             (historyEntry.type === 'melt' && historyEntry.state === 'UNPAID') ||
-            (historyEntry.type === 'send' &&
-              (historyEntry.state === 'pending' || historyEntry.state === 'prepared'));
+            isCancellablePendingEcash(historyEntry) ||
+            isCollapsingGhost;
 
           // Check if it's an expired mint transaction
           const isExpired =
@@ -307,7 +312,7 @@ export const Transactions = React.memo(
           if (isExpired) return 'expired';
           return isPending ? 'pending' : 'confirmed';
         }),
-      [sortedTimeline]
+      [sortedTimeline, collapsing]
     );
 
     const sections = useMemo(() => {
@@ -377,6 +382,30 @@ export const Transactions = React.memo(
       return sections.all;
     }, [sections, tab]);
 
+    // Cancellable subset of the visible pending bucket: ecash sends only.
+    // Used by the parent screen to drive the "Cancel N pending" footer.
+    const visiblePendingEcash = useMemo<SendHistoryEntry[]>(() => {
+      const out: SendHistoryEntry[] = [];
+      for (const item of pending || []) {
+        if (item.kind === 'transaction' && isCancellablePendingEcash(item.data)) {
+          out.push(item.data);
+        }
+      }
+      return out;
+    }, [pending]);
+
+    // Only emit when the cancellable id-set actually changes — `pending`'s
+    // reference churns on every history mutation, but the screen only
+    // cares when a cancellable row appears or disappears.
+    const lastEmittedSignatureRef = useRef<string>('');
+    useEffect(() => {
+      if (!onVisiblePendingEcashChange) return;
+      const signature = visiblePendingEcash.map((e) => e.operationId).join('|');
+      if (signature === lastEmittedSignatureRef.current) return;
+      lastEmittedSignatureRef.current = signature;
+      onVisiblePendingEcashChange(visiblePendingEcash);
+    }, [visiblePendingEcash, onVisiblePendingEcashChange]);
+
     const renderTimelineItem = useCallback(
       (item: TimelineItem) => {
         const key = getTimelineKey(item);
@@ -386,9 +415,16 @@ export const Transactions = React.memo(
         if (item.kind === 'split-bill') {
           return <SplitBillTransactionRow key={key} group={item.data} />;
         }
-        return <Transaction key={key} historyEntry={item.data} onPress={onTransactionPress} />;
+        return (
+          <Transaction
+            key={key}
+            historyEntry={item.data}
+            onPress={onTransactionPress}
+            onCancel={onCancelPendingEcash}
+          />
+        );
       },
-      [onTransactionPress]
+      [onTransactionPress, onCancelPendingEcash]
     );
 
     const emptyComponent = useMemo(
@@ -554,14 +590,22 @@ export const Transactions = React.memo(
 
     return (
       <Log name="Transactions">
-        <LegendList
-          waitForInitialLayout={false}
+        <AnimatedLegendList
           key={listKey}
           style={{ flex: 1 }}
           data={sectionsToDisplay}
           keyExtractor={(section) => section.index!}
           estimatedItemSize={estimateSectionHeight(sectionsToDisplay[0] || { data: [] })}
           maintainVisibleContentPosition
+          // One-frame transition. AnimatedLegendList's `itemLayoutAnimation`
+          // triggers a fresh LinearTransition on every measured-position
+          // change. With a long duration each delta would start a 260 ms
+          // animation that gets cancelled by the next frame's update — so
+          // the next section perpetually chases the target with a quarter-
+          // second lag. With a one-frame duration, each delta resolves
+          // before the next arrives, producing real-time tracking that
+          // moves in lock-step with the row's `layout` shrink.
+          itemLayoutAnimation={LinearTransition.duration(16).easing(Easing.linear)}
           contentInsetAdjustmentBehavior={disableContentInsetAdjustment ? 'never' : 'automatic'}
           ListHeaderComponent={<View>{typeof header === 'function' ? header() : header}</View>}
           ListEmptyComponent={emptyComponent}

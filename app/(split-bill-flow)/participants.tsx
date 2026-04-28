@@ -32,6 +32,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { LiquidGlassText } from 'liquid-glass-text';
 
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
@@ -293,13 +294,12 @@ export default function SplitBillParticipantsScreen() {
         options={{
           title: 'Who Pays',
           headerRight: () => (
-            <Pressable
+            <ScreenHeaderAction
               testID="split-bill-participants-search"
+              icon="mdi:magnify"
+              size={22}
               onPress={() => router.push('/(split-bill-flow)/search' as any)}
-              hitSlop={8}
-              style={{ paddingHorizontal: 8 }}>
-              <Icon name="mdi:magnify" size={22} color={foreground} />
-            </Pressable>
+            />
           ),
         }}
       />
@@ -332,7 +332,7 @@ export default function SplitBillParticipantsScreen() {
         zIndex={1}
       />
 
-      <BottomButtons style={{ zIndex: 2 }} paddingBottom={16} onLayout={handleBottomBarLayout}>
+      <BottomButtons style={{ zIndex: 2 }} onLayout={handleBottomBarLayout}>
         {selected.length > 0 && (
           <View style={styles.pillsRow}>
             <SelectedPreviewPill

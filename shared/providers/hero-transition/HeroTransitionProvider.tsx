@@ -14,7 +14,6 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { router } from 'expo-router';
 import { WalletHealthCardFrame } from '@/features/health/components/WalletHealthCardFrame';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
-import { PendingEcashCardFrame } from '@/shared/blocks/pending/PendingEcashCardFrame';
 import { measureInWindowAsync, rafAsync } from './measure';
 import type { HeroId, Rect, HeroRole } from './types';
 
@@ -31,8 +30,6 @@ type Ctx = {
   closeWalletHealth: (unit: string) => void;
   startClaimUsername: () => void;
   closeClaimUsername: () => void;
-  startPendingEcash: () => void;
-  closePendingEcash: () => void;
   isHidden: (id: HeroId, role: HeroRole) => boolean;
   isAnimating: (id: HeroId) => boolean;
   isTransitioning: (id: HeroId) => boolean;
@@ -43,11 +40,10 @@ const HeroTransitionContext = createContext<Ctx | null>(null);
 const DURATION_MS = 520;
 
 export function HeroTransitionProvider({ children }: { children: React.ReactNode }) {
-  const [background, surfaceForeground, red, green] = useThemeColor([
+  const [background, surfaceForeground, red] = useThemeColor([
     'background',
     'surface-foreground',
     'danger',
-    'green-400',
   ] as const);
   const primary950 = background;
   const primary50 = surfaceForeground;
@@ -56,7 +52,6 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
   const refs = useRef<Record<HeroId, Partial<Record<HeroRole, any>>>>({
     walletHealth: {},
     claimUsername: {},
-    pendingEcash: {},
   });
 
   const [phase, setPhase] = useState<HeroTransitionPhase>({ state: 'idle' });
@@ -369,124 +364,6 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
     setPhase({ state: 'idle' });
   }, [animateOverlay, fromH, fromW, fromX, fromY, phase.state, progress, toH, toW, toX, toY]);
 
-  const startPendingEcash = useCallback(async () => {
-    if (phase.state !== 'idle') return;
-
-    const sourceRef = refs.current.pendingEcash?.source;
-    const fromRect = await measureInWindowAsync(sourceRef);
-    if (!fromRect) {
-      router.navigate('/pendingEcash');
-      return;
-    }
-
-    setOverlayBorderColor(opacity(green, 0.25));
-    setPhase({ state: 'forward_navigating', id: 'pendingEcash' });
-    setOverlayVisible(true);
-
-    cancelAnimation(progress);
-    fromX.set(fromRect.x);
-    fromY.set(fromRect.y);
-    fromW.set(fromRect.width);
-    fromH.set(fromRect.height);
-    toX.set(0);
-    toY.set(0);
-    toW.set(0);
-    toH.set(0);
-    progress.set(0);
-
-    router.navigate('/pendingEcash');
-
-    for (let i = 0; i < 30; i++) {
-      await rafAsync();
-      const destRef = refs.current.pendingEcash?.destination;
-      const toRect = await measureInWindowAsync(destRef);
-      if (toRect) {
-        await rafAsync();
-        const toRectSettled = (await measureInWindowAsync(destRef)) ?? toRect;
-        setPhase({ state: 'forward_animating', id: 'pendingEcash' });
-        animateOverlay(fromRect, toRectSettled, () => {
-          setOverlayVisible(false);
-          setPhase({ state: 'idle' });
-        });
-        return;
-      }
-    }
-
-    setOverlayVisible(false);
-    setPhase({ state: 'idle' });
-  }, [
-    animateOverlay,
-    fromH,
-    fromW,
-    fromX,
-    fromY,
-    green,
-    phase.state,
-    progress,
-    toH,
-    toW,
-    toX,
-    toY,
-  ]);
-
-  const closePendingEcash = useCallback(async () => {
-    if (phase.state !== 'idle') return;
-
-    const destRef = refs.current.pendingEcash?.destination;
-    const fromRect = await measureInWindowAsync(destRef);
-    if (!fromRect) {
-      router.back();
-      return;
-    }
-
-    setOverlayBorderColor(opacity(green, 0.25));
-    setPhase({ state: 'back_navigating', id: 'pendingEcash' });
-    setOverlayVisible(true);
-
-    cancelAnimation(progress);
-    fromX.set(fromRect.x);
-    fromY.set(fromRect.y);
-    fromW.set(fromRect.width);
-    fromH.set(fromRect.height);
-    toX.set(0);
-    toY.set(0);
-    toW.set(0);
-    toH.set(0);
-    progress.set(0);
-
-    router.back();
-
-    for (let i = 0; i < 30; i++) {
-      await rafAsync();
-      const sourceRef = refs.current.pendingEcash?.source;
-      const toRect = await measureInWindowAsync(sourceRef);
-      if (!toRect) continue;
-
-      setPhase({ state: 'back_animating', id: 'pendingEcash' });
-      animateOverlay(fromRect, toRect, () => {
-        setOverlayVisible(false);
-        setPhase({ state: 'idle' });
-      });
-      return;
-    }
-
-    setOverlayVisible(false);
-    setPhase({ state: 'idle' });
-  }, [
-    animateOverlay,
-    fromH,
-    fromW,
-    fromX,
-    fromY,
-    green,
-    phase.state,
-    progress,
-    toH,
-    toW,
-    toX,
-    toY,
-  ]);
-
   const value = useMemo<Ctx>(
     () => ({
       registerRef,
@@ -494,8 +371,6 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
       closeWalletHealth,
       startClaimUsername,
       closeClaimUsername,
-      startPendingEcash,
-      closePendingEcash,
       isHidden,
       isAnimating,
       isTransitioning,
@@ -506,8 +381,6 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
       closeWalletHealth,
       startClaimUsername,
       closeClaimUsername,
-      startPendingEcash,
-      closePendingEcash,
       isHidden,
       isAnimating,
       isTransitioning,
@@ -532,12 +405,6 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
             {'id' in phase && phase.id === 'claimUsername' ? (
               <ClaimUsernameCardFrame
                 accentColor={gold}
-                backgroundColor={primary950}
-                highlightColor={primary50}
-              />
-            ) : 'id' in phase && phase.id === 'pendingEcash' ? (
-              <PendingEcashCardFrame
-                accentColor={green}
                 backgroundColor={primary950}
                 highlightColor={primary50}
               />
@@ -569,12 +436,6 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
               {'id' in phase && phase.id === 'claimUsername' ? (
                 <ClaimUsernameCardFrame
                   accentColor={gold}
-                  backgroundColor={primary950}
-                  highlightColor={primary50}
-                />
-              ) : 'id' in phase && phase.id === 'pendingEcash' ? (
-                <PendingEcashCardFrame
-                  accentColor={green}
                   backgroundColor={primary950}
                   highlightColor={primary50}
                 />

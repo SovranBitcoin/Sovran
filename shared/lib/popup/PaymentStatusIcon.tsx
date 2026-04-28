@@ -31,16 +31,36 @@ type Status = 'pending' | 'delivered' | 'confirmed' | 'failed';
 export function PaymentStatusIcon({
   size,
   status,
+  baseColor,
 }: {
   size: number;
   status: Status;
+  /** Override the pre-confirmation/failure stroke color. Defaults to the
+   * theme `foreground`. Toasts use a fixed `#000000` since they render on a
+   * theme-invariant white background. */
+  baseColor?: string;
 }): React.ReactElement {
-  const [foreground, success, danger] = useThemeColor(['foreground', 'success', 'danger'] as const);
+  const [themeForeground, success, danger] = useThemeColor([
+    'foreground',
+    'success',
+    'danger',
+  ] as const);
+  const foreground = baseColor ?? themeForeground;
+  // Initialise shared values from the *initial* status so a fresh mount
+  // with a terminal status renders the end-state immediately. Otherwise
+  // the useEffect below replays the draw-from-scratch animation every
+  // time a parent (e.g. SettingsRecoveryScreen swapping recovering →
+  // complete) remounts the row with `status='confirmed'`. Mounts that
+  // start at pending still get the proper transition animation because
+  // those start at the PENDING_OFFSET / *_LENGTH defaults below.
+  const isInitialConfirmed = status === 'confirmed';
+  const isInitialFailed = status === 'failed';
+  const isInitialTerminal = isInitialConfirmed || isInitialFailed;
   const rotation = useSharedValue(0);
-  const circleOffset = useSharedValue(PENDING_OFFSET);
-  const checkmarkOffset = useSharedValue(CHECKMARK_LENGTH);
-  const crossOffset = useSharedValue(CROSS_LENGTH);
-  const colorProgress = useSharedValue(status === 'confirmed' || status === 'failed' ? 1 : 0);
+  const circleOffset = useSharedValue(isInitialTerminal ? 0 : PENDING_OFFSET);
+  const checkmarkOffset = useSharedValue(isInitialConfirmed ? 0 : CHECKMARK_LENGTH);
+  const crossOffset = useSharedValue(isInitialFailed ? 0 : CROSS_LENGTH);
+  const colorProgress = useSharedValue(isInitialTerminal ? 1 : 0);
 
   useEffect(() => {
     if (status === 'pending' || status === 'delivered') {

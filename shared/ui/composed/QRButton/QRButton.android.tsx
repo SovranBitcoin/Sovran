@@ -1,10 +1,24 @@
-import React from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  measure,
+  runOnJS,
+  runOnUI,
+  useAnimatedRef,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
-import { Log } from '@/shared/lib/logger';
+import { Log, initLog } from '@/shared/lib/logger';
+import {
+  registerQRButtonRemeasure,
+  setQRButtonAnchor,
+  useBootMorphCompleted,
+} from '@/shared/lib/qrButtonAnchor';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -34,8 +48,64 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
     borderColor: opacity(BUTTON_COLOR, 0.4),
   };
 
+  const animatedRef = useAnimatedRef<Animated.View>();
+  const morphCompleted = useBootMorphCompleted();
+  const visibility = useSharedValue(morphCompleted ? 1 : 0);
+  const visibilityStyle = useAnimatedStyle(() => ({ opacity: visibility.value }));
+
+  const publishAnchor = useCallback(() => {
+    const targetRadius = containerStyle.borderRadius;
+    // Worklet path — UI-thread, syncs with frame.
+    runOnUI(() => {
+      'worklet';
+      const m = measure(animatedRef);
+      if (m === null || !m.width || !m.height) return;
+      runOnJS(setQRButtonAnchor)({
+        x: m.pageX,
+        y: m.pageY,
+        width: m.width,
+        height: m.height,
+        borderRadius: targetRadius,
+      });
+      runOnJS(initLog)(
+        'QRButtonAnchor',
+        `measure(UI) — pageX=${m.pageX} pageY=${m.pageY} width=${m.width} height=${m.height}`
+      );
+    })();
+    // JS-thread fallback for the Fabric quirk where measure() returns null.
+    // Same coord space; the store dedupes redundant publishes.
+    const node = animatedRef.current as unknown as {
+      measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
+    } | null;
+    node?.measureInWindow?.((x, y, w, h) => {
+      if (!w || !h) return;
+      setQRButtonAnchor({ x, y, width: w, height: h, borderRadius: targetRadius });
+      initLog(
+        'QRButtonAnchor',
+        `measureInWindow(JS) — x=${x} y=${y} width=${w} height=${h}`
+      );
+    });
+  }, [animatedRef, containerStyle.borderRadius]);
+
+  useEffect(() => {
+    visibility.value = withTiming(morphCompleted ? 1 : 0, { duration: 180 });
+  }, [morphCompleted, visibility]);
+
+  useEffect(() => {
+    const unregister = registerQRButtonRemeasure(publishAnchor);
+    return () => {
+      unregister();
+      setQRButtonAnchor(null);
+    };
+  }, [publishAnchor]);
+
   return (
     <Log name="QRButton">
+      <Animated.View
+        ref={animatedRef}
+        onLayout={publishAnchor}
+        collapsable={false}
+        style={[{ width: size, height: size }, visibilityStyle]}>
       <TouchableOpacity
         style={[styles.touchable, { ...containerStyle, shadowColor: accentColor }]}
         className="items-center justify-center"
@@ -89,6 +159,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
           <Icon name="stash:qr-code" size={24} color={surfaceForeground} />
         </View>
       </TouchableOpacity>
+      </Animated.View>
     </Log>
   );
 }

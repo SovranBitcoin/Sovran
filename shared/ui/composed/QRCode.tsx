@@ -6,6 +6,7 @@ import { useInterval } from 'usehooks-ts';
 import { UR, UREncoder } from '@gandlaf21/bc-ur';
 import { PressableFeedback } from 'heroui-native';
 import { log, Log } from '@/shared/lib/logger';
+import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -362,9 +363,7 @@ export const QRSpeedControls = memo(function QRSpeedControls({
   const foreground = useThemeColor('foreground');
 
   return (
-    <View
-      className="bg-surface-secondary overflow-hidden"
-      style={{ marginHorizontal: 16, borderRadius: 24, borderCurve: 'continuous' }}>
+    <GradientCard style={{ marginHorizontal: 16 }}>
       <HStack style={{ minHeight: 44 }}>
         <PressableFeedback
           testID="qr-speed-control"
@@ -402,6 +401,6 @@ export const QRSpeedControls = memo(function QRSpeedControls({
           <PressableFeedback.Ripple />
         </PressableFeedback>
       </HStack>
-    </View>
+    </GradientCard>
   );
 });

@@ -33,24 +33,24 @@ export function newVersionPopup(params: { version: string }): void {
   popup({
     message: 'New Version Available',
     text: `A new version (${params.version}) is available. Please update to the latest version.`,
-    icon: 'icon:mdi:cellphone-arrow-down',
+    icon: 'icon:mdi:download',
     variant: 'sheet',
   });
 }
 
 export function copyFailedPopup(): void {
-  popup({ message: 'Failed to copy', icon: 'icon:mdi:clipboard-alert-outline', type: 'error' });
+  popup({ message: 'Failed to copy', icon: 'icon:mdi:alert-circle-outline', type: 'error' });
 }
 
 export function openLinkFailedPopup(): void {
-  popup({ message: 'Failed to open link', icon: 'icon:mdi:link-off', type: 'error' });
+  popup({ message: 'Failed to open link', icon: 'icon:lucide:link', type: 'error' });
 }
 
 export function walletStillLoadingPopup(): void {
   popup({
     message: 'Wallet is still loading',
     text: 'Please wait for the wallet to finish loading before switching profiles.',
-    icon: 'icon:mdi:timer-sand',
+    icon: 'icon:mdi:clock-outline',
     type: 'info',
   });
 }
@@ -58,7 +58,7 @@ export function walletStillLoadingPopup(): void {
 export function engagementUpdateFailedPopup(action: 'follow' | 'like' | 'repost'): void {
   popup({
     message: `Unable to update ${action} right now`,
-    icon: 'icon:mdi:account-alert',
+    icon: 'icon:mdi:alert-circle',
     type: 'error',
   });
 }

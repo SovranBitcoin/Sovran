@@ -137,7 +137,6 @@ export default function SplitBillSearchScreen() {
       <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
         <BottomButtons
           style={{ position: 'relative', backgroundColor: background }}
-          paddingBottom={16}
           onLayout={handleBottomBarLayout}>
           <HStack justify="center" align="center">
             <ButtonHandler

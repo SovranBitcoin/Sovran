@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useCameraPermissions } from 'expo-camera';
 import { Linking } from 'react-native';
 
-import { buttonHandlerPopup, cameraPermissionPopup } from '@/shared/lib/popup';
+import { actionMenuPopup, cameraPermissionPopup } from '@/shared/lib/popup';
 import { log } from '@/shared/lib/logger';
 
 export function useHandleCameraPermission() {
@@ -35,19 +35,15 @@ export function useHandleCameraPermission() {
     }
 
     log.warn('camera.permission.denied', { canAskAgain: permission.canAskAgain });
-    // For both denied and blocked, show error with Open Settings button
-    buttonHandlerPopup({
+    // For both denied and blocked, surface the Open Settings action.
+    actionMenuPopup({
       title: permission.canAskAgain ? 'Camera Permission Denied' : 'Camera Permission Blocked',
-      description: permission.canAskAgain
-        ? 'Camera access is denied. Please enable it in your device settings.'
-        : 'Camera access is blocked. Please enable it in your device settings.',
       buttons: [
         {
           text: 'Open Settings',
-          icon: 'mdi:cog-outline',
+          icon: 'material-symbols:settings-rounded',
           variant: 'primary',
-          onPress: async (close: any) => {
-            close({} as any);
+          onPress: async () => {
             await Linking.openURL('app-settings:');
           },
         },

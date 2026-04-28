@@ -11,7 +11,6 @@ import {
   usePopupStore,
   isCustomSheetPayload,
   type StandardSheetPayload,
-  type CustomSheetPayload,
 } from '@/shared/stores/runtime/popupStore';
 import { blendColors, sanitizeColor } from '@/shared/lib/colorExtraction';
 import {
@@ -35,29 +34,13 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import {
-  ButtonHandlerContent,
-  EmojiPickerContent,
-  ProofSelectorContent,
-  PaymentOptionsContent,
-  PaymentFallbackContent,
-  ProfileSwitcherContent,
-} from '@/shared/lib/popup/sheets';
-import { IMPORT_NSEC_LABEL } from '@/shared/lib/popup/sheets/profile-switcher/constants';
+import { EmojiPickerContent } from '@/shared/lib/popup/sheets';
 import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
 import type {
   CustomSheetFooterConfig,
   CustomSheetPage,
   CustomSheetNavDirection,
 } from '@/shared/lib/popup/sheets/types';
-
-type ProfileRoute = 'profile-list' | 'import-nsec';
-type ProfileNavDirection = 'forward' | 'back';
-type ImportFooterState = {
-  onImport: () => void;
-  isDisabled: boolean;
-  isImporting: boolean;
-};
 
 function getStickyFooterClass(mode?: 'contentHeight' | 'snapPoints'): string {
   const px = mode === 'contentHeight' ? 'px-0' : 'px-4';
@@ -233,7 +216,7 @@ function SubmessageRenderer({
 }
 
 const CUSTOM_SHEET_CONTENT: Record<
-  Exclude<keyof ActionSheetPayloads, 'profile-switcher'>,
+  keyof ActionSheetPayloads,
   React.ComponentType<{
     payload: unknown;
     close: () => void;
@@ -257,50 +240,6 @@ const CUSTOM_SHEET_CONTENT: Record<
     canPop: boolean;
     setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
   }>,
-  'proof-selector': ProofSelectorContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'button-handler': ButtonHandlerContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'payment-options': PaymentOptionsContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
-  'payment-fallback': PaymentFallbackContent as React.ComponentType<{
-    payload: unknown;
-    close: () => void;
-    pushCustomPage: <K extends keyof ActionSheetPayloads>(
-      sheetId: K,
-      payload: ActionSheetPayloads[K]
-    ) => void;
-    popCustomPage: () => void;
-    canPop: boolean;
-    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
-  }>,
 };
 
 function SheetContent({
@@ -309,12 +248,8 @@ function SheetContent({
   close,
   openCycle,
   confirmedAnimation,
-  profileRoute,
-  profileNavDirection,
   customNavDirection,
   isContentHeight,
-  onProfileBack,
-  onImportFooterStateChange,
   pushCustomPage,
   popCustomPage,
   canPopCustomPage,
@@ -325,12 +260,8 @@ function SheetContent({
   close: () => void;
   openCycle: number;
   confirmedAnimation?: ConfirmedAnimation;
-  profileRoute: ProfileRoute;
-  profileNavDirection: ProfileNavDirection;
   customNavDirection: CustomSheetNavDirection;
   isContentHeight: boolean;
-  onProfileBack: () => void;
-  onImportFooterStateChange: (state: ImportFooterState) => void;
   pushCustomPage: <K extends keyof ActionSheetPayloads>(
     sheetId: K,
     payload: ActionSheetPayloads[K]
@@ -361,23 +292,7 @@ function SheetContent({
   if (isCustom) {
     if (!activeCustomPage) return <View />;
 
-    if (activeCustomPage.sheetId === 'profile-switcher') {
-      return (
-        <ProfileSwitcherContent
-          payload={activeCustomPage.payload as ActionSheetPayloads['profile-switcher']}
-          close={close}
-          route={profileRoute}
-          navDirection={profileNavDirection}
-          onBack={onProfileBack}
-          onImportFooterStateChange={onImportFooterStateChange}
-        />
-      );
-    }
-    const nonProfileSheetId = activeCustomPage.sheetId as Exclude<
-      keyof ActionSheetPayloads,
-      'profile-switcher'
-    >;
-    const ContentComponent = CUSTOM_SHEET_CONTENT[nonProfileSheetId];
+    const ContentComponent = CUSTOM_SHEET_CONTENT[activeCustomPage.sheetId];
     if (!ContentComponent) return <View />;
     const entering =
       customNavDirection === 'forward' ? SlideInRight.duration(220) : SlideInLeft.duration(220);
@@ -524,7 +439,6 @@ function SheetPopup() {
     customStack[0]?.sheetId ?? (isCustom && payload ? payload.sheetId : undefined);
   const layoutConfig =
     isCustom && customRootSheetId ? SHEET_LAYOUT_CONFIG[customRootSheetId] : undefined;
-  const isProfileSwitcher = activeCustomPage?.sheetId === 'profile-switcher';
   const standardPayload = !isCustom ? (payload as StandardSheetPayload | null) : null;
   const hasLiveStatus = standardPayload?.status != null;
   const [foreground, overlay, success] = useThemeColor([
@@ -569,48 +483,6 @@ function SheetPopup() {
     [layoutConfig]
   );
 
-  const [profileStack, setProfileStack] = useState<ProfileRoute[]>(['profile-list']);
-  const [profileNavDirection, setProfileNavDirection] = useState<ProfileNavDirection>('forward');
-  const [importFooterState, setImportFooterState] = useState<ImportFooterState>({
-    onImport: () => {},
-    isDisabled: true,
-    isImporting: false,
-  });
-  const profileRoute = profileStack[profileStack.length - 1] ?? 'profile-list';
-
-  const resetProfileStack = useCallback(() => {
-    setProfileNavDirection('forward');
-    setProfileStack(['profile-list']);
-  }, []);
-
-  const pushProfileRoute = useCallback((route: ProfileRoute) => {
-    setProfileNavDirection('forward');
-    setProfileStack((prev) => {
-      const currentRoute = prev[prev.length - 1];
-      if (currentRoute === route) return prev;
-      return [...prev, route];
-    });
-  }, []);
-
-  const popProfileRoute = useCallback(() => {
-    setProfileNavDirection('back');
-    setProfileStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) resetProfileStack();
-  }, [isOpen, resetProfileStack]);
-
-  useEffect(() => {
-    if (profileRoute !== 'import-nsec') {
-      setImportFooterState({
-        onImport: () => {},
-        isDisabled: true,
-        isImporting: false,
-      });
-    }
-  }, [profileRoute]);
-
   useEffect(() => {
     const standard = !isCustom ? (current as StandardSheetPayload) : null;
     if (!standard?.duration || !isOpen) {
@@ -628,104 +500,43 @@ function SheetPopup() {
     if (!open && isOpen) close();
   };
 
-  const switcherPayload = isProfileSwitcher
-    ? (activeCustomPage?.payload as CustomSheetPayload<'profile-switcher'>['payload'])
-    : null;
-
   const renderCustomFooter = useCallback(
     (props: { animatedFooterPosition: any }) => {
       if (!isCustom) return null;
-
-      if (!isProfileSwitcher) {
-        if (!customFooterConfig || customFooterConfig.buttons.length === 0) return null;
-        return (
-          <BottomSheetFooter {...props}>
-            <View className={getStickyFooterClass(layoutConfig?.mode)}>
-              <View
-                className={customFooterConfig.layout === 'row' ? 'flex-row' : undefined}
-                style={{ gap: 10 }}>
-                {customFooterConfig.buttons.map((button, index) => {
-                  const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
-                  const buttonClassName = getSheetButtonClassName(variant);
-                  const className =
-                    customFooterConfig.layout === 'row'
-                      ? [buttonClassName, 'flex-1'].filter(Boolean).join(' ')
-                      : buttonClassName;
-
-                  return (
-                    <Button
-                      key={`${button.label}-${index}`}
-                      variant={variant}
-                      onPress={button.onPress}
-                      className={className}
-                      isDisabled={button.isDisabled}>
-                      <Button.Label className={getSheetButtonLabelClassName(variant)}>
-                        {button.label}
-                      </Button.Label>
-                    </Button>
-                  );
-                })}
-              </View>
-            </View>
-          </BottomSheetFooter>
-        );
-      }
-
-      if (!switcherPayload) return null;
+      if (!customFooterConfig || customFooterConfig.buttons.length === 0) return null;
       return (
         <BottomSheetFooter {...props}>
           <View className={getStickyFooterClass(layoutConfig?.mode)}>
-            <View style={{ gap: 10 }}>
-              {profileRoute === 'profile-list' ? (
-                <>
+            <View
+              className={customFooterConfig.layout === 'row' ? 'flex-row' : undefined}
+              style={{ gap: 10 }}>
+              {customFooterConfig.buttons.map((button, index) => {
+                const variant = button.variant ?? (index === 0 ? 'primary' : 'tertiary');
+                const buttonClassName = getSheetButtonClassName(variant);
+                const className =
+                  customFooterConfig.layout === 'row'
+                    ? [buttonClassName, 'flex-1'].filter(Boolean).join(' ')
+                    : buttonClassName;
+
+                return (
                   <Button
-                    variant="primary"
-                    className={getSheetButtonClassName('primary')}
-                    onPress={() => {
-                      switcherPayload.onRequestAction({ type: 'create' });
-                      close();
-                    }}>
-                    <Button.Label className={getSheetButtonLabelClassName('primary')}>
-                      Generate new account
+                    key={`${button.label}-${index}`}
+                    variant={variant}
+                    onPress={button.onPress}
+                    className={className}
+                    isDisabled={button.isDisabled}>
+                    <Button.Label className={getSheetButtonLabelClassName(variant)}>
+                      {button.label}
                     </Button.Label>
                   </Button>
-                  <Button variant="tertiary" onPress={() => pushProfileRoute('import-nsec')}>
-                    <Button.Label>{IMPORT_NSEC_LABEL}</Button.Label>
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="primary"
-                    className={getSheetButtonClassName('primary')}
-                    onPress={importFooterState.onImport}
-                    isDisabled={importFooterState.isDisabled}>
-                    <Button.Label className={getSheetButtonLabelClassName('primary')}>
-                      {importFooterState.isImporting ? 'Importing...' : 'Import'}
-                    </Button.Label>
-                  </Button>
-                  <Button variant="tertiary" onPress={popProfileRoute}>
-                    <Button.Label>Back</Button.Label>
-                  </Button>
-                </>
-              )}
+                );
+              })}
             </View>
           </View>
         </BottomSheetFooter>
       );
     },
-    [
-      isCustom,
-      isProfileSwitcher,
-      customFooterConfig,
-      layoutConfig?.mode,
-      profileRoute,
-      switcherPayload,
-      close,
-      pushProfileRoute,
-      popProfileRoute,
-      importFooterState,
-    ]
+    [isCustom, customFooterConfig, layoutConfig?.mode]
   );
 
   if (destroyed) return null;
@@ -769,12 +580,8 @@ function SheetPopup() {
             close={close}
             openCycle={openCycle}
             confirmedAnimation={confirmedAnimation}
-            profileRoute={profileRoute}
-            profileNavDirection={profileNavDirection}
             customNavDirection={customNavDirection}
             isContentHeight={layoutConfig?.mode === 'contentHeight'}
-            onProfileBack={popProfileRoute}
-            onImportFooterStateChange={setImportFooterState}
             pushCustomPage={pushCustomPage}
             popCustomPage={popCustomPage}
             canPopCustomPage={canPopCustomPage}

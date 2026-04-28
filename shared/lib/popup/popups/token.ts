@@ -15,7 +15,7 @@ export function tokenAlreadyRedeemedPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Token Already Redeemed',
     text: 'All proofs are spent — the recipient already claimed it. Nothing to reclaim.',
-    icon: 'icon:mdi:information-outline',
+    icon: 'icon:mdi:information',
     type: 'info',
     ...overrides,
   });
@@ -81,7 +81,7 @@ export function fundsReclaimedPopup(
   popup({
     message: 'Funds Reclaimed',
     text: `${params.amount} ${params.unit} reclaimed back into your wallet.`,
-    icon: 'icon:mdi:cash-refund',
+    icon: 'icon:mdi:cash-multiple',
     type: 'success',
     ...overrides,
   });
@@ -90,7 +90,7 @@ export function fundsReclaimedPopup(
 export function reclaimFailedPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Reclaim Failed',
-    icon: 'icon:mdi:cash-remove',
+    icon: 'icon:mdi:cash-multiple',
     type: 'error',
     ...overrides,
   });
@@ -100,7 +100,7 @@ export function tokenCannotCheckStatusPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Cannot Check Status',
     text: 'No operation ID and no token available to verify.',
-    icon: 'icon:mdi:help-circle-outline',
+    icon: 'icon:mdi:help-circle',
     type: 'warning',
     ...overrides,
   });
@@ -127,7 +127,7 @@ export function tokenPendingNotRedeemedPopup(overrides?: BaseOverrides): void {
 export function transactionAlreadyCancelledPopup(overrides?: BaseOverrides): void {
   popup({
     message: 'Transaction was already cancelled',
-    icon: 'icon:mdi:information-outline',
+    icon: 'icon:mdi:information',
     type: 'info',
     ...overrides,
   });

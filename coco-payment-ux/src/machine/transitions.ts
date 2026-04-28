@@ -133,6 +133,7 @@ function handleAmountEntered(
         mintUrl: event.mintUrl,
         destination: event.destination,
         offline: event.offline,
+        meltTarget: event.meltTarget,
       }
     : {
         ...currentCtx,
@@ -140,6 +141,7 @@ function handleAmountEntered(
         mintUrl: event.mintUrl || currentCtx.mintUrl,
         destination: event.destination ?? currentCtx.destination,
         offline: event.offline ?? currentCtx.offline,
+        meltTarget: event.meltTarget ?? currentCtx.meltTarget,
       };
 
   if (!ctx.intent) {

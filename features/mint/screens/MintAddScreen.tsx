@@ -18,6 +18,7 @@ import { useDebouncedMintValidation } from '@/features/mint/hooks/useDebouncedMi
 import { useMintSearch } from '@/features/mint/hooks/useMintSearch';
 import type { MintSearchResult } from '@/shared/lib/apiClient';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
+import { useMintProfiles } from '@/features/mint/hooks/useMintProfiles';
 import {
   extractDomain,
   getMintDisplayName,
@@ -36,13 +37,13 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { ContactRow, mintIdentity } from '@/shared/ui/composed/ContactRow';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { LegendList, type NativeScrollEvent, type NativeSyntheticEvent } from '@legendapp/list';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import opacity from 'hex-color-opacity';
-import { log, cashuLog, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
 
 // Height constant for currency tabs (same as MintListScreen)
@@ -60,7 +61,13 @@ interface PseudoMint {
 interface DisplayMint {
   url: string;
   name: string;
-  mintInfo: { icon_url?: string | null; name?: string; description?: string | null } | null;
+  mintInfo: {
+    icon_url?: string | null;
+    name?: string;
+    description?: string | null;
+    /** NUT-06 contact entries — needed by `useMintProfiles` to find the operator's Nostr pubkey. */
+    contact?: Array<{ method: string; info: string }>;
+  } | null;
   contactFollowers?: number;
   contactReputation?: number;
   /** Server-provided audit state for sorting badge color */
@@ -77,7 +84,12 @@ type SearchableMint = DisplayMint | PseudoMint;
 
 function adaptSearchResult(result: MintSearchResult): DisplayMint {
   const profile = useMintProfileStore.getState().getCached(result.url);
-  const info = result.info ?? {};
+  const info = (result.info ?? {}) as {
+    icon_url?: string | null;
+    name?: string;
+    description?: string | null;
+    contact?: Array<{ method: string; info: string }>;
+  };
   return {
     url: result.url,
     name: info.name || result.name || extractDomain(result.url),
@@ -85,6 +97,7 @@ function adaptSearchResult(result: MintSearchResult): DisplayMint {
       icon_url: info.icon_url ?? null,
       name: info.name ?? result.name,
       description: info.description ?? null,
+      contact: Array.isArray(info.contact) ? info.contact : undefined,
     },
     contactFollowers: profile?.followers,
     contactReputation: profile ? Math.round(profile.reputation) : undefined,
@@ -290,7 +303,7 @@ export function MintAddScreen() {
   // Scroll tracking for animated currency tabs
   const scrollY = useSharedValue(0);
 
-  // Track header height from ModalLayoutWrapper
+  // Track header height from Screen
   const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
 
   const [selectedMints, setSelectedMints] = useState<Set<string>>(new Set());
@@ -356,6 +369,11 @@ export function MintAddScreen() {
 
   const { mints: knownMints } = useMintManagement();
 
+  // Subscribe to the mint-profile cache so that when `useMintProfiles` finishes
+  // resolving an operator's Nostr profile, `adaptSearchResult` re-runs and the
+  // row picks up `contactFollowers` / `contactReputation`.
+  const mintProfileCache = useMintProfileStore((s) => s.cache);
+
   // Adapt server results to display format, filter out already-known mints
   const displayMints = useMemo((): SearchableMint[] => {
     const t0 = performance.now();
@@ -410,7 +428,16 @@ export function MintAddScreen() {
       duration_ms: duration,
     });
     return adapted;
-  }, [searchResults, knownMints, searchQuery, validationState, customMintInfo]);
+  }, [searchResults, knownMints, searchQuery, validationState, customMintInfo, mintProfileCache]);
+
+  // Kick off Nostr profile fetches for any search result that has an operator
+  // pubkey in NUT-06 contact info. Results land in `useMintProfileStore`
+  // and the memo above re-runs once they arrive.
+  const profileFetchInputs = useMemo(
+    () => displayMints.map((m) => ({ url: m.url, mintInfo: m.mintInfo })),
+    [displayMints]
+  );
+  useMintProfiles(profileFetchInputs);
 
   // Extract available currencies from results
   const availableCurrencies = useMemo(() => {
@@ -666,40 +693,38 @@ export function MintAddScreen() {
   );
 
   return (
-    <Screen name="MintAddScreen">
+    <Screen
+      name="MintAddScreen"
+      headerGradient
+      stickyContent={currencyTabs}
+      stickyContentHeight={CURRENCY_TABS_HEIGHT}
+      scroll="custom"
+      onHeaderHeightChange={setTotalHeaderHeight}
+      footer={bottomButtons}
+      bgColor={surface}>
       <Stack.Screen options={screenOptions} />
-
-      <ModalLayoutWrapper
-        headerGradient
-        stickyContent={currencyTabs}
-        stickyContentHeight={CURRENCY_TABS_HEIGHT}
-        useCustomScrollView
-        onHeaderHeightChange={setTotalHeaderHeight}
-        bottomContent={bottomButtons}
-        bgColor={surface}>
-        <Spacer size={16} />
-        {!showContent ? (
-          <View className="flex-1 px-4" style={{ paddingTop: totalHeaderHeight }}>
-            <LoadingMintsList />
-          </View>
-        ) : (
-          <LegendList
-            data={displayMints}
-            renderItem={renderItem}
-            keyExtractor={keyExtractor}
-            extraData={selectedMints}
-            estimatedItemSize={120}
-            recycleItems
-            drawDistance={300}
-            style={{ flex: 1, height: 0 }}
-            contentContainerStyle={{ paddingBottom: 120 }}
-            ListHeaderComponent={listHeader}
-            ListEmptyComponent={emptyComponent}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-          />
-        )}
-      </ModalLayoutWrapper>
+      <Spacer size={16} />
+      {!showContent ? (
+        <View className="flex-1 px-4" style={{ paddingTop: totalHeaderHeight }}>
+          <LoadingMintsList />
+        </View>
+      ) : (
+        <LegendList
+          data={displayMints}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          extraData={selectedMints}
+          estimatedItemSize={120}
+          recycleItems
+          drawDistance={300}
+          style={{ flex: 1, height: 0 }}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={emptyComponent}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        />
+      )}
     </Screen>
   );
 }
