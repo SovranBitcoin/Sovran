@@ -19,6 +19,7 @@ import { useContactSearch, type DisplayResult } from '@/features/payments/hooks/
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
 import { isValidGeohash } from 'bitchat-module';
 import type { UserProfile } from '@/shared/lib/apiClient';
+import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 
 export type AllSearchResult =
   | { type: 'geohash'; id: string; geohash: string; score: number }
@@ -82,6 +83,22 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
   const { displayResults, searchLoading, hasSearched } = useContactSearch(query);
   const { tiers } = useLocationTiers();
 
+  // Pubkeys with a real (non-placeholder) row. The REST `/nostr/search`
+  // endpoint can return sparse / stale profile data — sometimes just a
+  // pubkey with none of `displayName`/`picture`/`nip05` populated — so we
+  // layer the shared kind-0 metadata cache on top. Cache hits paint
+  // immediately; missing/stale entries trigger a relay subscription. This
+  // mirrors the same overlay the split-bill picker does for its
+  // `useContactSearch` hits.
+  const realPubkeys = useMemo(
+    () =>
+      displayResults
+        .filter((r) => !!r.profile && !r.pubkey.startsWith('placeholder-'))
+        .map((r) => r.pubkey),
+    [displayResults],
+  );
+  const { metadata: cachedMetadata } = useNostrProfileMetadataMany(realPubkeys);
+
   return useMemo(() => {
     const trimmed = query.trim();
     const lowerQuery = trimmed.toLowerCase();
@@ -98,14 +115,37 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
     // prior results visible during a new query (stale-while-revalidate), so
     // flagging every row loading on every keystroke would re-skeleton real
     // results and cause the jarring flash we see on rapid typing.
-    const contactRows: AllSearchResult[] = displayResults.map((r: DisplayResult, i) => ({
-      type: 'contact' as const,
-      id: `contact:${r.pubkey}`,
-      pubkey: r.pubkey,
-      profile: r.profile,
-      isLoadingProfile: !hasSearched || !r.profile,
-      score: SCORE_CONTACT_BASE - i, // preserve order from API
-    }));
+    const contactRows: AllSearchResult[] = displayResults.map((r: DisplayResult, i) => {
+      // Overlay relay-cached kind-0 metadata over the REST snapshot:
+      // cache values win when defined (they're authoritative), falling
+      // back to the API row otherwise. Without this, search hits whose
+      // REST response carries only a pubkey render as fallback gradient
+      // + abbreviated pubkey title even though we already have the
+      // profile cached from another surface.
+      const cached = r.profile ? cachedMetadata.get(r.pubkey) : undefined;
+      const profile: UserProfile | undefined =
+        r.profile && cached
+          ? {
+              ...r.profile,
+              displayName: cached.displayName ?? r.profile.displayName,
+              name: cached.name ?? r.profile.name,
+              picture: cached.picture ?? r.profile.picture,
+              nip05: cached.nip05 ?? r.profile.nip05,
+              banner: cached.banner ?? r.profile.banner,
+              lud16: cached.lud16 ?? r.profile.lud16,
+              about: cached.about ?? r.profile.about,
+              website: cached.website ?? r.profile.website,
+            }
+          : r.profile;
+      return {
+        type: 'contact' as const,
+        id: `contact:${r.pubkey}`,
+        pubkey: r.pubkey,
+        profile,
+        isLoadingProfile: !hasSearched || !r.profile,
+        score: SCORE_CONTACT_BASE - i, // preserve order from API
+      };
+    });
 
     // --- tiers (label prefix or displayName substring) ---
     const tierRows: AllSearchResult[] = matchTiers(tiers, lowerQuery).map((tier) => {
@@ -129,5 +169,5 @@ export function useAllSearchResults(query: string): UseAllSearchResultsResult {
       results: combined,
       loading: searchLoading,
     };
-  }, [query, displayResults, searchLoading, hasSearched, tiers]);
+  }, [query, displayResults, searchLoading, hasSearched, tiers, cachedMetadata]);
 }

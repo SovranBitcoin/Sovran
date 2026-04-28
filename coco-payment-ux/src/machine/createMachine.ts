@@ -1064,7 +1064,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   const enterAmount = (
     amount: number,
     mintUrl: string,
-    opts?: { destination?: Destination; offline?: boolean }
+    opts?: { destination?: Destination; offline?: boolean; meltTarget?: string }
   ) =>
     send({
       type: 'AMOUNT_ENTERED',
@@ -1072,6 +1072,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       mintUrl,
       destination: opts?.destination,
       offline: opts?.offline,
+      meltTarget: opts?.meltTarget,
     });
 
   const chooseOption = (option: PaymentOption) => send({ type: 'OPTION_CHOSEN', option });

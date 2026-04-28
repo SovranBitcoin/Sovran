@@ -31,6 +31,15 @@ export function initNativeCrypto(): void {
   _initialized = true;
 
   try {
+    // Force cashu-ts's top-level to execute before we check for the
+    // global it installs. Metro's `inlineRequires: true` defers each
+    // import to first reference, so a static `import` of cashu-ts
+    // wouldn't actually load the module here — it only loads when
+    // a bound name is touched. The cashu-ts patch installs
+    // `globalThis.__CASHU_NATIVE` at module scope, so we have to
+    // load the module explicitly before reading the global.
+    require('@cashu/cashu-ts');
+
     const { NitroModules } = require('react-native-nitro-modules');
     const crypto = NitroModules.createHybridObject('Crypto');
 
@@ -43,9 +52,14 @@ export function initNativeCrypto(): void {
 
     if (globalThis.__CASHU_NATIVE) {
       globalThis.__CASHU_NATIVE.init(crypto);
-      cashuLog.info('cashu.native_crypto.enabled', {
-        functions: ['hashToCurve', 'blind', 'unblind', 'hashE', 'verifyDleqProof'],
-      });
+      const fns = ['hashToCurve', 'blind', 'unblind', 'hashE', 'verifyDleqProof'];
+      // pbkdf2HmacSha512 is consumed by `shared/lib/nostr/keyDerivation.ts`
+      // (BIP-39 mnemonicToSeed), independent of the cashu-ts patch.
+      // Surfacing it in the enabled-functions log makes it obvious whether
+      // a fresh build picked up the new native method without rebuilding
+      // the dev client.
+      if (typeof crypto.pbkdf2HmacSha512 === 'function') fns.push('pbkdf2HmacSha512');
+      cashuLog.info('cashu.native_crypto.enabled', { functions: fns });
     } else {
       cashuLog.warn('cashu.native_crypto.hook_missing', {
         reason: '__CASHU_NATIVE not found — cashu-ts patch not applied?',

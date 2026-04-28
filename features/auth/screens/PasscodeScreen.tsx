@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView } from 'react-native';
 import { router } from 'expo-router';
 
-import Container from '@/shared/ui/composed/Container';
+import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Card } from '@/shared/ui/composed/Card';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -12,7 +12,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import NumericKeyboard from '@/features/auth/components/NumericKeyboard';
 import { passcodeNotMatchPopup } from '@/shared/lib/popup';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 const PASSCODE_LENGTH = 4;
 
@@ -43,8 +43,7 @@ export function PasscodeScreen() {
   const currentValue = step === 'create' ? code : confirm;
 
   return (
-    <Container>
-      <Screen name="PasscodeScreen">
+    <ScreenWrapper name="PasscodeScreen" scroll="custom" safeArea>
         <ScrollView className={'px-4'}>
           <Card
             message="Forgetting your passcode will prevent you from accessing your wallet."
@@ -102,7 +101,6 @@ export function PasscodeScreen() {
             ]}
           />
         </ScrollView>
-      </Screen>
-    </Container>
+    </ScreenWrapper>
   );
 }

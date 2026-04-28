@@ -3,7 +3,9 @@ import { View } from 'react-native';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeStore, type ThemeMode } from '@/shared/stores/profile/themeStore';
 import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
-import { log } from '@/shared/lib/logger';
+import { log, initLog, useInitMount } from '@/shared/lib/logger';
+
+initLog('Module', 'ThemeProvider loaded');
 import { themeVariables, getThemeVariables } from '@/shared/lib/themeEngine';
 import { Uniwind } from 'uniwind';
 
@@ -27,6 +29,7 @@ const ThemeContext = createContext<ThemeContextValue>({
  * loaded) — missing either would flash the built-in fallback.
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  useInitMount('ThemeProvider');
   // Only gate on wallpaperStore — it's a global store and always hydrates.
   // themeStore is profile-scoped and its hydration is gated on
   // `_migrationGate`, which signals AFTER AccountScopedProviders mounts

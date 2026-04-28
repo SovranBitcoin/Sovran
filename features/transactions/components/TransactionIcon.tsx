@@ -1,7 +1,7 @@
 import React from 'react';
-import { ActivityIndicator } from 'react-native';
 import { View } from '@/shared/ui/primitives/View/View';
 import Icon from 'assets/icons';
+import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
@@ -43,11 +43,13 @@ export default function TransactionIcon({
 
   return (
     <Log name="TransactionIcon">
-      <View className="relative h-7 w-7 items-center justify-center bg-transparent">
+      <View
+        className="h-7 w-7 shrink-0 items-center justify-center bg-transparent"
+        style={{ marginTop: 6 }}>
         {isLoading ? (
-          <ActivityIndicator size="small" color={foreground} />
+          <Spinner size={22} color={foreground} />
         ) : (
-          <Icon name={getIconName()} color={foreground} size={28} />
+          <Icon name={getIconName()} color={foreground} size={24} />
         )}
       </View>
     </Log>

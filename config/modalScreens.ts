@@ -102,6 +102,7 @@ const flowGroups = [
   '(filter-flow)',
   '(map-flow)',
   '(split-bill-flow)',
+  '(theme-flow)',
 ].map(modalFlow);
 
 const standaloneScreens: ModalConfig[] = [
@@ -110,10 +111,6 @@ const standaloneScreens: ModalConfig[] = [
   slideFromRight('(user-flow)'),
   fullScreenModal('(stories-flow)', { contentStyle: { backgroundColor: '#000' } }),
   cardFade('healthModal'),
-  cardFade('pendingEcash', {
-    title: 'Pending Ecash',
-    headerBackButtonDisplayMode: 'minimal',
-  }),
   modalWithBlur('currency', 'formSheet', 'Select Amount'),
   modalTransparent('camera', 'Scan QR'),
   modalWithBlur('share', 'formSheet'),

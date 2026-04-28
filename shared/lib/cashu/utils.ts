@@ -11,7 +11,13 @@
  * @see {@link https://github.com/bitcoinvault/coco-cashu-core} Coco Cashu Core
  */
 
-import { getDecodedToken, type ReceiveHistoryEntry } from '@cashu/coco-core';
+import {
+  getDecodedToken,
+  type HistoryEntry,
+  type Manager,
+  type ReceiveHistoryEntry,
+  type SendHistoryEntry,
+} from '@cashu/coco-core';
 
 import { log } from '../logger';
 
@@ -129,6 +135,53 @@ export function buildReceiveHistoryEntry(
       rawToken,
       ...(p2pkPubkey ? { p2pkPubkey } : {}),
     },
+    state: 'prepared',
     token: decodedToken,
   };
+}
+
+// ============================================================================
+// Pending Ecash Send Helpers
+// ============================================================================
+
+/**
+ * Send-operation states that can be rolled back. `prepared` operations need
+ * `cancel`; `pending`/`executing` need `reclaim` (see `attemptRollback`).
+ */
+const CANCELLABLE_SEND_STATES = new Set(['pending', 'prepared']);
+
+/**
+ * Type guard: a history entry that can be cancelled by the user via swipe
+ * or the bulk-sweep button on Transactions.
+ */
+export function isCancellablePendingEcash(entry: HistoryEntry): entry is SendHistoryEntry {
+  return entry.type === 'send' && CANCELLABLE_SEND_STATES.has((entry as SendHistoryEntry).state);
+}
+
+/**
+ * State-aware rollback. Mirrors `attemptRollback` from
+ * `coco-payment-ux/src/operations/defaultOperations.ts` so the in-app sweep
+ * surface (Transactions) and the offline-payment-rollback path agree on
+ * which RPC to call: `cancel` for `prepared`, `reclaim` for `pending`/
+ * `executing`. Returns `true` on success, `false` otherwise (errors logged).
+ */
+export async function attemptRollback(mgr: Manager, operationId: string): Promise<boolean> {
+  try {
+    const operation = await mgr.ops.send.get(operationId);
+    if (operation && operation.state === 'prepared') {
+      await mgr.ops.send.cancel(operationId);
+    } else if (operation && (operation.state === 'pending' || operation.state === 'executing')) {
+      await mgr.ops.send.reclaim(operationId);
+    } else {
+      log.warn('cashu.utils.rollback.unexpected_state', {
+        operationId,
+        state: operation?.state ?? null,
+      });
+      return false;
+    }
+    return true;
+  } catch (error) {
+    log.error('cashu.utils.rollback.failed', { operationId, error });
+    return false;
+  }
 }

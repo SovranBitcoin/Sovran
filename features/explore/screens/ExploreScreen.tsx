@@ -1,4 +1,5 @@
 import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { useBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import { ScrollableGradientOverlay } from '@/shared/ui/composed/BackgroundView';
@@ -11,7 +12,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Link } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 import { ROUTSTR_PUBKEY } from '@/shared/lib/constants';
 import { notImplementedPopup } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
@@ -21,18 +22,14 @@ import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, Linking, ScrollView, StyleSheet, View as RNView } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
-import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { usePaginatedHistory } from '@cashu/coco-react';
 import { WalletHealthCard } from '@/features/health';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { ClaimUsernameCardFrame } from '@/shared/blocks/claim/ClaimUsernameCardFrame';
-import { PendingEcashCardFrame } from '@/shared/blocks/pending/PendingEcashCardFrame';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -499,13 +496,18 @@ const MapTeaserCard = () => {
   const { placesCache, fetchPlaces } = useBTCMapStore(
     useShallow((s) => ({ placesCache: s.placesCache, fetchPlaces: s.fetchPlaces }))
   );
+  const morphCompleted = useBootMorphCompleted();
 
-  // Pre-fetch places when component mounts (will use cache if available)
+  // Pre-fetch places once the boot splash → QR-button morph has settled.
+  // Native tabs eagerly mount Explore alongside the wallet, so without
+  // this gate this fetch (parses ~40k places, ~2–3s on the JS thread)
+  // races BitcoinNearYou's identical fetch and blocks first paint.
   useEffect(() => {
+    if (!morphCompleted) return;
     fetchPlaces().catch(() => {
       // Silently fail - we'll show fallback count
     });
-  }, [fetchPlaces]);
+  }, [morphCompleted, fetchPlaces]);
 
   const placesCount = placesCache?.data.length ?? 0;
   const displayCount =
@@ -916,167 +918,6 @@ const LightningAddressCard = () => {
   );
 };
 
-// Pending Ecash Card - Shows pending send operations that can be reclaimed
-// Styled to match WalletHealthCard with a green color scheme + hero transition
-const PendingEcashCard = () => {
-  const [foreground, background, green400] = useThemeColor([
-    'foreground',
-    'background',
-    'green-400',
-  ] as const);
-  const { history } = usePaginatedHistory();
-  const hero = useHeroTransition();
-  const cardRef = useRef<any>(null);
-
-  const primary50 = useMemo(() => opacity(foreground, 0.9), [foreground]);
-  const accentColor = green400;
-
-  // Filter pending send transactions
-  const pendingSends = useMemo(() => {
-    return history.filter(
-      (entry) => entry.type === 'send' && (entry.state === 'pending' || entry.state === 'prepared')
-    );
-  }, [history]);
-
-  // Calculate totals
-  const totalAmount = useMemo(() => {
-    return pendingSends.reduce((sum, tx) => sum + tx.amount, 0);
-  }, [pendingSends]);
-
-  const unit = pendingSends[0]?.unit || 'sat';
-
-  const handlePress = useCallback(() => {
-    hero.registerRef('pendingEcash', 'source', cardRef.current);
-    hero.startPendingEcash();
-  }, [hero]);
-
-  // Animated press state: GPU-accelerated scale + opacity (skill 3.3 / 7.1)
-  const pressed = useSharedValue(0);
-
-  const tap = Gesture.Tap()
-    .onBegin(() => {
-      pressed.set(withTiming(1, { duration: 150 }));
-    })
-    .onFinalize(() => {
-      pressed.set(withTiming(0, { duration: 200 }));
-    })
-    .onEnd(() => {
-      runOnJS(handlePress)();
-    });
-
-  const pressAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(pressed.get(), [0, 1], [1, 0.975]) }],
-    opacity: interpolate(pressed.get(), [0, 1], [1, 0.92]),
-  }));
-
-  // Don't show card if no pending transactions
-  if (pendingSends.length === 0) {
-    return null;
-  }
-
-  return (
-    <GestureDetector gesture={tap}>
-      <Animated.View style={pressAnimStyle}>
-        <RNView
-          ref={cardRef}
-          collapsable={false}
-          onLayout={() => hero.registerRef('pendingEcash', 'source', cardRef.current)}
-          shouldRasterizeIOS
-          renderToHardwareTextureAndroid
-          style={[
-            styles.pendingEcashCard,
-            {
-              borderColor: opacity(accentColor, 0.25),
-              opacity: hero.isHidden('pendingEcash', 'source') ? 0 : 1,
-            },
-          ]}>
-          <PendingEcashCardFrame
-            accentColor={accentColor}
-            backgroundColor={background}
-            highlightColor={primary50}>
-            <VStack style={{ padding: 18 }}>
-              <HStack align="center" justify="space-between">
-                <HStack align="center" gap={10}>
-                  <View
-                    style={[
-                      styles.pendingEcashIcon,
-                      { backgroundColor: opacity(accentColor, 0.16) },
-                    ]}>
-                    <Icon name="mdi:clock-alert-outline" size={22} color={accentColor} />
-                  </View>
-                  <VStack>
-                    <Text size={16} heavy style={{ color: primary50 }}>
-                      Pending Ecash
-                    </Text>
-                    <HStack align="center" gap={8} style={{ marginTop: 6 }}>
-                      <View
-                        style={[
-                          styles.pendingUnitPill,
-                          {
-                            backgroundColor: opacity(accentColor, 0.14),
-                            borderColor: opacity(accentColor, 0.22),
-                          },
-                        ]}>
-                        <Text size={10} heavy style={{ color: opacity(accentColor, 0.9) }}>
-                          {pendingSends.length} {pendingSends.length === 1 ? 'TOKEN' : 'TOKENS'}
-                        </Text>
-                      </View>
-                      <Text size={11} style={{ color: opacity(accentColor, 0.7) }}>
-                        Tap to reclaim
-                      </Text>
-                    </HStack>
-                  </VStack>
-                </HStack>
-                <Icon name="mdi:chevron-right" size={22} color={opacity(primary50, 0.85)} />
-              </HStack>
-
-              {/* Amount display row */}
-              <HStack align="center" style={{ marginTop: 14, gap: 16, flexWrap: 'wrap' }}>
-                <HStack align="center" gap={4}>
-                  <AmountFormatter
-                    amount={totalAmount}
-                    unit={unit}
-                    size={13}
-                    weight="medium"
-                    color={opacity(accentColor, 0.8)}
-                  />
-                  <Text size={11} style={{ color: opacity(accentColor, 0.8) }}>
-                    unclaimed
-                  </Text>
-                </HStack>
-              </HStack>
-
-              {/* CTA row */}
-              <View
-                style={[
-                  styles.pendingEcashCTA,
-                  {
-                    backgroundColor: opacity(accentColor, 0.12),
-                    borderColor: opacity(accentColor, 0.22),
-                  },
-                ]}>
-                <HStack align="center" justify="space-between">
-                  <HStack align="center" gap={8}>
-                    <Icon
-                      name="fluent:arrow-download-16-filled"
-                      size={16}
-                      color={opacity(accentColor, 0.9)}
-                    />
-                    <Text size={12} heavy style={{ color: primary50 }}>
-                      View & Reclaim
-                    </Text>
-                  </HStack>
-                  <Icon name="mdi:arrow-right" size={18} color={primary50} />
-                </HStack>
-              </View>
-            </VStack>
-          </PendingEcashCardFrame>
-        </RNView>
-      </Animated.View>
-    </GestureDetector>
-  );
-};
-
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -1243,15 +1084,6 @@ const ExploreScreen = () => {
               </View>
             )}
           </ScrollView>
-
-          <Spacer size={32} />
-
-          {/* Pending Ecash Section - only shows when there are pending transactions */}
-          <Animated.View
-            entering={FadeInUp.duration(380).delay(80)}
-            style={{ paddingHorizontal: 20 }}>
-            <PendingEcashCard />
-          </Animated.View>
 
           <Spacer size={32} />
 
@@ -1616,34 +1448,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
   lightningAddressCTA: {
-    marginTop: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  // Pending Ecash Card styles (matches WalletHealthCard pattern)
-  pendingEcashCard: {
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    overflow: 'hidden',
-    borderWidth: 1,
-  },
-  // pendingDecorationLeft/Right moved to PendingEcashCardFrame
-  pendingEcashIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pendingUnitPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  pendingEcashCTA: {
     marginTop: 14,
     borderRadius: 14,
     borderWidth: 1,

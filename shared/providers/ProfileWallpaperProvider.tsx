@@ -14,6 +14,9 @@
 import React, { createContext, useMemo } from 'react';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import type { UnitId, ThemeName } from '@/shared/stores/profile/themeStore';
+import { initLog, useInitMount } from '@/shared/lib/logger';
+
+initLog('Module', 'ProfileWallpaperProvider loaded');
 
 interface ProfileWallpaperContextValue {
   /** Resolve a wallpaper for a specific unit, or the profile primary if no unitId. */
@@ -23,6 +26,7 @@ interface ProfileWallpaperContextValue {
 const ProfileWallpaperContext = createContext<ProfileWallpaperContextValue | null>(null);
 
 export function ProfileWallpaperProvider({ children }: { children: React.ReactNode }) {
+  useInitMount('ProfileWallpaperProvider');
   const getUnitWallpaper = useThemeStore((s) => s.getUnitWallpaper);
 
   const value = useMemo<ProfileWallpaperContextValue>(

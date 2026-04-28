@@ -1,38 +1,50 @@
 import { GetInfoResponse } from '@cashu/cashu-ts';
 import { ok, err, Result } from 'neverthrow';
+import { z } from 'zod';
 import { apiLog } from './logger';
 import {
-  AuditMintResponse,
+  AuditMintResponse as AuditMintResponseStrict,
   CatalogResponse,
   LatestVersionResponse,
   MintReviewsResponse,
   MintSearchResponse,
-  NostrProfileFull,
+  NostrProfileResponse,
   SearchUsersResponse,
   loggableIssues,
   parseWith,
-  type AuditMintResponse as AuditMintResponseType,
   type CatalogResponse as CatalogResponseType,
   type LatestVersionResponse as LatestVersionResponseType,
   type MintRecommendation,
   type MintReviewsResponse as MintReviewsResponseType,
   type MintSearchResponse as MintSearchResponseType,
   type MintSearchResult,
-  type NostrProfileFull as NostrProfileFullType,
-  type NostrSearchResult,
+  type NostrProfileResponse as NostrProfileResponseType,
+  type UserProfile,
   type ParseError,
   type SearchUsersResponse as SearchUsersResponseType,
   type TopFollower,
 } from '@sovranbitcoin/schemas';
 
+// Local relaxation: the auditor returns `info` in several shapes depending
+// on the upstream mint state — sometimes a NUT-06 object, sometimes null,
+// sometimes an empty string when it couldn't reach the mint. The strict
+// schema rejected anything but a populated object, dropping `auditScore`/
+// `auditState` whenever the auditor's mint reach failed. Match the lenient
+// shape used by `MintSearchResult.info` (unknown + optional) — downstream
+// consumers (getMintCatalog) already type-narrow before reading.
+// TODO: mirror this in `sovran-schemas` and drop the override on next publish.
+const AuditMintResponse = AuditMintResponseStrict.extend({
+  info: z.unknown().optional(),
+});
+type AuditMintResponseType = z.infer<typeof AuditMintResponse>;
+
 const BASE_URL = 'https://api.sovran.money/api';
 
 export const PRICELIST_URL = `wss://ws.sovran.money`;
 
-// Re-export schema-derived types for backwards compatibility with legacy
-// interface names used across the app. NostrProfileResponse / UserProfile
-// are kept as aliases for the renamed NostrProfileFull / NostrSearchResult
-// so downstream consumers don't need to churn their imports.
+// Re-export schema-derived types for callers that previously imported them
+// from this module. `NostrProfileResponse` and `UserProfile` are re-exported
+// under their canonical schema names so downstream consumers need no changes.
 export type {
   AuditMintResponseType as AuditMintResponse,
   CatalogResponseType as WallpaperCatalogResponse,
@@ -41,8 +53,8 @@ export type {
   MintReviewsResponseType as MintReviewsResponse,
   MintSearchResult,
   MintSearchResponseType as MintSearchResponse,
-  NostrProfileFullType as NostrProfileResponse,
-  NostrSearchResult as UserProfile,
+  NostrProfileResponseType as NostrProfileResponse,
+  UserProfile,
   SearchUsersResponseType as SearchUsersResponse,
   TopFollower,
 };
@@ -97,7 +109,7 @@ const parseSearchUsers = parseWith(SearchUsersResponse, 'nostr/search');
 const parseAuditMint = parseWith(AuditMintResponse, 'cashu/mint/audit');
 const parseMintReviews = parseWith(MintReviewsResponse, 'cashu/mint/reviews');
 const parseMintSearch = parseWith(MintSearchResponse, 'cashu/mints/search');
-const parseNostrProfile = parseWith(NostrProfileFull, 'nostr/profile');
+const parseNostrProfile = parseWith(NostrProfileResponse, 'nostr/profile');
 const parseLatestVersion = parseWith(LatestVersionResponse, 'app/latest-version');
 const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
 

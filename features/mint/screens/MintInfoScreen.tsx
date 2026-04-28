@@ -437,7 +437,7 @@ export function MintInfoScreen() {
           await Linking.openURL(`https://x.com/${info.replace('@', '')}`);
           break;
         case 'nostr':
-          router.navigate({ pathname: '/userMessages', params: { pubkey: npubToPubkey(info) } });
+          router.navigate({ pathname: '/(user-flow)/profile', params: { npub: info } });
           break;
         default:
           await Clipboard.setStringAsync(info);
@@ -504,7 +504,7 @@ export function MintInfoScreen() {
             <RatingBarChart score={entry.kymScore} />
           )}
 
-          {entry?.auditState != null && (
+          {(entry?.auditState != null || typeof entry?.auditScore === 'number') && (
             <StatsGrid
               successRate={entry?.successRate as number | undefined}
               avgTimeMs={entry?.avgTimeMs as number | undefined}

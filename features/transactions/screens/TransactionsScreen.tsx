@@ -6,25 +6,33 @@
  *
  * Features:
  * - Native Stack header handles title and buttons
- * - Sticky month selector with blur/gradient below header (via ModalLayoutWrapper)
+ * - Sticky month selector with blur/gradient below header (via Screen)
  * - Virtualized transaction list
  * - Filter support via external props (from filter flow)
+ * - Inline pending-ecash sweep: when tab=Pending and the visible bucket has
+ *   cancellable ecash sends, surfaces a "Cancel N pending" footer that
+ *   reclaims every visible row, plus per-row swipe-to-cancel.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Transactions } from '@/features/transactions/components/Transactions';
 import { MonthSelector } from '@/features/transactions/components/MonthSelector';
-import { HistoryEntry } from '@cashu/coco-core';
+import { HistoryEntry, SendHistoryEntry } from '@cashu/coco-core';
 import { useHistoryWithMelts } from '@/features/transactions/hooks/useHistoryWithMelts';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
-import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { Screen } from '@/shared/ui/composed/Screen';
+import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
+import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
+import { rollbackPartialPopup, rollbackSuccessPopup } from '@/shared/lib/popup';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { useManager } from '@cashu/coco-react';
+import { attemptRollback } from '@/shared/lib/cashu/utils';
+import { useRollbackStore } from '@/shared/stores/runtime/rollbackStore';
 
 type StatusTab = 'All' | 'Confirmed' | 'Pending' | 'Expired';
 type PaymentType = 'all' | 'lightning' | 'ecash';
 type Direction = 'all' | 'incoming' | 'outgoing';
 
-// Height constant for month selector (sticky content)
 const MONTH_SELECTOR_HEIGHT = 48;
 
 interface TransactionsScreenProps {
@@ -58,19 +66,77 @@ export function TransactionsScreen({
   onMonthChange,
 }: TransactionsScreenProps) {
   useLifecycleLogger('TransactionsScreen');
-  // Use external filter props if provided, otherwise use internal state
+  const manager = useManager();
+
   const selectedCurrency = filterCurrency || initialAccount?.unit || 'sat';
   const paymentType = filterPaymentType;
   const direction = filterDirection;
-  const tab = initialTab; // Status tab now comes from filter flow
+  const tab = initialTab;
 
-  // Internal state for month selection if no external handler provided
   const [internalMonth, setInternalMonth] = useState<string | null>(null);
   const selectedMonth = filterMonth !== undefined ? filterMonth : internalMonth;
   const handleMonthChange = onMonthChange || setInternalMonth;
 
-  // Track total header height from ModalLayoutWrapper
   const [totalHeaderHeight, setTotalHeaderHeight] = useState(0);
+
+  const [visiblePendingEcash, setVisiblePendingEcash] = useState<SendHistoryEntry[]>([]);
+  const [isSweeping, setIsSweeping] = useState(false);
+
+  const reclaimOne = useCallback(
+    async (operationId: string): Promise<boolean> => {
+      const { start, succeed, fail } = useRollbackStore.getState();
+      start(operationId);
+      const ok = await attemptRollback(manager, operationId);
+      if (ok) succeed(operationId);
+      else fail(operationId);
+      return ok;
+    },
+    [manager]
+  );
+
+  const handleCancelOne = useCallback(
+    async (entry: SendHistoryEntry) => {
+      if (useRollbackStore.getState().inFlight.has(entry.operationId)) return;
+      log.info('transactions.pending.cancel.one', {
+        operationId: entry.operationId,
+        mintUrl: entry.mintUrl,
+      });
+      await reclaimOne(entry.operationId);
+    },
+    [reclaimOne]
+  );
+
+  const handleSweepVisible = useCallback(async () => {
+    if (isSweeping || visiblePendingEcash.length === 0) return;
+    log.info('transactions.pending.sweep.visible.start', {
+      count: visiblePendingEcash.length,
+    });
+    setIsSweeping(true);
+
+    const targets = [...visiblePendingEcash];
+    let success = 0;
+    let failed = 0;
+    for (const tx of targets) {
+      const ok = await reclaimOne(tx.operationId);
+      if (ok) success++;
+      else failed++;
+    }
+
+    setIsSweeping(false);
+    log.info('transactions.pending.sweep.visible.complete', { success, failed });
+
+    if (failed === 0) {
+      rollbackSuccessPopup({ count: success });
+    } else {
+      rollbackPartialPopup({ success, failed, total: targets.length });
+    }
+  }, [isSweeping, visiblePendingEcash, reclaimOne]);
+
+  const totalVisiblePendingAmount = useMemo(
+    () => visiblePendingEcash.reduce((sum, tx) => sum + tx.amount, 0),
+    [visiblePendingEcash]
+  );
+  const visibleUnit = visiblePendingEcash[0]?.unit || selectedCurrency;
 
   const getCocoTransactionTypes = useCallback((): HistoryEntry['type'][] => {
     if (paymentType === 'all' && direction === 'all') {
@@ -110,7 +176,6 @@ export function TransactionsScreen({
 
   const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}-${selectedMonth}`;
 
-  // Filter by currency and payment type/direction
   const filteredByTypeHistory = useMemo(() => {
     const allowedTypes = getCocoTransactionTypes();
 
@@ -123,7 +188,6 @@ export function TransactionsScreen({
 
   const parsedAccount = { unit: selectedCurrency };
 
-  // Month selector sticky content
   const monthSelectorContent = useMemo(
     () => (
       <MonthSelector
@@ -135,38 +199,72 @@ export function TransactionsScreen({
     [filteredByTypeHistory, selectedMonth, handleMonthChange]
   );
 
-  // List header spacer to push content below sticky header
   const listHeader = useMemo(
     () => <View style={{ height: totalHeaderHeight }} />,
     [totalHeaderHeight]
   );
 
+  // Footer: cancel-all-visible button. Only on the Pending tab — surfacing
+  // a sweep action while the user browses 'All' (mostly historical) mixes
+  // intents.
+  const showSweepFooter = tab === 'Pending' && visiblePendingEcash.length > 0;
+
+  const sweepFooter = useMemo(() => {
+    if (!showSweepFooter) return undefined;
+    return (
+      <BottomButtons>
+        <ButtonHandler
+          buttons={[
+            {
+              text: isSweeping
+                ? 'Cancelling...'
+                : `Cancel ${visiblePendingEcash.length} pending (${totalVisiblePendingAmount} ${visibleUnit.toUpperCase()})`,
+              variant: 'primary',
+              icon: 'mdi:broom',
+              loading: isSweeping,
+              disabled: isSweeping,
+              onPress: handleSweepVisible,
+            },
+          ]}
+        />
+      </BottomButtons>
+    );
+  }, [
+    showSweepFooter,
+    isSweeping,
+    visiblePendingEcash.length,
+    totalVisiblePendingAmount,
+    visibleUnit,
+    handleSweepVisible,
+  ]);
+
   return (
-    <ModalLayoutWrapper
+    <Screen
+      name="TransactionsScreen"
       headerGradient
       stickyContent={monthSelectorContent}
       stickyContentHeight={MONTH_SELECTOR_HEIGHT}
-      useCustomScrollView
+      scroll="custom"
+      footer={sweepFooter}
       onHeaderHeightChange={setTotalHeaderHeight}>
-      <Screen name="TransactionsScreen">
-        {/* Transaction list with proper header spacer */}
-        <Transactions
-          listKey={listKey}
-          account={{ ...parsedAccount, unit: selectedCurrency }}
-          showMore={false}
-          history={history}
-          isFetching={isFetching}
-          filter={direction}
-          type={paymentType}
-          mintUrlFilter={filterMintUrl}
-          at="all"
-          tab={tab}
-          selectedMonth={selectedMonth}
-          onTransactionPress={onTransactionPress}
-          header={listHeader}
-          disableContentInsetAdjustment
-        />
-      </Screen>
-    </ModalLayoutWrapper>
+      <Transactions
+        listKey={listKey}
+        account={{ ...parsedAccount, unit: selectedCurrency }}
+        showMore={false}
+        history={history}
+        isFetching={isFetching}
+        filter={direction}
+        type={paymentType}
+        mintUrlFilter={filterMintUrl}
+        at="all"
+        tab={tab}
+        selectedMonth={selectedMonth}
+        onTransactionPress={onTransactionPress}
+        onCancelPendingEcash={handleCancelOne}
+        onVisiblePendingEcashChange={setVisiblePendingEcash}
+        header={listHeader}
+        disableContentInsetAdjustment
+      />
+    </Screen>
   );
 }

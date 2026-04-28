@@ -1,7 +1,9 @@
 import React, { useEffect, createContext } from 'react';
 import { usePricelistStore, BitcoinPrices } from '@/shared/stores/global/pricelistStore';
 import { PRICELIST_URL } from '@/shared/lib/apiClient';
-import { log } from '@/shared/lib/logger';
+import { log, initLog, useInitMount } from '@/shared/lib/logger';
+
+initLog('Module', 'PricelistProvider loaded');
 import { PricelistWsMessage, loggableIssues, parseWith } from '@sovranbitcoin/schemas';
 
 const parsePricelistWs = parseWith(PricelistWsMessage, 'pricelist.ws');
@@ -16,6 +18,7 @@ interface PricelistContextType {
 const PricelistContext = createContext<PricelistContextType | null>(null);
 
 export const PricelistProvider = ({ children }: { children: React.ReactNode }) => {
+  useInitMount('PricelistProvider');
   const {
     pricelist,
     isLoading,

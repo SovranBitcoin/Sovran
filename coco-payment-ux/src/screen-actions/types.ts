@@ -50,9 +50,43 @@ export type ScreenActionName = {
   mintSelector: 'select' | 'getInfo' | 'addMint';
 };
 
+/**
+ * One alternate form of an action. Used to surface split-button menus in the UI
+ * without forcing callers to invent sibling action names for every payment
+ * method or format. Callers invoke a variant via
+ * `actions.<name>.execute({ variantId: v.id })`; the `variantId` threads through
+ * to the handler's ctx.
+ *
+ * Examples:
+ *   - `sendToken.copy` → `[{ id: 'text', ... }, { id: 'emoji', ... }]`
+ *   - `amountEntry.next` → `[{ id: 'ecash', ... }, { id: 'lightning', ... }]`
+ */
+export interface ActionVariant {
+  /** Stable identifier — consumed by handlers via `ctx.variantId`. */
+  id: string;
+  /** Short label — e.g. "as Lightning", "as Emoji". */
+  label: string;
+  /** Optional description for UI; often the `reason` when `available === false`. */
+  description?: string;
+  /** iconify name, optional. UI renders as the item's leading glyph. */
+  icon?: string;
+  /** True when the variant can be executed; false variants still render disabled. */
+  available: boolean;
+  /** Human-readable explanation when `available === false`. */
+  reason?: string;
+  /** Marks destructive variants (red styling). */
+  isDestructive?: boolean;
+}
+
 export interface ActionAvailability {
   available: boolean;
   reason?: string;
+  /**
+   * Optional alternate forms of this action. When present, the UI can surface a
+   * split-button menu and pass `{ variantId }` to `execute`. Back-compat: if
+   * omitted, existing screens behave identically.
+   */
+  variants?: ActionVariant[];
 }
 
 export interface ActionState extends ActionAvailability {

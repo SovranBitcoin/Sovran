@@ -42,7 +42,7 @@ import { Platform } from 'react-native';
 // When true, all log output (console + ring buffer) is active.
 // Tied to __DEV__ by default so dev builds always have logging.
 // Set to false manually to silence ALL output (useful when profiling overhead).
-const SHOW_LOGS = false
+const SHOW_LOGS = false;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -824,6 +824,89 @@ export const log = createLogger({
 
 export function initLog(tag: string, msg: string): void {
   log.info('init.timing', { tag, msg, offsetMs: now() });
+}
+
+/**
+ * Log mount + unmount of a component into the init timeline. Use on every
+ * provider / gate so we can see the mount waterfall during cold boot.
+ *   useInitMount('CocoProvider');
+ */
+export function useInitMount(tag: string): void {
+  useEffect(() => {
+    initLog(tag, 'mount');
+    return () => initLog(tag, 'unmount');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
+/**
+ * Log every render of a component into the init timeline (deduped by the
+ * 50ms window in createLogger). Use on hot-path providers when investigating
+ * unnecessary re-renders during boot.
+ */
+export function useInitRender(tag: string): void {
+  initLog(tag, 'render');
+}
+
+/**
+ * Time an async block. Logs `<label>.start` immediately and `<label>.end`
+ * on completion with `durationMs`. Re-throws errors after logging
+ * `<label>.error`.
+ *
+ * Returns the awaited value so it composes cleanly:
+ *   const proofs = await initPhase('Coco.dbOpen', () => manager.initialize());
+ */
+export async function initPhase<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  const start = now();
+  initLog(label, 'start');
+  try {
+    const result = await fn();
+    const durationMs = +(now() - start).toFixed(2);
+    log.info('init.timing', {
+      tag: label,
+      msg: 'end',
+      offsetMs: now(),
+      durationMs,
+    });
+    return result;
+  } catch (error) {
+    const durationMs = +(now() - start).toFixed(2);
+    log.warn('init.timing', {
+      tag: label,
+      msg: 'error',
+      offsetMs: now(),
+      durationMs,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+/** Synchronous variant of `initPhase`. Times a sync block and logs duration. */
+export function initPhaseSync<T>(label: string, fn: () => T): T {
+  const start = now();
+  initLog(label, 'start');
+  try {
+    const result = fn();
+    const durationMs = +(now() - start).toFixed(2);
+    log.info('init.timing', {
+      tag: label,
+      msg: 'end',
+      offsetMs: now(),
+      durationMs,
+    });
+    return result;
+  } catch (error) {
+    const durationMs = +(now() - start).toFixed(2);
+    log.warn('init.timing', {
+      tag: label,
+      msg: 'error',
+      offsetMs: now(),
+      durationMs,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 // ─── Domain Child Loggers ────────────────────────────────────────────────────

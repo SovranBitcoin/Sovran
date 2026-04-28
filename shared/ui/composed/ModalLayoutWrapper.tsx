@@ -4,14 +4,14 @@
  * Set debug={true} to see layout debug indicators.
  */
 
-import React, { ReactNode, useCallback, useEffect, useState } from 'react';
+import React, { ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { NativeScrollEvent, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedScrollHandler,
   useSharedValue,
   SharedValue,
 } from 'react-native-reanimated';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { HeaderHeightContext } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScrollEdgeFade } from './ScrollEdgeFade';
@@ -100,7 +100,12 @@ export function ModalLayoutWrapper({
   scrollIndicatorInsets,
   bgColor,
 }: ModalLayoutWrapperProps) {
-  const headerHeight = useHeaderHeight();
+  // Read the header height context directly with a fallback so this wrapper
+  // is safe to render outside a Stack navigator (e.g., AppGate renders the
+  // TermsAndConditionsScreen directly during onboarding before the user has
+  // entered the navigation tree). `useHeaderHeight()` throws when the
+  // context is missing; we just want 0 in that case.
+  const headerHeight = useContext(HeaderHeightContext) ?? 0;
   const insets = useSafeAreaInsets();
   const themeBackground = useThemeColor('background');
   const background = bgColor ?? themeBackground;

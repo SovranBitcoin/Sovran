@@ -31,7 +31,9 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { useInitializationStage } from './InitializationProvider';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { log, initLog } from '@/shared/lib/logger';
+import { log, initLog, initPhase, useInitMount } from '@/shared/lib/logger';
+
+initLog('Module', 'NostrKeysProvider loaded');
 
 interface NostrKeys {
   npub: string;
@@ -80,6 +82,7 @@ interface NostrKeysProviderProps {
  * This prevents expensive key derivation from happening multiple times
  */
 export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKeysProviderProps) {
+  useInitMount('NostrKeysProvider');
   const stage = useInitializationStage('nostr', {
     message: 'Initializing keys...',
     dependsOn: ['migrations'],
@@ -248,9 +251,7 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
 
         if (!mnemonicToUse) {
           stage.log('Generating new wallet...');
-          initLog('NostrKeys', 'generating new mnemonic...');
-          mnemonicToUse = await ensureMnemonicExists();
-          initLog('NostrKeys', `ensureMnemonicExists done: ${!!mnemonicToUse}`);
+          mnemonicToUse = await initPhase('NostrKeys.ensureMnemonic', () => ensureMnemonicExists());
           if (mnemonicToUse) {
             await refreshMnemonic();
           }
@@ -261,13 +262,17 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         }
 
         // Defer CPU-bound derivation until after animations (e.g. drawer close on profile switch)
-        await new Promise<void>((resolve) => {
-          InteractionManager.runAfterInteractions(() => resolve());
-        });
+        await initPhase(
+          'NostrKeys.runAfterInteractions',
+          () =>
+            new Promise<void>((resolve) => {
+              InteractionManager.runAfterInteractions(() => resolve());
+            })
+        );
 
-        initLog('NostrKeys', 'hashing mnemonic...');
-        const mHash = hashMnemonic(mnemonicToUse);
-        initLog('NostrKeys', 'mnemonic hashed');
+        const mHash = await initPhase('NostrKeys.hashMnemonic', async () =>
+          hashMnemonic(mnemonicToUse!)
+        );
         let defaultKeys: NostrKeys | null = null;
         let defaultCashuMnemonic: string | null = null;
 
@@ -320,11 +325,14 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         } else {
           // ── Derived profile: existing NIP-06 derivation path ──
           // Try loading cached keys from SecureStore (fast path)
-          initLog('NostrKeys', 'reading cached keys from SecureStore...');
-          const [cachedDerived, cachedCashu] = await Promise.all([
-            retrieveDerivedKeys(defaultAccountIndex),
-            retrieveCashuMnemonic(defaultAccountIndex),
-          ]);
+          const [cachedDerived, cachedCashu] = await initPhase(
+            'NostrKeys.cacheRead',
+            () =>
+              Promise.all([
+                retrieveDerivedKeys(defaultAccountIndex),
+                retrieveCashuMnemonic(defaultAccountIndex),
+              ])
+          );
           initLog(
             'NostrKeys',
             `cache read done — derived=${!!cachedDerived} cashu=${!!cachedCashu}`
@@ -346,13 +354,14 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
             defaultCashuMnemonic = cachedCashu.value;
           } else {
             stage.log('Deriving keys...');
-            initLog('NostrKeys', 'cache miss — deriving NIP-06 keys...');
-            defaultKeys = deriveNostrKeys(mnemonicToUse, defaultAccountIndex);
-            initLog('NostrKeys', 'NIP-06 keys derived');
+            defaultKeys = await initPhase('NostrKeys.deriveNip06', async () =>
+              deriveNostrKeys(mnemonicToUse!, defaultAccountIndex)
+            );
 
-            initLog('NostrKeys', 'deriving Cashu mnemonic (BIP32)...');
-            defaultCashuMnemonic = deriveCashuMnemonicPure(mnemonicToUse, defaultAccountIndex);
-            initLog('NostrKeys', 'Cashu mnemonic derived');
+            defaultCashuMnemonic = await initPhase(
+              'NostrKeys.deriveCashuMnemonic',
+              async () => deriveCashuMnemonicPure(mnemonicToUse!, defaultAccountIndex)
+            );
 
             const cachePayload: CachedDerivedKeys = {
               npub: defaultKeys.npub,

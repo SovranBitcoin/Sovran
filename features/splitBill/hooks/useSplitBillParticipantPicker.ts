@@ -285,12 +285,38 @@ export interface UseSplitBillParticipantPickerResult {
   searchLoading: boolean;
 }
 
-export function useSplitBillParticipantPicker(): UseSplitBillParticipantPickerResult {
-  const { keys: nostrKeys } = useNostrKeysContext();
+export interface UseSplitBillParticipantPickerOptions {
+  /**
+   * When `false`, all expensive subscriptions short-circuit: NDK relay
+   * subscriptions never go out, NIP-17 unwrapping is skipped, kind-0
+   * profile metadata isn't subscribed to, and the contact search
+   * stays dormant. The hook still returns a fully-shaped result —
+   * just with empty sections / candidates — so the consuming context
+   * provider can be mounted unconditionally without timing races.
+   *
+   * Defaults to `true` so existing call sites are unaffected.
+   */
+  enabled?: boolean;
+}
+
+export function useSplitBillParticipantPicker(
+  options: UseSplitBillParticipantPickerOptions = {},
+): UseSplitBillParticipantPickerResult {
+  const enabled = options.enabled ?? true;
+  // Suppress nostrKeys downstream when disabled. Both `useRecentContacts`
+  // and the kind-0 `useSubscribe` below already gate their relay traffic
+  // on `nostrKeys?.pubkey` being defined — passing `null` is the
+  // single-line knob that turns the entire NDK side of the hook into a
+  // no-op without restructuring the call graph.
+  const { keys: realNostrKeys } = useNostrKeysContext();
+  const nostrKeys = enabled ? realNostrKeys : null;
   const { peers: blePeers } = useBLEPeers();
   const { displayContacts } = useRecentContacts(nostrKeys);
   const [searchQuery, setSearchQuery] = useState('');
-  const { displayResults, searchLoading, hasSearched } = useContactSearch(searchQuery);
+  // Disabled mode: pass an empty query so `useContactSearch`'s length
+  // guard short-circuits before debounce or the API call.
+  const effectiveSearchQuery = enabled ? searchQuery : '';
+  const { displayResults, searchLoading, hasSearched } = useContactSearch(effectiveSearchQuery);
 
   // --- Self candidates — the user's own profiles (one entry per account
   //     in `profileStore`). Rendered in the "Your Accounts" section at

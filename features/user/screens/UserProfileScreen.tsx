@@ -36,7 +36,7 @@ import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
-import { Contacts, Metadata } from 'nostr-tools/kinds';
+import { Contacts } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
 import {
   copyPopup,
@@ -66,6 +66,7 @@ import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { useDominantColor, getContrastColors } from '@/shared/lib/colorExtraction';
 import type { VideoPostRecord, StoryUser } from '@/features/feed';
 import { ListGroup, PressableFeedback, Skeleton as HeroSkeleton } from 'heroui-native';
+import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Screen, nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
 
@@ -679,13 +680,15 @@ export function UserProfileScreen() {
   // NOSTR SUBSCRIPTIONS & API
   // ===========================
 
-  const metadataFilters = useMemo(
-    () => (pubkey ? [{ authors: [pubkey], kinds: [Metadata], limit: 1 }] : null),
-    [pubkey]
-  );
-  const { events: metadataEvents, eose: metadataEose } = useSubscribe({
-    filters: metadataFilters,
-  });
+  // Counterparty kind-0 metadata served from the shared SWR cache.
+  // The same hook drives `UserMessagesScreen`, so navigating
+  // Profile → Send Message hits a warm cache and the conversation
+  // header renders instantly with the right name + avatar (and the
+  // /(user-flow)/userMessages route avoids a duplicate kind-0
+  // fetch). First open per session pays one round-trip; the cache
+  // entry is shared across surfaces and persists across launches.
+  const { metadata: cachedProfile, isLoading: isMetadataLoading } =
+    useNostrProfileMetadata(pubkey);
 
   const contactListFilters = useMemo(
     () =>
@@ -723,19 +726,9 @@ export function UserProfileScreen() {
   // DERIVED STATE
   // ===========================
 
-  const userInfo = useMemo(() => {
-    if (!metadataEvents?.[0]) return null;
-    try {
-      return JSON.parse(metadataEvents[0].content);
-    } catch {
-      return null;
-    }
-  }, [metadataEvents]);
-
   const displayName = isOwnProfile
-    ? userInfo?.display_name || userInfo?.name || getUsername(pubkey || '')
-    : userInfo?.display_name || userInfo?.name || truncateMiddle(npub, 8);
-  const isMetadataLoading = !metadataEose;
+    ? cachedProfile?.displayName || cachedProfile?.name || getUsername(pubkey || '')
+    : cachedProfile?.displayName || cachedProfile?.name || truncateMiddle(npub, 8);
 
   const followerCount = profileData?.followers;
   const reputationScore = profileData?.score;
@@ -791,7 +784,9 @@ export function UserProfileScreen() {
     nostrLog.info('user.profile.story.view', { pubkey, videoCount: userVideoPosts.length });
     const storyUser: StoryUser = {
       pubkey,
-      profile: userInfo ? { name: displayName, picture: userInfo.picture } : undefined,
+      profile: cachedProfile
+        ? { name: displayName, picture: cachedProfile.picture }
+        : undefined,
       videoPosts: userVideoPosts,
     };
     router.navigate({
@@ -801,7 +796,7 @@ export function UserProfileScreen() {
         storyUsersJson: JSON.stringify([storyUser]),
       },
     });
-  }, [userVideoPosts, pubkey, userInfo, displayName]);
+  }, [userVideoPosts, pubkey, cachedProfile, displayName]);
 
   // ===========================
   // HANDLERS
@@ -912,38 +907,41 @@ export function UserProfileScreen() {
       },
     ];
 
-    if (userInfo?.nip05) {
+    if (cachedProfile?.nip05) {
+      const nip05 = cachedProfile.nip05;
       items.push({
         key: 'nip05',
         prefix: <Icon name="mdi:check-decagram" size={20} color={iconColor} />,
-        title: userInfo.nip05,
+        title: nip05,
         suffixIcon: 'lets-icons:copy',
-        onPress: () => handleCopy(userInfo.nip05, 'nip05'),
+        onPress: () => handleCopy(nip05, 'nip05'),
       });
     }
 
-    if (userInfo?.lud16) {
+    if (cachedProfile?.lud16) {
+      const lud16 = cachedProfile.lud16;
       items.push({
         key: 'lud16',
         prefix: <Icon name="mdi:lightning-bolt" size={20} color={iconColor} />,
-        title: userInfo.lud16,
+        title: lud16,
         suffixIcon: 'lets-icons:copy',
-        onPress: () => handleCopy(userInfo.lud16, 'lud16'),
+        onPress: () => handleCopy(lud16, 'lud16'),
       });
     }
 
-    if (userInfo?.website) {
+    if (cachedProfile?.website) {
+      const website = cachedProfile.website;
       items.push({
         key: 'website',
         prefix: <Icon name="mdi:web" size={20} color={iconColor} />,
-        title: userInfo.website,
+        title: website,
         suffixIcon: 'mdi:open-in-new',
-        onPress: () => handleOpenLink(userInfo.website),
+        onPress: () => handleOpenLink(website),
       });
     }
 
     return items;
-  }, [npub, userInfo, handleCopy, handleOpenLink, iconColor]);
+  }, [npub, cachedProfile, handleCopy, handleOpenLink, iconColor]);
 
   return (
     <Screen name="UserProfileScreen" style={{ flex: 1, backgroundColor: background }}>
@@ -972,7 +970,7 @@ export function UserProfileScreen() {
                   params: {
                     type: 'npub',
                     data: npub,
-                    ...(userInfo?.lud16 && { lud16: userInfo.lud16 }),
+                    ...(cachedProfile?.lud16 && { lud16: cachedProfile.lud16 }),
                   },
                 }}
                 asChild>
@@ -989,17 +987,17 @@ export function UserProfileScreen() {
         <UserFeed
           pubkey={pubkey}
           authorName={displayName}
-          authorPicture={userInfo?.picture}
+          authorPicture={cachedProfile?.picture}
           isOwnProfile={isOwnProfile}
           onVideoPostsReady={handleVideoPostsReady}
           ListHeaderComponent={
             <View>
               <BannerWithAvatar
-                bannerUrl={userInfo?.banner}
-                pictureUrl={userInfo?.picture}
+                bannerUrl={cachedProfile?.banner}
+                pictureUrl={cachedProfile?.picture}
                 pubkey={pubkey}
                 displayName={displayName}
-                nip05={userInfo?.nip05}
+                nip05={cachedProfile?.nip05}
                 isLoading={isMetadataLoading}
                 showFollowButton={!isOwnProfile && !!pubkey}
                 isFollowing={isFollowingProfile}
@@ -1030,10 +1028,9 @@ export function UserProfileScreen() {
                 isLoading={isProfileApiLoading}
               />
 
-              {/* About Card */}
-              {userInfo?.about && (
+              {cachedProfile?.about && (
                 <View style={{ paddingHorizontal: 16 }}>
-                  <Card variant="info" message={userInfo.about} />
+                  <Card variant="info" message={cachedProfile.about} />
                   <Spacer size={16} />
                 </View>
               )}

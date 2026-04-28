@@ -22,6 +22,12 @@ import type {
 
 const SATS_PER_BTC = 100_000_000;
 const BITSET_LIMIT = 2_000_000;
+// Per-coin cap for bitset-DP. `bits << BigInt(coin)` creates a BigInt that's
+// `coin + 1` bits long; Hermes' BigInt representation tops out well before
+// billions of bits, and even ~1M bits makes mount laggy. Any coin above this
+// forces the algorithm chooser to fall back to meet-in-the-middle, which is
+// insensitive to individual denomination size.
+const BITSET_MAX_COIN = 1_000_000;
 const EXHAUSTIVE_LIMIT = 20;
 const MITM_LIMIT = 40;
 const RANGE_EPSILON = 1e-9;
@@ -256,14 +262,30 @@ export function composeSatoshis(coins: number[], target: number): CompositionRes
     return compositionResult(true, target, target, target, 'exhaustive', t0);
   }
 
+  const maxCoin = valid.reduce((m, c) => (c > m ? c : m), 0);
+  const bitsetSafe = totalSum <= BITSET_LIMIT && maxCoin <= BITSET_MAX_COIN;
+
   let result: CompositionResult;
-  if (valid.length <= EXHAUSTIVE_LIMIT) {
-    result = exhaustiveSearch(valid, target, t0);
-  } else if (totalSum <= BITSET_LIMIT) {
-    result = bitsetDP(valid, target, t0);
-  } else {
-    const selected = valid.length <= MITM_LIMIT ? valid : prefilterCoins(valid, target, MITM_LIMIT);
-    result = meetInTheMiddle(selected, target, t0);
+  try {
+    if (valid.length <= EXHAUSTIVE_LIMIT) {
+      result = exhaustiveSearch(valid, target, t0);
+    } else if (bitsetSafe) {
+      result = bitsetDP(valid, target, t0);
+    } else {
+      const selected =
+        valid.length <= MITM_LIMIT ? valid : prefilterCoins(valid, target, MITM_LIMIT);
+      result = meetInTheMiddle(selected, target, t0);
+    }
+  } catch (err) {
+    // Defense in depth: if the chosen strategy throws (e.g. bitset-DP hitting
+    // Hermes' BigInt ceiling on an unusually large denomination), degrade to
+    // an unknown-composition result rather than crashing the amount screen.
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[composeSatoshis] strategy failed, returning unknown result',
+      err instanceof Error ? err.message : err
+    );
+    result = compositionResult(false, target, null, null, 'exhaustive', t0);
   }
   return result;
 }

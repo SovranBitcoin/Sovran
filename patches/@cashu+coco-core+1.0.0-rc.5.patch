@@ -2,7 +2,7 @@ diff --git a/node_modules/@cashu/coco-core/dist/index.cjs b/node_modules/@cashu/
 index 0000000..0000000 100644
 --- a/node_modules/@cashu/coco-core/dist/index.cjs
 +++ b/node_modules/@cashu/coco-core/dist/index.cjs
-@@ -1258,6 +1258,7 @@
+@@ -1337,6 +1337,7 @@
  	* @param options.trusted - Whether to add the mint as trusted (default: false)
  	*/
  	async addMintByUrl(mintUrl, options) {
@@ -10,7 +10,7 @@ index 0000000..0000000 100644
  		mintUrl = normalizeMintUrl(mintUrl);
  		const trusted = options?.trusted ?? false;
  		this.logger?.info("Adding mint by URL", {
-@@ -1295,6 +1296,7 @@
+@@ -1374,6 +1375,7 @@
  			mintUrl,
  			trusted
  		});
@@ -18,7 +18,7 @@ index 0000000..0000000 100644
  		return added;
  	}
  	async updateMintData(mintUrl) {
-@@ -1318,6 +1320,7 @@
+@@ -1397,6 +1399,7 @@
  		return await this.mintRepo.isTrustedMint(normalizeMintUrl(mintUrl));
  	}
  	async ensureUpdatedMint(mintUrl) {
@@ -26,7 +26,7 @@ index 0000000..0000000 100644
  		mintUrl = normalizeMintUrl(mintUrl);
  		let mint = await this.mintRepo.getMintByUrl(mintUrl).catch(() => null);
  		if (!mint) {
-@@ -1334,11 +1337,21 @@
+@@ -1413,11 +1416,21 @@
  		const now = Math.floor(Date.now() / 1e3);
  		if (mint.updatedAt < now - MINT_REFRESH_TTL_S) {
  			this.logger?.debug("Refreshing stale mint", { mintUrl });
@@ -51,7 +51,7 @@ index 0000000..0000000 100644
  		return {
  			mint,
  			keysets
-@@ -1376,27 +1389,36 @@
+@@ -1455,27 +1468,36 @@
  		await this.eventBus?.emit("mint:updated", await this.ensureUpdatedMint(mintUrl));
  	}
  	async updateMint(mint) {
@@ -106,7 +106,7 @@ index 0000000..0000000 100644
  		}
  		await Promise.all(keysets.map(async (ks) => {
  			if (await this.keysetRepo.getKeysetById(mint.mintUrl, ks.id)) {
-@@ -1431,7 +1453,9 @@
+@@ -1510,7 +1532,9 @@
  		mint.updatedAt = Math.floor(Date.now() / 1e3);
  		await this.mintRepo.addOrUpdateMint(mint);
  		const repoKeysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
@@ -117,7 +117,7 @@ index 0000000..0000000 100644
  			mintUrl: mint.mintUrl,
  			keysets: repoKeysets.length
  		});
-@@ -1618,10 +1642,12 @@
+@@ -1697,10 +1721,12 @@
  		return promise;
  	}
  	async getWalletWithActiveKeysetId(mintUrl) {
@@ -130,7 +130,7 @@ index 0000000..0000000 100644
  		return {
  			wallet,
  			keysetId: keyset.id,
-@@ -1729,8 +1755,9 @@
+@@ -1808,8 +1834,9 @@
  		return sendAmount + receiveFee;
  	}
  	async checkInflightProofs() {
@@ -141,7 +141,7 @@ index 0000000..0000000 100644
  		if (inflightProofs.length === 0) return;
  		const batchedByMint = {};
  		for (const proof of inflightProofs) {
-@@ -1777,6 +1804,7 @@
+@@ -1856,6 +1883,7 @@
  		}
  	}
  	async createOutputsAndIncrementCounters(mintUrl, amount, options) {
@@ -149,7 +149,7 @@ index 0000000..0000000 100644
  		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
  		if (!Number.isFinite(amount.keep) || !Number.isFinite(amount.send) || amount.keep < 0 || amount.send < 0) return {
  			keep: [],
-@@ -1814,11 +1842,14 @@
+@@ -1893,11 +1921,14 @@
  			data.send = _cashu_cashu_ts.OutputData.createDeterministicData(sendAmount, seed, currentCounter.counter + data.keep.length, keys);
  			if (data.send.length > 0) await this.counterService.incrementCounter(mintUrl, keys.id, data.send.length);
  		}
@@ -167,7 +167,7 @@ index 0000000..0000000 100644
  		});
  		return {
  			keep: data.keep,
-@@ -1828,6 +1859,7 @@
+@@ -1907,6 +1938,7 @@
  		};
  	}
  	async saveProofs(mintUrl, proofs) {
@@ -175,7 +175,7 @@ index 0000000..0000000 100644
  		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
  		if (!Array.isArray(proofs) || proofs.length === 0) return;
  		const groupedByKeyset = this.groupProofsByKeysetId(proofs);
-@@ -1864,6 +1896,7 @@
+@@ -1943,6 +1975,7 @@
  			const aggregate = new AggregateError(details.map((d) => d?.error instanceof Error ? d.error : new Error(String(d?.error))), `Failed to persist proofs for ${failed.length} keyset group(s)`);
  			throw new ProofOperationError(mintUrl, failedKeysets.length > 0 ? `Failed to persist proofs for ${failed.length} keyset group(s) [${failedKeysets.join(", ")}]` : `Failed to persist proofs for ${failed.length} keyset group(s)`, void 0, aggregate);
  		}
@@ -183,7 +183,7 @@ index 0000000..0000000 100644
  	}
  	async getReadyProofs(mintUrl) {
  		return this.proofRepository.getReadyProofs(mintUrl);
-@@ -1928,6 +1961,7 @@
+@@ -2097,6 +2130,7 @@
  	* @throws ProofOperationError if any proof is not available for reservation
  	*/
  	async reserveProofs(mintUrl, secrets, operationId) {
@@ -191,7 +191,7 @@ index 0000000..0000000 100644
  		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
  		if (!operationId || operationId.trim().length === 0) throw new ProofValidationError("operationId is required");
  		if (!secrets || secrets.length === 0) return { amount: 0 };
-@@ -1939,7 +1973,9 @@
+@@ -2108,7 +2142,9 @@
  			secrets,
  			amount
  		});
@@ -202,7 +202,7 @@ index 0000000..0000000 100644
  			mintUrl,
  			operationId,
  			count: secrets.length,
-@@ -2027,14 +2063,18 @@
+@@ -2196,14 +2232,18 @@
  	* @throws ProofValidationError if insufficient balance to cover the amount
  	*/
  	async selectProofsToSend(mintUrl, amount, includeFees = true) {
@@ -224,7 +224,7 @@ index 0000000..0000000 100644
  		});
  		return selectedProofs.send;
  	}
-@@ -2464,7 +2504,7 @@
+@@ -2485,7 +2525,7 @@
  	walletService;
  	requestProvider;
  	logger;
@@ -233,7 +233,7 @@ index 0000000..0000000 100644
  	restoreGapLimit = 100;
  	restoreStartCounter = 0;
  	constructor(proofService, counterService, walletService, requestProvider, logger) {
-@@ -2586,6 +2626,7 @@
+@@ -2607,6 +2647,7 @@
  	* Throws on any validation or persistence error. No transactions are used here.
  	*/
  	async restoreKeyset(mintUrl, wallet, keysetId) {
@@ -241,7 +241,7 @@ index 0000000..0000000 100644
  		this.logger?.debug("Restoring keyset", {
  			mintUrl,
  			keysetId
-@@ -2596,7 +2637,25 @@
+@@ -2617,7 +2658,25 @@
  			keysetId,
  			count: oldProofs.length
  		});
@@ -268,7 +268,7 @@ index 0000000..0000000 100644
  		if (proofs.length === 0) {
  			this.logger?.warn("No proofs to restore", {
  				mintUrl,
-@@ -2659,9 +2718,13 @@
+@@ -2680,9 +2739,13 @@
  			counter: newCounter
  		});
  		await this.proofService.saveProofs(mintUrl, mapProofToCoreProof(mintUrl, "ready", checkedProofs.ready));
@@ -283,13 +283,10 @@ index 0000000..0000000 100644
  			total: checkedProofs.ready.length + checkedProofs.spent.length
  		});
  	}
-@@ -3165,7 +3228,33 @@
- 				this.logger?.info("Mint operation quote already issued", {
- 					mintUrl,
- 					operationId
-+				});
-+				return;
-+			}
+@@ -3189,6 +3252,32 @@
+ 				});
+ 				return;
+ 			}
 +			// Sovran patch: abandon operations whose outputs the mint has
 +			// either fully signed (11003) or is locked processing (11004).
 +			// Both are terminal from this operation's perspective — the
@@ -303,7 +300,7 @@ index 0000000..0000000 100644
 +					operationId,
 +					code: err.code,
 +					detail: err.message
- 				});
++				});
 +				const repo = this.mintOperations?.mintOperationRepository;
 +				if (repo?.delete) {
 +					repo.delete(operationId).catch((delErr) => {
@@ -314,10 +311,12 @@ index 0000000..0000000 100644
 +						});
 +					});
 +				}
- 				return;
- 			}
++				return;
++			}
  			this.logger?.error("Mint operation error, not retrying", {
-@@ -5612,9 +5701,13 @@
+ 				mintUrl,
+ 				operationId,
+@@ -5650,9 +5739,13 @@
  	* This is the primary entry point used by WalletApi.
  	*/
  	async receive(token) {
@@ -331,7 +330,7 @@ index 0000000..0000000 100644
  	}
  	/**
  	* Finalize an executing operation (idempotent).
-@@ -7490,6 +7583,7 @@
+@@ -7544,6 +7637,7 @@
  	* @returns Prepared operation ready for execution
  	*/
  	async prepare(ctx) {
@@ -339,7 +338,7 @@ index 0000000..0000000 100644
  		const { mintUrl, id: operationId } = ctx.operation;
  		ctx.logger?.debug("Preparing bolt11 melt operation", {
  			operationId,
-@@ -7514,6 +7608,7 @@
+@@ -7568,6 +7662,7 @@
  			proofCount: selectedProofs.length,
  			needsSwap
  		});
@@ -347,7 +346,7 @@ index 0000000..0000000 100644
  		if (!needsSwap) return this.prepareDirectMelt(ctx, quote, selectedProofs);
  		return this.prepareSwapThenMelt(ctx, quote, totalAmount);
  	}
-@@ -7630,6 +7725,7 @@
+@@ -7686,6 +7781,7 @@
  	* 4. Handles the response (PAID → finalize, PENDING → wait, UNPAID → restore proofs)
  	*/
  	async execute(ctx) {
@@ -355,7 +354,7 @@ index 0000000..0000000 100644
  		const { quoteId, mintUrl, changeOutputData: serializedChangeOutputData, id: operationId } = ctx.operation;
  		ctx.logger?.debug("Executing bolt11 melt", {
  			operationId,
-@@ -7644,12 +7740,18 @@
+@@ -7700,12 +7796,18 @@
  			quoteId,
  			proofCount: proofsToMelt.length
  		});
@@ -376,7 +375,7 @@ index 0000000..0000000 100644
  		});
  		return this.handleMeltResponse(ctx, res, proofsToMelt);
  	}
-@@ -7999,6 +8101,7 @@
+@@ -8055,6 +8157,7 @@
  	* Prepare the send operation by selecting proofs and creating outputs.
  	*/
  	async prepare(ctx) {
@@ -384,7 +383,7 @@ index 0000000..0000000 100644
  		const { operation, wallet, proofService, logger } = ctx;
  		const { mintUrl, amount } = operation;
  		const exactProofs = await proofService.selectProofsToSend(mintUrl, amount, false);
-@@ -8059,7 +8162,9 @@
+@@ -8115,7 +8218,9 @@
  			operationId: operation.id,
  			needsSwap,
  			fee,
@@ -395,7 +394,7 @@ index 0000000..0000000 100644
  		});
  		return prepared;
  	}
-@@ -8067,6 +8172,7 @@
+@@ -8123,6 +8228,7 @@
  	* Execute the send operation by performing the swap and creating the token.
  	*/
  	async execute(ctx) {
@@ -403,7 +402,7 @@ index 0000000..0000000 100644
  		const { operation, wallet, reservedProofs, proofService, logger } = ctx;
  		const { mintUrl, amount, needsSwap, inputProofSecrets } = operation;
  		const inputProofs = reservedProofs.filter((p) => inputProofSecrets.includes(p.secret));
-@@ -8121,7 +8227,10 @@
+@@ -8177,7 +8283,10 @@
  		logger?.info("Send operation executed", {
  			operationId: operation.id,
  			sendProofCount: sendProofs.length,
@@ -415,7 +414,7 @@ index 0000000..0000000 100644
  		});
  		return {
  			status: "PENDING",
-@@ -8493,6 +8602,7 @@
+@@ -8549,6 +8658,7 @@
  //#region infra/handlers/mint/MintBolt11Handler.ts
  var MintBolt11Handler = class {
  	async prepare(ctx) {
@@ -423,7 +422,7 @@ index 0000000..0000000 100644
  		const quote = ctx.importedQuote ?? await ctx.wallet.createMintQuoteBolt11(ctx.operation.amount);
  		if (!quote.amount || quote.amount <= 0) throw new Error(`Mint quote ${quote.quote} has invalid amount`);
  		if (quote.amount !== ctx.operation.amount) throw new Error(`Mint quote ${quote.quote} amount ${quote.amount} does not match requested amount ${ctx.operation.amount}`);
-@@ -8502,6 +8612,7 @@
+@@ -8558,6 +8668,7 @@
  			send: 0
  		});
  		if (outputData.keep.length === 0) throw new Error("Failed to create deterministic outputs for mint operation");
@@ -431,7 +430,15 @@ index 0000000..0000000 100644
  		return {
  			...ctx.operation,
  			quoteId: quote.quote,
-@@ -8520,17 +8631,20 @@
+@@ -8569,6 +8680,7 @@
+ 			pubkey: quote.pubkey,
+ 			lastObservedRemoteState: quote.state,
+ 			lastObservedRemoteStateAt: Date.now(),
++			paidAt: quote.paidAt,
+ 			outputData: serializeOutputData({
+ 				keep: outputData.keep,
+ 				send: []
+@@ -8576,17 +8688,20 @@
  		};
  	}
  	async execute(ctx) {
@@ -457,7 +464,7 @@ index 0000000..0000000 100644
  			throw err;
  		}
  	}
-@@ -8595,13 +8709,16 @@
+@@ -8651,13 +8765,16 @@
  		}
  	}
  	async checkPending(ctx) {
@@ -475,7 +482,7 @@ index 0000000..0000000 100644
  			mintUrl,
  			quoteId,
  			state: quote.state
-@@ -8639,6 +8756,7 @@
+@@ -8695,6 +8812,7 @@
  		info: 2,
  		debug: 3
  	};
@@ -483,7 +490,7 @@ index 0000000..0000000 100644
  	constructor(prefix = "coco", options = {}) {
  		this.prefix = prefix;
  		this.level = options.level ?? "info";
-@@ -8646,21 +8764,36 @@
+@@ -8702,21 +8820,36 @@
  	shouldLog(level) {
  		return ConsoleLogger.levelPriority[level] <= ConsoleLogger.levelPriority[this.level];
  	}
@@ -524,17 +531,19 @@ index 0000000..0000000 100644
  	}
  	log(level, message, ...meta) {
  		switch (level) {
-@@ -8731,7 +8864,8 @@
- 		return this.proofService.getBalances();
+@@ -8799,23 +8932,39 @@
+ 		return this.receiveOperationService.receive(token);
  	}
  	async restore(mintUrl) {
 -		this.logger?.info("Starting restore", { mintUrl });
+-		const mint = await this.mintService.addMintByUrl(mintUrl, { trusted: true });
 +		var _mr0 = performance.now();
 +		this.logger?.info("coco.restore.start", { mintUrl });
- 		const mint = await this.mintService.addMintByUrl(mintUrl, { trusted: true });
++		const _alreadyTrusted = await this.mintService.isTrustedMint(mintUrl).catch(() => false);
++		const mint = await this.mintService.addMintByUrl(mintUrl, { trusted: _alreadyTrusted });
  		this.logger?.debug("Mint fetched for restore", {
  			mintUrl,
-@@ -8739,15 +8873,18 @@
+ 			keysetCount: mint.keysets.length
  		});
  		const { wallet } = await this.walletService.getWalletWithActiveKeysetId(mintUrl);
  		const failedKeysetIds = {};
@@ -558,10 +567,21 @@ index 0000000..0000000 100644
 +			for (const keyset of mint.keysets) try {
 +				await this.walletRestoreService.restoreKeyset(mintUrl, wallet, keyset.id);
 +			} catch (error) { this.logger?.error("Keyset restore failed", { mintUrl, keysetId: keyset.id, error }); failedKeysetIds[keyset.id] = error; }
++		}
++		/* Trust the mint if it wasn't already trusted and proofs were recovered */
++		if (!_alreadyTrusted) {
++			const _balances = await this.proofService.getBalancesByMint({ mintUrls: [mintUrl] }).catch(() => ({}));
++			const _mintBal = _balances[mintUrl]?.total ?? 0;
++			if (_mintBal > 0) {
++				await this.mintService.trustMint(mintUrl);
++				this.logger?.info("Mint trusted after recovery (balance found)", { mintUrl, balance: _mintBal });
++			} else {
++				this.logger?.info("Mint left untrusted (no balance)", { mintUrl });
++			}
  		}
  		if (Object.keys(failedKeysetIds).length > 0) {
  			this.logger?.error("Restore completed with failures", {
-@@ -8756,7 +8893,7 @@
+@@ -8824,7 +8973,7 @@
  			});
  			throw new Error("Failed to restore some keysets");
  		}
@@ -574,7 +594,7 @@ diff --git a/node_modules/@cashu/coco-core/dist/index.js b/node_modules/@cashu/c
 index 0000000..0000000 100644
 --- a/node_modules/@cashu/coco-core/dist/index.js
 +++ b/node_modules/@cashu/coco-core/dist/index.js
-@@ -1258,6 +1258,7 @@
+@@ -1337,6 +1337,7 @@
  	* @param options.trusted - Whether to add the mint as trusted (default: false)
  	*/
  	async addMintByUrl(mintUrl, options) {
@@ -582,7 +602,15 @@ index 0000000..0000000 100644
  		mintUrl = normalizeMintUrl(mintUrl);
  		const trusted = options?.trusted ?? false;
  		this.logger?.info("Adding mint by URL", {
-@@ -1318,6 +1319,7 @@
+@@ -1374,6 +1375,7 @@
+ 			mintUrl,
+ 			trusted
+ 		});
++		this.logger?.info("coco.mint.addByUrl", { _perf: true, ms: performance.now() - _t0, mintUrl, trusted });
+ 		return added;
+ 	}
+ 	async updateMintData(mintUrl) {
+@@ -1397,6 +1399,7 @@
  		return await this.mintRepo.isTrustedMint(normalizeMintUrl(mintUrl));
  	}
  	async ensureUpdatedMint(mintUrl) {
@@ -590,7 +618,7 @@ index 0000000..0000000 100644
  		mintUrl = normalizeMintUrl(mintUrl);
  		let mint = await this.mintRepo.getMintByUrl(mintUrl).catch(() => null);
  		if (!mint) {
-@@ -1334,9 +1336,18 @@
+@@ -1413,11 +1416,21 @@
  		const now = Math.floor(Date.now() / 1e3);
  		if (mint.updatedAt < now - MINT_REFRESH_TTL_S) {
  			this.logger?.debug("Refreshing stale mint", { mintUrl });
@@ -611,15 +639,18 @@ index 0000000..0000000 100644
 +			}
  		}
  		const keysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
++		this.logger?.debug("coco.mint.ensureUpdated", { _perf: true, ms: performance.now() - _t0, mintUrl, keysetCount: keysets.length, refreshed: mint.updatedAt < Math.floor(Date.now() / 1e3) - MINT_REFRESH_TTL_S });
  		return {
-@@ -1376,27 +1387,36 @@
+ 			mint,
+ 			keysets
+@@ -1455,27 +1468,36 @@
  		await this.eventBus?.emit("mint:updated", await this.ensureUpdatedMint(mintUrl));
  	}
  	async updateMint(mint) {
 -		let mintInfo;
 +		var _t0 = performance.now();
 +		/* --- sovran perf: fetch info + keysets in parallel with timeout --- */
-+		var _MINT_FETCH_TIMEOUT = 10000;
++		var _MINT_FETCH_TIMEOUT = 10000; // 10s max per mint
 +		let mintInfo, keysets;
  		try {
 -			this.logger?.debug("Fetching mint info", { mintUrl: mint.mintUrl });
@@ -643,7 +674,7 @@ index 0000000..0000000 100644
 +					this.mintAdapter.fetchMintInfo(mint.mintUrl),
 +					this.mintAdapter.fetchKeysets(mint.mintUrl),
 +				]),
-+				_timeoutPromise.then(function() {}, function(err) { throw err; }),
++				_timeoutPromise.then(function() { /* never resolves */ }, function(err) { throw err; }),
 +			]);
 +			if (infoResult.status === "rejected") {
 +				this.logger?.error("Failed to fetch mint info", { mintUrl: mint.mintUrl, err: infoResult.reason });
@@ -667,7 +698,7 @@ index 0000000..0000000 100644
  		}
  		await Promise.all(keysets.map(async (ks) => {
  			if (await this.keysetRepo.getKeysetById(mint.mintUrl, ks.id)) {
-@@ -1431,7 +1451,9 @@
+@@ -1510,7 +1532,9 @@
  		mint.updatedAt = Math.floor(Date.now() / 1e3);
  		await this.mintRepo.addOrUpdateMint(mint);
  		const repoKeysets = await this.keysetRepo.getKeysetsByMintUrl(mint.mintUrl);
@@ -678,7 +709,7 @@ index 0000000..0000000 100644
  			mintUrl: mint.mintUrl,
  			keysets: repoKeysets.length
  		});
-@@ -1618,6 +1640,7 @@
+@@ -1697,10 +1721,12 @@
  		return promise;
  	}
  	async getWalletWithActiveKeysetId(mintUrl) {
@@ -686,76 +717,106 @@ index 0000000..0000000 100644
  		const wallet = await this.getWallet(mintUrl);
  		const keyset = wallet.keyChain.getCheapestKeyset();
  		const mintKeys = keyset.toMintKeys();
-@@ -1729,6 +1752,7 @@
+ 		if (mintKeys === null) throw new Error("MintKeys is null. Cannot return a valid response.");
++		this.logger?.debug("coco.wallet.getWithKeyset", { _perf: true, ms: performance.now() - _t0, mintUrl, keysetId: keyset.id });
+ 		return {
+ 			wallet,
+ 			keysetId: keyset.id,
+@@ -1808,8 +1834,9 @@
  		return sendAmount + receiveFee;
  	}
  	async checkInflightProofs() {
 +		var _t0 = performance.now();
  		const inflightProofs = await this.proofRepository.getInflightProofs();
- 		this.logger?.debug("Checking inflight proofs", { count: inflightProofs.length });
+-		this.logger?.debug("Checking inflight proofs", { count: inflightProofs.length });
++		this.logger?.debug("coco.proof.checkInflight", { _perf: true, ms: performance.now() - _t0, count: inflightProofs.length });
  		if (inflightProofs.length === 0) return;
-@@ -1777,6 +1801,7 @@
+ 		const batchedByMint = {};
+ 		for (const proof of inflightProofs) {
+@@ -1856,6 +1883,7 @@
  		}
  	}
  	async createOutputsAndIncrementCounters(mintUrl, amount, options) {
-+		const _ot0 = performance.now();
++		var _t0 = performance.now();
  		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
  		if (!Number.isFinite(amount.keep) || !Number.isFinite(amount.send) || amount.keep < 0 || amount.send < 0) return {
  			keep: [],
-@@ -1785,8 +1810,21 @@
- 			keepAmount: 0
- 		};
- 		const { wallet, keys, keysetId } = await this.walletService.getWalletWithActiveKeysetId(mintUrl);
-+		const _ot1 = performance.now();
- 		const seed = await this.seedService.getSeed();
-+		const _ot2 = performance.now();
- 		const currentCounter = await this.counterService.getCounter(mintUrl, keys.id);
-+		const _ot3 = performance.now();
-+		this.logger?.debug("createOutputs setup [PERF]", {
-+			mintUrl,
-+			keysetId: keys.id,
-+			counter: currentCounter.counter,
-+			walletMs: Math.round((_ot1 - _ot0) * 100) / 100,
-+			seedMs: Math.round((_ot2 - _ot1) * 100) / 100,
-+			counterMs: Math.round((_ot3 - _ot2) * 100) / 100,
-+			keepAmount: amount.keep,
-+			sendAmount: amount.send
-+		});
- 		const data = {
- 			keep: [],
- 			send: []
-@@ -1806,19 +1844,27 @@
- 				adjustedKeepAmount: keepAmount
- 			});
- 		}
-+		const _ot4 = performance.now();
- 		if (keepAmount > 0) {
- 			data.keep = OutputData.createDeterministicData(keepAmount, seed, currentCounter.counter, keys);
- 			if (data.keep.length > 0) await this.counterService.incrementCounter(mintUrl, keys.id, data.keep.length);
- 		}
-+		const _ot5 = performance.now();
- 		if (sendAmount > 0) {
+@@ -1893,11 +1921,14 @@
  			data.send = OutputData.createDeterministicData(sendAmount, seed, currentCounter.counter + data.keep.length, keys);
  			if (data.send.length > 0) await this.counterService.incrementCounter(mintUrl, keys.id, data.send.length);
  		}
 -		this.logger?.debug("Deterministic outputs created", {
-+		const _ot6 = performance.now();
-+		this.logger?.info("Deterministic outputs created [PERF]", {
++		this.logger?.debug("coco.proof.createOutputs", {
++			_perf: true,
++			ms: performance.now() - _t0,
  			mintUrl,
  			keysetId: keys.id,
 -			amount,
 -			outputs: data.keep.length + data.send.length
 +			keepAmount,
 +			sendAmount,
-+			keepOutputs: data.keep.length,
-+			sendOutputs: data.send.length,
-+			keepGenMs: Math.round((_ot5 - _ot4) * 100) / 100,
-+			sendGenMs: Math.round((_ot6 - _ot5) * 100) / 100,
-+			totalMs: Math.round((_ot6 - _ot0) * 100) / 100
++			totalOutputs: data.keep.length + data.send.length
  		});
  		return {
  			keep: data.keep,
-@@ -2464,7 +2510,7 @@
+@@ -1907,6 +1938,7 @@
+ 		};
+ 	}
+ 	async saveProofs(mintUrl, proofs) {
++		var _t0 = performance.now();
+ 		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
+ 		if (!Array.isArray(proofs) || proofs.length === 0) return;
+ 		const groupedByKeyset = this.groupProofsByKeysetId(proofs);
+@@ -1943,6 +1975,7 @@
+ 			const aggregate = new AggregateError(details.map((d) => d?.error instanceof Error ? d.error : new Error(String(d?.error))), `Failed to persist proofs for ${failed.length} keyset group(s)`);
+ 			throw new ProofOperationError(mintUrl, failedKeysets.length > 0 ? `Failed to persist proofs for ${failed.length} keyset group(s) [${failedKeysets.join(", ")}]` : `Failed to persist proofs for ${failed.length} keyset group(s)`, void 0, aggregate);
+ 		}
++		this.logger?.debug("coco.proof.save", { _perf: true, ms: performance.now() - _t0, mintUrl, proofCount: proofs.length });
+ 	}
+ 	async getReadyProofs(mintUrl) {
+ 		return this.proofRepository.getReadyProofs(mintUrl);
+@@ -2097,6 +2130,7 @@
+ 	* @throws ProofOperationError if any proof is not available for reservation
+ 	*/
+ 	async reserveProofs(mintUrl, secrets, operationId) {
++		var _t0 = performance.now();
+ 		if (!mintUrl || mintUrl.trim().length === 0) throw new ProofValidationError("mintUrl is required");
+ 		if (!operationId || operationId.trim().length === 0) throw new ProofValidationError("operationId is required");
+ 		if (!secrets || secrets.length === 0) return { amount: 0 };
+@@ -2108,7 +2142,9 @@
+ 			secrets,
+ 			amount
+ 		});
+-		this.logger?.debug("Proofs reserved", {
++		this.logger?.debug("coco.proof.reserve", {
++			_perf: true,
++			ms: performance.now() - _t0,
+ 			mintUrl,
+ 			operationId,
+ 			count: secrets.length,
+@@ -2196,14 +2232,18 @@
+ 	* @throws ProofValidationError if insufficient balance to cover the amount
+ 	*/
+ 	async selectProofsToSend(mintUrl, amount, includeFees = true) {
++		var _t0 = performance.now();
+ 		const proofs = await this.proofRepository.getAvailableProofs(mintUrl);
+ 		if (proofs.reduce((acc, proof) => acc + proof.amount, 0) < amount) throw new ProofValidationError("Not enough proofs to send");
+ 		const selectedProofs = (await this.walletService.getWallet(mintUrl)).selectProofsToSend(proofs, amount, includeFees);
+-		this.logger?.debug("Selected proofs to send", {
++		this.logger?.debug("coco.proof.select", {
++			_perf: true,
++			ms: performance.now() - _t0,
+ 			mintUrl,
+ 			amount,
+-			selectedProofs,
+-			count: selectedProofs.send.length
++			availableCount: proofs.length,
++			selectedCount: selectedProofs.send.length,
++			includeFees
+ 		});
+ 		return selectedProofs.send;
+ 	}
+@@ -2485,7 +2525,7 @@
  	walletService;
  	requestProvider;
  	logger;
@@ -764,163 +825,60 @@ index 0000000..0000000 100644
  	restoreGapLimit = 100;
  	restoreStartCounter = 0;
  	constructor(proofService, counterService, walletService, requestProvider, logger) {
-@@ -2475,14 +2521,32 @@
- 		this.logger = logger;
- 	}
- 	async sweepKeyset(mintUrl, keysetId, bip39seed) {
--		this.logger?.debug("Sweeping keyset", {
-+		const _st0 = performance.now();
-+		this.logger?.info("Sweeping keyset [PERF START]", {
- 			mintUrl,
--			keysetId
-+			keysetId,
-+			batchSize: this.restoreBatchSize,
-+			gapLimit: this.restoreGapLimit
- 		});
- 		const { wallet } = await this.walletService.getWalletWithActiveKeysetId(mintUrl);
- 		const sweepWallet = new Wallet(new Mint(mintUrl, { customRequest: this.requestProvider.getRequestFn(mintUrl) }), { bip39seed });
-+		const _st1 = performance.now();
- 		await sweepWallet.loadMint();
-+		const _st2 = performance.now();
-+		this.logger?.debug("Sweep wallet loaded [PERF]", {
-+			mintUrl,
-+			keysetId,
-+			walletSetupMs: Math.round((_st1 - _st0) * 100) / 100,
-+			loadMintMs: Math.round((_st2 - _st1) * 100) / 100
-+		});
- 		const { proofs } = await sweepWallet.batchRestore(this.restoreBatchSize, this.restoreGapLimit, this.restoreStartCounter, keysetId);
-+		const _st3 = performance.now();
-+		this.logger?.info("Sweep batchRestore completed [PERF]", {
-+			mintUrl,
-+			keysetId,
-+			proofsFound: proofs.length,
-+			batchRestoreMs: Math.round((_st3 - _st2) * 100) / 100
-+		});
- 		if (proofs.length === 0) {
- 			this.logger?.warn("No proofs to sweep", {
- 				mintUrl,
-@@ -2586,17 +2650,56 @@
+@@ -2607,6 +2647,7 @@
  	* Throws on any validation or persistence error. No transactions are used here.
  	*/
  	async restoreKeyset(mintUrl, wallet, keysetId) {
--		this.logger?.debug("Restoring keyset", {
-+		const _rt0 = performance.now();
-+		this.logger?.info("Restoring keyset [PERF START]", {
++		var _rk0 = performance.now();
+ 		this.logger?.debug("Restoring keyset", {
  			mintUrl,
--			keysetId
-+			keysetId,
-+			batchSize: this.restoreBatchSize,
-+			gapLimit: this.restoreGapLimit,
-+			startCounter: this.restoreStartCounter
- 		});
-+		const _rt1 = performance.now();
- 		const oldProofs = await this.proofService.getProofsByKeysetId(mintUrl, keysetId);
-+		const _rt2 = performance.now();
- 		this.logger?.debug("Existing proofs before restore", {
- 			mintUrl,
+ 			keysetId
+@@ -2617,7 +2658,25 @@
  			keysetId,
--			count: oldProofs.length
-+			count: oldProofs.length,
-+			getProofsMs: Math.round((_rt2 - _rt1) * 100) / 100
+ 			count: oldProofs.length
  		});
 -		const { proofs, lastCounterWithSignature } = await wallet.batchRestore(this.restoreBatchSize, this.restoreGapLimit, this.restoreStartCounter, keysetId);
-+		/* --- sovran perf: probe-first + skip-redundancy optimization --- */
 +		var _rcfg = typeof globalThis !== "undefined" && globalThis.__CASHU_RECOVERY_CONFIG || {};
 +		var _PROBE_SIZE = _rcfg.probeSize != null ? _rcfg.probeSize : 5;
 +		var _skipProbe = _rcfg.skipProbe === true || _PROBE_SIZE <= 0;
 +		var _batchSz = _rcfg.batchSize != null ? _rcfg.batchSize : this.restoreBatchSize;
 +		var proofs, lastCounterWithSignature;
 +		if (_skipProbe) {
-+			/* No probe — full batchRestore from counter 0 (original behaviour) */
-+			this.logger?.info("Probe disabled, running full batchRestore [PERF]", { mintUrl, keysetId, batchSize: _batchSz });
 +			var fullResult = await wallet.batchRestore(_batchSz, this.restoreGapLimit, this.restoreStartCounter, keysetId);
 +			proofs = fullResult.proofs;
 +			lastCounterWithSignature = fullResult.lastCounterWithSignature;
 +		} else {
-+			const _probeT0 = performance.now();
 +			const probeResult = await wallet.restore(this.restoreStartCounter, _PROBE_SIZE, { keysetId });
-+			const _probeMs = Math.round((performance.now() - _probeT0) * 100) / 100;
 +			if (probeResult.proofs.length === 0) {
-+				this.logger?.info("Probe found no proofs, skipping full restore [PERF PROBE]", { mintUrl, keysetId, probeMs: _probeMs, probeSize: _PROBE_SIZE, savedBatchRestoreMs: "skipped" });
++				this.logger?.info("Probe found no proofs, skipping", { mintUrl, keysetId });
 +				return;
 +			}
-+			this.logger?.info("Probe found proofs, continuing from counter " + _PROBE_SIZE + " [PERF PROBE]", { mintUrl, keysetId, probeMs: _probeMs, probeProofs: probeResult.proofs.length, probeSize: _PROBE_SIZE });
 +			const restResult = await wallet.batchRestore(_batchSz, this.restoreGapLimit, this.restoreStartCounter + _PROBE_SIZE, keysetId);
 +			proofs = [...probeResult.proofs, ...restResult.proofs];
 +			lastCounterWithSignature = restResult.lastCounterWithSignature ?? probeResult.lastCounterWithSignature;
 +		}
-+		const _rt3 = performance.now();
-+		this.logger?.info("batchRestore completed [PERF]", {
-+			mintUrl,
-+			keysetId,
-+			proofsFound: proofs.length,
-+			batchRestoreMs: Math.round((_rt3 - _rt2) * 100) / 100,
-+			lastCounterWithSignature
-+		});
  		if (proofs.length === 0) {
  			this.logger?.warn("No proofs to restore", {
  				mintUrl,
-@@ -2619,7 +2722,15 @@
- 			});
- 			throw new Error("Restored less proofs than expected.");
- 		}
-+		const _rt4 = performance.now();
- 		const states = await wallet.checkProofsStates(proofs);
-+		const _rt5 = performance.now();
-+		this.logger?.info("checkProofsStates completed [PERF]", {
-+			mintUrl,
-+			keysetId,
-+			proofsChecked: proofs.length,
-+			checkStatesMs: Math.round((_rt5 - _rt4) * 100) / 100
-+		});
- 		if (!Array.isArray(states) || states.length !== proofs.length) {
- 			this.logger?.error("Malformed state check", {
- 				mintUrl,
-@@ -2645,24 +2756,32 @@
- 			if (state.state === "SPENT") checkedProofs.spent.push(proofs[index]);
- 			else checkedProofs.ready.push(proofs[index]);
- 		}
--		this.logger?.debug("Checked proof states", {
-+		this.logger?.info("Checked proof states [PERF]", {
- 			mintUrl,
- 			keysetId,
- 			ready: checkedProofs.ready.length,
- 			spent: checkedProofs.spent.length
- 		});
- 		const newCounter = lastCounterWithSignature ? lastCounterWithSignature + 1 : 0;
-+		const _rt6 = performance.now();
- 		await this.counterService.overwriteCounter(mintUrl, keysetId, newCounter);
--		this.logger?.debug("Requested counter overwrite for keyset", {
-+		const _rt7 = performance.now();
-+		this.logger?.debug("Counter overwrite [PERF]", {
- 			mintUrl,
- 			keysetId,
--			counter: newCounter
-+			counter: newCounter,
-+			counterWriteMs: Math.round((_rt7 - _rt6) * 100) / 100
+@@ -2680,9 +2739,13 @@
+ 			counter: newCounter
  		});
  		await this.proofService.saveProofs(mintUrl, mapProofToCoreProof(mintUrl, "ready", checkedProofs.ready));
 -		this.logger?.info("Saved restored proofs for keyset", {
-+		const _rt8 = performance.now();
-+		this.logger?.info("restoreKeyset completed [PERF TOTAL]", {
++		this.logger?.info("coco.restore.keyset", {
++			_perf: true,
++			ms: performance.now() - _rk0,
  			mintUrl,
  			keysetId,
--			total: checkedProofs.ready.length + checkedProofs.spent.length
-+			total: checkedProofs.ready.length + checkedProofs.spent.length,
-+			totalMs: Math.round((_rt8 - _rt0) * 100) / 100,
-+			batchRestoreMs: Math.round((_rt3 - _rt2) * 100) / 100,
-+			checkStatesMs: Math.round((_rt5 - _rt4) * 100) / 100,
-+			saveProofsMs: Math.round((_rt8 - _rt7) * 100) / 100
++			ready: checkedProofs.ready.length,
++			spent: checkedProofs.spent.length,
+ 			total: checkedProofs.ready.length + checkedProofs.spent.length
  		});
  	}
- };
-@@ -3165,7 +3284,33 @@
- 				this.logger?.info("Mint operation quote already issued", {
- 					mintUrl,
- 					operationId
-+				});
-+				return;
-+			}
+@@ -3189,6 +3252,32 @@
+ 				});
+ 				return;
+ 			}
 +			// Sovran patch: abandon operations whose outputs the mint has
 +			// either fully signed (11003) or is locked processing (11004).
 +			// Both are terminal from this operation's perspective — the
@@ -934,7 +892,7 @@ index 0000000..0000000 100644
 +					operationId,
 +					code: err.code,
 +					detail: err.message
- 				});
++				});
 +				const repo = this.mintOperations?.mintOperationRepository;
 +				if (repo?.delete) {
 +					repo.delete(operationId).catch((delErr) => {
@@ -945,10 +903,178 @@ index 0000000..0000000 100644
 +						});
 +					});
 +				}
- 				return;
- 			}
++				return;
++			}
  			this.logger?.error("Mint operation error, not retrying", {
-@@ -8639,6 +8784,7 @@
+ 				mintUrl,
+ 				operationId,
+@@ -5650,9 +5739,13 @@
+ 	* This is the primary entry point used by WalletApi.
+ 	*/
+ 	async receive(token) {
++		var _t0 = performance.now();
+ 		const initOp = await this.init(token);
++		var _tPrepare = performance.now();
+ 		const preparedOp = await this.prepare(initOp);
++		var _tExecute = performance.now();
+ 		await this.execute(preparedOp);
++		this.logger?.info("coco.receive.flow", { _perf: true, ms: performance.now() - _t0, initMs: _tPrepare - _t0, prepareMs: _tExecute - _tPrepare, executeMs: performance.now() - _tExecute, mintUrl: initOp.mintUrl });
+ 	}
+ 	/**
+ 	* Finalize an executing operation (idempotent).
+@@ -7544,6 +7637,7 @@
+ 	* @returns Prepared operation ready for execution
+ 	*/
+ 	async prepare(ctx) {
++		var _t0 = performance.now();
+ 		const { mintUrl, id: operationId } = ctx.operation;
+ 		ctx.logger?.debug("Preparing bolt11 melt operation", {
+ 			operationId,
+@@ -7568,6 +7662,7 @@
+ 			proofCount: selectedProofs.length,
+ 			needsSwap
+ 		});
++		ctx.logger?.info("coco.melt.prepare", { _perf: true, ms: performance.now() - _t0, amount, fee_reserve, needsSwap, proofCount: selectedProofs.length });
+ 		if (!needsSwap) return this.prepareDirectMelt(ctx, quote, selectedProofs);
+ 		return this.prepareSwapThenMelt(ctx, quote, totalAmount);
+ 	}
+@@ -7686,6 +7781,7 @@
+ 	* 4. Handles the response (PAID → finalize, PENDING → wait, UNPAID → restore proofs)
+ 	*/
+ 	async execute(ctx) {
++		var _t0 = performance.now();
+ 		const { quoteId, mintUrl, changeOutputData: serializedChangeOutputData, id: operationId } = ctx.operation;
+ 		ctx.logger?.debug("Executing bolt11 melt", {
+ 			operationId,
+@@ -7700,12 +7796,18 @@
+ 			quoteId,
+ 			proofCount: proofsToMelt.length
+ 		});
++		var _tNet = performance.now();
+ 		const changeOutputData = deserializeOutputData(serializedChangeOutputData);
+ 		const res = await ctx.mintAdapter.customMeltBolt11(mintUrl, proofsToMelt, changeOutputData.keep, quoteId);
+-		ctx.logger?.info("Melt execution completed", {
++		ctx.logger?.info("coco.melt.execute", {
++			_perf: true,
++			ms: performance.now() - _t0,
++			networkMs: performance.now() - _tNet,
+ 			operationId,
+ 			quoteId,
+-			state: res.state
++			state: res.state,
++			needsSwap: ctx.operation.needsSwap,
++			proofCount: proofsToMelt.length
+ 		});
+ 		return this.handleMeltResponse(ctx, res, proofsToMelt);
+ 	}
+@@ -8055,6 +8157,7 @@
+ 	* Prepare the send operation by selecting proofs and creating outputs.
+ 	*/
+ 	async prepare(ctx) {
++		var _t0 = performance.now();
+ 		const { operation, wallet, proofService, logger } = ctx;
+ 		const { mintUrl, amount } = operation;
+ 		const exactProofs = await proofService.selectProofsToSend(mintUrl, amount, false);
+@@ -8115,7 +8218,9 @@
+ 			operationId: operation.id,
+ 			needsSwap,
+ 			fee,
+-			inputProofCount: inputSecrets.length
++			inputProofCount: inputSecrets.length,
++			_perf: true,
++			ms: performance.now() - _t0
+ 		});
+ 		return prepared;
+ 	}
+@@ -8123,6 +8228,7 @@
+ 	* Execute the send operation by performing the swap and creating the token.
+ 	*/
+ 	async execute(ctx) {
++		var _t0 = performance.now();
+ 		const { operation, wallet, reservedProofs, proofService, logger } = ctx;
+ 		const { mintUrl, amount, needsSwap, inputProofSecrets } = operation;
+ 		const inputProofs = reservedProofs.filter((p) => inputProofSecrets.includes(p.secret));
+@@ -8177,7 +8283,10 @@
+ 		logger?.info("Send operation executed", {
+ 			operationId: operation.id,
+ 			sendProofCount: sendProofs.length,
+-			keepProofCount: keepProofs.length
++			keepProofCount: keepProofs.length,
++			_perf: true,
++			ms: performance.now() - _t0,
++			needsSwap
+ 		});
+ 		return {
+ 			status: "PENDING",
+@@ -8549,6 +8658,7 @@
+ //#region infra/handlers/mint/MintBolt11Handler.ts
+ var MintBolt11Handler = class {
+ 	async prepare(ctx) {
++		var _t0 = performance.now();
+ 		const quote = ctx.importedQuote ?? await ctx.wallet.createMintQuoteBolt11(ctx.operation.amount);
+ 		if (!quote.amount || quote.amount <= 0) throw new Error(`Mint quote ${quote.quote} has invalid amount`);
+ 		if (quote.amount !== ctx.operation.amount) throw new Error(`Mint quote ${quote.quote} amount ${quote.amount} does not match requested amount ${ctx.operation.amount}`);
+@@ -8558,6 +8668,7 @@
+ 			send: 0
+ 		});
+ 		if (outputData.keep.length === 0) throw new Error("Failed to create deterministic outputs for mint operation");
++		ctx.logger?.info("coco.mint.prepare", { _perf: true, ms: performance.now() - _t0, amount: quote.amount, quoteId: quote.quote, outputCount: outputData.keep.length });
+ 		return {
+ 			...ctx.operation,
+ 			quoteId: quote.quote,
+@@ -8569,6 +8680,7 @@
+ 			pubkey: quote.pubkey,
+ 			lastObservedRemoteState: quote.state,
+ 			lastObservedRemoteStateAt: Date.now(),
++			paidAt: quote.paidAt,
+ 			outputData: serializeOutputData({
+ 				keep: outputData.keep,
+ 				send: []
+@@ -8576,17 +8688,20 @@
+ 		};
+ 	}
+ 	async execute(ctx) {
++		var _t0 = performance.now();
+ 		const outputData = deserializeOutputData(ctx.operation.outputData);
+ 		try {
++			var _proofs = await ctx.wallet.mintProofsBolt11(ctx.operation.amount, ctx.operation.quoteId, void 0, {
++				type: "custom",
++				data: outputData.keep
++			});
++			ctx.logger?.info("coco.mint.execute", { _perf: true, ms: performance.now() - _t0, status: "ISSUED", proofCount: _proofs.length });
+ 			return {
+ 				status: "ISSUED",
+-				proofs: await ctx.wallet.mintProofsBolt11(ctx.operation.amount, ctx.operation.quoteId, void 0, {
+-					type: "custom",
+-					data: outputData.keep
+-				})
++				proofs: _proofs
+ 			};
+ 		} catch (err) {
+-			if (err instanceof MintOperationError && err.code === 20002) return { status: "ALREADY_ISSUED" };
++			if (err instanceof MintOperationError && err.code === 20002) { ctx.logger?.info("coco.mint.execute", { _perf: true, ms: performance.now() - _t0, status: "ALREADY_ISSUED" }); return { status: "ALREADY_ISSUED" }; }
+ 			throw err;
+ 		}
+ 	}
+@@ -8651,13 +8765,16 @@
+ 		}
+ 	}
+ 	async checkPending(ctx) {
++		var _t0 = performance.now();
+ 		const { mintUrl, quoteId } = ctx.operation;
+ 		ctx.logger?.info("Checking pending mint operation", {
+ 			mintUrl,
+ 			quoteId
+ 		});
+ 		const quote = await ctx.mintAdapter.checkMintQuoteState(mintUrl, quoteId);
+-		ctx.logger?.info("Pending mint quote state", {
++		ctx.logger?.info("coco.mint.checkPending", {
++			_perf: true,
++			ms: performance.now() - _t0,
+ 			mintUrl,
+ 			quoteId,
+ 			state: quote.state
+@@ -8695,6 +8812,7 @@
  		info: 2,
  		debug: 3
  	};
@@ -956,7 +1082,7 @@ index 0000000..0000000 100644
  	constructor(prefix = "coco", options = {}) {
  		this.prefix = prefix;
  		this.level = options.level ?? "info";
-@@ -8646,21 +8792,36 @@
+@@ -8702,21 +8820,36 @@
  	shouldLog(level) {
  		return ConsoleLogger.levelPriority[level] <= ConsoleLogger.levelPriority[this.level];
  	}
@@ -997,24 +1123,19 @@ index 0000000..0000000 100644
  	}
  	log(level, message, ...meta) {
  		switch (level) {
-@@ -8731,23 +8892,67 @@
- 		return this.proofService.getBalances();
+@@ -8799,23 +8932,39 @@
+ 		return this.receiveOperationService.receive(token);
  	}
  	async restore(mintUrl) {
 -		this.logger?.info("Starting restore", { mintUrl });
 -		const mint = await this.mintService.addMintByUrl(mintUrl, { trusted: true });
--		this.logger?.debug("Mint fetched for restore", {
-+		const _mr0 = performance.now();
-+		this.logger?.info("Starting restore [PERF START]", { mintUrl });
++		var _mr0 = performance.now();
++		this.logger?.info("coco.restore.start", { mintUrl });
 +		const _alreadyTrusted = await this.mintService.isTrustedMint(mintUrl).catch(() => false);
 +		const mint = await this.mintService.addMintByUrl(mintUrl, { trusted: _alreadyTrusted });
-+		const _mr1 = performance.now();
-+		this.logger?.info("Mint fetched for restore [PERF]", {
+ 		this.logger?.debug("Mint fetched for restore", {
  			mintUrl,
--			keysetCount: mint.keysets.length
-+			keysetCount: mint.keysets.length,
-+			keysetIds: mint.keysets.map(k => k.id),
-+			fetchMintMs: Math.round((_mr1 - _mr0) * 100) / 100
+ 			keysetCount: mint.keysets.length
  		});
  		const { wallet } = await this.walletService.getWalletWithActiveKeysetId(mintUrl);
  		const failedKeysetIds = {};
@@ -1025,50 +1146,24 @@ index 0000000..0000000 100644
 -				mintUrl,
 -				keysetId: keyset.id,
 -				error
--			});
--			failedKeysetIds[keyset.id] = error;
 +		var _rCfg = typeof globalThis !== "undefined" && globalThis.__CASHU_RECOVERY_CONFIG || {};
 +		var _parallel = _rCfg.parallelKeysets !== false;
-+		if (!_parallel) {
-+			/* Sequential keyset restoration */
-+			for (const keyset of mint.keysets) {
-+				const _kr0 = performance.now();
-+				try {
-+					await this.walletRestoreService.restoreKeyset(mintUrl, wallet, keyset.id);
-+					this.logger?.info("Keyset restore succeeded [PERF]", { mintUrl, keysetId: keyset.id, keysetRestoreMs: Math.round((performance.now() - _kr0) * 100) / 100 });
-+				} catch (error) {
-+					this.logger?.error("Keyset restore failed [PERF]", { mintUrl, keysetId: keyset.id, error, keysetRestoreMs: Math.round((performance.now() - _kr0) * 100) / 100 });
-+					failedKeysetIds[keyset.id] = error;
-+				}
-+			}
-+		}
-+		/* Parallel keyset restoration (default) */
 +		if (_parallel) {
-+		const _keysetPromises = mint.keysets.map(async (keyset) => {
-+			const _kr0 = performance.now();
-+			try {
++			const _kps = mint.keysets.map(async (keyset) => {
++				try { await this.walletRestoreService.restoreKeyset(mintUrl, wallet, keyset.id); }
++				catch (error) { this.logger?.error("Keyset restore failed", { mintUrl, keysetId: keyset.id, error }); failedKeysetIds[keyset.id] = error; }
+ 			});
+-			failedKeysetIds[keyset.id] = error;
++			await Promise.allSettled(_kps);
++		} else {
++			for (const keyset of mint.keysets) try {
 +				await this.walletRestoreService.restoreKeyset(mintUrl, wallet, keyset.id);
-+				this.logger?.info("Keyset restore succeeded [PERF]", {
-+					mintUrl,
-+					keysetId: keyset.id,
-+					keysetRestoreMs: Math.round((performance.now() - _kr0) * 100) / 100
-+				});
-+			} catch (error) {
-+				this.logger?.error("Keyset restore failed [PERF]", {
-+					mintUrl,
-+					keysetId: keyset.id,
-+					error,
-+					keysetRestoreMs: Math.round((performance.now() - _kr0) * 100) / 100
-+				});
-+				failedKeysetIds[keyset.id] = error;
-+			}
-+		});
-+		await Promise.allSettled(_keysetPromises);
++			} catch (error) { this.logger?.error("Keyset restore failed", { mintUrl, keysetId: keyset.id, error }); failedKeysetIds[keyset.id] = error; }
 +		}
 +		/* Trust the mint if it wasn't already trusted and proofs were recovered */
 +		if (!_alreadyTrusted) {
-+			const _balances = await this.getBalances();
-+			const _mintBal = _balances[mintUrl] ?? 0;
++			const _balances = await this.proofService.getBalancesByMint({ mintUrls: [mintUrl] }).catch(() => ({}));
++			const _mintBal = _balances[mintUrl]?.total ?? 0;
 +			if (_mintBal > 0) {
 +				await this.mintService.trustMint(mintUrl);
 +				this.logger?.info("Mint trusted after recovery (balance found)", { mintUrl, balance: _mintBal });
@@ -1078,16 +1173,12 @@ index 0000000..0000000 100644
  		}
  		if (Object.keys(failedKeysetIds).length > 0) {
  			this.logger?.error("Restore completed with failures", {
-@@ -8756,7 +8961,11 @@
+@@ -8824,7 +8973,7 @@
  			});
  			throw new Error("Failed to restore some keysets");
  		}
 -		this.logger?.info("Restore completed successfully", { mintUrl });
-+		this.logger?.info("Restore completed successfully [PERF TOTAL]", {
-+			mintUrl,
-+			totalMs: Math.round((performance.now() - _mr0) * 100) / 100,
-+			keysetCount: mint.keysets.length
-+		});
++		this.logger?.info("coco.restore.complete", { _perf: true, ms: performance.now() - _mr0, mintUrl, keysetCount: mint.keysets.length, failedCount: Object.keys(failedKeysetIds).length });
  	}
  	/**
  	* Sweeps a mint by sweeping each keyset and adds the swept proofs to the wallet

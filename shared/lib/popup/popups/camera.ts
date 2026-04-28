@@ -9,7 +9,7 @@ export function cameraPermissionPopup(
     popup({
       message: 'Camera Permission Granted',
       text: 'Camera access has been granted.',
-      icon: 'icon:mdi:camera-check',
+      icon: 'icon:mdi:camera',
       type: 'success',
       ...overrides,
     });
@@ -17,7 +17,7 @@ export function cameraPermissionPopup(
     popup({
       message: 'Camera Permission Denied',
       text: 'Camera access is denied. Please enable it in your device settings.',
-      icon: 'icon:mdi:camera-off',
+      icon: 'icon:mdi:camera',
       type: 'error',
       ...overrides,
     });
@@ -25,7 +25,7 @@ export function cameraPermissionPopup(
     popup({
       message: 'Camera Permission Blocked',
       text: 'Camera access is blocked. Please enable it in your device settings.',
-      icon: 'icon:mdi:camera-lock',
+      icon: 'icon:mdi:camera',
       buttons: [{ text: 'Open Settings', page: 'settings' }],
       type: 'error',
       ...overrides,
@@ -34,13 +34,13 @@ export function cameraPermissionPopup(
 }
 
 export function noQrCodeFoundPopup(): void {
-  popup({ message: 'No QR code found in image', icon: 'icon:mdi:qrcode-remove', type: 'info' });
+  popup({ message: 'No QR code found in image', icon: 'icon:mdi:qrcode', type: 'info' });
 }
 
 export function qrScanFailedPopup(): void {
   popup({
     message: 'Failed to scan QR code from image',
-    icon: 'icon:mdi:qrcode-remove',
+    icon: 'icon:mdi:qrcode',
     type: 'error',
   });
 }

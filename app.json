@@ -77,8 +77,8 @@
           "resizeMode": "contain",
           "imageWidth": 390,
           "dark": {
-            "image": "./assets/images/light-t.png",
-            "backgroundColor": "#000000"
+            "image": "./assets/images/dark-t.png",
+            "backgroundColor": "#FFFFFF"
           }
         }
       ],

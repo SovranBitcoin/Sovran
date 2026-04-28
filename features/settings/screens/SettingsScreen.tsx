@@ -5,7 +5,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
 import { Link, router } from 'expo-router';
 import { truncateMiddle } from '@/shared/lib/strings';
-import Container from '@/shared/ui/composed/Container';
+import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import * as Application from 'expo-application';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -21,7 +21,7 @@ import opacity from 'hex-color-opacity';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { ListGroup, PressableFeedback, Separator, Switch as HeroSwitch } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
@@ -236,6 +236,8 @@ export const SettingsScreen = () => {
   const setMockFailMelt = useSettingsStore((state) => state.setMockFailMelt);
   const mockFailPaymentRequest = useSettingsStore((state) => state.mockFailPaymentRequest);
   const setMockFailPaymentRequest = useSettingsStore((state) => state.setMockFailPaymentRequest);
+  const mockNoGlass = useSettingsStore((state) => state.mockNoGlass);
+  const setMockNoGlass = useSettingsStore((state) => state.setMockNoGlass);
 
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
@@ -271,8 +273,7 @@ export const SettingsScreen = () => {
   };
 
   return (
-    <Container>
-      <Screen name="SettingsScreen">
+    <ScreenWrapper name="SettingsScreen" scroll="custom" safeArea>
         <ScrollView className="px-4">
           <Section title="Account">
             <ProfileButton />
@@ -424,6 +425,25 @@ export const SettingsScreen = () => {
                   </PressableFeedback.Scale>
                   <PressableFeedback.Ripple />
                 </PressableFeedback>
+                <Separator className="mx-4" />
+                <PressableFeedback
+                  animation={false}
+                  onPress={() => setMockNoGlass(!mockNoGlass)}>
+                  <PressableFeedback.Scale>
+                    <ListGroup.Item disabled>
+                      <ListGroup.ItemContent>
+                        <ListGroup.ItemTitle>Mock no-glass</ListGroup.ItemTitle>
+                      </ListGroup.ItemContent>
+                      <ListGroup.ItemSuffix>
+                        <HeroSwitch
+                          isSelected={mockNoGlass}
+                          onSelectedChange={setMockNoGlass}
+                        />
+                      </ListGroup.ItemSuffix>
+                    </ListGroup.Item>
+                  </PressableFeedback.Scale>
+                  <PressableFeedback.Ripple />
+                </PressableFeedback>
               </ListGroup>
             </Section>
           ) : null}
@@ -449,7 +469,6 @@ export const SettingsScreen = () => {
             </VStack>
           </TouchableOpacity>
         </ScrollView>
-      </Screen>
-    </Container>
+    </ScreenWrapper>
   );
 };

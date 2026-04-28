@@ -4,7 +4,9 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { TermsAndConditionsScreen } from '@/features/onboarding/screens/TermsAndConditionsScreen';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import OnboardingScreen from '@/features/onboarding/components/OnboardingScreen';
-import { log, Log, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, Log, initLog, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
+
+initLog('Module', 'AppGate loaded');
 import { retrieveCashuSeed, retrieveMnemonic } from '@/shared/lib/nostr/secureStorage';
 import {
   useWalletLifecycleStore,
@@ -65,6 +67,7 @@ interface AppGateProps {
  * is shown a recovery prompt instead of the normal onboarding flow.
  */
 const AppGate: React.FC<AppGateProps> = ({ children }) => {
+  useInitMount('AppGate');
   useLifecycleLogger('AppGate');
   const { isReady, isLoading } = useNostrKeysContext();
   const isTermsAccepted = useSettingsStore((state) => state.isTermsAccepted());

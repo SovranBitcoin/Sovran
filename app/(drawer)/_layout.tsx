@@ -39,9 +39,9 @@ import {
   keyImportFailedPopup,
   profileSwitcherPopup,
   walletStillLoadingPopup,
+  type ProfileSwitcherAction,
 } from '@/shared/lib/popup';
 import { storeImportedNsec } from '@/shared/lib/nostr/secureStorage';
-import type { ProfileSwitcherAction } from '@/shared/lib/popup/actionSheetTypes';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 320);

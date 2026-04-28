@@ -52,7 +52,7 @@ import { useTransactionDistributionStore } from '@/shared/stores/profile/transac
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
-import { auditMint, reviewMint, fetchNostrProfile } from '@/shared/lib/apiClient';
+import { getMintCatalog } from '@/shared/lib/getMintCatalog';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -63,13 +63,23 @@ const FIAT_SYMBOLS: Record<string, string> = { usd: '$', eur: '€', gbp: '£' }
 
 type EntryRecord = Record<string, unknown>;
 
+/**
+ * Per-mint enrichment for the trust-review screen — reads detailed audit
+ * data (swap-by-swap timing, error breakdown) from the local stores that
+ * `useAuditedMint` / `MintReviewsScreen` populate when the user navigates
+ * into a mint's detail view. The Select-Mint list path goes through
+ * `getMintCatalog` instead and never calls this.
+ */
 function getMintEnrichment(mintUrl: string): EntryRecord {
   const normalized = normalizeMintUrlKey(mintUrl);
   const audit = useAuditMintStore.getState().getCached(normalized);
   const kym = useKYMMintStore.getState().getCached(normalized);
 
   const enrichment: EntryRecord = {};
-  if (kym) enrichment.kymScore = kym.score;
+  if (kym) {
+    enrichment.kymScore = kym.score;
+    enrichment.reviewCount = kym.recommendations?.length;
+  }
   const profile = useMintProfileStore.getState().getCached(normalized);
   if (profile) {
     enrichment.contactFollowers = profile.followers;
@@ -79,7 +89,15 @@ function getMintEnrichment(mintUrl: string): EntryRecord {
     const swaps = audit.auditData.swaps ?? [];
     const swapSuccess = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
     const swapTotal = swaps.length;
-    const successRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
+    // Prefer server-side aggregates so the score lights up even when the
+    // auditor hasn't run swaps recently — same logic as the mint-add screen.
+    const totalOps = (audit.auditData.n_mints ?? 0) + (audit.auditData.n_melts ?? 0);
+    const aggregateSuccessRate =
+      totalOps > 0
+        ? Math.max(0, Math.min(1, 1 - (audit.auditData.n_errors ?? 0) / totalOps))
+        : undefined;
+    const swapSuccessRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
+    const successRate = aggregateSuccessRate ?? swapSuccessRate;
     enrichment.auditScore = typeof successRate === 'number' ? successRate * 5 : undefined;
     enrichment.auditState = audit.auditData.state;
     enrichment.successRate = successRate;
@@ -156,55 +174,16 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           const pk = pubkeyRef.current;
           return pk ? useMintStore.getState().getSelectedMint(pk) : undefined;
         },
-        enrichMintListItem: (url) => getMintEnrichment(url) as any,
+        // Per-mint audit + KYM + operator Nostr profile, with a fallback to
+        // coco's NUT-06 `getMintInfo` for mints that the auditor doesn't
+        // track (e.g. mint.sovran.money is excluded from api.sovran.money).
+        // Awaited inside coco-payment-ux's buildMintListItems so rows reach
+        // the screen with score / audit / followers already set.
+        fetchMintCatalog: (mintUrls) =>
+          getMintCatalog(mintUrls, (url) => manager.mint.getMintInfo(url)),
+        // Trust-review screen still pulls per-mint detail (swap-by-swap timing)
+        // from the local audit / KYM caches populated by `useAuditedMint`.
         enrichMintReviewInfo: (url) => getMintEnrichment(url) as any,
-        fetchMintProfiles: (mintInfoMap) => {
-          for (const [mintUrl, info] of mintInfoMap.entries()) {
-            const contacts = info?.contact;
-            if (!Array.isArray(contacts)) continue;
-            const nostrContact = contacts.find((c: any) => c.method === 'nostr' && c.info);
-            if (!nostrContact) continue;
-            const store = useMintProfileStore.getState();
-            if (!store.isStale(mintUrl)) continue;
-            fetchNostrProfile(nostrContact.info)
-              .then((result) => {
-                if (result.isOk()) {
-                  store.setCached(mintUrl, result.value.followers, result.value.score);
-                }
-              })
-              .catch(() => {});
-          }
-        },
-        fetchMintAuditData: (mintUrls) => {
-          for (const mintUrl of mintUrls) {
-            const store = useAuditMintStore.getState();
-            if (!store.isStale(mintUrl)) continue;
-            auditMint({ mintUrl })
-              .then((result) => {
-                if (result.isOk()) {
-                  useAuditMintStore.getState().setCached(mintUrl, result.value, result.value.info);
-                }
-              })
-              .catch(() => {});
-          }
-        },
-        fetchMintReviewData: (mintUrls) => {
-          for (const mintUrl of mintUrls) {
-            const store = useKYMMintStore.getState();
-            if (!store.isStale(mintUrl)) continue;
-            reviewMint({ mintUrl })
-              .then((result) => {
-                if (result.isOk() && result.value.score !== null) {
-                  useKYMMintStore.getState().setCached(
-                    mintUrl,
-                    result.value.score,
-                    result.value.recommendations
-                  );
-                }
-              })
-              .catch(() => {});
-          }
-        },
         shouldMockFailPaymentRequest: () => useSettingsStore.getState().mockFailPaymentRequest,
       }),
     [manager, nfcAdapter, getOffline, getBtcPrice, getDisplayCurrency]
@@ -400,73 +379,75 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           });
         }
 
-        if (screenType === 'mintInfo' || screenType === 'mintSelector') {
+        // The mint-info (trust review) screen still pulls per-mint detail
+        // (swap timing, full review list) from the local audit / KYM / profile
+        // caches — populated by `useAuditedMint` and friends when the user
+        // navigates into a mint detail view. Subscribe so already-cached data
+        // and any in-flight fetches refresh the screen.
+        if (screenType === 'mintInfo') {
           const pushEnrichment = () => {
-            if (screenType === 'mintInfo') {
-              callback({ _mintEnrichment: true } as EntryRecord);
-            } else {
-              callback({ _mintItemsEnrichment: true } as EntryRecord);
-            }
+            callback({ _mintEnrichment: true } as EntryRecord);
           };
           unsubscribes.push(useAuditMintStore.subscribe(pushEnrichment));
           unsubscribes.push(useKYMMintStore.subscribe(pushEnrichment));
           unsubscribes.push(useMintProfileStore.subscribe(pushEnrichment));
 
-          if (screenType === 'mintSelector') {
-            // When a mint is added while the selector is open, build a
-            // new item and push it so the list updates live.
-            unsubscribes.push(
-              manager.on('mint:added', ({ mint }: { mint: { mintUrl: string } }) => {
-                const mintUrl = mint.mintUrl;
-                (async () => {
-                  try {
-                    const [info, balances] = await Promise.all([
-                      manager.mint.getMintInfo(mintUrl).catch(() => null),
-                      manager.wallet.getBalances().catch(() => ({}) as Record<string, number>),
-                    ]);
-                    const enrichment = getMintEnrichment(mintUrl);
-                    callback({
-                      _mintItemAdded: true,
-                      _newMintItem: {
-                        mintUrl,
-                        displayName: (info as any)?.name ?? mintUrl,
-                        iconUrl: (info as any)?.icon_url ?? undefined,
-                        balance: (balances as Record<string, number>)[mintUrl] ?? 0,
-                        unit: 'sat',
-                        status: 'available',
-                        reason: null,
-                        isPreferred: false,
-                        ...enrichment,
-                      },
-                    } as EntryRecord);
-                  } catch {
-                    callback({
-                      _mintItemAdded: true,
-                      _newMintItem: {
-                        mintUrl,
-                        displayName: mintUrl,
-                        balance: 0,
-                        unit: 'sat',
-                        status: 'available',
-                        reason: null,
-                        isPreferred: false,
-                      },
-                    } as EntryRecord);
-                  }
-                })();
-              })
-            );
-          }
+          mintInfoCallback = callback;
+          unsubscribes.push(() => {
+            mintInfoCallback = null;
+            mintInfoFetchingUrl = null;
+          });
+          pushEnrichment();
+        }
 
-          if (screenType === 'mintInfo') {
-            mintInfoCallback = callback;
-            unsubscribes.push(() => {
-              mintInfoCallback = null;
-              mintInfoFetchingUrl = null;
-            });
-            // Fire immediately so already-cached data is applied on mount
-            pushEnrichment();
-          }
+        if (screenType === 'mintSelector') {
+          // Live-update the open selector when a mint is added. Catalog data
+          // for the new mint is unavailable on the API immediately so the row
+          // shows up without score / audit pills until the next list build.
+          unsubscribes.push(
+            manager.on('mint:added', ({ mint }: { mint: { mintUrl: string } }) => {
+              const mintUrl = mint.mintUrl;
+              (async () => {
+                try {
+                  const [info, balances] = await Promise.all([
+                    manager.mint.getMintInfo(mintUrl).catch(() => null),
+                    manager.wallet.balances
+                      .byMint({ mintUrls: [mintUrl] })
+                      .catch(
+                        () =>
+                          ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>
+                      ),
+                  ]);
+                  callback({
+                    _mintItemAdded: true,
+                    _newMintItem: {
+                      mintUrl,
+                      displayName: (info as any)?.name ?? mintUrl,
+                      iconUrl: (info as any)?.icon_url ?? undefined,
+                      balance: balances[mintUrl]?.total ?? 0,
+                      unit: 'sat',
+                      status: 'available',
+                      reason: null,
+                      isPreferred: false,
+                    },
+                  } as EntryRecord);
+                } catch {
+                  callback({
+                    _mintItemAdded: true,
+                    _newMintItem: {
+                      mintUrl,
+                      displayName: mintUrl,
+                      balance: 0,
+                      unit: 'sat',
+                      status: 'available',
+                      reason: null,
+                      isPreferred: false,
+                    },
+                  } as EntryRecord);
+                }
+              })();
+            })
+          );
         }
 
         return () => {
@@ -479,7 +460,6 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         if (updated?._p2pkKeyUpdate && current.type === 'receive') return true;
         if (updated?._mintEnrichment && typeof current.mintUrl === 'string') return true;
         if (updated?._mintInfoFetched && typeof current.mintUrl === 'string') return true;
-        if (updated?._mintItemsEnrichment && Array.isArray(current.items)) return true;
         if (updated?._mintItemAdded && Array.isArray(current.items)) return true;
         return defaultShouldApply(current, updated);
       },
@@ -560,15 +540,6 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           }
 
           return { ...current, items: [...(current.items as EntryRecord[]), newItem] };
-        }
-        if (updated._mintItemsEnrichment && Array.isArray(current.items)) {
-          const items = (current.items as EntryRecord[]).map((item) => {
-            const mintUrl = item.mintUrl as string | undefined;
-            if (!mintUrl) return item;
-            const enrichment = getMintEnrichment(mintUrl);
-            return { ...item, ...enrichment };
-          });
-          return { ...current, items };
         }
         return defaultMerge(current, updated);
       },

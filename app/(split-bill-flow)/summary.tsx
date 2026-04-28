@@ -10,7 +10,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { LayoutChangeEvent, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -100,6 +100,16 @@ export default function SplitBillSummaryScreen() {
 
   const [confirming, setConfirming] = useState(false);
   const hasStarted = group ? group.state !== 'draft' : false;
+
+  // Reserve space for the floating bottom bar on the list. Hardcoding this
+  // clipped content when the button wrapped or safe-area insets grew, so we
+  // measure the rendered bar instead. 120 is the participants-screen default
+  // and a safe initial estimate for the first frame.
+  const [bottomBarHeight, setBottomBarHeight] = useState(120);
+  const handleBottomBarLayout = useCallback((event: LayoutChangeEvent) => {
+    const h = event.nativeEvent.layout.height;
+    setBottomBarHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
+  }, []);
 
   const paidCount = group ? group.participants.filter((p) => p.paymentState === 'paid').length : 0;
 
@@ -220,11 +230,11 @@ export default function SplitBillSummaryScreen() {
             />
           )}
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 140 }}
+          contentContainerStyle={{ paddingBottom: bottomBarHeight + 24 }}
         />
       </View>
 
-      <BottomButtons style={{ position: 'relative' }} paddingBottom={16}>
+      <BottomButtons style={{ position: 'relative' }} onLayout={handleBottomBarLayout}>
         <HStack justify="center" align="center">
           <ButtonHandler
             buttons={

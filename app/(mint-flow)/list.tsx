@@ -2,25 +2,24 @@
  * @fileoverview Mint List screen for Mint Flow
  *
  * General mint management modal — not driven by a payment flow.
- * Builds MintListItem[] from live data (useMints + useBalanceContext + cached stores)
- * via buildMintListItems so MintListScreen stays hook-free.
+ * Builds MintListItem[] from live data (useMints + useBalanceContext) plus
+ * the bulk catalog from `getMintCatalog`, the same source coco-payment-ux
+ * uses for Send / Receive Select Mint.
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
 import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
-import { TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 import { useBalanceContext, useMints } from '@cashu/coco-react';
 import type { MintAvailability } from 'coco-payment-ux';
 
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { MintListScreen } from '@/features/mint';
+import { useMintCatalog } from '@/features/mint/hooks/useMintCatalog';
 import { buildMintListItems } from '@/features/send';
-import Icon from 'assets/icons';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 
 function MintListRoute() {
-  const foreground = useThemeColor('foreground');
   const params = useLocalSearchParams<{
     showAddMintsButton?: string;
     showDetailsButton?: string;
@@ -34,7 +33,8 @@ function MintListRoute() {
   const onSelectAction = params.onSelectAction || 'goBack';
 
   const { trustedMints } = useMints();
-  const { balance: mintBalances } = useBalanceContext();
+  const { balances } = useBalanceContext();
+  const mintBalances = balances.byMint;
 
   // Force list rebuild when this screen regains focus (e.g. after adding a mint)
   const [focusKey, setFocusKey] = useState(0);
@@ -45,7 +45,7 @@ function MintListRoute() {
     () =>
       trustedMints.map((m) => ({
         mintUrl: m.mintUrl,
-        balance: mintBalances[m.mintUrl] ?? 0,
+        balance: mintBalances[m.mintUrl]?.total ?? 0,
         status: 'available' as const,
         reason: null,
         isPreferred: false,
@@ -53,10 +53,15 @@ function MintListRoute() {
     [trustedMints, mintBalances]
   );
 
+  // One bulk fetch — same source coco-payment-ux uses for Select Mint, so
+  // the audit / score pills render identically across both surfaces.
+  const mintUrls = useMemo(() => trustedMints.map((m) => m.mintUrl), [trustedMints]);
+  const catalog = useMintCatalog(mintUrls);
+
   const items = useMemo(
-    () => buildMintListItems(trustedMints, availability),
+    () => buildMintListItems(trustedMints, availability, catalog),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [trustedMints, availability, focusKey]
+    [trustedMints, availability, catalog, focusKey]
   );
 
   return (
@@ -69,9 +74,7 @@ function MintListRoute() {
           headerRight: () =>
             showAddMintsButton ? (
               <Link href="/add" asChild>
-                <TouchableOpacity style={{ padding: 8 }}>
-                  <Icon name="fluent:add-24-filled" size={24} color={foreground} />
-                </TouchableOpacity>
+                <ScreenHeaderAction icon="fluent:add-24-filled" onPress={() => {}} />
               </Link>
             ) : null,
         }}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { ListGroup, PressableFeedback } from 'heroui-native';
@@ -9,7 +10,7 @@ import type { HistoryEntry } from '@cashu/coco-core';
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
-import { View } from '@/shared/ui/primitives/View/View';
+import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log } from '@/shared/lib/logger';
 
@@ -29,7 +30,7 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
         ? 'Sent with'
         : 'Sending with'
       : historyEntry.type === 'receive'
-        ? historyEntry.state === 'redeemed'
+        ? historyEntry.state === 'finalized'
           ? 'Received with'
           : 'Receiving with'
         : 'Processing with';
@@ -65,8 +66,8 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
 
   return (
     <Log name="HistoryEntryRefresh">
-      <View className="mx-4">
-        <ListGroup variant="secondary">
+      <GradientCard style={styles.card}>
+        <ListGroup variant="transparent">
           {onPress ? (
             <PressableFeedback animation={false} onPress={onPress}>
               <PressableFeedback.Scale>{row}</PressableFeedback.Scale>
@@ -76,7 +77,13 @@ export function HistoryEntryRefresh({ mintInfo, historyEntry, onPress }: History
             row
           )}
         </ListGroup>
-      </View>
+      </GradientCard>
     </Log>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    marginHorizontal: 16,
+  },
+});

@@ -4,7 +4,7 @@ import type { BaseOverrides } from './types';
 export function rollbackSuccessPopup(params: { count: number }, overrides?: BaseOverrides): void {
   popup({
     message: `Successfully rolled back ${params.count} transaction${params.count !== 1 ? 's' : ''}`,
-    icon: 'icon:mdi:cash-refund',
+    icon: 'icon:mdi:cash-multiple',
     type: 'success',
     ...overrides,
   });

@@ -645,7 +645,7 @@ describe('mintSelector default handlers', () => {
 
       await mgr.execute('getInfo', { mintUrl: MINT1 });
 
-      expect(ops.buildMintReviewInfo).toHaveBeenCalledWith(MINT1);
+      expect(ops.buildMintReviewInfo).toHaveBeenCalledWith(MINT1, undefined);
       expect(navigation.mintInfo).toHaveBeenCalled();
     });
 

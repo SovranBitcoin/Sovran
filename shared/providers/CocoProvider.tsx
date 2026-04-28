@@ -5,11 +5,17 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
-import { log, initLog, deferWork } from '@/shared/lib/logger';
+import { log, initLog, initPhase, useInitMount, deferWork } from '@/shared/lib/logger';
+import {
+  getBootMorphCompleted,
+  subscribeBootMorphCompleted,
+} from '@/shared/lib/qrButtonAnchor';
 import {
   useWalletLifecycleStore,
   type RestoreStatus,
 } from '@/shared/stores/global/walletLifecycleStore';
+
+initLog('Module', 'CocoProvider loaded');
 
 /**
  * Resolves once the wallet-lifecycle restoreStatus is 'complete' or 'not-needed'
@@ -107,6 +113,7 @@ async function initializeDefaultMints(
  *    These run after the app is visible and don't hold up rendering.
  */
 export function CocoProvider({ children }: CocoProviderProps) {
+  useInitMount('CocoProvider');
   const stage = useInitializationStage('coco', {
     message: 'Initializing Coco...',
     dependsOn: ['nostr'],
@@ -141,9 +148,7 @@ export function CocoProvider({ children }: CocoProviderProps) {
           CocoManager.setSignerKey(keys.privateKey);
         }
 
-        initLog('Coco', 'calling CocoManager.initialize()...');
-        const mgr = await CocoManager.initialize();
-        initLog('Coco', 'CocoManager.initialize() done');
+        const mgr = await initPhase('Coco.managerInit', () => CocoManager.initialize());
         setManager(mgr);
 
         initLog('Coco', 'setting isReady=true, calling stage.complete()');
@@ -181,35 +186,27 @@ export function CocoProvider({ children }: CocoProviderProps) {
 
         // Safe to enable observe-only watchers and pre-warm the seed cache
         // immediately — neither uses the deterministic counter.
-        initLog('Coco-bg', 'enabling safe watchers...');
-        await CocoManager.enableSafeWatchers();
-        initLog('Coco-bg', 'safe watchers done');
+        await initPhase('Coco-bg.safeWatchers', () => CocoManager.enableSafeWatchers());
 
         const currentPubkey = keys?.pubkey;
         bgStage.log('Initializing default mints...');
-        initLog('Coco-bg', 'calling initializeDefaultMints()...');
         const currentSetSelectedMint = useMintStore.getState().setSelectedMint;
-        await initializeDefaultMints(manager, currentPubkey, currentSetSelectedMint);
-        initLog('Coco-bg', 'initializeDefaultMints done');
+        await initPhase('Coco-bg.defaultMints', () =>
+          initializeDefaultMints(manager, currentPubkey, currentSetSelectedMint)
+        );
 
         // Block NPC sync + the mint-operation processor until the wallet
         // has restored its NUT-13 counter (or proven restore isn't needed).
         // RestoreGate routes the user to /restore when this is pending.
-        initLog('Coco-bg', 'awaiting restore-ready signal before NPC sync...');
         bgStage.log('Waiting for wallet restore...');
-        await awaitRestoreReady();
-        initLog('Coco-bg', 'restore-ready, starting NPC sync + processor...');
+        await initPhase('Coco-bg.restoreReady', () => awaitRestoreReady());
         bgStage.log('Starting NPC sync...');
-        await CocoManager.enableNpcSyncAndProcessor();
-        initLog('Coco-bg', 'NPC sync + processor done');
+        await initPhase('Coco-bg.npcSync', () => CocoManager.enableNpcSyncAndProcessor());
 
         try {
           bgStage.log('Recovering pending operations...');
-          initLog('Coco-bg', 'recoverPendingSendOperations...');
-          await manager.ops.send.recovery.run();
-          initLog('Coco-bg', 'recoverPendingMeltOperations...');
-          await manager.ops.melt.recovery.run();
-          initLog('Coco-bg', 'recovery done');
+          await initPhase('Coco-bg.sendRecovery', () => manager.ops.send.recovery.run());
+          await initPhase('Coco-bg.meltRecovery', () => manager.ops.melt.recovery.run());
         } catch (recoveryErr) {
           initLog('Coco-bg', `recovery failed (non-fatal): ${recoveryErr}`);
         }
@@ -222,10 +219,49 @@ export function CocoProvider({ children }: CocoProviderProps) {
       }
     };
 
-    // Give the user a responsive window before starting heavy background work.
-    // deferWork logs drift (intended vs actual delay) which reveals JS thread freezes.
-    const handle = deferWork('coco.phase2', runBackground, 2000);
-    return () => handle.cancel();
+    // Wait for the splash → QR button morph to settle before starting
+    // heavy background work (default mints, NPC sync, recovery). The fixed
+    // 2-second delay we used before was a conservative estimate of "is the
+    // morph done"; tying it directly to the morph signal saves ~1.5s on a
+    // typical boot. The 500ms timeout is a safety net for the case where
+    // the morph never fires (e.g., user lands on onboarding instead of the
+    // wallet, or Coco init beat the user to a screen with a QRButton).
+    let started = false;
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    let unsubscribe: (() => void) | null = null;
+    let deferHandle: { cancel: () => void } | null = null;
+
+    const start = () => {
+      if (started) return;
+      started = true;
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = null;
+      }
+      unsubscribe?.();
+      unsubscribe = null;
+      // Tiny extra defer keeps Phase 2's first await off the morph's last
+      // animation frame.
+      deferHandle = deferWork('coco.phase2', runBackground, 50);
+    };
+
+    if (getBootMorphCompleted()) {
+      start();
+    } else {
+      unsubscribe = subscribeBootMorphCompleted((completed) => {
+        if (completed) start();
+      });
+      // Safety fallback — start anyway after 500ms even without a morph
+      // completion signal, so background sync is never indefinitely
+      // postponed on screens that never mount the QRButton.
+      timeoutHandle = setTimeout(start, 500);
+    }
+
+    return () => {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+      unsubscribe?.();
+      deferHandle?.cancel();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bgStage.canStart, manager, keys?.pubkey]);
 

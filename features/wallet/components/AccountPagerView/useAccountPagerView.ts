@@ -9,6 +9,12 @@ import { log } from '@/shared/lib/logger';
 
 export const BUTTON_H = 48;
 export const QR_SIZE = 72;
+// Lock the secondary action row height so the QR button below it lands at a
+// deterministic Y on first paint. Without this, the SwiftUI Host children
+// inside CircleActionButtons take a frame or two to settle their intrinsic
+// size, shifting the QR button down and breaking the boot-splash → QR morph
+// alignment. Value: circle (52) + label margin-top (6) + label line height (~18).
+export const SECONDARY_ACTION_ROW_HEIGHT = 76;
 
 export interface AccountType {
   unit: string;

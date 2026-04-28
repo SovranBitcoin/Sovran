@@ -248,6 +248,14 @@ export type FlowEvent =
       mintUrl: string;
       destination?: Destination;
       offline?: boolean;
+      /**
+       * Lightning target (lud16 / bolt11 / LNURL-pay) to seed `ctx.meltTarget`
+       * when the amount entry step is switching into a melt flow. Used by the
+       * Next variants menu: the ecash entry entry carries meltTarget alongside,
+       * and picking "as Lightning" fires AMOUNT_ENTERED with destination=meltQuote
+       * + meltTarget so the machine can route to navigateToMeltPreview.
+       */
+      meltTarget?: string;
     }
   | {
       type: 'MINT_SELECTED';
@@ -558,8 +566,16 @@ export interface MachineOperations {
    * Load detailed mint info for the trust review screen.
    * Called when the machine enters the `reviewMint` step.
    * The result is attached to `stepData.mintInfo` before the handler fires.
+   *
+   * `item` is the Select Mint row when this navigation came from the mint
+   * selector. Catalog fields on the row (auditScore, kymScore, etc.) take
+   * precedence over the local-cache `enrichMintReviewInfo` lookup so audit
+   * data shipped with the row survives the trip to the info screen.
    */
-  buildMintReviewInfo?: (mintUrl: string) => Promise<import('../types').MintReviewInfo>;
+  buildMintReviewInfo?: (
+    mintUrl: string,
+    item?: MintListItem
+  ) => Promise<import('../types').MintReviewInfo>;
   /**
    * Execute a lightning melt. Called when the user confirms a melt from the
    * preview screen via `confirmMelt()`. The machine routes to the result
@@ -767,7 +783,7 @@ export interface PaymentMachine {
   enterAmount: (
     amount: number,
     mintUrl: string,
-    opts?: { destination?: Destination; offline?: boolean }
+    opts?: { destination?: Destination; offline?: boolean; meltTarget?: string }
   ) => Promise<void>;
   /** User selected one of multiple payment options (e.g. from chooseOption step). */
   chooseOption: (option: PaymentOption) => Promise<void>;

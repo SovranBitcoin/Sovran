@@ -42,6 +42,13 @@ interface SettingsState {
   mockFailSend: boolean;
   mockFailMelt: boolean;
   mockFailPaymentRequest: boolean;
+  /**
+   * Dev toggle: when true, force `supportsLiquidGlass()` to return false
+   * everywhere — the app behaves as if the device doesn't support iOS 26
+   * liquid glass. Most surfaces re-render the next time they're visible;
+   * a few module-level gates (native tabs, headers) need an app relaunch.
+   */
+  mockNoGlass: boolean;
   termsAccepted: TermsAccepted | null;
   hasSeenOnboarding: boolean;
   quickAccessP2PK: boolean;
@@ -71,6 +78,7 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'passcode'> = {
   mockFailSend: false,
   mockFailMelt: false,
   mockFailPaymentRequest: false,
+  mockNoGlass: false,
   termsAccepted: null,
   hasSeenOnboarding: false,
   quickAccessP2PK: false,
@@ -112,6 +120,8 @@ interface SettingsActions {
   getMockFailMelt: () => boolean;
   setMockFailPaymentRequest: (enabled: boolean) => void;
   getMockFailPaymentRequest: () => boolean;
+  setMockNoGlass: (enabled: boolean) => void;
+  getMockNoGlass: () => boolean;
 
   // Terms acceptance
   acceptTerms: (date: string) => void;
@@ -226,6 +236,11 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ mockFailPaymentRequest: enabled });
       },
       getMockFailPaymentRequest: () => get().mockFailPaymentRequest,
+      setMockNoGlass: (enabled: boolean) => {
+        storeLog.info('store.settings.set_mock_no_glass', { enabled });
+        set({ mockNoGlass: enabled });
+      },
+      getMockNoGlass: () => get().mockNoGlass,
 
       // Terms
       acceptTerms: (date: string) => {
@@ -307,6 +322,7 @@ export const useSettingsStore = create<SettingsStore>()(
         mockFailSend: state.mockFailSend,
         mockFailMelt: state.mockFailMelt,
         mockFailPaymentRequest: state.mockFailPaymentRequest,
+        mockNoGlass: state.mockNoGlass,
         termsAccepted: state.termsAccepted,
         hasSeenOnboarding: state.hasSeenOnboarding,
         quickAccessP2PK: state.quickAccessP2PK,

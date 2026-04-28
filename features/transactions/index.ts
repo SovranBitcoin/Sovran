@@ -3,7 +3,6 @@
 export { TransactionsScreen } from './screens/TransactionsScreen';
 export { SwapTransactionScreen } from './screens/SwapTransactionScreen';
 export { FiltersScreen } from './screens/FiltersScreen';
-export { PendingEcashScreen } from './screens/PendingEcashScreen';
 export { Transactions } from './components/Transactions';
 export { Transaction } from './components/Transaction';
 export { SwapTransactionRow } from './components/SwapTransactionRow';

@@ -2,11 +2,11 @@ import { popup } from '../engine';
 import type { TextOverrides } from './types';
 
 export function invalidTokenPopup(): void {
-  popup({ message: 'Invalid token', icon: 'icon:mdi:ticket-alert', type: 'error' });
+  popup({ message: 'Invalid token', icon: 'icon:mdi:ticket-percent', type: 'error' });
 }
 
 export function noWalletAvailablePopup(): void {
-  popup({ message: 'No wallet available', icon: 'icon:mdi:wallet-outline', type: 'error' });
+  popup({ message: 'No wallet available', icon: 'icon:solar:wallet-bold', type: 'error' });
 }
 
 export function noApiKeyPopup(): void {
@@ -22,7 +22,7 @@ export function sendMessageFailedPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Failed to send message',
     text: 'Please try again.',
-    icon: 'icon:mdi:message-alert',
+    icon: 'icon:mdi:message-text',
     type: 'error',
     ...overrides,
   });
@@ -31,7 +31,7 @@ export function sendMessageFailedPopup(overrides?: TextOverrides): void {
 export function balanceRefreshedPopup(params: { balance: string }): void {
   popup({
     message: `Balance refreshed: ${params.balance}`,
-    icon: 'icon:mdi:wallet-check',
+    icon: 'icon:solar:wallet-bold',
     type: 'success',
   });
 }
@@ -39,7 +39,7 @@ export function balanceRefreshedPopup(params: { balance: string }): void {
 export function balanceRefreshFailedPopup(overrides?: TextOverrides): void {
   popup({
     message: 'Failed to refresh balance',
-    icon: 'icon:mdi:wallet-outline',
+    icon: 'icon:solar:wallet-bold',
     type: 'error',
     ...overrides,
   });
@@ -50,5 +50,5 @@ export function modelSwitchedPopup(params: { modelName: string }): void {
 }
 
 export function photoPickerComingSoonPopup(): void {
-  popup({ message: 'Photo picker coming soon', icon: 'icon:mdi:camera-plus', type: 'info' });
+  popup({ message: 'Photo picker coming soon', icon: 'icon:mdi:camera', type: 'info' });
 }

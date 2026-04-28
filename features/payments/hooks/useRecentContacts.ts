@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { NDKEvent, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { paymentLog } from '@/shared/lib/logger';
 import { unwrapGiftWrap } from '@/shared/lib/nostr/nip17';
+import {
+  getCachedUnwrap,
+  hydrateGiftWrapCache,
+  putUnwrap,
+} from '@/shared/lib/nostr/giftWrapCache';
 import { EncryptedDirectMessage } from 'nostr-tools/kinds';
 import { decryptNip04Events } from '../lib/decryptNip04Events';
 
@@ -51,20 +56,59 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
 
   const { events: giftWrapEvents } = useSubscribe({ filters: giftWrapFilters });
 
+  // Warm the persistent unwrap cache as soon as we know which profile is
+  // active. The cache hydrates from AsyncStorage in the background — by
+  // the time `unwrappedDMs` runs (after the first relay tick), most or
+  // all entries are in memory, so the loop below short-circuits to
+  // `getCachedUnwrap` for previously-seen wraps and only pays the
+  // secp256k1 ECDH cost on genuinely new wraps.
+  useEffect(() => {
+    if (nostrKeys?.pubkey) {
+      void hydrateGiftWrapCache(nostrKeys.pubkey);
+    }
+  }, [nostrKeys?.pubkey]);
+
   const unwrappedDMs = useMemo(() => {
     const privateKey = nostrKeys?.privateKey;
-    if (!giftWrapEvents?.length || !privateKey) return [];
-    return giftWrapEvents
+    const recipientPubkey = nostrKeys?.pubkey;
+    if (!giftWrapEvents?.length || !privateKey || !recipientPubkey) return [];
+    const t0 = performance.now();
+    let cacheHits = 0;
+    let unwrapped = 0;
+    let failed = 0;
+    const out = giftWrapEvents
       .map((event) => {
-        const unwrapped = unwrapGiftWrap(
+        // L1 hit: skip the two NIP-44 decrypts entirely.
+        const cached = getCachedUnwrap(recipientPubkey, event.id);
+        if (cached) {
+          cacheHits++;
+          return { ...cached, wrapId: event.id };
+        }
+        const fresh = unwrapGiftWrap(
           { content: event.content, pubkey: event.pubkey },
           privateKey
         );
-        if (!unwrapped) return null;
-        return { ...unwrapped, wrapId: event.id };
+        if (!fresh) {
+          failed++;
+          return null;
+        }
+        // Persist for the next session — the same wraps will keep
+        // arriving from relays on every `useSubscribe`, and we don't
+        // want to pay the unwrap cost again next launch.
+        putUnwrap(recipientPubkey, event.id, fresh);
+        unwrapped++;
+        return { ...fresh, wrapId: event.id };
       })
       .filter((dm): dm is NonNullable<typeof dm> => dm !== null);
-  }, [giftWrapEvents, nostrKeys?.privateKey]);
+    paymentLog.debug('payment.contacts.unwrap_pass', {
+      total: giftWrapEvents.length,
+      cacheHits,
+      unwrapped,
+      failed,
+      duration_ms: Math.round((performance.now() - t0) * 100) / 100,
+    });
+    return out;
+  }, [giftWrapEvents, nostrKeys?.privateKey, nostrKeys?.pubkey]);
 
   const [decryptedContacts, setDecryptedContacts] = useState<any[]>([]);
 
@@ -167,7 +211,10 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
         );
         const decrypted =
           needsDecrypt.length > 0
-            ? await decryptNip04Events(needsDecrypt, nostrKeys.privateKey)
+            ? await decryptNip04Events(needsDecrypt, {
+                privateKey: nostrKeys.privateKey,
+                recipientPubkey: nostrKeys.pubkey,
+              })
             : [];
         const results = [...decrypted, ...passthrough];
         paymentLog.debug('payment.contacts.decrypt', { decryptedCount: results.length });

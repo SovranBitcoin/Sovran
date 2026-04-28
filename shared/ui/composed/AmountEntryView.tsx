@@ -14,16 +14,19 @@ import opacity from 'hex-color-opacity';
 
 import type { QuickSendSuggestion } from 'coco-payment-ux/react';
 
+import { ActionMenuButton, type ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import CustomKeyboard from '@/shared/ui/composed/CustomKeyboard';
 import { FiatCurrencyPill } from '@/features/wallet';
+import { Button } from '@/shared/ui/primitives/Button';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import Icon from 'assets/icons';
 
 import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
 
@@ -126,6 +129,15 @@ export interface AmountEntryViewProps {
   extraButtons?: ButtonHandlerProps['buttons'];
 
   /**
+   * Optional split-button variants for the Next action. When present, Next
+   * renders as an ActionMenuButton (primary + chevron → Menu) listing each
+   * variant. The first variant's `onPress` is invoked by taps on the primary
+   * half; tapping a menu item calls that variant's `onPress`. Leave undefined
+   * to keep the plain Next button.
+   */
+  nextVariants?: ActionMenuVariant[];
+
+  /**
    * Color semantics:
    *   'send'    — danger tint on raw input; AmountFormatter uses useTypeColors.
    *   'receive' — foreground; AmountFormatter uses useTypeColors.
@@ -153,6 +165,7 @@ export function AmountEntryView({
   suggestions = [],
   onSuggestionTap,
   extraButtons,
+  nextVariants,
   transactionType = 'neutral',
 }: AmountEntryViewProps) {
   const [foreground, background, danger] = useThemeColor([
@@ -290,22 +303,85 @@ export function AmountEntryView({
           onKeyPress={onKeyPress}
         />
         <HStack justify="center" align="center">
-          <ButtonHandler
-            buttons={[
-              {
-                testID: nextTestID,
-                text: nextText,
-                icon: nextIcon,
-                variant: 'primary',
-                onPress: async () => {
-                  await onNext();
+          {nextVariants && nextVariants.length > 0 ? (
+            // Variants path — build the full row inline so the original
+            // ButtonHandler layout rules are preserved while Next is actually
+            // a Menu trigger:
+            //   • 1 slot : Next only, flex:1
+            //   • 2 slots: Next + extra, both text, flex:1 each
+            //   • 3 slots: Next + extra, both text, third extra icon-only
+            // This mirrors the plain-ButtonHandler path's "2 text + third
+            // collapses to icon" rule we lost when Next got split into its
+            // own component.
+            <HStack align="center" gap={0} style={{ flex: 1 }}>
+              <ActionMenuButton
+                label={nextText}
+                testID={nextTestID}
+                variant="primary"
+                loading={nextLoading}
+                disabled={nextDisabled}
+                variants={nextVariants}
+                // Bottom-anchored Next button — popover "top" placement pushes
+                // the menu too far up the screen (menu height stacks above
+                // trigger). Slide up as a bottom-sheet instead.
+                presentation="bottom-sheet"
+                // Tapping Next always opens the menu instead of firing the
+                // first variant directly. Even when only one option is
+                // available, the menu surfaces the exact action ("as Ecash" /
+                // "as Lightning") so the user knows what's about to happen
+                // before an invoice or token is minted.
+                collapsedPressOpensMenu
+                menuTitle="Select option"
+              />
+              {extraButtons && extraButtons.length > 0 ? (
+                <View style={{ flex: 1 }}>
+                  <Button
+                    testID={extraButtons[0].testID}
+                    text={extraButtons[0].text}
+                    variant={extraButtons[0].variant}
+                    loading={extraButtons[0].loading}
+                    disabled={extraButtons[0].disabled}
+                    onPress={() => extraButtons[0].onPress?.(() => {})}
+                  />
+                </View>
+              ) : null}
+              {extraButtons && extraButtons.length > 1 ? (
+                <View>
+                  <Button
+                    testID={extraButtons[1].testID}
+                    icon={
+                      extraButtons[1].icon ? (
+                        <Icon name={extraButtons[1].icon} />
+                      ) : (
+                        <Icon name="tabler:dots" />
+                      )
+                    }
+                    variant={extraButtons[1].variant ?? 'secondary'}
+                    loading={extraButtons[1].loading}
+                    disabled={extraButtons[1].disabled}
+                    onPress={() => extraButtons[1].onPress?.(() => {})}
+                  />
+                </View>
+              ) : null}
+            </HStack>
+          ) : (
+            <ButtonHandler
+              buttons={[
+                {
+                  testID: nextTestID,
+                  text: nextText,
+                  icon: nextIcon,
+                  variant: 'primary',
+                  onPress: async () => {
+                    await onNext();
+                  },
+                  loading: nextLoading,
+                  disabled: nextDisabled,
                 },
-                loading: nextLoading,
-                disabled: nextDisabled,
-              },
-              ...(extraButtons ?? []),
-            ]}
-          />
+                ...(extraButtons ?? []),
+              ]}
+            />
+          )}
         </HStack>
       </BottomButtons>
     </View>

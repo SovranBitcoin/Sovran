@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
+import { log } from '../logger';
 import { showToast, showSheet, type ToastConfig, type SheetConfig } from './bridge';
 import type { LiveSheetConfig } from './liveSheetTypes';
 import type { PopupIcon } from './icons';
-import { resolvePopupIcon } from './icons';
 import type { PopupTextSegment } from './format';
 import { flattenSegments } from './format';
+
+const popupLog = log.child({ module: 'popup' });
 
 type PopupVariant = 'toast' | 'sheet';
 
@@ -113,6 +115,7 @@ interface popupConfig {
 }
 
 export const popup = (config: popupConfig | string) => {
+  const originalInput = typeof config === 'string' ? config : config.message;
   if (typeof config === 'string') {
     config = { message: config };
   }
@@ -123,10 +126,11 @@ export const popup = (config: popupConfig | string) => {
     options.icon = `emoji:${emoji}`;
   }
 
-  const messageConfig =
-    typeof message === 'string' && MESSAGE_CONFIGS[message]
-      ? MESSAGE_CONFIGS[message]
-      : { title: message, text: message, type: MESSAGE_TYPES.INFO };
+  const matchedKnownError =
+    typeof message === 'string' && MESSAGE_CONFIGS[message] ? message : null;
+  const messageConfig = matchedKnownError
+    ? MESSAGE_CONFIGS[matchedKnownError]
+    : { title: message, text: message, type: MESSAGE_TYPES.INFO };
 
   const resolvedText =
     typeof messageConfig.text === 'function' ? messageConfig.text(params) : messageConfig.text;
@@ -137,10 +141,32 @@ export const popup = (config: popupConfig | string) => {
   const resolvedButtons = options.buttons || messageConfig.buttons || [];
   const messageType = options.type || messageConfig.type || MESSAGE_TYPES.INFO;
 
+  const variantReason: 'explicit' | 'config-default' | 'has-buttons' | 'default-toast' =
+    options.variant
+      ? 'explicit'
+      : messageConfig.variant
+        ? 'config-default'
+        : resolvedButtons.length > 0
+          ? 'has-buttons'
+          : 'default-toast';
+
   const variant: PopupVariant =
     (options.variant as PopupVariant) ||
     (messageConfig.variant as PopupVariant) ||
     (resolvedButtons.length > 0 ? 'sheet' : 'toast');
+
+  popupLog.info('popup.engine.invoke', {
+    originalMessage: originalInput,
+    matchedKnownError,
+    variant,
+    variantReason,
+    type: messageType,
+    buttonCount: resolvedButtons.length,
+    duration: options.duration,
+    hasIcon: !!options.icon,
+    hasLive: !!options.live,
+    hasOverrideText: overrideText != null,
+  });
 
   if (variant === 'sheet') {
     const sheetConfig: SheetConfig = {
@@ -161,13 +187,12 @@ export const popup = (config: popupConfig | string) => {
   }
 
   const description = resolveToastDescription(text);
-  const toastIcon = options.icon ? resolvePopupIcon(options.icon, 28) : undefined;
 
   const toastConfig: ToastConfig = {
     variant: TOAST_VARIANT_MAP[messageType] || 'default',
     label: messageConfig.title,
     description,
-    icon: toastIcon,
+    icon: options.icon,
     duration: options.duration,
     onShow: options.onOpen,
     onHide: options.onClose ? () => options.onClose!({ reason: 'dismiss' }) : undefined,

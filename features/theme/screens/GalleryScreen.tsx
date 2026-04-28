@@ -18,9 +18,9 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import Image from '@/shared/ui/primitives/Image';
 import Icon from 'assets/icons';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Screen, useLifecycleLogger, log } from '@/shared/lib/logger';
+import { useLifecycleLogger, log } from '@/shared/lib/logger';
 import { refreshCatalog } from '@/shared/lib/wallpaperSync';
 import opacity from 'hex-color-opacity';
 import { UnitPreviewCard } from '@/features/theme/components/UnitPreviewCard';
@@ -69,9 +69,9 @@ export function GalleryScreen() {
   );
 
   return (
-    <Screen name="GalleryScreen">
+    <>
       <Stack.Screen options={{ title: 'Gallery' }} />
-      <ModalLayoutWrapper useCustomScrollView>
+      <Screen name="GalleryScreen" scroll="custom">
         <ScrollView
           contentContainerStyle={{ paddingBottom: 40, paddingTop: headerHeight + 8 }}
           showsVerticalScrollIndicator={false}>
@@ -102,8 +102,8 @@ export function GalleryScreen() {
             </View>
           ))}
         </ScrollView>
-      </ModalLayoutWrapper>
-    </Screen>
+      </Screen>
+    </>
   );
 }
 

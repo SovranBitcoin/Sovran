@@ -11,10 +11,10 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import Container from '@/shared/ui/composed/Container';
+import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { deleteAllProfiles } from '@/shared/lib/profile/profileSessionOrchestrator';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -141,8 +141,7 @@ export function DeleteScreen() {
   }, []);
 
   return (
-    <Container>
-      <Screen name="DeleteScreen">
+    <ScreenWrapper name="DeleteScreen" scroll="custom" safeArea>
         <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
           <VStack spacing={24} className="flex-1 px-6 pt-12">
             <VStack spacing={24} className="flex-1 items-center justify-center">
@@ -214,7 +213,6 @@ export function DeleteScreen() {
             </VStack>
           </VStack>
         </ScrollView>
-      </Screen>
-    </Container>
+    </ScreenWrapper>
   );
 }

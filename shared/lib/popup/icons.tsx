@@ -6,7 +6,7 @@ import { log } from '../logger';
 
 export type PopupIcon = `emoji:${string}` | `icon:${string}` | `custom:${string}` | ReactNode;
 
-const CUSTOM_ICONS: Record<string, React.FC<{ size: number }>> = {};
+const CUSTOM_ICONS: Record<string, React.FC<{ size: number; color?: string }>> = {};
 
 /**
  * Resolves a declarative PopupIcon value to renderable JSX.
@@ -16,8 +16,16 @@ const CUSTOM_ICONS: Record<string, React.FC<{ size: number }>> = {};
  * - `custom:X` looks up a registered animated component in CUSTOM_ICONS
  * - ReactNode passes through as-is
  * - undefined falls back to a default lightbulb emoji
+ *
+ * `color` overrides the default theme `foreground` color used by Icon-based
+ * variants. Useful for surfaces that are theme-invariant (e.g. toasts, which
+ * are always white-on-black regardless of light/dark theme).
  */
-export function resolvePopupIcon(icon: PopupIcon | undefined, size: number): ReactNode {
+export function resolvePopupIcon(
+  icon: PopupIcon | undefined,
+  size: number,
+  color?: string
+): ReactNode {
   if (icon == null) {
     return <Text size={30}>💡</Text>;
   }
@@ -31,14 +39,14 @@ export function resolvePopupIcon(icon: PopupIcon | undefined, size: number): Rea
   }
 
   if (icon.startsWith('icon:')) {
-    return <Icon name={icon.slice(5)} size={size} />;
+    return <Icon name={icon.slice(5)} size={size} color={color} />;
   }
 
   if (icon.startsWith('custom:')) {
     const key = icon.slice(7);
     const Component = CUSTOM_ICONS[key];
     if (Component) {
-      return <Component size={size} />;
+      return <Component size={size} color={color} />;
     }
     log.warn('popup.unknown_icon', { key });
     return <Text size={30}>💡</Text>;

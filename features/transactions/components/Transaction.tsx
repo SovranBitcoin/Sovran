@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react';
+import Animated, { Easing, LinearTransition } from 'react-native-reanimated';
 
 import {
   HistoryEntry,
@@ -10,8 +11,15 @@ import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
+import { SwipeableRow } from '@/features/transactions/components/SwipeableRow';
 import TransactionIcon from '@/features/transactions/components/TransactionIcon';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
+import { isCancellablePendingEcash } from '@/shared/lib/cashu/utils';
+import {
+  COLLAPSE_DURATION_MS,
+  useIsCollapsing,
+  useIsReclaiming,
+} from '@/shared/stores/runtime/rollbackStore';
 import { UntranslatedText } from '@/shared/ui/primitives/Text';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -26,7 +34,6 @@ import {
   useTransactionDistributionStore,
   DistributionSource,
 } from '@/shared/stores/profile/transactionDistributionStore';
-import { useTransactionLocationStore } from '@/shared/stores/profile/transactionLocationStore';
 
 /**
  * Unified source for the row badge. Combines inbound (scan history) and
@@ -114,22 +121,6 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
   const handlePress = useCallback((): void => {
     log.debug('transaction.press', { type: historyEntry.type, id: historyEntry.id });
 
-    // DIAGNOSTIC: log lookup results for the row that was tapped.
-    // Remove after investigating why old transactions show no location/source.
-    const locationEntry = useTransactionLocationStore.getState().locations[historyEntry.id];
-    const scanEntry = useScanHistoryStore
-      .getState()
-      .entries.find((e) => e.transactionId === historyEntry.id);
-    log.info('tx.detail.lookup', {
-      id: historyEntry.id,
-      type: historyEntry.type,
-      createdAt: historyEntry.createdAt,
-      locationFound: !!locationEntry,
-      locationEntry,
-      scanEntryFound: !!scanEntry,
-      scanEntry,
-    });
-
     // Using router.navigate instead of router.push to prevent duplicate navigation
     switch (historyEntry.type) {
       case 'mint': {
@@ -189,11 +180,16 @@ interface TransactionProps {
   historyEntry: HistoryEntry;
   /** Optional custom press handler - if provided, overrides default navigation */
   onPress?: (historyEntry: HistoryEntry) => void;
-  /** Show a loading spinner on the icon */
-  isLoading?: boolean;
+  /**
+   * Optional swipe-to-cancel handler. When provided AND the entry is a
+   * cancellable pending ecash send, the row reveals a red Cancel track on
+   * left-swipe and calls this on commit. Otherwise the row is a plain tap
+   * target.
+   */
+  onCancel?: (historyEntry: SendHistoryEntry) => void;
 }
 
-export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: TransactionProps) => {
+export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: TransactionProps) => {
   const [foreground, danger, success] = useThemeColor(['foreground', 'danger', 'success'] as const);
 
   const {
@@ -218,84 +214,120 @@ export const Transaction = React.memo(({ historyEntry, onPress, isLoading }: Tra
   // a specific quote/transaction by full id when needed.
   const testID = `transaction-${historyEntry.type}-${historyEntry.id}`;
 
+  // operationId only exists on SendHistoryEntry; empty string is a safe
+  // fallback for the rollback-store hooks (`Set.has('')` returns false).
+  const sendOperationId =
+    historyEntry.type === 'send' ? (historyEntry as SendHistoryEntry).operationId : '';
+  const cancellable = isCancellablePendingEcash(historyEntry);
+  const isReclaiming = useIsReclaiming(sendOperationId);
+  const isCollapsing = useIsCollapsing(sendOperationId);
+  const swipeable = !!onCancel && cancellable;
+
+  // Post-success collapse: declarative target style + Reanimated's
+  // `layout` transition. When `isCollapsing` flips, React renders the
+  // wrapper with `height: 0, opacity: 0`; Reanimated's LinearTransition
+  // captures the pre/post layouts and interpolates between them on the
+  // UI thread (no per-frame JS re-renders). Yoga commits the new size
+  // each frame on the native side, so the section's measured height
+  // shrinks in real time and AnimatedLegendList's `itemLayoutAnimation`
+  // animates sibling sections in lock-step on the same UI-thread pass.
+  const collapsedStyle = isCollapsing ? { height: 0, opacity: 0 } : null;
+
+  const row = (
+    <TouchableOpacity
+      key={historyEntry?.id}
+      testID={testID}
+      className="flex-row items-center justify-between bg-transparent px-4 py-5"
+      style={isRolledBack ? { opacity: 0.33 } : undefined}
+      onPress={handlePress}>
+      <HStack spacing={12} flex={1}>
+        <TransactionIcon historyEntry={historyEntry} isLoading={isReclaiming} />
+
+        <VStack spacing={0} flex={1}>
+          <HStack justify="space-between" align="flex-end">
+            <UntranslatedText color={foreground} bold size={14}>
+              {displayLabel}
+            </UntranslatedText>
+            <AmountFormatter
+              amount={historyEntry.amount}
+              unit={historyEntry.unit}
+              size={16}
+              weight="heavy"
+              color={isSend ? danger : success}
+              sign={isSend ? '-' : isReceive ? '+' : null}
+            />
+          </HStack>
+
+          <HStack justify="space-between" align="center">
+            <HStack align="center" spacing={4}>
+              <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
+                {historyEntry?.createdAt
+                  ? convertTime(new Date(historyEntry.createdAt))
+                  : 'Unconfirmed'}
+              </UntranslatedText>
+              {transactionSource && (
+                <Icon
+                  name={SOURCE_ICONS[transactionSource]}
+                  size={10}
+                  color={opacity(foreground, 0.8)}
+                />
+              )}
+              {bip321Options &&
+                (() => {
+                  const hasLightning = bip321Options.some(
+                    (k) => k === 'lightningInvoice' || k === 'lightningAddress' || k === 'lnurlp'
+                  );
+                  const hasEcash = bip321Options.some(
+                    (k) => k === 'paymentRequest' || k === 'ecashToken'
+                  );
+                  const usedLightning = historyEntry.type === 'melt';
+                  // Sort: used method first
+                  const items = [
+                    hasLightning && { name: 'mdi:lightning-bolt', used: usedLightning },
+                    hasEcash && { name: 'majesticons:coins', used: !usedLightning },
+                  ].filter(Boolean) as { name: string; used: boolean }[];
+                  items.sort((a, b) => (a.used === b.used ? 0 : a.used ? -1 : 1));
+                  return items.map((item) => (
+                    <Icon
+                      key={item.name}
+                      name={item.name}
+                      size={10}
+                      color={opacity(foreground, item.used ? 0.8 : 0.4)}
+                    />
+                  ));
+                })()}
+            </HStack>
+            <UntranslatedText
+              overpass
+              bold
+              size={10}
+              color={opacity(foreground, 0.8)}
+              className="self-end text-right">
+              {fiatAmount}
+            </UntranslatedText>
+          </HStack>
+        </VStack>
+      </HStack>
+    </TouchableOpacity>
+  );
+
   return (
-    <Log name="Transaction">
-      <TouchableOpacity
-        key={historyEntry?.id}
-        testID={testID}
-        className="flex-row items-center justify-between bg-transparent px-4 py-5"
-        style={isRolledBack ? { opacity: 0.33 } : undefined}
-        onPress={handlePress}>
-        <HStack spacing={12} flex={1}>
-          <TransactionIcon historyEntry={historyEntry} isLoading={isLoading} />
-
-          <VStack spacing={0} flex={1}>
-            <HStack justify="space-between" align="flex-end">
-              <UntranslatedText color={foreground} bold size={14}>
-                {displayLabel}
-              </UntranslatedText>
-              <AmountFormatter
-                amount={historyEntry.amount}
-                unit={historyEntry.unit}
-                size={16}
-                weight="heavy"
-                color={isSend ? danger : success}
-                sign={isSend ? '-' : isReceive ? '+' : null}
-              />
-            </HStack>
-
-            <HStack justify="space-between" align="center">
-              <HStack align="center" spacing={4}>
-                <UntranslatedText size={10} color={opacity(foreground, 0.8)}>
-                  {historyEntry?.createdAt
-                    ? convertTime(new Date(historyEntry.createdAt))
-                    : 'Unconfirmed'}
-                </UntranslatedText>
-                {transactionSource && (
-                  <Icon
-                    name={SOURCE_ICONS[transactionSource]}
-                    size={10}
-                    color={opacity(foreground, 0.8)}
-                  />
-                )}
-                {bip321Options &&
-                  (() => {
-                    const hasLightning = bip321Options.some(
-                      (k) => k === 'lightningInvoice' || k === 'lightningAddress' || k === 'lnurlp'
-                    );
-                    const hasEcash = bip321Options.some(
-                      (k) => k === 'paymentRequest' || k === 'ecashToken'
-                    );
-                    const usedLightning = historyEntry.type === 'melt';
-                    // Sort: used method first
-                    const items = [
-                      hasLightning && { name: 'mdi:lightning-bolt', used: usedLightning },
-                      hasEcash && { name: 'majesticons:coins', used: !usedLightning },
-                    ].filter(Boolean) as { name: string; used: boolean }[];
-                    items.sort((a, b) => (a.used === b.used ? 0 : a.used ? -1 : 1));
-                    return items.map((item) => (
-                      <Icon
-                        key={item.name}
-                        name={item.name}
-                        size={10}
-                        color={opacity(foreground, item.used ? 0.8 : 0.4)}
-                      />
-                    ));
-                  })()}
-              </HStack>
-              <UntranslatedText
-                overpass
-                bold
-                size={10}
-                color={opacity(foreground, 0.8)}
-                className="self-end text-right">
-                {fiatAmount}
-              </UntranslatedText>
-            </HStack>
-          </VStack>
-        </HStack>
-      </TouchableOpacity>
-    </Log>
+    <Animated.View
+      style={[{ overflow: 'hidden' }, collapsedStyle]}
+      layout={LinearTransition.duration(COLLAPSE_DURATION_MS).easing(Easing.linear)}>
+      <Log name="Transaction">
+        {swipeable && cancellable && onCancel ? (
+          <SwipeableRow
+            testID={`${testID}-swipeable`}
+            enabled={!isReclaiming && !isCollapsing}
+            onCommit={() => onCancel(historyEntry)}>
+            {row}
+          </SwipeableRow>
+        ) : (
+          row
+        )}
+      </Log>
+    </Animated.View>
   );
 });
 

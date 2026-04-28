@@ -1,19 +1,34 @@
 import { NDKEvent, NDKPrivateKeySigner, NDKUser } from '@nostr-dev-kit/ndk-mobile';
 import { nostrLog } from '@/shared/lib/logger';
+import {
+  getCachedNip04Plaintext,
+  isKnownFailedNip04,
+  markNip04Failed,
+  putNip04Plaintext,
+} from '@/shared/lib/nostr/nip04Cache';
+
+export interface DecryptNip04EventsOptions {
+  privateKey: Uint8Array;
+  /** Active profile pubkey — scopes the persistent plaintext cache. */
+  recipientPubkey: string;
+}
 
 /**
- * Decrypt NIP-04 DM events for a list of items sharing { pubkey, dmEvent, nip17Content? }.
- * NIP-17 messages are already decrypted during unwrapping and passed through via nip17Content.
+ * Decrypt NIP-04 DM events. NIP-17 messages are passed through via
+ * `nip17Content` (already decrypted during unwrap). Cache hits on the
+ * persistent NIP-04 plaintext store skip the ECDH + AES-CBC cost.
  */
 export async function decryptNip04Events<
   T extends { pubkey: string | null; dmEvent?: any; nip17Content?: string },
->(items: T[], privateKey: Uint8Array): Promise<T[]> {
+>(items: T[], opts: DecryptNip04EventsOptions): Promise<T[]> {
+  const { privateKey, recipientPubkey } = opts;
   nostrLog.info('nostr.nip04.decrypt.start', { itemCount: items.length });
   const start = performance.now();
   // Defer signer creation until we actually need to decrypt
   let signer: NDKPrivateKeySigner | null = null;
   const results: T[] = [];
   let decryptedCount = 0;
+  let cacheHitCount = 0;
   let nip17Count = 0;
   let skippedCount = 0;
   let failedCount = 0;
@@ -31,9 +46,28 @@ export async function decryptNip04Events<
         continue;
       }
       if (item.dmEvent instanceof NDKEvent) {
+        const eventId = item.dmEvent.id;
+        // Negative-cache hit: known-bad event, render as encrypted
+        // placeholder without burning the ECDH + AES-CBC cost again.
+        if (eventId && isKnownFailedNip04(recipientPubkey, eventId)) {
+          results.push({ ...item, dmEvent: { ...item.dmEvent, content: '[Encrypted message]' } });
+          failedCount++;
+          continue;
+        }
+        // Positive-cache hit: skip decrypt, populate plaintext on the
+        // event so downstream code paths see the same shape they would
+        // after a fresh `decrypt()` call.
+        const cached = eventId ? getCachedNip04Plaintext(recipientPubkey, eventId) : undefined;
+        if (cached !== undefined) {
+          item.dmEvent.content = cached;
+          results.push({ ...item, dmEvent: { ...item.dmEvent, content: cached } });
+          cacheHitCount++;
+          continue;
+        }
         if (!signer) signer = new NDKPrivateKeySigner(privateKey);
         const counterparty = new NDKUser({ pubkey: item.pubkey });
         await item.dmEvent.decrypt(counterparty, signer);
+        if (eventId) putNip04Plaintext(recipientPubkey, eventId, item.dmEvent.content);
         results.push({ ...item, dmEvent: { ...item.dmEvent, content: item.dmEvent.content } });
         decryptedCount++;
       } else {
@@ -42,6 +76,8 @@ export async function decryptNip04Events<
       }
     } catch (error) {
       nostrLog.warn('nostr.nip04.decrypt.item_failed', { pubkey: item.pubkey?.slice(0, 8), error });
+      const eventId = (item.dmEvent as NDKEvent | undefined)?.id;
+      if (eventId) markNip04Failed(recipientPubkey, eventId);
       results.push({ ...item, dmEvent: { ...item.dmEvent, content: '[Encrypted message]' } });
       failedCount++;
     }
@@ -50,6 +86,7 @@ export async function decryptNip04Events<
   nostrLog.info('nostr.nip04.decrypt.done', {
     total: items.length,
     decrypted: decryptedCount,
+    cacheHits: cacheHitCount,
     nip17Passthrough: nip17Count,
     skipped: skippedCount,
     failed: failedCount,

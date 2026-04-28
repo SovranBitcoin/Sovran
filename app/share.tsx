@@ -1,13 +1,11 @@
 import React, { useCallback, useState } from 'react';
-import { TouchableOpacity } from 'react-native';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import Icon from 'assets/icons';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { ShareScreen, SHARE_CONFIGS, ShareType } from '@/features/user';
+import { useScreenOptions } from '@/shared/ui/composed/Screen';
+import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 
 function ShareRoute() {
-  const foreground = useThemeColor('foreground');
   const params = useLocalSearchParams<{
     type?: ShareType;
     data: string;
@@ -21,24 +19,18 @@ function ShareRoute() {
     setHeaderTitle(title);
   }, []);
 
-  const CloseButton = () => (
-    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-      <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-    </TouchableOpacity>
+  useScreenOptions(
+    () => ({
+      headerTitle,
+      headerLeft: () => (
+        <ScreenHeaderAction icon="material-symbols:close-rounded" onPress={() => router.back()} />
+      ),
+    }),
+    [headerTitle]
   );
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          headerTitle,
-          headerTitleStyle: { color: foreground },
-          headerTintColor: foreground,
-          headerLeft: () => <CloseButton />,
-        }}
-      />
-      <ShareScreen type={type} data={data ?? ''} npub={npub} onTitleChange={handleTitleChange} />
-    </>
+    <ShareScreen type={type} data={data ?? ''} npub={npub} onTitleChange={handleTitleChange} />
   );
 }
 

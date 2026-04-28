@@ -2,8 +2,8 @@ import React from 'react';
 import { useLocalSearchParams } from 'expo-router';
 
 import { ThreadView } from '@/features/feed/components/ThreadView';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
-import { Screen, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { Screen } from '@/shared/ui/composed/Screen';
+import { feedLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 export function ThreadScreen() {
   useLifecycleLogger('ThreadScreen', feedLog);
@@ -13,10 +13,8 @@ export function ThreadScreen() {
   feedLog.info('feed.thread.view', { eventId: eventId ?? '' });
 
   return (
-    <ModalLayoutWrapper useCustomScrollView>
-      <Screen name="ThreadScreen">
-        <ThreadView eventId={eventId ?? ''} />
-      </Screen>
-    </ModalLayoutWrapper>
+    <Screen name="ThreadScreen" scroll="custom">
+      <ThreadView eventId={eventId ?? ''} />
+    </Screen>
   );
 }

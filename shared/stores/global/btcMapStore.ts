@@ -110,6 +110,13 @@ interface BTCMapActions {
 
 type BTCMapStore = BTCMapState & BTCMapActions;
 
+// Module-level in-flight tracker. fetchPlaces parses ~40k places (2–3s of
+// JS-thread work), so concurrent callers (e.g., the wallet's BitcoinNearYou
+// and the explore tab's MapTeaserCard, which both mount on boot via native
+// tabs) used to each kick off their own fetch + parse. Sharing the in-flight
+// promise eliminates duplicate work and the second 3s blocker.
+let inflightPlacesFetch: Promise<BTCMapPlace[]> | null = null;
+
 export const useBTCMapStore = create<BTCMapStore>()(
   persist(
     (set, get) => ({
@@ -134,50 +141,62 @@ export const useBTCMapStore = create<BTCMapStore>()(
           if (cached && cached.length > 0) return cached;
         }
 
+        // Dedupe concurrent callers — return the in-flight promise instead
+        // of starting a second fetch + parse.
+        if (inflightPlacesFetch) return inflightPlacesFetch;
+
         storeLog.info('store.btc_map.fetch_places.start', { forceRefresh });
         const startTime = performance.now();
         set({ isLoading: true, error: null });
 
-        try {
-          const response = await fetch(`${SOVRAN_API_BASE}/places`);
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
+        const run = async (): Promise<BTCMapPlace[]> => {
+          try {
+            const response = await fetch(`${SOVRAN_API_BASE}/places`);
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
 
-          const raw = await response.json();
-          const parsed = parsePlaces(raw);
-          if (parsed.isErr()) {
-            storeLog.warn('store.btc_map.places.parse_failed', {
-              issues: loggableIssues(parsed.error),
+            const raw = await response.json();
+            const parsed = parsePlaces(raw);
+            if (parsed.isErr()) {
+              storeLog.warn('store.btc_map.places.parse_failed', {
+                issues: loggableIssues(parsed.error),
+              });
+              throw new Error('Invalid BTCMap places response');
+            }
+            const data = parsed.value as BTCMapPlace[];
+            storeLog.info('store.btc_map.fetch_places.success', {
+              count: data.length,
+              duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
             });
-            throw new Error('Invalid BTCMap places response');
+
+            set({
+              placesCache: { data, timestamp: Date.now() },
+              isLoading: false,
+              error: null,
+            });
+
+            return data;
+          } catch (error: unknown) {
+            const errorMessage =
+              error instanceof Error ? error.message : 'Failed to load merchants';
+            storeLog.error('store.btc_map.fetch_places.failed', {
+              error: errorMessage,
+              duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
+            });
+            set({ isLoading: false, error: errorMessage });
+
+            const cache = get().placesCache;
+            if (cache && cache.data.length > 0) return cache.data;
+
+            throw error;
           }
-          const data = parsed.value as BTCMapPlace[];
-          storeLog.info('store.btc_map.fetch_places.success', {
-            count: data.length,
-            duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
-          });
+        };
 
-          set({
-            placesCache: { data, timestamp: Date.now() },
-            isLoading: false,
-            error: null,
-          });
-
-          return data;
-        } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : 'Failed to load merchants';
-          storeLog.error('store.btc_map.fetch_places.failed', {
-            error: errorMessage,
-            duration_ms: Math.round((performance.now() - startTime) * 100) / 100,
-          });
-          set({ isLoading: false, error: errorMessage });
-
-          const cache = get().placesCache;
-          if (cache && cache.data.length > 0) return cache.data;
-
-          throw error;
-        }
+        inflightPlacesFetch = run().finally(() => {
+          inflightPlacesFetch = null;
+        });
+        return inflightPlacesFetch;
       },
 
       getCachedPlaceDetails: (id: number) => {

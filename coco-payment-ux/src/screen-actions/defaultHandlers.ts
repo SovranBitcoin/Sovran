@@ -423,11 +423,18 @@ export function createDefaultScreenActionHandlers(
         const mintUrl = (ctx as EntryLike).mintUrl as string | undefined;
         if (!mintUrl) return;
 
+        // The selector hands the full row in via `actions.getInfo.execute`
+        // so audit/score travel with the navigation; falls back to a
+        // cache-only build for callers that don't have a row.
+        const item = (ctx as EntryLike).item as
+          | import('../types').MintListItem
+          | undefined;
+
         const ops = getOperations();
         let infoEntry: EntryLike = { mintUrl };
         if (ops?.buildMintReviewInfo) {
           try {
-            const info = await ops.buildMintReviewInfo(mintUrl);
+            const info = await ops.buildMintReviewInfo(mintUrl, item);
             infoEntry = { ...(info as unknown as EntryLike) };
           } catch (e) {
             console.warn('[mintInfo] buildMintReviewInfo failed for', mintUrl, e instanceof Error ? e.message : e);
@@ -451,10 +458,57 @@ export function createDefaultScreenActionHandlers(
         const mintUrl =
           typeof entry.selectedMintUrl === 'string' ? entry.selectedMintUrl : '';
         if (typeof effectiveSat !== 'number' || effectiveSat <= 0) return;
-        const destination = entry.destination as Destination | undefined;
-        if (!destination) return;
-        console.info('[amountEntry.next] Amount confirmed | amount:', effectiveSat, '| mintUrl:', mintUrl || '(none)', '| destination:', destination);
-        void machine.enterAmount(effectiveSat, mintUrl, { destination });
+        const entryDestination = entry.destination as Destination | undefined;
+        if (!entryDestination) return;
+
+        // variantId may be provided by the Next variants menu (ecash /
+        // lightning). When it matches the entry's destination category we just
+        // pass it through; the only case that needs a real switch is picking
+        // Lightning from a sendEcash flow that carries a meltTarget (the
+        // "Send Money" DM path where both ecash and lightning are available).
+        const variantId = typeof ctx.variantId === 'string' ? ctx.variantId : undefined;
+        const meltTargetFromEntry = typeof entry.meltTarget === 'string' ? entry.meltTarget : '';
+
+        let destination: Destination = entryDestination;
+        let meltTarget: string | undefined;
+
+        if (variantId === 'lightning') {
+          if (entryDestination === 'meltQuote' || entryDestination === 'mintQuote') {
+            // Already on a lightning-backed flow — keep destination as-is.
+            destination = entryDestination;
+          } else if (meltTargetFromEntry) {
+            // Send-money path: switch sendEcash → meltQuote, seed meltTarget.
+            destination = 'meltQuote';
+            meltTarget = meltTargetFromEntry;
+          } else {
+            console.warn('[amountEntry.next] Lightning variant without meltTarget — aborting');
+            return;
+          }
+        } else if (variantId === 'ecash') {
+          if (entryDestination === 'mintQuote') {
+            console.warn('[amountEntry.next] Ecash variant not valid on mintQuote — aborting');
+            return;
+          }
+          // sendEcash / paymentRequest keep their destination; nothing to do.
+          destination = entryDestination;
+        } else if (variantId === 'onchain') {
+          console.info('[amountEntry.next] Onchain variant not supported yet');
+          return;
+        }
+
+        console.info(
+          '[amountEntry.next] Amount confirmed | amount:',
+          effectiveSat,
+          '| mintUrl:',
+          mintUrl || '(none)',
+          '| destination:',
+          destination,
+          '| variantId:',
+          variantId ?? '(none)',
+          '| meltTarget:',
+          meltTarget ? meltTarget.slice(0, 30) + '…' : '(none)'
+        );
+        void machine.enterAmount(effectiveSat, mintUrl, { destination, meltTarget });
       },
 
       paste: async (ctx: ScreenActionContext) => {

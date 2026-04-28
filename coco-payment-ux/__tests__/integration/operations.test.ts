@@ -98,12 +98,16 @@ describe('Operations — real Manager', () => {
     expect(entry.mintUrl).toBe(TEST_MINT);
   });
 
-  it('enrichment callbacks are applied to mint list items', async () => {
+  it('catalog data is applied to mint list items', async () => {
     const enrichedInstance = createCocoPaymentUX({
       manager,
-      enrichMintListItem: (url) => ({
-        kymScore: url === TEST_MINT ? 4.5 : undefined,
-      }),
+      fetchMintCatalog: async (mintUrls) => {
+        const map: Record<string, { kymScore?: number }> = {};
+        for (const url of mintUrls) {
+          if (url === TEST_MINT) map[url] = { kymScore: 4.5 };
+        }
+        return map;
+      },
     });
     await enrichedInstance.tracker.refresh();
 

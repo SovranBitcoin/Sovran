@@ -22,6 +22,19 @@ target_compile_definitions(secp256k1 PRIVATE
   SECP256K1_STATIC=1
   ENABLE_MODULE_EXTRAKEYS=1
   ENABLE_MODULE_SCHNORRSIG=1
+  ENABLE_MODULE_ECDH=1
+)
+
+# ---------------------------------------------------------------------------
+# Monocypher — vendored for ChaCha20 IETF (NIP-44 v2 cipher).
+# Single compilation unit; unused X25519 / Ed25519 / Poly1305 / BLAKE2b
+# code paths are dead-stripped by the linker in release builds.
+# ---------------------------------------------------------------------------
+add_library(monocypher STATIC
+  ../cpp/vendor/monocypher/monocypher.c
+)
+target_include_directories(monocypher PUBLIC
+  ../cpp/vendor/monocypher
 )
 
 # ---------------------------------------------------------------------------
@@ -40,6 +53,7 @@ target_include_directories(${PACKAGE_NAME} PRIVATE
   src/main/cpp
   ../cpp/core
   ../cpp/vendor/secp256k1/include
+  ../cpp/vendor/monocypher
 )
 
 find_library(LOG_LIB log)
@@ -49,4 +63,5 @@ target_link_libraries(
   ${LOG_LIB}
   android
   secp256k1
+  monocypher
 )

@@ -16,11 +16,11 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { PressableFeedback } from 'heroui-native';
 import Icon from 'assets/icons';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Screen, useLifecycleLogger, log } from '@/shared/lib/logger';
+import { useLifecycleLogger, log } from '@/shared/lib/logger';
 import { UnitPreviewCard } from '@/features/theme/components/UnitPreviewCard';
 import { useThemeDraft } from '@/features/theme/lib/themeDraft';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
@@ -108,7 +108,7 @@ export function ThemePreviewScreen() {
 
   const handleUnitPress = useCallback((unitId: string) => {
     router.push({
-      pathname: '/(settings-flow)/theme/background' as any,
+      pathname: '/(theme-flow)/background' as any,
       params: { unitId },
     });
   }, []);
@@ -134,11 +134,12 @@ export function ThemePreviewScreen() {
   });
 
   return (
-    <Screen name="ThemePreviewScreen">
+    <>
       <Stack.Screen options={{ title: 'Theme preview' }} />
-      <ModalLayoutWrapper
+      <Screen
+        name="ThemePreviewScreen"
         contentPadding={0}
-        bottomContent={
+        footer={
           isDirty ? (
             <BottomButtons>
               <ButtonHandler
@@ -182,7 +183,7 @@ export function ThemePreviewScreen() {
 
         <View style={styles.actionRow}>
           <PressableFeedback
-            onPress={() => router.push('/(settings-flow)/theme/gallery' as any)}
+            onPress={() => router.push('/(theme-flow)/gallery' as any)}
             animation={false}
             testID="theme-preview-theme-button">
             <PressableFeedback.Scale>
@@ -197,8 +198,8 @@ export function ThemePreviewScreen() {
             </PressableFeedback.Scale>
           </PressableFeedback>
         </View>
-      </ModalLayoutWrapper>
-    </Screen>
+      </Screen>
+    </>
   );
 }
 

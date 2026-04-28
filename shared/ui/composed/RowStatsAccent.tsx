@@ -45,8 +45,11 @@ export const STAT_ICONS = {
   /** Works-offline indicator. Tint: theme `success`. */
   offline: 'mdi:airplane',
   /** NIP-05 verification badge. Rendered next to a handle in the trailing
-   *  pill of the accent row; tint: `STAT_COLOR_SOCIAL` (blue) when valid,
-   *  dim otherwise. Handle text matches — blue on valid, dim on invalid. */
+   *  pill of the accent row; always tinted `STAT_COLOR_SOCIAL` (blue) to
+   *  match the rest of the nostr-sourced stats. Server-side `nip05Valid`
+   *  is too noisy (cache misses, transient `/.well-known/nostr.json`
+   *  fetch failures) to gate color on, and conflicts are already
+   *  filtered out of search results upstream. */
   nip05: 'mdi:check-decagram',
 } as const;
 
@@ -79,10 +82,10 @@ export interface RowStatsAccentProps {
   noteColor?: string;
   /** Optional NIP-05 pill rendered as the last entry on the stats line:
    *  `[stats] • <check> handle@relay.example.com` (truncated with ellipsis
-   *  to fit remaining width). `valid` tints the check + handle `STAT_COLOR_SOCIAL`
-   *  (blue) to group the pill with the other nostr-sourced stats; invalid
-   *  falls back to a dim foreground. Absent `handle` → pill is omitted. */
-  nip05?: { handle: string; valid?: boolean };
+   *  to fit remaining width). Always tinted `STAT_COLOR_SOCIAL` (blue) —
+   *  see `STAT_ICONS.nip05` for why we don't gate on a validity flag.
+   *  Absent `handle` → pill is omitted. */
+  nip05?: { handle: string };
 }
 
 export function RowStatsAccent({ stats, note, noteColor, nip05 }: RowStatsAccentProps) {
@@ -132,17 +135,13 @@ export function RowStatsAccent({ stats, note, noteColor, nip05 }: RowStatsAccent
               )}
               <View
                 style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 3 }}
-                accessibilityLabel={nip05!.valid ? `Verified ${nip05!.handle}` : nip05!.handle}>
-                <Icon
-                  name={STAT_ICONS.nip05}
-                  size={12}
-                  color={nip05!.valid ? STAT_COLOR_SOCIAL : opacity(foreground, 0.4)}
-                />
+                accessibilityLabel={`Verified ${nip05!.handle}`}>
+                <Icon name={STAT_ICONS.nip05} size={12} color={STAT_COLOR_SOCIAL} />
                 <Text
                   size={12}
                   numberOfLines={1}
                   ellipsizeMode="tail"
-                  color={nip05!.valid ? STAT_COLOR_SOCIAL : opacity(foreground, 0.6)}
+                  color={STAT_COLOR_SOCIAL}
                   style={{ flexShrink: 1 }}>
                   {nip05!.handle}
                 </Text>

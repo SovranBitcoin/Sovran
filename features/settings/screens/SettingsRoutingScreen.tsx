@@ -4,7 +4,7 @@ import {
   useSettingsStore,
   type MiddlemanRoutingSettings,
 } from '@/shared/stores/global/settingsStore';
-import Container from '@/shared/ui/composed/Container';
+import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Section } from '@/features/settings';
@@ -18,7 +18,7 @@ import {
   Slider,
   Switch as HeroSwitch,
 } from 'heroui-native';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 // ---------------------------------------------------------------------------
 // Main screen
@@ -42,8 +42,7 @@ export function SettingsRoutingScreen() {
   const asNumber = (value: number | number[]) => (Array.isArray(value) ? (value[0] ?? 0) : value);
 
   return (
-    <Container>
-      <Screen name="SettingsRoutingScreen">
+    <ScreenWrapper name="SettingsRoutingScreen" scroll="custom" safeArea>
         <ScrollView
           className="px-4"
           contentInsetAdjustmentBehavior="automatic"
@@ -211,7 +210,6 @@ export function SettingsRoutingScreen() {
             </VStack>
           </Section>
         </ScrollView>
-      </Screen>
-    </Container>
+    </ScreenWrapper>
   );
 }

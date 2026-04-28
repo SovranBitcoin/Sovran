@@ -60,7 +60,13 @@ namespace margelo::nitro::nutpatch {
       virtual std::shared_ptr<ArrayBuffer> createBlindSignature(const std::shared_ptr<ArrayBuffer>& B_, const std::shared_ptr<ArrayBuffer>& seckey) = 0;
       virtual bool verifyDleqProof(const std::shared_ptr<ArrayBuffer>& B_, const std::shared_ptr<ArrayBuffer>& C_, const std::shared_ptr<ArrayBuffer>& A, const std::shared_ptr<ArrayBuffer>& s, const std::shared_ptr<ArrayBuffer>& e) = 0;
       virtual std::shared_ptr<ArrayBuffer> createDleqProof(const std::shared_ptr<ArrayBuffer>& B_, const std::shared_ptr<ArrayBuffer>& seckey) = 0;
+      virtual std::shared_ptr<ArrayBuffer> batchUnblind(const std::vector<std::shared_ptr<ArrayBuffer>>& blindedSignatures, const std::vector<std::shared_ptr<ArrayBuffer>>& blindingFactors, const std::shared_ptr<ArrayBuffer>& mintPubkey) = 0;
       virtual std::shared_ptr<ArrayBuffer> batchDeriveLegacy(const std::shared_ptr<ArrayBuffer>& seed, double keysetIdInt, double startCounter, double count) = 0;
+      virtual std::shared_ptr<ArrayBuffer> ecdhNip44(const std::shared_ptr<ArrayBuffer>& seckey, const std::shared_ptr<ArrayBuffer>& xonlyPubkey) = 0;
+      virtual std::shared_ptr<ArrayBuffer> batchEcdhNip44(const std::shared_ptr<ArrayBuffer>& seckey, const std::vector<std::shared_ptr<ArrayBuffer>>& xonlyPubkeys) = 0;
+      virtual std::shared_ptr<ArrayBuffer> chacha20Ietf(const std::shared_ptr<ArrayBuffer>& key, const std::shared_ptr<ArrayBuffer>& nonce, double counter, const std::shared_ptr<ArrayBuffer>& data) = 0;
+      virtual std::shared_ptr<ArrayBuffer> hmacSha256(const std::shared_ptr<ArrayBuffer>& key, const std::shared_ptr<ArrayBuffer>& data) = 0;
+      virtual std::shared_ptr<ArrayBuffer> pbkdf2HmacSha512(const std::shared_ptr<ArrayBuffer>& password, const std::shared_ptr<ArrayBuffer>& salt, double iterations, double dkLen) = 0;
 
     protected:
       // Hybrid Setup

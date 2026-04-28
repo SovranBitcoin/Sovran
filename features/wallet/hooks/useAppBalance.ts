@@ -17,12 +17,12 @@ import { walletLog } from '@/shared/lib/logger';
 export function useAppBalance(): number {
   const mockMode = useSettingsStore((s) => s.mockMode);
   const mockBalance = useMockDataStore((s) => s.mockBalance);
-  const { balance: rawBalances } = useBalanceContext();
+  const { balances: rawBalanceCtx } = useBalanceContext();
   const { mints: rawMints } = useMints();
   const prevBalance = useRef<number | null>(null);
 
   // Stabilise coco-react references
-  const liveBalances = useShallowMemo(rawBalances);
+  const liveBalances = useShallowMemo(rawBalanceCtx.byMint);
 
   // Stabilise mints array — only recompute when URLs actually change
   const mintUrls = useMemo(() => rawMints.map((m) => m.mintUrl), [rawMints]);
@@ -39,7 +39,7 @@ export function useAppBalance(): number {
   return useMemo(() => {
     const total = mockMode
       ? mockBalance
-      : stableMintUrls.reduce((sum, url) => sum + (liveBalances[url] || 0), 0);
+      : stableMintUrls.reduce((sum, url) => sum + (liveBalances[url]?.total || 0), 0);
     if (prevBalance.current !== null && prevBalance.current !== total) {
       walletLog.info('wallet.balance.changed', {
         from: prevBalance.current,

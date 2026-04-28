@@ -27,7 +27,7 @@ import { Text, UntranslatedText } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import { ModalLayoutWrapper } from '@/shared/ui/composed/ModalLayoutWrapper';
+import { Screen } from '@/shared/ui/composed/Screen';
 import { useHistoryWithMelts } from '@/features/transactions';
 import type { HistoryEntry, MeltHistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 import {
@@ -53,7 +53,7 @@ import { router } from 'expo-router';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 interface Props {
   groupId: string | undefined;
@@ -368,11 +368,11 @@ export function SwapTransactionScreen({ groupId }: Props) {
   if (!groupId || !group) {
     log.warn('tx.swap.not_found', { groupId });
     return (
-      <ModalLayoutWrapper>
+      <Screen name="SwapTransactionScreen">
         <View style={styles.center}>
           <Text color={opacity(foreground, 0.66)}>Swap not found.</Text>
         </View>
-      </ModalLayoutWrapper>
+      </Screen>
     );
   }
 
@@ -396,9 +396,8 @@ export function SwapTransactionScreen({ groupId }: Props) {
   );
 
   return (
-    <ModalLayoutWrapper contentPadding={0}>
-      <Screen name="SwapTransactionScreen">
-        <VStack gap={12}>
+    <Screen name="SwapTransactionScreen" contentPadding={0}>
+      <VStack gap={12}>
           {/* ── Header: amount + swap icon (matches HistoryEntryHeader pattern) ── */}
           <HStack align="center" justify="space-between" className="p-5 pb-0 pt-0">
             <VStack>
@@ -580,8 +579,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
             ]}
           />
         </VStack>
-      </Screen>
-    </ModalLayoutWrapper>
+    </Screen>
   );
 }
 

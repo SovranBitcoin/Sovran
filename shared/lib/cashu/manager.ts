@@ -19,7 +19,7 @@ import {
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
-import { cashuLog, initLog } from '../logger';
+import { cashuLog, initLog, initPhase } from '../logger';
 
 interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
@@ -144,12 +144,12 @@ export class CocoManager {
     try {
       // 1. SQLite database (async to avoid blocking JS thread during profile switch)
       const dbName = this.getDbName();
-      initLog('CocoManager', `opening DB: ${dbName}`);
-      const db = await SQLite.openDatabaseAsync(dbName);
+      const db = await initPhase(`CocoManager.openDB[${dbName}]`, () =>
+        SQLite.openDatabaseAsync(dbName)
+      );
       this.db = db;
       const repositories = new ExpoSqliteRepositories({ database: db });
-      await repositories.init();
-      initLog('CocoManager', 'DB + repos initialized');
+      await initPhase('CocoManager.reposInit', () => repositories.init());
 
       // 2. Seed getter (lazy — no crypto work until first call, cached after)
       // Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s).
@@ -200,8 +200,9 @@ export class CocoManager {
 
       // 3. NPC plugin (constructor only — no network call)
       const plugins: any[] = [];
-      initLog('CocoManager', 'creating signer...');
-      const nsecSigner = await this.getCurrentProfileSigner();
+      const nsecSigner = await initPhase('CocoManager.getSigner', () =>
+        this.getCurrentProfileSigner()
+      );
       initLog('CocoManager', `signer created: ${!!nsecSigner}`);
 
       if (nsecSigner) {
@@ -253,15 +254,13 @@ export class CocoManager {
     cashuLog.info('cashu.manager.safe_watchers.start');
 
     if (this.seedGetter) {
-      initLog('CocoManager', 'pre-warming seed cache...');
-      await this.seedGetter();
-      initLog('CocoManager', 'seed cache warmed');
+      await initPhase('CocoManager.seedCacheWarm', () => this.seedGetter!());
     }
 
     try {
-      initLog('CocoManager', 'enabling proof state watcher...');
-      await this.instance.enableProofStateWatcher();
-      initLog('CocoManager', 'proof state watcher enabled');
+      await initPhase('CocoManager.enableProofWatcher', () =>
+        this.instance!.enableProofStateWatcher()
+      );
     } catch (error) {
       cashuLog.warn('cashu.manager.proof_watcher_failed', { error });
       try {

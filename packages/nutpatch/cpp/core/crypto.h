@@ -98,6 +98,99 @@ crypto_err_t batch_derive_legacy(const uint8_t *seed, size_t seed_len,
                                   uint32_t start_counter, uint32_t count,
                                   uint8_t *out);
 
+/**
+ * NIP-44 v2 ECDH: derive the raw 32-byte X-coordinate of the shared point
+ * between `seckey` and the X-only `xonly_pubkey`. Differs from libsecp256k1's
+ * default `secp256k1_ecdh` (which hashes the compressed-point output through
+ * SHA-256) — Nostr's NIP-44 spec requires the raw X coordinate as IKM into
+ * its HKDF-extract step. Returns 32 bytes regardless of whether we treat
+ * the X-only pubkey as having even (0x02 prefix) or odd (0x03) Y; the X
+ * coordinate of P and -P is identical so the prefix choice is arbitrary.
+ *
+ * @param seckey32        32-byte recipient private key
+ * @param xonly_pubkey32  32-byte counterparty X-only pubkey (BIP340 / Nostr)
+ * @param out32           32-byte output buffer for the raw X
+ */
+crypto_err_t ecdh_nip44(const uint8_t *seckey32,
+                         const uint8_t *xonly_pubkey32,
+                         uint8_t *out32);
+
+/**
+ * Batch variant of `ecdh_nip44`. Derives a shared X for each of `count`
+ * counterparty pubkeys against the same `seckey`. One JS↔native crossing
+ * regardless of inbox size — important when warming a NIP-17 cache from
+ * dozens of distinct senders on first launch.
+ *
+ * @param seckey32           32-byte recipient private key
+ * @param xonly_pubkeys_concat   count * 32 bytes of concatenated X-only pubkeys
+ * @param count              Number of counterparty pubkeys
+ * @param out                count * 32 bytes of concatenated shared X outputs
+ */
+crypto_err_t batch_ecdh_nip44(const uint8_t *seckey32,
+                               const uint8_t *xonly_pubkeys_concat,
+                               size_t count,
+                               uint8_t *out);
+
+/**
+ * ChaCha20 IETF stream cipher (RFC 8439). Symmetric — same call
+ * encrypts and decrypts. Used by NIP-44 v2 with a 12-byte nonce
+ * derived via HKDF-expand from the conversation key. Output buffer
+ * must be at least `data_len` bytes.
+ *
+ * @param key32     32-byte ChaCha20 key
+ * @param nonce12   12-byte IETF nonce
+ * @param counter   Initial block counter (NIP-44 always starts at 0)
+ * @param data      Input plaintext or ciphertext
+ * @param data_len  Length of data
+ * @param out       Output buffer (caller-allocated, >= data_len bytes)
+ */
+crypto_err_t chacha20_ietf(const uint8_t *key32,
+                            const uint8_t *nonce12,
+                            uint32_t counter,
+                            const uint8_t *data,
+                            size_t data_len,
+                            uint8_t *out);
+
+/**
+ * HMAC-SHA256. Output is always 32 bytes. Wrapper around the
+ * already-vendored secp256k1 internal HMAC implementation — exposed
+ * here so JS can build HKDF-expand on top of it without paying the
+ * pure-JS HMAC cost (HKDF-expand for NIP-44's 76-byte output makes
+ * 3 HMAC calls per message).
+ *
+ * @param key       HMAC key
+ * @param key_len   Length of key
+ * @param data      Message bytes to authenticate
+ * @param data_len  Length of data
+ * @param out32     Output buffer (always 32 bytes)
+ */
+crypto_err_t hmac_sha256(const uint8_t *key,
+                          size_t key_len,
+                          const uint8_t *data,
+                          size_t data_len,
+                          uint8_t *out32);
+
+/**
+ * PBKDF2-HMAC-SHA512 (RFC 8018). Used by BIP-39 mnemonicToSeed at
+ * 2048 iterations, dkLen=64 — pure-JS PBKDF2-SHA512 takes ~3 s on
+ * Hermes per cold profile boot, this drops it to single-digit ms.
+ *
+ * Caller is responsible for any UTF-8/NFKD normalisation; the C side
+ * treats password and salt as opaque byte strings.
+ *
+ * @param password      Password bytes (typically NFKD-normalised mnemonic)
+ * @param password_len  Length of password
+ * @param salt          Salt bytes (typically "mnemonic" + NFKD passphrase)
+ * @param salt_len      Length of salt
+ * @param iterations    PBKDF2 iteration count (BIP-39: 2048)
+ * @param dk_len        Desired derived-key length in bytes (BIP-39: 64)
+ * @param out           Caller-allocated output buffer (>= dk_len bytes)
+ */
+crypto_err_t pbkdf2_hmac_sha512(const uint8_t *password, size_t password_len,
+                                 const uint8_t *salt, size_t salt_len,
+                                 uint32_t iterations, uint32_t dk_len,
+                                 uint8_t *out);
+
 #ifdef __cplusplus
 }
 #endif

@@ -20,9 +20,30 @@ function sendTokenAvailability(entry: Record<string, unknown>): AvailabilityMap<
   const canAct = !isPaid && hasToken;
 
   return {
-    copy: { available: canAct },
+    copy: {
+      available: canAct,
+      variants: [
+        {
+          id: 'text',
+          label: 'as Text',
+          description: 'Copy the token string',
+          icon: 'lets-icons:copy',
+          available: canAct,
+        },
+        {
+          id: 'emoji',
+          label: 'as Emoji',
+          description: 'Copy as an emoji-packed string',
+          icon: 'fluent:emoji-24-filled',
+          available: canAct,
+        },
+      ],
+    },
     share: { available: canAct },
     nfc: { available: canAct },
+    // Deprecated — surfaced via `copy.variants[emoji]` instead. Retained so
+    // the wallet's existing handler (emojiPickerPopup) can still be invoked
+    // under the hood when the variant fires. Remove in Phase 5.
     copyAsEmoji: { available: canAct },
     checkStatus: {
       available: canAct && state === 'pending',
@@ -87,16 +108,128 @@ function amountEntryAvailability(entry: Record<string, unknown>): AvailabilityMa
   const numericValue = typeof entry.numericValue === 'number' ? entry.numericValue : 0;
   const destination = entry.destination as string | undefined;
   const isSendEcash = destination === 'sendEcash';
+  const isMeltQuote = destination === 'meltQuote';
+  const isMintQuote = destination === 'mintQuote';
+  const isPaymentRequest = destination === 'paymentRequest';
+  const meltTarget = typeof entry.meltTarget === 'string' ? entry.meltTarget : '';
+  const hasMeltTarget = meltTarget.length > 0;
   const hasFiatToggle =
     typeof entry.fiatCurrency === 'string' &&
     entry.fiatCurrency.length > 0 &&
     typeof entry.btcPrice === 'number' &&
     entry.btcPrice > 0;
 
+  // The Next menu always surfaces the same three options — ecash, lightning,
+  // onchain — and disables the ones that don't apply to the current flow. This
+  // mirrors the Copy menu's "always-visible, per-variant availability" shape
+  // so the UX is consistent across the app: users see every possible payment
+  // method, learn which ones exist, and get a reason string for anything
+  // currently unavailable.
+  const nextCanFire = numericValue > 0;
+
+  // ── ecash ──────────────────────────────────────────────────────────
+  let ecashAvailable = false;
+  let ecashDescription: string | undefined;
+  let ecashReason: string | undefined;
+  let ecashLabel = 'as Ecash';
+  if (isMintQuote) {
+    ecashReason = 'Not available for receive';
+  } else if (isMeltQuote) {
+    ecashReason = 'Lightning destination';
+  } else if (isPaymentRequest) {
+    ecashAvailable = nextCanFire;
+    ecashDescription = 'Send a Cashu payment request';
+    ecashLabel = 'as Ecash (payment request)';
+  } else if (isSendEcash) {
+    ecashAvailable = nextCanFire;
+    ecashDescription = 'Send as a Cashu token';
+  } else {
+    ecashReason = 'Unavailable';
+  }
+
+  // ── lightning ──────────────────────────────────────────────────────
+  // When a concrete meltTarget is present, surface it in the description so
+  // the user sees exactly what's about to be paid — `user@domain` for lud16 /
+  // NIP-05 targets, truncated middle for bolt11 / LNURL strings.
+  const formatLightningTarget = (target: string): string => {
+    const trimmed = target.trim();
+    if (trimmed.includes('@')) return trimmed;
+    if (trimmed.length <= 18) return trimmed;
+    return `${trimmed.slice(0, 9)}…${trimmed.slice(-9)}`;
+  };
+
+  let lightningAvailable = false;
+  let lightningDescription: string | undefined;
+  let lightningReason: string | undefined;
+  if (isMintQuote) {
+    lightningAvailable = nextCanFire;
+    lightningDescription = 'Create a Lightning invoice';
+  } else if (isMeltQuote) {
+    lightningAvailable = nextCanFire;
+    lightningDescription = hasMeltTarget
+      ? `Pay ${formatLightningTarget(meltTarget)} over Lightning`
+      : 'Pay over Lightning';
+  } else if (isPaymentRequest) {
+    lightningReason = 'Not supported for payment requests';
+  } else if (isSendEcash) {
+    if (hasMeltTarget) {
+      lightningAvailable = nextCanFire;
+      lightningDescription = `Pay ${formatLightningTarget(meltTarget)} over Lightning`;
+    } else {
+      lightningReason = 'No Lightning target';
+    }
+  } else {
+    lightningReason = 'Unavailable';
+  }
+
+  // ── onchain ────────────────────────────────────────────────────────
+  // Disabled everywhere until a real onchain rail ships.
+  const onchainAvailable = false;
+  const onchainReason = 'Coming soon';
+
+  // Base order — available entries bubble to the top via a stable sort below
+  // so the user sees executable options first and disabled/"coming soon" rows
+  // sink to the bottom.
+  const baseVariants = [
+    {
+      id: 'ecash',
+      label: ecashLabel,
+      icon: 'ph:coins',
+      available: ecashAvailable,
+      ...(ecashDescription ? { description: ecashDescription } : {}),
+      ...(ecashReason ? { reason: ecashReason } : {}),
+    },
+    {
+      id: 'lightning',
+      label: 'as Lightning',
+      icon: 'mingcute:lightning-fill',
+      available: lightningAvailable,
+      ...(lightningDescription ? { description: lightningDescription } : {}),
+      ...(lightningReason ? { reason: lightningReason } : {}),
+    },
+    {
+      id: 'onchain',
+      label: 'as Onchain',
+      icon: 'hugeicons:blockchain-01',
+      available: onchainAvailable,
+      reason: onchainReason,
+    },
+  ];
+  const nextVariants = baseVariants
+    .map((v, i) => ({ v, i }))
+    .sort((a, b) => {
+      if (a.v.available !== b.v.available) return a.v.available ? -1 : 1;
+      return a.i - b.i;
+    })
+    .map(({ v }) => v);
+
   return {
     setInput: { available: true },
     toggle: { available: hasFiatToggle },
-    next: { available: numericValue > 0 },
+    next: {
+      available: nextCanFire,
+      variants: nextVariants,
+    },
     paste: { available: isSendEcash },
     scanQr: { available: isSendEcash },
   };

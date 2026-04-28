@@ -20,7 +20,7 @@ import type {
   StepHandlerMap,
   URDecoderLike,
 } from '../machine/types';
-import type { MintListItem, MintReviewInfo, WalletContext } from '../types';
+import type { MintCatalogEntry, MintReviewInfo, WalletContext } from '../types';
 import { createDefaultOperations } from '../operations/defaultOperations';
 import { createWalletContextTracker, type WalletContextTracker } from './walletContextTracker';
 
@@ -49,14 +49,14 @@ export interface CocoPaymentUXConfig {
 
   getPreferredMintUrl?: () => string | undefined;
 
-  enrichMintListItem?: (mintUrl: string) => Partial<MintListItem>;
+  /**
+   * Bulk catalog fetcher. Awaited inside the mint-list build so audit / KYM /
+   * operator-profile data flows directly into each row. One call per list
+   * build, regardless of mint count.
+   */
+  fetchMintCatalog?: (mintUrls: string[]) => Promise<Record<string, MintCatalogEntry>>;
+  /** Per-mint enrichment for the trust-review screen. Read from local caches. */
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
-  /** Fire-and-forget: populate profile data for mints with Nostr operator contacts. */
-  fetchMintProfiles?: (mintInfoMap: Map<string, any>) => void;
-  /** Fire-and-forget: populate audit data for mints during list build. */
-  fetchMintAuditData?: (mintUrls: string[]) => void;
-  /** Fire-and-forget: populate review/KYM data for mints during list build. */
-  fetchMintReviewData?: (mintUrls: string[]) => void;
 
   /** Dev: when true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
@@ -87,7 +87,6 @@ export function createCocoPaymentUX(config: CocoPaymentUXConfig): CocoPaymentUXI
     unit = 'sat',
     getOffline,
     getLocale,
-    enrichMintListItem,
     enrichMintReviewInfo,
   } = config;
 
@@ -100,11 +99,8 @@ export function createCocoPaymentUX(config: CocoPaymentUXConfig): CocoPaymentUXI
     getProofAmounts: () => tracker.getContext().proofAmounts,
     getPreferredMintUrl: config.getPreferredMintUrl,
     sendNostrDM,
-    enrichMintListItem,
     enrichMintReviewInfo,
-    fetchMintProfiles: config.fetchMintProfiles,
-    fetchMintAuditData: config.fetchMintAuditData,
-    fetchMintReviewData: config.fetchMintReviewData,
+    fetchMintCatalog: config.fetchMintCatalog,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
   });
 

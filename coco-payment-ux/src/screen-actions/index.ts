@@ -16,6 +16,7 @@ export type {
   ActionAvailability,
   ActionHandler,
   ActionState,
+  ActionVariant,
   DecoratedEntryFields,
   ScreenActionContext,
   ScreenActionHandlerMap,

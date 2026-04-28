@@ -25,7 +25,13 @@ namespace margelo::nitro::nutpatch {
       prototype.registerHybridMethod("createBlindSignature", &HybridCryptoSpec::createBlindSignature);
       prototype.registerHybridMethod("verifyDleqProof", &HybridCryptoSpec::verifyDleqProof);
       prototype.registerHybridMethod("createDleqProof", &HybridCryptoSpec::createDleqProof);
+      prototype.registerHybridMethod("batchUnblind", &HybridCryptoSpec::batchUnblind);
       prototype.registerHybridMethod("batchDeriveLegacy", &HybridCryptoSpec::batchDeriveLegacy);
+      prototype.registerHybridMethod("ecdhNip44", &HybridCryptoSpec::ecdhNip44);
+      prototype.registerHybridMethod("batchEcdhNip44", &HybridCryptoSpec::batchEcdhNip44);
+      prototype.registerHybridMethod("chacha20Ietf", &HybridCryptoSpec::chacha20Ietf);
+      prototype.registerHybridMethod("hmacSha256", &HybridCryptoSpec::hmacSha256);
+      prototype.registerHybridMethod("pbkdf2HmacSha512", &HybridCryptoSpec::pbkdf2HmacSha512);
     });
   }
 

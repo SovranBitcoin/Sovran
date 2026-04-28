@@ -55,11 +55,11 @@ export function useMintSelector({
   const pubkey = keys?.pubkey;
 
   const { mints, isLoading: isMintsLoading } = useMintManagement();
-  const { balance: liveBalances } = useBalanceContext();
+  const { balances: liveBalances } = useBalanceContext();
 
   const selectedMints = useMintStore((state) => state.selectedMints);
   const mintUrl = selectedMintUrl ?? (pubkey ? selectedMints[pubkey] : undefined);
-  const balance = mintUrl ? liveBalances[mintUrl] || 0 : 0;
+  const balance = mintUrl ? liveBalances.byMint[mintUrl]?.total || 0 : 0;
   const mintData = useMemo(
     () => (mintUrl ? mints.find((m) => m.mintUrl === mintUrl) : undefined),
     [mints, mintUrl]

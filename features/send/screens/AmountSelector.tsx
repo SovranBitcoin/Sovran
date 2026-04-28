@@ -6,9 +6,10 @@
 
 import { useCallback, useMemo } from 'react';
 
-import type { ScreenActionName } from 'coco-payment-ux';
+import type { ActionVariant, ScreenActionName } from 'coco-payment-ux';
 import type { BoundAction, QuickSendSuggestion } from 'coco-payment-ux/react';
 
+import type { ActionMenuVariant } from '@/shared/ui/composed/ActionMenuButton';
 import {
   AmountEntryView,
   type AmountEntryTransactionType,
@@ -94,6 +95,28 @@ export function AmountSelector({
     await actions.next.execute();
   }, [actions.next, numericValue, inputMode, unit, transactionType]);
 
+  // Map the coco-payment-ux availability variants (ecash/lightning/onchain on
+  // send-money flows) into ActionMenuButton's variant shape. Each variant
+  // invokes `actions.next.execute({ variantId })`, which routes through the
+  // screen-action handler to the machine.
+  const nextVariants = useMemo<ActionMenuVariant[] | undefined>(() => {
+    const raw = actions.next.variants as ActionVariant[] | undefined;
+    if (!raw || raw.length === 0) return undefined;
+    return raw.map((v) => ({
+      id: v.id,
+      label: v.label,
+      description: v.description,
+      icon: v.icon,
+      isDisabled: !v.available,
+      reason: v.reason,
+      isDestructive: v.isDestructive,
+      onPress: async () => {
+        walletLog.info('amount.next.variant', { variantId: v.id });
+        await actions.next.execute({ variantId: v.id });
+      },
+    }));
+  }, [actions.next]);
+
   const extraButtons = useMemo((): ButtonHandlerProps['buttons'] => {
     const buttons: ButtonHandlerProps['buttons'] = [];
     if (actions.paste.available) {
@@ -148,6 +171,7 @@ export function AmountSelector({
         suggestions={suggestions}
         onSuggestionTap={handleSuggestionTap}
         extraButtons={extraButtons}
+        nextVariants={nextVariants}
         transactionType={transactionTypeForView}
       />
     </Screen>

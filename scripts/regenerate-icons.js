@@ -1,38 +1,190 @@
 #!/usr/bin/env node
 /**
- * Regenerates .monicon/icons.js from the icons array in assets/icons/index.tsx.
+ * Regenerates .monicon/icons.js from the icons array in
+ * assets/icons/index.tsx by fetching each iconify icon directly and writing
+ * the committed CJS-blob format:
+ *
+ *   module.exports = {
+ *     "prefix:name": {
+ *       svg: '<svg viewBox="0 0 W H" width="1em" height="1em" >BODY</svg>',
+ *       width: 16,
+ *       height: 16,
+ *     },
+ *     ...
+ *   };
+ *
+ * We can't use `@monicon/core@2`'s `bootstrap()` for this because its v2 API
+ * dropped the single-file CJS writer the old `loadIcons({ type: 'cjs', ... })`
+ * produced, and the installed version's default plugins output per-icon
+ * component files instead. The format above is what the runtime (and
+ * metro.config.js's @monicon/runtime alias) reads, so we reproduce it
+ * directly via the Iconify REST API.
+ *
  * Usage: node scripts/regenerate-icons.js
  */
-const { loadIcons } = require('@monicon/core');
+
 const path = require('path');
 const fs = require('fs');
 
 const ROOT = path.resolve(__dirname, '..');
-const iconsFile = path.join(ROOT, 'assets', 'icons', 'index.tsx');
-const content = fs.readFileSync(iconsFile, 'utf-8');
+const SRC = path.join(ROOT, 'assets', 'icons', 'index.tsx');
+const OUT_DIR = path.join(ROOT, '.monicon');
+const OUT_FILE = path.join(OUT_DIR, 'icons.js');
+const API_BASE = 'https://api.iconify.design';
+const CHUNK_MAX_URL_LENGTH = 3500; // leave margin under typical 4 KB URL caps
 
-// Extract the icons array from the TSX file
-const match = content.match(/export const icons:\s*string\[\]\s*=\s*\[([\s\S]*?)\];/);
-if (!match) {
-  console.error('Could not find icons array in assets/icons/index.tsx');
-  process.exit(1);
+function extractIcons() {
+  const content = fs.readFileSync(SRC, 'utf-8');
+  const match = content.match(/export const icons:\s*string\[\]\s*=\s*\[([\s\S]*?)\];/);
+  if (!match) {
+    throw new Error('Could not find icons array in assets/icons/index.tsx');
+  }
+  const raw = match[1].match(/'([^']+)'/g) ?? [];
+  const names = raw.map((s) => s.replace(/'/g, ''));
+  return Array.from(new Set(names));
 }
 
-const icons = match[1].match(/'([^']+)'/g).map((s) => s.replace(/'/g, ''));
-console.log(`Found ${icons.length} icons to load`);
+function groupByPrefix(icons) {
+  const byPrefix = new Map();
+  for (const icon of icons) {
+    const [prefix, name] = icon.split(':');
+    if (!prefix || !name) {
+      console.warn(`Skipping invalid icon name: ${icon}`);
+      continue;
+    }
+    if (!byPrefix.has(prefix)) byPrefix.set(prefix, []);
+    byPrefix.get(prefix).push(name);
+  }
+  return byPrefix;
+}
 
-loadIcons({
-  icons,
-  collections: ['circle-flags'],
-  root: ROOT,
-  type: 'cjs',
-  outputFileName: 'icons',
-  generateTypes: true,
-})
-  .then(() => {
-    console.log('Done! .monicon/icons.js regenerated.');
-  })
-  .catch((err) => {
-    console.error('Error regenerating icons:', err);
-    process.exit(1);
+function chunkByUrlLength(names, urlPrefix) {
+  // `urlPrefix` approximates the static part of the request URL so we chunk
+  // names before the full URL grows past API gateway limits.
+  const chunks = [];
+  let current = [];
+  let currentLen = urlPrefix.length;
+  for (const name of names) {
+    const added = name.length + 1; // +1 for comma
+    if (current.length > 0 && currentLen + added > CHUNK_MAX_URL_LENGTH) {
+      chunks.push(current);
+      current = [];
+      currentLen = urlPrefix.length;
+    }
+    current.push(name);
+    currentLen += added;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
+async function fetchPrefix(prefix, names) {
+  const urlPrefix = `${API_BASE}/${prefix}.json?icons=`;
+  const chunks = chunkByUrlLength(names, urlPrefix);
+  const merged = { icons: {}, aliases: {}, width: undefined, height: undefined };
+
+  for (const chunk of chunks) {
+    const url = `${urlPrefix}${chunk.join(',')}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn(`[${prefix}] HTTP ${res.status} for ${chunk.length} icons`);
+      continue;
+    }
+    const body = await res.json();
+    if (body.width != null) merged.width = body.width;
+    if (body.height != null) merged.height = body.height;
+    Object.assign(merged.icons, body.icons ?? {});
+    Object.assign(merged.aliases, body.aliases ?? {});
+    if (Array.isArray(body.not_found) && body.not_found.length > 0) {
+      console.warn(`[${prefix}] not found: ${body.not_found.join(', ')}`);
+    }
+  }
+  return merged;
+}
+
+function resolveAlias(aliases, icons, name, seen = new Set()) {
+  if (seen.has(name)) return null; // cycle guard
+  seen.add(name);
+  const alias = aliases[name];
+  if (!alias || !alias.parent) return null;
+  if (icons[alias.parent]) return icons[alias.parent];
+  return resolveAlias(aliases, icons, alias.parent, seen);
+}
+
+function formatSvg(body, viewBoxW, viewBoxH) {
+  // Match the committed format exactly: viewBox + width/height="1em", no xmlns.
+  return `<svg viewBox="0 0 ${viewBoxW} ${viewBoxH}" width="1em" height="1em" >${body}</svg>`;
+}
+
+function serialize(entries) {
+  // Produce a stable, pretty CJS blob that matches the committed file's
+  // indentation (2-space JSON with outer `module.exports = { ... }`).
+  const lines = ['// This file is automatically generated by Monicon. Do not edit this file directly.', 'module.exports = {'];
+  entries.forEach(([key, value], idx) => {
+    const isLast = idx === entries.length - 1;
+    const valueLines = [
+      '  ' + JSON.stringify(key) + ': {',
+      '    "svg": ' + JSON.stringify(value.svg) + ',',
+      '    "width": ' + value.width + ',',
+      '    "height": ' + value.height,
+      '  }' + (isLast ? '' : ','),
+    ];
+    lines.push(...valueLines);
   });
+  lines.push('};', '');
+  return lines.join('\n');
+}
+
+(async () => {
+  const icons = extractIcons();
+  console.log(`Found ${icons.length} icons in ${path.relative(ROOT, SRC)}`);
+
+  const byPrefix = groupByPrefix(icons);
+  console.log(`Grouped into ${byPrefix.size} prefix(es)`);
+
+  const entries = [];
+  for (const [prefix, names] of byPrefix) {
+    process.stdout.write(`  [${prefix}] fetching ${names.length}... `);
+    try {
+      const collection = await fetchPrefix(prefix, names);
+      let hits = 0;
+      for (const name of names) {
+        const full = `${prefix}:${name}`;
+        let icon = collection.icons[name];
+        if (!icon) {
+          icon = resolveAlias(collection.aliases, collection.icons, name);
+        }
+        if (!icon) {
+          console.warn(`\n    [${full}] not returned by API`);
+          continue;
+        }
+        const w = icon.width ?? collection.width ?? 16;
+        const h = icon.height ?? collection.height ?? 16;
+        entries.push([
+          full,
+          {
+            svg: formatSvg(icon.body, w, h),
+            width: 16, // stored width/height default to 16 in committed file
+            height: 16,
+          },
+        ]);
+        hits += 1;
+      }
+      console.log(`ok (${hits}/${names.length})`);
+    } catch (err) {
+      console.log('failed');
+      console.error(err);
+    }
+  }
+
+  // Stable ordering: follow the source array's order, not fetch order.
+  const order = new Map(icons.map((name, idx) => [name, idx]));
+  entries.sort((a, b) => (order.get(a[0]) ?? 1e9) - (order.get(b[0]) ?? 1e9));
+
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  fs.writeFileSync(OUT_FILE, serialize(entries), 'utf-8');
+  console.log(`Wrote ${entries.length} icons → ${path.relative(ROOT, OUT_FILE)}`);
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -1,7 +1,9 @@
 import React, { ReactNode, useEffect, useRef, useState } from 'react';
 
 import { runLegacyReduxBootstrap } from '@/shared/lib/migrations/legacyReduxMigrations';
-import { initLog, log, Log, useLifecycleLogger } from '@/shared/lib/logger';
+import { initLog, log, Log, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
+
+initLog('Module', 'LegacyMigrationGate loaded');
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 
 interface LegacyMigrationGateProps {
@@ -13,6 +15,7 @@ interface LegacyMigrationGateProps {
  * newer AsyncStorage/Zustand key-shape migrations run.
  */
 export default function LegacyMigrationGate({ children }: LegacyMigrationGateProps) {
+  useInitMount('LegacyMigrationGate');
   useLifecycleLogger('LegacyMigrationGate');
   const stage = useInitializationStage('legacy-redux-bootstrap', {
     message: 'Migrating legacy app data...',

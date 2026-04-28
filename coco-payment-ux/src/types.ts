@@ -126,6 +126,27 @@ export interface AmountEntryConstraints {
 // ---------------------------------------------------------------------------
 
 /**
+ * Bulk catalog entry returned by `fetchMintCatalog`. One round-trip for every
+ * trusted mint, awaited inside `buildMintListItems` and merged directly into
+ * each `MintListItem` — no subscribe-and-pray, no fire-and-forget per-mint
+ * fetches, no separate enrichment caches involved in the list flow.
+ */
+export interface MintCatalogEntry {
+  /** KYM (Know Your Mint) community score on a 0-5 scale. */
+  kymScore?: number;
+  /** Number of community reviews behind `kymScore`. */
+  reviewCount?: number;
+  /** Auditor swap success score on a 0-5 scale. */
+  auditScore?: number;
+  /** Auditor state string, e.g. 'OK' or 'ERROR'. */
+  auditState?: string;
+  /** Follower count of the mint operator's Nostr identity. */
+  contactFollowers?: number;
+  /** Reputation score (0-100) of the mint operator's Nostr identity. */
+  contactReputation?: number;
+}
+
+/**
  * A fully-resolved mint row ready for display. Built by the wallet before navigation so
  * the mint list screen requires no data fetching — all balances, scores, and availability
  * are pre-computed and passed as props.
@@ -133,8 +154,8 @@ export interface AmountEntryConstraints {
  * `status` / `reason` are derived from `MintAvailability` and encode whether the mint is
  * selectable in the current flow context (e.g. insufficient balance, not in payment request).
  *
- * `kymScore` and `auditScore` / `auditState` are optional — populated from local caches when
- * available, omitted otherwise. The screen should render without them gracefully.
+ * Catalog fields (`kymScore`, `auditScore`, etc.) come from `fetchMintCatalog`
+ * — see `MintCatalogEntry`. They're optional; the screen renders gracefully without them.
  */
 export interface MintListItem {
   mintUrl: string;
@@ -149,6 +170,8 @@ export interface MintListItem {
   isPreferred: boolean;
   /** KYM (Know Your Mint) community score, cached from Nostr events. */
   kymScore?: number;
+  /** Number of community reviews behind `kymScore`. */
+  reviewCount?: number;
   /** Auditor swap success score on a 0-5 scale. */
   auditScore?: number;
   /** Auditor state string, e.g. 'OK' or 'ERROR'. */

@@ -29,6 +29,7 @@ import {
   PAYMENT_REQUEST_COPY,
   RECEIVE_COPY,
 } from '@/shared/lib/paymentCopy';
+import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -478,11 +479,11 @@ function buildTimeline({
     }
 
     case 'receive': {
-      const receiveTx = historyEntry as ReceiveHistoryEntry & { state?: string };
-      const txState = receiveTx.state || 'redeemed';
+      const receiveTx = historyEntry as ReceiveHistoryEntry;
+      const txState = receiveTx.state ?? 'finalized';
 
-      // Local-only terminal state for scans that were already redeemed elsewhere.
-      if (txState === 'alreadySpent') {
+      // Receive operation rolled back — most often because the token was already spent.
+      if (txState === 'rolledBack') {
         return [
           {
             state: 'pending',
@@ -499,8 +500,8 @@ function buildTimeline({
         ];
       }
 
-      // 'pending' is a waiting state — token received, needs user action to redeem
-      if (txState === 'pending') {
+      // 'prepared' is a waiting state — token received, needs user action to redeem
+      if (txState === 'prepared') {
         return [
           {
             state: 'pending',
@@ -690,11 +691,11 @@ const getCardLabel = (
       return `${label} • ${status}`;
     }
     case 'receive': {
-      const receiveTx = historyEntry as ReceiveHistoryEntry & { state?: string };
-      const txState = receiveTx.state || 'redeemed';
-      if (txState === 'redeemed') {
+      const receiveTx = historyEntry as ReceiveHistoryEntry;
+      const txState = receiveTx.state ?? 'finalized';
+      if (txState === 'finalized') {
         status = 'Complete';
-      } else if (txState === 'alreadySpent') {
+      } else if (txState === 'rolledBack') {
         status = 'Already Spent';
       } else {
         status = 'Pending';
@@ -857,7 +858,7 @@ export function HistoryEntryTimeline({
 
   return (
     <Log name="HistoryEntryTimeline">
-      <View className="bg-surface-secondary mx-4 rounded-2xl p-5">
+      <GradientCard style={styles.card} contentStyle={styles.cardContent}>
         {/* Card Label */}
         <Text size={11} bold style={[styles.cardLabel, { color: foreground50 }]}>
           {cardLabel}
@@ -958,12 +959,18 @@ export function HistoryEntryTimeline({
             );
           })}
         </View>
-      </View>
+      </GradientCard>
     </Log>
   );
 }
 
 const styles = StyleSheet.create({
+  card: {
+    marginHorizontal: 16,
+  },
+  cardContent: {
+    padding: 20,
+  },
   cardLabel: {
     marginBottom: 8,
     textTransform: 'uppercase',

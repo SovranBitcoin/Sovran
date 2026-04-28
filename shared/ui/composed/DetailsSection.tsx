@@ -61,7 +61,7 @@ export function DetailsSection({
           </HStack>
         </Pressable>
         {expanded ? (
-          <Section items={items} camera={camera} style={{ marginHorizontal: 0 }} />
+          <Section items={items} camera={camera} gradient style={{ marginHorizontal: 0 }} />
         ) : null}
       </View>
     </Log>

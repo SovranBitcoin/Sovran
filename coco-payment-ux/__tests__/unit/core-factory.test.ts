@@ -38,10 +38,13 @@ function createMockManager() {
       getMintInfo: vi.fn().mockResolvedValue({ name: 'Test Mint' }),
     },
     wallet: {
-      getBalances: vi.fn().mockResolvedValue({
-        [MINT1]: 1000,
-        [MINT2]: 500,
-      }),
+      balances: {
+        byMint: vi.fn().mockResolvedValue({
+          [MINT1]: { spendable: 1000, reserved: 0, total: 1000 },
+          [MINT2]: { spendable: 500, reserved: 0, total: 500 },
+        }),
+        total: vi.fn().mockResolvedValue({ spendable: 1500, reserved: 0, total: 1500 }),
+      },
       send: vi.fn(),
       receive: vi.fn(),
       processPaymentRequest: vi.fn(),
@@ -239,9 +242,9 @@ describe('createWalletContextTracker', () => {
     await tracker.refresh();
 
     // Change the mock data
-    mockManager.manager.wallet.getBalances.mockResolvedValue({
-      [MINT1]: 2000,
-      [MINT2]: 500,
+    mockManager.manager.wallet.balances.byMint.mockResolvedValue({
+      [MINT1]: { spendable: 2000, reserved: 0, total: 2000 },
+      [MINT2]: { spendable: 500, reserved: 0, total: 500 },
     });
 
     // Trigger Manager event
@@ -280,9 +283,9 @@ describe('createWalletContextTracker', () => {
     tracker.dispose();
 
     // Change mock data — should not affect context since disposed
-    mockManager.manager.wallet.getBalances.mockResolvedValue({
-      [MINT1]: 9999,
-      [MINT2]: 9999,
+    mockManager.manager.wallet.balances.byMint.mockResolvedValue({
+      [MINT1]: { spendable: 9999, reserved: 0, total: 9999 },
+      [MINT2]: { spendable: 9999, reserved: 0, total: 9999 },
     });
 
     const listener = vi.fn();

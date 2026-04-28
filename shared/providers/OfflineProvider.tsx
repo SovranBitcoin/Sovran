@@ -6,7 +6,9 @@ import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { log } from '@/shared/lib/logger';
+import { log, initLog, useInitMount } from '@/shared/lib/logger';
+
+initLog('Module', 'OfflineProvider loaded');
 
 type OfflineContextValue = {
   isOffline: boolean;
@@ -57,6 +59,7 @@ function isOfflineFromState(state: Network.NetworkState): boolean {
 }
 
 export function OfflineProvider({ children }: OfflineProviderProps) {
+  useInitMount('OfflineProvider');
   const [networkOffline, setNetworkOffline] = useState(false);
   const [foreground, info] = useThemeColor(['foreground', 'red-300'] as const);
   const insets = useSafeAreaInsets();

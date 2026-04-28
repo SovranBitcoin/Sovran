@@ -116,7 +116,7 @@ function buildMockData() {
         state: 'PAID' as const,
       });
     } else if (row.type === 'receive') {
-      history.push({ ...base, type: 'receive' });
+      history.push({ ...base, type: 'receive', state: 'finalized' });
     } else if (row.type === 'send') {
       history.push({
         ...base,

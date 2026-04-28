@@ -2,7 +2,9 @@ import React, { ReactNode, useEffect, useRef, useState } from 'react';
 
 import { signalMigrationsComplete } from '@/shared/lib/cashu/profileScopedStorage';
 import { runGlobalMigrations } from '@/shared/lib/migrations/globalMigrations';
-import { initLog, log, Log, useLifecycleLogger } from '@/shared/lib/logger';
+import { initLog, log, Log, useInitMount, useLifecycleLogger } from '@/shared/lib/logger';
+
+initLog('Module', 'GlobalMigrationGate loaded');
 import { useInitializationStage } from '@/shared/providers/InitializationProvider';
 
 interface GlobalMigrationGateProps {
@@ -15,6 +17,7 @@ interface GlobalMigrationGateProps {
  * Blocks rendering of children until the runner completes.
  */
 export default function GlobalMigrationGate({ children }: GlobalMigrationGateProps) {
+  useInitMount('GlobalMigrationGate');
   useLifecycleLogger('GlobalMigrationGate');
   const stage = useInitializationStage('global-migrations', {
     message: 'Running global migrations...',

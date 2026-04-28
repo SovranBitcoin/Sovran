@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const { getDefaultConfig } = require('expo/metro-config');
 const { withUniwindConfig } = require('uniwind/metro');
@@ -10,9 +11,17 @@ const config = getDefaultConfig(__dirname);
 // symlink resolves but the target falls outside Metro's project roots.
 // `extraNodeModules` pins the schemas package's peer-deps (zod, neverthrow)
 // to the app's own copies so we don't ship two realms of ZodObject.
+//
+// On EAS / CI builds the sibling source isn't checked out — the npm package
+// is installed from node_modules directly. Adding a non-existent watchFolder
+// makes Metro's `verifyRootExists` throw and the transformer construction
+// fails (`Cannot read properties of undefined (reading 'transformFile')`).
+// Only add the watchFolder when the directory actually exists locally.
 const sovranSchemasPath = path.resolve(__dirname, '..', 'sovran-schemas');
 const appNodeModules = path.resolve(__dirname, 'node_modules');
-config.watchFolders = [...(config.watchFolders ?? []), sovranSchemasPath];
+if (fs.existsSync(sovranSchemasPath)) {
+  config.watchFolders = [...(config.watchFolders ?? []), sovranSchemasPath];
+}
 config.resolver = {
   ...config.resolver,
   unstable_enableSymlinks: true,
@@ -35,6 +44,20 @@ config.transformer = {
       keep_fnames: true,
     },
   },
+  // Defer `require()` evaluation per module until first use. With this
+  // disabled, Metro evaluates every top-of-file require() at bundle parse
+  // time, which on cold boot adds ~250ms of crypto/NDK/Cashu module init
+  // even when first paint never reaches that code. The few top-level
+  // side-effect imports that actually need eager evaluation (`SplashScreen.
+  // preventAutoHideAsync()` in `app/_layout.tsx`, polyfills) are still
+  // covered because those modules are touched by the entry, so their
+  // require() runs on first access of the parent module.
+  getTransformOptions: async () => ({
+    transform: {
+      experimentalImportSupport: false,
+      inlineRequires: true,
+    },
+  }),
 };
 
 // First apply Uniwind
@@ -72,6 +95,24 @@ const herouiNativeProviderPath = path.resolve(
   'index.js'
 );
 
+// Force `@cashu/cashu-ts` to resolve to the patched ESM bundle. The
+// patch in `patches/@cashu+cashu-ts+3.5.0.patch` only edits
+// `lib/cashu-ts.es.js` (where it installs the `__CASHU_NATIVE` global
+// and the native-crypto fast-path branches). Metro's default resolver,
+// driven by Expo's `resolverMainFields: ['react-native', 'browser', 'main']`
+// plus the package's exports map (`require → cashu-ts.cjs`), picks the
+// CJS bundle — which has none of the patch. Result: every session logs
+// `cashu.native_crypto.hook_missing` and cashu-ts crypto runs in pure
+// JS, blocking the JS thread for seconds during recovery.
+const cashuTsEsmPath = path.resolve(
+  __dirname,
+  'node_modules',
+  '@cashu',
+  'cashu-ts',
+  'lib',
+  'cashu-ts.es.js'
+);
+
 // Save Uniwind's resolver before adding ours — Uniwind intercepts CSS
 // imports and swaps them for platform-specific JS. Overwriting it causes a
 // black screen because styles never load.
@@ -100,6 +141,12 @@ uniwindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
     return {
       type: 'sourceFile',
       filePath: herouiNativeProviderPath,
+    };
+  }
+  if (moduleName === '@cashu/cashu-ts') {
+    return {
+      type: 'sourceFile',
+      filePath: cashuTsEsmPath,
     };
   }
   // Chain to Uniwind's resolver to preserve CSS interop styling

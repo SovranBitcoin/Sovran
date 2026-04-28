@@ -3,7 +3,7 @@ import { ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useMnemonic, useCashuMnemonic } from '@/shared/hooks/useSecureStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import Container from '@/shared/ui/composed/Container';
+import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import Icon from 'assets/icons';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { pubkeyToAccountNumber } from '@/shared/lib/nostr/keyDerivation';
@@ -15,7 +15,7 @@ import { Button, Card, Description, Input, Label, TextField } from 'heroui-nativ
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 const DebugRow: React.FC<{ label: string; value: string }> = ({ label, value }) => {
   const foreground = useThemeColor('foreground');
@@ -128,9 +128,8 @@ export const SettingsProfileScreen = () => {
   };
 
   return (
-    <Container>
-      <Screen name="SettingsProfileScreen">
-        <ScrollView className="px-4">
+    <ScreenWrapper name="SettingsProfileScreen" scroll="custom" safeArea>
+      <ScrollView className="px-4">
           <Text bold size={13} className="mb-2 ml-2 uppercase tracking-wide">
             Profile Details
           </Text>
@@ -239,7 +238,6 @@ export const SettingsProfileScreen = () => {
             </View>
           )}
         </ScrollView>
-      </Screen>
-    </Container>
+    </ScreenWrapper>
   );
 };

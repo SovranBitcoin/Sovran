@@ -12,6 +12,11 @@
 
 import type { UnsignedEvent, VerifiedEvent } from 'nostr-tools';
 import { getPublicKey, getEventHash, nip44, finalizeEvent, generateSecretKey } from 'nostr-tools';
+import { extract as hkdfExtract } from '@noble/hashes/hkdf.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { hexToBytes } from '@noble/hashes/utils.js';
+import { equalBytes } from '@noble/ciphers/utils.js';
+import { base64 } from '@scure/base';
 
 import { nostrLog } from '../logger';
 
@@ -33,17 +38,159 @@ const now = (): number => Math.round(Date.now() / 1000);
 /** Return a random timestamp within the last 2 days (for metadata privacy). */
 const randomNow = (): number => Math.round(now() - Math.random() * TWO_DAYS);
 
-/** Derive a NIP-44 conversation key from a private key and a public key. */
-const nip44ConversationKey = (privateKey: Uint8Array, publicKey: string) =>
-  nip44.v2.utils.getConversationKey(privateKey, publicKey);
+// Native NIP-44 v2 acceleration via `nutpatch`. ECDH dominates pure-JS
+// cost (~5–15ms/call); ChaCha20+HMAC are next-largest. We probe lazily
+// so test/SSR contexts (no native module) and dev builds before the
+// `bun nitrogen` regen still work via the nostr-tools fallback. A
+// runtime failure permanently disables the native path for the
+// session — retry storms hurt more than the fallback.
+const NIP44_SALT = new TextEncoder().encode('nip44-v2');
+type NativeEcdhFn = (sk: Uint8Array, pk: Uint8Array) => Uint8Array;
+type NativeChacha20Fn = (
+  key: Uint8Array,
+  nonce: Uint8Array,
+  counter: number,
+  data: Uint8Array,
+) => Uint8Array;
+type NativeHmacFn = (key: Uint8Array, data: Uint8Array) => Uint8Array;
 
-/** NIP-44-encrypt any JSON-serialisable data. */
+interface NutpatchExports {
+  nip44Ecdh?: NativeEcdhFn;
+  chacha20Ietf?: NativeChacha20Fn;
+  hmacSha256?: NativeHmacFn;
+}
+
+let _nativeEcdh: NativeEcdhFn | null = null;
+let _nativeChacha20: NativeChacha20Fn | null = null;
+let _nativeHmac: NativeHmacFn | null = null;
+let _nativeProbed = false;
+
+function probeNative(): void {
+  if (_nativeProbed) return;
+  _nativeProbed = true;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const nutpatch = require('nutpatch') as NutpatchExports;
+    if (typeof nutpatch.nip44Ecdh === 'function') {
+      _nativeEcdh = nutpatch.nip44Ecdh;
+    }
+    if (
+      typeof nutpatch.chacha20Ietf === 'function' &&
+      typeof nutpatch.hmacSha256 === 'function'
+    ) {
+      _nativeChacha20 = nutpatch.chacha20Ietf;
+      _nativeHmac = nutpatch.hmacSha256;
+    }
+    nostrLog.info('nostr.nip44.native.probed', {
+      ecdh: !!_nativeEcdh,
+      sym: !!(_nativeChacha20 && _nativeHmac),
+    });
+  } catch (err) {
+    nostrLog.info('nostr.nip44.native.unavailable', { err });
+  }
+}
+
+const nip44ConversationKey = (privateKey: Uint8Array, publicKey: string): Uint8Array => {
+  probeNative();
+  if (_nativeEcdh) {
+    try {
+      const sharedX = _nativeEcdh(privateKey, hexToBytes(publicKey));
+      return hkdfExtract(sha256, sharedX, NIP44_SALT);
+    } catch (err) {
+      _nativeEcdh = null;
+      nostrLog.warn('nostr.nip44.native_ecdh.failed_falling_back', { err });
+    }
+  }
+  return nip44.v2.utils.getConversationKey(privateKey, publicKey);
+};
+
 const nip44Encrypt = (data: object, privateKey: Uint8Array, publicKey: string): string =>
   nip44.v2.encrypt(JSON.stringify(data), nip44ConversationKey(privateKey, publicKey));
 
-/** NIP-44-decrypt a ciphertext and return the parsed JSON. */
-const nip44Decrypt = (ciphertext: string, privateKey: Uint8Array, peerPublicKey: string): unknown =>
-  JSON.parse(nip44.v2.decrypt(ciphertext, nip44ConversationKey(privateKey, peerPublicKey)));
+function hkdfExpandNative(
+  hmac: NativeHmacFn,
+  prk: Uint8Array,
+  info: Uint8Array,
+  length: number,
+): Uint8Array {
+  const blocks = Math.ceil(length / 32);
+  const out = new Uint8Array(blocks * 32);
+  // ReturnType<NativeHmacFn> avoids the Uint8Array<ArrayBuffer> vs
+  // Uint8Array<ArrayBufferLike> variance error from TS 5.7+ when
+  // assigning Nitro's wrapper output to a literal-allocated array.
+  let prev: ReturnType<NativeHmacFn> = new Uint8Array(0);
+  for (let i = 0; i < blocks; i++) {
+    const buf = new Uint8Array(prev.length + info.length + 1);
+    buf.set(prev, 0);
+    buf.set(info, prev.length);
+    buf[prev.length + info.length] = i + 1;
+    prev = hmac(prk, buf);
+    out.set(prev, i * 32);
+  }
+  return out.subarray(0, length);
+}
+
+const utf8Decoder = new TextDecoder('utf-8');
+
+function unpadNip44(padded: Uint8Array): string {
+  if (padded.length < 2) throw new Error('nip44 unpad: too short');
+  const unpaddedLen = (padded[0] << 8) | padded[1];
+  if (unpaddedLen < 1 || unpaddedLen > 65535) {
+    throw new Error('nip44 unpad: invalid length prefix');
+  }
+  const unpadded = padded.subarray(2, 2 + unpaddedLen);
+  if (unpadded.length !== unpaddedLen) {
+    throw new Error('nip44 unpad: truncated plaintext');
+  }
+  return utf8Decoder.decode(unpadded);
+}
+
+function nip44DecryptNative(
+  payloadB64: string,
+  conversationKey: Uint8Array,
+  chacha20: NativeChacha20Fn,
+  hmac: NativeHmacFn,
+): string {
+  const data = base64.decode(payloadB64);
+  if (data.length < 99 || data.length > 65603) {
+    throw new Error(`nip44 decrypt: invalid payload length ${data.length}`);
+  }
+  if (data[0] !== 2) {
+    throw new Error(`nip44 decrypt: unknown version ${data[0]}`);
+  }
+  const nonce = data.subarray(1, 33);
+  const ciphertext = data.subarray(33, data.length - 32);
+  const mac = data.subarray(data.length - 32);
+
+  const keys = hkdfExpandNative(hmac, conversationKey, nonce, 76);
+  const chachaKey = keys.subarray(0, 32);
+  const chachaNonce = keys.subarray(32, 44);
+  const hmacKey = keys.subarray(44, 76);
+
+  const macInput = new Uint8Array(nonce.length + ciphertext.length);
+  macInput.set(nonce, 0);
+  macInput.set(ciphertext, nonce.length);
+  if (!equalBytes(hmac(hmacKey, macInput), mac)) {
+    throw new Error('nip44 decrypt: MAC mismatch');
+  }
+
+  return unpadNip44(chacha20(chachaKey, chachaNonce, 0, ciphertext));
+}
+
+const nip44Decrypt = (ciphertext: string, privateKey: Uint8Array, peerPublicKey: string): unknown => {
+  probeNative();
+  if (_nativeChacha20 && _nativeHmac) {
+    try {
+      const convKey = nip44ConversationKey(privateKey, peerPublicKey);
+      return JSON.parse(nip44DecryptNative(ciphertext, convKey, _nativeChacha20, _nativeHmac));
+    } catch (err) {
+      _nativeChacha20 = null;
+      _nativeHmac = null;
+      nostrLog.warn('nostr.nip44.native_sym.failed_falling_back', { err });
+    }
+  }
+  return JSON.parse(nip44.v2.decrypt(ciphertext, nip44ConversationKey(privateKey, peerPublicKey)));
+};
 
 // ---------------------------------------------------------------------------
 // Core NIP-59 building blocks

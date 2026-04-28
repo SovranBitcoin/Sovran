@@ -51,20 +51,17 @@
  * ```
  *
  * @see {@link ./Button}
- * @see {@link shared/lib/popup/sheets/button-handler}
  * @see {@link ./View}
  */
 
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
+import { Menu, type MenuTriggerRef } from 'heroui-native';
 import { Log } from '@/shared/lib/logger';
 import { Button } from '@/shared/ui/primitives/Button';
-import { buttonHandlerPopup, emojiPickerPopup } from '@/shared/lib/popup';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import opacity from 'hex-color-opacity';
 import Icon from '@/assets/icons';
 
 /**
@@ -91,18 +88,14 @@ export interface ButtonHandlerButton {
    *  inline — use this to compose primitives like `AmountFormatter`
    *  alongside static text). */
   text: string | React.ReactNode;
+  /** Optional secondary caption shown under the button text in the overflow
+   *  Menu (has no effect on inline buttons). */
+  description?: string;
   /** Press event handler with close function parameter */
   onPress?: (close: (event: GestureResponderEvent) => void) => Promise<void>;
-  /** Optional nested action-sheet target for custom sheet navigation */
-  pushSheet?: ButtonHandlerPushTarget;
   /** Whether the button should be visible (default: true) */
   condition?: boolean;
 }
-
-type ButtonHandlerPushTarget = {
-  sheetId: 'emoji-picker';
-  payload: { token: string };
-};
 
 export type ButtonHandlerActionButton = ButtonHandlerButton;
 
@@ -121,8 +114,6 @@ export interface ButtonHandlerProps {
   buttons: ButtonHandlerActionButton[];
   /** Additional style overrides */
   style?: StyleProp<ViewStyle>;
-  /** Custom gradient color (defaults to theme primary color) */
-  gradientColor?: string;
   /** Additional CSS classes */
   className?: string;
 }
@@ -161,68 +152,51 @@ export function ButtonHandler({
   context: _context,
   buttons,
   style,
-  gradientColor,
   className,
 }: ButtonHandlerProps) {
   const [loading, setLoading] = useState(false);
-  const background = useThemeColor('background');
+  const danger = useThemeColor('danger');
 
   // Filter buttons based on condition
   const visibleButtons = buttons.filter((button) => button.condition !== false);
 
-  /**
-   * Handles button press with loading state management
-   *
-   * @description
-   * Manages global loading state and executes button press handlers.
-   * Prevents multiple simultaneous actions and ensures proper cleanup.
-   *
-   * **Process:** Check disabled state → set loading → execute handler → clear loading
-   * **Effects:** Updates loading state and executes button action
-   *
-   * @param {ButtonHandlerButton} button - The button that was pressed
-   * @returns {Promise<void>} Resolves when button action completes
-   *
-   * @example
-   * handleButtonPress(button) // Executes button.onPress with loading management
-   */
+  // Overflow Menu contents — items 3+ only. The first two are already
+  // rendered inline so we'd double-list them otherwise. Preserve the
+  // "Next last" reorder so a flow-continuation button (if any) anchors the
+  // bottom of the sheet.
+  const overflowMenuButtons = useMemo(() => {
+    const overflow = visibleButtons.slice(2);
+    return [
+      ...overflow.filter((b) => b.text !== 'Next'),
+      ...overflow.filter((b) => b.text === 'Next'),
+    ];
+  }, [visibleButtons]);
+
+  // heroui's `Menu.Trigger asChild` routes through `Slot.Pressable`, which
+  // doesn't compose with our Button (it wraps `TouchableOpacity`, not
+  // `Pressable`). Use the same imperative-open pattern as the Copy menu:
+  // invisible ref-backed Trigger + `.open()` from the visible button's
+  // onPress.
+  const moreMenuTriggerRef = useRef<MenuTriggerRef>(null);
+  const openMoreMenu = useCallback(() => {
+    setTimeout(() => moreMenuTriggerRef.current?.open(), 0);
+  }, []);
+
+  // Fires the button's onPress with a no-op close since the Menu closes
+  // itself on select (shouldCloseOnSelect default). Any async work runs in
+  // the background — callers still get their own per-button `loading` state.
+  const handleMenuItemPress = (button: ButtonHandlerActionButton): void => {
+    if (button.disabled) return;
+    void button.onPress?.(() => {});
+  };
+
   const handleButtonPress = async (button: ButtonHandlerActionButton) => {
     if (button.disabled) return;
-    if (button.pushSheet) {
-      if (button.pushSheet.sheetId === 'emoji-picker') {
-        emojiPickerPopup(button.pushSheet.payload);
-      }
-      return;
-    }
-
     setLoading(true);
     try {
       await button.onPress?.(() => {});
     } finally {
       setLoading(false);
-    }
-  };
-
-  /**
-   * Handles "More" button press for overflow actions
-   *
-   * @description
-   * Manages overflow button behavior. If 3 or fewer visible buttons, executes
-   * the third directly. Otherwise, opens the button-handler sheet.
-   *
-   * **Process:** Check button count → execute third button or open sheet
-   * **Effects:** Either executes action or opens overflow sheet
-   *
-   * @returns {Promise<void>} Resolves when action completes
-   *
-   * @example
-   * handleMorePress() // Executes third button or opens sheet
-   */
-  const handleMorePress = async () => {
-    if (visibleButtons.length <= 3) {
-      await handleButtonPress(visibleButtons[2]);
-    } else {
-      buttonHandlerPopup({ buttons: visibleButtons });
     }
   };
 
@@ -232,25 +206,8 @@ export function ButtonHandler({
         align="center"
         justify="space-between"
         spacing={0}
-        className={`flex-row pb-6 ${className || ''}`}
+        className={`flex-row ${className || ''}`}
         style={[style]}>
-        <LinearGradient
-          colors={[
-            opacity(gradientColor || background, 0.75),
-            opacity(gradientColor || background, 0),
-          ]}
-          start={{ x: 0, y: 1 }}
-          end={{ x: 0, y: 0 }}
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100%',
-            height: '100%',
-          }}
-        />
-
         {visibleButtons.slice(0, 2).map((button, index) => (
           <View key={index} className="flex-1">
             <Button
@@ -264,24 +221,82 @@ export function ButtonHandler({
           </View>
         ))}
 
-        {/* More button (if more than 2 buttons) */}
-        {visibleButtons.length > 2 && (
+        {/* Exactly 3 buttons: render the third inline as an icon-only button. */}
+        {visibleButtons.length === 3 && (
           <View>
             <Button
-              testID="more-button"
+              testID={visibleButtons[2].testID ?? 'more-button'}
               icon={
-                visibleButtons.length === 3 && visibleButtons[2].icon ? (
+                visibleButtons[2].icon ? (
                   <Icon name={visibleButtons[2].icon} />
                 ) : (
                   <Icon name="tabler:dots" />
                 )
               }
-              onPress={handleMorePress}
+              onPress={() => handleButtonPress(visibleButtons[2])}
               variant="secondary"
               loading={loading}
-              disabled={visibleButtons.length === 3 && visibleButtons[2].disabled}
+              disabled={visibleButtons[2].disabled}
             />
           </View>
+        )}
+
+        {/* 4+ buttons: "More" opens a bottom-sheet Menu listing items 3+. */}
+        {visibleButtons.length > 3 && (
+          <>
+            <Menu presentation="bottom-sheet">
+              <Menu.Trigger
+                ref={moreMenuTriggerRef}
+                style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+                <View style={{ width: 1, height: 1 }} />
+              </Menu.Trigger>
+              <Menu.Portal>
+                <Menu.Overlay />
+                <Menu.Content presentation="bottom-sheet">
+                  <Menu.Label className="text-lg font-bold text-foreground ml-3 -mt-2 mb-2">
+                    Select option
+                  </Menu.Label>
+                  {overflowMenuButtons.map((button, i) => {
+                    const label = typeof button.text === 'string' ? button.text : 'Action';
+                    const isDanger = button.variant === 'dangerous';
+                    return (
+                      <Menu.Item
+                        key={i}
+                        testID={button.testID ? `overflow-${button.testID}` : undefined}
+                        isDisabled={button.disabled}
+                        variant={isDanger ? 'danger' : 'default'}
+                        onPress={() => handleMenuItemPress(button)}>
+                        <HStack align="center" gap={10} style={{ flex: 1 }}>
+                          {button.icon ? (
+                            <Icon
+                              name={button.icon}
+                              size={20}
+                              color={isDanger ? danger : undefined}
+                            />
+                          ) : null}
+                          <View style={{ flex: 1 }}>
+                            <Menu.ItemTitle>{label}</Menu.ItemTitle>
+                            {button.description ? (
+                              <Menu.ItemDescription>{button.description}</Menu.ItemDescription>
+                            ) : null}
+                          </View>
+                        </HStack>
+                      </Menu.Item>
+                    );
+                  })}
+                </Menu.Content>
+              </Menu.Portal>
+            </Menu>
+            <View>
+              <Button
+                testID="more-button"
+                icon={<Icon name="tabler:dots" />}
+                onPress={openMoreMenu}
+                variant="secondary"
+                loading={loading}
+              />
+            </View>
+          </>
         )}
       </HStack>
     </Log>
