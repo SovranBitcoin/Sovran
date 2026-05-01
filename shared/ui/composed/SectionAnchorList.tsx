@@ -1,33 +1,39 @@
 /**
- * @fileoverview Section-anchored scrollable list.
+ * @fileoverview Section-anchored virtualized list.
  *
  * A generic section list where tapping an anchor pill in the horizontal
- * bar above the content scrolls the list to that section, and the active
- * anchor highlights as the user scrolls. The top chrome (anchor bar +
- * optional `aboveAnchors` block such as a `HistoryEntryHeader` or modal
- * header) sits transparently over the scroll area — rows scrolling past
- * fade out via a gradient before passing "behind" the chrome.
+ * bar above the content scrolls to that section, and the active anchor
+ * highlights as the user scrolls. The top chrome (anchor bar + optional
+ * `aboveAnchors` block) sits transparently over the scroll viewport —
+ * rows scrolling past fade out via a `ScrollEdgeFade` before passing
+ * "behind" the chrome.
  *
- * Extracted from the emoji picker's pattern
- * (`shared/lib/popup/sheets/emoji-picker/content.tsx`) so the same UX
- * can ship on the Split-Bill participant picker without duplicating the
- * offset-tracking + scroll-to-section plumbing.
+ * For a sticky bottom region (Generate/Import buttons, a Next CTA, etc.)
+ * compose `<BottomButtons>` as a *sibling* — same shape that screens
+ * like Receive use (`<Screen footer={<BottomButtons>...}>`). Pass the
+ * measured footer height back via `contentBottomInset` so the scroll
+ * content clears it.
  *
- * Design notes:
- *   - Plain ScrollView (or a caller-injected equivalent like
- *     BottomSheetScrollView) — not a SectionList / FlatList / LegendList.
- *     The offset-tracking pattern requires every section wrapper to be
- *     mounted, which virtualisation breaks. Both existing consumers
- *     render <100 rows, so the lack of virtualisation is fine.
- *   - Active-anchor tracking uses offset math + a ~400ms suppression
- *     window after a programmatic `scrollTo`, mirroring the emoji
- *     picker's original logic to avoid feedback loops.
- *   - `overrideContent` lets callers swap the sections view wholesale
- *     (e.g. search-results mode). When non-null, the anchor bar hides
- *     too, matching emoji-picker semantics.
- *   - The top chrome is measured via onLayout on both `aboveAnchors` and
- *     the anchor bar; the scroll area tucks under both with a negative
- *     margin so rows fade into the chrome via the gradient overlay.
+ * Internals:
+ *   - The body uses `@legendapp/list` (LegendList) under the hood for
+ *     virtualization with item recycling. With `recycleItems` plus
+ *     per-type estimated sizes, this handles 400+ equal-cell grids
+ *     (emoji picker) at 60fps even on older devices.
+ *   - Sections are flattened into a single typed data array of
+ *     `{kind:'header'|'row', sectionId, ...}` rows. For grids, callers
+ *     pass `rowChunkSize > 1` and `renderRow` to lay N items per row;
+ *     the chunking happens inside this component.
+ *   - Active-anchor tracking uses `onViewableItemsChanged` (smallest
+ *     visible index wins) with a ~400ms suppression window after a
+ *     programmatic `scrollToIndex` to avoid feedback loops.
+ *   - `overrideContent` lets callers swap the body wholesale (e.g.
+ *     search-results mode). When non-null, the LegendList unmounts and
+ *     the anchor bar hides — caller is responsible for any inner
+ *     virtualization in this branch (typically another `LegendList`).
+ *   - `ScrollComponent` injection lets hosts pass
+ *     `BottomSheetScrollView` so gorhom's pan gestures + keyboard
+ *     handling stay coherent inside a sheet. LegendList wires it via
+ *     its `renderScrollComponent` prop.
  */
 
 import React, {
@@ -41,8 +47,6 @@ import React, {
 } from 'react';
 import {
   LayoutChangeEvent,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   ScrollView,
   ScrollViewProps,
   StyleProp,
@@ -50,12 +54,16 @@ import {
   TouchableOpacity,
   ViewStyle,
 } from 'react-native';
+import { LegendList, type LegendListRef, type ViewToken } from '@legendapp/list';
 import opacity from 'hex-color-opacity';
 
 import { ScrollEdgeFade } from './ScrollEdgeFade';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { log, useRenderLogger } from '@/shared/lib/logger';
+
+const sectionListLog = log.child({ module: 'sectionAnchorList' });
 
 export interface AnchorSection<T> {
   id: string;
@@ -63,16 +71,31 @@ export interface AnchorSection<T> {
   anchor: { icon?: ReactNode; label: string; testID?: string };
   data: T[];
   /**
-   * Optional section-header row rendered above the items. When omitted,
-   * no header renders (the section is demarcated by the anchor pill
-   * only — fine for emoji-style UX).
+   * Optional section-header row rendered above the section's items. Use
+   * for a label, divider, or any content that should anchor the section.
+   * When omitted, the section is demarcated by the anchor pill alone
+   * (fine for emoji-style UX where the tab IS the label).
    */
   renderHeader?: () => ReactNode;
 }
 
 export interface SectionAnchorListProps<T> {
   sections: AnchorSection<T>[];
+  /** Per-item renderer. Used when `rowChunkSize` is 1 (the default). */
   renderItem: (item: T, sectionId: string) => ReactNode;
+  /**
+   * Per-row renderer. Required when `rowChunkSize > 1` — the caller
+   * lays out the chunk's items horizontally (e.g. a 6-cell flex row).
+   * Headers always render at full width regardless.
+   */
+  renderRow?: (items: T[], sectionId: string, rowIndex: number) => ReactNode;
+  /**
+   * Items per row. Default 1 (one item per row). For grids, set > 1
+   * so each rendered row contains N items — the *row* is the unit of
+   * virtualization, not the individual cell. Required to be paired
+   * with `renderRow`.
+   */
+  rowChunkSize?: number;
   keyExtractor: (item: T, sectionId: string) => string;
   /**
    * Content rendered above the anchor bar (HistoryEntryHeader,
@@ -83,7 +106,8 @@ export interface SectionAnchorListProps<T> {
   /**
    * When non-null, the sections view is replaced wholesale by this node
    * and the anchor bar hides. Used for search-results mode in the emoji
-   * picker; any similar "flip to alternate content" use case fits.
+   * picker. Callers that need virtualization in this branch should
+   * compose their own `LegendList` here.
    */
   overrideContent?: ReactNode;
   /** Bottom content-container padding — clears a floating bottom bar. */
@@ -91,76 +115,99 @@ export interface SectionAnchorListProps<T> {
   /**
    * Injected scroll container. Defaults to react-native's `ScrollView`.
    * Pass `BottomSheetScrollView` when rendering inside @gorhom/bottom-sheet
-   * to preserve gesture + keyboard handling.
+   * to preserve gesture + keyboard handling — LegendList uses this as
+   * its `renderScrollComponent` so the sheet sees the same scroll node
+   * it would for a plain `<BottomSheetScrollView>`.
    */
   ScrollComponent?: ComponentType<ScrollViewProps & { ref?: React.Ref<unknown> }>;
   /** Color the top fade tapers to. Defaults to theme `background`. */
   topFadeColor?: string;
-  /** Hysteresis band (px) for active-anchor detection. Default 40. */
-  activeThreshold?: number;
   /**
    * Extra style applied to the anchor bar's outer wrapper. Useful when
    * the component sits inside a full-bleed container and needs its own
-   * left/right/top insets to align with the surrounding content (e.g. the
-   * Split-Bill participants screen, where `HistoryEntryHeader` has 20px
-   * horizontal padding but the scroll area itself does not). The style
-   * is included in the measured chrome height, so the fade math stays
-   * correct.
+   * left/right/top insets.
    */
   anchorBarStyle?: StyleProp<ViewStyle>;
+  /** Estimated height of one chunked row (px). Defaults to 60. */
+  estimatedItemSize?: number;
+  /** Estimated height of a section-header row (px). Defaults to 0. */
+  estimatedHeaderSize?: number;
+  /**
+   * Extra style on the LegendList's `contentContainerStyle`. Useful for
+   * `paddingHorizontal` when the rendered rows shouldn't carry their
+   * own inset. Merged with this component's own paddingTop/paddingBottom.
+   */
+  listContentContainerStyle?: StyleProp<ViewStyle>;
 }
 
-const DEFAULT_ACTIVE_THRESHOLD = 40;
 const PROGRAMMATIC_SCROLL_SUPPRESS_MS = 400;
 /** Breathing room between the bottom of the chrome (tabs) and the first
- *  visible content row at scroll offset 0 — also the resting position
- *  when the user taps an anchor. */
+ *  visible content row at scroll offset 0. */
 const HEADROOM = 12;
-/** Portion of the anchor bar used for the gradient taper (the remainder
- *  above stays fully opaque). Smaller = sharper ramp to opaque. */
+/** Portion of the anchor bar used for the gradient taper. */
 const FADE_RATIO = 0.5;
+
+type FlatRow<T> =
+  | { kind: 'header'; sectionId: string; render: () => ReactNode }
+  | { kind: 'row'; sectionId: string; items: T[]; rowIndex: number; rowKey: string };
 
 export function SectionAnchorList<T>({
   sections,
   renderItem,
+  renderRow,
+  rowChunkSize = 1,
   keyExtractor,
   aboveAnchors,
   overrideContent,
   contentBottomInset = 24,
-  ScrollComponent = ScrollView as unknown as ComponentType<
-    ScrollViewProps & { ref?: React.Ref<unknown> }
-  >,
+  ScrollComponent,
   topFadeColor,
-  activeThreshold = DEFAULT_ACTIVE_THRESHOLD,
   anchorBarStyle,
+  estimatedItemSize = 60,
+  estimatedHeaderSize = 0,
+  listContentContainerStyle,
 }: SectionAnchorListProps<T>) {
+  // Track render count + per-render timing so a stress run shows up as
+  // either lots of renders (state churn) or as a slow single render
+  // (heavy `flatItems` rebuild). Threshold 50: tabbed pickers should
+  // not exceed that during normal use, so a higher count escalates to
+  // `warn` automatically.
+  useRenderLogger('SectionAnchorList', 50, sectionListLog);
+
   const [foreground, surfaceTertiary] = useThemeColor(['foreground', 'surface-tertiary'] as const);
 
   const [activeAnchor, setActiveAnchor] = useState<string | undefined>(sections[0]?.id);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const listRef = useRef<LegendListRef>(null);
   const tabScrollRef = useRef<ScrollView | null>(null);
-  const sectionOffsets = useRef<Record<string, number>>({});
   const tabOffsets = useRef<Record<string, { x: number; width: number }>>({});
   const programmaticScroll = useRef(false);
+  // Timestamp when a programmatic scroll began — paired with the
+  // suppression-window timeout to log scrollToIndex round-trip duration.
+  const programmaticScrollStart = useRef(0);
 
-  // Measure the chrome (aboveAnchors + anchorBar) so we can tuck the
-  // scroll content under it. The scroll view gets a negative top margin
-  // of chromeHeight plus a matching paddingTop, so the first row sits
-  // flush with the chrome's bottom. The gradient overlay covers the
-  // chrome region and tapers across the anchor-bar band: aboveAnchors
-  // stays fully opaque; rows fade out while passing the tabs.
+  // Measure the chrome (aboveAnchors + anchorBar) so the scroll
+  // content padding can clear it. The chrome is absolute-positioned
+  // over the scroll viewport and carries a `ScrollEdgeFade` backdrop.
   const [aboveAnchorsHeight, setAboveAnchorsHeight] = useState(0);
   const [anchorBarHeight, setAnchorBarHeight] = useState(0);
   const chromeHeight = aboveAnchorsHeight + anchorBarHeight;
 
   const handleAboveAnchorsLayout = useCallback((e: LayoutChangeEvent) => {
     const h = e.nativeEvent.layout.height;
-    setAboveAnchorsHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
+    setAboveAnchorsHeight((prev) => {
+      if (Math.abs(prev - h) <= 1) return prev;
+      sectionListLog.debug('sectionList.chrome.aboveAnchors', { from: prev, to: h });
+      return h;
+    });
   }, []);
 
   const handleAnchorBarLayout = useCallback((e: LayoutChangeEvent) => {
     const h = e.nativeEvent.layout.height;
-    setAnchorBarHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
+    setAnchorBarHeight((prev) => {
+      if (Math.abs(prev - h) <= 1) return prev;
+      sectionListLog.debug('sectionList.chrome.anchorBar', { from: prev, to: h });
+      return h;
+    });
   }, []);
 
   // Keep the active anchor valid when the section list itself changes
@@ -177,8 +224,8 @@ export function SectionAnchorList<T>({
     }
   }, [sections, activeAnchor, firstSectionId]);
 
-  // When the active anchor changes, scroll the anchor bar horizontally to
-  // keep it in view. Matches emoji-picker tab-centering behaviour.
+  // When the active anchor changes, scroll the anchor bar horizontally
+  // to keep it in view. Matches emoji-picker tab-centering behaviour.
   useEffect(() => {
     if (!activeAnchor) return;
     const tab = tabOffsets.current[activeAnchor];
@@ -188,159 +235,351 @@ export function SectionAnchorList<T>({
     }
   }, [activeAnchor]);
 
-  const handleSectionLayout = useCallback((sectionId: string, y: number) => {
-    sectionOffsets.current[sectionId] = y;
+  // Flatten sections into a single virtualizable row stream. Each
+  // section's optional `renderHeader` becomes a `header` row; its
+  // `data` is split into `rowChunkSize`-sized chunks, each becoming
+  // a `row` row. `sectionFirstIndex` maps a sectionId to the index
+  // of its first row in `flatItems` — used by `scrollToIndex` on
+  // anchor-pill taps.
+  const { flatItems, sectionFirstIndex } = useMemo(() => {
+    const start = Date.now();
+    const items: FlatRow<T>[] = [];
+    const firstIndex: Record<string, number> = {};
+    for (const section of sections) {
+      let firstRowForSection: number | undefined;
+      if (section.renderHeader) {
+        firstRowForSection = items.length;
+        items.push({ kind: 'header', sectionId: section.id, render: section.renderHeader });
+      }
+      const chunkSize = Math.max(1, rowChunkSize);
+      for (let i = 0; i < section.data.length; i += chunkSize) {
+        const chunk = section.data.slice(i, i + chunkSize);
+        const rowIndex = i / chunkSize;
+        const firstKey = keyExtractor(chunk[0]!, section.id);
+        const rowKey = chunkSize === 1 ? firstKey : `${section.id}-row-${rowIndex}-${firstKey}`;
+        if (firstRowForSection === undefined) firstRowForSection = items.length;
+        items.push({
+          kind: 'row',
+          sectionId: section.id,
+          items: chunk,
+          rowIndex,
+          rowKey,
+        });
+      }
+      if (firstRowForSection !== undefined) {
+        firstIndex[section.id] = firstRowForSection;
+      }
+    }
+    const elapsed = Date.now() - start;
+    // The flatten happens whenever `sections` / `rowChunkSize` /
+    // `keyExtractor` identity changes. If this runs hot, it's almost
+    // always because the caller is rebuilding `sections` every render.
+    sectionListLog.debug('sectionList.flatten', {
+      sectionsIn: sections.length,
+      flatRowsOut: items.length,
+      headers: items.filter((it) => it.kind === 'header').length,
+      rows: items.filter((it) => it.kind === 'row').length,
+      elapsedMs: elapsed,
+    });
+    return { flatItems: items, sectionFirstIndex: firstIndex };
+  }, [sections, rowChunkSize, keyExtractor]);
+
+  // One-shot mount log + the inverse for unmount. Captures the size of
+  // the dataset and the relevant LegendList tuning so log-doctor's
+  // `stats` mode can correlate later events to the picker config.
+  useEffect(() => {
+    const totalDataItems = sections.reduce((acc, s) => acc + s.data.length, 0);
+    sectionListLog.info('sectionList.mount', {
+      sections: sections.length,
+      totalDataItems,
+      flatRows: flatItems.length,
+      rowChunkSize,
+      estimatedItemSize,
+      estimatedHeaderSize,
+      hasOverride: overrideContent != null,
+    });
+    return () => {
+      sectionListLog.info('sectionList.unmount', {});
+    };
+    // Deliberately mount-only — re-running on every dep change would
+    // spam `mount` events whenever the caller built a new `sections`
+    // identity. The deeper diagnostic for that case is `sectionList.flatten`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The viewport's "top" for list-reading purposes is just below the
-  // chrome + headroom — all offset math is expressed relative to that
-  // point so scrollTo and active detection agree.
+  // Keep the anchor bar visible during the override path (e.g. emoji
+  // search results) so the chrome stays visually continuous as the
+  // body content flips. The tabs are not actionable while the override
+  // is active — tapping one is a no-op since `scrollToIndex` only
+  // operates on the section flatlist — but the visual continuity is
+  // worth more than hiding them. Caller can clear the override (close
+  // the search) to re-enable tab interaction.
+  const showAnchors = sections.length > 0;
+
+  // Viewport "top" for list-reading purposes is just below the chrome
+  // + headroom — same offset value drives the LegendList's scroll
+  // content paddingTop AND the `viewOffset` on `scrollToIndex`.
   const viewportTopOffset = chromeHeight + HEADROOM;
 
-  const handleScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+  // Active-anchor: pick the topmost visible row's sectionId. LegendList
+  // sorts `viewableItems` by index, so [0] is the topmost in-view row.
+  // Suppressed during programmatic scrolls so the animation doesn't
+  // trip self-reinforcing setActiveAnchor() updates.
+  //
+  // Ref-pattern for `activeAnchor` so the callback identity stays
+  // stable across renders. With `[activeAnchor]` as a dep, every
+  // anchor flip re-creates the callback → LegendList sees a new
+  // `onViewableItemsChanged` prop → re-runs viewability tracking.
+  // Empirically this added ~1 LegendList re-render per flip and
+  // amplified scroll-time JS thread blocks.
+  const activeAnchorRef = useRef(activeAnchor);
+  useEffect(() => {
+    activeAnchorRef.current = activeAnchor;
+  }, [activeAnchor]);
+  const handleViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (programmaticScroll.current) return;
-      const y = e.nativeEvent.contentOffset.y;
-      let current = sections[0]?.id;
-      for (const s of sections) {
-        const offset = sectionOffsets.current[s.id];
-        if (offset != null && offset <= y + viewportTopOffset + activeThreshold) {
-          current = s.id;
-        }
-      }
-      if (current && current !== activeAnchor) {
-        setActiveAnchor(current);
+      if (viewableItems.length === 0) return;
+      const top = viewableItems[0]!;
+      const row = top.item as FlatRow<T> | undefined;
+      const sectionId = row?.sectionId;
+      if (sectionId && sectionId !== activeAnchorRef.current) {
+        sectionListLog.debug('sectionList.viewable.flip', {
+          from: activeAnchorRef.current,
+          to: sectionId,
+          viewableCount: viewableItems.length,
+          topIndex: top.index,
+        });
+        setActiveAnchor(sectionId);
       }
     },
-    [sections, activeAnchor, activeThreshold, viewportTopOffset]
+    []
   );
+
+  // viewabilityConfig must be referentially stable across renders or
+  // RN warns. `itemVisiblePercentThreshold: 1` means "any pixel of the
+  // row is visible" — what we want for a quick activeAnchor flip the
+  // moment a new section's first row enters the viewport.
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 1,
+    minimumViewTime: 0,
+  }).current;
 
   const handleAnchorPress = useCallback(
     (id: string) => {
       setActiveAnchor(id);
-      const offset = sectionOffsets.current[id];
-      if (offset != null && scrollRef.current) {
-        programmaticScroll.current = true;
-        scrollRef.current.scrollTo({
-          y: Math.max(0, offset - viewportTopOffset),
-          animated: true,
-        });
-        setTimeout(() => {
-          programmaticScroll.current = false;
-        }, PROGRAMMATIC_SCROLL_SUPPRESS_MS);
+      const idx = sectionFirstIndex[id];
+      if (idx == null) {
+        sectionListLog.warn('sectionList.scrollTo.miss', { sectionId: id });
+        return;
       }
+      programmaticScroll.current = true;
+      programmaticScrollStart.current = Date.now();
+      sectionListLog.info('sectionList.scrollTo', {
+        sectionId: id,
+        index: idx,
+        viewOffset: viewportTopOffset,
+      });
+      // viewOffset shifts the destination so the target row settles
+      // BELOW the chrome (at y = viewportTopOffset from the viewport
+      // top edge), instead of behind it.
+      void listRef.current?.scrollToIndex({
+        index: idx,
+        animated: true,
+        viewOffset: viewportTopOffset,
+      });
+      setTimeout(() => {
+        programmaticScroll.current = false;
+        sectionListLog.debug('sectionList.scrollTo.complete', {
+          sectionId: id,
+          durationMs: Date.now() - programmaticScrollStart.current,
+        });
+      }, PROGRAMMATIC_SCROLL_SUPPRESS_MS);
     },
-    [viewportTopOffset]
+    [viewportTopOffset, sectionFirstIndex]
   );
 
-  const showAnchors = !overrideContent && sections.length > 0;
-
-  // `paddingTop: chromeHeight + HEADROOM` — first row sits below the
-  // chrome with a small breathing gap. The fade overlay covers only the
-  // chrome region (height: chromeHeight) so the HEADROOM band between
-  // the chrome and the first row is fully clear.
-  const contentContainerStyle = useMemo(
-    () => ({
-      paddingTop: viewportTopOffset,
-      paddingBottom: contentBottomInset,
-    }),
-    [viewportTopOffset, contentBottomInset]
+  // Merge component-managed paddingTop/paddingBottom with caller-supplied
+  // listContentContainerStyle (the latter typically carries
+  // paddingHorizontal). Computed lazily so a paddingHorizontal change
+  // doesn't invalidate the chrome-height memo.
+  const listContentContainerStyleMerged = useMemo(
+    () =>
+      StyleSheet.flatten([
+        listContentContainerStyle,
+        { paddingTop: viewportTopOffset, paddingBottom: contentBottomInset },
+      ]),
+    [listContentContainerStyle, viewportTopOffset, contentBottomInset]
   );
+
+  // Counter incremented every time LegendList invokes `renderListItem`
+  // — i.e. every time a row enters the recycling pool with new data.
+  // Logged in a throttled effect below so we can see "recycler invokes
+  // per second" without flooding the log on each call.
+  const recycleCount = useRef(0);
+  const lastRecycleLog = useRef(0);
+
+  // Per-row renderer for LegendList. Headers render `section.renderHeader()`
+  // wholesale; rows dispatch to `renderRow` (chunked) or `renderItem` (single).
+  const renderListItem = useCallback(
+    ({ item }: { item: FlatRow<T> }) => {
+      recycleCount.current += 1;
+      const now = Date.now();
+      // Throttle to one log per second so a burst of recycling shows
+      // up as a single rate-summary entry instead of N entries.
+      if (now - lastRecycleLog.current >= 1000) {
+        const rate = recycleCount.current;
+        recycleCount.current = 0;
+        lastRecycleLog.current = now;
+        if (rate > 0) {
+          sectionListLog.debug('sectionList.recycle.rate', { invokesLastSec: rate });
+        }
+      }
+      if (item.kind === 'header') return <>{item.render()}</>;
+      if (rowChunkSize > 1) {
+        if (!renderRow) return null;
+        return <>{renderRow(item.items, item.sectionId, item.rowIndex)}</>;
+      }
+      const single = item.items[0];
+      if (single === undefined) return null;
+      return <>{renderItem(single, item.sectionId)}</>;
+    },
+    [renderItem, renderRow, rowChunkSize]
+  );
+
+  const listKeyExtractor = useCallback((item: FlatRow<T>) => {
+    if (item.kind === 'header') return `header-${item.sectionId}`;
+    return item.rowKey;
+  }, []);
+
+  const getItemType = useCallback((item: FlatRow<T>) => item.kind, []);
+
+  const getEstimatedItemSize = useCallback(
+    (_item: FlatRow<T>, _index: number, type: string | undefined) => {
+      return type === 'header' ? estimatedHeaderSize : estimatedItemSize;
+    },
+    [estimatedHeaderSize, estimatedItemSize]
+  );
+
+  // `renderScrollComponent` lets the host inject its scroll container
+  // (e.g. `BottomSheetScrollView` for gorhom integration). Default to
+  // the standard react-native ScrollView when no host wraps us.
+  const renderScrollComponent = useMemo(() => {
+    if (!ScrollComponent) return undefined;
+    const Inner = ScrollComponent;
+    const Component = (props: ScrollViewProps) => <Inner {...props} />;
+    Component.displayName = 'SectionAnchorListScrollComponent';
+    return Component;
+  }, [ScrollComponent]);
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Top chrome layer — transparent by default, sits at zIndex 20
-          above the scroll area. Content fades behind it via the
-          gradient overlay below. */}
-      <View style={styles.chrome}>
-        {aboveAnchors != null && <View onLayout={handleAboveAnchorsLayout}>{aboveAnchors}</View>}
-        {showAnchors && (
-          <View onLayout={handleAnchorBarLayout} style={[styles.anchorBarOuter, anchorBarStyle]}>
-            <ScrollView
-              ref={tabScrollRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.anchorBarWrapper}
-              contentContainerStyle={styles.anchorBarContent}>
-              {sections.map((s) => {
-                const isSelected = activeAnchor === s.id;
-                return (
-                  <TouchableOpacity
-                    key={s.id}
-                    testID={s.anchor.testID}
-                    onPress={() => handleAnchorPress(s.id)}
-                    onLayout={(e) => {
-                      tabOffsets.current[s.id] = {
-                        x: e.nativeEvent.layout.x,
-                        width: e.nativeEvent.layout.width,
-                      };
-                    }}
-                    activeOpacity={0.7}
-                    style={[
-                      styles.anchorPill,
-                      { backgroundColor: isSelected ? surfaceTertiary : 'transparent' },
-                    ]}>
-                    {s.anchor.icon}
-                    <Text
-                      size={12}
-                      bold
-                      style={{ color: isSelected ? foreground : opacity(foreground, 0.7) }}>
-                      {s.anchor.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
-      </View>
+      {/* Body — virtualized LegendList for sections, or wholesale
+          `overrideContent` (e.g. search-results mode). Chrome is
+          absolute-positioned over the top edge regardless. */}
+      {overrideContent != null ? (
+        // The override path needs the same paddingTop the LegendList
+        // would have applied, so caller-rendered content also clears
+        // the chrome.
+        <View style={{ flex: 1, paddingTop: viewportTopOffset }}>{overrideContent}</View>
+      ) : (
+        <LegendList
+          ref={listRef}
+          data={flatItems}
+          renderItem={renderListItem}
+          keyExtractor={listKeyExtractor}
+          getItemType={getItemType}
+          getEstimatedItemSize={getEstimatedItemSize}
+          recycleItems
+          // Tuned down from 250 → 150 after a stress test showed that
+          // continuous fast scroll across many sections caused 6s+ JS
+          // thread blocks: the bigger the over-render buffer, the more
+          // rows LegendList synchronously reconciles per scroll frame.
+          // 150px = ~4 rows ahead of the viewport at 40px row height —
+          // enough to avoid blank flashes at typical scroll velocities,
+          // small enough that fast flicks don't pre-render a long tail.
+          drawDistance={150}
+          style={{ flex: 1 }}
+          contentContainerStyle={listContentContainerStyleMerged as never}
+          onViewableItemsChanged={handleViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          renderScrollComponent={renderScrollComponent}
+        />
+      )}
 
-      {/* Scroll content — tucks under the chrome via negative top margin
-          so rows can scroll behind it. First row sits a small gap below
-          the chrome bottom; the fade overlay covers the chrome region,
-          with the taper confined to the lower ~half of the anchor bar
-          so the ramp to opaque is quick and sits within the tab strip. */}
-      <View style={{ flex: 1, marginTop: -chromeHeight }}>
+      {/* Top chrome — absolute over the body. ScrollEdgeFade is the
+          backdrop (frosted-glass blur with eased mask + color gradient
+          so the bottom edge tapers into the scroll). aboveAnchors +
+          tab bar render on top. */}
+      <View pointerEvents="box-none" style={styles.chromeAbsolute}>
         <ScrollEdgeFade
           edge="top"
-          height={chromeHeight}
+          height={chromeHeight > 0 ? chromeHeight : 1}
           fadeSize={
             anchorBarHeight > 0
               ? Math.max(1, Math.round(anchorBarHeight * FADE_RATIO))
               : chromeHeight
           }
           color={topFadeColor}
-          zIndex={10}
+          zIndex={0}
         />
-        <ScrollComponent
-          ref={scrollRef as React.Ref<unknown>}
-          style={{ flex: 1 }}
-          contentContainerStyle={contentContainerStyle}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
-          {overrideContent ??
-            sections.map((section) => (
-              <View
-                key={section.id}
-                onLayout={(e) => handleSectionLayout(section.id, e.nativeEvent.layout.y)}>
-                {section.renderHeader?.()}
-                {section.data.map((item) => (
-                  <React.Fragment key={keyExtractor(item, section.id)}>
-                    {renderItem(item, section.id)}
-                  </React.Fragment>
-                ))}
-              </View>
-            ))}
-        </ScrollComponent>
+        <View pointerEvents="box-none" style={{ zIndex: 1 }}>
+          {aboveAnchors != null && (
+            <View onLayout={handleAboveAnchorsLayout}>{aboveAnchors}</View>
+          )}
+          {showAnchors && (
+            <View onLayout={handleAnchorBarLayout} style={[styles.anchorBarOuter, anchorBarStyle]}>
+              <ScrollView
+                ref={tabScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.anchorBarWrapper}
+                contentContainerStyle={styles.anchorBarContent}>
+                {sections.map((s) => {
+                  const isSelected = activeAnchor === s.id;
+                  return (
+                    <TouchableOpacity
+                      key={s.id}
+                      testID={s.anchor.testID}
+                      onPress={() => handleAnchorPress(s.id)}
+                      onLayout={(e) => {
+                        tabOffsets.current[s.id] = {
+                          x: e.nativeEvent.layout.x,
+                          width: e.nativeEvent.layout.width,
+                        };
+                      }}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.anchorPill,
+                        { backgroundColor: isSelected ? surfaceTertiary : 'transparent' },
+                      ]}>
+                      {s.anchor.icon}
+                      <Text
+                        size={12}
+                        bold
+                        style={{ color: isSelected ? foreground : opacity(foreground, 0.7) }}>
+                        {s.anchor.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  chrome: {
+  chromeAbsolute: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     zIndex: 20,
   },
   anchorBarOuter: {

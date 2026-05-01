@@ -38,6 +38,7 @@ import {
 } from '@/features/splitBill/components/ParticipantCardDeck';
 import Icon from 'assets/icons';
 import { Screen, useLifecycleLogger, walletLog, paymentLog } from '@/shared/lib/logger';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -264,7 +265,11 @@ export default function SplitBillDetailScreen() {
                       }
                     : undefined
                 }
-                title={p.nickname ?? p.pubkey?.slice(0, 12) ?? p.peerID ?? 'Participant'}
+                title={resolveIdentityName({
+                  pubkey: p.pubkey ?? p.peerID,
+                  bleNickname: p.nickname,
+                  fallbackName: 'Participant',
+                })}
                 subtitle={participantSubtitle(p)}
                 accent={
                   <AmountFormatter amount={p.amount} unit={group.unit} size={13} weight="heavy" />

@@ -27,6 +27,7 @@ import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition
 import { StyleSheet, InteractionManager, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { log, Log } from '@/shared/lib/logger';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -70,7 +71,6 @@ import {
   getFirstTagValue,
   parseProfileFromRaw,
   parseNoteMetrics,
-  tryNpubEncode,
   getEmbeddedRepostEvent,
   buildVideoOverlayLayout,
   computeFeedIndicesWithVideo,
@@ -856,7 +856,10 @@ function UserFeedInner({
   // ---------------------------
   // Render
   // ---------------------------
-  const displayName = authorName || tryNpubEncode(pubkey).slice(0, 12) + '…';
+  const displayName = resolveIdentityName({
+    pubkey,
+    overrideName: authorName,
+  });
   const renderFeedItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
       if (item.type === 'note') {

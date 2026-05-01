@@ -199,6 +199,7 @@ export const icons: string[] = [
   'mingcute:home-4-fill',
 
   // Explore page icons
+  'mdi:chevron-left',
   'mdi:chevron-right',
   'mdi:map-marker',
   'mdi:sim',

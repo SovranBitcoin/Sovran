@@ -7,11 +7,16 @@ export interface ProfileNameFields {
   display_name?: string;
 }
 
-/** `display_name → displayName → name → undefined`. NIP-01 metadata uses both
- *  snake_case (historical) and camelCase (current REST + relay enrichment),
- *  so callers should pass either shape through unchanged. Returns
- *  `undefined` when the profile carries no usable name — the caller then
- *  falls back to a pubkey-abbreviation via its own `titleFallback`. */
+/**
+ * `display_name → displayName → name → undefined`. Returns `undefined` when
+ * the profile carries no usable name.
+ *
+ * @deprecated Use `resolveIdentityName` from `@/shared/lib/identity` for new
+ * code — it accepts the full identity context (mint name, pubkey for
+ * deterministic fallback, BLE nickname, etc.) and never returns undefined.
+ * This helper remains only for the few sites that genuinely want a Nostr-
+ * profile-only resolver with explicit caller-managed fallbacks.
+ */
 export function resolveDisplayName(profile?: ProfileNameFields): string | undefined {
   return profile?.display_name || profile?.displayName || profile?.name || undefined;
 }

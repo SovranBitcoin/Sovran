@@ -274,7 +274,20 @@ export async function deleteAllProfiles(opts?: {
       log.warn('profile.orchestrator.clear_secure_data_failed', { error: e });
     }
 
-    // 3. Nuclear AsyncStorage wipe — every key, every store, everything
+    // 3a. Per-feature wipes BEFORE the nuclear AsyncStorage.clear() so any
+    // namespace that later migrates off AsyncStorage (SQLite, SecureStore, …)
+    // still gets cleaned up. AsyncStorage.clear() then catches anything we
+    // missed.
+    try {
+      const { wipeWhitenoiseStorageForAccounts } = await import(
+        '@/features/whitenoise/storage'
+      );
+      await wipeWhitenoiseStorageForAccounts(accountIndexes);
+    } catch (e) {
+      log.warn('profile.orchestrator.wipe_whitenoise_failed', { error: e });
+    }
+
+    // 3b. Nuclear AsyncStorage wipe — every key, every store, everything
     try {
       await AsyncStorage.clear();
     } catch (e) {

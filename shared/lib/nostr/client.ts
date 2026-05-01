@@ -10,10 +10,18 @@ export function npubToPubkey(npub: string): string {
   if (!npub) return '';
 
   if (npub.startsWith('npub')) {
-    const data = nip19.decode(npub);
-    if (data.type === 'npub') {
-      nostrLog.debug('nostr.client.npub_to_pubkey', { inputLen: npub.length, type: data.type });
-      return data.data;
+    try {
+      const data = nip19.decode(npub);
+      if (data.type === 'npub') {
+        nostrLog.debug('nostr.client.npub_to_pubkey', { inputLen: npub.length, type: data.type });
+        return data.data;
+      }
+    } catch (err) {
+      nostrLog.warn('nostr.client.npub_to_pubkey.decode_failed', {
+        inputLen: npub.length,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return '';
     }
   }
   return npub;

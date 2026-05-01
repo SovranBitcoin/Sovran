@@ -2,26 +2,33 @@
  * @fileoverview Gradient fade at the top or bottom edge of a scrolling view.
  *
  * Hides the visual cut-off where list content meets a sticky header (top
- * edge) or a floating bottom bar (bottom edge). Blurs + color-fades content
- * scrolling past the opaque end so items don't snap out of view.
+ * edge) or a floating bottom bar (bottom edge). Uses the same recipe as
+ * `BottomButtons`:
  *
- * Layout model: absolute, pointer-transparent. Drop it as a sibling to the
- * scroll container (usually inside the Screen or ModalLayoutWrapper
- * children) and it paints over the scroll region near the specified edge.
+ *   1. An eased ~26-stop alpha gradient masks the BlurView so iOS's
+ *      `UIVisualEffectView` reads enough alpha gradation to render a
+ *      smooth gradient blur instead of a banded one. A 3-stop linear
+ *      mask creates an alpha cliff the blur shader can't cross — visible
+ *      as a hard band on iOS.
+ *   2. A separate translucent → opaque color gradient is layered on top
+ *      of the masked blur. This guarantees the opaque-end pixels read
+ *      as solid container color so any residual banding under the blur
+ *      is hidden.
+ *   3. The blur defaults to iOS's `systemChromeMaterialDark` tint —
+ *      a true frosted-glass material, not just a darkening overlay.
  *
- * Design pattern:
- *   - Opaque half (adjacent to the edge) fully blurs + color-fills content
- *     behind it, so the sticky/floating UI reads against a uniform surface.
- *   - Fade half (pointing into the scroll content) tapers the blur + color
- *     down to transparent so the transition between "in view" and "behind
- *     the overlay" is smooth.
+ * Layout model: absolute, pointer-transparent. Drop it as a sibling to
+ * the scroll container or as a backdrop layer inside a sticky chrome /
+ * bottom section.
  */
 
-import React from 'react';
-import { StyleSheet } from 'react-native';
-import { BlurView } from 'expo-blur';
+import React, { useMemo } from 'react';
+import { Platform, StyleSheet } from 'react-native';
+import { BlurView, type BlurTint } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { easeGradient } from 'react-native-easing-gradient';
+import opacity from 'hex-color-opacity';
 
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -34,30 +41,51 @@ export interface ScrollEdgeFadeProps {
   /**
    * Size of the transparent-to-opaque taper band, in pixels. The
    * remaining `height - fadeSize` is the fully-opaque section adjacent
-   * to the edge. Defaults to `height / 2` which matches the historical
-   * ModalLayoutWrapper header-gradient shape (half opaque, half fading).
-   *
-   * Use a smaller `fadeSize` when the opaque region needs to cover a
-   * wide floating bar (e.g. wrap-growing pills) and the taper only
-   * needs to be a thin visual softener above it.
+   * to the edge. Defaults to `height / 2`.
    */
   fadeSize?: number;
   /**
    * Target color for the opaque end of the gradient. Defaults to the
    * theme's `background` token so content fades into the screen color.
+   * Set to `null` to disable the color gradient (blur-only).
    */
-  color?: string;
-  /** Apply a frosted-glass blur beneath the color fade. Default true. */
+  color?: string | null;
+  /** Apply a frosted-glass blur. Default true. */
   blur?: boolean;
-  /** BlurView intensity (0-100). Default 50. */
+  /** BlurView intensity at the fully-blurred end (0-100). Default 50. */
   blurIntensity?: number;
-  /** BlurView tint. Default 'dark'. */
-  blurTint?: 'light' | 'dark' | 'default';
-  /** Stack order. Default 50 (below ModalLayoutWrapper's sticky content at 99). */
+  /**
+   * BlurView tint. Defaults to `systemChromeMaterialDark` on iOS — the
+   * system material renders true frosted-glass blur that composes
+   * correctly through a gradient mask. Plain `'dark'` is a tinted
+   * overlay, not a blur. Android falls back to `dark`.
+   */
+  blurTint?: BlurTint;
+  /** Stack order. Default 50. */
   zIndex?: number;
   /** Distance from the specified edge in pixels. Default 0. */
   offset?: number;
 }
+
+// Eased mask gradients — pre-computed at module load. Stops are eased
+// between three anchors using react-native-easing-gradient's default
+// cubic-bezier ease-in-out, producing ~26 dense color stops. iOS reads
+// enough alpha gradation through these to render a smooth gradient
+// blur instead of a hard band.
+const { colors: BOTTOM_MASK_COLORS, locations: BOTTOM_MASK_LOCATIONS } = easeGradient({
+  colorStops: {
+    0: { color: 'transparent' },
+    0.5: { color: 'rgba(0,0,0,0.99)' },
+    1: { color: 'black' },
+  },
+});
+const { colors: TOP_MASK_COLORS, locations: TOP_MASK_LOCATIONS } = easeGradient({
+  colorStops: {
+    0: { color: 'black' },
+    0.5: { color: 'rgba(0,0,0,0.99)' },
+    1: { color: 'transparent' },
+  },
+});
 
 export function ScrollEdgeFade({
   edge,
@@ -66,35 +94,47 @@ export function ScrollEdgeFade({
   color,
   blur = true,
   blurIntensity = 50,
-  blurTint = 'dark',
+  blurTint = Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark',
   zIndex = 50,
   offset = 0,
 }: ScrollEdgeFadeProps) {
   const themeBackground = useThemeColor('background');
-  const fillColor = color ?? themeBackground;
+  const fillColor = color === null ? null : (color ?? themeBackground);
 
-  // Resolve fade band. Clamp so we always have a well-formed 3-stop mask
-  // even when callers pass extreme values — a 0 fadeSize produces a hard
-  // edge, a height-matching fadeSize produces a pure gradient with no
-  // opaque tail.
+  // Resolve fade band. Clamp so we always have a well-formed mask even
+  // when callers pass extreme values.
   const resolvedFade = Math.max(0, Math.min(fadeSize ?? height / 2, height));
   // Location where the opaque band starts, expressed as a 0-1 fraction
   // measured from the top of the region regardless of edge.
   const boundaryFromTop = edge === 'top' ? 1 - resolvedFade / height : resolvedFade / height;
 
-  // Mask always has three stops: outer-opaque, boundary-opaque, outer-transparent.
-  // For 'top': opaque at top, fade to transparent at bottom.
-  // For 'bottom': transparent at top, fade to opaque at bottom.
-  const maskColors = (
-    edge === 'top' ? ['black', 'black', 'transparent'] : ['transparent', 'black', 'black']
-  ) as [string, string, string];
-  const maskLocations = [0, boundaryFromTop, 1] as [number, number, number];
+  const isTop = edge === 'top';
+  const maskColors = isTop ? TOP_MASK_COLORS : BOTTOM_MASK_COLORS;
+  const maskLocations = isTop ? TOP_MASK_LOCATIONS : BOTTOM_MASK_LOCATIONS;
 
-  // Fill runs along the opaque-side half only.
-  const fillColors =
-    edge === 'top' ? ([fillColor, 'transparent'] as const) : (['transparent', fillColor] as const);
-  const fillLocations =
-    edge === 'top' ? ([boundaryFromTop, 1] as const) : ([0, boundaryFromTop] as const);
+  // 3-stop color gradient layered on top of the masked blur. Stops are
+  // tuned the same way `BottomButtons` does it: 0 alpha at the
+  // transparent edge, 75% mid, 100% at the opaque edge — guarantees the
+  // opaque pixels are fully solid even when the underlying blur shader
+  // bands.
+  const colorGradientColors = useMemo(() => {
+    if (!fillColor) return null;
+    const transparent = opacity(fillColor, 0);
+    const mid = opacity(fillColor, 0.75);
+    const solid = fillColor;
+    return isTop
+      ? ([solid, mid, transparent] as const)
+      : ([transparent, mid, solid] as const);
+  }, [fillColor, isTop]);
+
+  const colorGradientLocations = useMemo(() => {
+    // The mid stop sits at the same boundary as the alpha mask so the
+    // color gradient ramps in lockstep with the blur reveal.
+    const midLocation = isTop ? boundaryFromTop / 2 : (1 + boundaryFromTop) / 2;
+    return isTop
+      ? ([0, midLocation, boundaryFromTop] as const)
+      : ([boundaryFromTop, midLocation, 1] as const);
+  }, [boundaryFromTop, isTop]);
 
   return (
     <View
@@ -107,24 +147,28 @@ export function ScrollEdgeFade({
         height,
         zIndex,
       }}>
-      <MaskedView
-        style={StyleSheet.absoluteFill}
-        maskElement={
-          <LinearGradient
-            colors={maskColors}
-            locations={maskLocations}
-            style={StyleSheet.absoluteFill}
-          />
-        }>
-        {blur && (
+      {blur && (
+        <MaskedView
+          style={StyleSheet.absoluteFill}
+          maskElement={
+            <LinearGradient
+              colors={maskColors as unknown as readonly [string, string, ...string[]]}
+              locations={maskLocations as unknown as readonly [number, number, ...number[]]}
+              style={StyleSheet.absoluteFill}
+            />
+          }>
           <BlurView intensity={blurIntensity} tint={blurTint} style={StyleSheet.absoluteFill} />
-        )}
+        </MaskedView>
+      )}
+      {colorGradientColors && (
         <LinearGradient
-          colors={fillColors as unknown as [string, string, ...string[]]}
-          locations={fillLocations as unknown as [number, number, ...number[]]}
+          colors={colorGradientColors}
+          locations={colorGradientLocations}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-      </MaskedView>
+      )}
     </View>
   );
 }

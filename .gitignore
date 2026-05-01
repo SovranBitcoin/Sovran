@@ -86,6 +86,11 @@ expo-env.d.ts
 dist/
 web-build/
 
+# Vendored upstream packages — checked-in build artifacts so EAS can install
+# from a sibling-less tree. Sync via `bun run vendor:marmot-ts`.
+!vendor/**/dist/
+!vendor/**/dist/**
+
 sovran.money/
 
 # Cursor skills (avoid committing vendored git repos inside skills)

@@ -42,7 +42,7 @@ import { Platform } from 'react-native';
 // When true, all log output (console + ring buffer) is active.
 // Tied to __DEV__ by default so dev builds always have logging.
 // Set to false manually to silence ALL output (useful when profiling overhead).
-const SHOW_LOGS = false;
+const SHOW_LOGS = true;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -920,6 +920,8 @@ export const paymentLog = log.child({ module: 'payment' });
 export const feedLog = log.child({ module: 'feed' });
 export const apiLog = log.child({ module: 'api' });
 export const storeLog = log.child({ module: 'store' });
+export const aiLog = log.child({ module: 'ai' });
+export const chatLog = log.child({ module: 'chat' });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // JS Thread Blocking Detector

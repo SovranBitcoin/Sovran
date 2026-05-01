@@ -45,7 +45,7 @@ import {
 } from '@/shared/ui/composed/RowStatsAccent';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { formatCompact } from '@/shared/lib/number';
-import { resolveDisplayName } from '@/shared/lib/profile';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { relativeTime } from '@/shared/lib/time';
 
 // ---------------------------------------------------------------------------
@@ -375,15 +375,24 @@ function deriveSeed(ids: Identity[]): string | undefined {
 
 function deriveName(ids: Identity[]): string | undefined {
   const mint = find(ids, 'mint');
-  if (mint?.displayName) return mint.displayName;
-  const nostrName = resolveDisplayName(find(ids, 'nostr')?.profile);
-  if (nostrName) return nostrName;
+  const nostr = find(ids, 'nostr');
   const self = find(ids, 'self');
-  if (self?.nickname) return self.nickname;
   const ble = find(ids, 'ble');
-  if (ble?.nickname) return ble.nickname;
   const geohash = find(ids, 'geohash');
-  return geohash?.label ?? geohash?.displayName;
+
+  const resolved = resolveIdentityName({
+    mintName: mint?.displayName,
+    nostrProfile: nostr?.profile,
+    bleNickname: self?.nickname ?? ble?.nickname,
+    overrideName: geohash?.label ?? geohash?.displayName,
+    pubkey: nostr?.pubkey ?? self?.pubkey ?? ble?.peerID,
+  });
+
+  // The helper always returns a string. When the row is a pure-geohash
+  // row with no pubkey or label, return undefined so deriveTitleFallback
+  // can produce the `#geohash` form.
+  if (resolved === 'Unknown') return undefined;
+  return resolved;
 }
 
 function deriveTitleFallback(ids: Identity[]): string | undefined {

@@ -1,16 +1,14 @@
 export type { CopyTarget } from './copy';
 export { copyPopup } from './copy';
 export {
-  emojiPickerPopup,
+  profileSwitcherPopup,
   proofSelectorPopup,
   paymentOptionsPopup,
   paymentFallbackPopup,
 } from './actionSheets';
-export {
-  profileSwitcherPopup,
-  type ProfileSwitcherAction,
-  type ProfileSwitcherPayload,
-} from './profileSwitcher';
+export { emojiPickerPopup } from './emojiPicker';
+export { modelPickerPopup } from './modelPicker';
+export type { ProfileSwitcherAction } from '../actionSheetTypes';
 export {
   actionMenuPopup,
   dismissActionMenuPopup,

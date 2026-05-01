@@ -28,8 +28,7 @@ import { useContactSearch } from '@/features/payments/hooks/useContactSearch';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileStore, type ProfileEntry } from '@/shared/stores/global/profileStore';
 import { prefetchImages } from '@/shared/lib/imageCache';
-import { getUsername } from '@/shared/lib/username';
-import { resolveDisplayName } from '@/shared/lib/profile';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { walletLog } from '@/shared/lib/logger';
 import type {
   SplitBillDeliveryChannel,
@@ -173,7 +172,7 @@ function nostrCandidate(
   profile: ProfileMetadata | undefined,
   stats: SearchHitStats | undefined,
 ): PickerCandidate {
-  const nickname = resolveDisplayName(profile);
+  const nickname = resolveIdentityName({ pubkey, nostrProfile: profile });
   return {
     id: `nostr:${pubkey}`,
     source: 'nostr',
@@ -200,7 +199,10 @@ function nostrCandidate(
  * profile whose keys are currently mounted in `NostrKeysProvider`.
  */
 function selfCandidate(profile: ProfileEntry, isActive: boolean): PickerCandidate {
-  const nickname = profile.cachedDisplayName || getUsername(profile.pubkey);
+  const nickname = resolveIdentityName({
+    pubkey: profile.pubkey,
+    overrideName: profile.cachedDisplayName,
+  });
   return {
     id: `self:${profile.pubkey}`,
     source: 'self',
@@ -231,7 +233,7 @@ function searchCandidate(
   profile: ProfileMetadata | undefined,
   stats?: SearchHitStats
 ): PickerCandidate {
-  const nickname = resolveDisplayName(profile);
+  const nickname = resolveIdentityName({ pubkey, nostrProfile: profile });
   return {
     id: `nostr:${pubkey}`,
     source: 'nostr',

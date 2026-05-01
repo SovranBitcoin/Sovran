@@ -34,7 +34,7 @@ import { truncateMiddle } from '@/shared/lib/strings';
 import * as Clipboard from 'expo-clipboard';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
-import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
+import { SendMessageMenu } from '@/features/user/components/SendMessageMenu';
 import { NDKEvent, useNDK, useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Contacts } from 'nostr-tools/kinds';
 import { nip19 } from 'nostr-tools';
@@ -61,7 +61,7 @@ import {
   selectIsFollowingPubkey,
   useNostrSocialStore,
 } from '@/shared/stores/profile/nostrSocialStore';
-import { getUsername } from '@/shared/lib/username';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { useDominantColor, getContrastColors } from '@/shared/lib/colorExtraction';
 import type { VideoPostRecord, StoryUser } from '@/features/feed';
@@ -726,9 +726,11 @@ export function UserProfileScreen() {
   // DERIVED STATE
   // ===========================
 
-  const displayName = isOwnProfile
-    ? cachedProfile?.displayName || cachedProfile?.name || getUsername(pubkey || '')
-    : cachedProfile?.displayName || cachedProfile?.name || truncateMiddle(npub, 8);
+  // Same hierarchy whether it's our own or a foreign profile — drawer-style
+  // deterministic word pair after metadata. truncateMiddle(npub, …) is no
+  // longer used as a name; the npub still appears as a copy-row in the
+  // profile body.
+  const displayName = resolveIdentityName({ pubkey, nostrProfile: cachedProfile });
 
   const followerCount = profileData?.followers;
   const reputationScore = profileData?.score;
@@ -1066,21 +1068,7 @@ export function UserProfileScreen() {
       ) : null}
 
       <BottomButtons>
-        <ButtonHandler
-          buttons={[
-            {
-              text: 'Send Message',
-              variant: 'primary',
-              onPress: async () => {
-                nostrLog.info('user.profile.send_message', { pubkey });
-                router.navigate({
-                  pathname: '/(user-flow)/userMessages' as any,
-                  params: { pubkey },
-                });
-              },
-            },
-          ]}
-        />
+        <SendMessageMenu pubkey={pubkey} displayName={displayName} />
       </BottomButtons>
     </Screen>
   );

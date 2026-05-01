@@ -5,6 +5,8 @@ import {
   type NostrProfileResponse,
   type TopFollower,
 } from '@/shared/lib/apiClient';
+import { resolveIdentityName } from '@/shared/lib/identity';
+import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { log } from '@/shared/lib/logger';
 
 export type { TopFollower };
@@ -58,9 +60,14 @@ export function getFollowersWithProfiles(topFollowers: TopFollower[]): TopFollow
   return topFollowers.filter((f) => f.name || f.displayName || f.picture || f.image);
 }
 
-/** Best available display name for a follower, falling back to truncated npub. */
+/** Best available display name for a follower. Hierarchy matches the rest
+ *  of the app: nostr metadata → deterministic word pair seeded by hex
+ *  pubkey (decoded from the npub). */
 export function getFollowerDisplayName(follower: TopFollower): string {
-  return follower.displayName || follower.name || follower.npub.slice(0, 12) + '...';
+  return resolveIdentityName({
+    pubkey: npubToPubkey(follower.npub) || follower.npub,
+    nostrProfile: { displayName: follower.displayName, name: follower.name },
+  });
 }
 
 /** Best available picture URL for a follower. */

@@ -9,6 +9,7 @@ import {
   isLiquidGlassTabBarAvailable,
 } from '@/shared/blocks/LiquidGlassTabBar';
 import { Expo55NativeTabs, isExpo55NativeTabsSupported } from '@/navigation/nativeTabs';
+import { WhitenoiseSetupBanner } from '@/features/whitenoise/components/WhitenoiseSetupBanner';
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -72,13 +73,14 @@ export default function TabLayout() {
               <Expo55NativeTabs.Trigger.Label>Contacts</Expo55NativeTabs.Trigger.Label>
             </Expo55NativeTabs.Trigger>
 
-            <Expo55NativeTabs.Trigger name="explore">
+            <Expo55NativeTabs.Trigger name="ai">
               <Expo55NativeTabs.Trigger.Icon
-                sf={{ default: 'paperplane', selected: 'paperplane.fill' }}
+                sf={{ default: 'brain', selected: 'brain' }}
               />
-              <Expo55NativeTabs.Trigger.Label>Explore</Expo55NativeTabs.Trigger.Label>
+              <Expo55NativeTabs.Trigger.Label>AI</Expo55NativeTabs.Trigger.Label>
             </Expo55NativeTabs.Trigger>
           </Expo55NativeTabs>
+          <WhitenoiseSetupBanner />
         </View>
       </BackgroundProvider>
     );
@@ -128,14 +130,15 @@ export default function TabLayout() {
             }}
           />
           <Tabs.Screen
-            name="explore"
+            name="ai"
             options={{
-              title: 'Explore',
-              tabBarIcon: ({ color }) => <IconSymbol name="paperplane" color={color} size={24} />,
+              title: 'AI',
+              tabBarIcon: ({ color }) => <IconSymbol name="brain" color={color} size={24} />,
             }}
           />
         </Tabs>
         {hasAndroidLiquidGlass ? <GlobalLiquidGlassTabsOverlay /> : null}
+        <WhitenoiseSetupBanner />
       </View>
     </BackgroundProvider>
   );

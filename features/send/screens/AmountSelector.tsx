@@ -15,6 +15,7 @@ import {
   type AmountEntryTransactionType,
 } from '@/shared/ui/composed/AmountEntryView';
 import { Screen, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
+import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 
 import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
 
@@ -117,7 +118,17 @@ export function AmountSelector({
     }));
   }, [actions.next]);
 
+  // The AI-credit top-up flow lands on this screen via a hand-rolled
+  // navigation (`useRoutstrTopUpStore.start()` → `/(send-flow)/amount`),
+  // not through a QR/paste entry point. In that flow the only sensible
+  // action is "Next" — Paste / Scan-QR don't apply because the
+  // destination is fixed (the AI-credit wallet, not an arbitrary
+  // recipient). Suppress the extras while the top-up flow is active so
+  // the screen reduces to the keypad + Next button.
+  const isRoutstrTopUpActive = useRoutstrTopUpStore((s) => s.active);
+
   const extraButtons = useMemo((): ButtonHandlerProps['buttons'] => {
+    if (isRoutstrTopUpActive) return [];
     const buttons: ButtonHandlerProps['buttons'] = [];
     if (actions.paste.available) {
       buttons.push({
@@ -146,7 +157,7 @@ export function AmountSelector({
       });
     }
     return buttons;
-  }, [actions.paste, actions.scanQr]);
+  }, [isRoutstrTopUpActive, actions.paste, actions.scanQr]);
 
   const nextLoading = machineBusy || actions.next.loading;
   const nextDisabled = !actions.next.available;

@@ -6,6 +6,8 @@ coco/
 node_modules/
 .expo/
 dist/
+!vendor/**/dist/
+!vendor/**/dist/**
 web-build/
 *.orig.*
 *.jks

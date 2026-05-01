@@ -25,7 +25,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { getUsername } from '@/shared/lib/username';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfileStore, ProfileEntry } from '@/shared/stores/global/profileStore';
@@ -189,7 +189,10 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
                 state={profile.cachedPicture ? 'image' : 'fallback'}
                 seed={profile.pubkey}
                 picture={profile.cachedPicture}
-                name={profile.cachedDisplayName || getUsername(profile.pubkey)}
+                name={resolveIdentityName({
+                  pubkey: profile.pubkey,
+                  overrideName: profile.cachedDisplayName,
+                })}
                 size={30}
               />
             </TouchableOpacity>
@@ -301,7 +304,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
           pathname === '/(drawer)/(tabs)/' ||
           pathname.includes('(tabs)/index') ||
           (pathname.includes('(tabs)') &&
-            !pathname.includes('explore') &&
+            !pathname.includes('ai') &&
             !pathname.includes('feed') &&
             !pathname.includes('contacts'))
         );
@@ -312,7 +315,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
       if (route.includes('(tabs)/contacts') && pathname.includes('contacts')) {
         return true;
       }
-      if (route.includes('(tabs)/explore') && pathname.includes('explore')) {
+      if (route.includes('(tabs)/ai') && pathname.includes('/ai')) {
         return true;
       }
       if (route.includes('settings') && pathname.includes('settings')) {

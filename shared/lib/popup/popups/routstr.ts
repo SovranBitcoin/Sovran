@@ -19,14 +19,14 @@ export function routstrWalletCreatedPopup(params: { balance: string }): void {
 
 export function routstrInitializedPopup(params?: { balance?: string }): void {
   const message = params?.balance
-    ? `Routstr wallet initialized! Balance: ${params.balance}`
-    : 'Routstr wallet initialized! You can now use Routstr AI.';
+    ? `AI wallet initialized! Balance: ${params.balance}`
+    : 'AI wallet initialized! You can now chat with the AI.';
   popup({ message, icon: 'icon:mingcute:lightning-fill', type: 'success' });
 }
 
 export function routstrTransactionFailedPopup(overrides?: TextOverrides): void {
   popup({
-    message: 'Failed to process Routstr transaction',
+    message: 'AI transaction failed',
     icon: 'icon:mdi:alert-circle',
     type: 'error',
     ...overrides,

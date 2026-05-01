@@ -42,6 +42,7 @@ import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/Sect
 import { HistoryEntryHeader } from '@/features/transactions';
 import Icon from 'assets/icons';
 import { Screen, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -436,7 +437,11 @@ const SelectedPreviewPill = React.memo(function SelectedPreviewPill({
   surfaceSecondary,
 }: SelectedPreviewPillProps) {
   const named = selected[selected.length - 1];
-  const label = named.nickname ?? named.pubkey?.slice(0, 8) ?? named.peerID?.slice(0, 8) ?? '?';
+  const label = resolveIdentityName({
+    pubkey: named.pubkey ?? named.peerID,
+    bleNickname: named.nickname,
+    fallbackName: '?',
+  });
 
   const ringSize = STACK_AVATAR_SIZE + 4;
   const ringRadius = ringSize / 2;

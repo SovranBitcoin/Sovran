@@ -41,6 +41,10 @@ export interface ActionMenuVariant {
   description?: string;
   /** iconify name, rendered as the item's leading glyph. */
   icon?: string;
+  /** Custom leading glyph node (takes precedence over `icon`). Use when the
+   * variant needs an emoji or other non-iconify visual — e.g. the Marmot
+   * protocol identity. */
+  iconNode?: React.ReactNode;
   /** Hides the item from tap but keeps it visible with the reason as description. */
   isDisabled?: boolean;
   /** Reason the variant is unavailable — rendered as the description when disabled. */
@@ -259,7 +263,7 @@ function renderMenuPortal(
               void v.onPress();
             }}>
             <HStack align="center" gap={10} style={{ flex: 1 }}>
-              {v.icon ? <Icon name={v.icon} size={18} /> : null}
+              {v.iconNode ?? (v.icon ? <Icon name={v.icon} size={18} /> : null)}
               <View style={{ flex: 1 }}>
                 <Menu.ItemTitle>{v.label}</Menu.ItemTitle>
                 {(v.description || (v.isDisabled && v.reason)) && (

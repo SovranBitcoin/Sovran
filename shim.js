@@ -2,6 +2,13 @@ import 'text-encoding-polyfill';
 import 'react-native-get-random-values';
 import './polyfills';
 
+// Install react-native-quick-crypto FIRST so `globalThis.crypto.subtle` is
+// available before any crypto consumer initializes. ts-mls / @hpke/core (used
+// by White Noise / Marmot MLS) requires SubtleCrypto for KEM operations,
+// which Hermes does not provide natively.
+import { install as installQuickCrypto } from 'react-native-quick-crypto';
+installQuickCrypto();
+
 import * as c from 'expo-crypto';
 
 if (

@@ -12,7 +12,7 @@ export function noWalletAvailablePopup(): void {
 export function noApiKeyPopup(): void {
   popup({
     message: 'No API key configured',
-    text: 'Please set up your Routstr API key.',
+    text: 'Please set up your AI credit key.',
     icon: 'icon:solar:key-bold',
     type: 'error',
   });

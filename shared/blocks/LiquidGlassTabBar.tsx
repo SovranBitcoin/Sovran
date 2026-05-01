@@ -14,11 +14,11 @@ export const isLiquidGlassTabBarAvailable = () => {
   return Boolean(config || hasConfig);
 };
 
-const TAB_PATHS = ['/', '/explore'];
+const TAB_PATHS = ['/', '/ai'];
 
 function getTabIndexFromPathname(pathname: string): number | null {
   if (pathname === '/' || pathname === '/index' || pathname.startsWith('/index/')) return 0;
-  if (pathname === '/explore' || pathname.startsWith('/explore/')) return 1;
+  if (pathname === '/ai' || pathname.startsWith('/ai/')) return 1;
   return null;
 }
 

@@ -34,7 +34,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { EmojiPickerContent } from '@/shared/lib/popup/sheets';
+import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
+import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
 import { SHEET_LAYOUT_CONFIG } from '@/shared/lib/popup/sheets/sheetLayoutConfig';
 import type {
   CustomSheetFooterConfig,
@@ -215,6 +216,11 @@ function SubmessageRenderer({
   return <>{submessage}</>;
 }
 
+// Custom-sheet registry. Surfaces here render through heroui's standalone
+// `<BottomSheet>`, which (unlike heroui `<Menu presentation="bottom-sheet">`)
+// reliably mounts inside iOS FullWindowOverlay — i.e. above route modals.
+// Use this lane only when the menu lane can't deliver above-modal stacking;
+// for everything else, prefer `actionMenuPopup`.
 const CUSTOM_SHEET_CONTENT: Record<
   keyof ActionSheetPayloads,
   React.ComponentType<{
@@ -230,6 +236,17 @@ const CUSTOM_SHEET_CONTENT: Record<
   }>
 > = {
   'emoji-picker': EmojiPickerContent as React.ComponentType<{
+    payload: unknown;
+    close: () => void;
+    pushCustomPage: <K extends keyof ActionSheetPayloads>(
+      sheetId: K,
+      payload: ActionSheetPayloads[K]
+    ) => void;
+    popCustomPage: () => void;
+    canPop: boolean;
+    setFooterConfig: (config: CustomSheetFooterConfig | null) => void;
+  }>,
+  'model-picker': ModelPickerContent as React.ComponentType<{
     payload: unknown;
     close: () => void;
     pushCustomPage: <K extends keyof ActionSheetPayloads>(
@@ -557,13 +574,34 @@ function SheetPopup() {
           }
           handleComponent={
             isCustom
-              ? () => null
+              ? // Custom snapPoints sheets render the same chrome as
+                // `ActionMenuHost`'s `<Menu>` — heroui's default handle
+                // indicator. Suppressing it (`() => null`) leaves no top
+                // breathing room and the title sits flush against the
+                // sheet edge, which makes the picker look cramped vs
+                // Select Profile. Only the legacy `contentHeight` mode
+                // keeps the suppression (those sheets size to their own
+                // content and don't expect a handle).
+                layoutConfig?.mode === 'snapPoints'
+                ? undefined
+                : () => null
               : hasLiveStatus
                 ? (props: any) => <LiveSheetHandle {...props} animatedStyle={liveBackgroundStyle} />
                 : undefined
           }
           className={isCustom ? undefined : 'mx-4'}
-          backgroundClassName={isCustom ? 'bg-surface' : 'bg-surface rounded-[32px]'}
+          // Custom snapPoints sheets render the same chrome as `ActionMenuHost`
+          // (`<Menu presentation="bottom-sheet">`), which uses `bg-overlay` for
+          // its content background. Match it here so surfaces routed through
+          // PopupHost (e.g. emoji picker — needs FullWindowOverlay above route
+          // modals) are visually indistinguishable from menu-lane surfaces.
+          backgroundClassName={
+            isCustom
+              ? layoutConfig?.mode === 'snapPoints'
+                ? 'bg-overlay'
+                : 'bg-surface'
+              : 'bg-surface rounded-[32px]'
+          }
           backgroundComponent={
             hasLiveStatus
               ? (props: any) => (
@@ -572,7 +610,30 @@ function SheetPopup() {
               : undefined
           }
           contentContainerClassName={
-            isCustom && layoutConfig?.mode === 'snapPoints' ? 'h-full pt-2' : undefined
+            // Zero out heroui's default `p-5` and `pb-safe-offset-3` for
+            // custom snapPoints sheets — exact same recipe as
+            // `ActionMenuHost`'s `'h-full px-0 pt-0 pb-0'` for tabbed
+            // menus. The inner content (e.g. `SectionAnchorList`) handles
+            // its own bottom inset via `contentBottomInset` so the last
+            // row clears the iOS home indicator without the wrapper
+            // forcing a visible padding band beneath the BlurView.
+            isCustom && layoutConfig?.mode === 'snapPoints'
+              ? 'h-full px-0 pt-0 pb-0'
+              : undefined
+          }
+          // Patched flag (see patches/heroui-native+1.0.2.patch): swap
+          // heroui's `BottomSheetView` wrapper for a plain RN `View` so
+          // the nested gorhom-registered scrollable inside the custom
+          // sheet's content (e.g. the `BottomSheetScrollView` that
+          // `SectionAnchorList`'s `LegendList` uses via
+          // `renderScrollComponent`) stays the active scrollable. Without
+          // this, heroui's wrapper claims registration as a `VIEW`-type
+          // scrollable on mount and pan gestures dismiss the sheet
+          // instead of scrolling the list.
+          contentContainerProps={
+            isCustom && layoutConfig?.mode === 'snapPoints'
+              ? ({ useDirectView: true } as never)
+              : undefined
           }>
           <SheetContent
             payload={payload}

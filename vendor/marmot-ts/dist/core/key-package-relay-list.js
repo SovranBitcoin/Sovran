@@ -1,0 +1,89 @@
+import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
+import { KEY_PACKAGE_RELAY_LIST_KIND, KEY_PACKAGE_RELAY_LIST_RELAY_TAG, } from "./protocol.js";
+import { unixNow } from "../utils/nostr.js";
+/**
+ * Gets the relay URLs from a kind 10051 event.
+ * These relays indicate where a user publishes their KeyPackages.
+ *
+ * @param event - The kind 10051 event containing relay information
+ * @returns Array of relay URLs, or empty array if none found
+ *
+ * @example
+ * ```typescript
+ * const event = {
+ *   kind: 10051,
+ *   tags: [
+ *     ["relay", "wss://inbox.nostr.wine"],
+ *     ["relay", "wss://myrelay.nostr1.com"]
+ *   ],
+ *   // ... other fields
+ * };
+ * const relays = getKeyPackageRelayList(event);
+ * // Returns: ["wss://inbox.nostr.wine", "wss://myrelay.nostr1.com"]
+ * ```
+ */
+export function getKeyPackageRelayList(event) {
+    return event.tags
+        .filter((tag) => tag[0] === KEY_PACKAGE_RELAY_LIST_RELAY_TAG && tag[1])
+        .map((tag) => tag[1])
+        .filter(isValidRelayUrl)
+        .map(normalizeRelayUrl);
+}
+/**
+ * Validates a kind 10051 relay list event.
+ *
+ * @param event - The event to validate
+ * @returns True if the event is a valid kind 10051 relay list event
+ *
+ * @example
+ * ```typescript
+ * const isValid = isValidKeyPackageRelayListEvent(event);
+ * if (isValid) {
+ *   const relays = getKeyPackageRelayList(event);
+ * }
+ * ```
+ */
+export function isValidKeyPackageRelayListEvent(event) {
+    return (event.kind === KEY_PACKAGE_RELAY_LIST_KIND &&
+        getKeyPackageRelayList(event).length > 0);
+}
+/**
+ * Creates an unsigned Nostr event (kind 10051) for a key package relay list.
+ * The event specifies where a user publishes their key packages.
+ *
+ * @param options - Configuration for creating the relay list event
+ * @returns An unsigned Nostr event ready to be signed and published
+ *
+ * @example
+ * ```typescript
+ * const event = createKeyPackageRelayListEvent({
+ *   pubkey: "02a1633cafe37eeebe2b39b4ec5f3d74c35e61fa7e7e6b7b8c5f7c4f3b2a1b2c3d",
+ *   relays: ["wss://inbox.nostr.wine", "wss://myrelay.nostr1.com"],
+ *   client: "marmot-examples"
+ * });
+ * ```
+ */
+export function createKeyPackageRelayListEvent(options) {
+    const { pubkey, relays, client } = options;
+    // Validate relay URLs
+    const validRelays = relays
+        .filter((relay) => relay.trim().length > 0 && URL.canParse(relay))
+        .map(normalizeRelayUrl);
+    // Build tags (empty array allowed - users can have no key package relays)
+    const tags = validRelays.map((relay) => [
+        KEY_PACKAGE_RELAY_LIST_RELAY_TAG,
+        relay,
+    ]);
+    // Add client tag if provided
+    if (client) {
+        tags.push(["client", client]);
+    }
+    return {
+        kind: KEY_PACKAGE_RELAY_LIST_KIND,
+        created_at: unixNow(),
+        tags,
+        content: "",
+        pubkey,
+    };
+}
+//# sourceMappingURL=key-package-relay-list.js.map
