@@ -10,7 +10,7 @@ import { StyleSheet, Pressable, Linking, Dimensions, Platform } from 'react-nati
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -575,7 +575,7 @@ export const InlineMention = React.memo(function InlineMention({
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => {
-        router.navigate({ pathname: '/(user-flow)/profile' as any, params: { pubkey } });
+        router.push({ pathname: '/(user-flow)/profile' as any, params: { pubkey } });
       }}>
       @{label}
     </Text>

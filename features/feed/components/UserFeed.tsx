@@ -25,7 +25,7 @@
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
 import { StyleSheet, InteractionManager, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { log, Log } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -388,7 +388,7 @@ export const RepostCard = React.memo(function RepostCard({
           onPressIn={suppressThreadTapStart}
           onPressOut={suppressThreadTapEnd}
           onPress={() =>
-            router.navigate({
+            router.push({
               pathname: '/(user-flow)/profile' as any,
               params: { pubkey: reposterPubkey },
             })

@@ -427,6 +427,7 @@ export function createDefaultOperations(
           reviewCount: entry.reviewCount,
           auditScore: entry.auditScore,
           auditState: entry.auditState,
+          auditTotalOps: entry.auditTotalOps,
           contactFollowers: entry.contactFollowers,
           contactReputation: entry.contactReputation,
         };

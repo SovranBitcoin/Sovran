@@ -31,7 +31,7 @@ import {
   type ScreenActionsBridge,
 } from 'coco-payment-ux/react';
 
-import { log } from '@/shared/lib/logger';
+import { log, paymentLog } from '@/shared/lib/logger';
 import { useReceivePaymentUXExtras } from '@/features/receive/providers/ReceivePaymentUXExtras';
 import {
   createSovranExecuteMintQuote,
@@ -220,9 +220,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         });
         return;
       }
-      useTransactionDistributionStore
-        .getState()
-        .setDistribution(payload.quoteId, 'displayed');
+      useTransactionDistributionStore.getState().setDistribution(payload.quoteId, 'displayed');
       log.debug('payment.mint_quote.displayed_inference.applied', {
         quoteId: payload.quoteId,
         operationId: payload.operationId,
@@ -257,9 +255,18 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
     () => ({
       scanQr: async ({ unit, context }) => {
         if (context === 'receive') {
-          const granted = receiveExtras?.requestCameraPermission
-            ? await receiveExtras.requestCameraPermission()
-            : false;
+          if (!receiveExtras?.requestCameraPermission) {
+            // The Receive screen mounts inside `ReceivePaymentUXExtrasProvider`,
+            // which supplies `requestCameraPermission`. If we got here without
+            // it the provider isn't wrapping the route — log loudly so we can
+            // investigate, and fall through to the generic camera path so the
+            // user isn't stuck with a dead button.
+            paymentLog.warn('receive.scan.no_permission_provider');
+            router.navigate({ pathname: '/(receive-flow)/camera' as any, params: { unit } });
+            return;
+          }
+          const granted = await receiveExtras.requestCameraPermission();
+          paymentLog.info('receive.scan.permission', { granted });
           if (!granted) return;
           router.navigate({
             pathname: '/(receive-flow)/camera' as any,
@@ -348,8 +355,22 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           unsubscribes.push(
             manager.on(
               'mint-op:quote-state-changed',
-              ({ operationId, quoteId, state }: { mintUrl: string; operationId: string; quoteId: string; state: string }) => {
-                log.info('send.mint_quote_state_changed', { screenType, operationId, quoteId, state });
+              ({
+                operationId,
+                quoteId,
+                state,
+              }: {
+                mintUrl: string;
+                operationId: string;
+                quoteId: string;
+                state: string;
+              }) => {
+                log.info('send.mint_quote_state_changed', {
+                  screenType,
+                  operationId,
+                  quoteId,
+                  state,
+                });
                 callback({ type: 'mint', quoteId, state, operationId } as unknown as EntryRecord);
               }
             )
@@ -414,8 +435,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
                     manager.wallet.balances
                       .byMint({ mintUrls: [mintUrl] })
                       .catch(
-                        () =>
-                          ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>
+                        () => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>
                       ),
                   ]);
                   callback({
@@ -572,9 +592,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           entry?.type === 'mint' && typeof entry?.quoteId === 'string'
             ? (entry.quoteId as string)
             : entryId;
-        const distribution = useTransactionDistributionStore
-          .getState()
-          .distributions[distKey];
+        const distribution = useTransactionDistributionStore.getState().distributions[distKey];
         const source = scan?.source ?? distribution?.source ?? null;
         if (!source) return null;
         const labels: Record<string, string> = {

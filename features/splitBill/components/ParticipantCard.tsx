@@ -33,15 +33,7 @@ import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import {
-  getContrastColors,
-  useDominantColor,
-} from '@/shared/lib/colorExtraction';
-// `#F7931A` — bitcoin orange, already used in `shared/lib/themeEngine.ts`
-// as `orange-300` and in `shared/lib/map/mapClustering.ts` for the same
-// semantic cue ("bitcoin-accepting spot"). Using the raw hex keeps the
-// pill legible on any seeded gradient regardless of theme.
-const BTC_ORANGE = '#F7931A';
+import { getContrastColors, useDominantColor } from '@/shared/lib/colorExtraction';
 import { AnimatedQRCode } from '@/shared/ui/composed/QRCode';
 import { Log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -53,6 +45,11 @@ import type {
   SplitBillGroup,
   SplitBillParticipant,
 } from '@/shared/stores/profile/splitBillTransactionsStore';
+// `#F7931A` — bitcoin orange, already used in `shared/lib/themeEngine.ts`
+// as `orange-300` and in `shared/lib/map/mapClustering.ts` for the same
+// semantic cue ("bitcoin-accepting spot"). Using the raw hex keeps the
+// pill legible on any seeded gradient regardless of theme.
+const BTC_ORANGE = '#F7931A';
 
 export interface ParticipantCardProps {
   group: SplitBillGroup;
@@ -97,11 +94,16 @@ export function ParticipantCard({
   const isPaid = participant.paymentState === 'paid';
   const isExpired = participant.paymentState === 'expired';
   const isFailed = participant.deliveryState === 'failed';
+  const isSelf = participant.source === 'self' || participant.channel === 'self';
   const qrDimmed = isPaid || isExpired;
   const canView = !!participant.mintQuoteId && !!onView;
 
   const title = participant.nickname ?? seed.slice(0, 12);
 
+  // Internal (`self`) participants are paid via an internal coco transfer —
+  // there's no Lightning invoice to share. Show a different placeholder
+  // (avatar glyph + "Sending to @name…") instead of the spinner-and-
+  // "Generating invoice…" copy that confused the user during testing.
   const qrBody = participant.bolt11 ? (
     <View style={{ opacity: qrDimmed ? 0.4 : 1 }}>
       <AnimatedQRCode
@@ -110,6 +112,13 @@ export function ParticipantCard({
         size={QR_BLOCK_SIZE}
         padding={10}
       />
+    </View>
+  ) : isSelf ? (
+    <View style={styles.qrPlaceholder}>
+      <Icon name="mdi:account-arrow-right" size={32} color="rgba(255,255,255,0.85)" />
+      <Text size={12} style={{ color: 'rgba(255,255,255,0.85)', marginTop: 8 }}>
+        {`Sending to ${title}…`}
+      </Text>
     </View>
   ) : (
     <View style={styles.qrPlaceholder}>
@@ -230,10 +239,7 @@ export function ParticipantCard({
             style={({ pressed }) => [
               styles.viewButton,
               {
-                backgroundColor: opacity(
-                  '#FFFFFF',
-                  !canView ? 0.1 : pressed ? 0.38 : 0.22
-                ),
+                backgroundColor: opacity('#FFFFFF', !canView ? 0.1 : pressed ? 0.38 : 0.22),
               },
             ]}
             testID={`split-bill-card-view-${participant.id}`}>

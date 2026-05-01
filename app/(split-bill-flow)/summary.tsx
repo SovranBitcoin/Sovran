@@ -12,7 +12,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+
+import { useGuardedRouter as useRouter } from '@/shared/hooks/useGuardedRouter';
 import { useHeaderHeight } from '@react-navigation/elements';
 import opacity from 'hex-color-opacity';
 
@@ -148,10 +150,17 @@ export default function SplitBillSummaryScreen() {
     setConfirming(true);
     try {
       await confirm(groupId);
+      // After confirm transitions the group to `awaiting`, hand the user off
+      // to the Split Bill detail (per-participant deck + payment watcher).
+      // Replace so back doesn't drop us on a now-stale summary screen.
+      router.replace({
+        pathname: '/(split-bill-flow)/detail' as any,
+        params: { groupId },
+      });
     } finally {
       setConfirming(false);
     }
-  }, [groupId, confirming, confirm]);
+  }, [groupId, confirming, confirm, router]);
 
   const handleDone = useCallback(async () => {
     router.dismissAll();

@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View as RNView } from 'react-native';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
+
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';

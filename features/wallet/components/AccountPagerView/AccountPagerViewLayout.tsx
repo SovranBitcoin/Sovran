@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform } from 'react-native';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import 'react-native-get-random-values';
 import Swiper from 'react-native-web-infinite-swiper';
 

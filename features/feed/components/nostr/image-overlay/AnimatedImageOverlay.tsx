@@ -27,7 +27,7 @@ import Animated, {
 import { scheduleOnUI } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Log } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';

@@ -53,11 +53,7 @@ function isMintInfoObject(value: unknown): value is Record<string, unknown> {
   );
 }
 
-function deriveAuditScore(
-  n_mints: number,
-  n_melts: number,
-  n_errors: number
-): number | undefined {
+function deriveAuditScore(n_mints: number, n_melts: number, n_errors: number): number | undefined {
   const totalOps = n_mints + n_melts;
   if (totalOps <= 0) return undefined;
   const successRate = 1 - n_errors / totalOps;
@@ -89,10 +85,7 @@ async function resolveNostrProfile(
  */
 export type MintInfoLookup = (mintUrl: string) => Promise<GetInfoResponse | null>;
 
-async function fetchEntry(
-  mintUrl: string,
-  getMintInfo: MintInfoLookup
-): Promise<MintCatalogEntry> {
+async function fetchEntry(mintUrl: string, getMintInfo: MintInfoLookup): Promise<MintCatalogEntry> {
   const [auditRes, reviewRes] = await Promise.all([
     auditMint({ mintUrl }).catch(() => null),
     reviewMint({ mintUrl }).catch(() => null),
@@ -106,6 +99,7 @@ async function fetchEntry(
     const audit = auditRes.value;
     entry.auditScore = deriveAuditScore(audit.n_mints, audit.n_melts, audit.n_errors);
     entry.auditState = audit.state;
+    entry.auditTotalOps = audit.n_mints + audit.n_melts;
     // The auditor returns `info` in inconsistent shapes (object, null, "")
     // depending on whether it could reach the upstream mint. Only treat a
     // populated NUT-06-shaped object as usable; otherwise fetch direct so
@@ -115,9 +109,7 @@ async function fetchEntry(
       info = await getMintInfo(mintUrl).catch(() => null);
     }
     if (info) {
-      useAuditMintStore
-        .getState()
-        .setCached(mintUrl, audit, info as unknown as GetInfoResponse);
+      useAuditMintStore.getState().setCached(mintUrl, audit, info as unknown as GetInfoResponse);
     }
   } else {
     // … otherwise hit the mint directly for NUT-06 info so we can still

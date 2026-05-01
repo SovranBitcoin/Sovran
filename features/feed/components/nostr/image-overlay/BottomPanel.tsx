@@ -10,7 +10,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
@@ -241,7 +241,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
         {/* Author row */}
         <Pressable
           onPress={() => {
-            router.navigate({
+            router.push({
               pathname: '/(user-flow)/profile' as any,
               params: { pubkey: event.pubkey },
             });
@@ -398,7 +398,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
       <View style={[styles.wrap, absoluteBarStyles.bar]}>
         <Pressable
           onPress={() => {
-            router.navigate({
+            router.push({
               pathname: '/(user-flow)/profile' as any,
               params: { pubkey: event.pubkey },
             });

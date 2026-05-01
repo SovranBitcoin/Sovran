@@ -140,6 +140,9 @@ export interface MintCatalogEntry {
   auditScore?: number;
   /** Auditor state string, e.g. 'OK' or 'ERROR'. */
   auditState?: string;
+  /** Total mint+melt operations the auditor has observed for this mint.
+   *  Rendered as `(123)` next to the audit %. */
+  auditTotalOps?: number;
   /** Follower count of the mint operator's Nostr identity. */
   contactFollowers?: number;
   /** Reputation score (0-100) of the mint operator's Nostr identity. */
@@ -176,6 +179,8 @@ export interface MintListItem {
   auditScore?: number;
   /** Auditor state string, e.g. 'OK' or 'ERROR'. */
   auditState?: string;
+  /** Total mint+melt operations the auditor has observed for this mint. */
+  auditTotalOps?: number;
   /** Whether this mint can send the requested amount offline (exact proof composition). */
   worksOffline?: boolean;
   /** Whether the mint was unreachable during enrichment. */
@@ -200,7 +205,7 @@ export interface MintReviewInfo {
   description?: string;
   longDescription?: string;
   motd?: string;
-  contact?: Array<{ method: string; info: string }>;
+  contact?: { method: string; info: string }[];
   nuts?: number[];
   balance: number;
   unit: string;

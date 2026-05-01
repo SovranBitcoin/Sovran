@@ -7,15 +7,17 @@
  */
 
 import { Keyboard } from 'react-native';
-import { router } from 'expo-router';
 
 import { paymentLog } from '@/shared/lib/logger';
+import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 
 export function navigateToContact(pubkey: string, mintUrl?: string): void {
   Keyboard.dismiss();
   if (!pubkey) return;
   paymentLog.info('contact.item.press', { pubkey, ...(mintUrl ? { mintUrl } : {}) });
-  router.navigate({
+  // push (not navigate) so each profile pushes a new stack entry; tapping a
+  // follower from inside a profile then back returns to the previous one.
+  guardedRouter.push({
     pathname: '/(user-flow)/profile' as any,
     params: { pubkey, ...(mintUrl ? { mintUrl } : {}) },
   });

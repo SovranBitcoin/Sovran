@@ -1,21 +1,14 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react';
-import {
-  ScrollView,
-  Animated,
-  Alert,
-  Linking,
-  Easing,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
-import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
+import { ScrollView, Animated, Linking, Easing, StyleSheet, TouchableOpacity } from 'react-native';
+import { Stack, useLocalSearchParams, Link } from 'expo-router';
+
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
-import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { Card } from '@/shared/ui/composed/Card';
 import { Section } from '@/features/settings/screens/SettingsScreen';
 import Icon, { CurrencyIcon } from 'assets/icons';
@@ -437,7 +430,7 @@ export function MintInfoScreen() {
           await Linking.openURL(`https://x.com/${info.replace('@', '')}`);
           break;
         case 'nostr':
-          router.navigate({ pathname: '/(user-flow)/profile', params: { npub: info } });
+          router.push({ pathname: '/(user-flow)/profile', params: { npub: info } });
           break;
         default:
           await Clipboard.setStringAsync(info);
@@ -448,7 +441,7 @@ export function MintInfoScreen() {
   }, []);
 
   const contact = entry?.contact as
-    | Array<{ method: string; info: import('coco-payment-ux').FormattedString }>
+    | { method: string; info: import('coco-payment-ux').FormattedString }[]
     | undefined;
 
   return (

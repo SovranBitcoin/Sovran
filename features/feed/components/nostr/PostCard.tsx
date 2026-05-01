@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
+
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -138,7 +139,8 @@ export const PostCard = React.memo(function PostCard({
   }, [event.id]);
 
   const navigateToProfile = useCallback(() => {
-    router.navigate({
+    // push so each profile pushes a new stack entry — see navigateToContact.
+    router.push({
       pathname: '/(user-flow)/profile' as any,
       params: { pubkey: event.pubkey },
     });
@@ -202,7 +204,12 @@ export const PostCard = React.memo(function PostCard({
                   name={displayName}
                 />
                 <VStack style={sharedStyles.flex1}>
-                  <Text bold size={15} style={textPrimary} numberOfLines={1} fallback={nameFallback}>
+                  <Text
+                    bold
+                    size={15}
+                    style={textPrimary}
+                    numberOfLines={1}
+                    fallback={nameFallback}>
                     {displayName}
                   </Text>
                   <Text semibold size={13} style={textMuted}>

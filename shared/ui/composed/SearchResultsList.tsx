@@ -14,8 +14,9 @@
 import React, { useCallback, useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
-import { router } from 'expo-router';
 
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import {
   useAllSearchResults,
   type AllSearchResult,
@@ -83,6 +84,7 @@ export function SearchResultsList({
   ListEmptyComponent = NoResultsFound,
 }: SearchResultsListProps) {
   const { results, loading } = useAllSearchResults(searchQuery);
+  const tabBarPadding = useTabBarBottomPadding();
 
   const showNoResults = useMemo(() => {
     const trimmed = searchQuery.trim();
@@ -132,7 +134,7 @@ export function SearchResultsList({
         isLoadingProfile: true,
         score: 0,
       })),
-    [],
+    []
   );
 
   return (
@@ -145,7 +147,11 @@ export function SearchResultsList({
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="always"
         ListEmptyComponent={renderEmpty}
-        contentContainerStyle={showNoResults ? styles.emptyList : undefined}
+        contentContainerStyle={
+          showNoResults
+            ? [styles.emptyList, { paddingBottom: tabBarPadding }]
+            : { paddingBottom: tabBarPadding }
+        }
       />
     </View>
   );

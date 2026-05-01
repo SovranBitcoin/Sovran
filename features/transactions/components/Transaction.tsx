@@ -7,8 +7,9 @@ import {
   ReceiveHistoryEntry,
   SendHistoryEntry,
 } from '@cashu/coco-core';
-import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
+
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import Icon from 'assets/icons';
 import { SwipeableRow } from '@/features/transactions/components/SwipeableRow';
@@ -121,7 +122,6 @@ const useHistoryEntry = (historyEntry: HistoryEntry) => {
   const handlePress = useCallback((): void => {
     log.debug('transaction.press', { type: historyEntry.type, id: historyEntry.id });
 
-    // Using router.navigate instead of router.push to prevent duplicate navigation
     switch (historyEntry.type) {
       case 'mint': {
         // Coco uses 'mint' for Lightning-to-ecash (Lightning receive)

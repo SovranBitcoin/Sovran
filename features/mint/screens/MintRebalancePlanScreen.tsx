@@ -44,7 +44,7 @@ import { CocoManager } from '@/shared/lib/cashu/manager';
 import Icon from 'assets/icons';
 import { auditMint, type AuditMintResponse } from '@/shared/lib/apiClient';
 import { extractDomain } from '@/shared/lib/url';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 // StepState is imported from components/blocks/rebalance (groupSteps.ts)
 
@@ -1280,6 +1280,19 @@ export function MintRebalancePlanScreen() {
 
   const runStepsSequentially = useCallback(
     async (steps: TransferStep[], runId: number) => {
+      // Span the entire batch so log-doctor's `flows` view shows the wall-clock
+      // cost end to end. Per-step timing comes from the appendDebug
+      // step_start/step_end pairs already in `executeStep`.
+      const batchT0 = performance.now();
+      const stepsToRun = steps.filter((s) => {
+        const cur = stepStatesRef.current[s.id]?.status;
+        return cur !== 'done' && cur !== 'skipped';
+      }).length;
+      cashuLog.info('swap.batch.start', {
+        legCount: stepsToRun,
+        totalSteps: steps.length,
+        runId,
+      });
       try {
         for (const step of steps) {
           if (abortRef.current || runIdRef.current !== runId) return;
@@ -1288,8 +1301,14 @@ export function MintRebalancePlanScreen() {
           if (current === 'done' || current === 'skipped') continue;
 
           setCurrentStepId(step.id);
+          const stepT0 = performance.now();
           // Execute; if it fails, we keep going to the next step (error tolerant)
           await executeStep(step, runId);
+          cashuLog.info('swap.leg.complete', {
+            stepId: step.id,
+            duration_ms: Math.round(performance.now() - stepT0),
+            status: stepStatesRef.current[step.id]?.status,
+          });
         }
 
         if (abortRef.current || runIdRef.current !== runId) return;
@@ -1299,6 +1318,11 @@ export function MintRebalancePlanScreen() {
           useSwapTransactionsStore.getState().finalizeGroup(swapGroupIdRef.current, 'finished');
         }
       } finally {
+        cashuLog.info('swap.batch.complete', {
+          runId,
+          duration_ms: Math.round(performance.now() - batchT0),
+          aborted: abortRef.current,
+        });
         // Always reset the running ref when done
         isRunningRef.current = false;
       }
@@ -1642,184 +1666,184 @@ export function MintRebalancePlanScreen() {
         }}
       />
 
-        <View className="mx-4 my-2 rounded-2xl p-4" style={{ backgroundColor: surfaceSecondary }}>
-          <VStack gap={8}>
-            {runPlan && (
+      <View className="mx-4 my-2 rounded-2xl p-4" style={{ backgroundColor: surfaceSecondary }}>
+        <VStack gap={8}>
+          {runPlan && (
+            <View
+              className="h-1.5 overflow-hidden rounded-full"
+              style={{ backgroundColor: surfaceTertiary }}>
               <View
-                className="h-1.5 overflow-hidden rounded-full"
-                style={{ backgroundColor: surfaceTertiary }}>
-                <View
-                  className="h-1.5 rounded-full"
-                  style={{
-                    width: `${stepCounts.progressPct * 100}%`,
-                    backgroundColor: stepCounts.failed > 0 ? danger : green400,
-                  }}
-                />
-              </View>
-            )}
-            <HStack justify="space-between" align="center">
-              <Text size={14} style={{ color: fgMuted }}>
-                Total to move
-              </Text>
-              <AmountFormatter
-                amount={plan.totalAmount}
-                unit={unit}
-                size={18}
-                weight="heavy"
-                color={foreground}
+                className="h-1.5 rounded-full"
+                style={{
+                  width: `${stepCounts.progressPct * 100}%`,
+                  backgroundColor: stepCounts.failed > 0 ? danger : green400,
+                }}
               />
-            </HStack>
+            </View>
+          )}
+          <HStack justify="space-between" align="center">
+            <Text size={14} style={{ color: fgMuted }}>
+              Total to move
+            </Text>
+            <AmountFormatter
+              amount={plan.totalAmount}
+              unit={unit}
+              size={18}
+              weight="heavy"
+              color={foreground}
+            />
+          </HStack>
+          <HStack justify="space-between" align="center">
+            <Text size={14} style={{ color: fgMuted }}>
+              Steps
+            </Text>
+            <Text bold size={18} style={{ color: foreground }}>
+              {stepCounts.completed}/{plan.steps.length}
+            </Text>
+          </HStack>
+          {runPlan && stepCounts.skipped > 0 && (
             <HStack justify="space-between" align="center">
               <Text size={14} style={{ color: fgMuted }}>
-                Steps
+                Skipped
               </Text>
-              <Text bold size={18} style={{ color: foreground }}>
-                {stepCounts.completed}/{plan.steps.length}
+              <Text bold size={18} style={{ color: fgDim }}>
+                {stepCounts.skipped}
               </Text>
             </HStack>
-            {runPlan && stepCounts.skipped > 0 && (
-              <HStack justify="space-between" align="center">
-                <Text size={14} style={{ color: fgMuted }}>
-                  Skipped
-                </Text>
-                <Text bold size={18} style={{ color: fgDim }}>
-                  {stepCounts.skipped}
-                </Text>
-              </HStack>
-            )}
-            {runPlan && (
-              <HStack justify="space-between" align="center">
-                <Text size={14} style={{ color: fgMuted }}>
-                  Errors
-                </Text>
-                <Text bold size={18} style={{ color: stepCounts.failed > 0 ? danger : foreground }}>
-                  {stepCounts.failed}
-                </Text>
-              </HStack>
-            )}
-            <Text size={11} style={{ color: fgDim }}>
-              Transfers under {minTransferThreshold} sats are ignored
+          )}
+          {runPlan && (
+            <HStack justify="space-between" align="center">
+              <Text size={14} style={{ color: fgMuted }}>
+                Errors
+              </Text>
+              <Text bold size={18} style={{ color: stepCounts.failed > 0 ? danger : foreground }}>
+                {stepCounts.failed}
+              </Text>
+            </HStack>
+          )}
+          <Text size={11} style={{ color: fgDim }}>
+            Transfers under {minTransferThreshold} sats are ignored
+          </Text>
+        </VStack>
+      </View>
+
+      {alreadyBalanced && (
+        <View className="items-center p-10">
+          <VStack gap={12} align="center">
+            <Icon name="mdi:check-circle" size={48} color={green400} />
+            <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
+              Already balanced!
+            </Text>
+            <Text size={14} style={{ color: fgMuted, textAlign: 'center' }}>
+              Your current balances match the desired distribution.
             </Text>
           </VStack>
         </View>
+      )}
 
-        {alreadyBalanced && (
-          <View className="items-center p-10">
-            <VStack gap={12} align="center">
-              <Icon name="mdi:check-circle" size={48} color={green400} />
-              <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
-                Already balanced!
-              </Text>
-              <Text size={14} style={{ color: fgMuted, textAlign: 'center' }}>
-                Your current balances match the desired distribution.
-              </Text>
-            </VStack>
-          </View>
-        )}
+      {!alreadyBalanced && plan.steps.length === 0 && (
+        <View className="items-center p-10">
+          <VStack gap={12} align="center">
+            <Icon name="mdi:check-circle" size={48} color={green400} />
+            <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
+              No transfers needed
+            </Text>
+            <Text size={14} style={{ color: fgMuted, textAlign: 'center' }}>
+              All differences are below the {minTransferThreshold} sat threshold.
+            </Text>
+          </VStack>
+        </View>
+      )}
 
-        {!alreadyBalanced && plan.steps.length === 0 && (
-          <View className="items-center p-10">
-            <VStack gap={12} align="center">
-              <Icon name="mdi:check-circle" size={48} color={green400} />
-              <Text size={16} style={{ color: foreground, textAlign: 'center' }}>
-                No transfers needed
-              </Text>
-              <Text size={14} style={{ color: fgMuted, textAlign: 'center' }}>
-                All differences are below the {minTransferThreshold} sat threshold.
-              </Text>
-            </VStack>
-          </View>
-        )}
-
-        {plan.steps.length > 0 && (
-          <Animated.View layout={LinearTransition.duration(280)}>
-            <VStack gap={0} className="pt-2">
-              {groupStepsForDisplay(plan.steps, runPlan ? stepStates : {}).map((group) => {
-                if (group.chainId && group.steps.length > 1) {
-                  return (
-                    <RebalanceChainCard
-                      key={group.id}
-                      group={group}
-                      stepStates={runPlan ? stepStates : {}}
-                      mintInfoMap={mintInfoMap}
-                      unit={unit}
-                      isRunning={runStatus === 'running'}
-                      onRetry={handleRetry}
-                      onSkip={handleSkip}
-                    />
-                  );
-                }
-
-                const step = group.steps[0];
-                const state = runPlan
-                  ? stepStates[step.id] || { status: 'pending' }
-                  : { status: 'pending' as StepStatus };
+      {plan.steps.length > 0 && (
+        <Animated.View layout={LinearTransition.duration(280)}>
+          <VStack gap={0} className="pt-2">
+            {groupStepsForDisplay(plan.steps, runPlan ? stepStates : {}).map((group) => {
+              if (group.chainId && group.steps.length > 1) {
                 return (
-                  <RebalanceStepRow
-                    key={step.id}
-                    id={step.id}
-                    fromMintUrl={step.fromMintUrl}
-                    fromMintInfo={mintInfoMap[step.fromMintUrl]}
-                    toMintUrl={step.toMintUrl}
-                    toMintInfo={mintInfoMap[step.toMintUrl]}
-                    amount={step.amount}
+                  <RebalanceChainCard
+                    key={group.id}
+                    group={group}
+                    stepStates={runPlan ? stepStates : {}}
+                    mintInfoMap={mintInfoMap}
                     unit={unit}
-                    status={state.status}
-                    errorMessage={state.errorMessage}
-                    routeSuggestion={state.routeSuggestion}
-                    routingDetail={state.routingDetail}
-                    onRouteThrough={
-                      runStatus !== 'running' ? () => handleRouteThrough(step) : undefined
-                    }
-                    onRetry={
-                      runStatus !== 'running' &&
-                      state.status === 'failed' &&
-                      !String(state.errorMessage ?? '').startsWith('Payment pending.')
-                        ? () => handleRetry(step)
-                        : undefined
-                    }
-                    onSkip={runStatus !== 'running' ? () => handleSkip(step) : undefined}
-                    chainInfo={
-                      step.chainId && step.chainPath
-                        ? {
-                            chainId: step.chainId,
-                            chainPath: step.chainPath,
-                            chainHopIndex: step.chainHopIndex ?? 0,
-                            pathMintInfos: step.chainPath.map((url) => mintInfoMap[url] ?? null),
-                          }
-                        : undefined
-                    }
+                    isRunning={runStatus === 'running'}
+                    onRetry={handleRetry}
+                    onSkip={handleSkip}
                   />
                 );
-              })}
-            </VStack>
-          </Animated.View>
-        )}
+              }
 
-        {runStatus === 'finished' && plan.steps.length > 0 && swapGroupIdRef.current && (
-          <View className="px-4 pb-2 pt-3">
-            <TouchableOpacity
-              haptics
-              onPress={() => {
-                router.navigate({
-                  pathname: '/swap' as any,
-                  params: { groupId: swapGroupIdRef.current! },
-                });
-              }}>
-              <View
-                className="overflow-hidden rounded-[20px] border"
-                style={{ borderColor: surfaceTertiary, borderCurve: 'continuous' as any }}>
-                <BlurCardFrame accentColor={fgMuted}>
-                  <View className="z-[1] items-center p-3">
-                    <Text size={14} bold style={{ color: foreground }}>
-                      View Swap
-                    </Text>
-                  </View>
-                </BlurCardFrame>
-              </View>
-            </TouchableOpacity>
-          </View>
-        )}
+              const step = group.steps[0];
+              const state = runPlan
+                ? stepStates[step.id] || { status: 'pending' }
+                : { status: 'pending' as StepStatus };
+              return (
+                <RebalanceStepRow
+                  key={step.id}
+                  id={step.id}
+                  fromMintUrl={step.fromMintUrl}
+                  fromMintInfo={mintInfoMap[step.fromMintUrl]}
+                  toMintUrl={step.toMintUrl}
+                  toMintInfo={mintInfoMap[step.toMintUrl]}
+                  amount={step.amount}
+                  unit={unit}
+                  status={state.status}
+                  errorMessage={state.errorMessage}
+                  routeSuggestion={state.routeSuggestion}
+                  routingDetail={state.routingDetail}
+                  onRouteThrough={
+                    runStatus !== 'running' ? () => handleRouteThrough(step) : undefined
+                  }
+                  onRetry={
+                    runStatus !== 'running' &&
+                    state.status === 'failed' &&
+                    !String(state.errorMessage ?? '').startsWith('Payment pending.')
+                      ? () => handleRetry(step)
+                      : undefined
+                  }
+                  onSkip={runStatus !== 'running' ? () => handleSkip(step) : undefined}
+                  chainInfo={
+                    step.chainId && step.chainPath
+                      ? {
+                          chainId: step.chainId,
+                          chainPath: step.chainPath,
+                          chainHopIndex: step.chainHopIndex ?? 0,
+                          pathMintInfos: step.chainPath.map((url) => mintInfoMap[url] ?? null),
+                        }
+                      : undefined
+                  }
+                />
+              );
+            })}
+          </VStack>
+        </Animated.View>
+      )}
+
+      {runStatus === 'finished' && plan.steps.length > 0 && swapGroupIdRef.current && (
+        <View className="px-4 pb-2 pt-3">
+          <TouchableOpacity
+            haptics
+            onPress={() => {
+              router.navigate({
+                pathname: '/swap' as any,
+                params: { groupId: swapGroupIdRef.current! },
+              });
+            }}>
+            <View
+              className="overflow-hidden rounded-[20px] border"
+              style={{ borderColor: surfaceTertiary, borderCurve: 'continuous' as any }}>
+              <BlurCardFrame accentColor={fgMuted}>
+                <View className="z-[1] items-center p-3">
+                  <Text size={14} bold style={{ color: foreground }}>
+                    View Swap
+                  </Text>
+                </View>
+              </BlurCardFrame>
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
     </Screen>
   );
 }

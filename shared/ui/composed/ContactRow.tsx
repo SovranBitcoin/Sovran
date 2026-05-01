@@ -30,11 +30,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import {
-  ListRow,
-  type ListRowAvatar,
-  type ListRowIconCircle,
-} from '@/shared/ui/composed/ListRow';
+import { ListRow, type ListRowAvatar, type ListRowIconCircle } from '@/shared/ui/composed/ListRow';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import {
   RowStatsAccent,
@@ -91,6 +87,9 @@ export interface MintStatFields {
   reviewCount?: number;
   auditScore?: number;
   auditState?: string;
+  /** Total auditor-observed mint+melt operations. Rendered as `(123)` next
+   *  to the audit %. */
+  auditTotalOps?: number;
   worksOffline?: boolean;
   contactFollowers?: number;
   contactReputation?: number;
@@ -133,12 +132,7 @@ export interface SelfIdentity {
   subtitle?: string;
 }
 
-export type Identity =
-  | NostrIdentity
-  | MintIdentity
-  | BleIdentity
-  | GeohashIdentity
-  | SelfIdentity;
+export type Identity = NostrIdentity | MintIdentity | BleIdentity | GeohashIdentity | SelfIdentity;
 
 export type StatKey =
   | 'balance'
@@ -156,7 +150,7 @@ export type StatKey =
 export function nostrIdentity(
   pubkey: string,
   profile?: NostrProfileLike,
-  opts?: { isLoadingProfile?: boolean; verified?: boolean },
+  opts?: { isLoadingProfile?: boolean; verified?: boolean }
 ): NostrIdentity {
   return {
     kind: 'nostr',
@@ -172,22 +166,52 @@ export function nostrIdentity(
 
 /** Overload: accept either a full `MintListItem` or a minimal shape. */
 export function mintIdentity(item: MintListItem): MintIdentity;
-export function mintIdentity(
-  input: { mintUrl: string; displayName: string; iconUrl?: string; stats?: MintStatFields },
-): MintIdentity;
+export function mintIdentity(input: {
+  mintUrl: string;
+  displayName: string;
+  iconUrl?: string;
+  stats?: MintStatFields;
+}): MintIdentity;
 export function mintIdentity(
   input:
     | MintListItem
-    | { mintUrl: string; displayName: string; iconUrl?: string; stats?: MintStatFields },
+    | { mintUrl: string; displayName: string; iconUrl?: string; stats?: MintStatFields }
 ): MintIdentity {
   if ('balance' in input) {
-    const { mintUrl, displayName, iconUrl, balance, unit, status, kymScore, reviewCount, auditScore, auditState, worksOffline, contactFollowers, contactReputation } = input;
+    const {
+      mintUrl,
+      displayName,
+      iconUrl,
+      balance,
+      unit,
+      status,
+      kymScore,
+      reviewCount,
+      auditScore,
+      auditState,
+      auditTotalOps,
+      worksOffline,
+      contactFollowers,
+      contactReputation,
+    } = input;
     return {
       kind: 'mint',
       mintUrl,
       displayName,
       iconUrl,
-      stats: { balance, unit, status, kymScore, reviewCount, auditScore, auditState, worksOffline, contactFollowers, contactReputation },
+      stats: {
+        balance,
+        unit,
+        status,
+        kymScore,
+        reviewCount,
+        auditScore,
+        auditState,
+        auditTotalOps,
+        worksOffline,
+        contactFollowers,
+        contactReputation,
+      },
     };
   }
   return { kind: 'mint', ...input };
@@ -209,7 +233,7 @@ export function geohashIdentity(
     displayName?: string;
     transport?: 'ble' | 'nostr' | 'geohash';
     icon?: string;
-  },
+  }
 ): GeohashIdentity {
   return {
     kind: 'geohash',
@@ -224,7 +248,7 @@ export function geohashIdentity(
 export function selfIdentity(
   pubkey: string,
   nickname: string,
-  opts?: { avatarUrl?: string; isActive?: boolean; subtitle?: string },
+  opts?: { avatarUrl?: string; isActive?: boolean; subtitle?: string }
 ): SelfIdentity {
   return {
     kind: 'self',
@@ -254,7 +278,7 @@ export interface ContactRowProps {
 
   /** Declarative stat picker. Omit to use the kind's default. Order preserved,
    *  stats with no data drop out silently. */
-  stats?: ReadonlyArray<StatKey>;
+  stats?: readonly StatKey[];
 
   selectable?: boolean;
   selected?: boolean;
@@ -324,12 +348,12 @@ function hashSeed(seed: string): number {
   return Math.abs(h);
 }
 
-function pickPlaceholder(seed: string | undefined, options: ReadonlyArray<string>): string {
+function pickPlaceholder(seed: string | undefined, options: readonly string[]): string {
   if (!seed || options.length === 0) return options[0] ?? '';
   return options[hashSeed(seed) % options.length];
 }
 
-const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], ReadonlyArray<StatKey>> = {
+const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], readonly StatKey[]> = {
   // `following` is intentionally absent: the count lands in a narrow accent
   // row where a second "people" number alongside followers doesn't earn its
   // space. UserProfileScreen still shows it on the full profile header.
@@ -346,7 +370,7 @@ const DEFAULT_STATS_BY_KIND: Record<Identity['kind'], ReadonlyArray<StatKey>> = 
 
 function find<K extends Identity['kind']>(
   ids: Identity[],
-  kind: K,
+  kind: K
 ): Extract<Identity, { kind: K }> | undefined {
   return ids.find((i): i is Extract<Identity, { kind: K }> => i.kind === kind);
 }
@@ -435,8 +459,8 @@ function deriveSubtitle(ids: Identity[]): string | undefined {
  *  contactFollowers) for reputation / followers. */
 function buildStats(
   ids: Identity[],
-  keys: ReadonlyArray<StatKey>,
-  tints: { warning: string; success: string },
+  keys: readonly StatKey[],
+  tints: { warning: string; success: string }
 ): RowStat[] {
   const mintStats = find(ids, 'mint')?.stats;
   const nostr = find(ids, 'nostr');
@@ -474,10 +498,18 @@ function buildStats(
       case 'audit':
         if (typeof mintStats?.auditScore === 'number') {
           const pct = Math.round((mintStats.auditScore / 5) * 100);
+          const total = mintStats.auditTotalOps;
           out.push({
             icon: STAT_ICONS.audit,
             value: `${pct}%`,
+            // Mirrors the score case: show the operation count in brackets so
+            // the user knows whether the % comes from 12 ops or 12,000.
+            meta: typeof total === 'number' && total > 0 ? formatCompact(total) : undefined,
             color: mintStats.auditState === 'ERROR' ? STAT_COLOR_ERROR : tints.success,
+            accessibilityLabel:
+              typeof total === 'number'
+                ? `Audit success ${pct}% across ${total} operations`
+                : `Audit success ${pct}%`,
           });
         }
         break;
@@ -669,36 +701,32 @@ export function ContactRow({
 
   // ---- Trailing ---------------------------------------------------------
 
-  const chevronNode = (
-    <Icon name="mdi:chevron-right" size={24} color={opacity(foreground, 0.25)} />
-  );
+  const chevronNode = <Icon name="mdi:chevron-right" size={24} color={opacity(foreground, 0.25)} />;
 
-  const selectionNode = selectable
-    ? selectionVariant === 'checkbox'
-      ? (
-          <Checkbox
-            checked={selected}
-            onCheckedChange={() => onToggle?.()}
-            size={24}
-            variant="success"
-          />
-        )
-      : (
-          <View
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: 12,
-              borderWidth: 1.5,
-              borderColor: selected ? accent : opacity(foreground, 0.25),
-              backgroundColor: selected ? accent : 'transparent',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            {selected ? <Icon name="mdi:check" size={16} color="#FFFFFF" /> : null}
-          </View>
-        )
-    : null;
+  const selectionNode = selectable ? (
+    selectionVariant === 'checkbox' ? (
+      <Checkbox
+        checked={selected}
+        onCheckedChange={() => onToggle?.()}
+        size={24}
+        variant="success"
+      />
+    ) : (
+      <View
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          borderWidth: 1.5,
+          borderColor: selected ? accent : opacity(foreground, 0.25),
+          backgroundColor: selected ? accent : 'transparent',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        {selected ? <Icon name="mdi:check" size={16} color="#FFFFFF" /> : null}
+      </View>
+    )
+  ) : null;
 
   const inspectNode = onInspectPress ? (
     <TouchableOpacity
@@ -710,11 +738,13 @@ export function ContactRow({
   ) : null;
 
   const bleConnectionNode =
-    ble && ble.isConnected !== undefined
-      ? ble.isConnected
-        ? <Icon name="mdi:broadcast" size={20} color={CONNECTED_ACCENT} />
-        : <Icon name="mdi:clock-outline" size={20} color={opacity(foreground, 0.3)} />
-      : null;
+    ble && ble.isConnected !== undefined ? (
+      ble.isConnected ? (
+        <Icon name="mdi:broadcast" size={20} color={CONNECTED_ACCENT} />
+      ) : (
+        <Icon name="mdi:clock-outline" size={20} color={opacity(foreground, 0.3)} />
+      )
+    ) : null;
 
   let trailingNode: ReactNode;
   if (trailingOverride !== undefined) {

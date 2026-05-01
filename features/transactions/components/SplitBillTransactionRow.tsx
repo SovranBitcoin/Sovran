@@ -14,8 +14,9 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
+
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import Icon from 'assets/icons';
 import { UntranslatedText } from '@/shared/ui/primitives/Text';

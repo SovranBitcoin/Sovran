@@ -3,9 +3,10 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
 import Icon from 'assets/icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { useRouter } from 'expo-router';
 import opacity from 'hex-color-opacity';
 
+import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
+import { useTabBarBottomPadding } from '@/shared/hooks/useTabBarBottomPadding';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useMintManagement } from '@/features/mint';
 import { useRecentContacts } from '@/features/payments/hooks/useRecentContacts';
@@ -44,9 +45,7 @@ type TopTab = 'contacts' | 'groups';
  */
 function parseGeohashQuery(trimmed: string): string | null {
   if (!trimmed) return null;
-  const hash = trimmed.startsWith('#')
-    ? trimmed.slice(1).toLowerCase()
-    : trimmed.toLowerCase();
+  const hash = trimmed.startsWith('#') ? trimmed.slice(1).toLowerCase() : trimmed.toLowerCase();
   if (hash.length < 2) return null;
   if (!isValidGeohash(hash)) return null;
   if (!trimmed.startsWith('#') && /\s/.test(trimmed)) return null;
@@ -54,7 +53,7 @@ function parseGeohashQuery(trimmed: string): string | null {
 }
 
 function GeohashJumpRow({ geohash }: { geohash: string }) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   return (
     <ContactRow
       identity={geohashIdentity(geohash, {
@@ -76,7 +75,7 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
 }
 
 function GroupsTierRow({ tier }: { tier: TierEntry }) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   return (
     <ContactRow
       identity={geohashIdentity(tier.geohash, {
@@ -114,6 +113,7 @@ export const ContactsScreen = () => {
     'accent',
   ] as const);
   const { tiers: locationTiers } = useLocationTiers();
+  const tabBarPadding = useTabBarBottomPadding();
 
   // When the search closes, restore the outer tab. If the user was on the
   // "Groups" pill, surface the groups list they were browsing.
@@ -180,7 +180,7 @@ export const ContactsScreen = () => {
         ...whitenoiseContactPubkeys,
       ]),
     ],
-    [contactPubkeys, mintPubkeys, requestPubkeys, whitenoiseContactPubkeys],
+    [contactPubkeys, mintPubkeys, requestPubkeys, whitenoiseContactPubkeys]
   );
   const { metadata: profilesMap } = useNostrProfileMetadataMany(allPubkeys);
 
@@ -199,9 +199,7 @@ export const ContactsScreen = () => {
       if (!lowerQuery) return true;
       if (!profile) return false;
       const candidates = [profile.name, profile.displayName, profile.nip05];
-      return candidates.some(
-        (v) => typeof v === 'string' && v.toLowerCase().includes(lowerQuery)
-      );
+      return candidates.some((v) => typeof v === 'string' && v.toLowerCase().includes(lowerQuery));
     },
     [lowerQuery]
   );
@@ -232,7 +230,7 @@ export const ContactsScreen = () => {
   // (this memo depends on `profilesMap`).
   const mintsWithProfile = useMemo(
     () => displayMints.filter((m: any) => m.pubkey && profilesMap.has(m.pubkey)),
-    [displayMints, profilesMap],
+    [displayMints, profilesMap]
   );
 
   const filteredDisplayMints = useMemo(() => {
@@ -343,9 +341,7 @@ export const ContactsScreen = () => {
         // displayName replaces the truncated-pubkey fallback.
         return (
           <ContactRow
-            identity={[
-              nostrIdentity(req.fromPubkey, profile, { isLoadingProfile: false }),
-            ]}
+            identity={[nostrIdentity(req.fromPubkey, profile, { isLoadingProfile: false })]}
             subtitle="Wants to start a White Noise chat"
             hideMetadata
             trailing={
@@ -381,7 +377,7 @@ export const ContactsScreen = () => {
             mintUrl,
             displayName: item.mintInfo?.name ?? mintUrl,
             iconUrl: item.mintInfo?.icon_url,
-          }),
+          })
         );
       }
       if (item.pubkey) {
@@ -402,12 +398,7 @@ export const ContactsScreen = () => {
         />
       );
     },
-    [
-      profilesMap,
-      whitenoiseBusyId,
-      acceptWhitenoiseRequest,
-      declineWhitenoiseRequest,
-    ]
+    [profilesMap, whitenoiseBusyId, acceptWhitenoiseRequest, declineWhitenoiseRequest]
   );
 
   const renderEmpty = useCallback(() => {
@@ -451,10 +442,7 @@ export const ContactsScreen = () => {
   }, [lowerQuery, locationTiers]);
 
   // Groups pill still surfaces the geohash jump row as a list header.
-  const groupsGeohashQuery = useMemo(
-    () => parseGeohashQuery(trimmedQuery),
-    [trimmedQuery]
-  );
+  const groupsGeohashQuery = useMemo(() => parseGeohashQuery(trimmedQuery), [trimmedQuery]);
 
   // Pill visibility:
   //   • No active search → base pills (Groups lives in the outer tab bar).
@@ -500,10 +488,7 @@ export const ContactsScreen = () => {
         <Pressable
           key={tab}
           onPress={() => setActiveTab(tab)}
-          style={[
-            styles.tab,
-            isActive && { borderBottomColor: accent, borderBottomWidth: 2 },
-          ]}>
+          style={[styles.tab, isActive && { borderBottomColor: accent, borderBottomWidth: 2 }]}>
           <Text
             style={[
               styles.tabLabel,
@@ -530,7 +515,11 @@ export const ContactsScreen = () => {
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="always"
       ListEmptyComponent={renderEmpty}
-      contentContainerStyle={currentListData.length === 0 ? styles.emptyList : undefined}
+      contentContainerStyle={
+        currentListData.length === 0
+          ? [styles.emptyList, { paddingBottom: tabBarPadding }]
+          : { paddingBottom: tabBarPadding }
+      }
     />
   );
 
@@ -561,7 +550,9 @@ export const ContactsScreen = () => {
           ) : null
         }
         contentContainerStyle={
-          tierData.length === 0 && !groupsGeohashQuery ? styles.emptyList : undefined
+          tierData.length === 0 && !groupsGeohashQuery
+            ? [styles.emptyList, { paddingBottom: tabBarPadding }]
+            : { paddingBottom: tabBarPadding }
         }
       />
     );
@@ -575,10 +566,7 @@ export const ContactsScreen = () => {
     activeTab === 'groups' || (activeTab === 'contacts' && activeFilter === 'Groups');
 
   const showAllSearch =
-    activeTab === 'contacts' &&
-    activeFilter === 'All' &&
-    isSearching &&
-    trimmedQuery.length > 0;
+    activeTab === 'contacts' && activeFilter === 'All' && isSearching && trimmedQuery.length > 0;
 
   return (
     <Screen name="ContactsScreen" style={styles.root}>
@@ -622,11 +610,13 @@ export const ContactsScreen = () => {
       )}
 
       <ScreenContainer>
-        {showGroupsBody
-          ? renderGroupsList()
-          : showAllSearch
-            ? <SearchResultsList searchQuery={searchQuery} />
-            : renderContactsList()}
+        {showGroupsBody ? (
+          renderGroupsList()
+        ) : showAllSearch ? (
+          <SearchResultsList searchQuery={searchQuery} />
+        ) : (
+          renderContactsList()
+        )}
       </ScreenContainer>
     </Screen>
   );

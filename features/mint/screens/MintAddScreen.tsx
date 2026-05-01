@@ -66,7 +66,7 @@ interface DisplayMint {
     name?: string;
     description?: string | null;
     /** NUT-06 contact entries — needed by `useMintProfiles` to find the operator's Nostr pubkey. */
-    contact?: Array<{ method: string; info: string }>;
+    contact?: { method: string; info: string }[];
   } | null;
   contactFollowers?: number;
   contactReputation?: number;
@@ -88,7 +88,7 @@ function adaptSearchResult(result: MintSearchResult): DisplayMint {
     icon_url?: string | null;
     name?: string;
     description?: string | null;
-    contact?: Array<{ method: string; info: string }>;
+    contact?: { method: string; info: string }[];
   };
   return {
     url: result.url,
@@ -251,13 +251,17 @@ const MintItem = memo(function MintItem({
   // the 0–5 audit-score scale `ContactRow` expects, so the audit pill
   // renders identically whether the signal came from a `MintListItem` or
   // from the Mint Add search enrichment.
-  const auditScore = useMemo<number | undefined>(() => {
-    if (!('serverStats' in mint) || !mint.serverStats) return undefined;
+  const { auditScore, auditTotalOps } = useMemo<{
+    auditScore: number | undefined;
+    auditTotalOps: number | undefined;
+  }>(() => {
+    if (!('serverStats' in mint) || !mint.serverStats)
+      return { auditScore: undefined, auditTotalOps: undefined };
     const { n_mints, n_melts, n_errors } = mint.serverStats;
     const totalOps = n_mints + n_melts;
-    if (totalOps <= 0) return undefined;
+    if (totalOps <= 0) return { auditScore: undefined, auditTotalOps: undefined };
     const successRate = 1 - n_errors / totalOps; // 0..1
-    return successRate * 5; // 0..5
+    return { auditScore: successRate * 5, auditTotalOps: totalOps };
   }, [mint]);
 
   return (
@@ -277,10 +281,9 @@ const MintItem = memo(function MintItem({
               : undefined,
           auditScore,
           auditState: 'auditState' in mint ? mint.auditState : undefined,
-          contactReputation:
-            'contactReputation' in mint ? mint.contactReputation : undefined,
-          contactFollowers:
-            'contactFollowers' in mint ? mint.contactFollowers : undefined,
+          auditTotalOps,
+          contactReputation: 'contactReputation' in mint ? mint.contactReputation : undefined,
+          contactFollowers: 'contactFollowers' in mint ? mint.contactFollowers : undefined,
         },
       })}
       subtitle={extractDomain(mint.url)}
@@ -311,14 +314,8 @@ export function MintAddScreen() {
   const [selectedCurrency, setSelectedCurrency] = useState('ALL');
 
   // Search toggle (matches contacts page pattern)
-  const {
-    isSearching,
-    searchQuery,
-    clearKey,
-    onOpenSearch,
-    onCloseSearch,
-    onSearchChange,
-  } = useHeaderSearch();
+  const { isSearching, searchQuery, clearKey, onOpenSearch, onCloseSearch, onSearchChange } =
+    useHeaderSearch();
 
   // URL validation fallback — only triggers when input looks like a URL
   const {
@@ -355,7 +352,10 @@ export function MintAddScreen() {
   }, [validationState, validatedUrl, customMintInfo]);
 
   // Server-side mint search
-  const { results: searchResults, loading: searchLoading } = useMintSearch(searchQuery, selectedCurrency);
+  const { results: searchResults, loading: searchLoading } = useMintSearch(
+    searchQuery,
+    selectedCurrency
+  );
 
   // Hold a skeleton until the discovered list stops changing for 500ms.
   // Individual fetchMintInfo calls resolve at different times, causing the list
@@ -386,16 +386,10 @@ export function MintAddScreen() {
     let hasPseudo = false;
 
     // If searching with a URL-like query that validated as a mint, prepend it
-    if (
-      searchQuery.trim() &&
-      validationState.isValid === true &&
-      customMintInfo !== null
-    ) {
+    if (searchQuery.trim() && validationState.isValid === true && customMintInfo !== null) {
       const apiUrl = normalizeUrlForApi(searchQuery);
       const normalizedInput = normalizeMintUrlKey(apiUrl);
-      const alreadyInResults = adapted.some(
-        (m) => normalizeMintUrlKey(m.url) === normalizedInput
-      );
+      const alreadyInResults = adapted.some((m) => normalizeMintUrlKey(m.url) === normalizedInput);
       if (!alreadyInResults && !knownMintUrls.has(normalizedInput)) {
         const pseudoMint: PseudoMint = {
           url: apiUrl,
@@ -449,7 +443,10 @@ export function MintAddScreen() {
     }
     const allowed = ['SAT', 'USD', 'EUR', 'GBP'];
     const currencies = ['ALL', ...[...units].filter((c) => allowed.includes(c))];
-    cashuLog.debug('mint.add.currencies.extracted', { currencies, resultCount: searchResults.length });
+    cashuLog.debug('mint.add.currencies.extracted', {
+      currencies,
+      resultCount: searchResults.length,
+    });
     return currencies;
   }, [searchResults]);
 
@@ -511,21 +508,37 @@ export function MintAddScreen() {
           try {
             const restoreT0 = performance.now();
             await manager.wallet.restore(mintUrl);
-            log.info('mint.add.restore.success', { mintUrl, duration_ms: Math.round(performance.now() - restoreT0) });
+            log.info('mint.add.restore.success', {
+              mintUrl,
+              duration_ms: Math.round(performance.now() - restoreT0),
+            });
           } catch (restoreErr) {
-            log.warn('mint.add.restore.failed', { mintUrl, error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr) });
+            log.warn('mint.add.restore.failed', {
+              mintUrl,
+              error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr),
+            });
           }
 
           if (i < mintUrlsToAdd.length - 1) {
             await new Promise((r) => setTimeout(r, 100));
           }
         } catch (err) {
-          log.error('mint.add.item.failed', { mintUrl, duration_ms: Math.round(performance.now() - itemT0), error: err instanceof Error ? err.message : String(err) });
+          log.error('mint.add.item.failed', {
+            mintUrl,
+            duration_ms: Math.round(performance.now() - itemT0),
+            error: err instanceof Error ? err.message : String(err),
+          });
           errors.push({ mintUrl, error: err instanceof Error ? err.message : String(err) });
         }
       }
 
       log.info('mint.add.batch.complete', { added: results.length, failed: errors.length });
+      // Give the MintProvider's `mint:added` listener a tick to refetch
+      // `trustedMints` before we pop back. Without this delay the parent
+      // Mint List screen sometimes refocuses before the new mint is in
+      // its `useMints()` snapshot, leaving the row missing until the next
+      // background tick.
+      await new Promise((resolve) => setTimeout(resolve, 50));
       if (errors.length === 0) {
         mintsAddedPopup({ added: results.length });
         router.back();
@@ -577,7 +590,15 @@ export function MintAddScreen() {
       selectedCurrency,
       selectedCount: selectedMints.size,
     });
-  }, [showContent, searchLoading, displayMints.length, isSearching, searchQuery, selectedCurrency, selectedMints.size]);
+  }, [
+    showContent,
+    searchLoading,
+    displayMints.length,
+    isSearching,
+    searchQuery,
+    selectedCurrency,
+    selectedMints.size,
+  ]);
 
   // ── Header: search icon toggle (matches contacts pattern) ──────────────
 

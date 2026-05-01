@@ -9,7 +9,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Circle as SvgCircle } from 'react-native-svg';
 import { Metadata } from 'nostr-tools/kinds';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';

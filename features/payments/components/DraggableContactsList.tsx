@@ -1,6 +1,6 @@
 import React, { FC, useCallback, useMemo } from 'react';
 import { ScrollView, View as RNView, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 
 import { ContactRow, mintIdentity, nostrIdentity } from '@/shared/ui/composed/ContactRow';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -48,13 +48,12 @@ const RenderItem = React.memo(
     index: number;
     length: number;
   }) => {
-    const router = useRouter();
+    const router = useGuardedRouter();
 
     const pubkey: string = item.pubkey;
     const isMint = item.type === 'mint';
     const mintUrl: string | undefined = item.mint?.mintUrl;
-    const isVerified =
-      !isMint && !!pubkey && Object.values(PUBLIC_KEYS).includes(pubkey as any);
+    const isVerified = !isMint && !!pubkey && Object.values(PUBLIC_KEYS).includes(pubkey as any);
 
     // Item's latest DM preview. For contact-type items this is the subtitle
     // verbatim (replies-mode); for mint-type items it falls back to the
@@ -80,7 +79,7 @@ const RenderItem = React.memo(
         type: item.type,
         pubkey: pubkey.slice(0, 16),
       });
-      router.navigate({
+      router.push({
         pathname: '/(user-flow)/profile' as const,
         params: { pubkey },
       });
@@ -101,9 +100,7 @@ const RenderItem = React.memo(
     );
     if (!isFirst && !isLast) return row;
     return (
-      <RNView style={{ paddingTop: isFirst ? 4 : 0, paddingBottom: isLast ? 4 : 0 }}>
-        {row}
-      </RNView>
+      <RNView style={{ paddingTop: isFirst ? 4 : 0, paddingBottom: isLast ? 4 : 0 }}>{row}</RNView>
     );
   }
 );

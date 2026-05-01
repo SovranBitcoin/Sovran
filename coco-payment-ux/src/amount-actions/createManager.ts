@@ -100,6 +100,18 @@ export function createAmountActionManager(
       fiatSymbol,
       config: quickSendConfig ?? undefined,
     });
+    // Logged so we can verify the "Send all" suggestion's satoshis matches the
+    // actual sum of available proofs. Mismatches indicate the wallet's
+    // proofAmounts cache is stale relative to coco's proof state.
+    const sendAll = result.find((s) => s.sendAll);
+    console.info(
+      '[amount.suggestion.derive] proofCount:',
+      len,
+      '| spendableTotal:',
+      sum,
+      '| displayedSendAll:',
+      sendAll?.satoshis ?? '(none)'
+    );
     sugCache = { len, sum, price, result };
     return result;
   }

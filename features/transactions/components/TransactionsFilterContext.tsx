@@ -6,7 +6,8 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
-import { router } from 'expo-router';
+
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 
 type PaymentType = 'all' | 'lightning' | 'ecash';
 type Direction = 'all' | 'incoming' | 'outgoing';

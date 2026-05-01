@@ -19,7 +19,8 @@ import {
   Linking,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { Stack, router, useLocalSearchParams, Link } from 'expo-router';
+import { Stack, useLocalSearchParams, Link } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -271,7 +272,9 @@ function TopFollowersComponent({
   if (!isLoading && followersWithProfiles.length === 0) return null;
 
   const handleFollowerPress = (follower: TopFollower) => {
-    router.navigate({
+    // push (not navigate) so each profile pushes a new stack entry; tapping
+    // through follower → follower-of-follower then back returns step by step.
+    router.push({
       pathname: '/(user-flow)/profile' as any,
       params: { npub: follower.npub },
     });
@@ -493,10 +496,7 @@ function BannerWithAvatarComponent({
               />
             ) : null}
             <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: opacity(foreground, 0.5) },
-              ]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: opacity(foreground, 0.5) }]}
             />
           </>
         ) : bannerState === 'image' ? (
@@ -650,7 +650,11 @@ export function UserProfileScreen() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
-  const { npub: npubParam, pubkey: pubkeyParam, mintUrl: mintUrlParam } = useLocalSearchParams<{
+  const {
+    npub: npubParam,
+    pubkey: pubkeyParam,
+    mintUrl: mintUrlParam,
+  } = useLocalSearchParams<{
     npub?: string;
     pubkey?: string;
     mintUrl?: string;
@@ -687,8 +691,7 @@ export function UserProfileScreen() {
   // /(user-flow)/userMessages route avoids a duplicate kind-0
   // fetch). First open per session pays one round-trip; the cache
   // entry is shared across surfaces and persists across launches.
-  const { metadata: cachedProfile, isLoading: isMetadataLoading } =
-    useNostrProfileMetadata(pubkey);
+  const { metadata: cachedProfile, isLoading: isMetadataLoading } = useNostrProfileMetadata(pubkey);
 
   const contactListFilters = useMemo(
     () =>
@@ -786,9 +789,7 @@ export function UserProfileScreen() {
     nostrLog.info('user.profile.story.view', { pubkey, videoCount: userVideoPosts.length });
     const storyUser: StoryUser = {
       pubkey,
-      profile: cachedProfile
-        ? { name: displayName, picture: cachedProfile.picture }
-        : undefined,
+      profile: cachedProfile ? { name: displayName, picture: cachedProfile.picture } : undefined,
       videoPosts: userVideoPosts,
     };
     router.navigate({
@@ -957,7 +958,9 @@ export function UserProfileScreen() {
                   href={{
                     pathname: '/(mint-flow)/info' as any,
                     params: {
-                      mintInfoEntry: JSON.stringify({ mintUrl: profileData?.mintUrl || mintUrlParam }),
+                      mintInfoEntry: JSON.stringify({
+                        mintUrl: profileData?.mintUrl || mintUrlParam,
+                      }),
                     },
                   }}
                   asChild>
@@ -1001,7 +1004,12 @@ export function UserProfileScreen() {
                 displayName={displayName}
                 nip05={cachedProfile?.nip05}
                 isLoading={isMetadataLoading}
-                showFollowButton={!isOwnProfile && !!pubkey}
+                // Wait until our own keys are known before deciding whether to
+                // show the follow button. Otherwise on own-profile open we would
+                // briefly render the skeleton (isOwnProfile=false until keys load),
+                // then unmount it once `isOwnProfile` flips true — a content shift
+                // every time you open your own profile.
+                showFollowButton={!!nostrKeys?.pubkey && !isOwnProfile && !!pubkey}
                 isFollowing={isFollowingProfile}
                 isFollowLoading={followInFlight}
                 onToggleFollow={handleToggleFollow}

@@ -23,7 +23,7 @@ import {
 } from '@expo/ui/swift-ui';
 import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { liquidGlassModifiers, supportsLiquidGlass } from '@/shared/lib/version';
-import { useRouter } from 'expo-router';
+import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { reservedProofsFreedPopup, reservedProofsFailedPopup } from '@/shared/lib/popup';
 import { usePaginatedHistory } from '@cashu/coco-react';
@@ -171,7 +171,7 @@ function EcashStatusPill({
  * Component that displays the primary balance with unit toggling capability
  */
 export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactElement {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const { history } = usePaginatedHistory();
   const displayBtc = useSettingsStore((state) => state.getDisplayBtc());
   const setDisplayBtc = useSettingsStore((state) => state.setDisplayBtc);

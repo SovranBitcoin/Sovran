@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useWindowDimensions } from 'react-native';
-import { router } from 'expo-router';
+import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useHandleCameraPermission } from '@/features/camera';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';

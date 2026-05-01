@@ -508,7 +508,16 @@ export function createDefaultScreenActionHandlers(
           '| meltTarget:',
           meltTarget ? meltTarget.slice(0, 30) + '…' : '(none)'
         );
-        void machine.enterAmount(effectiveSat, mintUrl, { destination, meltTarget });
+        try {
+          await machine.enterAmount(effectiveSat, mintUrl, { destination, meltTarget });
+          console.info('[amountEntry.next] machine.enterAmount resolved');
+        } catch (err) {
+          console.warn(
+            '[amountEntry.next] machine.enterAmount threw:',
+            err instanceof Error ? err.message : String(err)
+          );
+          throw err;
+        }
       },
 
       paste: async (ctx: ScreenActionContext) => {

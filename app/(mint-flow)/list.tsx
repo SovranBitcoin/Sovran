@@ -18,6 +18,7 @@ import { MintListScreen } from '@/features/mint';
 import { useMintCatalog } from '@/features/mint/hooks/useMintCatalog';
 import { buildMintListItems } from '@/features/send';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
+import { cashuLog } from '@/shared/lib/logger';
 
 function MintListRoute() {
   const params = useLocalSearchParams<{
@@ -38,7 +39,14 @@ function MintListRoute() {
 
   // Force list rebuild when this screen regains focus (e.g. after adding a mint)
   const [focusKey, setFocusKey] = useState(0);
-  useFocusEffect(useCallback(() => { setFocusKey((k) => k + 1); }, []));
+  useFocusEffect(
+    useCallback(() => {
+      setFocusKey((k) => k + 1);
+      cashuLog.info('mint.list.refocus', {
+        trustedMintCount: trustedMints.length,
+      });
+    }, [trustedMints.length])
+  );
 
   // Build a neutral availability array (all mints available, no flow constraints).
   const availability = useMemo<MintAvailability[]>(

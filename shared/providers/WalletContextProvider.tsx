@@ -87,16 +87,41 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     return trustedMintUrls;
   }, [trustedMintUrls]);
 
+  // RC4+ removed the legacy `total` injection into the per-mint map; mintBalances
+  // already contains only mint-keyed entries.
+  const mintBalancesOnly = mintBalances;
+
+  // Stable balance signature so `fetchProofAmounts` re-runs whenever any mint
+  // balance changes (i.e. after a send / receive). Without this the cached
+  // `proofAmounts` would only refresh on mint-add, leaving "Send all" showing
+  // the pre-spend total — the user-reported bug where the quick suggestions
+  // sometimes exceed the actual spendable balance.
+  const balanceSignature = useMemo(
+    () =>
+      Object.entries(mintBalancesOnly)
+        .map(([url, total]) => `${url}:${total}`)
+        .sort()
+        .join('|'),
+    [mintBalancesOnly]
+  );
+
   const fetchProofAmounts = useCallback(async () => {
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', {
       mintCount: stableMintUrls.length,
     });
-    const proofService = manager.proofService;
+    // proofService is the underlying coco service; type-check warns it's
+    // private but other call sites (manager.ts:701) read it the same way.
+    // Cast to `any` to keep this file aligned with that pattern.
+    const proofService = (manager as any).proofService;
     const next: Record<string, number[]> = {};
+    let totalReady = 0;
     for (const url of stableMintUrls) {
       try {
         const proofs = await proofService.getReadyProofs(url);
-        next[url] = proofs.map((p) => p.amount).sort((a, b) => a - b);
+        next[url] = proofs
+          .map((p: { amount: number }) => p.amount)
+          .sort((a: number, b: number) => a - b);
+        totalReady += next[url].reduce((sum: number, n: number) => sum + n, 0);
       } catch (err) {
         walletLog.warn('provider.wallet_context.proof_fetch_failed', {
           mintUrl: url,
@@ -107,17 +132,16 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     }
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_done', {
       mintCount: stableMintUrls.length,
+      totalReady,
     });
     setProofAmounts(next);
   }, [manager, stableMintUrls]);
 
   useEffect(() => {
     fetchProofAmounts();
-  }, [fetchProofAmounts]);
-
-  // RC4+ removed the legacy `total` injection into the per-mint map; mintBalances
-  // already contains only mint-keyed entries.
-  const mintBalancesOnly = mintBalances;
+    // balanceSignature isn't used inside fetchProofAmounts but its change is the
+    // signal that proofs have moved — depend on it explicitly.
+  }, [fetchProofAmounts, balanceSignature]);
 
   const value = useMemo<WalletContext>(() => {
     walletLog.info('provider.wallet_context.value_updated', {
