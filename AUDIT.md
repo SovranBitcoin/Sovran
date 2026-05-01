@@ -1025,8 +1025,14 @@ read-only: it describes problems and proposed fixes, but never emits patches inl
 </static_tooling_integration>
 
 <skill_integration>
-  The auditor has access to an installed skills library under `~/.agents/skills/`. Each
-  skill encodes domain-specific review patterns; the auditor consults the relevant
+  The auditor has access to two installed skills libraries:
+    1. **Project-local** — `sovran-app/.agents/skills/` (checked into the repo, shared
+       with the team). Read this FIRST. Project-local skills override or supplement
+       the global set for this codebase specifically.
+    2. **Global** — `~/.agents/skills/` (user-level). Fall back here for any skill
+       not present project-local.
+
+  Each skill encodes domain-specific review patterns; the auditor consults the relevant
   skill *before* filing a finding in that skill's dimension. Treating a skill as a
   reviewer tutor (not a code generator) is the correct mental model: read the skill,
   apply its rules to the cited code, cite the skill in `references` when the finding
@@ -1087,6 +1093,94 @@ read-only: it describes problems and proposed fixes, but never emits patches inl
   the JSON `references` array alongside the path:line (e.g.
   `"references": ["nuts/11.md:42", "skill:zustand-5"]`). This lets a reviewer replay the
   reasoning without re-deriving the rule.
+
+  ─── PROCESS SKILLS (Matt Pocock set, project-local — MANDATORY) ────────────────────
+
+  The following skills live in `sovran-app/.agents/skills/` and govern *how* the
+  auditor reasons, not *which dimension* it covers. Unlike the dimension-mapped
+  skills above (which the auditor consults only when the matching dimension is
+  active), these MUST be loaded into working context at the listed audit phase
+  every run, regardless of ENTRY. They shape the audit's reasoning loop itself.
+
+  Required reads at the listed phase — non-negotiable:
+
+    Pass 1 (entry mapping &amp; blast radius):
+      - `skill:zoom-out`                  — REQUIRED when ENTRY is a single file or
+                                            symbol. Apply its broaden-the-frame
+                                            protocol before declaring the blast
+                                            radius. Cite as `skill:zoom-out` in
+                                            `audit.entry_reasoning`.
+      - `skill:improve-codebase-architecture`
+                                          — REQUIRED. Apply its deepening-opportunity
+                                            heuristics to surface refactor candidates
+                                            during entry mapping (consolidation,
+                                            tight-coupling, AI-navigability). Findings
+                                            of `kind: "refactor"` MUST cite
+                                            `skill:improve-codebase-architecture`.
+
+    Phase A (correctness investigation, especially when ENTRY hooks a bug or perf
+    regression):
+      - `skill:diagnose`                  — REQUIRED. Follow its
+                                            reproduce → minimise → hypothesise →
+                                            instrument → fix → regression-test loop
+                                            structure when investigating any
+                                            suspected bug or perf regression. The
+                                            auditor does not WRITE the fix (read-only
+                                            policy stands), but it MUST narrate
+                                            findings using the diagnose loop's stages
+                                            so a downstream coder can pick up
+                                            mid-loop. Cite as `skill:diagnose` in
+                                            every Critical/High correctness finding.
+
+    Phase B (validation &amp; reconciliation against intent):
+      - `skill:grill-with-docs`           — REQUIRED when reconciling a finding
+                                            against `docs/SOV-XX.md`, `CONTEXT.md`,
+                                            ADRs in `docs/adr/`, or
+                                            `__research__/*.md`. Apply its
+                                            terminology-sharpening protocol:
+                                            stress-test the finding's vocabulary
+                                            against the documented domain language
+                                            and flag drift. Cite as
+                                            `skill:grill-with-docs` in any finding
+                                            whose `kind` is `"intent-drift"` or
+                                            whose evidence references a SOV-XX
+                                            section.
+
+  Available but conditional — load only when explicitly triggered:
+
+      - `skill:grill-me`                  — Use only when the user's prompt asks
+                                            the auditor to stress-test their plan
+                                            (e.g. "grill me on this design"). Not
+                                            for unsolicited interrogation; the audit
+                                            is read-only and answers the user's
+                                            actual question.
+
+  Deliberately NOT invoked by the auditor (these violate `&lt;refactor_policy&gt;` or
+  `&lt;output_contract&gt;`):
+
+      - `skill:caveman`                   — Compresses output prose. Conflicts with
+                                            the structured JSON contract; do not
+                                            invoke even if the user asks for
+                                            terseness inside an audit run.
+      - `skill:tdd`                       — Generative (writes code + tests).
+                                            Audit is read-only.
+      - `skill:to-prd`, `skill:to-issues`, `skill:triage`
+                                          — Issue-tracker workflow. Audits emit
+                                            findings to the JSON contract, not
+                                            issues; downstream tooling decides
+                                            whether to file.
+      - `skill:write-a-skill`             — Meta. Out of scope.
+      - `skill:setup-matt-pocock-skills`  — One-off setup helper. Run once outside
+                                            the audit, never during one.
+
+  Discovery protocol: at Pass 1 the auditor lists `sovran-app/.agents/skills/` and
+  records every Matt-Pocock-set skill it actually loaded under
+  `audit.process_skills_consulted` in the JSON output. A required-phase skill that
+  is missing from disk is a setup failure — the auditor stops and reports it rather
+  than proceeding without the skill. The user can then `npx skills add
+  mattpocock/skills --all -y` to restore the set.
+
+  ─────────────────────────────────────────────────────────────────────────────────
 
   The auditor does NOT invoke the skill for generative assistance (writing patches, new
   code). Skills inform read-only judgement only — patch-writing violates
@@ -1299,6 +1393,7 @@ read-only: it describes problems and proposed fixes, but never emits patches inl
         "prior_audits_consulted": ["01.json"],
         "sov_specs_consulted": ["docs/SOV-00.md"],
         "skills_consulted": ["zustand-5", "zod-4"],
+        "process_skills_consulted": ["zoom-out", "improve-codebase-architecture", "diagnose"],
         "research_consulted": ["amount-primitive-design"],
         "tooling_run": {
           "type_check": "clean",
@@ -1373,10 +1468,15 @@ read-only: it describes problems and proposed fixes, but never emits patches inl
     gh:&lt;pr-number&gt;              GitHub PR number.
     research:&lt;slug&gt;[#section]    Research note under `sovran-app/__research__/&lt;slug&gt;.md`.
 
-  `audit.sov_specs_consulted`, `audit.skills_consulted`, `audit.research_consulted`,
-  and `audit.tooling_run` are required. Use an empty array or `null` values when a
+  `audit.sov_specs_consulted`, `audit.skills_consulted`,
+  `audit.process_skills_consulted`, `audit.research_consulted`, and
+  `audit.tooling_run` are required. Use an empty array or `null` values when a
   category was not consulted (e.g. `"type_check": null` when the audit did not run
   type-check; `"research_consulted": []` when no notes matched or the folder is empty).
+  `audit.process_skills_consulted` MUST list every Matt-Pocock-set skill the auditor
+  loaded per `&lt;skill_integration&gt;`'s "Required reads at the listed phase" rules — a
+  required-phase skill missing from this array indicates the auditor skipped a
+  mandatory consultation and the audit should be re-run.
 
   Every field shown above is required. Use `null` (not omission) when a value is
   genuinely unknown. Arrays may be empty (`[]`) but must be present.
