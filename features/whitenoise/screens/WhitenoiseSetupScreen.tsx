@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import Icon from 'assets/icons';
 import { Button } from '@/shared/ui/primitives/Button';
+import { Screen } from '@/shared/ui/composed/Screen';
+import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useWhitenoiseSetup } from '../hooks/useWhitenoiseSetup';
 import { MarmotIcon } from '../components/MarmotIcon';
@@ -11,18 +13,37 @@ export function WhitenoiseSetupScreen() {
   const router = useRouter();
   const { isReady, isLoading, isBootstrapping, keyPackageCount, error, bootstrap } =
     useWhitenoiseSetup();
-  const [background, foreground, foregroundSecondary, accent, danger] = useThemeColor([
-    'background',
+  const [foreground, foregroundSecondary, accent, danger] = useThemeColor([
     'foreground',
     'surface-secondary-foreground',
     'accent',
     'danger',
   ]);
 
+  const bottomButtons = (
+    <BottomButtons>
+      {isReady ? (
+        <Button
+          text="All set — close"
+          variant="primary"
+          onPress={() => router.back()}
+          testID="whitenoise-setup-close"
+        />
+      ) : (
+        <Button
+          text={isBootstrapping ? 'Setting up…' : 'Set up White Noise'}
+          variant="primary"
+          loading={isBootstrapping}
+          disabled={isLoading || isBootstrapping}
+          onPress={bootstrap}
+          testID="whitenoise-setup-start"
+        />
+      )}
+    </BottomButtons>
+  );
+
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: background }}
-      contentContainerStyle={styles.content}>
+    <Screen name="WhitenoiseSetupScreen" contentPadding={24} footer={bottomButtons}>
       <View style={styles.iconCircle}>
         <MarmotIcon size={64} />
       </View>
@@ -63,27 +84,7 @@ export function WhitenoiseSetupScreen() {
           {error}
         </Text>
       ) : null}
-
-      <View style={styles.actions}>
-        {isReady ? (
-          <Button
-            text="All set — close"
-            variant="primary"
-            onPress={() => router.back()}
-            testID="whitenoise-setup-close"
-          />
-        ) : (
-          <Button
-            text={isBootstrapping ? 'Setting up…' : 'Set up White Noise'}
-            variant="primary"
-            loading={isBootstrapping}
-            disabled={isLoading || isBootstrapping}
-            onPress={bootstrap}
-            testID="whitenoise-setup-start"
-          />
-        )}
-      </View>
-    </ScrollView>
+    </Screen>
   );
 }
 
@@ -107,11 +108,6 @@ function Bullet({
 }
 
 const styles = StyleSheet.create({
-  content: {
-    padding: 24,
-    paddingTop: 48,
-    gap: 16,
-  },
   iconCircle: {
     width: 72,
     height: 72,
@@ -119,6 +115,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 24,
     marginBottom: 12,
   },
   title: {
@@ -130,6 +127,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
     lineHeight: 22,
+    marginTop: 16,
   },
   bullets: {
     gap: 12,
@@ -161,8 +159,5 @@ const styles = StyleSheet.create({
   error: {
     fontSize: 13,
     marginTop: 8,
-  },
-  actions: {
-    marginTop: 24,
   },
 });
