@@ -52,7 +52,11 @@ export interface ScrollEdgeFadeProps {
   color?: string | null;
   /** Apply a frosted-glass blur. Default true. */
   blur?: boolean;
-  /** BlurView intensity at the fully-blurred end (0-100). Default 50. */
+  /**
+   * BlurView intensity at the fully-blurred end (0-100). Default 10 —
+   * matches `BottomButtons` so top and bottom edge fades on the same
+   * screen render with the same frosted-glass weight.
+   */
   blurIntensity?: number;
   /**
    * BlurView tint. Defaults to `systemChromeMaterialDark` on iOS — the
@@ -93,7 +97,7 @@ export function ScrollEdgeFade({
   fadeSize,
   color,
   blur = true,
-  blurIntensity = 50,
+  blurIntensity = 10,
   blurTint = Platform.OS === 'ios' ? 'systemChromeMaterialDark' : 'dark',
   zIndex = 50,
   offset = 0,
