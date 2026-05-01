@@ -28,7 +28,10 @@ import { useAiSend } from '../hooks/useAiSend';
 import { deriveActivePath, getSiblingInfo, withSynthesisedParents } from '../lib/branching';
 
 // Stable config — referential identity matters for useBackgroundConfig deps.
-const BG_CONFIG = { blurMode: 'partial' as const };
+// `full` matches HomeFeed.tsx so the AI tab inherits the same background
+// treatment as Feed (and therefore Contacts, which doesn't set its own and
+// inherits whichever sibling last focused).
+const BG_CONFIG = { blurMode: 'full' as const };
 
 // Visual gap between the bubble and either the tab bar (closed state) or
 // the keyboard (open state). Same value on both sides so the bubble feels
