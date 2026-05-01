@@ -19,6 +19,7 @@ export {
 } from './actionMenu';
 export {
   paymentStatusPopup,
+  swapStatusPopup,
   sendSuccessPopup,
   receiveSuccessPopup,
   nostrPaymentSentPopup,

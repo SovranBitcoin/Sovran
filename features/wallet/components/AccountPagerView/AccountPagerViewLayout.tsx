@@ -10,6 +10,7 @@ import { QRButton } from '@/shared/ui/composed/QRButton';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
+import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import { Account } from '../Account';
 import {
   BUTTON_H,
@@ -37,6 +38,13 @@ export function AccountPagerViewLayout({
     handleScanQR,
     handleSend,
   } = shared;
+
+  // While a multi-leg swap is running, every payment-initiating button on
+  // this screen is gated. Coco's mint/melt services serialize through a
+  // per-instance lock, and the user kicking off a Send/Receive/Swap/Split
+  // Bill in parallel can stall the swap or surface "operation already in
+  // progress" errors. Greying out is the cheapest user-visible indicator.
+  const isSwapping = useSwapStatusStore((s) => s.active?.state === 'running');
 
   return (
     <Log name="AccountPagerViewLayout">
@@ -83,6 +91,7 @@ export function AccountPagerViewLayout({
           systemIcon="fork.knife"
           label="Split Bill"
           testID="wallet-split-bill"
+          disabled={isSwapping}
           onPress={() => {
             walletLog.info('wallet.split_bill.tap');
             router.push('/(split-bill-flow)/amount' as any);
@@ -93,6 +102,7 @@ export function AccountPagerViewLayout({
           systemIcon="arrow.left.arrow.right"
           label="Swap"
           testID="wallet-swap"
+          disabled={isSwapping}
           onPress={() => {
             walletLog.info('wallet.swap.tap', { unit: account.unit });
             router.navigate({
@@ -113,9 +123,19 @@ export function AccountPagerViewLayout({
         />
       </HStack>
 
+      {/* Wrap the Receive / Send / QR row in a single pointerEvents=none
+          shroud while swapping. CapsuleButton and QRButton don't accept a
+          `disabled` prop, so the cheapest correct gate is to short-circuit
+          touches at the parent and reduce opacity to match
+          CircleActionButton's disabled treatment (0.4). */}
       <View
+        pointerEvents={isSwapping ? 'none' : 'auto'}
         className="relative w-full justify-center px-3"
-        style={{ marginTop: 8, height: Math.max(QR_SIZE, BUTTON_H) }}>
+        style={{
+          marginTop: 8,
+          height: Math.max(QR_SIZE, BUTTON_H),
+          opacity: isSwapping ? 0.4 : 1,
+        }}>
         <View className="flex-row gap-3">
           <View testID="wallet-receive" className="flex-1">
             <CapsuleButton

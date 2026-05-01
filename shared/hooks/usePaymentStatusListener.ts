@@ -13,6 +13,7 @@ import { useManagerContext } from '@cashu/coco-react';
 
 import { paymentStatusPopup } from '@/shared/lib/popup';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import { isSwapStatusActive } from '@/shared/stores/runtime/swapStatusStore';
 import { paymentLog } from '@/shared/lib/logger';
 
 const NPC_RECEIVE_POPUP_MAX_AGE_MS = 5 * 60 * 1000;
@@ -82,6 +83,17 @@ export function usePaymentStatusListener(): void {
         });
         if (state !== 'PAID') return;
 
+        // Suppress per-leg toasts while a swap is running — the unified
+        // SwapStatusToast owns the user-facing surface for the duration.
+        if (isSwapStatusActive()) {
+          paymentLog.info('hook.payment_status.suppressed_for_swap', {
+            quoteId,
+            mintUrl,
+            phase: 'mint_quote_state_changed',
+          });
+          return;
+        }
+
         const history = await manager.history.getPaginatedHistory(0, 100);
         const entry = history.find(
           (h) =>
@@ -93,8 +105,7 @@ export function usePaymentStatusListener(): void {
         const unit = entry.unit ?? 'sat';
 
         const existingActive = usePaymentStatusStore.getState().active;
-        const isDuplicate =
-          existingActive?.variant === 'receive' && existingActive.id === quoteId;
+        const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
 
         paymentLog.info('hook.payment_status.receive_processing', {
           quoteId,
@@ -144,6 +155,15 @@ export function usePaymentStatusListener(): void {
         paymentLog.debug('hook.payment_status.mint_quote_added', { quoteId, state, mintUrl });
         if (state !== 'PAID') return;
 
+        if (isSwapStatusActive()) {
+          paymentLog.info('hook.payment_status.suppressed_for_swap', {
+            quoteId,
+            mintUrl,
+            phase: 'mint_quote_added',
+          });
+          return;
+        }
+
         const paidAt = op.paidAt ?? op.quote?.paidAt;
         if (!shouldShowNpcReceivePopup({ paidAt })) {
           paymentLog.info('hook.payment_status.npc_quote_suppressed', {
@@ -160,8 +180,7 @@ export function usePaymentStatusListener(): void {
         const unit = op.unit ?? op.intent?.unit ?? 'sat';
 
         const existingActive = usePaymentStatusStore.getState().active;
-        const isDuplicate =
-          existingActive?.variant === 'receive' && existingActive.id === quoteId;
+        const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
 
         paymentLog.info('hook.payment_status.npc_receive_processing', {
           quoteId,
@@ -197,41 +216,39 @@ export function usePaymentStatusListener(): void {
       ({ operationId, operation }: { mintUrl: string; operationId: string; operation: any }) => {
         // operation.quoteId is the cashu-ts quote ID that matches the popup's id.
         // Fallback chain: operation.quoteId → operation.quote?.quoteId → operationId
-        const quoteId = (operation as any)?.quoteId ?? (operation as any)?.quote?.quoteId ?? operationId;
+        const quoteId =
+          (operation as any)?.quoteId ?? (operation as any)?.quote?.quoteId ?? operationId;
         paymentLog.info('hook.payment_status.mint_quote_redeemed', { operationId, quoteId });
         usePaymentStatusStore.getState().setConfirmed(quoteId);
       }
     );
 
-    const offReceiveCreated = manager.on(
-      'receive-op:finalized',
-      async ({ mintUrl, operation }) => {
-        const amount = operation.amount;
-        paymentLog.info('hook.payment_status.receive_created', {
-          mintUrl,
-          amount,
-          operationId: operation.id,
-        });
-        const store = usePaymentStatusStore.getState();
-        const hadPending =
-          store.active?.variant === 'receive-ecash' &&
-          store.active?.amount === amount &&
-          store.active?.mintUrl === mintUrl;
+    const offReceiveCreated = manager.on('receive-op:finalized', async ({ mintUrl, operation }) => {
+      const amount = operation.amount;
+      paymentLog.info('hook.payment_status.receive_created', {
+        mintUrl,
+        amount,
+        operationId: operation.id,
+      });
+      const store = usePaymentStatusStore.getState();
+      const hadPending =
+        store.active?.variant === 'receive-ecash' &&
+        store.active?.amount === amount &&
+        store.active?.mintUrl === mintUrl;
 
-        if (hadPending && store.active) {
-          // Brief delay so HistoryService.handleReceiveOperationUpdated can persist the entry
-          await new Promise((r) => setTimeout(r, 50));
-          if (cancelledRef.current) return;
-          const history = await manager.history.getPaginatedHistory(0, 20);
-          const realEntry = history.find(
-            (h) => h.type === 'receive' && h.amount === amount && h.mintUrl === mintUrl
-          );
-          if (realEntry?.id) {
-            store.setConfirmed(store.active.id, { receiveEntryId: realEntry.id });
-          }
+      if (hadPending && store.active) {
+        // Brief delay so HistoryService.handleReceiveOperationUpdated can persist the entry
+        await new Promise((r) => setTimeout(r, 50));
+        if (cancelledRef.current) return;
+        const history = await manager.history.getPaginatedHistory(0, 20);
+        const realEntry = history.find(
+          (h) => h.type === 'receive' && h.amount === amount && h.mintUrl === mintUrl
+        );
+        if (realEntry?.id) {
+          store.setConfirmed(store.active.id, { receiveEntryId: realEntry.id });
         }
       }
-    );
+    });
 
     const offSendFinalized = manager.on(
       'send:finalized',
@@ -247,6 +264,14 @@ export function usePaymentStatusListener(): void {
         const amount = operation.amount;
         const unit = 'sat';
         paymentLog.info('hook.payment_status.send_finalized', { operationId, mintUrl, amount });
+        if (isSwapStatusActive()) {
+          paymentLog.info('hook.payment_status.suppressed_for_swap', {
+            operationId,
+            mintUrl,
+            phase: 'send_finalized',
+          });
+          return;
+        }
         const store = usePaymentStatusStore.getState();
         const hadPending =
           (store.active?.id === operationId &&
@@ -297,6 +322,15 @@ export function usePaymentStatusListener(): void {
           quoteId: operation.quoteId,
           amount: operation.amount,
         });
+        if (isSwapStatusActive()) {
+          paymentLog.info('hook.payment_status.suppressed_for_swap', {
+            operationId,
+            mintUrl,
+            quoteId: operation.quoteId,
+            phase: 'melt_finalized',
+          });
+          return;
+        }
         const store = usePaymentStatusStore.getState();
         // Match by variant, not quoteId — the machine's onPaymentProcessing
         // uses a timestamp-based ID that won't match the real quoteId.

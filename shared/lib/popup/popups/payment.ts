@@ -7,9 +7,11 @@ import { popup } from '../engine';
 import { showCustomToast } from '../bridge';
 import { fmt } from '../format';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
+import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import type { PopupTextSegment } from '../format';
 import { PaymentStatusIcon } from '../PaymentStatusIcon';
 import { PaymentStatusToast } from '../PaymentStatusToast';
+import { SwapStatusToast } from '../SwapStatusToast';
 import type { BaseOverrides, PopupOverrides, TextOverrides } from './types';
 
 type PaymentStatusVariant = 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
@@ -172,6 +174,26 @@ export function paymentStatusPopup(payload: {
         };
       },
       subscribe: (onUpdate) => usePaymentStatusStore.subscribe(onUpdate),
+    },
+  });
+}
+
+/**
+ * Show the unified swap-progress toast. The orchestrator calls
+ * `useSwapStatusStore.start({ legs })` before this; the toast subscribes to
+ * the store and re-renders as legs flip pending → active → done. On
+ * `complete()` / `fail()` it animates to the green/red terminal state and
+ * auto-dismisses 3s later. Also clears `useSwapStatusStore.active` on hide.
+ */
+export function swapStatusPopup(): void {
+  showCustomToast({
+    component: (toastProps) => React.createElement(SwapStatusToast, toastProps),
+    duration: 'persistent',
+    onHide: () => {
+      // Defensive — the toast clears too, but a manual dismiss path
+      // (e.g. user swipes) needs the store reset to avoid stale state on
+      // the next swap.
+      useSwapStatusStore.getState().clear();
     },
   });
 }

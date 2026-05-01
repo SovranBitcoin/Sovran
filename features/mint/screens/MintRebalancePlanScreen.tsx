@@ -22,6 +22,8 @@ import {
   useSwapTransactionsStore,
   type SwapLegLocalStatus,
 } from '@/shared/stores/profile/swapTransactionsStore';
+import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
+import { swapStatusPopup } from '@/shared/lib/popup';
 import {
   RebalanceStepRow,
   RebalanceChainCard,
@@ -141,13 +143,13 @@ export function MintRebalancePlanScreen() {
     stepStatesRef.current = stepStates;
   }, [stepStates]);
 
-  useEffect(() => {
-    return () => {
-      abortRef.current = true;
-      runIdRef.current += 1;
-      isRunningRef.current = false;
-    };
-  }, []);
+  // No unmount-abort: the swap orchestration runs as a closure-bound async
+  // loop, and `useSwapStatusStore` + the unified SwapStatusToast both live
+  // outside the React tree. Letting the loop continue means the user can
+  // back out of this screen mid-swap and the swap finishes silently in the
+  // background — the toast keeps reporting progress, and the "View" button
+  // navigates into the SwapTransactionScreen for full detail. Local
+  // `setStepStates` calls after unmount are silent no-ops in React 19.
 
   const alreadyBalanced = useMemo(() => {
     return isAlreadyBalanced(plan.currentBalances, plan.targetBalances, minTransferThreshold);
@@ -1293,22 +1295,42 @@ export function MintRebalancePlanScreen() {
         totalSteps: steps.length,
         runId,
       });
+      const swapStatus = useSwapStatusStore.getState();
+      let anyFailed = false;
       try {
         for (const step of steps) {
           if (abortRef.current || runIdRef.current !== runId) return;
 
           const current = stepStatesRef.current[step.id]?.status;
-          if (current === 'done' || current === 'skipped') continue;
+          if (current === 'done' || current === 'skipped') {
+            // Pre-completed legs (e.g. retry-failed-only run) — leave the
+            // store's pip showing whatever it was before the rerun.
+            continue;
+          }
 
           setCurrentStepId(step.id);
+          // Flip the SwapStatusToast pip to "active" before kicking the step;
+          // executeStep is sync about its UI state but async about coco RPCs.
+          useSwapStatusStore.getState().setActiveLeg(step.id);
           const stepT0 = performance.now();
           // Execute; if it fails, we keep going to the next step (error tolerant)
           await executeStep(step, runId);
+          const finalStatus = stepStatesRef.current[step.id]?.status;
           cashuLog.info('swap.leg.complete', {
             stepId: step.id,
             duration_ms: Math.round(performance.now() - stepT0),
-            status: stepStatesRef.current[step.id]?.status,
+            status: finalStatus,
           });
+          if (finalStatus === 'done') {
+            useSwapStatusStore.getState().setLegDone(step.id);
+          } else if (finalStatus === 'skipped') {
+            useSwapStatusStore.getState().setLegSkipped(step.id);
+          } else if (finalStatus === 'failed') {
+            anyFailed = true;
+            useSwapStatusStore
+              .getState()
+              .setLegFailed(step.id, stepStatesRef.current[step.id]?.errorMessage);
+          }
         }
 
         if (abortRef.current || runIdRef.current !== runId) return;
@@ -1317,6 +1339,21 @@ export function MintRebalancePlanScreen() {
         if (swapGroupIdRef.current) {
           useSwapTransactionsStore.getState().finalizeGroup(swapGroupIdRef.current, 'finished');
         }
+        // Only flip the toast to its terminal state if the orchestrator owns
+        // an active swap (the popup was shown). The check guards retry runs
+        // that didn't trigger handleStart's start() call.
+        if (swapStatus.active) {
+          if (anyFailed) {
+            useSwapStatusStore.getState().fail();
+          } else {
+            useSwapStatusStore.getState().complete();
+          }
+        }
+      } catch (err) {
+        if (swapStatus.active) {
+          useSwapStatusStore.getState().fail(err instanceof Error ? err.message : String(err));
+        }
+        throw err;
       } finally {
         cashuLog.info('swap.batch.complete', {
           runId,
@@ -1331,9 +1368,16 @@ export function MintRebalancePlanScreen() {
   );
 
   const handleStart = useCallback(() => {
-    // Use ref-based guard to prevent race conditions (state check is async)
+    // Per-instance ref-based guard (this screen mount).
     if (isRunningRef.current) return;
     if (runStatus === 'running') return;
+    // Cross-instance guard: a prior screen mount may still be running an
+    // orchestration (the user backed out and reopened). Refuse to start a
+    // second concurrent swap so coco's mint/melt services don't overlap.
+    if (useSwapStatusStore.getState().active?.state === 'running') {
+      log.info('mint.rebalance.start_blocked_by_active_swap');
+      return;
+    }
 
     // Immediately set ref to prevent concurrent starts
     isRunningRef.current = true;
@@ -1358,6 +1402,23 @@ export function MintRebalancePlanScreen() {
     setStepStates(initial);
     setRunStatus('running');
     setCurrentStepId(null);
+
+    // Wire the unified Swap status toast — `usePaymentStatusListener` reads
+    // `useSwapStatusStore.active` and skips per-op toasts while this is
+    // running, so the user sees one progress notification instead of N.
+    const totalAmount = snapshot.steps.reduce((sum, s) => sum + (s.amount ?? 0), 0);
+    useSwapStatusStore.getState().start({
+      id: `swap-${runId}-${Date.now()}`,
+      unit,
+      totalAmount,
+      // Backs the toast's "View" button so completion → tap → SwapTransactionScreen.
+      groupId: swapGroupIdRef.current ?? undefined,
+      legs: snapshot.steps.map((s) => ({
+        id: s.id,
+        label: `${extractDomain(s.fromMintUrl)} → ${extractDomain(s.toMintUrl)}`,
+      })),
+    });
+    swapStatusPopup();
 
     // Kick off the runner (do not await; keep UI responsive)
     // Use the snapshot steps (stable), not any live recomputed list.
