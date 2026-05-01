@@ -40,6 +40,35 @@
  *     ],
  *   });
  *
+ * Usage (tabbed sections — pick-one-of-N grouped by category):
+ *
+ *   actionMenuPopup({
+ *     title: 'Select profile',
+ *     sections: [
+ *       { id: 'imported', anchor: { icon: 'mdi:download', label: 'Imported' },
+ *         buttons: importedProfileButtons },
+ *       { id: 'derived', anchor: { icon: 'mdi:source-branch', label: 'Derived' },
+ *         buttons: derivedProfileButtons },
+ *     ],
+ *     footerButtons: [{ text: 'Generate new account', icon: '...', onPress: ... }],
+ *   });
+ *
+ * Usage (tabbed sections with custom bodies + search, e.g. emoji picker):
+ *
+ *   actionMenuPopup({
+ *     title: 'Emoji',
+ *     snapPoint: '80%',
+ *     searchable: {
+ *       placeholder: 'Search emoji...',
+ *       renderResults: (q) => <EmojiGrid emojis={searchEmojis(q)} ... />,
+ *     },
+ *     sections: CATEGORIES.map((cat) => ({
+ *       id: cat.id,
+ *       anchor: { icon: <Text>{cat.icon}</Text>, label: cat.label },
+ *       renderBody: () => <EmojiGrid emojis={cat.emojis} ... />,
+ *     })),
+ *   });
+ *
  * Usage (input form, e.g. import nsec):
  *
  *   actionMenuPopup({
@@ -61,9 +90,17 @@ import { useSyncExternalStore } from 'react';
 import type React from 'react';
 import type { GestureResponderEvent } from 'react-native';
 
+import { log } from '@/shared/lib/logger';
+
+const actionMenuLog = log.child({ module: 'actionMenu' });
+
 export interface ActionMenuButton {
   text: string;
   icon?: string;
+  /** Custom leading glyph node (takes precedence over `icon`). Use when the
+   * row needs an avatar / emoji / non-iconify visual — e.g. profile rows in
+   * the profile switcher menu. */
+  iconNode?: React.ReactNode;
   testID?: string;
   variant?: 'primary' | 'secondary' | 'dangerous';
   /** Disables tap and (when `reason` is set) renders the reason as the description. */
@@ -118,16 +155,73 @@ export interface ActionMenuPrimaryAction {
   ) => void | Promise<void>;
 }
 
+/**
+ * A scroll-to-section group within a tabbed menu. Each section gets a pill in
+ * the horizontal anchor bar above the scroll viewport; tapping the pill
+ * scrolls the body to the section, and the active pill highlights as the
+ * user scrolls. Reuses `SectionAnchorList` under the hood.
+ *
+ * Provide `buttons` for a vertical list of `Menu.Item`s (the profile-switcher
+ * pattern), or `renderBody` for arbitrary content like an emoji grid. When
+ * both are set, `renderBody` wins.
+ */
+export interface ActionMenuSection {
+  id: string;
+  anchor: { icon?: React.ReactNode; label: string; testID?: string };
+  buttons?: ActionMenuButton[];
+  renderBody?: () => React.ReactNode;
+}
+
+/**
+ * Search support for tabbed menus. The host owns the input state and renders
+ * a `BottomSheetTextInput` above the anchor bar; while the query is non-empty
+ * the sections + tab bar hide and `renderResults(query)` becomes the body.
+ * Return `null` (or omit `renderResults`) to keep showing the section list
+ * regardless of input — useful when the caller wants the input as filter only.
+ */
+export interface ActionMenuSearchable {
+  placeholder?: string;
+  renderResults?: (query: string) => React.ReactNode | null;
+}
+
 export interface ActionMenuPayload {
   /** Rendered as `Menu.Label` at the top of the sheet. */
   title?: string;
   /** Custom content rendered between the title and any items / inputs. */
   header?: React.ReactNode;
   buttons?: ActionMenuButton[];
+  /**
+   * Buttons pinned at the bottom of the sheet (with a gradient/blur fade
+   * above them so the scrollable content visibly disappears beneath).
+   * Rendered after `inputs` and `primaryAction`. Use for affordances that
+   * should always be reachable regardless of scroll position — e.g.
+   * "Generate new account" / "Import Nostr" on the profile switcher
+   * where the scrollable header can be tall.
+   *
+   * When set, the menu's body becomes a scroll container capped at ~85%
+   * of the viewport. When unset, the menu auto-fits content as before.
+   */
+  footerButtons?: ActionMenuButton[];
   /** Form inputs rendered above the primary action. */
   inputs?: ActionMenuInput[];
   /** Submit button for `inputs`. Required when `inputs` is set. */
   primaryAction?: ActionMenuPrimaryAction;
+  /**
+   * Tabbed scroll-to-section groups. When set, the menu body becomes a
+   * scrollable section list with a horizontal anchor bar above it (same
+   * `SectionAnchorList` primitive used elsewhere). Mutually exclusive with
+   * top-level `buttons` / `inputs` for the body region — those are still
+   * supported for legacy single-list menus.
+   */
+  sections?: ActionMenuSection[];
+  /** Adds a search input above the anchor bar. Has no effect without `sections`. */
+  searchable?: ActionMenuSearchable;
+  /**
+   * Override the sheet's snap point. Defaults: `'60%'` when there's a sticky
+   * footer or sections, otherwise dynamic-sized to content. Useful for tabbed
+   * pickers that need taller real estate (`'80%'`).
+   */
+  snapPoint?: string;
   /** Fired when the sheet closes without the user picking any item (overlay tap, swipe-down). */
   onDismiss?: () => void;
 }
@@ -141,6 +235,17 @@ function emit(): void {
 
 /** Open the action menu with the given payload. */
 export function actionMenuPopup(payload: ActionMenuPayload): void {
+  actionMenuLog.info('actionMenu.dispatch', {
+    title: payload.title,
+    hadPayload: currentPayload !== null,
+    sections: payload.sections?.length ?? 0,
+    buttons: payload.buttons?.length ?? 0,
+    footerButtons: payload.footerButtons?.length ?? 0,
+    inputs: payload.inputs?.length ?? 0,
+    hasSearchable: !!payload.searchable,
+    snapPoint: payload.snapPoint,
+    listeners: listeners.size,
+  });
   currentPayload = payload;
   emit();
 }
@@ -148,6 +253,7 @@ export function actionMenuPopup(payload: ActionMenuPayload): void {
 /** Dismiss the menu programmatically (the host also dismisses on overlay tap / swipe). */
 export function dismissActionMenuPopup(): void {
   if (currentPayload === null) return;
+  actionMenuLog.info('actionMenu.dismiss', { title: currentPayload.title });
   currentPayload = null;
   emit();
 }

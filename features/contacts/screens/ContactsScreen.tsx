@@ -26,6 +26,12 @@ import {
 import { ScreenContainer } from '../components/ScreenContainer';
 import { navigateToContact } from '../lib/navigateToProfile';
 import { SearchFilters } from '../components/search/SearchFilters';
+import {
+  useWhitenoiseRequests,
+  type WhitenoiseRequest,
+} from '@/features/whitenoise/hooks/useWhitenoiseRequests';
+import { useWhitenoiseDmContacts } from '@/features/whitenoise/hooks/useWhitenoiseDmContacts';
+import { RequestActions } from '@/features/whitenoise/components/RequestActions';
 import { SEARCH_FILTERS_HEIGHT } from '../lib/constants/styles';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
 import { isValidGeohash } from 'bitchat-module';
@@ -131,6 +137,34 @@ export const ContactsScreen = () => {
     dmEvents
   );
 
+  // Pending White Noise (Marmot MLS) DM invites — surfaced as the
+  // 'Requests' pill. The InviteReader (mounted by WhitenoiseProvider) keeps
+  // this list fresh in the background; we just read from it here. Pulled
+  // up next to contactPubkeys / mintPubkeys so the inviter pubkeys feed
+  // into the same batched kind-0 metadata subscription below — otherwise
+  // request rows would show empty avatar + "loading…" placeholders forever
+  // because their pubkeys would never be in `authors`.
+  const {
+    requests: whitenoiseRequests,
+    busyId: whitenoiseBusyId,
+    accept: acceptWhitenoiseRequest,
+    decline: declineWhitenoiseRequest,
+  } = useWhitenoiseRequests();
+  const requestPubkeys = useMemo(
+    () => whitenoiseRequests.map((r) => r.fromPubkey),
+    [whitenoiseRequests]
+  );
+
+  // Accepted Marmot DM counterparties — Marmot uses kind-445 group events,
+  // not kind-4/kind-14 DMs, so they don't show up via useRecentContacts.
+  // Read them directly from our local DM-index and merge into the contact
+  // sources below.
+  const { entries: whitenoiseDmEntries } = useWhitenoiseDmContacts();
+  const whitenoiseContactPubkeys = useMemo(
+    () => whitenoiseDmEntries.map((e) => e.pubkey),
+    [whitenoiseDmEntries]
+  );
+
   // Profile metadata is served from the shared SWR cache. Cache hits
   // paint immediately; misses/stale entries trigger one batched kind-0
   // subscription with `authors: missingOrStale`. Other surfaces
@@ -138,8 +172,15 @@ export const ContactsScreen = () => {
   // and consume the same cache, so visiting Contacts after using any
   // of them is essentially instant.
   const allPubkeys = useMemo(
-    () => [...new Set([...contactPubkeys, ...mintPubkeys])],
-    [contactPubkeys, mintPubkeys],
+    () => [
+      ...new Set([
+        ...contactPubkeys,
+        ...mintPubkeys,
+        ...requestPubkeys,
+        ...whitenoiseContactPubkeys,
+      ]),
+    ],
+    [contactPubkeys, mintPubkeys, requestPubkeys, whitenoiseContactPubkeys],
   );
   const { metadata: profilesMap } = useNostrProfileMetadataMany(allPubkeys);
 
@@ -205,14 +246,62 @@ export const ContactsScreen = () => {
     });
   }, [mintsWithProfile, profilesMap, lowerQuery, matchesProfileQuery]);
 
+  const requestRows = useMemo(
+    () =>
+      whitenoiseRequests.map((r) => ({
+        type: 'request' as const,
+        pubkey: r.fromPubkey,
+        request: r,
+      })),
+    [whitenoiseRequests]
+  );
+
+  // Map accepted Marmot DM counterparties into the same row shape used by
+  // useRecentContacts entries so renderContactItem (and search filtering)
+  // treats them identically. timestamp 0 keeps them below entries with
+  // genuine recent activity until we wire group-history reads.
+  const whitenoiseContactRows = useMemo(
+    () =>
+      whitenoiseDmEntries.map((e) => ({
+        type: 'contact' as const,
+        pubkey: e.pubkey,
+        dmEvent: null,
+        nip17Content: undefined as string | undefined,
+        timestamp: 0,
+      })),
+    [whitenoiseDmEntries]
+  );
+
+  const filteredWhitenoiseContacts = useMemo(() => {
+    if (!lowerQuery) return whitenoiseContactRows;
+    return whitenoiseContactRows.filter((c) => {
+      const profile = profilesMap.get(c.pubkey);
+      return matchesProfileQuery(profile);
+    });
+  }, [whitenoiseContactRows, profilesMap, lowerQuery, matchesProfileQuery]);
+
   const currentListData = useMemo(() => {
     switch (activeFilter) {
-      case 'Recent':
-        return filteredDisplayContacts;
+      case 'Recent': {
+        // Merge NIP-17/NIP-04 recent contacts with accepted Marmot DM
+        // counterparties, deduped by pubkey (NIP-17 entries win — they
+        // carry actual lastMessage previews).
+        const byKey = new Map<string, any>();
+        for (const item of filteredWhitenoiseContacts) byKey.set(item.pubkey, item);
+        for (const item of filteredDisplayContacts) {
+          if (item.pubkey) byKey.set(item.pubkey, item);
+        }
+        return Array.from(byKey.values());
+      }
       case 'Mints':
         return filteredDisplayMints;
+      case 'Requests':
+        return requestRows;
       default: {
         const byKey = new Map<string, any>();
+        for (const item of filteredWhitenoiseContacts) {
+          byKey.set(item.pubkey, item);
+        }
         for (const item of filteredDisplayContacts) {
           const key = item.pubkey || item.mint?.mintUrl;
           if (key) byKey.set(key, item);
@@ -224,7 +313,13 @@ export const ContactsScreen = () => {
         return Array.from(byKey.values());
       }
     }
-  }, [activeFilter, filteredDisplayContacts, filteredDisplayMints]);
+  }, [
+    activeFilter,
+    filteredDisplayContacts,
+    filteredDisplayMints,
+    filteredWhitenoiseContacts,
+    requestRows,
+  ]);
 
   const handleFilterChange = useCallback((filter: string) => {
     log.debug('contacts.filter_changed', { filter });
@@ -234,9 +329,46 @@ export const ContactsScreen = () => {
 
   const renderContactItem = useCallback(
     ({ item }: { item: any }) => {
+      // White Noise pending invite — keep it in this list so the empty/
+      // loading/scrolling behaviour is the same as the other pills, but
+      // swap the trailing slot for accept/decline buttons.
+      if (item.type === 'request') {
+        const req: WhitenoiseRequest = item.request;
+        const profile = profilesMap.get(req.fromPubkey);
+        // Strangers' kind-0 metadata may simply not be on the user's
+        // default relay set — that's the whole point of a "request". So
+        // render with the seeded fallback immediately rather than a
+        // skeleton forever. If metadata arrives later (the kind-0 batch
+        // happens to find it), the avatar swaps to the image and the
+        // displayName replaces the truncated-pubkey fallback.
+        return (
+          <ContactRow
+            identity={[
+              nostrIdentity(req.fromPubkey, profile, { isLoadingProfile: false }),
+            ]}
+            subtitle="Wants to start a White Noise chat"
+            hideMetadata
+            trailing={
+              <RequestActions
+                isBusy={whitenoiseBusyId === req.id}
+                onAccept={() => void acceptWhitenoiseRequest(req)}
+                onDecline={() => void declineWhitenoiseRequest(req)}
+              />
+            }
+            testID={`request-row:${req.fromPubkey}`}
+          />
+        );
+      }
+
       const profile = item.pubkey ? profilesMap.get(item.pubkey) : undefined;
       const lastMessage = item.dmEvent?.content as string | undefined;
-      const isLoadingProfile = item.pubkey !== undefined && profile === undefined;
+      // Don't drive the avatar's loading skeleton off "profile is missing":
+      // for strangers (Marmot DM accept, Requests pill) kind-0 may simply
+      // not be on our relay set, so missing IS the steady state. With
+      // `resolveIdentityName` powering the title, the seeded fallback
+      // avatar plus deterministic word-pair name renders immediately —
+      // no skeleton-forever rows.
+      const isLoadingProfile = false;
       const mintUrl: string | undefined = item.mint?.mintUrl;
 
       // Layered identity: mint-type items also have a nostr contact key
@@ -270,7 +402,12 @@ export const ContactsScreen = () => {
         />
       );
     },
-    [profilesMap]
+    [
+      profilesMap,
+      whitenoiseBusyId,
+      acceptWhitenoiseRequest,
+      declineWhitenoiseRequest,
+    ]
   );
 
   const renderEmpty = useCallback(() => {
@@ -289,7 +426,9 @@ export const ContactsScreen = () => {
         <Text style={[styles.emptyText, { color: opacity(foreground, 0.4) }]}>
           {activeFilter === 'Mints'
             ? 'No mints with nostr contacts found'
-            : 'No recent contacts yet'}
+            : activeFilter === 'Requests'
+              ? 'No pending White Noise invites'
+              : 'No recent contacts yet'}
         </Text>
       </View>
     );
@@ -322,10 +461,11 @@ export const ContactsScreen = () => {
   //   • Search open, empty query → all pills so the user can pick a scope.
   //   • Search open with a query → only pills that have at least one match.
   const visibleFilters = useMemo<readonly string[]>(() => {
-    if (!isSearching) return ['All', 'Recent', 'Mints'];
-    if (!lowerQuery) return ['All', 'Recent', 'Mints', 'Groups'];
+    if (!isSearching) return ['All', 'Recent', 'Requests', 'Mints'];
+    if (!lowerQuery) return ['All', 'Recent', 'Requests', 'Mints', 'Groups'];
     const list: string[] = ['All'];
     if (filteredDisplayContacts.length > 0) list.push('Recent');
+    if (whitenoiseRequests.length > 0) list.push('Requests');
     if (filteredDisplayMints.length > 0) list.push('Mints');
     if (matchingTiers.length > 0 || groupsGeohashQuery) list.push('Groups');
     return list;
@@ -334,6 +474,7 @@ export const ContactsScreen = () => {
     lowerQuery,
     filteredDisplayContacts,
     filteredDisplayMints,
+    whitenoiseRequests,
     matchingTiers,
     groupsGeohashQuery,
   ]);

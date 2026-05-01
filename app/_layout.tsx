@@ -47,6 +47,7 @@ import { MODAL_SCREENS, ModalConfig } from '../config/modalScreens';
 import { getBaseModalHeaderOptions } from '../config/flowLayoutOptions';
 import { CocoProvider } from '@/shared/providers/CocoProvider';
 import { BitchatBLEProvider } from '@/shared/providers/BitchatBLEProvider';
+import { WhitenoiseProvider } from '@/features/whitenoise/WhitenoiseProvider';
 import { WalletContextProvider } from '@/shared/providers/WalletContextProvider';
 import { HeroTransitionProvider } from '@/shared/providers/hero-transition/HeroTransitionProvider';
 import { CocoPaymentUXProvider } from '@/features/send/providers/CocoPaymentUX';
@@ -138,6 +139,7 @@ function AccountScopedProviders({
         ProfileWallpaperProvider,
         [NostrKeysProvider, { defaultAccountIndex: accountIndex }],
         [NostrNDKProvider, { accountIndex }],
+        [WhitenoiseProvider, { accountIndex }],
         CocoProvider,
         WalletContextProvider,
         CocoPaymentUXProvider,

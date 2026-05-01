@@ -76,6 +76,7 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
     let cacheHits = 0;
     let unwrapped = 0;
     let failed = 0;
+    let nonDm = 0;
     const out = giftWrapEvents
       .map((event) => {
         // L1 hit: skip the two NIP-44 decrypts entirely.
@@ -99,12 +100,26 @@ export function useRecentContacts(nostrKeys: NostrKeys | null) {
         unwrapped++;
         return { ...fresh, wrapId: event.id };
       })
-      .filter((dm): dm is NonNullable<typeof dm> => dm !== null);
+      // Drop non-NIP-17 inner rumors. kind-1059 is overloaded across the
+      // Nostr ecosystem — Marmot Welcomes (kind 444), MLS proposals, and
+      // other application rumors all share the same gift-wrap envelope.
+      // Recent contacts should only surface actual chat DMs (kind 14),
+      // otherwise an MLS invite from a stranger leaks into the Recent
+      // pill as a skeleton row.
+      .filter((dm): dm is NonNullable<typeof dm> => {
+        if (dm === null) return false;
+        if (dm.kind !== 14) {
+          nonDm++;
+          return false;
+        }
+        return true;
+      });
     paymentLog.debug('payment.contacts.unwrap_pass', {
       total: giftWrapEvents.length,
       cacheHits,
       unwrapped,
       failed,
+      nonDm,
       duration_ms: Math.round((performance.now() - t0) * 100) / 100,
     });
     return out;

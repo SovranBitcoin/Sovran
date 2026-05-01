@@ -18,8 +18,14 @@ import {
   InteractionManager,
   TextInput as RNTextInput,
   Animated as RNAnimated,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import {
+  KeyboardAvoidingView,
+  useKeyboardState,
+} from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -66,7 +72,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import TextInput from '@/shared/ui/primitives/TextInput';
 import Icon from 'assets/icons';
-import { SessionsPanel } from '@/features/user/components/routstr/SessionsPanel';
+import { ChatComposer } from '@/shared/ui/composed/chat/ChatComposer';
 import {
   ContextMenu,
   Host,
@@ -81,6 +87,11 @@ import { Button } from '@/shared/ui/primitives/Button';
 
 // Utilities
 import { isValidEcashToken } from '@/shared/lib/cashu/utils';
+import {
+  clearStreaming,
+  setStreaming,
+  useStreamingContent,
+} from '@/features/ai/lib/streamingBuffer';
 import { ROUTSTR_PUBKEY } from '@/shared/lib/constants';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
@@ -105,11 +116,11 @@ import {
 import opacity from 'hex-color-opacity';
 import { GlassSearchBar } from '@/shared/ui/composed/GlassSearchBar';
 import { truncateMiddle } from '@/shared/lib/strings';
-import { getUsername } from '@/shared/lib/username';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { chatLog, Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 function formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp * 1000);
@@ -566,11 +577,18 @@ function MessageBubble({
     'shade-500',
   ] as const);
 
-  const content = Array.isArray(message.content)
+  // Live tokens during a Routstr stream are pushed to the module-level
+  // `streamingBuffer` (same one the AI tab uses) — only the bubble whose id
+  // matches re-renders per chunk. The persisted message stays at its last
+  // committed value (we do a single `addMessage` at stream completion), so
+  // we prefer the live buffer reading whenever it's non-null.
+  const liveStreamingContent = useStreamingContent(message.id);
+  const messageContentString = Array.isArray(message.content)
     ? message.content.join('')
     : typeof message.content === 'string'
       ? message.content
       : String(message.content || '');
+  const content = liveStreamingContent ?? messageContentString;
 
   const reasoningContent = message.reasoningContent || '';
   const isStreamComplete = message.isStreamComplete !== undefined ? message.isStreamComplete : true;
@@ -921,6 +939,11 @@ export function UserMessagesScreen({
   const [isRefreshingBalance, setIsRefreshingBalance] = useState(false);
   const [isAttachmentsBottomSheetOpen, setIsAttachmentsBottomSheetOpen] = useState(false);
   const [isModelSwitchBottomSheetOpen, setIsModelSwitchBottomSheetOpen] = useState(false);
+  // Measured height of the ChatComposer wrapper. Used to position the
+  // floating "Send Money" / "Top Up" action row just above the composer
+  // — fixed offsets break when the composer's intrinsic height changes
+  // (e.g. the new single-bubble layout is taller than the old pill).
+  const [composerHeight, setComposerHeight] = useState(0);
   const [isSessionsPanelOpen, setIsSessionsPanelOpen] = useState(false);
   const [sessionSearchQuery, setSessionSearchQuery] = useState('');
   const [sessionClearKey, setSessionClearKey] = useState(0);
@@ -931,6 +954,105 @@ export function UserMessagesScreen({
 
   // Routstr mode detection
   const isRoutstrMode = pubkey === ROUTSTR_PUBKEY;
+
+  // ─── Perf instrumentation (chat surface) ──────────────────────────────
+  // Same shape as AiChatScreen / WhitenoiseDMScreen / GeohashChatScreen so
+  // log-doctor's `--event chat.kav|chat.list|chat.send|chat.composer`
+  // filter spans every message surface uniformly. Surface tag flips with
+  // `isRoutstrMode` so DM and AI traffic separate cleanly in the timeline.
+  const perfSurface = isRoutstrMode ? 'routstr-legacy' : 'nostr-dm';
+  const kbStateLegacy = useKeyboardState();
+  const kbStateRefLegacy = useRef({ isVisible: false, height: 0 });
+  useEffect(() => {
+    const prev = kbStateRefLegacy.current;
+    if (prev.isVisible === kbStateLegacy.isVisible && prev.height === kbStateLegacy.height) return;
+    chatLog.info('chat.kav.keyboard_state', {
+      surface: perfSurface,
+      from: { isVisible: prev.isVisible, height: prev.height },
+      to: { isVisible: kbStateLegacy.isVisible, height: kbStateLegacy.height },
+      headerHeight,
+      composerHeight,
+    });
+    kbStateRefLegacy.current = { isVisible: kbStateLegacy.isVisible, height: kbStateLegacy.height };
+  }, [kbStateLegacy.isVisible, kbStateLegacy.height, headerHeight, composerHeight, perfSurface]);
+
+  const listLayoutRefLegacy = useRef<{ height: number; width: number } | null>(null);
+  // Loose typing — same LegendList vs RN type-mismatch story as the other
+  // chat surfaces (see AiChatScreen / GeohashChatScreen perf hooks).
+  const handleListLayoutLegacy = useCallback(
+    (e: LayoutChangeEvent | any) => {
+      const { width, height } = (e as LayoutChangeEvent).nativeEvent.layout;
+      const last = listLayoutRefLegacy.current;
+      if (last && Math.abs(last.width - width) < 0.5 && Math.abs(last.height - height) < 0.5) {
+        return;
+      }
+      listLayoutRefLegacy.current = { width, height };
+      chatLog.info('chat.list.layout', {
+        surface: perfSurface,
+        width: Math.round(width),
+        height: Math.round(height),
+      });
+    },
+    [perfSurface]
+  );
+
+  const listContentSizeRefLegacy = useRef<{ w: number; h: number } | null>(null);
+  const handleListContentSizeLegacy = useCallback(
+    (w: number, h: number) => {
+      const last = listContentSizeRefLegacy.current;
+      if (last && Math.abs(last.w - w) < 0.5 && Math.abs(last.h - h) < 0.5) return;
+      const viewportH = listLayoutRefLegacy.current?.height ?? 0;
+      listContentSizeRefLegacy.current = { w, h };
+      chatLog.debug('chat.list.content_size', {
+        surface: perfSurface,
+        contentW: Math.round(w),
+        contentH: Math.round(h),
+        viewportH: Math.round(viewportH),
+        overflow: Math.round(h - viewportH),
+        msgsCount: messages.length,
+      });
+    },
+    [perfSurface, messages.length]
+  );
+
+  const lastScrollLogRefLegacy = useRef(0);
+  const handleListScrollLegacy = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent> | any) => {
+      const now = Date.now();
+      if (now - lastScrollLogRefLegacy.current < 120) return;
+      lastScrollLogRefLegacy.current = now;
+      const { contentOffset, contentSize, layoutMeasurement } = (
+        e as NativeSyntheticEvent<NativeScrollEvent>
+      ).nativeEvent;
+      chatLog.debug('chat.list.scroll', {
+        surface: perfSurface,
+        offsetY: Math.round(contentOffset.y),
+        contentH: Math.round(contentSize.height),
+        viewportH: Math.round(layoutMeasurement.height),
+        distFromEnd: Math.round(
+          contentSize.height - (contentOffset.y + layoutMeasurement.height)
+        ),
+      });
+    },
+    [perfSurface]
+  );
+
+  const prevMsgRefLegacy = useRef({ count: 0, lastId: '' });
+  useEffect(() => {
+    const prev = prevMsgRefLegacy.current;
+    const last = messages[messages.length - 1];
+    const next = { count: messages.length, lastId: last?.id ?? '' };
+    if (next.count === prev.count && next.lastId === prev.lastId) return;
+    chatLog.info('chat.list.history_change', {
+      surface: perfSurface,
+      prevCount: prev.count,
+      count: next.count,
+      delta: next.count - prev.count,
+      lastSender: last?.sender ?? null,
+      lastIsSending: last?.isSending ?? null,
+    });
+    prevMsgRefLegacy.current = next;
+  }, [messages, perfSurface]);
 
   // Calculate minimum bottom sheet detent (kept for potential future use)
   const _bottomSheetDetents = useMemo((): ('medium' | 'large' | number)[] => {
@@ -1046,10 +1168,13 @@ export function UserMessagesScreen({
   // DERIVED STATE
   // ===========================
   const displayName = isRoutstrMode
-    ? counterpartyMetadata?.displayName || counterpartyMetadata?.name || 'routstr'
-    : counterpartyMetadata?.displayName ||
-      counterpartyMetadata?.name ||
-      getUsername(pubkey);
+    ? // AI session — a deterministic word-pair "clever-whale" would mislead
+      // users into thinking it's a person. Use a semantic label instead.
+      resolveIdentityName({
+        nostrProfile: counterpartyMetadata,
+        fallbackName: 'AI',
+      })
+    : resolveIdentityName({ pubkey, nostrProfile: counterpartyMetadata });
   const userPicture = counterpartyMetadata?.picture;
   const lud16 = counterpartyMetadata?.lud16;
   const myProfile = useProfileDisplay(nostrKeys?.pubkey || '');
@@ -1539,9 +1664,12 @@ export function UserMessagesScreen({
     setMessages((prev) => [...prev, assistantMessageDisplay]);
 
     setStreamingMessageId(assistantMessageId);
-
-    // LegendList maintainScrollAtEnd handles this automatically
-    let assistantAddedToStore = false;
+    // Mirror useAiSend.ts: route in-flight tokens through the module-level
+    // streaming buffer instead of round-tripping through Zustand. Without
+    // this, every chunk persisted the entire conversation to AsyncStorage
+    // (log-doctor showed `_dedup=186` `store.routstr.update_message` for a
+    // single message — i.e. ~186 store writes during one assistant reply).
+    setStreaming(assistantMessageId, '');
 
     try {
       let apiMessages: { role: 'user' | 'assistant' | 'system'; content: string }[];
@@ -1627,6 +1755,8 @@ export function UserMessagesScreen({
         if (reasoningContent) {
           hasReceivedAnyContent = true;
           fullReasoning += reasoningContent;
+          // Reasoning chunks flow far less often than content chunks; the
+          // local `setMessages` is fine here.
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMessageId
@@ -1637,7 +1767,7 @@ export function UserMessagesScreen({
         }
 
         if (content) {
-          // Finalize thinking duration when first content token arrives
+          // Finalize thinking duration when first content token arrives.
           if (!fullContent) {
             thinkingSec = Math.round((performance.now() - sendStart) / 1000);
             setMessages((prev) =>
@@ -1649,38 +1779,10 @@ export function UserMessagesScreen({
           hasReceivedAnyContent = true;
           fullContent += content;
 
-          if (!isAnonymous) {
-            if (!assistantAddedToStore) {
-              addMessage({
-                id: assistantMessageId,
-                role: 'assistant',
-                content: fullContent,
-                timestamp: timestamp + 1,
-                thinkingDurationSec: thinkingSec,
-                reasoningContent: fullReasoning || undefined,
-              });
-              assistantAddedToStore = true;
-            } else {
-              updateMessage(assistantMessageId, fullContent);
-            }
-          }
-
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMessageId
-                ? {
-                    ...msg,
-                    content: fullContent,
-                    reasoningContent: fullReasoning || undefined,
-                    isStreamComplete,
-                  }
-                : msg
-            )
-          );
-
-          if (fullContent.length < 100 || fullContent.length % 100 === 0) {
-            // LegendList maintainScrollAtEnd handles this automatically
-          }
+          // Live tokens go to the streaming buffer ONLY. The persisted
+          // store and the local `setMessages` get one write each at stream
+          // completion (below) — not per chunk.
+          setStreaming(assistantMessageId, fullContent);
         } else if (isStreamComplete) {
           setMessages((prev) =>
             prev.map((msg) => (msg.id === assistantMessageId ? { ...msg, isStreamComplete } : msg))
@@ -1697,29 +1799,39 @@ export function UserMessagesScreen({
         total_ms: Math.round(performance.now() - sendStart),
       });
 
+      // Single Zustand persist write per assistant message — same pattern as
+      // useAiSend.ts. Replaces what used to be one `addMessage` plus 100+
+      // `updateMessage` calls per reply, each of which serialized the whole
+      // conversation to AsyncStorage.
       if (!isAnonymous && fullContent) {
-        if (!assistantAddedToStore) {
-          addMessage({
-            id: assistantMessageId,
-            role: 'assistant',
-            content: fullContent,
-            timestamp: timestamp + 1,
-            thinkingDurationSec: thinkingSec,
-            reasoningContent: fullReasoning || undefined,
-          });
-        } else {
-          updateMessage(assistantMessageId, fullContent);
-        }
+        addMessage({
+          id: assistantMessageId,
+          role: 'assistant',
+          content: fullContent,
+          timestamp: timestamp + 1,
+          thinkingDurationSec: thinkingSec,
+          reasoningContent: fullReasoning || undefined,
+        });
       }
 
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantMessageId
-            ? { ...msg, content: fullContent, isStreamComplete: true }
+            ? {
+                ...msg,
+                content: fullContent,
+                reasoningContent: fullReasoning || undefined,
+                reasoningDurationSec: thinkingSec,
+                isStreamComplete: true,
+              }
             : msg
         )
       );
 
+      // Clear the streaming buffer BEFORE we drop streamingMessageId so the
+      // bubble's last render reads its content from `message.content`
+      // (committed above) rather than the now-empty buffer.
+      clearStreaming();
       setStreamingMessageId(null);
 
       if (!hasReceivedAnyContent && chunkCount > 0) {
@@ -1771,10 +1883,12 @@ export function UserMessagesScreen({
           prev.filter((msg) => msg.id !== userMessageId && msg.id !== assistantMessageId)
         );
 
+        // Streaming flow only persists the assistant message at completion,
+        // so on a 402 we only need to roll back the user message. The
+        // assistant placeholder lives in local state + the streaming buffer
+        // — neither survives this filter / `clearStreaming` in the finally.
         if (!isAnonymous) {
-          removeMessages(
-            new Set([userMessageId, ...(assistantAddedToStore ? [assistantMessageId] : [])])
-          );
+          removeMessages(new Set([userMessageId]));
         }
 
         actionMenuPopup({
@@ -1822,14 +1936,16 @@ export function UserMessagesScreen({
         prev.filter((msg) => msg.id !== userMessageId && msg.id !== assistantMessageId)
       );
 
+      // Same reasoning as the 402 branch: the assistant message is only
+      // persisted on stream completion, so a mid-stream error means only
+      // the user message needs rollback.
       if (!isAnonymous) {
-        removeMessages(
-          new Set([userMessageId, ...(assistantAddedToStore ? [assistantMessageId] : [])])
-        );
+        removeMessages(new Set([userMessageId]));
       }
     } finally {
       setIsSending(false);
       setStreamingMessageId(null);
+      clearStreaming();
     }
   };
 
@@ -1838,6 +1954,12 @@ export function UserMessagesScreen({
 
     const text = messageText.trim();
     setMessageText('');
+
+    chatLog.info('chat.send.dispatch', {
+      surface: isRoutstrMode ? 'routstr-legacy' : 'nostr-dm',
+      textLen: text.length,
+      historyCount: messages.length,
+    });
 
     if (isRoutstrMode) {
       await handleRoutstrSend(text);
@@ -2507,6 +2629,10 @@ export function UserMessagesScreen({
             <LegendList
               ref={listRef}
               data={messages}
+              onLayout={handleListLayoutLegacy}
+              onContentSizeChange={handleListContentSizeLegacy}
+              onScroll={handleListScrollLegacy}
+              scrollEventThrottle={120}
               renderItem={({ item }: { item: any }) => (
                 <MessageBubble
                   message={item}
@@ -2555,76 +2681,47 @@ export function UserMessagesScreen({
 
           {/* Input Area */}
           <View
-            style={{
-              backgroundColor: surfaceSecondary,
-              paddingHorizontal: 16,
-              paddingTop: 12,
-              paddingBottom: insets.bottom,
-              borderTopWidth: 1,
-              borderTopColor: surfaceTertiary,
-            }}>
-            <HStack align="center" spacing={12}>
-              {isRoutstrMode ? (
-                <Pressable
-                  onPress={() => setIsAttachmentsBottomSheetOpen(true)}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    backgroundColor: surfaceTertiary,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <Icon name="fluent:add-24-filled" size={24} color={foreground} />
-                </Pressable>
-              ) : (
-                <Avatar
-                  state={myProfile.picture ? 'image' : 'fallback'}
-                  size={40}
-                  seed={nostrKeys?.pubkey}
-                  picture={myProfile.picture}
-                  name={myName}
-                />
-              )}
-
-              <TextInput
-                value={messageText}
-                onChangeText={setMessageText}
-                placeholder="Type a message..."
-                style={{
-                  flex: 1,
-                  backgroundColor: surfaceTertiary,
-                  borderRadius: 20,
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  borderWidth: 0,
-                  margin: 0,
-                  shadowOpacity: 0,
-                }}
-                multiline
-                maxLength={500}
-                returnKeyType="send"
-                onSubmitEditing={handleSendMessage}
-              />
-
-              <Pressable onPress={handleSendMessage} disabled={!messageText.trim() || isSending}>
-                <Icon
-                  name="iconamoon:send-fill"
-                  size={24}
-                  color={messageText.trim() && !isSending ? foreground : shade500}
-                />
-              </Pressable>
-            </HStack>
+            onLayout={(e) => setComposerHeight(e.nativeEvent.layout.height)}
+            collapsable={false}>
+            <ChatComposer
+              value={messageText}
+              onChangeText={setMessageText}
+              onSend={handleSendMessage}
+              disabled={isSending}
+              placeholder="Type a message..."
+              surface={perfSurface}
+              leadingIconNode={
+                isRoutstrMode ? (
+                  <Pressable onPress={() => setIsAttachmentsBottomSheetOpen(true)}>
+                    <Icon name="fluent:add-24-filled" size={20} color={foreground} />
+                  </Pressable>
+                ) : (
+                  <Avatar
+                    state={myProfile.picture ? 'image' : 'fallback'}
+                    size={32}
+                    seed={nostrKeys?.pubkey}
+                    picture={myProfile.picture}
+                    name={myName}
+                  />
+                )
+              }
+            />
           </View>
 
-          {/* Action Buttons - Floating above input */}
-          {((isRoutstrMode && (balance === null || balance < 1000)) ||
-            (!isRoutstrMode && lud16)) && (
+          {/* Action Buttons - Floating above input. `composerHeight + 8`
+              keeps the row 8pt above whatever the composer measures right
+              now (single-line ≈ 96pt, multi-line grows). The previous
+              `insets.bottom + 60` magic number was tuned for the old
+              single-row pill composer and put the buttons behind the new
+              taller bubble. */}
+          {composerHeight > 0 &&
+            ((isRoutstrMode && (balance === null || balance < 1000)) ||
+              (!isRoutstrMode && lud16)) && (
             <View
               pointerEvents="box-none"
               style={{
                 position: 'absolute',
-                bottom: insets.bottom + 60,
+                bottom: composerHeight + 8,
                 left: 0,
                 right: 0,
               }}>
@@ -2659,19 +2756,6 @@ export function UserMessagesScreen({
           )}
         </View>
 
-        {/* Sessions Panel */}
-        {isRoutstrMode && (
-          <SessionsPanel
-            isOpen={isSessionsPanelOpen}
-            onClose={handleCloseSessionsPanel}
-            onSessionSelect={() => {}}
-            onNewSession={handleNewSession}
-            searchQuery={sessionSearchQuery}
-            onRefreshBalance={handleRefreshBalance}
-            onTopUp={() => handleTopUp()}
-            onSwitchModel={() => setIsModelSwitchBottomSheetOpen(true)}
-          />
-        )}
       </Screen>
     </KeyboardAvoidingView>
   );

@@ -6,21 +6,23 @@
  */
 
 import React, { useEffect } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { UserMessagesScreen } from '@/features/user';
-import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { ROUTSTR_PUBKEY } from '@/shared/lib/constants';
 
 function ModalScreen() {
-  const { pubkey, model } = useLocalSearchParams<{ pubkey: string; model?: string }>();
-  const { setSelectedModel } = useRoutstrStore();
+  const { pubkey } = useLocalSearchParams<{ pubkey: string }>();
 
-  // If a model is passed and this is routstr, set it as selected
+  // Legacy deep-link: opening the AI agent as a DM now redirects to the AI
+  // tab — the standalone DM screen no longer hosts the AI experience. The
+  // AI tab is tier-only and always boots into Auto, so a `?model=` param
+  // can no longer preselect a specific model.
   useEffect(() => {
-    if (model && pubkey === ROUTSTR_PUBKEY) {
-      setSelectedModel(model);
-    }
-  }, [model, pubkey, setSelectedModel]);
+    if (pubkey !== ROUTSTR_PUBKEY) return;
+    router.replace('/(drawer)/(tabs)/ai');
+  }, [pubkey]);
+
+  if (pubkey === ROUTSTR_PUBKEY) return null;
 
   return <UserMessagesScreen pubkey={pubkey} />;
 }

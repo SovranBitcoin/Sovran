@@ -21,6 +21,7 @@ import opacity from 'hex-color-opacity';
 import type { BLEPeer } from 'bitchat-module';
 
 import { ContactRow, bleIdentity } from '@/shared/ui/composed/ContactRow';
+import { resolveIdentityName } from '@/shared/lib/identity';
 import { useBLEPeers } from '../hooks/useBLEPeers';
 
 interface PeerRowProps {
@@ -28,7 +29,10 @@ interface PeerRowProps {
 }
 
 function PeerRow({ peer }: PeerRowProps) {
-  const displayName = peer.nickname?.trim() || peer.peerID.slice(0, 12);
+  const displayName = resolveIdentityName({
+    pubkey: peer.peerID,
+    bleNickname: peer.nickname,
+  });
 
   const openDM = () => {
     // Replace the Network sheet with the DM screen. `replace` (not `push`)

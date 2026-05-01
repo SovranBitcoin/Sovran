@@ -11,7 +11,7 @@ import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { reviewMint } from '@/shared/lib/apiClient';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
-import { getUsername } from '@/shared/lib/username';
+import { useIdentityName } from '@/shared/hooks/useIdentityName';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
@@ -57,7 +57,10 @@ const ReviewItem = React.memo(function ReviewItem({
 
   const reviewText = review.comment?.trim() || '';
   const reviewScore = review.score ?? 0;
-  const displayName = getUsername(review.pubkey);
+  // Reviewer names: prefer Nostr metadata (cached in the shared SWR
+  // store, populated by other surfaces), fall back to the deterministic
+  // word pair so reviews never render anonymous-looking hex.
+  const { displayName } = useIdentityName(review.pubkey);
 
   const formattedDate = review.created_at
     ? new Date(review.created_at * 1000).toLocaleDateString(undefined, {

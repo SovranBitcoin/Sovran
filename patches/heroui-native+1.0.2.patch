@@ -1,0 +1,73 @@
+diff --git a/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js b/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js
+--- a/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js
++++ b/node_modules/heroui-native/lib/module/helpers/internal/components/bottom-sheet-content-container.js
+@@ -1,7 +1,7 @@
+ "use strict";
+
+ import { useEffect, useRef } from 'react';
+-import { BackHandler } from 'react-native';
++import { BackHandler, View } from 'react-native';
+ import { useAnimatedReaction } from 'react-native-reanimated';
+ import { scheduleOnRN } from 'react-native-worklets';
+ import GorhomBottomSheetPackage from "../../../optional/gorhom-bottom-sheet.js";
+@@ -81,9 +81,20 @@ export function BottomSheetContentContainer({
+     // We only want to snap when isOpen or initialIndex changes.
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [isOpen, initialIndex]);
+-  return /*#__PURE__*/_jsx(BottomSheetView, {
++  // sovran-app patch: opt-in flag to use a plain RN View instead of
++  // gorhom's BottomSheetView. BottomSheetView unconditionally registers
++  // the active scrollable type as VIEW in its mount effect, which runs
++  // *after* a nested BottomSheetScrollView's effect (parent effects fire
++  // after child effects). The override turns the inner scrollable into
++  // a no-op — sheet pan gestures consume the swipe instead of scrolling
++  // the inner list. Setting `useDirectView: true` on contentContainerProps
++  // skips that registration so `<BottomSheetScrollView>` works inside
++  // heroui Menu / BottomSheet content.
++  const { useDirectView, ...restContentContainerProps } = contentContainerProps ?? {};
++  const Container = useDirectView ? View : BottomSheetView;
++  return /*#__PURE__*/_jsx(Container, {
+     className: contentContainerClassName,
+-    ...contentContainerProps,
++    ...restContentContainerProps,
+     children: children
+   });
+ }
+diff --git a/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx b/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx
+--- a/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx
++++ b/node_modules/heroui-native/src/helpers/internal/components/bottom-sheet-content-container.tsx
+@@ -1,5 +1,5 @@
+ import { useEffect, useRef } from 'react';
+-import { BackHandler } from 'react-native';
++import { BackHandler, View } from 'react-native';
+ import { useAnimatedReaction } from 'react-native-reanimated';
+ import { scheduleOnRN } from 'react-native-worklets';
+ import GorhomBottomSheetPackage from '../../../optional/gorhom-bottom-sheet';
+@@ -90,12 +90,24 @@ export function BottomSheetContentContainer({
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [isOpen, initialIndex]);
+
++  // sovran-app patch: opt-in flag to use a plain RN View instead of
++  // gorhom's BottomSheetView. BottomSheetView unconditionally registers
++  // the active scrollable type as VIEW in its mount effect, which runs
++  // *after* a nested BottomSheetScrollView's effect (parent effects fire
++  // after child effects). The override turns the inner scrollable into
++  // a no-op — sheet pan gestures consume the swipe instead of scrolling
++  // the inner list. Setting `useDirectView: true` on contentContainerProps
++  // skips that registration so `<BottomSheetScrollView>` works inside
++  // heroui Menu / BottomSheet content.
++  const { useDirectView, ...restContentContainerProps } =
++    (contentContainerProps as { useDirectView?: boolean } | undefined) ?? {};
++  const Container = useDirectView ? View : BottomSheetView;
+   return (
+-    <BottomSheetView
++    <Container
+       className={contentContainerClassName}
+-      {...contentContainerProps}
++      {...restContentContainerProps}
+     >
+       {children}
+-    </BottomSheetView>
++    </Container>
+   );
+ }
