@@ -1,22 +1,27 @@
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
+import { z } from 'zod';
 import { BitChatScreen } from '@/features/bitchat/screens/BitChatScreen';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+
+const GEOHASH = /^[0-9bcdefghjkmnpqrstuvwxyz]{1,12}$/;
+
+const ParamsSchema = z.object({
+  geohash: z.string().regex(GEOHASH, 'invalid geohash'),
+  tierLabel: z.string().max(64).optional(),
+});
 
 export default function BitChatRoute() {
-  const { geohash, tierLabel } = useLocalSearchParams<{
-    geohash: string;
-    tierLabel?: string;
-  }>();
-
-  if (!geohash) return null;
+  const params = useRouteParams(ParamsSchema, { where: 'bitchat-flow.geohash' });
+  if (!params) return null;
 
   return (
     <>
       <Stack.Screen
         options={{
-          title: tierLabel ? `${tierLabel} Chat` : `#${geohash}`,
+          title: params.tierLabel ? `${params.tierLabel} Chat` : `#${params.geohash}`,
         }}
       />
-      <BitChatScreen geohash={geohash} tierLabel={tierLabel} />
+      <BitChatScreen geohash={params.geohash} tierLabel={params.tierLabel} />
     </>
   );
 }

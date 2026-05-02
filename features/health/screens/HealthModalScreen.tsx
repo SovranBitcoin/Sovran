@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View as RNView } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack } from 'expo-router';
+import { z } from 'zod';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +24,13 @@ import { log, useLifecycleLogger } from '@/shared/lib/logger';
 const DEFAULT_CURRENCIES = ['SAT'];
 const HEADER_OVERLAP = 24;
 
+// `unit` is non-critical UX state — coerce any out-of-allowlist value back
+// to `'sat'` rather than closing the modal, so a malformed deep link still
+// shows the wallet-health view in the canonical unit.
+const ParamsSchema = z.object({
+  unit: z.enum(['sat', 'usd', 'eur', 'gbp', 'btc']).catch('sat').optional(),
+});
+
 function getCurrenciesFromMints(trustedMints: any[]): string[] {
   const units: string[] = [];
   for (const mint of trustedMints) {
@@ -40,8 +49,8 @@ function getCurrenciesFromMints(trustedMints: any[]): string[] {
 
 export function HealthModalScreen() {
   useLifecycleLogger('HealthModalScreen');
-  const params = useLocalSearchParams<{ unit?: string }>();
-  const initialUnit = (params.unit || 'sat').toLowerCase();
+  const params = useRouteParams(ParamsSchema, { where: 'app.healthModal' });
+  const initialUnit = params?.unit ?? 'sat';
 
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const hero = useHeroTransition();

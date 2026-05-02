@@ -19,7 +19,9 @@ import {
   Linking,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { Stack, useLocalSearchParams, Link } from 'expo-router';
+import { Stack, Link } from 'expo-router';
+import { z } from 'zod';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -74,6 +76,21 @@ import { Screen, nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
 const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
 const AVATAR_OVERLAP = AVATAR_SIZE / 4;
+
+const HEX_64 = /^[0-9a-f]{64}$/;
+const NPUB = /^npub1[02-9ac-hj-np-z]{58,}$/;
+const HTTPS_URL = /^https:\/\/[^\s]+$/;
+
+const UserProfileParamsSchema = z
+  .object({
+    npub: z.string().regex(NPUB, 'invalid npub').optional(),
+    pubkey: z.string().regex(HEX_64, 'pubkey must be 64-hex').optional(),
+    mintUrl: z.string().regex(HTTPS_URL, 'mintUrl must be https').max(2048).optional(),
+  })
+  .refine((v) => !!(v.npub || v.pubkey), {
+    message: 'either npub or pubkey is required',
+    path: ['pubkey'],
+  });
 
 function buildUpdatedContactTags(
   existingTags: string[][],
@@ -650,15 +667,12 @@ export function UserProfileScreen() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const { ndk } = useNDK();
   const { keys: nostrKeys } = useNostrKeysContext();
-  const {
-    npub: npubParam,
-    pubkey: pubkeyParam,
-    mintUrl: mintUrlParam,
-  } = useLocalSearchParams<{
-    npub?: string;
-    pubkey?: string;
-    mintUrl?: string;
-  }>();
+  const params = useRouteParams(UserProfileParamsSchema, {
+    where: 'user-flow.profile',
+  });
+  const npubParam = params?.npub;
+  const pubkeyParam = params?.pubkey;
+  const mintUrlParam = params?.mintUrl;
 
   const pubkey = useMemo(() => {
     if (pubkeyParam) return pubkeyParam;
