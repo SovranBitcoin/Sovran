@@ -536,10 +536,26 @@ export const Button = ({
     }
   };
 
+  // Synchronous re-entrancy guard. `disabled`/`loading` are React state and
+  // land after the second tap commits, so they can't catch a rapid
+  // double-tap whose handler awaits — every `Button` whose `onPress` does
+  // real async work (send, melt, swap, accept/decline, key derivation) was
+  // previously exposed. The ref locks before `await` runs and clears in
+  // `finally`, so synchronous handlers (toggles, navigation) are unaffected.
+  const inFlightRef = useRef<Promise<void> | null>(null);
+
   const handlePress = async (e: any) => {
-    if (disabled || loading) return;
+    if (disabled || loading || inFlightRef.current) return;
     await triggerHaptic('end');
-    await onPress(e);
+    const result = onPress(e);
+    if (result instanceof Promise) {
+      inFlightRef.current = result;
+      try {
+        await result;
+      } finally {
+        if (inFlightRef.current === result) inFlightRef.current = null;
+      }
+    }
   };
 
   const handlePressIn = async (event: any) => {

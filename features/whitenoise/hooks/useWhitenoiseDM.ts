@@ -6,6 +6,7 @@ import {
   type MarmotGroup,
 } from '@internet-privacy/marmot-ts';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useWhitenoise } from '../WhitenoiseProvider';
 import { WhitenoiseDmIndex } from '../storage/dmIndex';
 import { WhitenoiseGroupHistory } from '../storage/groupHistory';
@@ -176,7 +177,7 @@ export function useWhitenoiseDM(
     };
   }, [client, group, relays, selfPubkey, upsertMessage]);
 
-  const send = useCallback(
+  const sendInner = useCallback(
     async (text: string) => {
       if (!text.trim()) return;
       if (!client) {
@@ -255,6 +256,13 @@ export function useWhitenoiseDM(
     },
     [client, counterpartyPubkey, relays, selfPubkey, upsertMessage]
   );
+
+  // The lazy group-creation path is the high-cost double-tap target: a
+  // second concurrent call before `groupRef.current` is set re-enters the
+  // `!activeGroup` branch, calls `client.createGroup` again, and burns a
+  // second key package while orphaning the first group. The `isCreatingGroup`
+  // React flag wasn't enough — it commits one render too late.
+  const send = useSingleFlight(sendInner);
 
   return {
     isClientReady: !!client,

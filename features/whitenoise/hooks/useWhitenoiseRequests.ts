@@ -4,6 +4,7 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import type { UnreadInvite } from '@internet-privacy/marmot-ts';
 import { useWhitenoise } from '../WhitenoiseProvider';
 import { WhitenoiseDmIndex } from '../storage/dmIndex';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { log } from '@/shared/lib/logger';
 
 const wnLog = log.child({ module: 'whitenoise' });
@@ -71,7 +72,7 @@ export function useWhitenoiseRequests(): UseWhitenoiseRequestsState {
     };
   }, [inviteReader]);
 
-  const accept = useCallback(
+  const acceptInner = useCallback(
     async (request: WhitenoiseRequest) => {
       if (!client || !inviteReader) {
         setError('White Noise client not ready');
@@ -110,7 +111,7 @@ export function useWhitenoiseRequests(): UseWhitenoiseRequestsState {
     [accountIndex, client, inviteReader]
   );
 
-  const decline = useCallback(
+  const declineInner = useCallback(
     async (request: WhitenoiseRequest) => {
       if (!inviteReader) return;
       setBusyId(request.id);
@@ -131,6 +132,13 @@ export function useWhitenoiseRequests(): UseWhitenoiseRequestsState {
     },
     [inviteReader]
   );
+
+  // `busyId` is React state and lands too late to block a rapid second tap.
+  // The single-flight guard drops the duplicate before it reaches
+  // `joinGroupFromWelcome` (which would consume a second key package and
+  // leave the inviteReader in an inconsistent state).
+  const accept = useSingleFlight(acceptInner);
+  const decline = useSingleFlight(declineInner);
 
   return {
     requests,

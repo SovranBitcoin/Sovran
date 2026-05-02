@@ -13,6 +13,7 @@ import {
   sendMessageFailedPopup,
 } from '@/shared/lib/popup';
 import { aiLog, log } from '@/shared/lib/logger';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import {
   AFFORD_BUFFER,
@@ -576,7 +577,7 @@ export function useAiSend() {
     ]
   );
 
-  const send = useCallback(
+  const sendInner = useCallback(
     async (userMessage: string) => {
       const trimmed = userMessage.trim();
       if (!trimmed) return;
@@ -638,6 +639,13 @@ export function useAiSend() {
     [apiKey, isAnonymous, currentSessionId, createSession, addMessage, streamIntoPlaceholder]
   );
 
+  // `isSending` (React state) only blocks subsequent sends after the first
+  // `setStatus` flush — a rapid double-tap lands both calls into
+  // `streamIntoPlaceholder` before the disabled flag commits, billing the
+  // user twice and corrupting the active branch tree. `useSingleFlight`
+  // drops the duplicate at the ref level.
+  const send = useSingleFlight(sendInner);
+
   /**
    * Spawn a new sibling assistant under the same parent as `messageId`,
    * stream a fresh response, and flip the active branch to the new sibling.
@@ -645,7 +653,7 @@ export function useAiSend() {
    * sibling (follow-up exchanges) drop out of view immediately and can be
    * brought back via the bubble's chevron nav.
    */
-  const retry = useCallback(
+  const retryInner = useCallback(
     async (messageId: string) => {
       if (!apiKey) {
         noApiKeyPopup();
@@ -705,6 +713,10 @@ export function useAiSend() {
     },
     [apiKey, addMessage, setActiveBranch, streamIntoPlaceholder]
   );
+
+  // Retry shares the double-tap exposure with `send`: a rapid tap on the
+  // regenerate chevron would spawn two sibling assistants and bill twice.
+  const retry = useSingleFlight(retryInner);
 
   const balance = useRoutstrStore((s) => s.balance);
   return { send, retry, ...status, balance };

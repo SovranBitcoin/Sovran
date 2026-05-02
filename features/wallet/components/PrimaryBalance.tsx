@@ -24,6 +24,7 @@ import {
 import { font, foregroundStyle, frame, glassEffect } from '@expo/ui/swift-ui/modifiers';
 import { liquidGlassModifiers, supportsLiquidGlass } from '@/shared/lib/version';
 import { useGuardedRouter } from '@/shared/hooks/useGuardedRouter';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { CocoManager } from '@/shared/lib/cashu/manager';
 import { reservedProofsFreedPopup, reservedProofsFailedPopup } from '@/shared/lib/popup';
 import { usePaginatedHistory } from '@cashu/coco-react';
@@ -215,7 +216,10 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     });
   }, [router, account]);
 
-  const handleReservedPress = useCallback(() => {
+  // Wrap the alert in a promise that resolves when the user closes it so a
+  // rapid second tap on the Reserved pill is dropped by `useSingleFlight`
+  // (otherwise React Native happily stacks two alerts on top of each other).
+  const handleReservedPressInner = useCallback(async () => {
     const recoverPending = async () => {
       walletLog.info('wallet.reserved.recovery_start', { reservedTotal });
       try {
@@ -240,11 +244,30 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
       }
     };
 
-    Alert.alert('Reserved Proofs', 'Choose a recovery action.', [
-      { text: 'Close', style: 'cancel' },
-      { text: 'Recover Pending Operations', onPress: recoverPending },
-    ]);
-  }, []);
+    await new Promise<void>((resolve) => {
+      Alert.alert(
+        'Reserved Proofs',
+        'Choose a recovery action.',
+        [
+          { text: 'Close', style: 'cancel', onPress: () => resolve() },
+          {
+            text: 'Recover Pending Operations',
+            onPress: async () => {
+              try {
+                await recoverPending();
+              } finally {
+                resolve();
+              }
+            },
+          },
+        ],
+        // Android only — iOS always fires one of the buttons on dismiss.
+        { onDismiss: () => resolve() }
+      );
+    });
+  }, [reservedTotal]);
+
+  const handleReservedPress = useSingleFlight(handleReservedPressInner);
 
   return (
     <Log name="PrimaryBalance">
