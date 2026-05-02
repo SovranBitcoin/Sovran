@@ -173,7 +173,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
       const sourceRef = refs.current.walletHealth?.source;
       const fromRect = await measureInWindowAsync(sourceRef);
       if (!fromRect) {
-        router.navigate({ pathname: '/healthModal' as any, params: { unit } });
+        router.navigate({ pathname: '/healthModal', params: { unit } });
         return;
       }
 
@@ -192,7 +192,7 @@ export function HeroTransitionProvider({ children }: { children: React.ReactNode
       toH.set(0);
       progress.set(0);
 
-      router.navigate({ pathname: '/healthModal' as any, params: { unit } });
+      router.navigate({ pathname: '/healthModal', params: { unit } });
 
       // Wait until destination registers and layout stabilizes.
       // (This can take a bit on slower devices and with transparent headers.)

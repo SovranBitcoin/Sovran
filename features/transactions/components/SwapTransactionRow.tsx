@@ -34,7 +34,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
       legs: group.legs.length,
     });
     router.navigate({
-      pathname: '/swap' as any,
+      pathname: '/swap',
       params: { groupId: group.id },
     });
   }, [group.id, group.state, group.legs.length]);

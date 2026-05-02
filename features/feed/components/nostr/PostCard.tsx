@@ -133,7 +133,7 @@ export const PostCard = React.memo(function PostCard({
 
   const navigateToThread = useCallback(() => {
     router.navigate({
-      pathname: '/(user-flow)/thread' as any,
+      pathname: '/(user-flow)/thread',
       params: { eventId: event.id },
     });
   }, [event.id]);
@@ -141,7 +141,7 @@ export const PostCard = React.memo(function PostCard({
   const navigateToProfile = useCallback(() => {
     // push so each profile pushes a new stack entry — see navigateToContact.
     router.push({
-      pathname: '/(user-flow)/profile' as any,
+      pathname: '/(user-flow)/profile',
       params: { pubkey: event.pubkey },
     });
   }, [event.pubkey]);

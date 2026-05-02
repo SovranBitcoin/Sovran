@@ -262,28 +262,28 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
             // investigate, and fall through to the generic camera path so the
             // user isn't stuck with a dead button.
             paymentLog.warn('receive.scan.no_permission_provider');
-            router.navigate({ pathname: '/(receive-flow)/camera' as any, params: { unit } });
+            router.navigate({ pathname: '/(receive-flow)/camera', params: { unit } });
             return;
           }
           const granted = await receiveExtras.requestCameraPermission();
           paymentLog.info('receive.scan.permission', { granted });
           if (!granted) return;
           router.navigate({
-            pathname: '/(receive-flow)/camera' as any,
+            pathname: '/(receive-flow)/camera',
             params: { unit },
           });
         } else {
-          router.navigate({ pathname: '/camera' as any, params: { unit } });
+          router.navigate({ pathname: '/camera', params: { unit } });
         }
       },
       mintInfo: (mintInfoEntry) => {
         router.navigate({
-          pathname: '/(mint-flow)/info' as any,
+          pathname: '/(mint-flow)/info',
           params: { mintInfoEntry },
         });
       },
       addMint: () => {
-        router.push('/(mint-flow)/add' as any);
+        router.push('/(mint-flow)/add');
       },
       goBack: () => {
         router.back();

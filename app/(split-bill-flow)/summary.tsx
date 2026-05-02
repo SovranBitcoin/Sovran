@@ -160,7 +160,7 @@ export default function SplitBillSummaryScreen() {
       // to the Split Bill detail (per-participant deck + payment watcher).
       // Replace so back doesn't drop us on a now-stale summary screen.
       router.replace({
-        pathname: '/(split-bill-flow)/detail' as any,
+        pathname: '/(split-bill-flow)/detail',
         params: { groupId },
       });
     } finally {

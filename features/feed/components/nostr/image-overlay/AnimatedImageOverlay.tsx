@@ -244,7 +244,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
   const onReplyPress = useCallback(() => {
     if (!activeOverlayPost) return;
     router.navigate({
-      pathname: '/(user-flow)/thread' as any,
+      pathname: '/(user-flow)/thread',
       params: { eventId: activeOverlayPost.event.id },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depend on event.id only so memoized panel gets stable callback

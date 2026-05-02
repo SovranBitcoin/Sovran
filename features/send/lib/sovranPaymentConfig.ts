@@ -185,10 +185,7 @@ export function createSovranExecuteReceive(
         const newEntry = (after as ReadonlyArray<Record<string, unknown>>).find((h) => {
           const id = typeof h.id === 'string' ? h.id : '';
           return (
-            h.type === 'receive' &&
-            h.mintUrl === mintUrl &&
-            id.length > 0 &&
-            !beforeIds.has(id)
+            h.type === 'receive' && h.mintUrl === mintUrl && id.length > 0 && !beforeIds.has(id)
           );
         });
         if (newEntry?.id) {
@@ -330,11 +327,7 @@ export function createSovranExecuteMintQuote(
         const persisted = (after as ReadonlyArray<Record<string, unknown>>).find((h) => {
           if (h.type !== 'mint' || h.mintUrl !== mintUrl) return false;
           // Preferred: deterministic quoteId match
-          if (
-            mintOp.quoteId &&
-            typeof h.quoteId === 'string' &&
-            h.quoteId === mintOp.quoteId
-          ) {
+          if (mintOp.quoteId && typeof h.quoteId === 'string' && h.quoteId === mintOp.quoteId) {
             return true;
           }
           // Fallback: set difference on ids
@@ -842,7 +835,7 @@ export function createSovranHandlers({
       const isFallback = (machine.getContext().failedOptionValues?.length ?? 0) > 0;
       const nav = isFallback ? router.replace : router.navigate;
       nav({
-        pathname: '/(send-flow)/paymentRequest' as any,
+        pathname: '/(send-flow)/paymentRequest',
         params: { paymentRequestEntry: JSON.stringify(entry) },
       });
     },
@@ -949,12 +942,12 @@ export function createSovranHandlers({
         ...(constraints.paymentRequest ? { paymentRequest: constraints.paymentRequest } : {}),
         ...(constraints.meltTarget ? { meltTarget: constraints.meltTarget } : {}),
       };
-      const pathname =
-        constraints.destination === 'mintQuote' ? '/(receive-flow)/amount' : '/(send-flow)/amount';
-      router.navigate({
-        pathname: pathname as any,
-        params: { amountEntry: JSON.stringify(entry) },
-      });
+      const params = { amountEntry: JSON.stringify(entry) };
+      router.navigate(
+        constraints.destination === 'mintQuote'
+          ? { pathname: '/(receive-flow)/amount', params }
+          : { pathname: '/(send-flow)/amount', params }
+      );
       paymentLog.info('navigate.enterAmount.done', { duration_ms: performance.now() - t0 });
     },
 
@@ -976,14 +969,12 @@ export function createSovranHandlers({
         unit,
       };
 
-      const pathname =
+      const params = { mintSelectorEntry: JSON.stringify(entry) };
+      router.navigate(
         destination === 'mintQuote' || scope === 'npc'
-          ? '/(receive-flow)/mintSelect'
-          : '/(send-flow)/mintSelect';
-      router.navigate({
-        pathname: pathname as any,
-        params: { mintSelectorEntry: JSON.stringify(entry) },
-      });
+          ? { pathname: '/(receive-flow)/mintSelect', params }
+          : { pathname: '/(send-flow)/mintSelect', params }
+      );
     },
 
     chooseOption: (stepData) => {

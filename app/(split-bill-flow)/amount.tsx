@@ -41,7 +41,7 @@ export default function SplitBillAmountScreen() {
       inputMode,
     });
     router.push({
-      pathname: '/(split-bill-flow)/participants' as any,
+      pathname: '/(split-bill-flow)/participants',
       params: { totalAmount: String(effectiveSatAmount), unit: 'sat' },
     });
   }, [effectiveSatAmount, inputMode, router]);

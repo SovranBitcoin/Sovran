@@ -13,10 +13,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import {
-  KeyboardAvoidingView,
-  useKeyboardState,
-} from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import { router, Stack } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { LegendList } from '@legendapp/list';
@@ -203,10 +200,7 @@ export function GeohashChatScreen({
     prevMsgRef.current = next;
   }, [messages, perfSurface]);
 
-  const tierDef = useMemo(
-    () => LOCATION_TIERS.find((t) => t.label === tierLabel),
-    [tierLabel]
-  );
+  const tierDef = useMemo(() => LOCATION_TIERS.find((t) => t.label === tierLabel), [tierLabel]);
 
   // Precompute grouping: consecutive messages from the same sender form a group
   const groupingMap = useMessageGrouping(messages);
@@ -295,9 +289,7 @@ export function GeohashChatScreen({
                   // Tappable peer-count pill for the mesh chat. Mirrors
                   // upstream bitchat's header icon+count affordance that
                   // opens the Network sheet.
-                  <Pressable
-                    onPress={() => router.push('/(user-flow)/bitchatNetwork' as any)}
-                    hitSlop={8}>
+                  <Pressable onPress={() => router.push('/(user-flow)/bitchatNetwork')} hitSlop={8}>
                     <HStack spacing={6} align="center">
                       <Icon
                         name="mdi:broadcast"

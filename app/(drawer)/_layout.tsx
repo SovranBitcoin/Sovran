@@ -52,10 +52,16 @@ function waitForDrawerClose(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, DRAWER_CLOSE_SETTLE_MS));
 }
 
+type MenuRoute =
+  | '/(drawer)/(tabs)/feed'
+  | '/(drawer)/(tabs)'
+  | '/(drawer)/(tabs)/contacts'
+  | '/(settings-flow)';
+
 type MenuItem = {
   icon: string;
   label: string;
-  route: string;
+  route: MenuRoute;
   drawerLabel: string;
 };
 
@@ -63,25 +69,25 @@ const MENU_ITEMS: MenuItem[] = [
   {
     icon: 'mingcute:home-4-fill',
     label: 'Feed',
-    route: '(drawer)/(tabs)/feed',
+    route: '/(drawer)/(tabs)/feed',
     drawerLabel: 'feed',
   },
   {
     icon: 'fluent:wallet-20-filled',
     label: 'Wallet',
-    route: '(drawer)/(tabs)',
+    route: '/(drawer)/(tabs)',
     drawerLabel: 'wallet',
   },
   {
     icon: 'ph:user-bold',
     label: 'Contacts',
-    route: '(drawer)/(tabs)/contacts',
+    route: '/(drawer)/(tabs)/contacts',
     drawerLabel: 'contacts',
   },
   {
     icon: 'material-symbols:settings-rounded',
     label: 'Settings',
-    route: '(settings-flow)',
+    route: '/(settings-flow)',
     drawerLabel: 'settings',
   },
 ];
@@ -225,7 +231,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
     if (nostrKeys?.pubkey) {
       closeDrawer();
       router.navigate({
-        pathname: '/(user-flow)/profile' as any,
+        pathname: '/(user-flow)/profile',
         params: {
           pubkey: nostrKeys.pubkey,
         },
@@ -295,8 +301,8 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
   const navInProgressRef = useRef(false);
 
   const isRouteActive = useCallback(
-    (route: string) => {
-      if (route === '(drawer)/(tabs)' || route === '(drawer)/(tabs)/index') {
+    (route: MenuRoute) => {
+      if (route === '/(drawer)/(tabs)') {
         return (
           pathname === '/' ||
           pathname === '/index' ||
@@ -327,14 +333,14 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
   );
 
   const handleNavigation = useCallback(
-    (route: string) => {
+    (route: MenuRoute) => {
       if (navInProgressRef.current) return;
       if (isRouteActive(route)) {
         props.navigation.closeDrawer();
         return;
       }
       navInProgressRef.current = true;
-      router.navigate(`/${route}` as any);
+      router.navigate(route);
       props.navigation.closeDrawer();
       setTimeout(() => {
         navInProgressRef.current = false;
@@ -361,8 +367,8 @@ function DrawerContentInner({
   handleNavigation,
 }: {
   closeDrawer: () => void;
-  isRouteActive: (route: string) => boolean;
-  handleNavigation: (route: string) => void;
+  isRouteActive: (route: MenuRoute) => boolean;
+  handleNavigation: (route: MenuRoute) => void;
 }) {
   const { setConfig } = useBackgroundContext();
   const muted = useThemeColor('muted');

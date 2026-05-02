@@ -244,7 +244,7 @@ export function StoriesRow({ userPubkey }: StoriesRowProps) {
   const handleStoryPress = useCallback(
     (index: number) => {
       router.navigate({
-        pathname: '/(stories-flow)/stories' as any,
+        pathname: '/(stories-flow)/stories',
         params: {
           startIndex: String(index),
           storyUsersJson: JSON.stringify(storyUsers),

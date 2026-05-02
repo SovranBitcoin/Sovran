@@ -26,10 +26,7 @@ import { useThemeDraft } from '@/features/theme/lib/themeDraft';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { useAlbumList } from '@/features/theme/lib/useAlbumList';
 
-function shallowEqual(
-  a: Record<string, string>,
-  b: Record<string, string>,
-): boolean {
+function shallowEqual(a: Record<string, string>, b: Record<string, string>): boolean {
   const ak = Object.keys(a);
   const bk = Object.keys(b);
   if (ak.length !== bk.length) return false;
@@ -108,16 +105,14 @@ export function ThemePreviewScreen() {
 
   const handleUnitPress = useCallback((unitId: string) => {
     router.push({
-      pathname: '/(theme-flow)/background' as any,
+      pathname: '/(theme-flow)/background',
       params: { unitId },
     });
   }, []);
 
   const cards = PREVIEW_UNITS.map((unit) => {
     const theme =
-      unitWallpapers[unit.id] ||
-      storeUnitWallpapers[unit.id] ||
-      getUnitWallpaperFromStore(unit.id);
+      unitWallpapers[unit.id] || storeUnitWallpapers[unit.id] || getUnitWallpaperFromStore(unit.id);
     log.debug('theme.preview.card.resolve', { unitId: unit.id, theme });
     return (
       <UnitPreviewCard
@@ -183,7 +178,7 @@ export function ThemePreviewScreen() {
 
         <View style={styles.actionRow}>
           <PressableFeedback
-            onPress={() => router.push('/(theme-flow)/gallery' as any)}
+            onPress={() => router.push('/(theme-flow)/gallery')}
             animation={false}
             testID="theme-preview-theme-button">
             <PressableFeedback.Scale>

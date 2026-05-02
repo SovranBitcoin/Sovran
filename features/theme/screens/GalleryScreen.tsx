@@ -65,7 +65,7 @@ export function GalleryScreen() {
       setAlbum(slug, PREVIEW_UNIT_IDS);
       router.back();
     },
-    [setAlbum],
+    [setAlbum]
   );
 
   return (
@@ -107,18 +107,12 @@ export function GalleryScreen() {
   );
 }
 
-function SectionHeader({
-  topic,
-  author,
-}: {
-  topic: string;
-  author: AlbumAuthor | null;
-}) {
+function SectionHeader({ topic, author }: { topic: string; author: AlbumAuthor | null }) {
   const foreground = useThemeColor('foreground');
   const openProfile = useCallback(() => {
     if (author?.pubkey) {
       router.navigate({
-        pathname: '/(user-flow)/profile' as any,
+        pathname: '/(user-flow)/profile',
         params: { pubkey: author.pubkey },
       });
     }
@@ -139,10 +133,7 @@ function SectionHeader({
           </PressableFeedback>
         ) : null}
         <VStack style={{ flex: 1 }}>
-          <Text
-            size={13}
-            medium
-            style={{ color: opacity(foreground, 0.5), letterSpacing: 1.5 }}>
+          <Text size={13} medium style={{ color: opacity(foreground, 0.5), letterSpacing: 1.5 }}>
             {topic.toUpperCase()}
           </Text>
           {author?.displayName ? (

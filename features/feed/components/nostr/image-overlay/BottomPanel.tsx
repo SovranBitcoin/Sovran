@@ -242,7 +242,7 @@ export const ImageOverlayBottomPanelContent = React.memo(function ImageOverlayBo
         <Pressable
           onPress={() => {
             router.push({
-              pathname: '/(user-flow)/profile' as any,
+              pathname: '/(user-flow)/profile',
               params: { pubkey: event.pubkey },
             });
           }}
@@ -399,7 +399,7 @@ export const ImageOverlayAbsoluteBar = React.memo(function ImageOverlayAbsoluteB
         <Pressable
           onPress={() => {
             router.push({
-              pathname: '/(user-flow)/profile' as any,
+              pathname: '/(user-flow)/profile',
               params: { pubkey: event.pubkey },
             });
           }}

@@ -52,7 +52,7 @@ export function SwapStatusToast({ hide, ...toastProps }: SwapStatusToastProps) {
       hide();
       return;
     }
-    guardedRouter.push({ pathname: '/swap' as any, params: { groupId } });
+    guardedRouter.push({ pathname: '/swap', params: { groupId } });
     hide();
     clear();
   }, [groupId, hide, clear]);

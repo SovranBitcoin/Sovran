@@ -292,7 +292,7 @@ function TopFollowersComponent({
     // push (not navigate) so each profile pushes a new stack entry; tapping
     // through follower → follower-of-follower then back returns step by step.
     router.push({
-      pathname: '/(user-flow)/profile' as any,
+      pathname: '/(user-flow)/profile',
       params: { npub: follower.npub },
     });
   };
@@ -807,7 +807,7 @@ export function UserProfileScreen() {
       videoPosts: userVideoPosts,
     };
     router.navigate({
-      pathname: '/(stories-flow)/stories' as any,
+      pathname: '/(stories-flow)/stories',
       params: {
         startIndex: '0',
         storyUsersJson: JSON.stringify([storyUser]),
@@ -970,7 +970,7 @@ export function UserProfileScreen() {
               {(profileData?.mintUrl || mintUrlParam) && (
                 <Link
                   href={{
-                    pathname: '/(mint-flow)/info' as any,
+                    pathname: '/(mint-flow)/info',
                     params: {
                       mintInfoEntry: JSON.stringify({
                         mintUrl: profileData?.mintUrl || mintUrlParam,
@@ -985,7 +985,7 @@ export function UserProfileScreen() {
               )}
               <Link
                 href={{
-                  pathname: '/(user-flow)/share' as any,
+                  pathname: '/(user-flow)/share',
                   params: {
                     type: 'npub',
                     data: npub,

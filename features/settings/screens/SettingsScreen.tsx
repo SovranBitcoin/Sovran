@@ -3,7 +3,7 @@ import { ScrollView, Linking, Alert } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 
-import { Link, router } from 'expo-router';
+import { Link, router, type Href } from 'expo-router';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import * as Application from 'expo-application';
@@ -56,7 +56,7 @@ const ProfileButton = () => {
     <ListGroup variant="secondary">
       <PressableFeedback
         animation={false}
-        onPress={() => router.navigate('/(settings-flow)/profile' as any)}>
+        onPress={() => router.navigate('/(settings-flow)/profile')}>
         <PressableFeedback.Scale>
           <ListGroup.Item disabled>
             <ListGroup.ItemPrefix>
@@ -89,7 +89,7 @@ export const RowButton: React.FC<{
   label: string;
   value?: string;
   onPress?: () => void;
-  href?: string;
+  href?: Href;
   isFirst?: boolean;
   isLast?: boolean;
   isDanger?: boolean;
@@ -155,7 +155,7 @@ export const RowButton: React.FC<{
 
   if (href) {
     return (
-      <Link href={href as any} asChild>
+      <Link href={href} asChild>
         <TouchableOpacity>{content}</TouchableOpacity>
       </Link>
     );
@@ -171,14 +171,14 @@ export const RowButton: React.FC<{
 const TRIPLE_TAP_WINDOW_MS = 1500;
 
 const SettingsListLinkItem: React.FC<{
-  href: string;
+  href: Href;
   title: string;
   description?: string;
   isDanger?: boolean;
 }> = ({ href, title, description, isDanger }) => {
   const danger = useThemeColor('danger');
   return (
-    <PressableFeedback animation={false} onPress={() => router.navigate(href as any)}>
+    <PressableFeedback animation={false} onPress={() => router.navigate(href)}>
       <PressableFeedback.Scale>
         <ListGroup.Item disabled>
           <ListGroup.ItemContent>
@@ -274,63 +274,166 @@ export const SettingsScreen = () => {
 
   return (
     <ScreenWrapper name="SettingsScreen" scroll="custom" safeArea>
-        <ScrollView className="px-4">
-          <Section title="Account">
-            <ProfileButton />
-          </Section>
-          <Section title="Preferences">
+      <ScrollView className="px-4">
+        <Section title="Account">
+          <ProfileButton />
+        </Section>
+        <Section title="Preferences">
+          <ListGroup variant="secondary">
+            <SettingsListLinkItem href="/(settings-flow)/routing" title="Swap Routing" />
+          </ListGroup>
+        </Section>
+        <Section title="App Information">
+          <ListGroup variant="secondary">
+            <SettingsListActionItem
+              title="View Source on GitHub"
+              onPress={() => {
+                Linking.openURL('https://github.com/SovranBitcoin/Sovran');
+              }}
+            />
+            <Separator className="mx-4" />
+            <SettingsListActionItem
+              title="Contact the Developer"
+              onPress={() => {
+                Linking.openURL('https://x.com/KevinKelbie');
+              }}
+            />
+          </ListGroup>
+        </Section>
+        <Section title="Security">
+          <ListGroup variant="secondary">
+            <SettingsListLinkItem href="/(settings-flow)/keyring" title="P2PK Keys" />
+            <Separator className="mx-4" />
+            <SettingsListLinkItem
+              href="/(settings-flow)/recovery"
+              title="Recover Wallet"
+              description="Restore ecash from all mints using your seed"
+            />
+          </ListGroup>
+        </Section>
+
+        <Section title="Privacy">
+          <ListGroup variant="secondary">
+            <PressableFeedback
+              animation={false}
+              onPress={() => setSendLocationEnabled(!(sendLocationEnabled ?? false))}>
+              <PressableFeedback.Scale>
+                <ListGroup.Item disabled>
+                  <ListGroup.ItemContent>
+                    <ListGroup.ItemTitle>Location Stamps</ListGroup.ItemTitle>
+                    <ListGroup.ItemDescription>
+                      Attach your approximate location when making transactions. (metadata only
+                      stored on your device)
+                    </ListGroup.ItemDescription>
+                  </ListGroup.ItemContent>
+                  <ListGroup.ItemSuffix>
+                    <HeroSwitch
+                      isSelected={sendLocationEnabled ?? false}
+                      onSelectedChange={setSendLocationEnabled}
+                    />
+                  </ListGroup.ItemSuffix>
+                </ListGroup.Item>
+              </PressableFeedback.Scale>
+              <PressableFeedback.Ripple />
+            </PressableFeedback>
+          </ListGroup>
+        </Section>
+
+        {devMode ? (
+          <Section title="Developer">
             <ListGroup variant="secondary">
-              <SettingsListLinkItem href="/(settings-flow)/routing" title="Swap Routing" />
-            </ListGroup>
-          </Section>
-          <Section title="App Information">
-            <ListGroup variant="secondary">
-              <SettingsListActionItem
-                title="View Source on GitHub"
-                onPress={() => {
-                  Linking.openURL('https://github.com/SovranBitcoin/Sovran');
-                }}
-              />
+              <SettingsListActionItem title="Export Database" onPress={handleExportDatabase} />
               <Separator className="mx-4" />
-              <SettingsListActionItem
-                title="Contact the Developer"
-                onPress={() => {
-                  Linking.openURL('https://x.com/KevinKelbie');
-                }}
-              />
-            </ListGroup>
-          </Section>
-          <Section title="Security">
-            <ListGroup variant="secondary">
-              <SettingsListLinkItem href="/(settings-flow)/keyring" title="P2PK Keys" />
               <Separator className="mx-4" />
               <SettingsListLinkItem
-                href="/(settings-flow)/recovery"
-                title="Recover Wallet"
-                description="Restore ecash from all mints using your seed"
+                href="/(settings-flow)/storage"
+                title="Storage Inventory"
+                description="View persisted storage keys and coco database files"
               />
-            </ListGroup>
-          </Section>
-
-          <Section title="Privacy">
-            <ListGroup variant="secondary">
-              <PressableFeedback
-                animation={false}
-                onPress={() => setSendLocationEnabled(!(sendLocationEnabled ?? false))}>
+              <Separator className="mx-4" />
+              <PressableFeedback animation={false} onPress={() => setMockMode(!mockMode)}>
                 <PressableFeedback.Scale>
                   <ListGroup.Item disabled>
                     <ListGroup.ItemContent>
-                      <ListGroup.ItemTitle>Location Stamps</ListGroup.ItemTitle>
-                      <ListGroup.ItemDescription>
-                        Attach your approximate location when making transactions. (metadata only
-                        stored on your device)
-                      </ListGroup.ItemDescription>
+                      <ListGroup.ItemTitle>Mock Mode</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <HeroSwitch isSelected={mockMode} onSelectedChange={setMockMode} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+              <Separator className="mx-4" />
+              <PressableFeedback animation={false} onPress={() => setMockOffline(!mockOffline)}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Mock Offline</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <HeroSwitch isSelected={mockOffline} onSelectedChange={setMockOffline} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+              <Separator className="mx-4" />
+              <PressableFeedback animation={false} onPress={() => setMockFailSend(!mockFailSend)}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Mock Fail Send</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <HeroSwitch isSelected={mockFailSend} onSelectedChange={setMockFailSend} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+              <Separator className="mx-4" />
+              <PressableFeedback animation={false} onPress={() => setMockFailMelt(!mockFailMelt)}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Mock Fail Melt</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <HeroSwitch isSelected={mockFailMelt} onSelectedChange={setMockFailMelt} />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+              <Separator className="mx-4" />
+              <PressableFeedback
+                animation={false}
+                onPress={() => setMockFailPaymentRequest(!mockFailPaymentRequest)}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Mock Fail Payment Request</ListGroup.ItemTitle>
                     </ListGroup.ItemContent>
                     <ListGroup.ItemSuffix>
                       <HeroSwitch
-                        isSelected={sendLocationEnabled ?? false}
-                        onSelectedChange={setSendLocationEnabled}
+                        isSelected={mockFailPaymentRequest}
+                        onSelectedChange={setMockFailPaymentRequest}
                       />
+                    </ListGroup.ItemSuffix>
+                  </ListGroup.Item>
+                </PressableFeedback.Scale>
+                <PressableFeedback.Ripple />
+              </PressableFeedback>
+              <Separator className="mx-4" />
+              <PressableFeedback animation={false} onPress={() => setMockNoGlass(!mockNoGlass)}>
+                <PressableFeedback.Scale>
+                  <ListGroup.Item disabled>
+                    <ListGroup.ItemContent>
+                      <ListGroup.ItemTitle>Mock no-glass</ListGroup.ItemTitle>
+                    </ListGroup.ItemContent>
+                    <ListGroup.ItemSuffix>
+                      <HeroSwitch isSelected={mockNoGlass} onSelectedChange={setMockNoGlass} />
                     </ListGroup.ItemSuffix>
                   </ListGroup.Item>
                 </PressableFeedback.Scale>
@@ -338,137 +441,25 @@ export const SettingsScreen = () => {
               </PressableFeedback>
             </ListGroup>
           </Section>
+        ) : null}
 
-          {devMode ? (
-            <Section title="Developer">
-              <ListGroup variant="secondary">
-                <SettingsListActionItem title="Export Database" onPress={handleExportDatabase} />
-                <Separator className="mx-4" />
-                <Separator className="mx-4" />
-                <SettingsListLinkItem
-                  href="/(settings-flow)/storage"
-                  title="Storage Inventory"
-                  description="View persisted storage keys and coco database files"
-                />
-                <Separator className="mx-4" />
-                <PressableFeedback animation={false} onPress={() => setMockMode(!mockMode)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock Mode</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch isSelected={mockMode} onSelectedChange={setMockMode} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-                <Separator className="mx-4" />
-                <PressableFeedback animation={false} onPress={() => setMockOffline(!mockOffline)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock Offline</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch isSelected={mockOffline} onSelectedChange={setMockOffline} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-                <Separator className="mx-4" />
-                <PressableFeedback animation={false} onPress={() => setMockFailSend(!mockFailSend)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock Fail Send</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch isSelected={mockFailSend} onSelectedChange={setMockFailSend} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-                <Separator className="mx-4" />
-                <PressableFeedback animation={false} onPress={() => setMockFailMelt(!mockFailMelt)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock Fail Melt</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch isSelected={mockFailMelt} onSelectedChange={setMockFailMelt} />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-                <Separator className="mx-4" />
-                <PressableFeedback
-                  animation={false}
-                  onPress={() => setMockFailPaymentRequest(!mockFailPaymentRequest)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock Fail Payment Request</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch
-                          isSelected={mockFailPaymentRequest}
-                          onSelectedChange={setMockFailPaymentRequest}
-                        />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-                <Separator className="mx-4" />
-                <PressableFeedback
-                  animation={false}
-                  onPress={() => setMockNoGlass(!mockNoGlass)}>
-                  <PressableFeedback.Scale>
-                    <ListGroup.Item disabled>
-                      <ListGroup.ItemContent>
-                        <ListGroup.ItemTitle>Mock no-glass</ListGroup.ItemTitle>
-                      </ListGroup.ItemContent>
-                      <ListGroup.ItemSuffix>
-                        <HeroSwitch
-                          isSelected={mockNoGlass}
-                          onSelectedChange={setMockNoGlass}
-                        />
-                      </ListGroup.ItemSuffix>
-                    </ListGroup.Item>
-                  </PressableFeedback.Scale>
-                  <PressableFeedback.Ripple />
-                </PressableFeedback>
-              </ListGroup>
-            </Section>
-          ) : null}
+        <Section title="Danger Zone" isDanger>
+          <ListGroup variant="secondary">
+            <SettingsListLinkItem href="/(settings-flow)/delete" title="Delete Account" isDanger />
+          </ListGroup>
+        </Section>
 
-          <Section title="Danger Zone" isDanger>
-            <ListGroup variant="secondary">
-              <SettingsListLinkItem
-                href="/(settings-flow)/delete"
-                title="Delete Account"
-                isDanger
-              />
-            </ListGroup>
-          </Section>
-
-          <TouchableOpacity onPress={handleVersionPress}>
-            <VStack spacing={4}>
-              <Text className="text-foreground/50 text-center" bold size={13}>
-                {name}
-              </Text>
-              <Text className="text-foreground/50 text-center" size={13} medium>
-                App Version {version} ({buildNumber})
-              </Text>
-            </VStack>
-          </TouchableOpacity>
-        </ScrollView>
+        <TouchableOpacity onPress={handleVersionPress}>
+          <VStack spacing={4}>
+            <Text className="text-foreground/50 text-center" bold size={13}>
+              {name}
+            </Text>
+            <Text className="text-foreground/50 text-center" size={13} medium>
+              App Version {version} ({buildNumber})
+            </Text>
+          </VStack>
+        </TouchableOpacity>
+      </ScrollView>
     </ScreenWrapper>
   );
 };

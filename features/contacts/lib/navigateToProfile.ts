@@ -18,7 +18,7 @@ export function navigateToContact(pubkey: string, mintUrl?: string): void {
   // push (not navigate) so each profile pushes a new stack entry; tapping a
   // follower from inside a profile then back returns to the previous one.
   guardedRouter.push({
-    pathname: '/(user-flow)/profile' as any,
+    pathname: '/(user-flow)/profile',
     params: { pubkey, ...(mintUrl ? { mintUrl } : {}) },
   });
 }

@@ -348,7 +348,7 @@ export const RepostCard = React.memo(function RepostCard({
 
   const navigateToThread = useCallback(() => {
     router.navigate({
-      pathname: '/(user-flow)/thread' as any,
+      pathname: '/(user-flow)/thread',
       params: { eventId: threadEventId },
     });
   }, [threadEventId]);
@@ -389,7 +389,7 @@ export const RepostCard = React.memo(function RepostCard({
           onPressOut={suppressThreadTapEnd}
           onPress={() =>
             router.push({
-              pathname: '/(user-flow)/profile' as any,
+              pathname: '/(user-flow)/profile',
               params: { pubkey: reposterPubkey },
             })
           }>

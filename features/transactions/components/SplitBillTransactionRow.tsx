@@ -82,7 +82,7 @@ export const SplitBillTransactionRow = React.memo(({ group }: Props) => {
       participants: group.participants.length,
     });
     router.navigate({
-      pathname: '/(split-bill-flow)/detail' as any,
+      pathname: '/(split-bill-flow)/detail',
       params: { groupId: group.id },
     });
   }, [group.id, group.state, group.participants.length]);

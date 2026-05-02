@@ -94,7 +94,7 @@ export function AccountPagerViewLayout({
           disabled={isSwapping}
           onPress={() => {
             walletLog.info('wallet.split_bill.tap');
-            router.push('/(split-bill-flow)/amount' as any);
+            router.push('/(split-bill-flow)/amount');
           }}
         />
         <CircleActionButton
@@ -118,7 +118,7 @@ export function AccountPagerViewLayout({
           testID="wallet-action-theme"
           onPress={() => {
             walletLog.info('wallet.theme.tap');
-            router.push('/(theme-flow)/preview' as any);
+            router.push('/(theme-flow)/preview');
           }}
         />
       </HStack>

@@ -575,7 +575,7 @@ export const InlineMention = React.memo(function InlineMention({
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       onPress={() => {
-        router.push({ pathname: '/(user-flow)/profile' as any, params: { pubkey } });
+        router.push({ pathname: '/(user-flow)/profile', params: { pubkey } });
       }}>
       @{label}
     </Text>
@@ -913,7 +913,7 @@ export const QuotedPostCard = React.memo(function QuotedPostCard({
   const handleOpenQuotedThread = useCallback(() => {
     if (!event) return;
     router.navigate({
-      pathname: '/(user-flow)/thread' as any,
+      pathname: '/(user-flow)/thread',
       params: { eventId: event.id },
     });
   }, [event]);
@@ -1491,7 +1491,7 @@ export function buildVideoOverlayLayout(
       likePendingDirection: engagement.likePendingDirection,
       onCommentPress: () =>
         router.navigate({
-          pathname: '/(user-flow)/thread' as any,
+          pathname: '/(user-flow)/thread',
           params: { eventId: event.id },
         }),
       onRepostPress: () => toggleRepost(event),

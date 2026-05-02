@@ -1893,7 +1893,7 @@ export function MintRebalancePlanScreen() {
             haptics
             onPress={() => {
               router.navigate({
-                pathname: '/swap' as any,
+                pathname: '/swap',
                 params: { groupId: swapGroupIdRef.current! },
               });
             }}>

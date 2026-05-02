@@ -14,7 +14,7 @@ export const isLiquidGlassTabBarAvailable = () => {
   return Boolean(config || hasConfig);
 };
 
-const TAB_PATHS = ['/', '/ai'];
+const TAB_PATHS = ['/', '/ai'] as const;
 
 function getTabIndexFromPathname(pathname: string): number | null {
   if (pathname === '/' || pathname === '/index' || pathname.startsWith('/index/')) return 0;
@@ -133,7 +133,7 @@ export function GlobalLiquidGlassTabsOverlay() {
             iconTintEnabled
             onTabSelected={(index) => {
               setSelectedTabIndex(index);
-              router.navigate(TAB_PATHS[index] as any);
+              router.navigate(TAB_PATHS[index]);
             }}
           />
         </View>

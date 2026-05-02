@@ -222,7 +222,7 @@ export default function SplitBillParticipantsScreen() {
       perPerson,
     });
     router.push({
-      pathname: '/(split-bill-flow)/summary' as any,
+      pathname: '/(split-bill-flow)/summary',
       params: { groupId: group.id },
     });
   }, [
@@ -306,7 +306,7 @@ export default function SplitBillParticipantsScreen() {
               testID="split-bill-participants-search"
               icon="mdi:magnify"
               size={22}
-              onPress={() => router.push('/(split-bill-flow)/search' as any)}
+              onPress={() => router.push('/(split-bill-flow)/search')}
             />
           ),
         }}
