@@ -31,6 +31,7 @@ import type { Keypair } from '@cashu/coco-core';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { nip19 } from 'nostr-tools';
+import { hexToBytes } from '@noble/hashes/utils.js';
 import QRCode from 'react-native-qrcode-svg';
 import { Tabs } from '@/shared/ui/composed/Tabs';
 import opacity from 'hex-color-opacity';
@@ -265,20 +266,6 @@ export const SettingsKeyringScreen: React.FC = () => {
   });
 
   /**
-   * Helper to convert hex string to bytes
-   */
-  const hexToBytes = (hex: string): Uint8Array | null => {
-    if (hex.length !== 64 || !/^[0-9a-fA-F]+$/.test(hex)) {
-      return null;
-    }
-    const bytes = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) {
-      bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
-    }
-    return bytes;
-  };
-
-  /**
    * Try to import a key with multiple strategies without manipulating the input
    */
   const tryImportKey = async (input: string): Promise<boolean> => {
@@ -295,11 +282,10 @@ export const SettingsKeyringScreen: React.FC = () => {
       } catch {}
     }
 
-    // Strategy 2: Try as raw 64-char hex
-    const rawBytes = hexToBytes(input);
-    if (rawBytes) {
+    // Strategy 2: Try as raw 64-char hex (32-byte private key)
+    if (input.length === 64 && /^[0-9a-fA-F]+$/.test(input)) {
       try {
-        await manager.keyring.addKeyPair(rawBytes);
+        await manager.keyring.addKeyPair(hexToBytes(input));
         return true;
       } catch {}
     }

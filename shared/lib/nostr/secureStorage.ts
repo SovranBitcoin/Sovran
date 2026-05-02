@@ -2,6 +2,8 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+import { useCallback, useEffect, useState } from 'react';
 
 import { nostrLog, redactError } from '../logger';
 
@@ -32,6 +34,38 @@ const IOS_SECURE_OPTIONS = {
   // For production, you might want to set requireAuthentication: true
 } as const;
 
+const secureOptions = (): SecureStore.SecureStoreOptions =>
+  Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+
+async function secureGet(key: string, op: string): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(key, secureOptions());
+  } catch (error) {
+    nostrLog.error(`nostr.secure.${op}_failed`, { error: redactError(error) });
+    return null;
+  }
+}
+
+async function secureSet(key: string, value: string, op: string): Promise<boolean> {
+  try {
+    await SecureStore.setItemAsync(key, value, secureOptions());
+    return true;
+  } catch (error) {
+    nostrLog.error(`nostr.secure.${op}_failed`, { error: redactError(error) });
+    return false;
+  }
+}
+
+async function secureDelete(key: string, op: string): Promise<boolean> {
+  try {
+    await SecureStore.deleteItemAsync(key, secureOptions());
+    return true;
+  } catch (error) {
+    nostrLog.error(`nostr.secure.${op}_failed`, { error: redactError(error) });
+    return false;
+  }
+}
+
 function getDebugMnemonicOverride(): string | null {
   if (!__DEV__) {
     return null;
@@ -56,43 +90,29 @@ function getDebugMnemonicOverride(): string | null {
  * @returns Promise<boolean> True if stored successfully, false otherwise
  */
 export async function storeMnemonic(mnemonic: string): Promise<boolean> {
-  try {
-    if (!mnemonic || typeof mnemonic !== 'string') {
-      throw new Error('Invalid mnemonic provided');
-    }
-
-    // Validate it's a 12-word mnemonic
-    const words = mnemonic.trim().split(' ');
-    if (words.length !== 12) {
-      throw new Error('Mnemonic must be exactly 12 words');
-    }
-
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-
-    await SecureStore.setItemAsync(STORAGE_KEYS.USER_MNEMONIC, mnemonic, options);
-
-    return true;
-  } catch (error) {
-    nostrLog.error('nostr.secure.store_mnemonic_failed', { error: redactError(error) });
+  if (!mnemonic || typeof mnemonic !== 'string') {
+    nostrLog.error('nostr.secure.store_mnemonic_failed', {
+      error: 'Invalid mnemonic provided',
+    });
     return false;
   }
+  const words = mnemonic.trim().split(' ');
+  if (words.length !== 12) {
+    nostrLog.error('nostr.secure.store_mnemonic_failed', {
+      error: 'Mnemonic must be exactly 12 words',
+    });
+    return false;
+  }
+
+  return secureSet(STORAGE_KEYS.USER_MNEMONIC, mnemonic, 'store_mnemonic');
 }
 
 /**
  * Retrieves the user's mnemonic phrase from secure storage
  * @returns Promise<string | null> The mnemonic phrase or null if not found/error
  */
-export async function retrieveMnemonic(): Promise<string | null> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-
-    const mnemonic = await SecureStore.getItemAsync(STORAGE_KEYS.USER_MNEMONIC, options);
-
-    return mnemonic;
-  } catch (error) {
-    nostrLog.error('nostr.secure.retrieve_mnemonic_failed', { error: redactError(error) });
-    return null;
-  }
+export function retrieveMnemonic(): Promise<string | null> {
+  return secureGet(STORAGE_KEYS.USER_MNEMONIC, 'retrieve_mnemonic');
 }
 
 /**
@@ -190,37 +210,27 @@ export async function clearAllSecureData(
   accountIndexes: number[],
   importedPubkeys: string[] = []
 ): Promise<boolean> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
+  const keysToDelete: string[] = [
+    STORAGE_KEYS.USER_MNEMONIC,
+    STORAGE_KEYS.MIGRATIONS_COMPLETE_LEGACY,
+  ];
 
-    const keysToDelete: string[] = [
-      STORAGE_KEYS.USER_MNEMONIC,
-      STORAGE_KEYS.MIGRATIONS_COMPLETE_LEGACY,
-    ];
-
-    for (const i of accountIndexes) {
-      keysToDelete.push(migrationsCompleteKey(i), derivedKeysKey(i), cashuMnemonicKey(i));
-    }
-
-    for (const pubkey of importedPubkeys) {
-      keysToDelete.push(importedNsecKey(pubkey));
-    }
-
-    const clearPromises = keysToDelete.map((key) =>
-      SecureStore.deleteItemAsync(key, options).catch((error) => {
-        nostrLog.warn('nostr.secure.clear_key_failed', { key, error: redactError(error) });
-        return false;
-      })
-    );
-
-    await Promise.all(clearPromises);
-
-    nostrLog.info('nostr.secure.all_data_cleared');
-    return true;
-  } catch (error) {
-    nostrLog.error('nostr.secure.clear_all_failed', { error: redactError(error) });
-    return false;
+  for (const i of accountIndexes) {
+    keysToDelete.push(migrationsCompleteKey(i), derivedKeysKey(i), cashuMnemonicKey(i));
   }
+
+  for (const pubkey of importedPubkeys) {
+    keysToDelete.push(importedNsecKey(pubkey));
+  }
+
+  const results = await Promise.all(keysToDelete.map((key) => secureDelete(key, 'clear_key')));
+  const allOk = results.every(Boolean);
+  if (allOk) {
+    nostrLog.info('nostr.secure.all_data_cleared');
+  } else {
+    nostrLog.warn('nostr.secure.all_data_cleared_with_errors');
+  }
+  return allOk;
 }
 
 // ── Derived Keys Cache ──────────────────────────────────────────
@@ -245,25 +255,14 @@ export function hashMnemonic(mnemonic: string): string {
   return hash.toString(36);
 }
 
-export async function storeDerivedKeys(
-  accountIndex: number,
-  keys: CachedDerivedKeys
-): Promise<boolean> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-    await SecureStore.setItemAsync(derivedKeysKey(accountIndex), JSON.stringify(keys), options);
-    return true;
-  } catch (error) {
-    nostrLog.error('nostr.secure.store_keys_failed', { error: redactError(error) });
-    return false;
-  }
+export function storeDerivedKeys(accountIndex: number, keys: CachedDerivedKeys): Promise<boolean> {
+  return secureSet(derivedKeysKey(accountIndex), JSON.stringify(keys), 'store_keys');
 }
 
 export async function retrieveDerivedKeys(accountIndex: number): Promise<CachedDerivedKeys | null> {
+  const raw = await secureGet(derivedKeysKey(accountIndex), 'retrieve_keys');
+  if (!raw) return null;
   try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-    const raw = await SecureStore.getItemAsync(derivedKeysKey(accountIndex), options);
-    if (!raw) return null;
     return JSON.parse(raw) as CachedDerivedKeys;
   } catch (error) {
     nostrLog.error('nostr.secure.retrieve_keys_failed', { error: redactError(error) });
@@ -271,29 +270,21 @@ export async function retrieveDerivedKeys(accountIndex: number): Promise<CachedD
   }
 }
 
-export async function storeCashuMnemonic(
+export function storeCashuMnemonic(
   accountIndex: number,
   cashuMnemonicValue: string,
   mnemonicHash: string
 ): Promise<boolean> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-    const payload = JSON.stringify({ value: cashuMnemonicValue, mnemonicHash });
-    await SecureStore.setItemAsync(cashuMnemonicKey(accountIndex), payload, options);
-    return true;
-  } catch (error) {
-    nostrLog.error('nostr.secure.store_cashu_mnemonic_failed', { error: redactError(error) });
-    return false;
-  }
+  const payload = JSON.stringify({ value: cashuMnemonicValue, mnemonicHash });
+  return secureSet(cashuMnemonicKey(accountIndex), payload, 'store_cashu_mnemonic');
 }
 
 export async function retrieveCashuMnemonic(
   accountIndex: number
 ): Promise<{ value: string; mnemonicHash: string } | null> {
+  const raw = await secureGet(cashuMnemonicKey(accountIndex), 'retrieve_cashu_mnemonic');
+  if (!raw) return null;
   try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-    const raw = await SecureStore.getItemAsync(cashuMnemonicKey(accountIndex), options);
-    if (!raw) return null;
     return JSON.parse(raw) as { value: string; mnemonicHash: string };
   } catch (error) {
     nostrLog.error('nostr.secure.retrieve_cashu_mnemonic_failed', { error: redactError(error) });
@@ -308,38 +299,23 @@ function cashuSeedKey(accountIndex: number): string {
   return `${STORAGE_KEYS.CASHU_SEED_PREFIX}${accountIndex}`;
 }
 
-export async function storeCashuSeed(
+export function storeCashuSeed(
   accountIndex: number,
   seed: Uint8Array,
   mnemonicHash: string
 ): Promise<boolean> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-    const hex = Array.from(seed)
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-    const payload = JSON.stringify({ hex, mnemonicHash });
-    await SecureStore.setItemAsync(cashuSeedKey(accountIndex), payload, options);
-    return true;
-  } catch (error) {
-    nostrLog.error('nostr.secure.store_cashu_seed_failed', { error: redactError(error) });
-    return false;
-  }
+  const payload = JSON.stringify({ hex: bytesToHex(seed), mnemonicHash });
+  return secureSet(cashuSeedKey(accountIndex), payload, 'store_cashu_seed');
 }
 
 export async function retrieveCashuSeed(
   accountIndex: number
 ): Promise<{ seed: Uint8Array; mnemonicHash: string } | null> {
+  const raw = await secureGet(cashuSeedKey(accountIndex), 'retrieve_cashu_seed');
+  if (!raw) return null;
   try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-    const raw = await SecureStore.getItemAsync(cashuSeedKey(accountIndex), options);
-    if (!raw) return null;
     const parsed = JSON.parse(raw) as { hex: string; mnemonicHash: string };
-    const bytes = new Uint8Array(parsed.hex.length / 2);
-    for (let i = 0; i < bytes.length; i++) {
-      bytes[i] = parseInt(parsed.hex.substring(i * 2, i * 2 + 2), 16);
-    }
-    return { seed: bytes, mnemonicHash: parsed.mnemonicHash };
+    return { seed: hexToBytes(parsed.hex), mnemonicHash: parsed.mnemonicHash };
   } catch (error) {
     nostrLog.error('nostr.secure.retrieve_cashu_seed_failed', { error: redactError(error) });
     return null;
@@ -358,41 +334,25 @@ function migrationsCompleteKey(accountIndex: number): string {
  * per-account key was introduced.
  */
 export async function isMigrationsComplete(accountIndex: number = 0): Promise<boolean> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-    // Check per-account key first
-    const perAccount = await SecureStore.getItemAsync(migrationsCompleteKey(accountIndex), options);
-    if (perAccount === 'true') return true;
+  // Check per-account key first
+  const perAccount = await secureGet(migrationsCompleteKey(accountIndex), 'check_migration_flag');
+  if (perAccount === 'true') return true;
 
-    // Backward compat: check legacy global key (only trust it for account 0)
-    if (accountIndex === 0) {
-      const legacy = await SecureStore.getItemAsync(
-        STORAGE_KEYS.MIGRATIONS_COMPLETE_LEGACY,
-        options
-      );
-      if (legacy === 'true') {
-        // Promote to per-account key so we don't check legacy again
-        await SecureStore.setItemAsync(migrationsCompleteKey(0), 'true', options);
-        return true;
-      }
+  // Backward compat: check legacy global key (only trust it for account 0)
+  if (accountIndex === 0) {
+    const legacy = await secureGet(STORAGE_KEYS.MIGRATIONS_COMPLETE_LEGACY, 'check_migration_flag');
+    if (legacy === 'true') {
+      // Promote to per-account key so we don't check legacy again
+      await secureSet(migrationsCompleteKey(0), 'true', 'set_migration_flag');
+      return true;
     }
-
-    return false;
-  } catch (error) {
-    nostrLog.error('nostr.secure.check_migration_flag_failed', { error: redactError(error) });
-    return false;
   }
+
+  return false;
 }
 
-export async function setMigrationsComplete(accountIndex: number = 0): Promise<boolean> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-    await SecureStore.setItemAsync(migrationsCompleteKey(accountIndex), 'true', options);
-    return true;
-  } catch (error) {
-    nostrLog.error('nostr.secure.set_migration_flag_failed', { error: redactError(error) });
-    return false;
-  }
+export function setMigrationsComplete(accountIndex: number = 0): Promise<boolean> {
+  return secureSet(migrationsCompleteKey(accountIndex), 'true', 'set_migration_flag');
 }
 
 // ── Imported Nsec Storage ───────────────────────────────────────
@@ -401,34 +361,57 @@ function importedNsecKey(pubkeyHex: string): string {
   return `${STORAGE_KEYS.IMPORTED_NSEC_PREFIX}${pubkeyHex}`;
 }
 
-export async function storeImportedNsec(pubkeyHex: string, nsecValue: string): Promise<boolean> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-    await SecureStore.setItemAsync(importedNsecKey(pubkeyHex), nsecValue, options);
-    return true;
-  } catch (error) {
-    nostrLog.error('nostr.secure.store_nsec_failed', { error: redactError(error) });
-    return false;
-  }
+export function storeImportedNsec(pubkeyHex: string, nsecValue: string): Promise<boolean> {
+  return secureSet(importedNsecKey(pubkeyHex), nsecValue, 'store_nsec');
 }
 
-export async function retrieveImportedNsec(pubkeyHex: string): Promise<string | null> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-    return await SecureStore.getItemAsync(importedNsecKey(pubkeyHex), options);
-  } catch (error) {
-    nostrLog.error('nostr.secure.retrieve_nsec_failed', { error: redactError(error) });
-    return null;
-  }
+export function retrieveImportedNsec(pubkeyHex: string): Promise<string | null> {
+  return secureGet(importedNsecKey(pubkeyHex), 'retrieve_nsec');
 }
 
-export async function deleteImportedNsec(pubkeyHex: string): Promise<boolean> {
-  try {
-    const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
-    await SecureStore.deleteItemAsync(importedNsecKey(pubkeyHex), options);
-    return true;
-  } catch (error) {
-    nostrLog.error('nostr.secure.delete_nsec_failed', { error: redactError(error) });
-    return false;
-  }
+export function deleteImportedNsec(pubkeyHex: string): Promise<boolean> {
+  return secureDelete(importedNsecKey(pubkeyHex), 'delete_nsec');
+}
+
+// ── Hooks ───────────────────────────────────────────────────────
+
+export interface UseMnemonicReturn {
+  value: string | null;
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+}
+
+/**
+ * React hook over `retrieveMnemonic`. Auto-loads on mount when `autoLoad` is
+ * true (default). The mnemonic is the only key consumed via a hook today; if
+ * other keys grow consumers, generalize then.
+ */
+export function useMnemonic(autoLoad: boolean = true): UseMnemonicReturn {
+  const [value, setValue] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(autoLoad);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const stored = await retrieveMnemonic();
+    setValue(stored);
+    if (stored === null) {
+      // `retrieveMnemonic` swallows errors and returns null on either
+      // not-found or genuine failure; the hook exposes a generic message
+      // for the failure-shaped UI but does not distinguish — callers that
+      // need that distinction read SecureStore directly.
+      setError(null);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (autoLoad) {
+      refresh();
+    }
+  }, [autoLoad, refresh]);
+
+  return { value, loading, error, refresh };
 }

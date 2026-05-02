@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { useMnemonic, useCashuMnemonic } from '@/shared/hooks/useSecureStore';
+import { useMnemonic } from '@/shared/lib/nostr/secureStorage';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import Icon from 'assets/icons';
@@ -34,8 +34,8 @@ const DebugRow: React.FC<{ label: string; value: string }> = ({ label, value }) 
 export const SettingsProfileScreen = () => {
   useLifecycleLogger('SettingsProfileScreen');
   const { value: mnemonic, loading: mnemonicLoading } = useMnemonic();
-  const { value: cashuMnemonic, loading: cashuMnemonicLoading } = useCashuMnemonic();
-  const { keys: nostrKeys, isLoading: nostrKeysLoading } = useNostrKeysContext();
+  const { keys: nostrKeys, cashuMnemonic, isLoading: nostrKeysLoading } = useNostrKeysContext();
+  const cashuMnemonicLoading = nostrKeysLoading;
   const mutedColor = useThemeColor('muted');
   const [visibleFields, setVisibleFields] = useState({
     mnemonic: false,

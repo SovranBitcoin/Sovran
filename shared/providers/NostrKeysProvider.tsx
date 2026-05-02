@@ -8,7 +8,6 @@ import React, {
   useRef,
 } from 'react';
 import { InteractionManager } from 'react-native';
-import { useMnemonic } from '@/shared/hooks/useSecureStore';
 import {
   ensureMnemonicExists,
   retrieveMnemonic,
@@ -18,6 +17,7 @@ import {
   storeCashuMnemonic,
   retrieveImportedNsec,
   hashMnemonic,
+  useMnemonic,
   type CachedDerivedKeys,
 } from '@/shared/lib/nostr/secureStorage';
 import {
@@ -325,13 +325,11 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
         } else {
           // ── Derived profile: existing NIP-06 derivation path ──
           // Try loading cached keys from SecureStore (fast path)
-          const [cachedDerived, cachedCashu] = await initPhase(
-            'NostrKeys.cacheRead',
-            () =>
-              Promise.all([
-                retrieveDerivedKeys(defaultAccountIndex),
-                retrieveCashuMnemonic(defaultAccountIndex),
-              ])
+          const [cachedDerived, cachedCashu] = await initPhase('NostrKeys.cacheRead', () =>
+            Promise.all([
+              retrieveDerivedKeys(defaultAccountIndex),
+              retrieveCashuMnemonic(defaultAccountIndex),
+            ])
           );
           initLog(
             'NostrKeys',
@@ -358,9 +356,8 @@ export function NostrKeysProvider({ children, defaultAccountIndex = 0 }: NostrKe
               deriveNostrKeys(mnemonicToUse!, defaultAccountIndex)
             );
 
-            defaultCashuMnemonic = await initPhase(
-              'NostrKeys.deriveCashuMnemonic',
-              async () => deriveCashuMnemonicPure(mnemonicToUse!, defaultAccountIndex)
+            defaultCashuMnemonic = await initPhase('NostrKeys.deriveCashuMnemonic', async () =>
+              deriveCashuMnemonicPure(mnemonicToUse!, defaultAccountIndex)
             );
 
             const cachePayload: CachedDerivedKeys = {
