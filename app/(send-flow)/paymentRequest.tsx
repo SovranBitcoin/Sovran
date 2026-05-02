@@ -4,19 +4,28 @@
  * Part of the (send-flow) modal group - displays with back button.
  * The navigateToPaymentRequest handler navigates here with a synthetic
  * entry containing the encoded payment request.
+ *
+ * Validates the `paymentRequestEntry` deep-link param at the route
+ * boundary per AUDIT.md dim-5 — the param is a JSON-encoded entry that
+ * carries an attacker-controllable BOLT11/Cashu payment request and was
+ * previously forwarded raw to the screen.
  */
 
 import React, { useCallback } from 'react';
-import { useLocalSearchParams, router, Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
+import { z } from 'zod';
 
 import { PaymentRequestScreen } from '@/features/send';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+
+const ParamsSchema = z.object({
+  paymentRequestEntry: z.string().min(1).max(64_000).optional(),
+});
 
 function ModalScreen() {
-  const { paymentRequestEntry } = useLocalSearchParams<{
-    paymentRequestEntry?: string;
-  }>();
+  const params = useRouteParams(ParamsSchema, { where: 'send-flow.paymentRequest' });
 
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
@@ -32,6 +41,8 @@ function ModalScreen() {
     void machine.requestMintSelector();
   }, [machine]);
 
+  if (!params) return null;
+
   return (
     <>
       <Stack.Screen
@@ -41,8 +52,8 @@ function ModalScreen() {
         }}
       />
       <PaymentRequestScreen
-        key={paymentRequestEntry}
-        paymentRequestEntry={paymentRequestEntry}
+        key={params.paymentRequestEntry}
+        paymentRequestEntry={params.paymentRequestEntry}
         onCancel={() => {
           router.dismissTo('/');
         }}

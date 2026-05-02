@@ -5,22 +5,30 @@
  * The mintHistoryEntry param contains the full MintHistoryEntry as JSON.
  * Wires up the resolver so MintSelector can trigger changeMint(),
  * which re-runs the createMintQuote handler with the new mint.
+ *
+ * Validates deep-link params at the route boundary per AUDIT.md dim-5
+ * (audit 23#F-002): unguarded `JSON.parse(...)` was the crash +
+ * invoice-spoofing surface.
  */
 
 import React, { useCallback } from 'react';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
+import { z } from 'zod';
 
 import { MintQuoteScreen } from '@/features/receive';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+
+const ParamsSchema = z.object({
+  mintHistoryEntry: z.string().min(1).max(64_000),
+  unit: z.string().max(16).optional(),
+});
 
 function ModalScreen() {
-  const params = useLocalSearchParams<{
-    mintHistoryEntry: string;
-    unit?: string;
-  }>();
+  const params = useRouteParams(ParamsSchema, { where: 'receive-flow.mintQuote' });
 
-  const unit = params.unit ?? 'sat';
+  const unit = params?.unit ?? 'sat';
 
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit });
@@ -35,6 +43,8 @@ function ModalScreen() {
   const handleRequestMintList = useCallback(() => {
     void machine.requestMintSelector();
   }, [machine]);
+
+  if (!params) return null;
 
   return (
     <>

@@ -7,10 +7,15 @@
  *
  * Availability is derived from the entry: when destination is absent
  * (persist/management flow), getInfo and addMint actions are available.
+ *
+ * Validates the `mintSelectorEntry` deep-link param at the route boundary
+ * per AUDIT.md dim-5 — the param is a JSON-encoded entry decoded by
+ * `useScreenActions`.
  */
 
 import React, { useEffect } from 'react';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router } from 'expo-router';
+import { z } from 'zod';
 
 import { useScreenActions } from 'coco-payment-ux/react';
 import type { MintListItem } from 'coco-payment-ux';
@@ -20,15 +25,20 @@ import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+
+const ParamsSchema = z.object({
+  mintSelectorEntry: z.string().min(1).max(64_000).optional(),
+});
 
 function ReceiveMintSelectRoute() {
   useLifecycleLogger('ReceiveMintSelectRoute');
-  const params = useLocalSearchParams<{ mintSelectorEntry?: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'receive-flow.mintSelect' });
 
   const walletContext = useWalletContext();
   usePaymentFlowMachine({ walletContext });
 
-  const { entry, actions } = useScreenActions('mintSelector', params.mintSelectorEntry);
+  const { entry, actions } = useScreenActions('mintSelector', params?.mintSelectorEntry);
 
   const items: MintListItem[] = Array.isArray(entry?.items) ? (entry.items as MintListItem[]) : [];
 
@@ -51,6 +61,8 @@ function ReceiveMintSelectRoute() {
         .map((i) => ({ mint: i.displayName, reason: i.reason?.code })),
     });
   }, [items, entry?.scope, entry?.destination]);
+
+  if (!params) return null;
 
   return (
     <>
