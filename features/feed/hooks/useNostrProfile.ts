@@ -23,34 +23,47 @@ export function useNostrProfile(pubkey: string | null): UseNostrProfileResult {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchProfile = useCallback(async () => {
-    if (!pubkey) {
-      setData(null);
+  // Refetch builds a fresh AbortController each call; the effect's cleanup
+  // signal aborts whichever fetch is in flight when pubkey changes or the
+  // component unmounts.
+  const fetchProfile = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!pubkey) {
+        setData(null);
+        setIsLoading(false);
+        return;
+      }
+
+      log.debug('feed.profile.fetch.start', { pubkey });
+      setIsLoading(true);
+      setError(null);
+
+      const result = await fetchNostrProfile(pubkey, { signal });
+      if (signal?.aborted) return;
+      if (result.isOk()) {
+        log.debug('feed.profile.fetch.success', { pubkey, hasData: !!result.value });
+        setData(result.value);
+      } else {
+        log.warn('feed.profile.fetch.error', { pubkey, error: result.error });
+        setError(result.error);
+        setData(null);
+      }
       setIsLoading(false);
-      return;
-    }
-
-    log.debug('feed.profile.fetch.start', { pubkey });
-    setIsLoading(true);
-    setError(null);
-
-    const result = await fetchNostrProfile(pubkey);
-    if (result.isOk()) {
-      log.debug('feed.profile.fetch.success', { pubkey, hasData: !!result.value });
-      setData(result.value);
-    } else {
-      log.warn('feed.profile.fetch.error', { pubkey, error: result.error });
-      setError(result.error);
-      setData(null);
-    }
-    setIsLoading(false);
-  }, [pubkey]);
+    },
+    [pubkey]
+  );
 
   useEffect(() => {
-    fetchProfile();
+    const controller = new AbortController();
+    fetchProfile(controller.signal);
+    return () => controller.abort();
   }, [fetchProfile]);
 
-  return { data, isLoading, error, refetch: fetchProfile };
+  const refetch = useCallback(() => {
+    void fetchProfile();
+  }, [fetchProfile]);
+
+  return { data, isLoading, error, refetch };
 }
 
 /**

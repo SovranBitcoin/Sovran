@@ -6,7 +6,11 @@
 // ---------------------------------------------------------------------------
 
 import { log } from '@/shared/lib/logger';
-import { useWallpaperStore, type WallpaperCatalogEntry, type DownloadedWallpaper } from '@/shared/stores/global/wallpaperStore';
+import {
+  useWallpaperStore,
+  type WallpaperCatalogEntry,
+  type DownloadedWallpaper,
+} from '@/shared/stores/global/wallpaperStore';
 import { fetchWallpaperCatalog } from '@/shared/lib/apiClient';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +31,7 @@ export interface SyncPlan {
 export function computeSyncPlan(
   serverCatalog: WallpaperCatalogEntry[],
   localDownloaded: Record<string, DownloadedWallpaper>,
-  albumSlug?: string,
+  albumSlug?: string
 ): SyncPlan {
   const serverWallpapers = albumSlug
     ? serverCatalog.filter((w) => w.albumSlug === albumSlug)
@@ -72,10 +76,11 @@ export function computeSyncPlan(
 // ---------------------------------------------------------------------------
 
 /**
- * Refresh the wallpaper catalog from the API.
+ * Refresh the wallpaper catalog from the API. `signal` aborts the fetch
+ * if the caller goes away before the catalog lands.
  */
-export async function refreshCatalog(): Promise<boolean> {
-  const result = await fetchWallpaperCatalog();
+export async function refreshCatalog(signal?: AbortSignal): Promise<boolean> {
+  const result = await fetchWallpaperCatalog({ signal });
 
   if (result.isErr()) {
     log.warn('wallpaper.sync.catalog_failed', { error: result.error.message });
@@ -85,9 +90,7 @@ export async function refreshCatalog(): Promise<boolean> {
   const { wallpapers, albums } = result.value;
   // Schema palette is typed as Record<string, string>; the app's WallpaperCatalogEntry
   // narrows it to the specific shade-keyed ThemePalette. JSON shape matches.
-  useWallpaperStore
-    .getState()
-    .setCatalog(wallpapers as WallpaperCatalogEntry[], albums);
+  useWallpaperStore.getState().setCatalog(wallpapers as WallpaperCatalogEntry[], albums);
   return true;
 }
 
@@ -101,7 +104,7 @@ export async function refreshCatalog(): Promise<boolean> {
  */
 export async function syncAlbum(
   albumSlug: string,
-  onProgress?: (completed: number, total: number) => void,
+  onProgress?: (completed: number, total: number) => void
 ): Promise<SyncPlan> {
   // Refresh catalog first
   await refreshCatalog();
@@ -130,7 +133,7 @@ export async function syncAlbum(
         await store.downloadWallpaper(entry);
         completed++;
         onProgress?.(completed, totalOps);
-      }),
+      })
     );
   }
 
@@ -151,16 +154,14 @@ export async function syncAlbum(
  */
 export async function downloadAlbum(
   albumSlug: string,
-  onProgress?: (completed: number, total: number) => void,
+  onProgress?: (completed: number, total: number) => void
 ): Promise<number> {
   // Refresh catalog first
   await refreshCatalog();
 
   const store = useWallpaperStore.getState();
   const albumWallpapers = store.catalog.filter((w) => w.albumSlug === albumSlug);
-  const toDownload = albumWallpapers.filter(
-    (w) => !store.downloaded[w.themeName],
-  );
+  const toDownload = albumWallpapers.filter((w) => !store.downloaded[w.themeName]);
 
   let completed = 0;
   const concurrency = 3;
@@ -172,7 +173,7 @@ export async function downloadAlbum(
         await store.downloadWallpaper(entry);
         completed++;
         onProgress?.(completed, toDownload.length);
-      }),
+      })
     );
   }
 
@@ -184,9 +185,7 @@ export async function downloadAlbum(
  */
 export async function deleteAlbum(albumSlug: string): Promise<number> {
   const store = useWallpaperStore.getState();
-  const toDelete = Object.values(store.downloaded).filter(
-    (w) => w.albumSlug === albumSlug,
-  );
+  const toDelete = Object.values(store.downloaded).filter((w) => w.albumSlug === albumSlug);
 
   for (const w of toDelete) {
     await store.removeDownloaded(w.themeName);

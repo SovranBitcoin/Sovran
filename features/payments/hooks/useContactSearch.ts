@@ -55,15 +55,22 @@ export function useContactSearch(searchQuery: string) {
       return;
     }
 
-    let cancelled = false;
+    // Abort any in-flight request when the query changes or the component
+    // unmounts. Without this the radio stays warm for every keystroke in a
+    // typing burst even though only the last result is consumed.
+    const controller = new AbortController();
     setSearchLoading(true);
     setHasSearched(true);
 
     const search = async () => {
       try {
         paymentLog.debug('payment.contacts.search', { query: debouncedQuery, limit: 10 });
-        const result = await apiSearchUsers({ query: debouncedQuery, limit: 10 });
-        if (cancelled) return;
+        const result = await apiSearchUsers({
+          query: debouncedQuery,
+          limit: 10,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
         if (result.isOk()) {
           const data = result.value;
           if (data.results && Array.isArray(data.results)) {
@@ -98,19 +105,19 @@ export function useContactSearch(searchQuery: string) {
           setSearchResults([]);
         }
       } catch (err) {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         paymentLog.error('payment.contacts.search.error', {
           query: debouncedQuery,
           error: err instanceof Error ? err : new Error(String(err)),
         });
         setSearchResults([]);
       } finally {
-        if (!cancelled) setSearchLoading(false);
+        if (!controller.signal.aborted) setSearchLoading(false);
       }
     };
 
     search();
-    return () => { cancelled = true; };
+    return () => controller.abort();
   }, [debouncedQuery, addSearchToHistory, seedFromSearchResults]);
 
   // Stale-while-revalidate: once the first response has landed we keep

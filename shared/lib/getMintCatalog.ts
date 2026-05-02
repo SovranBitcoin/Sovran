@@ -62,14 +62,15 @@ function deriveAuditScore(n_mints: number, n_melts: number, n_errors: number): n
 
 async function resolveNostrProfile(
   mintUrl: string,
-  pubkey: string
+  pubkey: string,
+  signal?: AbortSignal
 ): Promise<{ followers: number; reputation: number } | undefined> {
   const profileStore = useMintProfileStore.getState();
   const cached = profileStore.getCached(mintUrl);
   if (cached && !profileStore.isStale(mintUrl)) {
     return { followers: cached.followers, reputation: cached.reputation };
   }
-  const profile = await fetchNostrProfile(pubkey).catch(() => null);
+  const profile = await fetchNostrProfile(pubkey, { signal }).catch(() => null);
   if (profile && profile.isOk()) {
     const { followers, score } = profile.value;
     useMintProfileStore.getState().setCached(mintUrl, followers, score);
@@ -85,10 +86,14 @@ async function resolveNostrProfile(
  */
 export type MintInfoLookup = (mintUrl: string) => Promise<GetInfoResponse | null>;
 
-async function fetchEntry(mintUrl: string, getMintInfo: MintInfoLookup): Promise<MintCatalogEntry> {
+async function fetchEntry(
+  mintUrl: string,
+  getMintInfo: MintInfoLookup,
+  signal?: AbortSignal
+): Promise<MintCatalogEntry> {
   const [auditRes, reviewRes] = await Promise.all([
-    auditMint({ mintUrl }).catch(() => null),
-    reviewMint({ mintUrl }).catch(() => null),
+    auditMint({ mintUrl, signal }).catch(() => null),
+    reviewMint({ mintUrl, signal }).catch(() => null),
   ]);
 
   const entry: MintCatalogEntry = {};
@@ -131,7 +136,7 @@ async function fetchEntry(mintUrl: string, getMintInfo: MintInfoLookup): Promise
 
   const pubkey = extractNostrPubkey(info);
   if (pubkey) {
-    const profile = await resolveNostrProfile(mintUrl, pubkey);
+    const profile = await resolveNostrProfile(mintUrl, pubkey, signal);
     if (profile) {
       entry.contactFollowers = profile.followers;
       entry.contactReputation = Math.round(profile.reputation);
@@ -144,15 +149,17 @@ async function fetchEntry(mintUrl: string, getMintInfo: MintInfoLookup): Promise
 /**
  * Pull the catalog for `mintUrls` in parallel. Each mint independently
  * resolves audit / review / Nostr-profile data; failures on any single
- * mint never block the others.
+ * mint never block the others. `signal` cancels every in-flight request
+ * for the batch — pass it from the calling effect's cleanup.
  */
 export async function getMintCatalog(
   mintUrls: string[],
-  getMintInfo: MintInfoLookup
+  getMintInfo: MintInfoLookup,
+  signal?: AbortSignal
 ): Promise<Record<string, MintCatalogEntry>> {
   if (mintUrls.length === 0) return {};
   const entries = await Promise.all(
-    mintUrls.map(async (url) => [url, await fetchEntry(url, getMintInfo)] as const)
+    mintUrls.map(async (url) => [url, await fetchEntry(url, getMintInfo, signal)] as const)
   );
   return Object.fromEntries(entries);
 }

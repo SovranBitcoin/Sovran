@@ -42,7 +42,8 @@ export function useMintProfiles(mints: MintWithInfo[]): void {
   const inflightRef = useRef(new Set<string>());
 
   useEffect(() => {
-    const { getCached, setCached, isStale } = useMintProfileStore.getState();
+    const { isStale } = useMintProfileStore.getState();
+    const controller = new AbortController();
     for (const mint of mints) {
       const pubkey = extractNostrPubkey(mint.mintInfo);
       if (!pubkey) continue;
@@ -51,9 +52,10 @@ export function useMintProfiles(mints: MintWithInfo[]): void {
       if (!isStale(key) || inflightRef.current.has(key)) continue;
 
       inflightRef.current.add(key);
-      fetchNostrProfile(pubkey).then(
+      fetchNostrProfile(pubkey, { signal: controller.signal }).then(
         (result) => {
           inflightRef.current.delete(key);
+          if (controller.signal.aborted) return;
           if (result.isOk()) {
             const { followers, score } = result.value;
             cashuLog.debug('mint.profile.resolved', {
@@ -70,5 +72,6 @@ export function useMintProfiles(mints: MintWithInfo[]): void {
         }
       );
     }
+    return () => controller.abort();
   }, [mints]);
 }

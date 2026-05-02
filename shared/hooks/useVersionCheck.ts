@@ -20,6 +20,7 @@ export const useVersionCheck = () => {
   const bootDone = useBootMorphCompleted();
   useEffect(() => {
     if (!bootDone) return;
+    const controller = new AbortController();
     const checkForUpdates = async () => {
       const currentVersion = Application.nativeApplicationVersion;
       if (!currentVersion) {
@@ -31,8 +32,10 @@ export const useVersionCheck = () => {
 
       const result = await getLatestVersion({
         storage: { version: currentVersion },
+        signal: controller.signal,
       });
 
+      if (controller.signal.aborted) return;
       if (!result.isOk()) {
         log.warn('hook.version_check.api_error', { currentVersion });
         return;
@@ -56,5 +59,6 @@ export const useVersionCheck = () => {
     };
 
     checkForUpdates();
+    return () => controller.abort();
   }, [bootDone]);
 };

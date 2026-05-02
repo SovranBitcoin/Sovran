@@ -36,8 +36,13 @@ export function useMintSearch(query: string, currency: string): UseMintSearchRet
       cashuLog.debug('mint.search.debounce.start', { query, delay });
     }
 
+    // One AbortController per debounced fire — cancelled when the query
+    // changes again, the currency flips, or the component unmounts. Means
+    // every keystroke in a burst no longer stays in flight after the next
+    // keystroke supersedes it.
+    const controller = new AbortController();
+
     timerRef.current = setTimeout(() => {
-      let cancelled = false;
       const fetchId = ++fetchCountRef.current;
       const t0 = performance.now();
       setLoading(true);
@@ -49,10 +54,14 @@ export function useMintSearch(query: string, currency: string): UseMintSearchRet
         query: query.trim() || undefined,
         currency: currency !== 'ALL' ? currency : undefined,
         fields: 'name,icon_url,description,contact',
+        signal: controller.signal,
       })
         .then((res) => {
-          if (cancelled) {
-            cashuLog.debug('mint.search.cancelled', { fetchId, duration_ms: Math.round(performance.now() - t0) });
+          if (controller.signal.aborted) {
+            cashuLog.debug('mint.search.cancelled', {
+              fetchId,
+              duration_ms: Math.round(performance.now() - t0),
+            });
             return;
           }
           const duration = Math.round(performance.now() - t0);
@@ -74,33 +83,34 @@ export function useMintSearch(query: string, currency: string): UseMintSearchRet
             }
             setResults(res.value.results);
           } else {
-            cashuLog.warn('mint.search.api_error', { fetchId, query, currency, duration_ms: duration });
-            setError('Failed to search mints');
-          }
-        })
-        .catch((err) => {
-          if (!cancelled) {
-            cashuLog.error('mint.search.network_error', {
+            cashuLog.warn('mint.search.api_error', {
               fetchId,
               query,
               currency,
-              duration_ms: Math.round(performance.now() - t0),
-              error: err instanceof Error ? err.message : String(err),
+              duration_ms: duration,
             });
             setError('Failed to search mints');
           }
         })
+        .catch((err) => {
+          if (controller.signal.aborted) return;
+          cashuLog.error('mint.search.network_error', {
+            fetchId,
+            query,
+            currency,
+            duration_ms: Math.round(performance.now() - t0),
+            error: err instanceof Error ? err.message : String(err),
+          });
+          setError('Failed to search mints');
+        })
         .finally(() => {
-          if (!cancelled) setLoading(false);
+          if (!controller.signal.aborted) setLoading(false);
         });
-
-      return () => {
-        cancelled = true;
-      };
     }, delay);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      controller.abort();
     };
   }, [query, currency]);
 

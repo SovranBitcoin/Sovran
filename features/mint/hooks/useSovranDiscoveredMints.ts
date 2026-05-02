@@ -55,18 +55,20 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
   const { mints: knownMints } = useMintManagement();
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchMints = async () => {
       try {
         setLoading(true);
         setError(null);
         processedUrls.current.clear();
 
-        const response = await fetch(SOVRAN_MINTS_API_URL);
+        const response = await fetch(SOVRAN_MINTS_API_URL, { signal: controller.signal });
         if (!response.ok) {
           throw new Error(`Failed to fetch mints: ${response.statusText}`);
         }
 
         const raw = await response.json();
+        if (controller.signal.aborted) return;
         const parsed = parseMintList(raw);
         if (parsed.isErr()) {
           cashuLog.warn('mint.sovran.list.parse_failed', {
@@ -116,7 +118,8 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
           };
 
           try {
-            const mintInfoResult = await fetchMintInfo(url);
+            const mintInfoResult = await fetchMintInfo(url, { signal: controller.signal });
+            if (controller.signal.aborted) return;
             const info = mintInfoResult.isOk() ? mintInfoResult.value : null;
             cashuLog.debug('mint.sovran.info.resolved', {
               url,
@@ -130,6 +133,7 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
               mintInfo: info,
             });
           } catch (err) {
+            if (controller.signal.aborted) return;
             cashuLog.warn('mint.sovran.info.error', {
               url,
               error: err instanceof Error ? err : new Error(String(err)),
@@ -141,6 +145,7 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
 
         setLoading(false);
       } catch (err) {
+        if (controller.signal.aborted) return;
         cashuLog.error('mint.sovran.error', {
           error: err instanceof Error ? err : new Error(String(err)),
         });
@@ -150,6 +155,7 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
     };
 
     fetchMints();
+    return () => controller.abort();
   }, [knownMints, retryCount]);
 
   const retry = () => setRetryCount((prev) => prev + 1);

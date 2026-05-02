@@ -95,6 +95,7 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
       return;
     }
 
+    const controller = new AbortController();
     const loadMint = async () => {
       try {
         setLoading(true);
@@ -115,19 +116,17 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
 
         // Fetch audit data directly from API
         cashuLog.info('mint.audit.fetch', { mintUrl });
-        const auditResult = await auditMint({ mintUrl });
+        const auditResult = await auditMint({ mintUrl, signal: controller.signal });
+        if (controller.signal.aborted) return;
         if (auditResult.isOk()) {
-          const auditData = auditResult.value;
-
-          // Transform to expected interface
-          const transformedAuditInfo = transformAuditData(auditData);
-          setAuditInfo(transformedAuditInfo);
+          setAuditInfo(transformAuditData(auditResult.value));
         } else {
           setAuditInfo(undefined);
         }
 
         // Fetch mint info
-        const mintInfoResult = await fetchMintInfo(mintUrl);
+        const mintInfoResult = await fetchMintInfo(mintUrl, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         if (mintInfoResult.isOk()) {
           const mintInfoData = mintInfoResult.value;
           setMintInfo(mintInfoData);
@@ -144,6 +143,7 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
           setMintInfo(undefined);
         }
       } catch (err) {
+        if (controller.signal.aborted) return;
         cashuLog.error('mint.audit.error', {
           mintUrl,
           error: err instanceof Error ? err : new Error(String(err)),
@@ -152,11 +152,12 @@ export const useAuditedMint = (mintUrl?: string): UseAuditedMintResult => {
         setAuditInfo(undefined);
         setMintInfo(undefined);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
     loadMint();
+    return () => controller.abort();
   }, [mintUrl, getCached, setCached, isStale]);
 
   return { auditInfo, mintInfo, loading, error };

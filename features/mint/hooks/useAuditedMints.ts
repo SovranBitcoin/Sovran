@@ -138,10 +138,15 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
       return;
     }
 
+    // One controller for this batch — aborting on cleanup releases every
+    // queued request whose mint hasn't been polled yet, plus whichever
+    // requests are mid-flight at the worker concurrency limit.
+    const controller = new AbortController();
     let activeCount = 0;
     let queueIndex = 0;
 
     const fetchNext = async () => {
+      if (controller.signal.aborted) return;
       if (queueIndex >= urlsToFetch.length) {
         if (activeCount === 0 && mountedRef.current) {
           setLoading(false);
@@ -165,12 +170,12 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
 
         const apiUrl = original.startsWith('http') ? original : `https://${original}`;
 
-        const auditResult = await auditMint({ mintUrl: apiUrl });
+        const auditResult = await auditMint({ mintUrl: apiUrl, signal: controller.signal });
         if (auditResult.isOk()) {
           auditInfo = transformAuditData(auditResult.value);
         }
 
-        const mintInfoResult = await fetchMintInfo(apiUrl);
+        const mintInfoResult = await fetchMintInfo(apiUrl, { signal: controller.signal });
         if (mintInfoResult.isOk()) {
           mintInfo = mintInfoResult.value;
         }
@@ -185,13 +190,14 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
           hasMintInfo: !!mintInfo,
         });
 
-        if (mountedRef.current) {
+        if (mountedRef.current && !controller.signal.aborted) {
           setData((prev) => ({
             ...prev,
             [normalized]: { auditInfo, mintInfo, loading: false },
           }));
         }
       } catch {
+        if (controller.signal.aborted) return;
         log.warn('mint.audit.fetch.error', { mintUrl: normalized });
         if (mountedRef.current) {
           setData((prev) => ({
@@ -209,6 +215,8 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
     for (let i = 0; i < Math.min(CONCURRENT_LIMIT, urlsToFetch.length); i++) {
       fetchNext();
     }
+
+    return () => controller.abort();
   }, [mintUrlsKey, mintUrls, getCached, setCached, isStale]);
 
   useEffect(() => {

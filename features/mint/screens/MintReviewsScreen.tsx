@@ -292,18 +292,29 @@ export function MintReviewsScreen() {
   const kymRecommendations = cached?.recommendations;
 
   useEffect(() => {
-    if (!mintUrl) { setKymLoading(false); return; }
+    if (!mintUrl) {
+      setKymLoading(false);
+      return;
+    }
     // Show cached data immediately if available
     if (cached) setKymLoading(false);
-    // Always fetch fresh from server
-    reviewMint({ mintUrl })
+    // Always fetch fresh from server. Abort on unmount or if mintUrl changes
+    // mid-flight so a slow review fetch doesn't write into a stale screen.
+    const controller = new AbortController();
+    reviewMint({ mintUrl, signal: controller.signal })
       .then((result) => {
+        if (controller.signal.aborted) return;
         if (result.isOk() && result.value.score !== null) {
-          useKYMMintStore.getState().setCached(mintUrl, result.value.score, result.value.recommendations);
+          useKYMMintStore
+            .getState()
+            .setCached(mintUrl, result.value.score, result.value.recommendations);
         }
       })
       .catch(() => {})
-      .finally(() => setKymLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setKymLoading(false);
+      });
+    return () => controller.abort();
   }, [mintUrl]);
 
   log.debug('mint.reviews.load', { mintUrl, kymLoading, score: kymScore });

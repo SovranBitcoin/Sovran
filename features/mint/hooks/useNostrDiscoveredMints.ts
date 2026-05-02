@@ -77,6 +77,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
       return;
     }
 
+    const controller = new AbortController();
     try {
       setError(null);
 
@@ -130,7 +131,8 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
         const score = averageScore(recommendations);
 
         try {
-          const mintInfoResult = await fetchMintInfo(url);
+          const mintInfoResult = await fetchMintInfo(url, { signal: controller.signal });
+          if (controller.signal.aborted) return;
           const info = mintInfoResult.isOk() ? mintInfoResult.value : null;
           cashuLog.debug('mint.nostr.info.resolved', {
             url,
@@ -145,6 +147,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
             mintInfo: info,
           });
         } catch (err) {
+          if (controller.signal.aborted) return;
           cashuLog.warn('mint.nostr.info.error', {
             url,
             error: err instanceof Error ? err : new Error(String(err)),
@@ -158,6 +161,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
       });
       setError('Failed to process mint recommendations. Please try again.');
     }
+    return () => controller.abort();
   }, [events, knownMints, eose]);
 
   useEffect(() => {
