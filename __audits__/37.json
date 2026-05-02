@@ -1,0 +1,414 @@
+{
+  "audit": {
+    "date": "2026-05-01",
+    "commit": "38797b50",
+    "entry_point": "sovran-app/features/payments",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Score +7: features/payments slice never an ENTRY across 36 prior audits; only useRecentContacts.ts appears once in covered_paths (audit 33's runner-up substring). +3 unaudited slice, +2 name absent from covered_paths, +1 dim-2/6 underweighted in audits 32-36, +1 churn (7 commits in last 90d, including current branch fix #38797b50). Top disqualified: modules/bitchat-module (+6, only 1 commit/90d, no churn bonus); features/onboarding (+6, less crypto-critical surface). features/payments wins because it owns NIP-04 decryption (lib/decryptNip04Events.ts) plus contact-search hooks that key the send/split-bill picker — bearer-instrument crypto and untrusted-input boundaries on a wallet.",
+    "repos_touched": ["sovran-app"],
+    "prior_audits_consulted": [
+      "01.json","02.json","03.json","04.json","05.json","06.json","07.json","08.json","09.json","10.json",
+      "11.json","12.json","13.json","14.json","15.json","16.json","17.json","18.json","19.json","20.json",
+      "21.json","22.json","23.json","24.json","25.json","26.json","27.json","28.json","29.json","30.json",
+      "31.json","32.json","33.json","34.json","35.json","36.json"
+    ],
+    "sov_specs_consulted": ["docs/SOV-00.md"],
+    "skills_consulted": ["zod-4", "neverthrow-return-types", "zustand-5", "nostr"],
+    "process_skills_consulted": ["zoom-out", "improve-codebase-architecture", "diagnose"],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "clean for features/payments (errors elsewhere in shared/lib/cashu/manager.ts, migration.ts, downloadedThemeRegistry.ts, CapsuleButton.android.tsx — out of scope)",
+      "lint": "0 hits in features/payments (57 problems repo-wide, none in scope)",
+      "knip": "3 unused files + 1 unused interface in features/payments; 5 unused exports in adjacent shared/lib/nostr/{nip04Cache,giftWrapCache}",
+      "analyze_structure": "9 files, 806 LOC code, 0 cycles, 6 'orphans' (all confirmed externally-imported), 3 colocate suggestions"
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.75,
+      "title": "Mint-info refetch + NIP-04 decrypt cycle re-runs N times per session driven by mint:* event cascade",
+      "repo": "sovran-app",
+      "path": "features/payments/hooks/useMintContacts.ts",
+      "line": 25,
+      "symbol": "useMintContacts",
+      "dimension": 7,
+      "description": "useMintContacts.ts:25-66 runs `Promise.all(mints.map(getMintInfo))` inside a useEffect keyed on `[mints, getMintInfo]`. Each fresh `mints` array reference re-fetches /v1/info for every trusted mint and then re-runs the NIP-04 decrypt cycle (line 112-139). The reference churns because useMintManagement.ts:160-172 subscribes to coco's `mint:added` / `mint:updated` / `mint:trusted` / `mint:untrusted` events and calls `loadMints()` on each, replacing the entire `mints` state on every event. log.txt --latest shows 5 consecutive `payment.mint.contacts.loaded total=6 withNostr=5` cycles within a few hundred ms each, each followed by an `nostr.nip04.decrypt.start itemCount=5` and `payment.mint.contacts.decrypt`. `npm run log-doctor -- network --latest` shows `coco.manager.MintService.fetching_mint_info_keysets_in_parallel` firing for all 6 mints at 3451ms (cold start) and again at 742874ms (after a recovery/restore event), each triggering a full re-fetch.",
+      "why_it_matters": "On a wallet with N trusted mints, every coco mint event causes N concurrent /v1/info HTTP fetches plus N sequential AES-CBC decrypts. The NIP-44 `padding: invalid` warning at +4.5ms in log-doctor errors confirms decrypt work is on the JS thread. Two perf.js_thread_blocked WARNs in the same session (`blocked_ms=947` and `blocked_ms=1158`) sit immediately after these refresh waterfalls. With recovery flows that fire `mint:updated` per-mint per-keyset-refresh, this multiplies linearly. The refetch is silent to the user; the only signal is dropped frames.",
+      "fix": "Two-step: (a) memoise `getMintInfo` results inside useMintContacts so the same `(mintUrl, infoVersion)` pair only re-fetches when the cached info is genuinely stale; or move the per-mint info fetch to a coco-managed cache so the `mint:updated` payload identifies which mint changed (event currently appears to be ambient — check coco/packages/coco-react). (b) Stop the cascade at the source: in shared/lib/cashu/useMintManagement.ts:160-172, only call `loadMints()` if the event's mint is new or removed — for `mint:updated` of a known mint, splice the existing array instead of replacing it. The downstream useEffect dep `[mints, getMintInfo]` should also be replaced with a stable dep (e.g. a `mintUrls.join(',')` signature) so adding/removing a mint matters but a no-op refresh does not.",
+      "references": [
+        "skill:diagnose",
+        "skill:improve-codebase-architecture",
+        "skill:react-native-best-practices",
+        "log-doctor:slow",
+        "log-doctor:timeline:payment.mint.contacts.loaded",
+        "log-doctor:network",
+        "git:38797b50",
+        "git:e26c8f9a"
+      ],
+      "verification_note": "Counter-argument considered: the 5 cycles at cold start could be intentional during initial mint-keyset sync. Rejected — log-doctor shows the same 6-mint waterfall fires again at 742874ms long after cold start, after the user did nothing related to mints. Even if cold-start cycling is acceptable, the runtime cycling is not. Demoted to High (not Critical) because no funds are at risk; the cost is JS-thread blocks and battery.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-002",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Contact search client guard at length<2 sends 2-char queries that fail server SearchQuery.min(3)",
+      "repo": "sovran-app",
+      "path": "features/payments/hooks/useContactSearch.ts",
+      "line": 41,
+      "symbol": "useContactSearch",
+      "dimension": 4,
+      "description": "useContactSearch.ts:41 and :51 short-circuit only when `trimmed.length < 2`. Two-character queries flow through to apiSearchUsers (line 65), which hits api.sovran.money/api/nostr/search. The shared schema at node_modules/@sovranbitcoin/schemas/src/nostr-api.ts:64 declares `SearchQuery: query: z.string().min(3).max(512)` — server-side validation rejects any 2-char query. The client treats the rejection as 'no results' and renders the No-Results panel after a skeleton flash. SearchResultsList.tsx:93 has the right behaviour (`if (trimmed.length < 2) return false` for showNoResults), but the underlying hook still fires the request and the No-Results path is reachable via the parent.",
+      "why_it_matters": "User types 'b', 'bo', then 'bob': the 2-char query produces a noisy skeleton + no-results flash before the 3-char query lands with real results. Network waste is small but the UX flash is visible on every search. The deeper signal: the client and server have drifted by one character despite a shared package; either the schema is wrong (bilingual/CJK queries break under min(3)) or the client guard is wrong.",
+      "fix": "Replace `trimmed.length < 2` with `trimmed.length < 3` in useContactSearch.ts:41 and :51 to mirror the server. Keep SearchResultsList.tsx:93 in sync. If short queries are wanted (e.g. CJK / single-emoji), relax the schema to `min(1)` and document the rationale in @sovranbitcoin/schemas — but pick one source of truth.",
+      "references": [
+        "skill:zod-4",
+        "node_modules/@sovranbitcoin/schemas/src/nostr-api.ts:64",
+        "git:90f1326a"
+      ],
+      "verification_note": "Verified by reading the schema at node_modules/@sovranbitcoin/schemas/src/nostr-api.ts:64 alongside useContactSearch.ts:41/51 and SearchResultsList.tsx:93. Server behaviour itself was not exercised in this audit (audit 22 covered api.sovran.money/src/nostr.ts); the schema is the contract.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-003",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Sovran SUPPORT pubkey hardcoded as a literal in useRecentContacts despite PUBLIC_KEYS.SUPPORT existing",
+      "repo": "sovran-app",
+      "path": "features/payments/hooks/useRecentContacts.ts",
+      "line": 16,
+      "symbol": "DEFAULT_CONTACTS",
+      "dimension": 4,
+      "description": "useRecentContacts.ts:14-23 declares `DEFAULT_CONTACTS = [{ pubkey: '1e53e900c3bbc5ead295215efe27b2c8d5fbd15fb3dd810da3063674cb7213b2', label: 'Sovran' }, { pubkey: 'c673ff0b...', label: 'kelbie' }]`. The same Sovran SUPPORT key is already exported from shared/lib/constants.ts:4 as `PUBLIC_KEYS.SUPPORT` and is consumed by DraggableContactsList.tsx:56 for the 'verified' badge check.",
+      "why_it_matters": "Two literal definitions of the same support pubkey will drift if the support identity rotates. The DraggableContactsList badge then shows the new SUPPORT key as verified while useRecentContacts still defaults to the old one (or vice versa). Low-severity today, but it is exactly the kind of duplication that breaks when someone needs it most.",
+      "fix": "Replace the literal at useRecentContacts.ts:16 with `PUBLIC_KEYS.SUPPORT`. If the second 'kelbie' default is to remain in the shipped build, add it to PUBLIC_KEYS as `PUBLIC_KEYS.AUTHOR` (or similar) with a comment explaining why a personal pubkey is curated into every user's payment UI — auditing default-contact policy should be a one-file read.",
+      "references": [
+        "skill:improve-codebase-architecture",
+        "git:38797b50"
+      ],
+      "verification_note": "Grep confirmed both file paths reference the same 64-char hex literal at useRecentContacts.ts:16 and shared/lib/constants.ts:4. Counter-argument: literal duplication is harmless if no rotation occurs — kept Low rather than Medium for that reason.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "Personal developer pubkey injected as a default contact in every user's payment picker",
+      "repo": "sovran-app",
+      "path": "features/payments/hooks/useRecentContacts.ts",
+      "line": 21,
+      "symbol": "DEFAULT_CONTACTS",
+      "dimension": 2,
+      "description": "useRecentContacts.ts:19-22 hardcodes `c673ff0b5f228feb0abb1001882178d4c588bc4e50f857173544b5543b454f81` as a default contact labelled 'kelbie' that surfaces in every user's contact list when they have no recent activity. This is a deliberate product decision (the developer's own npub), but it is undeclared in PUBLIC_KEYS, has no comment, and has no per-build override.",
+      "why_it_matters": "Default contacts are a trust signal — users see them in the same picker as their own DM partners. If the personal nsec for 'kelbie' is ever compromised, every Sovran installation routes payments to a hostile destination by default until the next app update. The same risk applies to SUPPORT but at least SUPPORT is documented in PUBLIC_KEYS and can be audited by reviewers in one place.",
+      "fix": "Promote 'kelbie' to PUBLIC_KEYS with a comment naming it as the developer's signing identity (or remove it if the original intent has been outgrown). Consider gating it behind `__DEV__` so production builds don't ship a personal key as a default. If the marketing intent is to surface real Sovran identities, sign them with the SUPPORT key instead and route through a NIP-65 contact list, so rotation is in-band rather than in-binary.",
+      "references": [
+        "nips/02.md",
+        "skill:security-review",
+        "git:38797b50"
+      ],
+      "verification_note": "Verified by grepping the literal across the repo (only useRecentContacts.ts contains it). Counter-argument: 'this is the dev's own pubkey, the dev controls the binary, no security risk' — accepted in part, demoted from Medium to Low. The remaining concern is reviewability: a future auditor reading PUBLIC_KEYS gets a complete picture of well-known identities; today they have to grep features/* to find this one.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-005",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "decryptNip04Events mutates caller's NDKEvent.content in place before returning a fresh-spread result",
+      "repo": "sovran-app",
+      "path": "features/payments/lib/decryptNip04Events.ts",
+      "line": 62,
+      "symbol": "decryptNip04Events",
+      "dimension": 1,
+      "description": "decryptNip04Events.ts:62 assigns `item.dmEvent.content = cached;` directly on the input NDKEvent before pushing a new spread object on line 63. Line 69-71 also mutates: `await item.dmEvent.decrypt(...)` writes into the NDKEvent in place, then `putNip04Plaintext(...)` caches the new value, and the spread on line 71 reads the just-mutated `item.dmEvent.content`. The function's return signature implies a pure transform (returns a new T[]), but the input array's items are mutated as a side effect.",
+      "why_it_matters": "Callers that hold a reference to the original `dmEvents` array (or memoised contactsWithDefaults shape) and re-read it after the decrypt resolves will see the post-decrypt plaintext where they may expect the encrypted ciphertext. In useRecentContacts.ts:201-249 the array is rebuilt on the next memo pass so the bug is masked, but any future caller that diffs pre vs post will get inconsistent state. The NIP-04 plaintext is then visible on an input event the caller did not necessarily intend to expose downstream.",
+      "fix": "Treat NDKEvent as immutable from this function's perspective. Either clone via NDKEvent's serialize/deserialize before decrypt, or build the result purely from `cached` / `decrypted` strings without writing back into `item.dmEvent`. The fresh-spread on line 63 / 71 already produces the right output object; the in-place mutation buys nothing.",
+      "references": [
+        "nips/04.md",
+        "skill:typescript-advanced-types",
+        "git:7d53b318"
+      ],
+      "verification_note": "Verified by reading lines 60-72 against NDKEvent semantics. Counter-argument: NDKEvent is a class with an internal cache and content mutation is normal NDK behaviour, plus the only current caller (useRecentContacts) rebuilds its memo every pass. Accepted, demoted from Medium to Low.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Low",
+      "confidence": 0.75,
+      "title": "useContactSearch trusts JSON.parse(res.profileEvent) without runtime type-check on parsed.pubkey",
+      "repo": "sovran-app",
+      "path": "features/payments/hooks/useContactSearch.ts",
+      "line": 71,
+      "symbol": "useContactSearch",
+      "dimension": 1,
+      "description": "useContactSearch.ts:71-79 reads `res.profileEvent` (declared in @sovranbitcoin/schemas as `z.string().max(262_144).optional()`), parses it with JSON.parse, and assigns `parsed.pubkey` into `profileEventPubkey` if truthy. There is no runtime check that `parsed.pubkey` is a 64-char hex string; if the API returns `{ \"pubkey\": { ... } }` or `{ \"pubkey\": 42 }` the resulting `profile.pubkey` is then a non-string that flows into setSearchResults, useNostrMetadataCache.seedFromSearchResults, useSearchHistoryStore.addSearch, and ContactRow's `nostrIdentity(pubkey, ...)`.",
+      "why_it_matters": "The /nostr/search endpoint already passes its top-level response through SearchUsersResponse on the client (apiClient.ts:108), so the outer shape is trusted. The inner profileEvent string is opaque — the schema bounds its size but not its content. A malformed parse drops via the catch block, but a structurally-valid-but-typed-wrong parse silently corrupts a hex-pubkey field downstream. The Zod v4 codec idiom (`z.string().transform(JSON.parse).pipe(NostrEventSchema)`) would handle this in one place.",
+      "fix": "Either: (a) validate parsed shape with `z.object({ pubkey: Hex64 }).safeParse(parsed)` and fall back to `res.pubkey` on failure; or (b) move the unwrap into the schema package as a NostrEventCodec that does the JSON.parse + shape check, so every consumer of UserProfile.profileEvent gets a typed event rather than a raw string.",
+      "references": [
+        "skill:zod-4",
+        "skill:neverthrow-return-types",
+        "node_modules/@sovranbitcoin/schemas/src/nostr-api.ts:25"
+      ],
+      "verification_note": "Verified by reading the schema (profileEvent is `z.string().max(262_144).optional()`) and the consumer block. Counter-argument: the field appears to be the kind-0 raw event from the DVM enrichment, server-controlled, so trust is high. Accepted in part — kept Low rather than dropped because boundary discipline is the explicit goal of the shared schemas package.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "DraggableContactsList.tsx is dead code since #189 swapped ContactsScreen to LegendList",
+      "repo": "sovran-app",
+      "path": "features/payments/components/DraggableContactsList.tsx",
+      "line": 110,
+      "symbol": "DraggableContactsList",
+      "dimension": 3,
+      "description": "knip flags features/payments/components/DraggableContactsList.tsx (199 LOC) as an unused file. Grep confirms zero external importers — the only matches are within the file itself. Origin: introduced in commit 7d53b318 (#178); migrated to ContactRow + PUBLIC_KEYS in da9d782f (#187); orphaned by 90f1326a (#189) which rebuilt ContactsScreen.tsx around `LegendList` (line 509) and deleted the DraggableContactsList call site without removing the component.",
+      "why_it_matters": "199 LOC of skeleton + card + render-item logic that drifts from the live ContactRow path. Future style or behavioural changes to ContactRow (the canonical row) won't propagate here; reviewers reading the feature flow lose minutes rediscovering it isn't on the path. The file also references `useGuardedRouter` and `PUBLIC_KEYS` which makes it look load-bearing.",
+      "fix": "Delete features/payments/components/DraggableContactsList.tsx outright. Re-running knip after the delete should surface no other features/payments hits beyond ProfileImage.tsx, index.ts, and the DecryptNip04EventsOptions interface.",
+      "references": [
+        "knip:unused-file",
+        "git:da9d782f",
+        "git:90f1326a",
+        "git:7d53b318"
+      ],
+      "verification_note": "Verified: knip --production-style report lists the file; Grep for `DraggableContactsList` finds only self-references. Cross-checked ContactsScreen.tsx (the prior caller) at line 509 — uses LegendList directly with renderContactItem.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "DraggableContactsList.tsx deleted."
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "ProfileImage.tsx is a 22-LOC pass-through to Avatar with no remaining caller",
+      "repo": "sovran-app",
+      "path": "features/payments/components/ProfileImage.tsx",
+      "line": 10,
+      "symbol": "ProfileImage",
+      "dimension": 3,
+      "description": "knip flags features/payments/components/ProfileImage.tsx as unused. The component renders `<Avatar state={loading ? 'loading' : profile?.picture ? 'image' : 'fallback'} ... />` — Avatar's `state` prop already supports the same three modes (per shared/ui/primitives/Avatar.tsx). Grep confirms no caller. Created in #178; ContactRow's nostrIdentity helper has owned this responsibility since #187.",
+      "why_it_matters": "Pure pass-through with no caller. Fails the deletion test in skill:improve-codebase-architecture — removing it concentrates no complexity because no one consumes the indirection.",
+      "fix": "Delete features/payments/components/ProfileImage.tsx. If a 'state-mapping for Avatar' helper is ever needed again, write it as a pure function colocated with Avatar, not a component.",
+      "references": [
+        "knip:unused-file",
+        "skill:improve-codebase-architecture",
+        "git:7d53b318"
+      ],
+      "verification_note": "Verified: knip + grep + reading Avatar.tsx's state-prop API confirm the component is a no-leverage shallow module.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "File deleted in commit 13fa9a3b — the Avatar `state` prop already covers all three modes the wrapper composed."
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "features/payments/index.ts barrel re-exports NoResultsFound that no caller imports through it",
+      "repo": "sovran-app",
+      "path": "features/payments/index.ts",
+      "line": 3,
+      "symbol": "NoResultsFound",
+      "dimension": 4,
+      "description": "features/payments/index.ts only exports `NoResultsFound`. The single external consumer (shared/ui/composed/SearchResultsList.tsx:26) imports directly from `@/features/payments/components/NoResultsFound`, bypassing the barrel. knip flags the barrel as unused. The other features/payments consumers (ContactsScreen, useSplitBillParticipantPicker, useAllSearchResults) all use deep imports too — no one consumes the barrel.",
+      "why_it_matters": "An unused barrel signals that the feature has no curated public surface — every caller picks the file path it wants. Either the barrel should be the only entry (consistent with .cursor/rules/folder-structure.mdc) or it should be removed. Today it just exists.",
+      "fix": "Pick one. (a) Delete features/payments/index.ts and rely on deep imports — matches what every caller already does. (b) Re-export the public surface (`useRecentContacts`, `useContactSearch`, `useMintContacts`, `decryptNip04Events`, `NoResultsFound`) and update the four call sites to import via `@/features/payments`. Option (a) costs less; option (b) makes the feature a deep module per skill:improve-codebase-architecture.",
+      "references": [
+        "knip:unused-file",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Verified by knip + grep (the four importers all use deep paths).",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Considered as Slice B (knip orphan-export sweep). Not picked. Real and unfixed."
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "Unused public exports in shared/lib/nostr cache modules — clear/evict lifecycle hooks have no caller",
+      "repo": "sovran-app",
+      "path": "shared/lib/nostr/giftWrapCache.ts",
+      "line": 16,
+      "symbol": "isKnownFailedUnwrap, clearGiftWrapCache, evictGiftWrapCacheFromMemory, clearNip04Cache, evictNip04CacheFromMemory",
+      "dimension": 3,
+      "description": "knip flags five exports as unused: shared/lib/nostr/giftWrapCache.ts:16 `isKnownFailedUnwrap`, :18 `clearGiftWrapCache`, :19 `evictGiftWrapCacheFromMemory`, plus shared/lib/nostr/nip04Cache.ts:16 `clearNip04Cache`, :17 `evictNip04CacheFromMemory`. The cache implementation at shared/lib/cache/createPubkeyScopedCache.ts:268-271 has an explicit TODO: 'wire callers to invoke this on profile switch once app-restart-on-switch is replaced with in-process switching.' Today the JS runtime tears down on profile switch so the on-disk blobs stay scoped per pubkey; the in-memory state resets via the JS reset.",
+      "why_it_matters": "The cache module exposes a profile-lifecycle contract (`evictFromMemory`, `clear`) that the rest of the app does not exercise. If/when in-process profile switching lands, the bearer-secrets in these caches (NIP-44 plaintexts and NIP-04 plaintexts) will leak across profiles unless these hooks are wired in. Leaving them exported but uncalled is correct as a future-proofing seam, but they should be flagged so 'in-process profile switching' work can find them.",
+      "fix": "Either (a) wire the eviction calls now in shared/lib/profile/profileSessionOrchestrator.ts (audit 28 covered this surface) so they run on every profile switch even though today it's redundant — costs nothing and prevents regression when the JS-reset path goes away; or (b) leave them exported and add a comment block above each pointing at the orchestrator file that should call them once switching becomes in-process.",
+      "references": [
+        "knip:unused-export",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Verified: knip output names all five, and createPubkeyScopedCache.ts:268-271 self-documents the gap.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "All five lifecycle exports deleted in commit 13fa9a3b — `isKnownFailedUnwrap`, `markUnwrapFailed`, `clearGiftWrapCache`, `evictGiftWrapCacheFromMemory`, `clearNip04Cache`, `evictNip04CacheFromMemory`. The audit's option (b) (leave exported with a TODO) was rejected: when in-process profile switching lands, callers can re-export the underlying `cache.clear` / `cache.evictFromMemory` from createPubkeyScopedCache directly. Recreating an unused public surface 'just in case' is the drift this slice was deleting."
+    },
+    {
+      "id": "F-011",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "Inconsistent Icon import path inside features/payments — half use '@/assets/icons', half use 'assets/icons'",
+      "repo": "sovran-app",
+      "path": "features/payments/components/SearchTip.tsx",
+      "line": 3,
+      "symbol": "Icon",
+      "dimension": 4,
+      "description": "features/payments/components/NoResultsFound.tsx:4 uses `import Icon from '@/assets/icons'`. features/payments/components/SearchTip.tsx:3 uses `import Icon from 'assets/icons'` — same module, two paths, both resolve via the babel alias plugin but follow different conventions. Other features (e.g. features/contacts/screens/ContactsScreen.tsx:4) also use the bare `assets/icons` form, so the inconsistency is repo-wide.",
+      "why_it_matters": "Both forms work today because the babel-plugin-module-resolver has both `@/` and the bare alias. But mixing them in adjacent files in the same feature is the kind of inconsistency that becomes a tooling pothole — Metro cache invalidation, jest moduleNameMapper, knip's import resolution all need to agree on which form to canonicalise.",
+      "fix": "Pick one form per the .cursor/rules/folder-structure.mdc guidance (the repo-wide tilt is `@/` for shared, bare for assets — but adopt one for both). Run a codemod over assets/icons importers and document the chosen form in folder-structure.mdc.",
+      "references": [
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Verified by grep across features/payments — two forms within the same component family.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-012",
+      "severity": "Low",
+      "confidence": 0.8,
+      "title": "useMintContacts swallows getMintInfo and npubToPubkey errors via empty catch blocks",
+      "repo": "sovran-app",
+      "path": "features/payments/hooks/useMintContacts.ts",
+      "line": 36,
+      "symbol": "useMintContacts",
+      "dimension": 1,
+      "description": "useMintContacts.ts:34-38 wraps `getMintInfo(mint.mintUrl)` in a try/catch { return { mint, mintInfo: null }; } with no log and no telemetry — the failure produces a silent null mintInfo that filters out (line 43-47). useMintContacts.ts:93-97 wraps `npubToPubkey(nostrContact.info)` in `try { ... } catch {}` with an `// ignore decode failure` comment, also silent. The outer effect logs `payment.mint.contacts.error` only on the Promise.all-level rejection (line 53), which Promise.all + per-call try/catch can never reach.",
+      "why_it_matters": "Mint /v1/info failures are operationally meaningful — a mint that has rotated DNS, is rate-limiting, or is censoring needs to be surfaced before the user attempts a melt. Today the row silently disappears from the contacts list with no log line; a user reporting 'a mint disappeared from my list' has no log evidence to triage from. Same shape on npubToPubkey — a malformed npub from a mint's NIP-87 metadata silently drops the row.",
+      "fix": "Replace both catches with `paymentLog.warn('payment.mint.contacts.info_fetch_failed', { mintUrl, error })` / `'payment.mint.contacts.npub_decode_failed'`. log-doctor's stats mode will then surface them as a top event when they recur. Cost is zero; observability gain is real.",
+      "references": [
+        "skill:diagnose",
+        "skill:neverthrow-wrap-exceptions"
+      ],
+      "verification_note": "Verified by reading lines 34-38 and 93-97. Counter-argument: silent fallback is the correct UX (don't surface mint outages mid-render). Accepted — the fix isn't 'show an error to the user', it's 'log it for the developer'.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-013",
+      "severity": "Low",
+      "confidence": 0.75,
+      "title": "useRecentContacts and useMintContacts pass `any[]` and `mintInfo: any` through the picker chain",
+      "repo": "sovran-app",
+      "path": "features/payments/hooks/useRecentContacts.ts",
+      "line": 128,
+      "symbol": "decryptedContacts, contactMap",
+      "dimension": 1,
+      "description": "useRecentContacts.ts:128 declares `useState<any[]>([])` for decryptedContacts; line 134-137 contactMap entries are typed `{ type: string; event?: NDKEvent; dm?: ...; timestamp: number }` but the consumer at line 165-171 emits `{ pubkey, dmEvent, nip17Content, timestamp }` — the field names don't match the contactMap shape, so the `any` cast is what makes it compile. useMintContacts.ts:17, :74, :155 propagate `mintInfo: any` through `mintsWithInfo` → `mintsWithMetadata` → `displayMints`, including filter callbacks at :44-46 (`(c: any) => c.method === 'nostr'`) and :91 (`(c: any) => c.method === 'nostr'`).",
+      "why_it_matters": "The picker chain (DraggableContactsList — when alive — and ContactsScreen's renderContactItem) reads fields like `item.mint?.mintUrl`, `item.mintInfo?.icon_url`, `item.mintInfo?.name` off these any-typed objects. Type-check passes by accident. A future change to the cashu-ts MintInfo shape (field renaming, added union variants) won't surface as a TS error — it'll surface as a runtime undefined-render at the row level.",
+      "fix": "Type `mintInfo` against `@cashu/cashu-ts`'s `GetInfoResponse` (already imported in apiClient.ts:1). For useRecentContacts.ts, define a tagged union for contactMap entries and the resulting flat array — the discriminator is already `type: 'nip04' | 'nip17' | 'mint'`. The compiler will then catch the field-name mismatch on the spread shape at line 167-171.",
+      "references": [
+        "skill:typescript-advanced-types",
+        "lint:@typescript-eslint/no-explicit-any (would fire if the rule were on for this file)"
+      ],
+      "verification_note": "Verified by reading both files. Counter-argument: this is feature code with limited blast radius and the types stabilise around the picker render. Accepted — kept Low.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-014",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "useContactSearch fires apiSearchUsers without an AbortSignal — orphan fetches on rapid typing",
+      "repo": "sovran-app",
+      "path": "features/payments/hooks/useContactSearch.ts",
+      "line": 65,
+      "symbol": "useContactSearch",
+      "dimension": 7,
+      "description": "useContactSearch.ts:62-113 protects against stale-set with a `let cancelled = false` flag. If the user types fast enough to pass the 250ms debounce barrier (e.g. they pause typing for 250ms then resume), `apiSearchUsers` is called with no abort signal — the underlying fetch in apiClient.ts:78-102 also takes no `init` param. When the user keeps typing, multiple fetches stack in flight; the `cancelled` flag prevents the state-set, but the request still completes and the response body is parsed (Zod safeParse over up to 1000 results × ~262KB profileEvent each = up to 262MB worst case).",
+      "why_it_matters": "Cellular networks with multi-second RTT and a fast-typing user can stack 5-10 in-flight searches, each parsing a non-trivial Zod schema on result. log-doctor's network mode does not capture the search endpoint in this audit's log.txt, so this is theoretical, but the code path is concrete.",
+      "fix": "Pass an AbortController through fetchParsed: extend apiClient.ts:120-127 to accept an optional `signal: AbortSignal`, plumb it into `fetch(url, { signal })` at line 86. In useContactSearch.ts:62-113 create a new AbortController per effect, pass `controller.signal`, and call `controller.abort()` from the cleanup. The cancelled flag becomes redundant.",
+      "references": [
+        "skill:native-data-fetching",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Verified by reading the full apiClient.ts:78-102 fetchParsed signature (no `init` consumer for the AbortController) and the useContactSearch effect cleanup. Marked UNVERIFIED for runtime impact since log.txt does not include a search session — kept Low because the fix is mechanical and the code is paint-by-numbers wrong.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "partial",
+    "3": "pass",
+    "4": "pass",
+    "5": "skipped",
+    "6": "partial",
+    "7": "pass",
+    "8": "skipped",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "dead-code",
+      "description": "Delete features/payments/components/DraggableContactsList.tsx (199 LOC, no caller since #189) and features/payments/components/ProfileImage.tsx (22 LOC, no caller since #187). Re-export only the live surface from features/payments/index.ts (or delete the barrel and let deep imports stand). Confirms knip output post-delete.",
+      "files": [
+        "features/payments/components/DraggableContactsList.tsx",
+        "features/payments/components/ProfileImage.tsx",
+        "features/payments/index.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Move the Sovran SUPPORT and 'kelbie' default-contact pubkeys into shared/lib/constants.ts:PUBLIC_KEYS so default-contact policy can be audited in one file. Replace the literal at useRecentContacts.ts:14-23 with a `DEFAULT_CONTACTS = [{ pubkey: PUBLIC_KEYS.SUPPORT, label: 'Sovran' }, ...]` shape. Keeps the 'kelbie' decision visible to reviewers; pairs with F-004's recommendation to consider gating it behind __DEV__.",
+      "files": [
+        "features/payments/hooks/useRecentContacts.ts",
+        "shared/lib/constants.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Stop the mint-info refetch cascade. In shared/lib/cashu/useMintManagement.ts:160-172, switch the four mint:* listeners from full `loadMints()` rebuilds to surgical splice-by-mintUrl. In features/payments/hooks/useMintContacts.ts:25-66, change the useEffect dep from `[mints, getMintInfo]` to `[mintUrlSignature, getMintInfo]` (joined sorted URLs) so add/remove triggers a re-fetch but a no-op event does not. This addresses the High finding F-001.",
+      "files": [
+        "features/payments/hooks/useMintContacts.ts",
+        "features/mint/hooks/useMintManagement.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Add an optional `signal: AbortSignal` to apiClient.ts:fetchParsed and forward it to fetch. Update apiClient.ts:searchUsers to accept and pass through the signal. Wire useContactSearch.ts:62-113 to construct a per-effect AbortController. Eliminates orphan in-flight fetches and removes the cancelled-flag indirection. Touches one shared seam (apiClient) so other rapid-typing endpoints (searchMints, etc.) get the same treatment.",
+      "files": [
+        "shared/lib/apiClient.ts",
+        "features/payments/hooks/useContactSearch.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Align client- and server-side query length in the search boundary: change useContactSearch.ts and SearchResultsList.tsx to use `length < 3` (matching SearchQuery.min(3) in the schema package). Or — if shorter queries are intentional for CJK or single-emoji users — relax SearchQuery to min(1) and document the rationale. Pick one source of truth.",
+      "files": [
+        "features/payments/hooks/useContactSearch.ts",
+        "shared/ui/composed/SearchResultsList.tsx",
+        "node_modules/@sovranbitcoin/schemas/src/nostr-api.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Wire profile-switch eviction calls (clearGiftWrapCache, clearNip04Cache, evictGiftWrapCacheFromMemory, evictNip04CacheFromMemory) into shared/lib/profile/profileSessionOrchestrator.ts now, even though the JS runtime currently teardown-resets in-memory state. Removes the latent leak that would surface the moment in-process profile switching lands. Closes the TODO at shared/lib/cache/createPubkeyScopedCache.ts:268-271.",
+      "files": [
+        "shared/lib/profile/profileSessionOrchestrator.ts",
+        "shared/lib/nostr/giftWrapCache.ts",
+        "shared/lib/nostr/nip04Cache.ts",
+        "shared/lib/cache/createPubkeyScopedCache.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Replace the empty catch blocks at useMintContacts.ts:36 and :95 with `paymentLog.warn('payment.mint.contacts.info_fetch_failed', { mintUrl, error })` and `paymentLog.warn('payment.mint.contacts.npub_decode_failed', { mintUrl, info, error })`. log-doctor's `stats` mode will then surface recurring mint outages as top events without changing user-facing UX. No new log-doctor mode needed for this — existing `stats` and `errors` will pick them up.",
+      "files": [
+        "features/payments/hooks/useMintContacts.ts"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Open a research note `__research__/payments-mint-event-cascade.md` (status: draft) capturing the finding F-001 mint-event cascade pattern. Several adjacent hooks (useNostrProfileMetadataMany consumers, useWhitenoiseDmContacts) follow the same shape: subscribe to coco/NDK events that fire frequently, recompute everything from scratch on each. This note would frame the architectural choice — surgical event-payload diffs vs full recompute — for the SOV-13 (Receive) and SOV-11 (Balance/Rebalance) specs that are still TODO. Pairs naturally with the eventual SOV-11 ratification.",
+      "files": [
+        "sovran-app/__research__/payments-mint-event-cascade.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Is the 'kelbie' default contact at useRecentContacts.ts:21 intentional shipped policy, a leftover from local dev, or marketing-curated? The fix differs by intent — see F-004.",
+    "Does NDK's useSubscribe treat `{ filters: null }` as 'no subscription' or 'subscribe-to-all'? useRecentContacts.ts:49 and :57 pass null when nostrKeys are unloaded; if the latter, this is a privacy/perf leak at boot. Marked UNVERIFIED — requires reading @nostr-dev-kit/ndk-mobile useSubscribe internals or adding a test that mounts the hook with null nostrKeys and asserts no REQ frame.",
+    "Should the `profileEvent` field stay on UserProfile in @sovranbitcoin/schemas, or be promoted to a typed nested codec? Today every consumer that wants the inner pubkey re-implements JSON.parse — useContactSearch is one example, but useNostrMetadataCache.seedFromSearchResults likely does similar. A schema-level codec would centralise the JSON.parse + Hex64-shape check.",
+    "SOV-13 (Receive) and SOV-14 (NPC Atomic Swaps) are still TODO. The mint-event cascade finding F-001 may belong in either or both — flag during ratification."
+  ]
+}

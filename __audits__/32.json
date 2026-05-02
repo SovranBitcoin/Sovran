@@ -1,0 +1,402 @@
+{
+  "audit": {
+    "date": "2026-05-01",
+    "commit": "38797b50",
+    "entry_point": "sovran-app/features/contacts/screens/ContactsScreen.tsx",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Score +7. features/contacts slice absent from 31 prior audits' covered_slices, name absent from any covered_paths substring, dim 5/8 underweighted recently, 6 commits in last 90 days. Tied at +7 with features/payments (lost LOC tie-break, 962 < 1023). features/whitenoise (+6) was the strongest runner-up — brand-new MLS/NIP-EE encrypted-DM surface with 21 files / 2202 LOC — but lost the rubric on strict scoring (1 commit in 90d, no churn bonus). Within features/contacts, ContactsScreen.tsx is the natural ENTRY (527 LOC of code, 660 total — by far the largest file, expo-router entry, fans into payments/, whitenoise/, mint/, bitchat/, NostrKeysProvider, image cache, search subsystem).",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json",
+      "28.json",
+      "29.json",
+      "30.json",
+      "31.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "react-native-best-practices",
+      "security-review",
+      "nostr"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "errors outside blast radius (none in features/contacts)",
+      "lint": "2 prettier errors in features/contacts/hooks/useAllSearchResults.ts",
+      "knip": "BASE_FILTERS, SEARCH_FILTERS, animation-configs.ts unused",
+      "analyze_structure": "no cycles; 2 in-feature orphans (ContactsScreen entry, useAllSearchResults consumed by shared/ui — false positive in feature scope)"
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.85,
+      "title": "Untrusted Nostr profile picture URLs prefetched without validation",
+      "repo": "sovran-app",
+      "path": "features/contacts/screens/ContactsScreen.tsx",
+      "line": 188,
+      "symbol": "useEffect → prefetchImages",
+      "dimension": 2,
+      "description": "ContactsScreen calls prefetchImages with every contact's `picture` URL drawn from kind-0 events on Nostr (line 188: `prefetchImages(Array.from(profilesMap.values()).map((p) => p.picture))`). prefetchImages → prefetchImage at shared/lib/imageCache.ts:35-50 hands the raw string to `Image.prefetch(normalized, 'memory-disk')` after only `.trim()` — no scheme allowlist, no host validation, no size bound. A Nostr profile broadcast by anyone on the network can therefore steer the device to fetch from any URL the moment ContactsScreen mounts.",
+      "why_it_matters": "Every visit to Contacts leaks the device's IP, User-Agent, and an implicit presence signal to every server hosting a contact's avatar. Tracking pixels are trivial — a kind-0 with `picture: 'https://attacker.example/track?npub=...'` records the user's online activity each time the contacts list refreshes. `file://` and RFC1918 hosts are not blocked, so attacker-controlled metadata can probe device-internal services (e.g. expo-dev or debug servers) with no user consent. Confirmed by network log: `image.prefetch.batch count=2 duration_ms=1046.15` WARN at offset 89172ms while loading m.primal.net assets — a single picture took 1007ms.",
+      "fix": "In shared/lib/imageCache.ts:35, add a `safePrefetchUrl(url): URL | null` helper that (1) parses the URL and rejects anything that isn't `https:` (or `data:` with a small max-byte cap), (2) rejects `localhost`, `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `0.0.0.0`, `*.internal`, `*.local`, and any `.onion` (Image fetch can't reach Tor anyway), (3) early-returns when validation fails. Document the trust boundary at the metadata cache layer: kind-0 `picture`/`banner`/`lud16` strings are untrusted. Apply the same gate to the mint icon prefetch in features/payments/hooks/useMintContacts.ts:70 — mint info is more trusted but a compromised mint could still abuse it.",
+      "references": [
+        "nips/01.md",
+        "skill:security-review",
+        "skill:nostr"
+      ],
+      "verification_note": "Re-read imageCache.ts:35-50 and ContactsScreen.tsx:188 — no validation present at either layer. Counter-argument: `expo-image` may sanitise URLs internally — UNVERIFIED, but expo-image's contract is to fetch any URI passed; sanitisation is the caller's responsibility. Counter-argument: trust at the kind-0 ingest layer. Looked at parseRawMetadata (shared/hooks/useNostrProfileMetadata.ts:84-100) — only JSON.parses the content, no URL field validation. Finding holds.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "LegendList extraData={profilesMap.size} drops profile-content updates",
+      "repo": "sovran-app",
+      "path": "features/contacts/screens/ContactsScreen.tsx",
+      "line": 511,
+      "symbol": "renderContactsList → LegendList",
+      "dimension": 1,
+      "description": "Line 511 passes `extraData={profilesMap.size}` to the LegendList. The map is sourced from useNostrProfileMetadataMany at line 185, which produces a fresh Map reference whenever the underlying Zustand `byPubkey` slice changes (shared/hooks/useNostrProfileMetadata.ts:129-137). When an existing contact's kind-0 metadata is updated (display name, avatar, nip05) the cache replaces the entry but `profilesMap.size` is unchanged. LegendList's `extraData` is the canonical re-render trigger when the per-item closure depends on data outside `data` itself; passing a primitive that doesn't change leaves rendered items stale.",
+      "why_it_matters": "A contact who edits their Nostr profile while the user has Contacts open renders with the previous name and avatar until the screen is unmounted. The renderContactItem useCallback (line 328-402) does take `profilesMap` in its deps, so a fresh callback is allocated on each cache update — but virtualized lists key per-row memoisation off `data[index]` identity and `extraData`, not the `renderItem` reference. The deps array `[profilesMap, whitenoiseBusyId, acceptWhitenoiseRequest, declineWhitenoiseRequest]` (line 401) confirms the author already understood that profilesMap is the source of update truth — but the wiring at extraData drops the signal.",
+      "fix": "Replace `extraData={profilesMap.size}` with `extraData={profilesMap}`. The hook returns a fresh Map ref on each cache write (shared/hooks/useNostrProfileMetadata.ts:129-137), so the reference change is sufficient and there is no perf regression. If the team prefers a primitive, derive a content-aware token instead — e.g. `useMemo(() => Array.from(profilesMap.values()).map(p => p.picture ?? '' + (p.displayName ?? '')).join('|'), [profilesMap])` — and pass that. Apply the same fix to any other LegendList that uses size/length as extraData over a Map/Array of derived content.",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-checked at line 511. Verified upstream hook returns fresh Map (shared/hooks/useNostrProfileMetadata.ts:129-137 useMemo deps include `byPubkey`). Counter-argument: `data` reference IS fresh through `currentListData → filteredDisplayContacts → profilesMap` deps chain, so LegendList sees a new array. But the array CONTAINS the same item refs (only the predicate changed which items survive, not the items' identities), and LegendList memoises rendered rows by item identity + extraData. Finding holds.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "router.push params cast `as any` defeats typed-routes",
+      "repo": "sovran-app",
+      "path": "features/contacts/screens/ContactsScreen.tsx",
+      "line": 70,
+      "symbol": "GeohashJumpRow / GroupsTierRow",
+      "dimension": 5,
+      "description": "Lines 70 and 96 wrap router.push payloads in `as any` casts (`} as any);`). The same anti-pattern appears in features/contacts/lib/navigateToProfile.ts:21 (`pathname: '/(user-flow)/profile' as any`). With `experiments.typedRoutes` ON in expo-router 55, this defeats compile-time deep-link param validation — a typo in pathname or a missing param produces no diagnostic. The receiver at app/(user-flow)/geohashChat.tsx:13 pulls params via useLocalSearchParams<{ geohash: string; tierLabel?: string; transport?: 'nostr' | 'ble' }>() but never zod-parses them; if a malformed geohash slipped through, GeohashChatScreen would receive it raw.",
+      "why_it_matters": "Routes are an integration boundary. A renamed pathname or a renamed param key won't fail the build, won't fail tests that don't exercise the deep link, and will only show up as a runtime no-op in the wrong corner of the app. For navigation that drives Nostr/BLE subscription filters (GeohashChatScreen), bad params can produce silently broken transport behaviour.",
+      "fix": "Replace `as any` with `as Href` (the type expo-router exports). Validate params at the receiver instead — at app/(user-flow)/geohashChat.tsx:13, parse with `z.strictObject({ geohash: z.string().refine(isValidGeohash), tierLabel: z.string().max(64).optional(), transport: z.enum(['nostr', 'ble']).optional() })`. Apply to navigateToProfile.ts:21 too: `pubkey: z.string().regex(/^[0-9a-f]{64}$/)`.",
+      "references": [
+        "docs/SOV-00.md §11",
+        "skill:zod-4"
+      ],
+      "verification_note": "Re-confirmed lines 70, 96. Cross-checked navigateToProfile.ts:21. Receivers verified at app/(user-flow)/geohashChat.tsx and app/(user-flow)/profile.tsx (the latter just re-exports UserProfileScreen with no validation visible at the route level).",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "router.push as-any casts belong to Slice B (typed-routes hygiene); not in this PR."
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.65,
+      "title": "payment.contacts.recent / decrypt re-fire on every relay flush",
+      "repo": "sovran-app",
+      "path": "features/payments/hooks/useRecentContacts.ts",
+      "line": 131,
+      "symbol": "recentActivityContacts memo + decrypt useEffect",
+      "dimension": 7,
+      "description": "Log evidence: `payment.contacts.recent contactCount=4 nip04Events=0 nip17Events=37/39` fires 7+ times across 425s, each followed by `payment.contacts.decrypt`. Every time `dmEvents` or `unwrappedDMs` changes reference (NDK buffer flush) the recentActivityContacts memo (line 131-180) rebuilds Map+sort, then the decrypt useEffect (line 200-249) fires `decryptNip04Events` over the entire current contact set. The unwrap cache (line 71-126) short-circuits the NIP-44 cost when wraps haven't changed, but the surrounding work still runs.",
+      "why_it_matters": "Contacts is one of the cheapest screens to mount and one of the easiest to leave open in the background. A relay subscription that flushes every few seconds keeps a useEffect chain churning, allocating Maps, sorting, and re-running decryptNip04Events even when output count is unchanged. The visible log shows decryptedCount=4 fired 7+ times for the same 4 contacts in one session.",
+      "fix": "At useRecentContacts.ts:131-180, hash the input set (e.g. `dmEvents.map(e => e.id).sort().join(',')`) and short-circuit the memo when unchanged. At the decrypt useEffect (line 200-249), gate on a hash of `contactsWithDefaults.map(c => c.dmEvent?.id ?? c.nip17Content ?? c.pubkey)` — only re-decrypt when the input set's identity changes. Sub-fix: useRecentContacts/useMintContacts both fire on `dmEvents` changes; consider lifting the dmEvents subscription up so the same useSubscribe doesn't run twice.",
+      "references": [
+        "nips/04.md",
+        "nips/17.md"
+      ],
+      "verification_note": "Log evidence verified via `npm run log-doctor -- timeline --event 'contact|whitenoise|ContactsScreen' --limit 40` (showed 7+ recent/decrypt cycles with stable contactCount). Confidence 0.65 because this finding is in an upstream hook not the audited file; the screen is a consumer.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-005",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "mintHost helper recreated each render",
+      "repo": "sovran-app",
+      "path": "features/contacts/screens/ContactsScreen.tsx",
+      "line": 217,
+      "symbol": "mintHost",
+      "dimension": 7,
+      "description": "Lines 217-224 declare `const mintHost = (url) => { try { return new URL(url).hostname.toLowerCase(); } catch { return url.toLowerCase(); } };` inside the component body. The function is pure and has no captures. It's invoked from the `filteredDisplayMints` useMemo (line 241) on every render; since the function reference changes each render, useMemo cannot use it as a dep, but the function literal itself is allocated on every render.",
+      "why_it_matters": "Tiny waste. Hoisting it to module scope makes intent explicit (it's a pure utility, not a closure) and avoids the per-render allocation. No bug — just an idle reference that the React compiler may or may not collapse depending on Compiler behaviour.",
+      "fix": "Hoist `mintHost` to module scope just below `parseGeohashQuery` at the top of the file, or move it to a shared utility (Sovran already has `shared/lib/url.ts` candidates).",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-checked lines 217-245. Function is pure with no captures.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "`: any` casts on contact/mint items defeat the typing the upstream hooks already provide",
+      "repo": "sovran-app",
+      "path": "features/contacts/screens/ContactsScreen.tsx",
+      "line": 198,
+      "symbol": "matchesProfileQuery / filteredDisplayContacts / filteredDisplayMints / renderContactItem",
+      "dimension": 6,
+      "description": "Ten `: any` annotations across lines 198, 209, 232, 238, 287, 299, 304, 307, 329, 359 erase the types the upstream hooks return. useRecentContacts returns implicit-typed arrays (`contacts: { type: string; pubkey: string; dmEvent: NDKEvent | null; nip17Content: string | undefined; timestamp: number }[]` for entries — but ALSO returns a different shape with `dmEvent: { content: string }` after decryption at line 263 of useRecentContacts.ts). useMintContacts returns yet another shape. The screen squashes both into `any` and then field-accesses (`item.dmEvent?.content`, `item.mint?.mintUrl`, `item.mintInfo?.name`) without type guidance.",
+      "why_it_matters": "The shape inconsistency at useRecentContacts.ts:168 vs :263 (`dmEvent: NDKEvent | null` vs `dmEvent: { content: string }`) is exactly the kind of drift a discriminated union catches at compile time. Today, a typo or refactor in either producer can land in production silently. This is why the same screen's `extraData` typo (F-002) wasn't caught — there's no `LegendListProps<ContactItem>['extraData']` type pulling the developer toward the correct field.",
+      "fix": "Export a discriminated `DisplayContact` from useRecentContacts (`type DisplayContact = ContactRowEntry | ContactRowDecryptedEntry`) and `DisplayMint` from useMintContacts. Type ContactsScreen's local memos and renderContactItem against them. Drop every `: any` annotation in this file.",
+      "references": [
+        "lint:@typescript-eslint/no-explicit-any",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Counted 10 `: any` annotations at lines 198, 209, 232, 238, 287, 299, 304, 307, 329, 359 (re-read each).",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "RequestActions Pressables lack accessibility props",
+      "repo": "sovran-app",
+      "path": "features/whitenoise/components/RequestActions.tsx",
+      "line": 38,
+      "symbol": "RequestActions Decline / Accept",
+      "dimension": 8,
+      "description": "Both Pressables (lines 38-46 Decline, 47-55 Accept) carry only `testID` and an inline Text label. They lack `accessibilityRole=\"button\"` and `accessibilityLabel`. Screen-reader users hit the row, get the contact identity, and then encounter two unidentified tap targets that perform crypto-significant actions: Accept calls `client.joinGroupFromWelcome` (writes MLS state, sends a network welcome reply, persists to storage); Decline marks the rumor read.",
+      "why_it_matters": "Wallet-flow accessibility shouldn't bottleneck on visual identification of action buttons. WCAG 2.2 4.1.2 requires programmatic name/role for every interactive element. A user with VoiceOver enabled cannot reliably distinguish Accept from Decline by row context alone if the surrounding ContactRow announces 'wants to start a White Noise chat' with no follow-up role for the trailing buttons.",
+      "fix": "Add `accessibilityRole=\"button\"` and explicit labels (`accessibilityLabel=\"Accept invite from <displayName>\"`, `accessibilityLabel=\"Decline invite from <displayName>\"`). Pass the displayName down from ContactsScreen so the label is meaningful. Add `accessibilityState={{ disabled: !!isBusy }}` and stop using `isBusy` as a render-mode swap — keep the buttons mounted but disabled, so a screen-reader user is informed of the busy state instead of having the controls disappear.",
+      "references": [
+        "skill:vercel-react-native-skills"
+      ],
+      "verification_note": "Re-checked RequestActions.tsx:20-58.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Medium",
+      "confidence": 0.7,
+      "title": "Whitenoise accept/decline lack a single-flight guard at the hook boundary",
+      "repo": "sovran-app",
+      "path": "features/whitenoise/hooks/useWhitenoiseRequests.ts",
+      "line": 74,
+      "symbol": "accept / decline",
+      "dimension": 7,
+      "description": "`accept(request)` (line 74) checks client/inviteReader, then sets busyId, then awaits `client.joinGroupFromWelcome`. There is no `if (busyId !== null) return` guard at the top. The Pressable in RequestActions (line 47) calls `() => void acceptWhitenoiseRequest(req)` directly. Between two rapid taps and React rendering the busy state to the consumer (RequestActions then unmounts the buttons via the `if (isBusy)` branch at RequestActions.tsx:28), accept can be invoked twice with the same rumor. The interval is bounded only by React's batched re-render (~16ms minimum); a normal double-tap fits inside.",
+      "why_it_matters": "joinGroupFromWelcome is presumably not idempotent under MLS semantics — a duplicate welcome ratchet could leave the group state half-initialised, cause two `WhitenoiseDmIndex.set` writes for the same fromPubkey, and double-fire the post-accept `router.push('/(user-flow)/whitenoiseDM')` (the guardedRouter cooldown protects the second push, but the in-flight crypto work is wasted at best, and at worst leaves a corrupt record). Same shape applies to decline → marks rumor read twice (idempotent, safe), but the Accept side is the funds-shaped concern: marmot-ts is local-only here, but the DM index that maps `fromPubkey → groupId` is the correctness anchor for every subsequent send.",
+      "fix": "At the top of `accept`: `if (busyId !== null) return;`. Better: use a `useRef<string | null>(null)` instead of state for the guard so subsequent renders never see a stale value (state updates are async and batched). Apply the same guard to `decline`. As defence-in-depth, add `disabled={!!isBusy}` to RequestActions Pressables (see F-007).",
+      "references": [
+        "nips/60.md"
+      ],
+      "verification_note": "Re-read accept/decline (lines 74-133). UNVERIFIED for the specific MLS-state outcome of double-joinGroupFromWelcome — depends on @internet-privacy/marmot-ts internals (upstream). Confidence 0.7 reflects this. The structural race is self-evident from source per <log_doctor_integration> rules so the finding is kept rather than dropped.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Unused exports BASE_FILTERS and SEARCH_FILTERS in SearchFilters.tsx",
+      "repo": "sovran-app",
+      "path": "features/contacts/components/search/SearchFilters.tsx",
+      "line": 7,
+      "symbol": "BASE_FILTERS / SEARCH_FILTERS",
+      "dimension": 1,
+      "description": "Lines 7-8 export two constants. ContactsScreen.tsx builds its own visibleFilters list inline (line 451-468) and passes it via the `filters` prop, never importing the exported constants. knip flags both as unused exports. SEARCH_FILTERS (which adds 'Groups') was never consumed anywhere; BASE_FILTERS is used as the default arg of the prop on line 24 and does not need to be exported.",
+      "why_it_matters": "Unused exports are deception — a future developer reading SearchFilters.tsx sees an exported tuple and assumes downstream surfaces use it for choice consistency, then changes one without finding the other. ContactsScreen (line 451-468) duplicates the canonical list inline.",
+      "fix": "Drop `export` on BASE_FILTERS (keep it as a module-level const for the prop default). Delete SEARCH_FILTERS entirely. Wire ContactsScreen to import BASE_FILTERS so the canonical list lives in one place; the screen can extend it conditionally (`[...BASE_FILTERS, 'Groups']`) when search is active.",
+      "references": [
+        "knip:unused-export"
+      ],
+      "verification_note": "knip output: `BASE_FILTERS features/contacts/components/search/SearchFilters.tsx:7:14`, `SEARCH_FILTERS features/contacts/components/search/SearchFilters.tsx:8:14`. Re-read SearchFilters.tsx to confirm lines.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "SEARCH_FILTERS deleted; BASE_FILTERS unexported (kept as the default prop value). Commit 13fa9a3b. ContactsScreen still builds its own list inline — the wider 'wire one canonical list' suggestion is left as a separate concern."
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "Dead file features/contacts/lib/constants/animation-configs.ts",
+      "repo": "sovran-app",
+      "path": "features/contacts/lib/constants/animation-configs.ts",
+      "line": 4,
+      "symbol": "HEADER_SPRING_CONFIG",
+      "dimension": 1,
+      "description": "knip lists this 4-LOC file as fully unimported. It exports HEADER_SPRING_CONFIG, presumably an artefact from an older Contacts header animation that was removed. analyze-structure orphan analysis confirms it has no consumers in features/contacts and a project-wide grep finds no other importers.",
+      "why_it_matters": "Dead file. Removes mental load and ensures lint/type-check don't run over a useless file.",
+      "fix": "Delete features/contacts/lib/constants/animation-configs.ts.",
+      "references": [
+        "knip:unused-files"
+      ],
+      "verification_note": "knip flagged the file. analyze-structure reported it under `Expected public barrels / compatibility surfaces` but with `4 loc` and no external importer found via grep. Safe delete.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "File deleted in commit 13fa9a3b."
+    },
+    {
+      "id": "F-011",
+      "severity": "Nit",
+      "confidence": 0.95,
+      "title": "Prettier formatting errors in useAllSearchResults.ts",
+      "repo": "sovran-app",
+      "path": "features/contacts/hooks/useAllSearchResults.ts",
+      "line": 49,
+      "symbol": "parseGeohashQuery",
+      "dimension": 8,
+      "description": "ESLint reports two prettier/prettier errors: line 49 wants `?·trimmed.slice(1).toLowerCase()` on a single line; line 98 has a trailing comma to delete.",
+      "why_it_matters": "Auto-fixable with `--fix`. CI lint must already be flagging this on PRs.",
+      "fix": "Run `npx eslint --fix features/contacts/hooks/useAllSearchResults.ts`.",
+      "references": [
+        "lint:prettier/prettier"
+      ],
+      "verification_note": "ESLint output: `49:39 error Replace ⏎····?·trimmed.slice(1).toLowerCase()⏎··· with ·?·trimmed.slice(1).toLowerCase() prettier/prettier`, `98:21 error Delete , prettier/prettier`.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-012",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "geohashChat route does not validate geohash before mounting GeohashChatScreen",
+      "repo": "sovran-app",
+      "path": "app/(user-flow)/geohashChat.tsx",
+      "line": 19,
+      "symbol": "GeohashChatRoute",
+      "dimension": 5,
+      "description": "Line 19: `if (!geohash) return null;` is the only validation. The geohash is then passed straight to GeohashChatScreen which uses it as a Nostr `#g` tag filter and a BLE peer-discovery key. ContactsScreen's call sites (lines 67-71, 89-97) DO validate via `parseGeohashQuery`/`isValidGeohash`, but a deep-link entry (`com.sovranbitcoin.dev://geohashChat?geohash=<arbitrary>`) bypasses ContactsScreen entirely.",
+      "why_it_matters": "The screen subscribes to `#g` tag filters with the raw value. A non-geohash string (long, with special characters) would either produce empty results or — worst case — confuse the filter format. Defence-in-depth at the route boundary aligns with the SOV-00 §11 rule (`Persisted stores rehydrate before any gate reads them`) extended to deep-link inputs.",
+      "fix": "At app/(user-flow)/geohashChat.tsx:13-19, parse with `z.strictObject({ geohash: z.string().refine(isValidGeohash, 'invalid geohash'), tierLabel: z.string().max(64).optional(), transport: z.enum(['nostr', 'ble']).optional() })`. On parse failure, `router.replace('/')` and toast 'Invalid geohash link'.",
+      "references": [
+        "docs/SOV-00.md §11",
+        "skill:zod-4"
+      ],
+      "verification_note": "Re-read app/(user-flow)/geohashChat.tsx:9-29. No validation beyond truthy check.",
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "app/(user-flow)/geohashChat.tsx already adopted useRouteParams in commit 7df64614 ahead of this session's deep-link slice — the cited line range no longer applies."
+    },
+    {
+      "id": "F-013",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "prefetchImages fires N concurrent fetches with no concurrency cap",
+      "repo": "sovran-app",
+      "path": "shared/lib/imageCache.ts",
+      "line": 60,
+      "symbol": "prefetchImages → Promise.all",
+      "dimension": 7,
+      "description": "shared/lib/imageCache.ts:60 calls `await Promise.all(urls.map((url) => prefetchImage(url)))`. With 50 contacts in the visibleFilters list, ContactsScreen's useEffect at line 187 fires 50 concurrent Image.prefetch calls on first paint and on every profilesMap update. Each one shares the JS thread for HTTPS setup before delegating to native.",
+      "why_it_matters": "Confirmed by network-mode log: `image.prefetch.batch count=2 duration_ms=1046.15` WARN, single image `https://m.primal.net/NYTD.png duration_ms=1007.29` — the fan-out costs scale linearly. This isn't a hard bug today (only 50 cached profiles is bounded) but the boundary is the upstream cache size and Nostr is unbounded by design.",
+      "fix": "At shared/lib/imageCache.ts:52, replace `Promise.all(urls.map(...))` with a small semaphore. A 4–8 concurrency cap is safe — or use `expo-image`'s `priority` field to let the native layer schedule. Alternative: batch by visibility — only prefetch for items in or near the LegendList viewport, not the whole list.",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Log evidence: `image.prefetch.batch count=2 duration_ms=1046.15` at offset 89172ms. Confidence 0.7 because the bound (50 contacts) is small in practice; this is preventive.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-014",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Duplicate parseGeohashQuery / matchTiers between screen and hook",
+      "repo": "sovran-app",
+      "path": "features/contacts/screens/ContactsScreen.tsx",
+      "line": 46,
+      "symbol": "parseGeohashQuery / matchingTiers",
+      "dimension": 4,
+      "description": "ContactsScreen.tsx:46-53 defines parseGeohashQuery (8 lines). useAllSearchResults.ts:47-56 defines parseGeohashQuery (10 lines, identical logic). ContactsScreen.tsx:432-442 inlines tier-matching identical to useAllSearchResults.ts:63-72 `matchTiers`. Line 430 carries an explicit comment `(Mirrors the matching in useAllSearchResults so Groups pill and All pill stay consistent)` — the author already knows this is a duplication risk.",
+      "why_it_matters": "Drift risk: the next change to geohash parsing (e.g. allow `@` prefix in addition to `#`) or tier matching (e.g. add `transport === 'wifi'` rule) lands in one place and silently desynchronises the All-pill vs Groups-pill behaviour.",
+      "fix": "Extract `parseGeohashQuery` and `matchTiers` to features/contacts/lib/searchMatchers.ts. Import from both consumers.",
+      "references": [],
+      "verification_note": "Diffed both implementations — line-for-line equivalent matching logic. Confidence 0.95.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "skipped",
+    "4": "skipped",
+    "5": "pass",
+    "6": "pass",
+    "7": "pass",
+    "8": "pass",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Hoist parseGeohashQuery and matchTiers out of ContactsScreen.tsx and useAllSearchResults.ts into features/contacts/lib/searchMatchers.ts. The author has flagged the drift risk in a comment at line 430 — formalise the dedup before the next change.",
+      "files": [
+        "features/contacts/screens/ContactsScreen.tsx",
+        "features/contacts/hooks/useAllSearchResults.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Export typed `DisplayContact` (discriminated union) from useRecentContacts and `DisplayMint` from useMintContacts. Replace every `: any` cast in ContactsScreen with the discriminated union. The shape inconsistency between useRecentContacts.ts:168 (dmEvent: NDKEvent | null) and :263 (dmEvent: { content: string }) is the kind of drift that a tagged union catches.",
+      "files": [
+        "features/payments/hooks/useRecentContacts.ts",
+        "features/payments/hooks/useMintContacts.ts",
+        "features/contacts/screens/ContactsScreen.tsx"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Delete features/contacts/lib/constants/animation-configs.ts (HEADER_SPRING_CONFIG has no consumers). Drop `export` on BASE_FILTERS in SearchFilters.tsx and delete SEARCH_FILTERS entirely. Re-route ContactsScreen.tsx visibleFilters to import BASE_FILTERS so there is one canonical filter list.",
+      "files": [
+        "features/contacts/lib/constants/animation-configs.ts",
+        "features/contacts/components/search/SearchFilters.tsx",
+        "features/contacts/screens/ContactsScreen.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Add a URL safety gate at shared/lib/imageCache.ts (https-only, no RFC1918, no localhost, optional data: with size cap). Apply it once at prefetchImage so every consumer (ContactsScreen.tsx:188, useMintContacts.ts:70, plus FeedScreen, UserMessagesScreen, mint icons) inherits the protection.",
+      "files": [
+        "shared/lib/imageCache.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Propose a new log-doctor mode `react-list` (~150 lines) that aggregates LegendList/FlatList signals: per-list extraData stability (warn when extraData is a primitive that hasn't changed in N renders but the data prop has), per-list keyExtractor index-fallback rate, and per-list renderItem closure-recreation cadence. Today these patterns require eyeballing renders mode and reading source — a dedicated mode would catch F-002 mechanically. Documentation goes in .claude/rules/log-doctor.md alongside the existing modes.",
+      "files": [
+        "scripts/log-doctor/",
+        ".claude/rules/log-doctor.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Does @internet-privacy/marmot-ts.client.joinGroupFromWelcome tolerate two concurrent calls with the same rumor? F-008's MLS-specific outcome depends on this. A targeted upstream test would resolve it.",
+    "Is there a plan to add an SOV-XX spec for the contacts/search surface? With features/contacts, features/feed, features/payments, features/whitenoise, and shared/ui/composed/SearchResultsList all touching the same pubkey-search and contact-row machinery, a regression spec would freeze the cross-feature contract — likely band 5 (surfaces).",
+    "Should the failing NIP-17 wrap (cacheHits=43 unwrapped=0 failed=1 in payment.contacts.unwrap_pass logs) be quarantined after N consecutive failures so the failed-wrap counter doesn't keep firing on every relay flush? Currently the count is metadata-only and the failed wrap is silently retried indefinitely.",
+    "extraData={profilesMap.size} (F-002) is the same pattern other screens may use; a project-wide grep for `extraData={` and an audit of each instance would catch siblings."
+  ]
+}

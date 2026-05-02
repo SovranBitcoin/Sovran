@@ -274,8 +274,8 @@
       ],
       "verification_note": "grep -rn 'NsecSigner' sovran-app returns only manager.ts call sites (5 matches, all inside manager.ts itself) plus one rule-doc reference. Counter-argument considered: 'Uint8Array in JS is by-reference anyway; making the field private doesn't prevent the constructor arg holder from keeping a reference.' True, but the class is constructed only inside this file with bytes derived at call time; constraining the field prevents future field-level drift. Low severity because no external consumer exists today.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Real and unfixed. NsecSigner field-visibility tightening is a defence-in-depth slice; pairs naturally with the secureStorage cleanup cluster (audit 04 / 10 / 11)."
+      "completion_status": "complete",
+      "completion_note": "Class declaration is now `class NsecSigner` (no export) and the field is `private readonly secretKey` (commit 13fa9a3b). External holders cannot read the raw nsec bytes; the only callers are the three constructor sites inside manager.ts."
     },
     {
       "id": "F-012",

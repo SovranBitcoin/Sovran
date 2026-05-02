@@ -219,7 +219,7 @@
       "verification_note": "Verified by direct read of each declaration site. extractModelName at L423-425 is literally `return getModelDisplayName(modelId, availableModels)`.",
       "prior_audit_id": null,
       "completion_status": "partial",
-      "completion_note": "extractModelName deleted; the over-exported types/consts (TIER_MATRIX, DEFAULT_PROVIDER_ID, DEFAULT_TIER_ID, buildCandidateChain, BranchInfo, RoutstrTierId/ProviderId/Session, TopUpResult/Failure) remain in scope for a follow-up sweep."
+      "completion_note": "Format.ts internals (TIER_MATRIX, DEFAULT_PROVIDER_ID, DEFAULT_TIER_ID, buildCandidateChain) unexported in commit 13fa9a3b. extractModelName already deleted previously. Remaining: BranchInfo (branching.ts), RoutstrTierId / RoutstrProviderId / RoutstrSession (routstrStore.ts), TopUpResult / TopUpFailure (topUp.ts) — deferred."
     },
     {
       "id": "F-012",
