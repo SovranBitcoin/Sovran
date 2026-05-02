@@ -210,11 +210,12 @@ export function ButtonHandler({
       <HStack
         align="center"
         justify="space-between"
-        spacing={0}
         className={`flex-row ${className || ''}`}
         style={[style]}>
         {visibleButtons.slice(0, 2).map((button, index) => (
-          <View key={index} className="flex-1">
+          <View
+            key={button.testID ?? (typeof button.text === 'string' ? button.text : `btn-${index}`)}
+            className="flex-1">
             <Button
               testID={button.testID}
               onPress={() => handleButtonPress(button)}
@@ -258,7 +259,7 @@ export function ButtonHandler({
               <Menu.Portal>
                 <Menu.Overlay />
                 <Menu.Content presentation="bottom-sheet">
-                  <Menu.Label className="text-lg font-bold text-foreground ml-3 -mt-2 mb-2">
+                  <Menu.Label className="text-foreground -mt-2 mb-2 ml-3 text-lg font-bold">
                     Select option
                   </Menu.Label>
                   {overflowMenuButtons.map((button, i) => {
@@ -266,7 +267,10 @@ export function ButtonHandler({
                     const isDanger = button.variant === 'dangerous';
                     return (
                       <Menu.Item
-                        key={i}
+                        key={
+                          button.testID ??
+                          (typeof button.text === 'string' ? button.text : `overflow-${i}`)
+                        }
                         testID={button.testID ? `overflow-${button.testID}` : undefined}
                         isDisabled={button.disabled}
                         variant={isDanger ? 'danger' : 'default'}

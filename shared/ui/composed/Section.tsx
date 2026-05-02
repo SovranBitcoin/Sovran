@@ -43,9 +43,10 @@ export function Section({ items, style, camera = false, special, gradient }: Sec
     const titleObj = typeof item.title === 'object' ? item.title : null;
     const titleId = titleObj?.id;
     const titleText = typeof item.title === 'string' ? item.title : (titleObj?.children ?? '');
+    const rowKey = titleId ?? titleText ?? `row-${index}`;
 
     return (
-      <HStack key={index} justify="space-between" className="p-2">
+      <HStack key={rowKey} justify="space-between" className="p-2">
         <Text id={titleId} heavy size={16} color={opacity(foreground, 0.9)}>
           {titleText}
         </Text>
@@ -59,9 +60,7 @@ export function Section({ items, style, camera = false, special, gradient }: Sec
   if (gradient) {
     return (
       <Log name="Section">
-        <GradientCard
-          style={{ marginHorizontal: 16, ...style }}
-          contentStyle={{ padding: 8 }}>
+        <GradientCard style={{ marginHorizontal: 16, ...style }} contentStyle={{ padding: 8 }}>
           {rows}
         </GradientCard>
       </Log>
