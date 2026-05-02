@@ -350,7 +350,9 @@
       "fix": "Replace `Dimensions.get('window').height` with `useWindowDimensions().height`. Do the same sweep in any other file that uses Dimensions.get directly inside a render function (grep `Dimensions\\.get` across shared/ui — 1 match here; across the whole app for a follow-up).",
       "references": ["skill:react-native-best-practices", "skill:building-native-ui"],
       "verification_note": "Re-read BackgroundView.tsx:95-186. Confirmed Dimensions.get usage and its propagation into gradientLocations. QRCode.tsx uses useWindowDimensions correctly at line 88, providing the contrast. Confidence 0.85 — behaviour is confirmed; the severity Medium reflects that this is a visual-only regression on a minority of interactions.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Real and unfixed at BackgroundView.tsx:108. Confirmed during this session's survey: 13 module-load Dimensions.get('window') call sites still alive across the app (BackgroundView, app/_layout.tsx, drawer/_layout.tsx, SettingsRecoveryScreen, DeleteScreen, UserMessagesScreen, CameraScreen/types, walletHeader, ParticipantCardDeck, MapScreen, feed/shared, InitializationProvider). Considered as an alternative slice ('module-load Dimensions sweep') and held back because each call site is its own micro-decision (some constants live in StyleSheet.create blocks that can't accept hooks, requiring inline conversions)."
     },
     {
       "id": "F-019",
