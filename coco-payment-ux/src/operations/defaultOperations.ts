@@ -198,7 +198,7 @@ export function createDefaultOperations(
         '[executeSend] Complete | operationId:',
         operation.id,
         '| state:',
-        (operation as any).state
+        operation.state
       );
 
       // Try history first (should be there after execute), fall back to
@@ -221,11 +221,11 @@ export function createDefaultOperations(
       const entry = {
         id: operation.id,
         type: 'send' as const,
-        createdAt: (operation as any).createdAt ?? Date.now(),
-        mintUrl: (operation as any).mintUrl ?? mintUrl,
+        createdAt: operation.createdAt,
+        mintUrl: operation.mintUrl,
         unit: 'sat',
         state: 'pending',
-        amount: (operation as any).amount ?? amount,
+        amount: operation.amount,
         token,
         metadata: { operationId: operation.id },
       };
@@ -268,11 +268,11 @@ export function createDefaultOperations(
       const entry = {
         id: operation.id,
         type: 'send' as const,
-        createdAt: (operation as any).createdAt ?? Date.now(),
-        mintUrl: (operation as any).mintUrl ?? mintUrl,
+        createdAt: operation.createdAt,
+        mintUrl: operation.mintUrl,
         unit: 'sat',
         state: 'pending',
-        amount: (operation as any).amount ?? amount,
+        amount: operation.amount,
         token,
         metadata: { operationId: operation.id },
       };
@@ -300,13 +300,13 @@ export function createDefaultOperations(
       const entry = {
         id: mintOp.id,
         type: 'mint' as const,
-        createdAt: (mintOp as any).createdAt ?? Date.now(),
-        mintUrl: (mintOp as any).mintUrl ?? mintUrl,
-        unit: (mintOp as any).unit ?? 'sat',
+        createdAt: mintOp.createdAt,
+        mintUrl: mintOp.mintUrl,
+        unit: mintOp.unit,
         quoteId: mintOp.quoteId,
         state: 'UNPAID',
-        amount: (mintOp as any).amount ?? amount,
-        paymentRequest: (mintOp as any).request,
+        amount: mintOp.amount,
+        paymentRequest: mintOp.request,
         metadata: { operationId: mintOp.id },
       };
       return { historyEntry: JSON.stringify(entry) };
@@ -598,12 +598,12 @@ export function createDefaultOperations(
       const entry = {
         id: result.id,
         type: 'melt' as const,
-        createdAt: (result as any).createdAt ?? Date.now(),
-        mintUrl: (result as any).mintUrl ?? mintUrl,
+        createdAt: result.createdAt,
+        mintUrl: result.mintUrl,
         unit: 'sat',
-        quoteId: (result as any).quoteId ?? '',
+        quoteId: result.quoteId,
         state: mapMeltOperationState(result.state),
-        amount: (result as any).amount ?? amount,
+        amount: result.amount,
         metadata: { operationId: result.id, meltTarget },
       };
       return { historyEntry: JSON.stringify(entry) };

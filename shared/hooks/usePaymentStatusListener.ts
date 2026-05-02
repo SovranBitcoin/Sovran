@@ -18,38 +18,27 @@ import { paymentLog } from '@/shared/lib/logger';
 
 const NPC_RECEIVE_POPUP_MAX_AGE_MS = 5 * 60 * 1000;
 
-function getNpcQuoteTimestampMs(quote: Pick<RawMintQuote, 'paidAt'>): number | null {
-  const rawTimestamp = quote.paidAt;
-  if (typeof rawTimestamp !== 'number' || !Number.isFinite(rawTimestamp) || rawTimestamp <= 0) {
-    return null;
-  }
-
-  return rawTimestamp * 1000;
-}
-
 /**
- * Decide whether a `mint-op:pending` event with `state === 'PAID'` should surface
- * a "Payment received" toast. Only NPC sync produces these events (live in-app
- * mints emit pending with state 'UNPAID' and transition via quote-state-changed),
- * so we treat anything older than the threshold — or with no `paidAt` at all —
- * as a retroactive replay (recovery, cold-start sync) and stay silent.
+ * Decide whether a `mint-op:pending` event with `lastObservedRemoteState === 'PAID'`
+ * should surface a "Payment received" toast. Only NPC sync produces these events
+ * (live in-app mints emit pending with state 'UNPAID' and transition via
+ * quote-state-changed), so we treat anything older than the threshold — or with
+ * no observed-state timestamp at all — as a retroactive replay (recovery,
+ * cold-start sync) and stay silent.
+ *
+ * `lastObservedRemoteStateAt` is set to `Date.now()` by MintBolt11Handler.prepare
+ * when the NPC plugin imports the quote, so the freshness window is "import time
+ * was within 5 minutes" — newly synced NPC payments fire, stale replays don't.
  */
 function shouldShowNpcReceivePopup(
-  quote: Pick<RawMintQuote, 'paidAt'>,
+  observedAtMs: number | undefined,
   nowMs: number = Date.now()
 ): boolean {
-  const quoteTimestampMs = getNpcQuoteTimestampMs(quote);
-  if (quoteTimestampMs === null) return false;
-
-  return nowMs - quoteTimestampMs <= NPC_RECEIVE_POPUP_MAX_AGE_MS;
+  if (typeof observedAtMs !== 'number' || !Number.isFinite(observedAtMs) || observedAtMs <= 0) {
+    return false;
+  }
+  return nowMs - observedAtMs <= NPC_RECEIVE_POPUP_MAX_AGE_MS;
 }
-
-type RawMintQuote = {
-  state?: string;
-  amount?: number;
-  unit?: string;
-  paidAt?: number;
-};
 
 export function usePaymentStatusListener(): void {
   const { manager } = useManagerContext();
@@ -65,17 +54,7 @@ export function usePaymentStatusListener(): void {
 
     const offStateChanged = manager.on(
       'mint-op:quote-state-changed',
-      async ({
-        mintUrl,
-        quoteId,
-        state,
-      }: {
-        mintUrl: string;
-        quoteId: string;
-        state: string;
-        operationId: string;
-        operation: any;
-      }) => {
+      async ({ mintUrl, quoteId, state }) => {
         paymentLog.debug('hook.payment_status.mint_quote_state_changed', {
           quoteId,
           state,
@@ -136,92 +115,89 @@ export function usePaymentStatusListener(): void {
       }
     );
 
-    const offAdded = manager.on(
-      'mint-op:pending',
-      ({
-        mintUrl,
-        operationId,
-        operation,
-      }: {
-        mintUrl: string;
-        operationId: string;
-        operation: any;
-      }) => {
-        const op = operation as any;
-        // PendingMintOperation is flat: read top-level fields; the legacy `op.quote.*`
-        // / `op.intent.*` namespaces never existed and silently fell back to defaults.
-        const quoteId = op.quoteId ?? op.quote?.quoteId ?? operationId;
-        const state = op.lastObservedRemoteState ?? op.quote?.state;
-        paymentLog.debug('hook.payment_status.mint_quote_added', { quoteId, state, mintUrl });
-        if (state !== 'PAID') return;
+    const offAdded = manager.on('mint-op:pending', ({ mintUrl, operationId, operation }) => {
+      // The MintOperation union includes `init` (no quoteId/observed state); only
+      // pending-or-later carries the quote snapshot we need.
+      if (operation.state === 'init') {
+        paymentLog.debug('hook.payment_status.mint_pending_init_skipped', {
+          operationId,
+          mintUrl,
+        });
+        return;
+      }
 
-        if (isSwapStatusActive()) {
-          paymentLog.info('hook.payment_status.suppressed_for_swap', {
-            quoteId,
-            mintUrl,
-            phase: 'mint_quote_added',
-          });
-          return;
-        }
+      const {
+        quoteId,
+        lastObservedRemoteState: state,
+        lastObservedRemoteStateAt,
+        amount,
+        unit,
+      } = operation;
+      paymentLog.debug('hook.payment_status.mint_quote_added', { quoteId, state, mintUrl });
+      if (state !== 'PAID') return;
 
-        const paidAt = op.paidAt ?? op.quote?.paidAt;
-        if (!shouldShowNpcReceivePopup({ paidAt })) {
-          paymentLog.info('hook.payment_status.npc_quote_suppressed', {
-            quoteId,
-            mintUrl,
-            paidAt,
-            ageMs: typeof paidAt === 'number' ? Date.now() - paidAt * 1000 : null,
-            reason: paidAt == null ? 'no_paidAt' : 'too_old',
-          });
-          return;
-        }
-
-        const amount = op.amount ?? op.intent?.amount ?? 0;
-        const unit = op.unit ?? op.intent?.unit ?? 'sat';
-
-        const existingActive = usePaymentStatusStore.getState().active;
-        const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
-
-        paymentLog.info('hook.payment_status.npc_receive_processing', {
+      if (isSwapStatusActive()) {
+        paymentLog.info('hook.payment_status.suppressed_for_swap', {
           quoteId,
           mintUrl,
-          amount,
-          unit,
-          isDuplicate,
+          phase: 'mint_quote_added',
         });
-        usePaymentStatusStore.getState().setActive({
-          variant: 'receive',
-          id: quoteId,
+        return;
+      }
+
+      if (!shouldShowNpcReceivePopup(lastObservedRemoteStateAt)) {
+        paymentLog.info('hook.payment_status.npc_quote_suppressed', {
+          quoteId,
           mintUrl,
-          amount,
-          unit,
-          state: 'processing',
+          observedAt: lastObservedRemoteStateAt ?? null,
+          ageMs:
+            typeof lastObservedRemoteStateAt === 'number'
+              ? Date.now() - lastObservedRemoteStateAt
+              : null,
+          reason: lastObservedRemoteStateAt == null ? 'no_observed_at' : 'too_old',
         });
-
-        if (isDuplicate) {
-          paymentLog.info('hook.payment_status.receive_popup_suppressed', {
-            quoteId,
-            mintUrl,
-            reason: 'already_active',
-          });
-          return;
-        }
-
-        paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
+        return;
       }
-    );
 
-    const offRedeemed = manager.on(
-      'mint-op:finalized',
-      ({ operationId, operation }: { mintUrl: string; operationId: string; operation: any }) => {
-        // operation.quoteId is the cashu-ts quote ID that matches the popup's id.
-        // Fallback chain: operation.quoteId → operation.quote?.quoteId → operationId
-        const quoteId =
-          (operation as any)?.quoteId ?? (operation as any)?.quote?.quoteId ?? operationId;
-        paymentLog.info('hook.payment_status.mint_quote_redeemed', { operationId, quoteId });
-        usePaymentStatusStore.getState().setConfirmed(quoteId);
+      const existingActive = usePaymentStatusStore.getState().active;
+      const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
+
+      paymentLog.info('hook.payment_status.npc_receive_processing', {
+        quoteId,
+        mintUrl,
+        amount,
+        unit,
+        isDuplicate,
+      });
+      usePaymentStatusStore.getState().setActive({
+        variant: 'receive',
+        id: quoteId,
+        mintUrl,
+        amount,
+        unit,
+        state: 'processing',
+      });
+
+      if (isDuplicate) {
+        paymentLog.info('hook.payment_status.receive_popup_suppressed', {
+          quoteId,
+          mintUrl,
+          reason: 'already_active',
+        });
+        return;
       }
-    );
+
+      paymentStatusPopup({ variant: 'receive', id: quoteId, mintUrl, amount, unit });
+    });
+
+    const offRedeemed = manager.on('mint-op:finalized', ({ operationId, operation }) => {
+      // FinalizedMintOperation always carries quoteId; init shouldn't reach finalize,
+      // but narrow defensively to satisfy the union and keep operationId as a fallback
+      // for any future variant that lacks a quoteId.
+      const quoteId = operation.state === 'init' ? operationId : operation.quoteId;
+      paymentLog.info('hook.payment_status.mint_quote_redeemed', { operationId, quoteId });
+      usePaymentStatusStore.getState().setConfirmed(quoteId);
+    });
 
     const offReceiveCreated = manager.on('receive-op:finalized', async ({ mintUrl, operation }) => {
       const amount = operation.amount;
@@ -250,67 +226,53 @@ export function usePaymentStatusListener(): void {
       }
     });
 
-    const offSendFinalized = manager.on(
-      'send:finalized',
-      ({
-        mintUrl,
-        operationId,
-        operation,
-      }: {
-        mintUrl: string;
-        operationId: string;
-        operation: { amount: number };
-      }) => {
-        const amount = operation.amount;
-        const unit = 'sat';
-        paymentLog.info('hook.payment_status.send_finalized', { operationId, mintUrl, amount });
-        if (isSwapStatusActive()) {
-          paymentLog.info('hook.payment_status.suppressed_for_swap', {
-            operationId,
-            mintUrl,
-            phase: 'send_finalized',
-          });
-          return;
-        }
-        const store = usePaymentStatusStore.getState();
-        const hadPending =
-          (store.active?.id === operationId &&
-            (store.active.variant === 'send' || store.active.variant === 'payment-request')) ||
-          (store.active?.variant === 'payment-request' &&
-            (store.active?.state === 'processing' || store.active?.state === 'delivered'));
-
-        if (hadPending) {
-          store.setConfirmed(store.active!.id, { operationId });
-          return;
-        }
-
-        store.setActive({
-          variant: 'send',
-          id: operationId,
+    const offSendFinalized = manager.on('send:finalized', ({ mintUrl, operationId, operation }) => {
+      const amount = operation.amount;
+      const unit = 'sat';
+      paymentLog.info('hook.payment_status.send_finalized', { operationId, mintUrl, amount });
+      if (isSwapStatusActive()) {
+        paymentLog.info('hook.payment_status.suppressed_for_swap', {
+          operationId,
           mintUrl,
-          amount,
-          unit,
-          state: 'confirmed',
+          phase: 'send_finalized',
         });
-
-        paymentStatusPopup({ variant: 'send', id: operationId, mintUrl, amount, unit });
+        return;
       }
-    );
+      const store = usePaymentStatusStore.getState();
+      const hadPending =
+        (store.active?.id === operationId &&
+          (store.active.variant === 'send' || store.active.variant === 'payment-request')) ||
+        (store.active?.variant === 'payment-request' &&
+          (store.active?.state === 'processing' || store.active?.state === 'delivered'));
 
-    const offMeltRolledBack = manager.on(
-      'melt-op:rolled-back',
-      ({ operation }: { operation: { error?: string } }) => {
-        paymentLog.warn('hook.payment_status.melt_rolled_back', { error: operation.error });
-        const store = usePaymentStatusStore.getState();
-        if (store.active?.variant === 'melt' && store.active?.state === 'processing') {
-          paymentLog.error('hook.payment_status.melt_failed', {
-            id: store.active.id,
-            error: operation.error,
-          });
-          store.setFailed(store.active.id, new Error(operation.error ?? 'Payment was rolled back'));
-        }
+      if (hadPending) {
+        store.setConfirmed(store.active!.id, { operationId });
+        return;
       }
-    );
+
+      store.setActive({
+        variant: 'send',
+        id: operationId,
+        mintUrl,
+        amount,
+        unit,
+        state: 'confirmed',
+      });
+
+      paymentStatusPopup({ variant: 'send', id: operationId, mintUrl, amount, unit });
+    });
+
+    const offMeltRolledBack = manager.on('melt-op:rolled-back', ({ operation }) => {
+      paymentLog.warn('hook.payment_status.melt_rolled_back', { error: operation.error });
+      const store = usePaymentStatusStore.getState();
+      if (store.active?.variant === 'melt' && store.active?.state === 'processing') {
+        paymentLog.error('hook.payment_status.melt_failed', {
+          id: store.active.id,
+          error: operation.error,
+        });
+        store.setFailed(store.active.id, new Error(operation.error ?? 'Payment was rolled back'));
+      }
+    });
 
     const offMeltFinalized = manager.on(
       'melt-op:finalized',
