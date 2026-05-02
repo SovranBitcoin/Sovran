@@ -159,14 +159,8 @@ export default function SplitBillDetailScreen() {
       const p = group.participants.find((x) => x.id === participantId);
       if (!p?.mintQuoteId) return;
       try {
-        const history: Record<string, unknown>[] =
-          (await (manager as any).history?.getPaginatedHistory?.(0, 200)) ?? [];
-        const entry = history.find(
-          (h) =>
-            h.type === 'mint' &&
-            typeof (h as any).quoteId === 'string' &&
-            (h as any).quoteId === p.mintQuoteId
-        );
+        const history = await manager.history.getPaginatedHistory(0, 200);
+        const entry = history.find((h) => h.type === 'mint' && h.quoteId === p.mintQuoteId);
         if (!entry) {
           paymentLog.warn('split_bill.detail.view_lookup_failed', {
             groupId,

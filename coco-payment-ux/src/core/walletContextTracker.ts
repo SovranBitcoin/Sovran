@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Manager } from '@cashu/coco-core';
+import { getReadyProofs } from '../api/managerInternals';
 import type { WalletContext } from '../types';
 
 export interface WalletContextTrackerConfig {
@@ -50,17 +51,9 @@ export function createWalletContextTracker(
 
       const amounts: Record<string, number[]> = {};
 
-      const proofService = (
-        manager as unknown as {
-          proofService: {
-            getReadyProofs: (url: string) => Promise<Array<{ amount: number }>>;
-          };
-        }
-      ).proofService;
-
       for (const mint of trustedMints) {
         try {
-          const proofs = await proofService.getReadyProofs((mint as any).mintUrl);
+          const proofs = await getReadyProofs(manager, (mint as any).mintUrl);
           amounts[(mint as any).mintUrl] = proofs
             .map((p) => p.amount)
             .sort((a, b) => a - b);

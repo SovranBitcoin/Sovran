@@ -685,8 +685,7 @@ export function useSplitBillPaymentWatcher(groupId?: string) {
       tickCount++;
       const tickStart = performance.now();
       try {
-        const history: Record<string, unknown>[] =
-          (await (manager as any).history?.getPaginatedHistory?.(0, 200)) ?? [];
+        const history = await manager.history.getPaginatedHistory(0, 200);
         const historyMs = performance.now() - tickStart;
         const store = useSplitBillTransactionsStore.getState();
         const group = store.getGroup(groupId);
@@ -699,10 +698,11 @@ export function useSplitBillPaymentWatcher(groupId?: string) {
         for (const p of group.participants) {
           if (!p.mintQuoteId) continue;
           if (p.paymentState === 'paid') continue;
-          const row = history.find(
-            (h) => h.type === 'mint' && typeof h.quoteId === 'string' && h.quoteId === p.mintQuoteId
-          );
+          const row = history.find((h) => h.type === 'mint' && h.quoteId === p.mintQuoteId);
           if (row) matched++;
+          // Coco's MintQuoteState is 'UNPAID' | 'PAID' | 'ISSUED' — but mints
+          // may surface 'EXPIRED' via legacy or upstream paths the type does
+          // not enumerate yet. Read as string so both branches stay reachable.
           const state = row?.state as string | undefined;
           if (state === 'PAID' || state === 'ISSUED') {
             store.markPaymentPaidByQuoteId(p.mintQuoteId);

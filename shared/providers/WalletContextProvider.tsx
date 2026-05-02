@@ -3,7 +3,8 @@
  *
  * Provides a pre-built WalletContext (trustedMintUrls, mintBalances, proofAmounts,
  * preferredMintUrl) so call sites don't need to construct it or fetch proofs.
- * Proof amounts are fetched from manager.proofService when balance changes.
+ * Proof amounts are fetched via coco-payment-ux's getReadyProofs seam when
+ * balance changes.
  *
  * Must be a descendant of CocoProvider (CocoCashuProvider).
  */
@@ -19,7 +20,7 @@ import React, {
 } from 'react';
 
 import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
-import type { WalletContext } from 'coco-payment-ux';
+import { getReadyProofs, type WalletContext } from 'coco-payment-ux';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -109,19 +110,13 @@ export function WalletContextProvider({ children }: { children: React.ReactNode 
     walletLog.debug('provider.wallet_context.fetch_proof_amounts_start', {
       mintCount: stableMintUrls.length,
     });
-    // proofService is the underlying coco service; type-check warns it's
-    // private but other call sites (manager.ts:701) read it the same way.
-    // Cast to `any` to keep this file aligned with that pattern.
-    const proofService = (manager as any).proofService;
     const next: Record<string, number[]> = {};
     let totalReady = 0;
     for (const url of stableMintUrls) {
       try {
-        const proofs = await proofService.getReadyProofs(url);
-        next[url] = proofs
-          .map((p: { amount: number }) => p.amount)
-          .sort((a: number, b: number) => a - b);
-        totalReady += next[url].reduce((sum: number, n: number) => sum + n, 0);
+        const proofs = await getReadyProofs(manager, url);
+        next[url] = proofs.map((p) => p.amount).sort((a, b) => a - b);
+        totalReady += next[url].reduce((sum, n) => sum + n, 0);
       } catch (err) {
         walletLog.warn('provider.wallet_context.proof_fetch_failed', {
           mintUrl: url,

@@ -16,6 +16,14 @@ export {
 // Re-export Manager type so consumers don't need to import coco-cashu-core
 export type { Manager } from '@cashu/coco-core';
 
+// Typed accessors for coco Manager internals — see api/managerInternals.ts
+export {
+  getReadyProofs,
+  getWallet,
+  listMeltOperationsByState,
+  deleteMintOperation,
+} from './api/managerInternals';
+
 // Machine (state machine core)
 export { createPaymentMachine } from './machine/createMachine';
 export { resolveNext } from './machine/resolveNext';

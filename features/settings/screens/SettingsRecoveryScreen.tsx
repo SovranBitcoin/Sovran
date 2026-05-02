@@ -29,6 +29,7 @@ import { useMintManagement } from '@/features/mint';
 import { useNavigation, router } from 'expo-router';
 import { Mint } from '@cashu/coco-core';
 import { useBalanceContext } from '@cashu/coco-react';
+import { deleteMintOperation } from 'coco-payment-ux';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { PaymentStatusIcon } from '@/shared/lib/popup/PaymentStatusIcon';
@@ -516,32 +517,20 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         const pendingOps = await manager.ops.mint.listPending();
         if (pendingOps.length > 0) {
           // Coco doesn't expose a public abandon API for pending operations,
-          // so reach into the private repository — same pattern this manager
-          // already uses for proofRepository / proofService elsewhere.
-          const repo = (
-            manager as unknown as {
-              mintOperationRepository?: { delete(id: string): Promise<void> };
-            }
-          ).mintOperationRepository;
-          if (repo?.delete) {
-            for (const op of pendingOps) {
-              await repo.delete(op.id).catch((e) =>
-                cashuLog.warn('recovery.cleanup.delete_failed', {
-                  operationId: op.id,
-                  mintUrl: op.mintUrl,
-                  error: (e as Error)?.message,
-                })
-              );
-            }
-            cashuLog.info('recovery.cleanup.dropped_stuck_pending_ops', {
-              count: pendingOps.length,
-              operationIds: pendingOps.map((o) => o.id),
-            });
-          } else {
-            cashuLog.warn('recovery.cleanup.no_repo_access', {
-              pendingOpCount: pendingOps.length,
-            });
+          // so go through the typed seam in coco-payment-ux/api/managerInternals.
+          for (const op of pendingOps) {
+            await deleteMintOperation(manager, op.id).catch((e) =>
+              cashuLog.warn('recovery.cleanup.delete_failed', {
+                operationId: op.id,
+                mintUrl: op.mintUrl,
+                error: (e as Error)?.message,
+              })
+            );
           }
+          cashuLog.info('recovery.cleanup.dropped_stuck_pending_ops', {
+            count: pendingOps.length,
+            operationIds: pendingOps.map((o) => o.id),
+          });
         }
       } catch (cleanupErr) {
         cashuLog.warn('recovery.cleanup.failed', {

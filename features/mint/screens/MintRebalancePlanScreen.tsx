@@ -15,6 +15,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useMints, useBalanceContext, useManager } from '@cashu/coco-react';
+import { getReadyProofs, getWallet } from 'coco-payment-ux';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { useLightningOperations } from '@/features/receive/hooks/useLightningOperations';
 import { MIN_FEE_RESERVE } from '@/features/mint/components/rebalance';
@@ -395,8 +396,8 @@ export function MintRebalancePlanScreen() {
         let feeHeadroom = STATIC_FEE_HEADROOM;
         let worstCaseInputFee = 0;
         try {
-          const proofs = await manager.proofService.getReadyProofs(fromMintUrl);
-          const wallet = await manager.walletService.getWallet(fromMintUrl);
+          const proofs = await getReadyProofs(manager, fromMintUrl);
+          const wallet = await getWallet(manager, fromMintUrl);
           worstCaseInputFee = wallet.getFeesForProofs(proofs as any);
           // fee_reserve (conservative floor) + worst-case input fee (all proofs selected)
           feeHeadroom = Math.max(STATIC_FEE_HEADROOM, MIN_FEE_RESERVE + worstCaseInputFee);
@@ -478,7 +479,7 @@ export function MintRebalancePlanScreen() {
         // HTTP, no persistence/events) to discover the real fee_reserve, then
         // re-cap the transfer amount if needed — avoiding blind retry loops.
         try {
-          const probeWallet = await manager.walletService.getWallet(fromMintUrl);
+          const probeWallet = await getWallet(manager, fromMintUrl);
           const probeQuote = await (probeWallet as any).createMeltQuoteBolt11(invoice);
           const actualFeeReserve = Number(probeQuote.fee_reserve ?? 0);
 
@@ -902,8 +903,8 @@ export function MintRebalancePlanScreen() {
                 // compute the headroom specifically for this hop's source mint.
                 let hopFeeHeadroom = STATIC_FEE_HEADROOM;
                 try {
-                  const hopProofs = await manager.proofService.getReadyProofs(hopFrom);
-                  const hopWallet = await manager.walletService.getWallet(hopFrom);
+                  const hopProofs = await getReadyProofs(manager, hopFrom);
+                  const hopWallet = await getWallet(manager, hopFrom);
                   const hopInputFee = hopWallet.getFeesForProofs(hopProofs as any);
                   hopFeeHeadroom = Math.max(STATIC_FEE_HEADROOM, MIN_FEE_RESERVE + hopInputFee);
                 } catch {
@@ -948,7 +949,7 @@ export function MintRebalancePlanScreen() {
 
                 // ── Probe melt quote for this hop's actual fee_reserve ──
                 try {
-                  const hopProbeWallet = await manager.walletService.getWallet(hopFrom);
+                  const hopProbeWallet = await getWallet(manager, hopFrom);
                   const hopProbeQuote = await (hopProbeWallet as any).createMeltQuoteBolt11(
                     hopInvoice
                   );
@@ -958,8 +959,8 @@ export function MintRebalancePlanScreen() {
                     // Recompute hop fee headroom with probed fee_reserve
                     let hopProbeInputFee = 0;
                     try {
-                      const hpProofs = await manager.proofService.getReadyProofs(hopFrom);
-                      const hpWallet = await manager.walletService.getWallet(hopFrom);
+                      const hpProofs = await getReadyProofs(manager, hopFrom);
+                      const hpWallet = await getWallet(manager, hopFrom);
                       hopProbeInputFee = hpWallet.getFeesForProofs(hpProofs as any);
                     } catch {
                       /* use 0 */
