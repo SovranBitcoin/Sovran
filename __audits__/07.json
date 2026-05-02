@@ -21,57 +21,61 @@
       "id": "F-001",
       "severity": "Critical",
       "confidence": 0.95,
-      "title": "LNURL callback invoice amount not validated against requested msats — malicious LNURL server can steal funds",
+      "title": "LNURL callback invoice amount not validated against requested msats \u2014 malicious LNURL server can steal funds",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/lnurl.ts",
       "line": 87,
       "symbol": "requestInvoiceFromLnurl",
       "dimension": 2,
       "description": "requestInvoiceFromLnurl POSTs to params.callback with ?amount=${amountMsats}, reads response.json(), and returns data.pr directly as a bolt11 invoice. No zod parse of the response; no check that the returned bolt11 actually encodes amountMsats; no verification that data.pr even starts with lnbc. The returned invoice is fed straight into coco-core ops.melt.prepare at defaultOperations.ts:564-568. LUD-06 explicitly requires the wallet to verify h tag matches h(metadata) and that the invoice amount == requested amount before signing/paying.",
-      "why_it_matters": "A malicious lightning address / LNURL server (or a MitM against plain HTTP .onion endpoints — see F-017) returns a bolt11 encoding 100000 sats when the user requested 100 sats. The wallet passes it to mgr.ops.melt.prepare; coco asks the mint to quote the invoice; the mint quotes for 100000 sats; the melt executes against the user's proofs. Direct funds loss, proportional to the user's available balance on the selected mint.",
+      "why_it_matters": "A malicious lightning address / LNURL server (or a MitM against plain HTTP .onion endpoints \u2014 see F-017) returns a bolt11 encoding 100000 sats when the user requested 100 sats. The wallet passes it to mgr.ops.melt.prepare; coco asks the mint to quote the invoice; the mint quotes for 100000 sats; the melt executes against the user's proofs. Direct funds loss, proportional to the user's available balance on the selected mint.",
       "fix": "Parse the LNURL response with a z.strictObject ({ pr: z.string().regex(/^ln[bt]/i).max(4096), routes: z.array(z.any()).max(0).optional() }). Decode data.pr via decodeBolt11 and assert the parsed amount field equals amountMsats (within zero tolerance). Reject on mismatch with a distinct error code (LNURL_AMOUNT_MISMATCH) so the wallet can surface the discrepancy. Also verify h tag equals sha256(metadata) per LUD-06 before accepting the invoice.",
       "references": [
         "coco-payment-ux/src/lnurl.ts:87-97",
         "coco-payment-ux/src/operations/defaultOperations.ts:560-568",
         "https://github.com/lnurl/luds/blob/luds/06.md"
       ],
-      "verification_note": "Re-read lnurl.ts:58-97. Confirmed zero validation of data.pr; only a falsy check (line 90). Grepped requestInvoiceFromLnurl consumers — only defaultOperations.ts:562 in executeMelt. Counter-argument considered: maybe coco-core validates invoice amount against the user's stated melt amount downstream — verified by reading coco/packages/coco-core/src/ops/melt — it calls mint /v1/melt/quote with the invoice; the mint returns whatever quote the invoice encodes. The user-entered amount is not cross-checked against the decoded bolt11 amount.",
-      "prior_audit_id": null
+      "verification_note": "Re-read lnurl.ts:58-97. Confirmed zero validation of data.pr; only a falsy check (line 90). Grepped requestInvoiceFromLnurl consumers \u2014 only defaultOperations.ts:562 in executeMelt. Counter-argument considered: maybe coco-core validates invoice amount against the user's stated melt amount downstream \u2014 verified by reading coco/packages/coco-core/src/ops/melt \u2014 it calls mint /v1/melt/quote with the invoice; the mint returns whatever quote the invoice encodes. The user-entered amount is not cross-checked against the decoded bolt11 amount.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Bolt11 decode + msat cross-check now happens in requestInvoiceFromLnurl; LNURL_INVOICE_AMOUNT_MISMATCH surfaces distinctly."
     },
     {
       "id": "F-002",
       "severity": "High",
       "confidence": 0.97,
-      "title": "coco-payment-ux has 131 raw console.* calls and zero scoped-logger usage — violates repo logging convention and defeats log-doctor",
+      "title": "coco-payment-ux has 131 raw console.* calls and zero scoped-logger usage \u2014 violates repo logging convention and defeats log-doctor",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/machine/createMachine.ts",
       "line": 277,
       "symbol": "console.info|console.warn",
       "dimension": 10,
-      "description": "`grep -c 'console\\.' coco-payment-ux/src/` returns 131. Every code path — createMachine.ts (send dispatch, melt, payment-request, NFC), defaultOperations.ts (executeSend/Melt/Receive/MintQuote, attemptRollback, buildMintReviewInfo), lnurl.ts, transitions.ts, resolveNext.ts, screen-actions/createManager.ts, walletContextTracker.ts, nostr/sendDirectMessage.ts — logs via free-form console.info / console.warn with bracket-prefixed ad-hoc event names like `[PaymentMachine] Transition | from: X → Y | event: Z`. Sovran-app's convention per shared/lib/logger is scoped loggers (paymentLog, cashuLog, nostrLog, storageLog) emitting structured events consumed by scripts/log-doctor.ts.",
-      "why_it_matters": "First, log-doctor timeline/flows/errors modes cannot match coco-payment-ux events by regex pattern (they're not structured). The log.txt I inspected contains 374 perf.js_thread_blocked entries but zero matching entries for the payment machine's transitions — meaning a post-mortem on a failed payment today cannot cite a specific machine step. Second, console.warn in createMachine.ts:375 (Melt failed) and 460 (Payment request failed) capture err.message — if coco or a downstream helper puts a secret / token / proof into an Error message, it ends up in device logs and possibly Sentry. Third, console.info in lnurl.ts:71 logs the full lightning address (`target: 'user@domain'`) — not secret but an identifier that would help an attacker correlate sessions.",
-      "fix": "Introduce a small logger abstraction in coco-payment-ux (e.g. src/logger.ts exporting getLogger(scope) which defaults to console but lets the app inject paymentLog/cashuLog). Replace every console.info with log.info('machine.transition', { from, to, event: event.type }) — structured keys so log-doctor can match. Redact meltTarget / token / bolt11 to counts and prefixes; never log full err.message for cashu failures without a redaction step. Document the pattern in coco-payment-ux/docs/logging.md.",
+      "description": "`grep -c 'console\\.' coco-payment-ux/src/` returns 131. Every code path \u2014 createMachine.ts (send dispatch, melt, payment-request, NFC), defaultOperations.ts (executeSend/Melt/Receive/MintQuote, attemptRollback, buildMintReviewInfo), lnurl.ts, transitions.ts, resolveNext.ts, screen-actions/createManager.ts, walletContextTracker.ts, nostr/sendDirectMessage.ts \u2014 logs via free-form console.info / console.warn with bracket-prefixed ad-hoc event names like `[PaymentMachine] Transition | from: X \u2192 Y | event: Z`. Sovran-app's convention per shared/lib/logger is scoped loggers (paymentLog, cashuLog, nostrLog, storageLog) emitting structured events consumed by scripts/log-doctor.ts.",
+      "why_it_matters": "First, log-doctor timeline/flows/errors modes cannot match coco-payment-ux events by regex pattern (they're not structured). The log.txt I inspected contains 374 perf.js_thread_blocked entries but zero matching entries for the payment machine's transitions \u2014 meaning a post-mortem on a failed payment today cannot cite a specific machine step. Second, console.warn in createMachine.ts:375 (Melt failed) and 460 (Payment request failed) capture err.message \u2014 if coco or a downstream helper puts a secret / token / proof into an Error message, it ends up in device logs and possibly Sentry. Third, console.info in lnurl.ts:71 logs the full lightning address (`target: 'user@domain'`) \u2014 not secret but an identifier that would help an attacker correlate sessions.",
+      "fix": "Introduce a small logger abstraction in coco-payment-ux (e.g. src/logger.ts exporting getLogger(scope) which defaults to console but lets the app inject paymentLog/cashuLog). Replace every console.info with log.info('machine.transition', { from, to, event: event.type }) \u2014 structured keys so log-doctor can match. Redact meltTarget / token / bolt11 to counts and prefixes; never log full err.message for cashu failures without a redaction step. Document the pattern in coco-payment-ux/docs/logging.md.",
       "references": [
         "coco-payment-ux/src/machine/createMachine.ts:277,281,321,334,340,375,396,413,424,431,455,460,516,740,745,766,819,824,843",
         "coco-payment-ux/src/operations/defaultOperations.ts:186,188,191,210,232,257,278,284,311,334,343,346,354,430,436,439,442,462,466,469,479,504,511,520,528,551,557,569,571,589,591,598,623,632,636,653,661,680,683,714,719",
         "sovran-app/shared/lib/logger.ts",
         "sovran-app/.claude/rules/log-doctor.md"
       ],
-      "verification_note": "Grepped 131 console.* hits. Counter-argument considered: coco-payment-ux is a portable file: dep that may be published to npm — a hard dependency on sovran-app's logger breaks that. Response: the logger abstraction I proposed defaults to console and accepts an injected logger via CocoPaymentUXConfig, preserving portability while letting Sovran wire scoped loggers.",
-      "prior_audit_id": null
+      "verification_note": "Grepped 131 console.* hits. Counter-argument considered: coco-payment-ux is a portable file: dep that may be published to npm \u2014 a hard dependency on sovran-app's logger breaks that. Response: the logger abstraction I proposed defaults to console and accepts an injected logger via CocoPaymentUXConfig, preserving portability while letting Sovran wire scoped loggers.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "console.* sweep is Slice B; this slice keeps logger discipline scoped to the changed sites only."
     },
     {
       "id": "F-003",
       "severity": "High",
       "confidence": 0.95,
-      "title": "coco-payment-ux has zero zod usage and src/schemas/ is empty — LNURL / nip44 / coco history outputs flow into state with no schema validation",
+      "title": "coco-payment-ux has zero zod usage and src/schemas/ is empty \u2014 LNURL / nip44 / coco history outputs flow into state with no schema validation",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/schemas",
       "line": 1,
       "symbol": "packages.schemas",
       "dimension": 6,
       "description": "`ls coco-payment-ux/src/schemas/` returns empty. `grep -r \"from ['\\\"]zod['\\\"]\" coco-payment-ux/` returns zero. package.json declares no zod dependency. Every boundary inside the package uses blind casts: lnurl.ts:64 `data as LnUrlPayParams`; nip17.ts:163,171 `nip44Decrypt(...) as { pubkey: string; content: string; kind: number }` (decrypted JSON from an arbitrary sender); defaultOperations.ts JSON.parses historyEntry and casts to `any` at lines 202, 249, 339, 430, 443, 655, 743; createMachine.ts scatters `stepData as any` casts everywhere (line 176, 224 and many more).",
-      "why_it_matters": "Same underlying issue as prior audit F-001@06.json and F-006@06.json, now re-surfaced inside the coco-payment-ux boundary. Three concrete consequences here: (a) LNURL — see F-001. (b) nip44 — a peer can put any JSON in a gift-wrap rumor.content; `tags` is used as `rumor.tags` without shape/length bounds, enabling prototype-like downstream mishaps if a tag looks like `['__proto__', 'x']`. (c) coco history JSON — if coco-core evolves history schemas, undefined fields flow through .slice() / .toString() at UI layer and crash a screen mid-flow. Category is also the only mechanism that would detect a cross-version coco upgrade breaking history shape.",
+      "why_it_matters": "Same underlying issue as prior audit F-001@06.json and F-006@06.json, now re-surfaced inside the coco-payment-ux boundary. Three concrete consequences here: (a) LNURL \u2014 see F-001. (b) nip44 \u2014 a peer can put any JSON in a gift-wrap rumor.content; `tags` is used as `rumor.tags` without shape/length bounds, enabling prototype-like downstream mishaps if a tag looks like `['__proto__', 'x']`. (c) coco history JSON \u2014 if coco-core evolves history schemas, undefined fields flow through .slice() / .toString() at UI layer and crash a screen mid-flow. Category is also the only mechanism that would detect a cross-version coco upgrade breaking history shape.",
       "fix": "Declare zod v4 schemas for every external input the package consumes: LnUrlPayParams, LnurlCallbackResponse, Nip17Rumor, Nip17Seal, CocoHistoryEntry (send/receive/melt/mint variants as a discriminated union). Place them in packages/schemas (see prior audit F-006@06.json) so the app and the package share the same shape. Every `as X` blind cast in the files above becomes `Schema.safeParse(x)` returning Result or throwing a typed SchemaError. Apply .max() caps to all strings (tags[].max(32), content.max(65536), etc.) for DoS mitigation.",
       "references": [
         "coco-payment-ux/src/schemas/ (empty)",
@@ -80,35 +84,39 @@
         "coco-payment-ux/src/operations/defaultOperations.ts:202,249,339,430,443,655,743",
         "sovran-app/__audits__/06.json (F-001, F-006)"
       ],
-      "verification_note": "Listed src/schemas/ — empty. Grepped zod — zero hits. Counter-argument considered: maybe validation happens one level up in the app's apiClient — apiClient.ts does not cover LNURL, nip44 rumors, or coco history (those never traverse apiClient). The gap is real and local to this package.",
-      "prior_audit_id": "F-006@06.json"
+      "verification_note": "Listed src/schemas/ \u2014 empty. Grepped zod \u2014 zero hits. Counter-argument considered: maybe validation happens one level up in the app's apiClient \u2014 apiClient.ts does not cover LNURL, nip44 rumors, or coco history (those never traverse apiClient). The gap is real and local to this package.",
+      "prior_audit_id": "F-006@06.json",
+      "completion_status": "partial",
+      "completion_note": "LNURL boundary now validates pay-params + invoice via shared zod schemas + bolt11 amount assert. nip17.ts seal/rumor and defaultOperations.ts history-JSON casts are still bare."
     },
     {
       "id": "F-004",
       "severity": "Medium",
       "confidence": 0.7,
-      "title": "unwrapGiftWrap does not verify the seal's Schnorr signature — relies on NIP-44 ECDH binding alone",
+      "title": "unwrapGiftWrap does not verify the seal's Schnorr signature \u2014 relies on NIP-44 ECDH binding alone",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/nostr/nip17.ts",
       "line": 158,
       "symbol": "unwrapGiftWrap",
       "dimension": 2,
       "description": "unwrapGiftWrap decrypts the wrap (kind 1059) with the recipient's key, then decrypts the seal (kind 13) with the recipient's key and the seal's claimed pubkey, then returns senderPubkey = seal.pubkey. It checks seal.kind === 13 (line 169) and seal.pubkey === rumor.pubkey (line 179) but never verifyEvent(seal). NIP-59 requires the seal be signed by the sender; the verify step is what binds the sender's claim of identity to the rumor.",
-      "why_it_matters": "NIP-44 v2's HMAC-SHA256 over aad=nonce||ciphertext does provide ciphertext authentication under the ECDH-derived conversation key — so forging a seal that decrypts requires knowledge of either alice_priv or recipient_priv. ECDH therefore covers the common forgery case. The residual risk is defence-in-depth: (a) if a peer's privkey is derived from a weak KDF or leaked (e.g. via an unrelated NIP-04 bug), a signature check on the seal would still catch a tampered wrap; (b) the rumor.id is also not verified against getEventHash(rumor) — a peer could send a rumor whose id mismatches its content, breaking replay dedup at downstream consumers that key on rumor.id. The practical threat today is limited; the NIP-59 spec still requires the verify step.",
+      "why_it_matters": "NIP-44 v2's HMAC-SHA256 over aad=nonce||ciphertext does provide ciphertext authentication under the ECDH-derived conversation key \u2014 so forging a seal that decrypts requires knowledge of either alice_priv or recipient_priv. ECDH therefore covers the common forgery case. The residual risk is defence-in-depth: (a) if a peer's privkey is derived from a weak KDF or leaked (e.g. via an unrelated NIP-04 bug), a signature check on the seal would still catch a tampered wrap; (b) the rumor.id is also not verified against getEventHash(rumor) \u2014 a peer could send a rumor whose id mismatches its content, breaking replay dedup at downstream consumers that key on rumor.id. The practical threat today is limited; the NIP-59 spec still requires the verify step.",
       "fix": "Import verifyEvent from nostr-tools. After parsing the seal (line 167) call verifyEvent(seal as VerifiedEvent); return null on failure. After parsing the rumor (line 177) compute getEventHash({ ...rumor }) and confirm it equals rumor.id; return null on mismatch. Both checks are O(1) per message and mirror the spec.",
       "references": [
         "coco-payment-ux/src/nostr/nip17.ts:158-193",
         "nips/59.md (seal MUST be signed)",
         "nips/44.md (ECDH + HMAC binding)"
       ],
-      "verification_note": "Re-read nip17.ts:158-193 — confirmed no verifyEvent call and no rumor.id check. Counter-argument considered: NIP-44's HMAC provides sender auth since the conversation key is keyed on the sender's pubkey — correct for the forgery case, but does not replace the spec-mandated signature check for defence-in-depth or id integrity.",
-      "prior_audit_id": null
+      "verification_note": "Re-read nip17.ts:158-193 \u2014 confirmed no verifyEvent call and no rumor.id check. Counter-argument considered: NIP-44's HMAC provides sender auth since the conversation key is keyed on the sender's pubkey \u2014 correct for the forgery case, but does not replace the spec-mandated signature check for defence-in-depth or id integrity.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "NIP-59 seal verify + rumor.id check is its own slice (touches nip17.ts shared/coco copies; F-013 must be resolved first)."
     },
     {
       "id": "F-005",
       "severity": "Medium",
       "confidence": 0.9,
-      "title": "LNURL fetch calls have no AbortController, timeout, or response-size cap — UX DoS via hostile server",
+      "title": "LNURL fetch calls have no AbortController, timeout, or response-size cap \u2014 UX DoS via hostile server",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/lnurl.ts",
       "line": 62,
@@ -121,21 +129,22 @@
         "coco-payment-ux/src/lnurl.ts:62,87",
         "coco-payment-ux/src/machine/createMachine.ts:275-280 (sendLocked)"
       ],
-      "verification_note": "Re-read lnurl.ts — confirmed bare fetch. log-doctor slow --latest --threshold 200 shows 374 perf.js_thread_blocked events this session but none trace directly to lnurl.ts — the user has not hit a hostile LNURL server in the captured session. The hazard is latent. Counter-argument considered: the platform may enforce a default fetch timeout — React Native's XHR-backed fetch has no default timeout on iOS/Android.",
+      "verification_note": "Re-read lnurl.ts \u2014 confirmed bare fetch. log-doctor slow --latest --threshold 200 shows 374 perf.js_thread_blocked events this session but none trace directly to lnurl.ts \u2014 the user has not hit a hostile LNURL server in the captured session. The hazard is latent. Counter-argument considered: the platform may enforce a default fetch timeout \u2014 React Native's XHR-backed fetch has no default timeout on iOS/Android.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "safeFetch wraps every LNURL fetch with timeout + AbortSignal; LNURL_TIMEOUT routes distinctly."
     },
     {
       "id": "F-006",
       "severity": "Medium",
       "confidence": 0.85,
-      "title": "parse.ts accepts http:// mint URLs — token transport to plain HTTP mints leaks cashu over the wire",
+      "title": "parse.ts accepts http:// mint URLs \u2014 token transport to plain HTTP mints leaks cashu over the wire",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/parse.ts",
       "line": 287,
       "symbol": "parsePaymentInput.mintUrl",
       "dimension": 2,
-      "description": "The mint URL branch at parse.ts:287 matches /^https?:\\/\\//i — both https:// and http:// pass. The ParsedPaymentInput.mintUrl then flows via `openMint` intent (intent.ts:79) into `mgr.mint.addMint` / `mgr.mint.getMintInfo`. If coco-core does not enforce https, a user scanning a QR for `http://evil.example.com/mint` gets that mint added as a trust candidate; subsequent mint/swap/melt traffic travels in cleartext.",
+      "description": "The mint URL branch at parse.ts:287 matches /^https?:\\/\\//i \u2014 both https:// and http:// pass. The ParsedPaymentInput.mintUrl then flows via `openMint` intent (intent.ts:79) into `mgr.mint.addMint` / `mgr.mint.getMintInfo`. If coco-core does not enforce https, a user scanning a QR for `http://evil.example.com/mint` gets that mint added as a trust candidate; subsequent mint/swap/melt traffic travels in cleartext.",
       "why_it_matters": "Cashu mint traffic includes blinded messages (NUT-03), signatures (NUT-02), and melt quotes (NUT-05). Most are not directly token-recoverable by a passive observer, but the /v1/swap endpoint exposes unblinded C values once the client processes them; a MitM on HTTP can swap-race or return malformed Bs that break recovery. Also: many mints publish /v1/info over HTTP accidentally and the current parser does not warn the user. Not Critical only because the first send via a hostile plain-HTTP mint would require user approval via the trust flow.",
       "fix": "Restrict the mint URL match to `^https:\\/\\/` by default. Accept `^http:\\/\\/` only if the host ends in `.onion`. For any http:// url, return a warning in `warnings` and surface a localizable reason code MINT_INSECURE_HTTP; have the wallet's trustMint flow require an extra confirmation. Document in coco-payment-ux README that plain HTTP is rejected except for .onion.",
       "references": [
@@ -143,140 +152,150 @@
         "coco-payment-ux/src/intent.ts:79",
         "nuts/03.md"
       ],
-      "verification_note": "Re-read parse.ts:287 — regex is /^https?:\\/\\//i. Counter-argument considered: coco-core may reject non-https at the HTTP layer — verified by reading coco/packages/coco-core/src/mint/MintService.ts; addMint accepts any URL string and passes it to fetch. No https enforcement in coco.",
-      "prior_audit_id": null
+      "verification_note": "Re-read parse.ts:287 \u2014 regex is /^https?:\\/\\//i. Counter-argument considered: coco-core may reject non-https at the HTTP layer \u2014 verified by reading coco/packages/coco-core/src/mint/MintService.ts; addMint accepts any URL string and passes it to fetch. No https enforcement in coco.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "parsePaymentInput now rejects http:// non-onion mint URLs with MINT_INSECURE_HTTP."
     },
     {
       "id": "F-007",
       "severity": "Medium",
       "confidence": 0.85,
-      "title": "LNURL callback URL assembled via string concat — breaks when callback already has a query string",
+      "title": "LNURL callback URL assembled via string concat \u2014 breaks when callback already has a query string",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/lnurl.ts",
       "line": 87,
       "symbol": "requestInvoiceFromLnurl",
       "dimension": 1,
-      "description": "Line 87: `await fetch(`${params.callback}?amount=${amountMsats}`)`. Many LN address providers return a callback like `https://lnservice.example/lnurlp/user?token=abc` — the string concat appends `?amount=X` producing a double-`?` URL that most HTTP stacks reject or interpret as a malformed query with `token=abc?amount=X`. Even when it doesn't fail, passing `amount` as an un-encoded integer works by luck; a callback that uses `;` separators or already contains `amount=` in its path produces wrong behaviour.",
+      "description": "Line 87: `await fetch(`${params.callback}?amount=${amountMsats}`)`. Many LN address providers return a callback like `https://lnservice.example/lnurlp/user?token=abc` \u2014 the string concat appends `?amount=X` producing a double-`?` URL that most HTTP stacks reject or interpret as a malformed query with `token=abc?amount=X`. Even when it doesn't fail, passing `amount` as an un-encoded integer works by luck; a callback that uses `;` separators or already contains `amount=` in its path produces wrong behaviour.",
       "why_it_matters": "Melt via lightning address silently fails (NO_INVOICE_RETURNED) or targets a wrong endpoint. The user sees a generic failure and retries, potentially against a different provider. Ties together with F-001: a hostile provider that issues an `?amount` pre-stamped callback could force the wallet to ignore the user's requested amount.",
       "fix": "Replace with URL constructor: `const url = new URL(params.callback); url.searchParams.set('amount', String(amountMsats)); await fetch(url.toString(), { signal });`. Also assert url.protocol === 'https:' (or http: for .onion) so a hostile LUD-06 payload can't switch transport mid-flow.",
       "references": [
         "coco-payment-ux/src/lnurl.ts:87",
         "https://github.com/lnurl/luds/blob/luds/06.md"
       ],
-      "verification_note": "Re-read lnurl.ts:87 — confirmed template-literal concat with no URL-object path. Counter-argument considered: LUD-06 spec callbacks rarely carry a query — empirically correct for Lightning addresses but wrong for LNURL-pay via explicit URL.",
-      "prior_audit_id": null
+      "verification_note": "Re-read lnurl.ts:87 \u2014 confirmed template-literal concat with no URL-object path. Counter-argument considered: LUD-06 spec callbacks rarely carry a query \u2014 empirically correct for Lightning addresses but wrong for LNURL-pay via explicit URL.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Callback URL composed via URL.searchParams.set; pre-existing query strings preserved."
     },
     {
       "id": "F-008",
       "severity": "Medium",
       "confidence": 0.75,
-      "title": "shouldMockFailPaymentRequest is not gated by __DEV__ — misconfigured prod build can spuriously fail payment delivery",
+      "title": "shouldMockFailPaymentRequest is not gated by __DEV__ \u2014 misconfigured prod build can spuriously fail payment delivery",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/operations/defaultOperations.ts",
       "line": 676,
       "symbol": "shouldMockFailPaymentRequest",
       "dimension": 1,
       "description": "defaultOperations.ts:676 and :710 check `config.shouldMockFailPaymentRequest?.()` in both the Nostr and HTTP transport paths. The check is live in every build. The JSDoc at createCocoPaymentUX.ts:61-62 labels it `/** Dev: when true, executePaymentRequest simulates a delivery failure to test rollback. */` but the runtime code has no __DEV__ / process.env.NODE_ENV gate.",
-      "why_it_matters": "If the flag's provider function is ever wired to a prod-visible debug toggle (Settings → Developer → Simulate failures) and left on, users send a real ecash send which then throws a synthetic error, rollback fires, proofs are reclaimed. Reclaim success lands `rolledBack: true` — not funds loss, but a real transaction round-trip with no delivery. If rollback FAILS (e.g. mint is briefly offline during reclaim), the token is in limbo: the recipient never got it, and the sender's state is inconsistent.",
+      "why_it_matters": "If the flag's provider function is ever wired to a prod-visible debug toggle (Settings \u2192 Developer \u2192 Simulate failures) and left on, users send a real ecash send which then throws a synthetic error, rollback fires, proofs are reclaimed. Reclaim success lands `rolledBack: true` \u2014 not funds loss, but a real transaction round-trip with no delivery. If rollback FAILS (e.g. mint is briefly offline during reclaim), the token is in limbo: the recipient never got it, and the sender's state is inconsistent.",
       "fix": "Guard the check with a build-time flag: `if ((process.env.NODE_ENV !== 'production' || __DEV__) && config.shouldMockFailPaymentRequest?.()) { ... }`. Alternatively move shouldMockFailPaymentRequest out of the CocoPaymentUXConfig surface entirely and into a separate dev-only wrapper that wallets opt into.",
       "references": [
         "coco-payment-ux/src/operations/defaultOperations.ts:676,710",
         "coco-payment-ux/src/core/createCocoPaymentUX.ts:61"
       ],
-      "verification_note": "Re-read defaultOperations.ts:676-702,710-739. Confirmed no __DEV__ gate. Counter-argument considered: the wallet is responsible for only calling shouldMockFailPaymentRequest when appropriate — defensive-coding practice says the library should not honour a mock-failure request in production builds.",
-      "prior_audit_id": null
+      "verification_note": "Re-read defaultOperations.ts:676-702,710-739. Confirmed no __DEV__ gate. Counter-argument considered: the wallet is responsible for only calling shouldMockFailPaymentRequest when appropriate \u2014 defensive-coding practice says the library should not honour a mock-failure request in production builds.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "__DEV__ gate around shouldMockFailPaymentRequest is independent of the trust-boundary slice."
     },
     {
       "id": "F-009",
       "severity": "Medium",
       "confidence": 0.85,
-      "title": "sendDirectMessageToRelays has no publish timeout — Nostr payment-request delivery can hang indefinitely",
+      "title": "sendDirectMessageToRelays has no publish timeout \u2014 Nostr payment-request delivery can hang indefinitely",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/nostr/sendDirectMessage.ts",
       "line": 54,
       "symbol": "sendDirectMessageToRelays",
       "dimension": 7,
-      "description": "Line 54: `await Promise.any(pool.publish(uniqueRelays, wrap))`. Promise.any resolves on the first relay OK; it rejects only when ALL relays reject. nostr-tools SimplePool.publish returns per-relay promises that never settle when the socket stalls (no heartbeat) — so if every relay stalls, the await hangs until TCP eventually fails (or forever with keepalive). The caller chain is executePaymentRequest (defaultOperations.ts:679) → the payment-request confirm handler — the machine's sendLocked release is in a finally and does release eventually, but in the interim the UI shows 'Sending…' indefinitely.",
-      "why_it_matters": "Real-world relay availability is poor: relay.damus.io, nos.lol, and relay.primal.net all regularly stall on publish under load. A user sending a Nostr payment request with a small relay set encounters indefinite spinners. On rollback paths, this compounds because attemptRollback runs after deliveryErr — if the publish hangs, the err path never fires and rollback never happens.",
+      "description": "Line 54: `await Promise.any(pool.publish(uniqueRelays, wrap))`. Promise.any resolves on the first relay OK; it rejects only when ALL relays reject. nostr-tools SimplePool.publish returns per-relay promises that never settle when the socket stalls (no heartbeat) \u2014 so if every relay stalls, the await hangs until TCP eventually fails (or forever with keepalive). The caller chain is executePaymentRequest (defaultOperations.ts:679) \u2192 the payment-request confirm handler \u2014 the machine's sendLocked release is in a finally and does release eventually, but in the interim the UI shows 'Sending\u2026' indefinitely.",
+      "why_it_matters": "Real-world relay availability is poor: relay.damus.io, nos.lol, and relay.primal.net all regularly stall on publish under load. A user sending a Nostr payment request with a small relay set encounters indefinite spinners. On rollback paths, this compounds because attemptRollback runs after deliveryErr \u2014 if the publish hangs, the err path never fires and rollback never happens.",
       "fix": "Race Promise.any against an AbortSignal.timeout(15000) (Bun/modern-RN polyfill ok, else manual setTimeout + AbortController). On timeout, throw a NostrDeliveryTimeoutError; executePaymentRequest catches it and runs attemptRollback like any other deliveryErr. Optionally emit onPaymentProgress during the publish so the UI can show per-relay state.",
       "references": [
         "coco-payment-ux/src/nostr/sendDirectMessage.ts:52-59",
         "coco-payment-ux/src/operations/defaultOperations.ts:679-702"
       ],
-      "verification_note": "Re-read sendDirectMessage.ts:27-59. Confirmed no timeout. Counter-argument considered: SimplePool has internal socket timeouts — false for the publish path; SimplePool.publish returns whatever the underlying Relay.publish returns, which does not enforce a publish-side timeout.",
-      "prior_audit_id": null
+      "verification_note": "Re-read sendDirectMessage.ts:27-59. Confirmed no timeout. Counter-argument considered: SimplePool has internal socket timeouts \u2014 false for the publish path; SimplePool.publish returns whatever the underlying Relay.publish returns, which does not enforce a publish-side timeout.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Promise.any(pool.publish(...)) is now raced against a 15s default timeout via withTimeout."
     },
     {
       "id": "F-010",
       "severity": "Medium",
       "confidence": 0.75,
-      "title": "createMachine.ts parses the same historyEntry JSON string 2-3 times per confirm path — blocking work on JS thread",
+      "title": "createMachine.ts parses the same historyEntry JSON string 2-3 times per confirm path \u2014 blocking work on JS thread",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/machine/createMachine.ts",
       "line": 338,
       "symbol": "send (CONFIRM_MELT|CONFIRM_PAYMENT_REQUEST|confirmSend)",
       "dimension": 7,
-      "description": "Every confirm path JSON.parses result.historyEntry 2-3 times: CONFIRM_MELT at lines 338 (for linkTransaction), 352 (for onTransactionCreated + onMeltQuoteCreated); CONFIRM_PAYMENT_REQUEST at lines 429 and 443; NFC send at lines 641 and 655; confirmSend at line 716; createMintQuote at line 829. Each call repeats the same parse. historyEntry is coco-core's serialized history row — for a melt with blank outputs it can easily be 8-16 KB.",
-      "why_it_matters": "log-doctor --latest --threshold 200 this session shows 374 perf.js_thread_blocked events with blocked_ms values up to 3248ms. Attribution is dominated by coco rate-limiter and AnimatedBackgroundView rendering, not this package — so this is UNVERIFIED as a hot spot in the current trace. Still, parsing the same 10KB string three times instead of once is a needless JS-thread cost on the melt critical path. Per dimension 7, this is a measurable improvement if the history size grows.",
+      "description": "Every confirm path JSON.parses result.historyEntry 2-3 times: CONFIRM_MELT at lines 338 (for linkTransaction), 352 (for onTransactionCreated + onMeltQuoteCreated); CONFIRM_PAYMENT_REQUEST at lines 429 and 443; NFC send at lines 641 and 655; confirmSend at line 716; createMintQuote at line 829. Each call repeats the same parse. historyEntry is coco-core's serialized history row \u2014 for a melt with blank outputs it can easily be 8-16 KB.",
+      "why_it_matters": "log-doctor --latest --threshold 200 this session shows 374 perf.js_thread_blocked events with blocked_ms values up to 3248ms. Attribution is dominated by coco rate-limiter and AnimatedBackgroundView rendering, not this package \u2014 so this is UNVERIFIED as a hot spot in the current trace. Still, parsing the same 10KB string three times instead of once is a needless JS-thread cost on the melt critical path. Per dimension 7, this is a measurable improvement if the history size grows.",
       "fix": "Parse once per branch: `const parsed = tryParseHistoryEntry(result.historyEntry); if (parsed?.id) { linkTransaction(...); onTransactionCreated(...); onMeltQuoteCreated(...); }`. Extract a `tryParseHistoryEntry` helper that returns `{ parsed, raw }` so callers can pass the raw string when linkTransaction or notifications need it without re-stringifying.",
       "references": [
         "coco-payment-ux/src/machine/createMachine.ts:338,352,429,443,641,655,716,829",
         "log-doctor slow --latest --threshold 200 (Largest gap: 11670ms; 374 perf.js_thread_blocked events)"
       ],
-      "verification_note": "Re-read createMachine.ts — confirmed 8 JSON.parse sites. Log-doctor evidence UNVERIFIED for this specific cause (no perf.js_thread_blocked directly tied to a JSON.parse stack frame in the captured session). Counter-argument considered: V8/Hermes may inline cache the parse — unlikely to deduplicate three distinct parse calls on the same string across function boundaries.",
+      "verification_note": "Re-read createMachine.ts \u2014 confirmed 8 JSON.parse sites. Log-doctor evidence UNVERIFIED for this specific cause (no perf.js_thread_blocked directly tied to a JSON.parse stack frame in the captured session). Counter-argument considered: V8/Hermes may inline cache the parse \u2014 unlikely to deduplicate three distinct parse calls on the same string across function boundaries.",
       "prior_audit_id": null
     },
     {
       "id": "F-011",
       "severity": "Medium",
       "confidence": 0.8,
-      "title": "usePaymentFlowMachine writes to refs during render — React anti-pattern",
+      "title": "usePaymentFlowMachine writes to refs during render \u2014 React anti-pattern",
       "repo": "sovran-app",
       "path": "coco-payment-ux/coco-payment-ux/src/react/CocoPaymentUXProvider.tsx",
       "line": 458,
       "symbol": "usePaymentFlowMachine",
       "dimension": 3,
-      "description": "Lines 458-459: `ctx.walletContextRef.current = walletContext; ctx.unitRef.current = unit;` execute during the render of any consumer that calls usePaymentFlowMachine. The refs are shared across the whole app via context, so the write is a global side-effect. StrictMode double-invocation calls this hook twice on mount and any render — the observed 'final' value is the one from the most recent render, which is usually fine, but any observer that reads the ref synchronously mid-render (e.g. machine.getContext called from a downstream hook during the same commit) sees whatever the first render wrote.",
-      "why_it_matters": "React's docs explicitly say 'never mutate something during rendering'. The practical symptom is: screen A mounts (walletContextRef.current = A.walletContext); screen B mounts in the same commit (walletContextRef.current = B.walletContext); the machine's send() fires from A's handler but reads B's wallet context. Today the failure mode is latent — screens typically mount serially, not concurrently — but expo-router's concurrent features and transitions could expose it.",
-      "fix": "Move the writes into useLayoutEffect (or useEffect) with [walletContext, unit] deps. In the same hook, provide a stable callback getWalletContext() that reads the latest ref — the ref is still updated imperatively, just outside render. Add a lint rule (eslint-plugin-react) to ban writes to ref.current during render.",
+      "description": "Lines 458-459: `ctx.walletContextRef.current = walletContext; ctx.unitRef.current = unit;` execute during the render of any consumer that calls usePaymentFlowMachine. The refs are shared across the whole app via context, so the write is a global side-effect. StrictMode double-invocation calls this hook twice on mount and any render \u2014 the observed 'final' value is the one from the most recent render, which is usually fine, but any observer that reads the ref synchronously mid-render (e.g. machine.getContext called from a downstream hook during the same commit) sees whatever the first render wrote.",
+      "why_it_matters": "React's docs explicitly say 'never mutate something during rendering'. The practical symptom is: screen A mounts (walletContextRef.current = A.walletContext); screen B mounts in the same commit (walletContextRef.current = B.walletContext); the machine's send() fires from A's handler but reads B's wallet context. Today the failure mode is latent \u2014 screens typically mount serially, not concurrently \u2014 but expo-router's concurrent features and transitions could expose it.",
+      "fix": "Move the writes into useLayoutEffect (or useEffect) with [walletContext, unit] deps. In the same hook, provide a stable callback getWalletContext() that reads the latest ref \u2014 the ref is still updated imperatively, just outside render. Add a lint rule (eslint-plugin-react) to ban writes to ref.current during render.",
       "references": [
         "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx:451-471",
         "https://react.dev/reference/react/useRef#avoiding-recreating-the-ref-contents"
       ],
-      "verification_note": "Re-read CocoPaymentUXProvider.tsx:451-471. Confirmed ref writes are in the function body, not in an effect. Counter-argument considered: ref writes are cheap and don't trigger re-renders — correct, but the semantic issue is read-during-render, which is what breaks.",
+      "verification_note": "Re-read CocoPaymentUXProvider.tsx:451-471. Confirmed ref writes are in the function body, not in an effect. Counter-argument considered: ref writes are cheap and don't trigger re-renders \u2014 correct, but the semantic issue is read-during-render, which is what breaks.",
       "prior_audit_id": null
     },
     {
       "id": "F-012",
       "severity": "Medium",
       "confidence": 0.9,
-      "title": "Deep-link customSchemes not lowercased before set insertion — case-mismatched schemes silently fail",
+      "title": "Deep-link customSchemes not lowercased before set insertion \u2014 case-mismatched schemes silently fail",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx",
       "line": 384,
       "symbol": "deepLinks.customSchemes",
       "dimension": 5,
-      "description": "Line 381: `const scheme = match[1].toLowerCase();`. Line 384: `const accepted = new Set(['cashu', ...(deepLinks.customSchemes ?? [])]);`. The lookup is `accepted.has(scheme)` — scheme is always lowercase, but customSchemes are added verbatim. A wallet passing `customSchemes: ['Cashu', 'LN']` (very plausible from a typed config) never has deep links delivered because the set lookup compares 'cashu' (lc) vs 'Cashu' (pc).",
-      "why_it_matters": "Deep link delivery silently fails. The wallet's onError handler is not invoked (the link is just ignored at line 385). From the app side, it's indistinguishable from 'user didn't actually share via that scheme'. A user saved to clipboard as `ln:lnbc1...`, tapped a share-into-app action, nothing happens. Forward-compat concern mirrors prior-audit F-003 — scheme configuration is across external/OS surface.",
+      "description": "Line 381: `const scheme = match[1].toLowerCase();`. Line 384: `const accepted = new Set(['cashu', ...(deepLinks.customSchemes ?? [])]);`. The lookup is `accepted.has(scheme)` \u2014 scheme is always lowercase, but customSchemes are added verbatim. A wallet passing `customSchemes: ['Cashu', 'LN']` (very plausible from a typed config) never has deep links delivered because the set lookup compares 'cashu' (lc) vs 'Cashu' (pc).",
+      "why_it_matters": "Deep link delivery silently fails. The wallet's onError handler is not invoked (the link is just ignored at line 385). From the app side, it's indistinguishable from 'user didn't actually share via that scheme'. A user saved to clipboard as `ln:lnbc1...`, tapped a share-into-app action, nothing happens. Forward-compat concern mirrors prior-audit F-003 \u2014 scheme configuration is across external/OS surface.",
       "fix": "Lowercase customSchemes at set insertion: `const accepted = new Set(['cashu', ...(deepLinks.customSchemes ?? []).map((s) => s.toLowerCase())]);`. Similarly lowercase ignoredHosts. Add a runtime warn if any customScheme contains an uppercase char (defensive).",
       "references": [
         "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx:378-385"
       ],
-      "verification_note": "Re-read CocoPaymentUXProvider.tsx:378-388. Confirmed no lowercasing of customSchemes/ignoredHosts. Counter-argument considered: maybe the package docs tell wallets to lowercase — README does not mention this invariant.",
-      "prior_audit_id": null
+      "verification_note": "Re-read CocoPaymentUXProvider.tsx:378-388. Confirmed no lowercasing of customSchemes/ignoredHosts. Counter-argument considered: maybe the package docs tell wallets to lowercase \u2014 README does not mention this invariant.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "CocoPaymentUXProvider deeplink scheme normalisation is a separate seam (provider, not parse)."
     },
     {
       "id": "F-013",
       "severity": "Medium",
       "confidence": 0.95,
-      "title": "Duplicate nip17.ts — coco-payment-ux version is 193 lines, shared/lib/nostr/nip17.ts is 263 lines; app imports from shared, not the package",
+      "title": "Duplicate nip17.ts \u2014 coco-payment-ux version is 193 lines, shared/lib/nostr/nip17.ts is 263 lines; app imports from shared, not the package",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/nostr/nip17.ts",
       "line": 1,
       "symbol": "buildGiftWrappedDM|unwrapGiftWrap",
       "dimension": 3,
-      "description": "`diff -q coco-payment-ux/src/nostr/nip17.ts shared/lib/nostr/nip17.ts` reports files differ; wc -l = 193 vs 263. Grepping `from.*shared/lib/nostr/nip17` vs `from.*coco-payment-ux.*nostr` across sovran-app source — the app's UserMessagesScreen.tsx:46 and splitBill/useSplitBillOrchestrator.ts:37 both import from `@/shared/lib/nostr/nip17`. The coco-payment-ux version is exported publicly (index.ts:139-145) but is only consumed by this package's own sendDirectMessageToRelays helper — which is itself called only via the sendNostrDM config injection, and the Sovran app wires that to the shared/lib version (see features/send/providers/CocoPaymentUX.tsx injection).",
-      "why_it_matters": "Any NIP-17 / NIP-44 security fix applied to one file will not propagate to the other. The shared/lib version has 70 extra lines — plausibly sig verification, padding checks, error-code enums — which the coco-payment-ux version lacks. Finding F-004 (no seal sig verification) may already be fixed in the shared version and not the package version. Code drift between the two is guaranteed.",
+      "description": "`diff -q coco-payment-ux/src/nostr/nip17.ts shared/lib/nostr/nip17.ts` reports files differ; wc -l = 193 vs 263. Grepping `from.*shared/lib/nostr/nip17` vs `from.*coco-payment-ux.*nostr` across sovran-app source \u2014 the app's UserMessagesScreen.tsx:46 and splitBill/useSplitBillOrchestrator.ts:37 both import from `@/shared/lib/nostr/nip17`. The coco-payment-ux version is exported publicly (index.ts:139-145) but is only consumed by this package's own sendDirectMessageToRelays helper \u2014 which is itself called only via the sendNostrDM config injection, and the Sovran app wires that to the shared/lib version (see features/send/providers/CocoPaymentUX.tsx injection).",
+      "why_it_matters": "Any NIP-17 / NIP-44 security fix applied to one file will not propagate to the other. The shared/lib version has 70 extra lines \u2014 plausibly sig verification, padding checks, error-code enums \u2014 which the coco-payment-ux version lacks. Finding F-004 (no seal sig verification) may already be fixed in the shared version and not the package version. Code drift between the two is guaranteed.",
       "fix": "Decide canonically: either (a) make coco-payment-ux's nip17.ts the only implementation and have shared/lib re-export from it, or (b) delete coco-payment-ux/src/nostr/nip17.ts entirely and have this package take a sendNostrDM callback plus a separate recipientKey helper from the injecting wallet. Option (b) is the cleaner inversion of control: the package doesn't ship its own gift-wrap implementation at all.",
       "references": [
         "coco-payment-ux/src/nostr/nip17.ts",
@@ -284,33 +303,35 @@
         "features/user/screens/UserMessagesScreen.tsx:46",
         "features/splitBill/hooks/useSplitBillOrchestrator.ts:37"
       ],
-      "verification_note": "Diff confirmed files differ. Grep confirmed app imports only from shared/. Counter-argument considered: maybe some tests or the package's own sendDirectMessageToRelays use the package version — true for sendDirectMessageToRelays, but the Sovran app does not call sendDirectMessageToRelays; it wires its own sendNostrDM via CocoPaymentUX.tsx. So the package's nip17.ts is effectively dead from the app's perspective.",
+      "verification_note": "Diff confirmed files differ. Grep confirmed app imports only from shared/. Counter-argument considered: maybe some tests or the package's own sendDirectMessageToRelays use the package version \u2014 true for sendDirectMessageToRelays, but the Sovran app does not call sendDirectMessageToRelays; it wires its own sendNostrDM via CocoPaymentUX.tsx. So the package's nip17.ts is effectively dead from the app's perspective.",
       "prior_audit_id": null
     },
     {
       "id": "F-014",
       "severity": "Low",
       "confidence": 0.9,
-      "title": "lnurl.ts blind-casts data as LnUrlPayParams — NaN propagation through min/max comparisons",
+      "title": "lnurl.ts blind-casts data as LnUrlPayParams \u2014 NaN propagation through min/max comparisons",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/lnurl.ts",
       "line": 64,
       "symbol": "getLnurlPayParams",
       "dimension": 1,
-      "description": "Line 64: `return data as LnUrlPayParams`. If the server returns `{ minSendable: 'abc' }` or `{}`, the cast succeeds at compile time and the subsequent comparison `amountMsats < params.minSendable` evaluates `amountMsats < NaN` / `amountMsats < undefined`, both of which are false. The out-of-range check at line 80-85 therefore fails open — any amount is 'in range'. Invoice is then requested with that amount, and whatever the server returns goes to mgr.ops.melt.prepare.",
+      "description": "Line 64: `return data as LnUrlPayParams`. If the server returns `{ minSendable: 'abc' }` or `{}`, the cast succeeds at compile time and the subsequent comparison `amountMsats < params.minSendable` evaluates `amountMsats < NaN` / `amountMsats < undefined`, both of which are false. The out-of-range check at line 80-85 therefore fails open \u2014 any amount is 'in range'. Invoice is then requested with that amount, and whatever the server returns goes to mgr.ops.melt.prepare.",
       "why_it_matters": "Secondary to F-001 (which addresses the actual invoice amount). This adds a second failure mode: a server with non-numeric fields bypasses the min/maxSendable guard entirely. Combined with F-001, funds loss is compounded.",
       "fix": "Folded into F-003's zod schema for LnUrlPayParams. Independently, add `if (!Number.isFinite(params.minSendable) || !Number.isFinite(params.maxSendable)) throw ...` as a defense-in-depth assertion before the comparison.",
       "references": [
         "coco-payment-ux/src/lnurl.ts:64,80-85"
       ],
-      "verification_note": "Re-read lnurl.ts:58-85. Confirmed no Number.isFinite check. Counter-argument considered: most LN servers return well-typed fields — true for well-behaved servers; the audit cares about the hostile case.",
-      "prior_audit_id": null
+      "verification_note": "Re-read lnurl.ts:58-85. Confirmed no Number.isFinite check. Counter-argument considered: most LN servers return well-typed fields \u2014 true for well-behaved servers; the audit cares about the hostile case.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "LnurlPayParamsSchema (zod) refines minSendable/maxSendable as nonneg integers; NaN-comparison fail-open is closed."
     },
     {
       "id": "F-015",
       "severity": "Low",
       "confidence": 0.8,
-      "title": "createMachine.ts uses `{} as any` stepData initializer and many as-any casts — weakens the state machine's own type model",
+      "title": "createMachine.ts uses `{} as any` stepData initializer and many as-any casts \u2014 weakens the state machine's own type model",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/machine/createMachine.ts",
       "line": 176,
@@ -322,27 +343,27 @@
       "references": [
         "coco-payment-ux/src/machine/createMachine.ts:176,256-313,616-620,685-686,747,780-797,806-812,817,845-852"
       ],
-      "verification_note": "Re-read createMachine.ts — confirmed pervasive as-any casts. Counter-argument considered: discriminated-union narrowing is awkward in mutating assignments — the setStep helper above is the standard resolution and is a lightweight refactor.",
+      "verification_note": "Re-read createMachine.ts \u2014 confirmed pervasive as-any casts. Counter-argument considered: discriminated-union narrowing is awkward in mutating assignments \u2014 the setStep helper above is the standard resolution and is a lightweight refactor.",
       "prior_audit_id": null
     },
     {
       "id": "F-016",
       "severity": "Low",
       "confidence": 0.6,
-      "title": "defaultOperations.ts writes rawToken into synthetic receive history metadata — widens token-at-rest surface",
+      "title": "defaultOperations.ts writes rawToken into synthetic receive history metadata \u2014 widens token-at-rest surface",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/operations/defaultOperations.ts",
       "line": 539,
       "symbol": "executeReceive (fallback entry)",
       "dimension": 2,
-      "description": "Line 539 constructs a synthetic history entry with `metadata: { rawToken: tokenString }` when the DB-backed findReceiveHistoryEntry fails. The entry is handed to notifications.onTransactionCreated / entry-update subscribers. The coco-core DB schema already stores tokens in history rows (findReceiveHistoryEntry looks them up via `h.metadata?.rawToken === tokenString || h.token === tokenString` at line 811), so this does not add a new persistence surface — but it widens the serialization surface: any subscriber that pushes the entry into Zustand persist, Sentry breadcrumb, or analytics event now has the full bearer token in its payload.",
-      "why_it_matters": "Ecash tokens are bearer instruments. Once redeemed by the mint the token is spent and cannot be replayed, so the practical risk is narrow. But during the race window between receive and redeem — or if the mint has a replay bug — any leak (crash report, log export, backup) is funds. The widening is incremental (coco already stores this) but is nonetheless a leaky pattern.",
+      "description": "Line 539 constructs a synthetic history entry with `metadata: { rawToken: tokenString }` when the DB-backed findReceiveHistoryEntry fails. The entry is handed to notifications.onTransactionCreated / entry-update subscribers. The coco-core DB schema already stores tokens in history rows (findReceiveHistoryEntry looks them up via `h.metadata?.rawToken === tokenString || h.token === tokenString` at line 811), so this does not add a new persistence surface \u2014 but it widens the serialization surface: any subscriber that pushes the entry into Zustand persist, Sentry breadcrumb, or analytics event now has the full bearer token in its payload.",
+      "why_it_matters": "Ecash tokens are bearer instruments. Once redeemed by the mint the token is spent and cannot be replayed, so the practical risk is narrow. But during the race window between receive and redeem \u2014 or if the mint has a replay bug \u2014 any leak (crash report, log export, backup) is funds. The widening is incremental (coco already stores this) but is nonetheless a leaky pattern.",
       "fix": "In the synthetic fallback, store `metadata: { tokenSha256: hashHex(tokenString) }` instead of the full token. Correlation (the lookup at line 811) can use the hash. If the full token is genuinely needed for UI (e.g. re-display), leave it in the top-level `token` field (which the UI path already handles via getReceiveTokenString at line 365) and keep rawToken out of metadata. Audit every notification subscriber that handles transaction entries for accidental persistence of metadata.rawToken.",
       "references": [
         "coco-payment-ux/src/operations/defaultOperations.ts:532-542,801-814",
         "coco-payment-ux/src/screen-actions/createManager.ts:365-378"
       ],
-      "verification_note": "Re-read defaultOperations.ts:502-542 — confirmed synthetic entry's metadata contains rawToken. Counter-argument considered: this field mirrors coco-core's own schema and is not a novel surface — correct, which is why this is Low not Medium.",
+      "verification_note": "Re-read defaultOperations.ts:502-542 \u2014 confirmed synthetic entry's metadata contains rawToken. Counter-argument considered: this field mirrors coco-core's own schema and is not a novel surface \u2014 correct, which is why this is Low not Medium.",
       "prior_audit_id": null
     },
     {
@@ -355,27 +376,27 @@
       "line": 39,
       "symbol": "parseLnurlp|decodeUrlOrAddress",
       "dimension": 2,
-      "description": "parseLnurlp (line 39) and decodeUrlOrAddress (line 52) emit `http://` URLs when the domain ends in `.onion`. The subsequent fetch at line 62 uses the platform's default networking stack which has no Tor integration. On iOS/Android, `.onion` DNS resolution fails at the OS level, so the fetch fails fast — no immediate data leak. But on platforms with a user-configured Tor bridge or future Orbot integration, or on a dev build that uses a DNS override, the fetch happens over plain HTTP without Tor anonymization.",
+      "description": "parseLnurlp (line 39) and decodeUrlOrAddress (line 52) emit `http://` URLs when the domain ends in `.onion`. The subsequent fetch at line 62 uses the platform's default networking stack which has no Tor integration. On iOS/Android, `.onion` DNS resolution fails at the OS level, so the fetch fails fast \u2014 no immediate data leak. But on platforms with a user-configured Tor bridge or future Orbot integration, or on a dev build that uses a DNS override, the fetch happens over plain HTTP without Tor anonymization.",
       "why_it_matters": "The LUD-04 allowance of HTTP for .onion assumes Tor transport; falling through to the platform fetch defeats the anonymity property. Low because current platforms refuse the lookup; hazard surfaces the moment Tor plumbing is added.",
       "fix": "When the parsed domain ends in `.onion`, either (a) throw with ONION_NO_TRANSPORT until the wallet injects a Tor-aware fetch adapter, or (b) consume an optional `transport: 'tor' | 'clearnet'` config the wallet provides and route onion requests only through the tor adapter.",
       "references": [
         "coco-payment-ux/src/lnurl.ts:39,52",
         "https://github.com/lnurl/luds/blob/luds/04.md"
       ],
-      "verification_note": "Re-read lnurl.ts:34-56. Confirmed onion branch returns http://. Counter-argument considered: platform DNS will error out — true today, but fragile as a security property.",
+      "verification_note": "Re-read lnurl.ts:34-56. Confirmed onion branch returns http://. Counter-argument considered: platform DNS will error out \u2014 true today, but fragile as a security property.",
       "prior_audit_id": null
     },
     {
       "id": "F-018",
       "severity": "Nit",
       "confidence": 0.5,
-      "title": "Deep-link host is not length-capped — very long token URLs drive long scan-processing",
+      "title": "Deep-link host is not length-capped \u2014 very long token URLs drive long scan-processing",
       "repo": "sovran-app",
       "path": "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx",
       "line": 378,
       "symbol": "deepLinks.url",
       "dimension": 7,
-      "description": "The regex at line 378 extracts `host = match[2]` — any non-`/?#` chars, unbounded. A deep link `cashu://<64 KB base64 blob>` pushes a huge string into machine.scan('deeplink'). Not security-critical (the scan path is already sanitized), but worth capping to prevent a malicious app from inducing unbounded work via a prepared intent.",
+      "description": "The regex at line 378 extracts `host = match[2]` \u2014 any non-`/?#` chars, unbounded. A deep link `cashu://<64 KB base64 blob>` pushes a huge string into machine.scan('deeplink'). Not security-critical (the scan path is already sanitized), but worth capping to prevent a malicious app from inducing unbounded work via a prepared intent.",
       "why_it_matters": "Low probability (the OS usually caps intent-URL length around a few KB) but defence-in-depth.",
       "fix": "Add `if (host.length > 16384) { deepLinks.onError?.(new Error('DEEP_LINK_TOO_LONG')); return; }` before calling machine.scan.",
       "references": [
@@ -400,7 +421,7 @@
   "refactor_plan": [
     {
       "type": "consolidate",
-      "description": "Introduce a small logger abstraction at coco-payment-ux/src/logger.ts with getLogger(scope) returning {info,warn,error} — default implementation wraps console. Expose via CocoPaymentUXConfig.logger so the Sovran app can inject scoped loggers from shared/lib/logger (paymentLog, cashuLog, nostrLog). Replace every console.* call in the 131-hit surface (createMachine.ts, defaultOperations.ts, lnurl.ts, transitions.ts, resolveNext.ts, screen-actions/createManager.ts, walletContextTracker.ts, nostr/sendDirectMessage.ts, nip17.ts) with structured events: paymentLog.info('machine.transition', {from, to, event}) etc. Document redaction rules (never log token strings, meltTarget contents beyond length, or error messages that may carry proof secrets) inline in the logger.ts module.",
+      "description": "Introduce a small logger abstraction at coco-payment-ux/src/logger.ts with getLogger(scope) returning {info,warn,error} \u2014 default implementation wraps console. Expose via CocoPaymentUXConfig.logger so the Sovran app can inject scoped loggers from shared/lib/logger (paymentLog, cashuLog, nostrLog). Replace every console.* call in the 131-hit surface (createMachine.ts, defaultOperations.ts, lnurl.ts, transitions.ts, resolveNext.ts, screen-actions/createManager.ts, walletContextTracker.ts, nostr/sendDirectMessage.ts, nip17.ts) with structured events: paymentLog.info('machine.transition', {from, to, event}) etc. Document redaction rules (never log token strings, meltTarget contents beyond length, or error messages that may carry proof secrets) inline in the logger.ts module.",
       "files": [
         "coco-payment-ux/src/logger.ts",
         "coco-payment-ux/src/machine/createMachine.ts",
@@ -431,14 +452,14 @@
     },
     {
       "type": "consolidate",
-      "description": "Harden lnurl.ts end-to-end: (1) switch to URL-constructor based callback assembly with .searchParams.set('amount', ...); (2) enforce https:// or .onion on url.protocol after parsing; (3) wrap both fetches in an AbortController with a 15s default (configurable); (4) assert response content-length <= 8192 before .json(); (5) after decodeBolt11(data.pr), assert the decoded amount field equals amountMsats with zero tolerance — reject with LNURL_AMOUNT_MISMATCH otherwise; (6) verify h tag == sha256(metadata) per LUD-06. Closes F-001, F-005, F-007, F-014 as one integrated change.",
+      "description": "Harden lnurl.ts end-to-end: (1) switch to URL-constructor based callback assembly with .searchParams.set('amount', ...); (2) enforce https:// or .onion on url.protocol after parsing; (3) wrap both fetches in an AbortController with a 15s default (configurable); (4) assert response content-length <= 8192 before .json(); (5) after decodeBolt11(data.pr), assert the decoded amount field equals amountMsats with zero tolerance \u2014 reject with LNURL_AMOUNT_MISMATCH otherwise; (6) verify h tag == sha256(metadata) per LUD-06. Closes F-001, F-005, F-007, F-014 as one integrated change.",
       "files": [
         "coco-payment-ux/src/lnurl.ts"
       ]
     },
     {
       "type": "dead-code",
-      "description": "Resolve the duplicate nip17.ts. Recommended: delete coco-payment-ux/src/nostr/nip17.ts and coco-payment-ux/src/nostr/sendDirectMessage.ts entirely; the Sovran app already injects sendNostrDM via CocoPaymentUXConfig wired to shared/lib/nostr/nip17.ts. Remove the re-exports at coco-payment-ux/src/index.ts:139-145. In the new packaging (schemas + injectable logger), coco-payment-ux becomes strictly UX orchestration + parsing — protocol implementations live one layer up. Alternative (less invasive): keep the package's nip17 but make it the canonical implementation and have shared/lib/nostr/nip17.ts re-export from it, then add verifyEvent(seal) + getEventHash(rumor) checks in exactly one place.",
+      "description": "Resolve the duplicate nip17.ts. Recommended: delete coco-payment-ux/src/nostr/nip17.ts and coco-payment-ux/src/nostr/sendDirectMessage.ts entirely; the Sovran app already injects sendNostrDM via CocoPaymentUXConfig wired to shared/lib/nostr/nip17.ts. Remove the re-exports at coco-payment-ux/src/index.ts:139-145. In the new packaging (schemas + injectable logger), coco-payment-ux becomes strictly UX orchestration + parsing \u2014 protocol implementations live one layer up. Alternative (less invasive): keep the package's nip17 but make it the canonical implementation and have shared/lib/nostr/nip17.ts re-export from it, then add verifyEvent(seal) + getEventHash(rumor) checks in exactly one place.",
       "files": [
         "coco-payment-ux/src/nostr/nip17.ts",
         "coco-payment-ux/src/nostr/sendDirectMessage.ts",
@@ -481,8 +502,9 @@
   ],
   "open_questions": [
     "coco-payment-ux is declared 'UI and navigation agnostic' in package.json:3 yet imports React (optional peer) and the default fetch stack. Is the long-term plan to publish to npm or keep as a file: dep forever? Answer determines whether the logger abstraction (refactor item 1) should default to console or be required-by-contract.",
-    "Does coco-core's mgr.mint.addMint enforce https:// on new mint URLs, or is that enforcement expected at the caller layer? Verified by reading coco/ but only partial — confirming with a single paste into the trust flow would resolve F-006.",
-    "The shared/lib/nostr/nip17.ts (263 lines) vs coco-payment-ux/src/nostr/nip17.ts (193 lines) diff — is the 70-line delta the sig-verify logic that F-004 flags as missing, or is it orthogonal (e.g. padding/error-code handling)? Diff inspection deferred to the refactor PR.",
-    "Are coco-core history rows actually storing the full cashu token in the token field for receive entries, or is that a legacy / partial-persistence path? Answer shapes F-016 — if coco already persists tokens in every receive history row, the synthetic-entry widening is negligible; if coco only sometimes persists them, the synthetic path is materially worse."
-  ]
+    "Does coco-core's mgr.mint.addMint enforce https:// on new mint URLs, or is that enforcement expected at the caller layer? Verified by reading coco/ but only partial \u2014 confirming with a single paste into the trust flow would resolve F-006.",
+    "The shared/lib/nostr/nip17.ts (263 lines) vs coco-payment-ux/src/nostr/nip17.ts (193 lines) diff \u2014 is the 70-line delta the sig-verify logic that F-004 flags as missing, or is it orthogonal (e.g. padding/error-code handling)? Diff inspection deferred to the refactor PR.",
+    "Are coco-core history rows actually storing the full cashu token in the token field for receive entries, or is that a legacy / partial-persistence path? Answer shapes F-016 \u2014 if coco already persists tokens in every receive history row, the synthetic-entry widening is negligible; if coco only sometimes persists them, the synthetic path is materially worse."
+  ],
+  "completion_note": "F-001/F-005/F-006/F-007/F-009/F-014 shipped via lightning trust-boundary slice (commit f27ea8e8); F-002/F-003 partially or fully deferred to logger and nip17/history-JSON slices."
 }

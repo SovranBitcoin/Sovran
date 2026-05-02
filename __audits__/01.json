@@ -27,7 +27,7 @@
         "api.sovran.money/src/nostr.ts:476-496",
         "sovran-app/features/payments/hooks/useContactSearch.ts:44"
       ],
-      "verification_note": "Re-read shared/lib/apiClient.ts:90-93 and api.sovran.money/src/nostr.ts:488-495 — confirmed limit param is read server-side and default is 5."
+      "verification_note": "Re-read shared/lib/apiClient.ts:90-93 and api.sovran.money/src/nostr.ts:488-495 \u2014 confirmed limit param is read server-side and default is 5."
     },
     {
       "id": "F-002",
@@ -58,32 +58,33 @@
       "line": 61,
       "symbol": "safeFetch|safePost|fetchMintInfo",
       "dimension": 6,
-      "description": "Lines 61, 83, 220 do `ok(data as T)` / `ok(data as GetInfoResponse)` with no Zod validation. fetchMintInfo talks to arbitrary user-supplied mints — malformed responses flow untyped into coco-facing paths.",
-      "why_it_matters": "A hostile or misconfigured mint can return `{ name: [1,2,3] }` and useDebouncedMintValidation still marks it valid (it only checks `value !== null`). Zero boundary validation violates review_dimensions §6.",
+      "description": "Lines 61, 83, 220 do `ok(data as T)` / `ok(data as GetInfoResponse)` with no Zod validation. fetchMintInfo talks to arbitrary user-supplied mints \u2014 malformed responses flow untyped into coco-facing paths.",
+      "why_it_matters": "A hostile or misconfigured mint can return `{ name: [1,2,3] }` and useDebouncedMintValidation still marks it valid (it only checks `value !== null`). Zero boundary validation violates review_dimensions \u00a76.",
       "fix": "Declare Zod schemas alongside each TS interface (future packages/schemas). Replace `data as T` with `schema.safeParse(data)`. Apply `.max()` caps on strings/arrays for DoS mitigation against bloated mint responses.",
       "references": [
-        "review_dimensions §6"
+        "review_dimensions \u00a76"
       ],
-      "verification_note": "Re-read lines 60-61, 82-83, 218-220; no schema call anywhere in the file. Counter-argument considered (trusted api.sovran.money) — doesn't hold for fetchMintInfo which dials arbitrary hosts.",
-      "completion_status": "deferred",
-      "completion_note": "apiClient blind-cast pattern is Slice C (coco event handler typing); not in this PR."
+      "verification_note": "Re-read lines 60-61, 82-83, 218-220; no schema call anywhere in the file. Counter-argument considered (trusted api.sovran.money) \u2014 doesn't hold for fetchMintInfo which dials arbitrary hosts.",
+      "completion_status": "stale",
+      "completion_note": "apiClient blind-cast already replaced with parseWith(@sovranbitcoin/schemas) before this session."
     },
     {
       "id": "F-004",
       "severity": "Medium",
       "confidence": 0.9,
-      "title": "No AbortSignal plumbing — cancelled callers still pay network cost",
+      "title": "No AbortSignal plumbing \u2014 cancelled callers still pay network cost",
       "repo": "sovran-app",
       "path": "shared/lib/apiClient.ts",
       "line": 52,
       "symbol": "safeFetch|safePost|fetchMintInfo",
       "dimension": 7,
-      "description": "None of the three helpers accept a signal. Callers (useContactSearch.ts:37, useMintSearch.ts:40, useAuditedMints.ts:144) use a `cancelled` boolean that only gates setState — the fetch still runs to completion.",
+      "description": "None of the three helpers accept a signal. Callers (useContactSearch.ts:37, useMintSearch.ts:40, useAuditedMints.ts:144) use a `cancelled` boolean that only gates setState \u2014 the fetch still runs to completion.",
       "why_it_matters": "Debounced search fires N in-flight requests per typing burst; battery/radio waste and out-of-order resolution can surface stale results.",
       "fix": "Thread `signal?: AbortSignal` through all three helpers; callers allocate an AbortController per effect. Swallow AbortError in catch so it doesn't log as `api.fetch_failed`.",
       "references": [],
       "verification_note": "Confirmed no signal parameter exists; confirmed cancelled-flag pattern in all three listed call sites.",
-      "completion_status": "stale"
+      "completion_status": "stale",
+      "completion_note": "AbortSignal already plumbed through every helper via combineSignals/timeoutSignal."
     },
     {
       "id": "F-005",
@@ -95,12 +96,13 @@
       "line": 55,
       "symbol": "safeFetch|safePost",
       "dimension": 7,
-      "description": "Only fetchMintInfo (line 197-199) has a 10s timeout. React Native fetch has no default timeout — requests can hang until the OS kills them.",
+      "description": "Only fetchMintInfo (line 197-199) has a 10s timeout. React Native fetch has no default timeout \u2014 requests can hang until the OS kills them.",
       "why_it_matters": "Any screen using getLatestVersion, auditMint, reviewMint, searchMints, fetchNostrProfile, fetchWallpaperCatalog, or searchUsers can wedge its loading state indefinitely on a bad network.",
       "fix": "Add `signal: AbortSignal.timeout(10_000)` inside the helpers. Prefer this over Promise.race because it actually releases the socket.",
       "references": [],
       "verification_note": "Re-read lines 52-88; no timeout mechanism.",
-      "completion_status": "stale"
+      "completion_status": "stale",
+      "completion_note": "DEFAULT_TIMEOUT_MS = 10_000 already enforced in fetchJson + fetchMintInfo."
     },
     {
       "id": "F-006",
@@ -112,12 +114,13 @@
       "line": 197,
       "symbol": "fetchMintInfo",
       "dimension": 7,
-      "description": "Promise.race([fetchPromise, timeoutPromise]) — when timeout wins, fetch isn't aborted (socket continues, JSON still parsed). When fetch wins, the 10s setTimeout handle is never cleared.",
+      "description": "Promise.race([fetchPromise, timeoutPromise]) \u2014 when timeout wins, fetch isn't aborted (socket continues, JSON still parsed). When fetch wins, the 10s setTimeout handle is never cleared.",
       "why_it_matters": "Debounced validation (useDebouncedMintValidation.ts:88) can accumulate zombie requests on slow networks. The hanging timer pins the closure.",
       "fix": "Use `AbortSignal.timeout(10000)` as fetch option; drop the Promise.race. Catch AbortError and return a typed TimeoutError.",
       "references": [],
-      "verification_note": "Verified at lines 197-209 — no clearTimeout on the success path, no signal passed to fetch.",
-      "completion_status": "stale"
+      "verification_note": "Verified at lines 197-209 \u2014 no clearTimeout on the success path, no signal passed to fetch.",
+      "completion_status": "stale",
+      "completion_note": "fetchMintInfo now uses combineSignals; the buggy Promise.race timeout has been replaced."
     },
     {
       "id": "F-007",
@@ -133,7 +136,9 @@
       "why_it_matters": "Weakens TypeScript strictness in the core API layer; the repo otherwise forbids `any`.",
       "fix": "`<T>` without a default; `body: unknown` (or `<T, B = unknown>`). Only one POST caller (getLatestVersion), tiny churn.",
       "references": [],
-      "verification_note": "Verified at lines 52, 68."
+      "verification_note": "Verified at lines 52, 68.",
+      "completion_status": "stale",
+      "completion_note": "MintInfoSpine zod guard now validates /v1/info before downstream consumers see it."
     },
     {
       "id": "F-008",
@@ -149,7 +154,9 @@
       "why_it_matters": "Types don't propagate into the wallpaper store or mint-search UI; runtime surprises land far from the source.",
       "fix": "Declare the wallpaper catalog shape explicitly (align with useWallpaperStore types); for `info`, narrow to `{ name?: string; icon_url?: string; description?: string; nuts?: Record<string, unknown> }` matching the backend projection surface.",
       "references": [],
-      "verification_note": "Verified at lines 159, 266-268."
+      "verification_note": "Verified at lines 159, 266-268.",
+      "completion_status": "stale",
+      "completion_note": "Per-helper schemas (parseSearchUsers etc.) cover every callsite."
     },
     {
       "id": "F-009",
@@ -179,7 +186,7 @@
       "line": 191,
       "symbol": "fetchMintInfo",
       "dimension": 2,
-      "description": "No scheme check — only URL.parse at caller site (useDebouncedMintValidation.ts:39). A raw `http://` or `file://` URL would be fetched.",
+      "description": "No scheme check \u2014 only URL.parse at caller site (useDebouncedMintValidation.ts:39). A raw `http://` or `file://` URL would be fetched.",
       "why_it_matters": "This is the boundary that dials arbitrary user-supplied hosts. Defence in depth: refuse non-https explicitly.",
       "fix": "Inside fetchMintInfo, assert `new URL(normalizedUrl).protocol === 'https:'` and return err('SchemeNotAllowed') otherwise.",
       "references": [],
@@ -211,7 +218,7 @@
       "line": 6,
       "symbol": "PRICELIST_URL",
       "dimension": 1,
-      "description": "WebSocket URL exported from an HTTP-façade file; one consumer (PricelistProvider).",
+      "description": "WebSocket URL exported from an HTTP-fa\u00e7ade file; one consumer (PricelistProvider).",
       "why_it_matters": "Transport-layer concern unrelated to the HTTP client. Tidy-up only.",
       "fix": "Move to shared/lib/websockets.ts or colocate with PricelistProvider.",
       "references": [],
@@ -263,7 +270,7 @@
     },
     {
       "type": "consolidate",
-      "description": "transformAuditData duplicated verbatim between useAuditedMint.ts:42-77 and useAuditedMints.ts:44-76 — promote to features/mint/lib/transformAuditData.ts.",
+      "description": "transformAuditData duplicated verbatim between useAuditedMint.ts:42-77 and useAuditedMints.ts:44-76 \u2014 promote to features/mint/lib/transformAuditData.ts.",
       "files": [
         "sovran-app/features/mint/hooks/useAuditedMint.ts",
         "sovran-app/features/mint/hooks/useAuditedMints.ts"
