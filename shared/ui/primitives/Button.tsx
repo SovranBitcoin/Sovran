@@ -67,6 +67,7 @@ import {
 } from 'react-native';
 import { log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import { TouchableOpacity } from './TouchableOpacity';
@@ -536,26 +537,20 @@ export const Button = ({
     }
   };
 
-  // Synchronous re-entrancy guard. `disabled`/`loading` are React state and
-  // land after the second tap commits, so they can't catch a rapid
-  // double-tap whose handler awaits — every `Button` whose `onPress` does
-  // real async work (send, melt, swap, accept/decline, key derivation) was
-  // previously exposed. The ref locks before `await` runs and clears in
-  // `finally`, so synchronous handlers (toggles, navigation) are unaffected.
-  const inFlightRef = useRef<Promise<void> | null>(null);
+  // Synchronous re-entrancy guard via the shared `useSingleFlight` hook —
+  // `disabled`/`loading` are React state and land one render after the
+  // second tap commits, so they can't catch a rapid double-tap whose
+  // handler awaits. Routing through the same hook every other call site
+  // uses keeps the guard's behaviour in exactly one place.
+  const guardedOnPress = useSingleFlight(async (e: any) => {
+    const result = onPress(e);
+    if (result instanceof Promise) await result;
+  });
 
   const handlePress = async (e: any) => {
-    if (disabled || loading || inFlightRef.current) return;
+    if (disabled || loading) return;
     await triggerHaptic('end');
-    const result = onPress(e);
-    if (result instanceof Promise) {
-      inFlightRef.current = result;
-      try {
-        await result;
-      } finally {
-        if (inFlightRef.current === result) inFlightRef.current = null;
-      }
-    }
+    await guardedOnPress(e);
   };
 
   const handlePressIn = async (event: any) => {

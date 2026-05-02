@@ -190,21 +190,17 @@ export function ButtonHandler({
     void button.onPress?.(() => {});
   };
 
-  // Synchronous in-flight guard alongside the React `loading` flag. The
-  // boolean is for the spinner; the ref is what actually blocks a rapid
-  // second tap from re-entering before React commits `loading=true`.
-  const inFlightRef = useRef<Promise<void> | null>(null);
-
+  // The inner shared `Button` already routes its onPress through
+  // `useSingleFlight`, so a rapid second tap is dropped before reaching
+  // this wrapper. We only own the spinner-coordination boolean here.
   const handleButtonPress = async (button: ButtonHandlerActionButton) => {
-    if (button.disabled || inFlightRef.current) return;
+    if (button.disabled) return;
     const result = button.onPress?.(() => {});
     if (!(result instanceof Promise)) return;
-    inFlightRef.current = result;
     setLoading(true);
     try {
       await result;
     } finally {
-      if (inFlightRef.current === result) inFlightRef.current = null;
       setLoading(false);
     }
   };
