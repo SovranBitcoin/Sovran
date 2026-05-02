@@ -7,7 +7,7 @@ import {
 } from '@internet-privacy/marmot-ts';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { useWhitenoise } from '../WhitenoiseProvider';
+import { useWhitenoise } from '../WhitenoiseContext';
 import { WhitenoiseDmIndex } from '../storage/dmIndex';
 import { WhitenoiseGroupHistory } from '../storage/groupHistory';
 import { log } from '@/shared/lib/logger';
@@ -72,6 +72,11 @@ export function useWhitenoiseDM(
 
   const groupRef = useRef<WnGroup | null>(null);
   groupRef.current = group;
+
+  // Monotonic counter so two sends in the same millisecond don't collide on
+  // the optimistic id (upsertMessage dedupes by id and would silently drop
+  // the second message from the visible scrollback).
+  const optimisticCounterRef = useRef(0);
 
   const upsertMessage = useCallback((msg: WhitenoiseDmMessage) => {
     setMessages((prev) => {
@@ -231,7 +236,7 @@ export function useWhitenoiseDM(
         setIsCreatingGroup(false);
       }
 
-      const optimisticId = `pending-${Date.now()}`;
+      const optimisticId = `pending-${Date.now()}-${++optimisticCounterRef.current}`;
       const nowSec = Math.floor(Date.now() / 1000);
       upsertMessage({
         id: optimisticId,

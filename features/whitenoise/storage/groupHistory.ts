@@ -18,6 +18,13 @@ type StoredApplicationRumor = {
 export class WhitenoiseGroupHistory implements BaseGroupHistory {
   private readonly storageKey: string;
   private readonly backend: AsyncStorageKVBackend<StoredApplicationRumor[]>;
+  // saveMessage is fire-and-forget from marmot-ts (send path + ingest path).
+  // The read-await-modify-write sequence races when a peer's kind-445 event
+  // arrives during a local send: both calls read the same `existing`, both
+  // push, the second setItem silently overwrites the first. Serialize through
+  // a per-instance promise chain — chain failures swallowed so one rejection
+  // doesn't poison subsequent writes.
+  private writeChain: Promise<void> = Promise.resolve();
 
   constructor(accountIndex: number, groupId: Uint8Array) {
     this.backend = new AsyncStorageKVBackend<StoredApplicationRumor[]>(
@@ -27,9 +34,13 @@ export class WhitenoiseGroupHistory implements BaseGroupHistory {
   }
 
   async saveMessage(message: Uint8Array): Promise<void> {
-    const existing = (await this.backend.getItem(this.storageKey)) ?? [];
-    existing.push({ bytes: message, receivedAt: Date.now() });
-    await this.backend.setItem(this.storageKey, existing);
+    const next = this.writeChain.then(async () => {
+      const existing = (await this.backend.getItem(this.storageKey)) ?? [];
+      existing.push({ bytes: message, receivedAt: Date.now() });
+      await this.backend.setItem(this.storageKey, existing);
+    });
+    this.writeChain = next.catch(() => undefined);
+    return next;
   }
 
   async purgeMessages(): Promise<void> {

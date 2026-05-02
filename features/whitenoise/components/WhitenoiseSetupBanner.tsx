@@ -8,7 +8,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { PaymentStatusIcon } from '@/shared/lib/popup/PaymentStatusIcon';
 import { useWhitenoiseSetup } from '../hooks/useWhitenoiseSetup';
-import { useWhitenoise } from '../WhitenoiseProvider';
+import { useWhitenoise } from '../WhitenoiseContext';
 import { MarmotIcon } from './MarmotIcon';
 
 /**
@@ -70,13 +70,20 @@ export function WhitenoiseSetupBanner({ testID }: { testID?: string }) {
     if (phase === 'gone' && !isReady) setPhase('idle');
   }, [isReady, phase]);
 
+  // Hold the green check for a beat, then dismiss. Owned by an effect so
+  // unmount (profile switch, tab change) clears the timer instead of
+  // firing setPhase on a dead component.
+  useEffect(() => {
+    if (phase !== 'success') return;
+    const id = setTimeout(() => setPhase('gone'), SUCCESS_HOLD_MS);
+    return () => clearTimeout(id);
+  }, [phase]);
+
   const onPress = useCallback(async () => {
     if (phase !== 'idle') return;
     setPhase('running');
     await bootstrap();
     setPhase('success');
-    // Hold the green check for a beat, then dismiss.
-    setTimeout(() => setPhase('gone'), SUCCESS_HOLD_MS);
   }, [phase, bootstrap]);
 
   // Render gates — idle state hides when there's nothing to set up.
@@ -121,14 +128,7 @@ function BannerCard({
   isBootstrapping: boolean;
   testID?: string;
 }) {
-  const [
-    surface,
-    foreground,
-    foregroundSecondary,
-    accent,
-    iconBg,
-    separator,
-  ] = useThemeColor([
+  const [surface, foreground, foregroundSecondary, accent, iconBg, separator] = useThemeColor([
     'surface-secondary',
     'foreground',
     'surface-secondary-foreground',
@@ -146,11 +146,7 @@ function BannerCard({
   // the draw-circle + checkmark stroke. Same animation the restore screen
   // and the payment toast pop use, so the affordance reads identically.
   const statusIconState =
-    phase === 'running' || isBootstrapping
-      ? 'pending'
-      : phase === 'success'
-        ? 'confirmed'
-        : null;
+    phase === 'running' || isBootstrapping ? 'pending' : phase === 'success' ? 'confirmed' : null;
 
   return (
     <Pressable
@@ -176,8 +172,8 @@ function BannerCard({
             size={13}
             style={{ color: foregroundSecondary, lineHeight: 18, marginTop: 2 }}
             numberOfLines={3}>
-            Publish your encryption keys so contacts can start
-            MLS-encrypted DMs and group chats with you.
+            Publish your encryption keys so contacts can start MLS-encrypted DMs and group chats
+            with you.
           </Text>
         </View>
       </View>

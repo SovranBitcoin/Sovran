@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useWhitenoise } from '../WhitenoiseProvider';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useWhitenoise } from '../WhitenoiseContext';
 import { WhitenoiseDmIndex, type WhitenoiseDmIndexEntry } from '../storage/dmIndex';
 import { log } from '@/shared/lib/logger';
 
@@ -20,18 +20,18 @@ export function useWhitenoiseDmContacts(): {
 } {
   const { inviteReader, accountIndex } = useWhitenoise();
   const [entries, setEntries] = useState<WhitenoiseDmIndexEntry[]>([]);
+  const index = useMemo(() => new WhitenoiseDmIndex(accountIndex), [accountIndex]);
 
   const refresh = useCallback(async () => {
     try {
-      const idx = new WhitenoiseDmIndex(accountIndex);
-      const list = await idx.list();
+      const list = await index.list();
       setEntries(list);
     } catch (err) {
       wnLog.warn('whitenoise.dm_contacts.list_failed', {
         error: err instanceof Error ? err.message : String(err),
       });
     }
-  }, [accountIndex]);
+  }, [index]);
 
   useEffect(() => {
     void refresh();

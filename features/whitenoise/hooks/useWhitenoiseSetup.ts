@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { MarmotClient } from '@internet-privacy/marmot-ts';
-import { useWhitenoise } from '../WhitenoiseProvider';
+import { useWhitenoise } from '../WhitenoiseContext';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { log } from '@/shared/lib/logger';
 

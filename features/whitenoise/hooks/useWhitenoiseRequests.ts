@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import type { UnreadInvite } from '@internet-privacy/marmot-ts';
-import { useWhitenoise } from '../WhitenoiseProvider';
+import { useWhitenoise } from '../WhitenoiseContext';
 import { WhitenoiseDmIndex } from '../storage/dmIndex';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { log } from '@/shared/lib/logger';

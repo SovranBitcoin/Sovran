@@ -9,8 +9,6 @@ import { createWhitenoiseInviteStore } from './storage/inviteStore';
 import { useWhitenoiseInbox } from './hooks/useWhitenoiseInbox';
 import { WhitenoiseContext, type WhitenoiseContextValue } from './WhitenoiseContext';
 
-export { useWhitenoise } from './WhitenoiseContext';
-
 const wnLog = log.child({ module: 'whitenoise' });
 
 export function WhitenoiseProvider({
