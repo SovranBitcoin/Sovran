@@ -275,6 +275,24 @@ describe('parsePaymentInput — mint URLs', () => {
     const result = parse(INPUTS.mintUrlWithTrailingSlash);
     expect(result.type).toBe('mintUrl');
   });
+
+  it('rejects a plain http:// mint URL', () => {
+    // Cashu mint traffic carries blinded messages, signatures, and melt
+    // quotes; on plain HTTP a MitM can swap-race or return malformed Bs.
+    // The parser must not classify cleartext mints as `mintUrl` — it
+    // surfaces MINT_INSECURE_HTTP so the wallet's trust flow can refuse.
+    const result = parse('http://mint1.example.com');
+    expect(result.type).toBe('unknown');
+    expect(result.errors).toContain('MINT_INSECURE_HTTP');
+  });
+
+  it('accepts http:// for a .onion mint', () => {
+    // Tor hidden services do not use TLS; their transport is already
+    // anonymised and authenticated by the .onion address.
+    const result = parse('http://abcdefghijklmnop.onion/mint');
+    expect(result.type).toBe('mintUrl');
+    expect(result.errors).not.toContain('MINT_INSECURE_HTTP');
+  });
 });
 
 // ---------------------------------------------------------------------------

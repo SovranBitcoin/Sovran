@@ -142,6 +142,8 @@ export {
   parseLnurlp,
   decodeUrlOrAddress,
   isLightningInvoiceBolt11,
+  LnurlError,
+  type LnurlErrorCode,
 } from './lnurl';
 
 // Nostr (NIP-17 gift wrap + relay publishing)

@@ -160,6 +160,13 @@ export interface DefaultOperationsConfig {
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
   /** When true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
+  /**
+   * Per-request timeout for external lightning calls (LNURL pay-params,
+   * LNURL invoice callback). Plumbed into `requestInvoiceFromLnurl` so a
+   * stalled lightning-address provider cannot wedge the melt critical
+   * path indefinitely. Defaults to the helper's own default (15s).
+   */
+  lightningTimeoutMs?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -575,7 +582,9 @@ export function createDefaultOperations(
 
       const bolt11 = isLightningInvoiceBolt11(meltTarget)
         ? meltTarget
-        : await requestInvoiceFromLnurl(meltTarget, amount);
+        : await requestInvoiceFromLnurl(meltTarget, amount, {
+            timeoutMs: config.lightningTimeoutMs,
+          });
 
       const operation = await mgr.ops.melt.prepare({
         mintUrl,

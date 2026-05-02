@@ -60,6 +60,13 @@ export interface CocoPaymentUXConfig {
 
   /** Dev: when true, executePaymentRequest simulates a delivery failure to test rollback. */
   shouldMockFailPaymentRequest?: () => boolean;
+
+  /**
+   * Per-request timeout for external lightning calls (LNURL pay-params,
+   * LNURL invoice callback). Defaults to 15 seconds. Tighter values give
+   * the melt flow a faster fail-stop on hostile or stalled providers.
+   */
+  lightningTimeoutMs?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +109,7 @@ export function createCocoPaymentUX(config: CocoPaymentUXConfig): CocoPaymentUXI
     enrichMintReviewInfo,
     fetchMintCatalog: config.fetchMintCatalog,
     shouldMockFailPaymentRequest: config.shouldMockFailPaymentRequest,
+    lightningTimeoutMs: config.lightningTimeoutMs,
   });
 
   return {
