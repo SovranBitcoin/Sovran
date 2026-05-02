@@ -80,15 +80,14 @@ function toError(e: FetchOrParseError): Error {
 
 /**
  * `true` when the rejection came from an `AbortController.abort()` — caller
- * cancellation or the per-request timeout. We surface these as ordinary
- * errors but skip the `api.fetch_failed` log to keep telemetry clean during
- * normal user flows (debounced search bursts, screen unmounts).
+ * cancellation or the per-request timeout. Spec impls raise `DOMException`
+ * here, but Hermes doesn't ship `DOMException`, so duck-type on `.name`
+ * instead of using `instanceof`.
  */
 function isAbortError(e: unknown): boolean {
-  return (
-    (e instanceof DOMException && e.name === 'AbortError') ||
-    (e instanceof Error && (e.name === 'AbortError' || e.name === 'TimeoutError'))
-  );
+  if (typeof e !== 'object' || e === null) return false;
+  const name = (e as { name?: unknown }).name;
+  return name === 'AbortError' || name === 'TimeoutError';
 }
 
 /**
@@ -114,14 +113,20 @@ function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {
 /**
  * Build a signal that fires after `ms` ms. Falls back to a manual timer when
  * `AbortSignal.timeout` isn't on the runtime — kept to one call site so the
- * compatibility check is centralized.
+ * compatibility check is centralized. The fallback uses a plain `Error`
+ * tagged with `name = 'TimeoutError'` because Hermes lacks `DOMException`;
+ * `isAbortError` duck-types on the name either way.
  */
 function timeoutSignal(ms: number): AbortSignal {
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
     return AbortSignal.timeout(ms);
   }
   const c = new AbortController();
-  setTimeout(() => c.abort(new DOMException('Timed out', 'TimeoutError')), ms);
+  setTimeout(() => {
+    const err = new Error('Timed out');
+    err.name = 'TimeoutError';
+    c.abort(err);
+  }, ms);
   return c.signal;
 }
 
