@@ -10,23 +10,17 @@ import Animated, {
 } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 
-import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { supportsBlur } from '@/shared/lib/version';
 import { guardedRouter } from '@/shared/hooks/useGuardedRouter';
 import { useSwapStatusStore } from '@/shared/stores/runtime/swapStatusStore';
 import type { SwapLeg } from '@/shared/stores/runtime/swapStatusStore';
 import { PaymentStatusIcon } from './PaymentStatusIcon';
 import { useToastSurface } from './useToastSurface';
+import { DANGER_DARK_BG, SUCCESS_DARK_BG, TINT_ALPHA, ToastSlab } from './ToastSlab';
 
 const ICON_SIZE = 32;
 const TITLE_FONT_SIZE = 15;
 const SUB_FONT_SIZE = 13;
-const BLUR_INTENSITY = 60;
-const TINT_ALPHA = 0.3;
-// Same constants `PaymentStatusToast` uses so the success/failure tint reads
-// identical across the two toast surfaces.
-const SUCCESS_DARK_BG = '#089A2C';
-const DANGER_DARK_BG = '#9A082E';
 
 function legSummary(legs: SwapLeg[]): { doneCount: number; total: number } {
   let doneCount = 0;
@@ -121,49 +115,34 @@ export function SwapStatusToast({ hide, ...toastProps }: SwapStatusToastProps) {
     : `${isDone ? total : summary.doneCount} of ${total} swaps`;
 
   return (
-    <Toast
-      placement="top"
-      className="overflow-hidden bg-transparent p-0"
-      isAnimatedStyleActive={false}
-      {...(toastProps as any)}>
-      {blurSupported && (
-        <BlurView intensity={BLUR_INTENSITY} tint="dark" style={StyleSheet.absoluteFill} />
-      )}
-      <Animated.View style={[StyleSheet.absoluteFill, backgroundStyle]} />
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 16,
-          paddingVertical: 14,
-          gap: 12,
-        }}>
-        <PaymentStatusIcon size={ICON_SIZE} status={status} baseColor={surfaceFg} />
+    <ToastSlab
+      toastProps={toastProps}
+      tint={<Animated.View style={[StyleSheet.absoluteFill, backgroundStyle]} />}>
+      <PaymentStatusIcon size={ICON_SIZE} status={status} baseColor={surfaceFg} />
 
-        <View style={{ flex: 1, gap: 2 }}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <RNText
+          style={{ fontSize: TITLE_FONT_SIZE, fontWeight: '600', color: surfaceFg }}
+          numberOfLines={1}>
+          {title}
+        </RNText>
+        {subtitle ? (
           <RNText
-            style={{ fontSize: TITLE_FONT_SIZE, fontWeight: '600', color: surfaceFg }}
+            style={{ fontSize: SUB_FONT_SIZE, color: opacity(surfaceFg, 0.85) }}
             numberOfLines={1}>
-            {title}
+            {subtitle}
           </RNText>
-          {subtitle ? (
-            <RNText
-              style={{ fontSize: SUB_FONT_SIZE, color: opacity(surfaceFg, 0.85) }}
-              numberOfLines={1}>
-              {subtitle}
-            </RNText>
-          ) : null}
-        </View>
-
-        {/* "View" action — mirrors PaymentStatusToast.tsx:322-326 — visible
-            from the moment the toast opens so the user can always tap into
-            the SwapTransactionScreen, mid-flight or after the fact. */}
-        {groupId ? (
-          <Toast.Action style={{ backgroundColor: surfaceFg }} onPress={onPressView}>
-            <Button.Label style={{ color: surfaceBg }}>View</Button.Label>
-          </Toast.Action>
         ) : null}
       </View>
-    </Toast>
+
+      {/* "View" action — visible from the moment the toast opens so the
+          user can always tap into the SwapTransactionScreen, mid-flight or
+          after the fact. Mirrors the same pattern in PaymentStatusToast. */}
+      {groupId ? (
+        <Toast.Action style={{ backgroundColor: surfaceFg }} onPress={onPressView}>
+          <Button.Label style={{ color: surfaceBg }}>View</Button.Label>
+        </Toast.Action>
+      ) : null}
+    </ToastSlab>
   );
 }

@@ -11,7 +11,6 @@ import Animated, {
 import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import { log } from '../logger';
-import { BlurView } from '@/shared/ui/primitives/BlurView';
 import { supportsBlur } from '@/shared/lib/version';
 import { formatAmount } from '@/shared/lib/currency';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
@@ -22,20 +21,12 @@ import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { PaymentStatusIcon } from './PaymentStatusIcon';
 import { fmt, isAmountSegment, type PopupTextSegment } from './format';
 import { useToastSurface } from './useToastSurface';
+import { DANGER_DARK_BG, SUCCESS_DARK_BG, TINT_ALPHA, ToastSlab } from './ToastSlab';
 
 type PaymentStatusToastVariant = 'receive' | 'send' | 'melt' | 'receive-ecash' | 'payment-request';
 
 const ICON_SIZE = 32;
 const SEGMENT_FONT_SIZE = 13;
-const BLUR_INTENSITY = 60;
-const TINT_ALPHA = 0.3;
-// Mirrors the timeline checkpoint dot pattern (AnimatedCheckpointDot): the
-// "dark" variant is the surface, the bright theme `success`/`danger` token
-// is the foreground (icon/text). Hardcoded since the toast is
-// theme-invariant — these values match `--success-foreground` /
-// `--danger-foreground` in the light-theme palette (themeEngine.ts).
-const SUCCESS_DARK_BG = '#089A2C';
-const DANGER_DARK_BG = '#9A082E';
 
 /**
  * Inline amount renderer. The shared `AmountFormatter` is overkill for the
@@ -43,15 +34,7 @@ const DANGER_DARK_BG = '#9A082E';
  * static foreground color (text colors don't animate; only the bg/icon
  * react to confirmation/failure).
  */
-function ToastAmountText({
-  amount,
-  unit,
-  color,
-}: {
-  amount: number;
-  unit: string;
-  color: string;
-}) {
+function ToastAmountText({ amount, unit, color }: { amount: number; unit: string; color: string }) {
   const displayBtc = useSettingsStore((s) => s.getDisplayBtc());
   const formatted = formatAmount({ amount, unit }, { useUserPreference: true });
   // Mirrors `decorate` in AmountFormatter.tsx — only sat amounts get a
@@ -261,75 +244,58 @@ export function PaymentStatusToast({
   });
 
   return (
-    <Toast
-      placement="top"
-      className="overflow-hidden p-0 bg-transparent"
-      isAnimatedStyleActive={false}
-      {...(toastProps as any)}>
-      {blurSupported && (
-        <BlurView intensity={BLUR_INTENSITY} tint="dark" style={StyleSheet.absoluteFill} />
-      )}
-      <Animated.View style={[StyleSheet.absoluteFill, backgroundStyle]} />
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 16,
-          paddingVertical: 14,
-          gap: 12,
-        }}>
-        {/* Icon — base color tracks the toast surface foreground so the
-            initial pre-confirmation render reads on the dark slab. */}
-        <PaymentStatusIcon size={ICON_SIZE} status={status} baseColor={surfaceFg} />
+    <ToastSlab
+      toastProps={toastProps}
+      tint={<Animated.View style={[StyleSheet.absoluteFill, backgroundStyle]} />}>
+      {/* Icon — base color tracks the toast surface foreground so the
+          initial pre-confirmation render reads on the dark slab. */}
+      <PaymentStatusIcon size={ICON_SIZE} status={status} baseColor={surfaceFg} />
 
-        {/* Title + Subtitle — colors stay constant; only bg + icon react
-            to confirmation/failure. */}
-        <View style={{ flex: 1, gap: 2 }}>
-          <RNText
-            style={{ fontSize: 15, fontWeight: '600', color: surfaceFg }}
-            numberOfLines={1}>
-            {config.message}
+      {/* Title + Subtitle — colors stay constant; only bg + icon react
+          to confirmation/failure. */}
+      <View style={{ flex: 1, gap: 2 }}>
+        <RNText style={{ fontSize: 15, fontWeight: '600', color: surfaceFg }} numberOfLines={1}>
+          {config.message}
+        </RNText>
+        {typeof submessage === 'string' ? (
+          <RNText style={{ fontSize: 13, color: surfaceFg }} numberOfLines={1}>
+            {submessage}
           </RNText>
-          {typeof submessage === 'string' ? (
-            <RNText style={{ fontSize: 13, color: surfaceFg }} numberOfLines={1}>
-              {submessage}
-            </RNText>
-          ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {(submessage as PopupTextSegment[]).map((segment, i) =>
-                isAmountSegment(segment) ? (
-                  <ToastAmountText
-                    key={i}
-                    amount={segment.amount}
-                    unit={segment.unit}
-                    color={surfaceFg}
-                  />
-                ) : (
-                  <RNText
-                    key={i}
-                    style={{
-                      fontFamily: 'MonaSans-Black',
-                      fontSize: SEGMENT_FONT_SIZE,
-                      color: surfaceFg,
-                    }}>
-                    {segment as string}
-                  </RNText>
-                )
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* Action button — shown only when confirmed (not when failed).
-            Uses the neutral toast surface inverse (light pill, dark label)
-            so it stays theme-tinted instead of taking on the success
-            green wash. */}
-        {isConfirmed && !isFailed && (
-          <Toast.Action style={{ backgroundColor: surfaceFg }} onPress={onPressViewTransaction}>
-            <Button.Label style={{ color: surfaceBg }}>View</Button.Label>
-          </Toast.Action>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {(submessage as PopupTextSegment[]).map((segment, i) =>
+              isAmountSegment(segment) ? (
+                <ToastAmountText
+                  key={i}
+                  amount={segment.amount}
+                  unit={segment.unit}
+                  color={surfaceFg}
+                />
+              ) : (
+                <RNText
+                  key={i}
+                  style={{
+                    fontFamily: 'MonaSans-Black',
+                    fontSize: SEGMENT_FONT_SIZE,
+                    color: surfaceFg,
+                  }}>
+                  {segment as string}
+                </RNText>
+              )
+            )}
+          </View>
         )}
       </View>
-    </Toast>
+
+      {/* Action button — shown only when confirmed (not when failed).
+          Uses the neutral toast surface inverse (light pill, dark label)
+          so it stays theme-tinted instead of taking on the success
+          green wash. */}
+      {isConfirmed && !isFailed && (
+        <Toast.Action style={{ backgroundColor: surfaceFg }} onPress={onPressViewTransaction}>
+          <Button.Label style={{ color: surfaceBg }}>View</Button.Label>
+        </Toast.Action>
+      )}
+    </ToastSlab>
   );
 }
