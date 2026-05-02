@@ -46,7 +46,7 @@ function PeerRow({ peer }: PeerRowProps) {
         peerID: peer.peerID,
         nickname: displayName,
       },
-    } as any);
+    });
   };
 
   return (
