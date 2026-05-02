@@ -39,7 +39,7 @@ import {
 
 import { buildReceiveHistoryEntry } from '@/shared/lib/cashu/utils';
 import { decode, isEncoded } from '@/shared/lib/third-party/emoji';
-import { writeTokenToNFC } from '@/shared/lib/nfc';
+import { writeTokenToNFC, NfcError } from '@/shared/lib/nfc';
 import {
   allOptionsDisabledPopup,
   balanceTooLowPopup,
@@ -1033,37 +1033,41 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
           return;
         }
 
-        const writeResult = await writeTokenToNFC(getEncodedTokenV4(entry.token));
-        if (writeResult.success) {
+        try {
+          await writeTokenToNFC(getEncodedTokenV4(entry.token));
           paymentLog.info('payment.screen_action.nfc.success');
           nfcEcashSharedPopup();
           return;
-        }
+        } catch (rawError) {
+          const code = rawError instanceof NfcError ? rawError.code : 'WRITE_FAILED';
+          const message =
+            rawError instanceof Error ? rawError.message : 'Unable to write token via NFC.';
+          const lostConnection = code === 'TAG_LOST' || code === 'TRANSCEIVE_FAILED';
 
-        const lostConnection =
-          writeResult.errorCode === 'TAG_LOST' || writeResult.errorCode === 'TRANSCEIVE_FAILED';
-
-        if (lostConnection && entry.operationId) {
-          paymentLog.warn('payment.screen_action.nfc.connection_lost', {
-            operationId: entry.operationId,
-          });
-          try {
-            await manager.ops.send.reclaim(entry.operationId);
-            nfcConnectionLostPopup();
-            return;
-          } catch (rollbackError) {
-            paymentLog.error('payment.screen_action.nfc.rollback_failed', { error: rollbackError });
-            nfcSendFailedPopup({
-              rollbackFailed: true,
-              text: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          if (lostConnection && entry.operationId) {
+            paymentLog.warn('payment.screen_action.nfc.connection_lost', {
+              operationId: entry.operationId,
             });
-            return;
+            try {
+              await manager.ops.send.reclaim(entry.operationId);
+              nfcConnectionLostPopup();
+              return;
+            } catch (rollbackError) {
+              paymentLog.error('payment.screen_action.nfc.rollback_failed', {
+                error:
+                  rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+              });
+              nfcSendFailedPopup({
+                rollbackFailed: true,
+                text:
+                  rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+              });
+              return;
+            }
           }
-        }
 
-        nfcSendFailedPopup({
-          text: writeResult.errorMessage || 'Unable to write token via NFC.',
-        });
+          nfcSendFailedPopup({ text: message });
+        }
       },
 
       /**

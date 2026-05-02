@@ -1,40 +1,37 @@
 /**
  * Write a Cashu token to an NFC tag (e.g. for P2P sharing).
- * Standalone from the POS payment flow.
+ *
+ * Standalone from the POS payment flow: this owns the IsoDep session
+ * lifecycle and AID/NDEF selection itself, then delegates the wire-level
+ * write to the canonical `writeNdefTextRecord` helper that the
+ * coco-payment-ux adapter also uses.
+ *
+ * Throws `NfcError` on any failure; callers should match on `error.code`
+ * (e.g. `'TAG_LOST'`, `'TRANSCEIVE_FAILED'`).
  */
 
 import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 import { NfcError } from './errors';
-import { SELECT_AID, SELECT_NDEF, updateBinary, MAX_CHUNK_SIZE } from './constants';
+import { SELECT_AID, SELECT_NDEF } from './constants';
 import { sendApdu, getStatusMessage } from './apdu';
-import { buildTextNdef } from './ndef';
 import { isNfcSupported, isNfcEnabled } from './status';
+import { writeNdefTextRecord } from './write';
 import { nfcLog } from '../logger';
 
-export interface NfcTokenWriteResult {
-  success: boolean;
-  errorCode?: string;
-  errorMessage?: string;
-}
-
-export async function writeTokenToNFC(token: string): Promise<NfcTokenWriteResult> {
+export async function writeTokenToNFC(token: string): Promise<void> {
   nfcLog.info('nfc.write.start');
 
   if (!(await isNfcSupported())) {
-    return {
-      success: false,
-      errorCode: 'NOT_SUPPORTED',
-      errorMessage: 'NFC is not supported on this device',
-    };
+    throw new NfcError('NFC is not supported on this device', 'NOT_SUPPORTED');
   }
   if (!(await isNfcEnabled())) {
-    return { success: false, errorCode: 'NOT_ENABLED', errorMessage: 'NFC is disabled' };
+    throw new NfcError('NFC is disabled', 'NOT_ENABLED');
   }
 
   try {
     // Cancel any stale NFC session from a previous attempt that wasn't
-    // cleaned up (e.g. the sheet dismiss animation blocked the native
-    // NFC modal from appearing and the user never got to cancel it).
+    // cleaned up (e.g. the sheet dismiss animation blocked the native NFC
+    // modal from appearing and the user never got to cancel it).
     try {
       await NfcManager.cancelTechnologyRequest();
     } catch {
@@ -58,52 +55,20 @@ export async function writeTokenToNFC(token: string): Promise<NfcTokenWriteResul
       );
     }
 
-    const ndef = buildTextNdef(token);
-    nfcLog.debug('nfc.write.ndef_message', {
-      nlen: (ndef[0] << 8) | ndef[1],
-      totalBytes: ndef.length,
-    });
-
-    r = await sendApdu(updateBinary(0, [ndef[0], ndef[1]]), 'WRITE NLEN');
-    if (!r.ok) {
-      throw new NfcError(
-        `Failed writing NLEN (${getStatusMessage(r.sw)})`,
-        'WRITE_NLEN_FAILED',
-        r.sw
-      );
-    }
-
-    let offset = 2;
-    const body = ndef.slice(2);
-    const totalChunks = Math.ceil(body.length / MAX_CHUNK_SIZE);
-    for (let chunkNum = 0; offset - 2 < body.length; chunkNum++) {
-      const chunk = body.slice(offset - 2, offset - 2 + MAX_CHUNK_SIZE);
-      nfcLog.debug('nfc.write.chunk', { chunk: chunkNum + 1, totalChunks, bytes: chunk.length });
-      r = await sendApdu(updateBinary(offset, chunk), `WRITE chunk ${chunkNum + 1}`);
-      if (!r.ok) {
-        throw new NfcError(
-          `Failed writing chunk (${getStatusMessage(r.sw)})`,
-          'WRITE_CHUNK_FAILED',
-          r.sw
-        );
-      }
-      offset += chunk.length;
-    }
-
+    await writeNdefTextRecord(token);
     nfcLog.info('nfc.write.success');
-    return { success: true };
   } catch (error) {
-    nfcLog.error('nfc.write.failed', { error });
-    if (error instanceof NfcError) {
-      return { success: false, errorCode: error.code, errorMessage: error.message };
-    }
     const message = error instanceof Error ? error.message : String(error);
-    return { success: false, errorCode: 'WRITE_FAILED', errorMessage: message };
+    nfcLog.error('nfc.write.failed', { error: message });
+    if (error instanceof NfcError) throw error;
+    throw new NfcError(message, 'WRITE_FAILED');
   } finally {
     try {
       await NfcManager.cancelTechnologyRequest();
     } catch (e) {
-      nfcLog.warn('nfc.write.release_failed', { error: e });
+      nfcLog.warn('nfc.write.release_failed', {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 }

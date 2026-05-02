@@ -1,9 +1,9 @@
 /**
  * NfcIOAdapter — platform implementation for coco-payment-ux NFC flows.
  *
- * Wraps existing APDU/NDEF primitives into the adapter interface that
- * the payment machine consumes. Low-level transport stays in this module;
- * policy and orchestration live in coco-payment-ux.
+ * Wraps APDU/NDEF primitives into the adapter interface that the payment
+ * machine consumes. Low-level transport stays in this module; policy and
+ * orchestration live in coco-payment-ux.
  */
 
 import NfcManager, { NfcTech } from 'react-native-nfc-manager';
@@ -11,21 +11,19 @@ import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 import type { NfcIOAdapter } from 'coco-payment-ux';
 
 import { NfcError } from './errors';
-import { SELECT_AID, SELECT_NDEF, readBinary, updateBinary, MAX_CHUNK_SIZE } from './constants';
+import { SELECT_AID, SELECT_NDEF, readBinary, MAX_CHUNK_SIZE } from './constants';
 import { sendApdu, getStatusMessage } from './apdu';
-import { buildTextNdef, decodeTextRecord } from './ndef';
+import { decodeTextRecord } from './ndef';
 import { isNfcSupported, isNfcEnabled } from './status';
+import { writeNdefTextRecord } from './write';
 import { nfcLog } from '../logger';
 
 export function createNfcAdapter(): NfcIOAdapter {
-  let sessionActive = false;
-
   return {
     async readPaymentRequest(): Promise<string> {
       nfcLog.info('nfc.adapter.read_start');
 
       await NfcManager.requestTechnology(NfcTech.IsoDep);
-      sessionActive = true;
       nfcLog.info('nfc.adapter.isodep_acquired');
 
       let r = await sendApdu(SELECT_AID, 'SELECT AID');
@@ -109,7 +107,7 @@ export function createNfcAdapter(): NfcIOAdapter {
     async writeToken(token: string): Promise<void> {
       nfcLog.info('nfc.adapter.write_start');
 
-      let r = await sendApdu(SELECT_NDEF, 'SELECT NDEF (write)');
+      const r = await sendApdu(SELECT_NDEF, 'SELECT NDEF (write)');
       if (!r.ok) {
         throw new NfcError(
           `NDEF file not accessible for write (${getStatusMessage(r.sw)})`,
@@ -118,62 +116,18 @@ export function createNfcAdapter(): NfcIOAdapter {
         );
       }
 
-      const ndef = buildTextNdef(token);
-
-      // Three-phase write per NFC Forum Type 4 Tag spec:
-      // 1. Zero NLEN — signals readers the content is being updated
-      r = await sendApdu(updateBinary(0, [0x00, 0x00]), 'ZERO NLEN');
-      if (!r.ok) {
-        throw new NfcError(
-          `Failed zeroing NLEN (${getStatusMessage(r.sw)})`,
-          'WRITE_NLEN_FAILED',
-          r.sw
-        );
-      }
-
-      // 2. Write NDEF body in chunks (skip the first 2 NLEN bytes from ndef)
-      const body = ndef.slice(2);
-      let offset = 2;
-      const totalChunks = Math.ceil(body.length / MAX_CHUNK_SIZE);
-      for (let chunkNum = 0; offset - 2 < body.length; chunkNum++) {
-        const chunk = body.slice(offset - 2, offset - 2 + MAX_CHUNK_SIZE);
-        nfcLog.debug('nfc.adapter.write_chunk', {
-          chunk: chunkNum + 1,
-          totalChunks,
-          bytes: chunk.length,
-        });
-        r = await sendApdu(updateBinary(offset, chunk), `WRITE chunk ${chunkNum + 1}`);
-        if (!r.ok) {
-          throw new NfcError(
-            `Failed writing chunk (${getStatusMessage(r.sw)})`,
-            'WRITE_CHUNK_FAILED',
-            r.sw
-          );
-        }
-        offset += chunk.length;
-      }
-
-      // 3. Set final NLEN — makes the content visible to readers
-      r = await sendApdu(updateBinary(0, [ndef[0], ndef[1]]), 'SET NLEN');
-      if (!r.ok) {
-        throw new NfcError(
-          `Failed writing final NLEN (${getStatusMessage(r.sw)})`,
-          'WRITE_NLEN_FAILED',
-          r.sw
-        );
-      }
-
+      await writeNdefTextRecord(token);
       nfcLog.info('nfc.adapter.write_success');
     },
 
     async releaseSession(): Promise<void> {
-      if (!sessionActive) return;
-      sessionActive = false;
       try {
         await NfcManager.cancelTechnologyRequest();
         nfcLog.info('nfc.adapter.session_released');
       } catch (e) {
-        nfcLog.warn('nfc.adapter.release_failed', { error: e });
+        nfcLog.warn('nfc.adapter.release_failed', {
+          error: e instanceof Error ? e.message : String(e),
+        });
       }
     },
 
