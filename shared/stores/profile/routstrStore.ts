@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { redactError, storeLog } from '@/shared/lib/logger';
 import { RoutstrModel } from '@/shared/lib/routstr/api';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 // Last-resort model id used by the legacy `UserMessagesScreen` flow when no
@@ -178,8 +177,6 @@ interface RoutstrActions {
 
   setAnonymousMode: (isAnonymous: boolean) => void;
   getAnonymousMode: () => boolean;
-
-  clearAllData: () => Promise<void>;
 }
 
 type RoutstrStore = RoutstrState & RoutstrActions;
@@ -554,27 +551,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
       },
 
       getAnonymousMode: () => get().isAnonymousMode,
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useRoutstrStore, {
-            apiKey: null,
-            balance: null,
-            conversationHistory: [],
-            activeChildren: {},
-            selectedModel: null,
-            selectedTier: DEFAULT_TIER,
-            selectedProvider: DEFAULT_PROVIDER,
-            modelsCache: null,
-            sessions: [],
-            currentSessionId: null,
-            isAnonymousMode: false,
-          });
-        } catch (error) {
-          storeLog.error('store.routstr.clear_failed', { error: redactError(error) });
-          throw error;
-        }
-      },
     }),
     {
       name: 'routstr-store',

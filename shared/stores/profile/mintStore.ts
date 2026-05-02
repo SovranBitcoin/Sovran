@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { redactError, storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
@@ -16,9 +15,6 @@ interface MintState {
 interface MintActions {
   setSelectedMint: (pubkey: string, mintUrl: string) => void;
   getSelectedMint: (pubkey: string) => string | undefined;
-  clearSelectedMint: (pubkey: string) => void;
-  getAllSelectedMints: () => Record<string, string | undefined>;
-  clearAllData: () => Promise<void>;
 }
 
 type MintStore = MintState & MintActions;
@@ -40,25 +36,6 @@ export const useMintStore = create<MintStore>()(
       },
 
       getSelectedMint: (pubkey: string) => get().selectedMints[pubkey],
-
-      clearSelectedMint: (pubkey: string) => {
-        storeLog.info('store.mint.clear_selected');
-        set((state) => {
-          const { [pubkey]: _, ...rest } = state.selectedMints;
-          return { selectedMints: rest };
-        });
-      },
-
-      getAllSelectedMints: () => get().selectedMints,
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useMintStore, { selectedMints: {} });
-        } catch (error) {
-          storeLog.error('store.mint.clear_failed', { error: redactError(error) });
-          throw error;
-        }
-      },
     }),
     {
       name: 'mint-store',

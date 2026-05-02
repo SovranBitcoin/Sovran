@@ -11,7 +11,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { redactError, storeLog } from '@/shared/lib/logger';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 export interface TransactionLocation {
@@ -36,12 +35,6 @@ interface TransactionLocationActions {
   ) => void;
   /** Get the location for a transaction */
   getTransactionLocation: (entryId: string) => TransactionLocation | null;
-  /** Remove location for a specific transaction */
-  removeTransactionLocation: (entryId: string) => void;
-  /** Clear all stored locations */
-  clearAllLocations: () => void;
-  /** Clear all data from both state and storage */
-  clearAllData: () => Promise<void>;
 }
 
 type TransactionLocationStore = TransactionLocationState & TransactionLocationActions;
@@ -85,28 +78,6 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
       getTransactionLocation: (entryId: string) => {
         const state = get();
         return state.locations[entryId] ?? null;
-      },
-
-      removeTransactionLocation: (entryId: string) => {
-        storeLog.debug('store.tx_location.remove', { entryId });
-        set((state) => {
-          const { [entryId]: _, ...rest } = state.locations;
-          return { locations: rest };
-        });
-      },
-
-      clearAllLocations: () => {
-        storeLog.info('store.tx_location.clear_all');
-        set({ locations: {} });
-      },
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useTransactionLocationStore, { locations: {} });
-        } catch (error) {
-          storeLog.error('store.tx_location.clear_failed', { error: redactError(error) });
-          throw error;
-        }
       },
     }),
     {

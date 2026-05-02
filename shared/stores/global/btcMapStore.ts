@@ -9,7 +9,6 @@ import {
   parseWith,
 } from '@sovranbitcoin/schemas';
 import { fetchJson, type RequestControls } from '@/shared/lib/apiClient';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface BTCMapPlace {
@@ -109,10 +108,7 @@ interface BTCMapActions {
     controls?: RequestControls
   ) => Promise<BTCMapPlaceDetails>;
   getCachedPlaceDetails: (id: number) => BTCMapPlaceDetails | null;
-  setSelectedPlace: (place: BTCMapPlaceDetails | null) => void;
   setError: (error: string | null) => void;
-  clearCache: () => void;
-  clearAllData: () => Promise<void>;
 }
 
 type BTCMapStore = BTCMapState & BTCMapActions;
@@ -278,35 +274,9 @@ export const useBTCMapStore = create<BTCMapStore>()(
         return data;
       },
 
-      setSelectedPlace: (place) => {
-        storeLog.debug('store.btc_map.set_selected_place', { id: place?.id ?? null });
-        set({ selectedPlace: place });
-      },
-
       setError: (error) => {
         if (error) storeLog.warn('store.btc_map.set_error', { error });
         set({ error });
-      },
-
-      clearCache: () => {
-        storeLog.info('store.btc_map.clear_cache');
-        set({ placesCache: null, placeDetailsCache: {} });
-      },
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useBTCMapStore, {
-            placesCache: null,
-            placeDetailsCache: {},
-            isLoading: false,
-            isLoadingDetails: false,
-            selectedPlace: null,
-            error: null,
-          });
-        } catch (error) {
-          storeLog.error('store.btc_map.clear_failed', { error: redactError(error) });
-          throw error;
-        }
       },
     }),
     {

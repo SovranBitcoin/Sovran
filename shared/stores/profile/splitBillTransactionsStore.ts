@@ -25,7 +25,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { redactError, storeLog } from '@/shared/lib/logger';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 // ---------------------------------------------------------------------------
@@ -145,8 +144,6 @@ interface SplitBillStoreActions {
 
   getGroup: (groupId: string) => SplitBillGroup | null;
   getGroupsForUnit: (unit: string) => SplitBillGroup[];
-
-  clearAllData: () => Promise<void>;
 }
 
 type SplitBillStore = SplitBillStoreState & SplitBillStoreActions;
@@ -463,18 +460,6 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
       getGroupsForUnit: (unit) => {
         const groups = Object.values(get().groups).filter((g) => g.unit === unit);
         return groups.sort((a, b) => b.createdAt - a.createdAt);
-      },
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useSplitBillTransactionsStore, {
-            groups: {},
-            quoteIdToSplitBill: {},
-          });
-        } catch (error) {
-          storeLog.error('store.split_bill.clear_failed', { error: redactError(error) });
-          throw error;
-        }
       },
     }),
     {

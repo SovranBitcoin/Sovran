@@ -28,7 +28,6 @@ import {
   BUILTIN_COLOR_THEME_NAMES,
 } from '@/shared/lib/theme/builtinAlbums';
 import { PersistedThemeStore, type ThemeMode } from '@sovranbitcoin/schemas';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
@@ -54,14 +53,6 @@ interface ThemeActions {
   setUnitWallpaper: (unitId: UnitId, theme: ThemeName) => void;
   /** Resolve a unit's wallpaper, walking the fallback chain. */
   getUnitWallpaper: (unitId?: UnitId) => ThemeName;
-  /** Returns all currently-assigned unit wallpapers as a list. */
-  getAllUnitWallpapers: () => Array<{ unitId: UnitId; theme: ThemeName }>;
-  /** Set light/dark mode for this profile. */
-  setMode: (mode: ThemeMode) => void;
-  /** Remove the active album and all overrides — falls back to FALLBACK_THEME. Mode is preserved. */
-  resetToDefault: () => void;
-  /** Wipe all persisted data for the current profile. */
-  clearAllData: () => Promise<void>;
 }
 
 type ThemeStore = ThemeState & ThemeActions;
@@ -175,32 +166,6 @@ export const useThemeStore = create<ThemeStore>()(
           if (fallback) return fallback;
         }
         return FALLBACK_THEME;
-      },
-
-      getAllUnitWallpapers: () =>
-        Object.entries(get().unitWallpapers).map(([unitId, theme]) => ({ unitId, theme })),
-
-      setMode: (mode) => {
-        storeLog.info('store.theme.set_mode', { mode });
-        set({ mode });
-      },
-
-      resetToDefault: () => {
-        storeLog.info('store.theme.reset');
-        set({ activeAlbumSlug: null, unitWallpapers: {} });
-      },
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useThemeStore, {
-            activeAlbumSlug: null,
-            unitWallpapers: {},
-            mode: DEFAULT_MODE,
-          });
-        } catch (error) {
-          storeLog.error('store.theme.clear_failed', { error: redactError(error) });
-          throw error;
-        }
       },
     }),
     {

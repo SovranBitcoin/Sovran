@@ -4,7 +4,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { isBackgroundImageTheme } from 'config/backgroundImageThemes';
 import { redactError, storeLog } from '@/shared/lib/logger';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface TermsAccepted {
@@ -196,11 +195,6 @@ interface SettingsActions {
   // Middleman routing
   setMiddlemanRouting: (settings: Partial<MiddlemanRoutingSettings>) => void;
   getMiddlemanRouting: () => MiddlemanRoutingSettings;
-
-  // Utility methods
-  getAllSettings: () => SettingsState;
-  resetSettings: () => void;
-  clearAllData: () => Promise<void>;
 }
 
 type SettingsStore = SettingsState & SettingsActions;
@@ -336,23 +330,6 @@ export const useSettingsStore = create<SettingsStore>()(
         }));
       },
       getMiddlemanRouting: () => get().middlemanRouting,
-
-      // Utility
-      getAllSettings: () => get(),
-
-      resetSettings: () => {
-        storeLog.info('store.settings.reset');
-        set({ ...DEFAULT_SETTINGS, passcode: '' });
-      },
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useSettingsStore, { ...DEFAULT_SETTINGS, passcode: '' });
-        } catch (error) {
-          storeLog.error('store.settings.clear_failed', { error: redactError(error) });
-          throw error;
-        }
-      },
     }),
     {
       name: 'settings-store',

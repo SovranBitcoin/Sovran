@@ -15,7 +15,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { redactError, storeLog } from '@/shared/lib/logger';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
@@ -64,32 +63,8 @@ interface ScanHistoryActions {
     container?: string,
     optionKinds?: string[]
   ) => void;
-  /** Get all scan history entries */
-  getEntries: () => ScanHistoryEntry[];
-  /** Get entries filtered by type */
-  getEntriesByType: (type: ScanType) => ScanHistoryEntry[];
-  /** Get most recent scans (default: 20) */
-  getRecentScans: (limit?: number) => ScanHistoryEntry[];
-  /** Get most recent scans of a specific type */
-  getRecentScansByType: (type: ScanType, limit?: number) => ScanHistoryEntry[];
-  /** Check if a raw string has been scanned before */
-  hasScanned: (raw: string) => boolean;
-  /** Find an entry by raw string */
-  findByRaw: (raw: string) => ScanHistoryEntry | undefined;
-  /** Find an entry by processed string */
-  findByProcessed: (processed: string) => ScanHistoryEntry | undefined;
-  /** Find an entry by transaction ID */
-  findByTransactionId: (transactionId: string) => ScanHistoryEntry | undefined;
   /** Link a scan entry to a transaction by matching the processed string */
   linkTransaction: (processed: string, transactionId: string) => void;
-  /** Remove a specific entry by id */
-  removeEntry: (id: string) => void;
-  /** Clear all history */
-  clearHistory: () => void;
-  /** Clear history for a specific type */
-  clearHistoryByType: (type: ScanType) => void;
-  /** Clear all stored data (state + AsyncStorage) */
-  clearAllData: () => Promise<void>;
 }
 
 type ScanHistoryStore = ScanHistoryState & ScanHistoryActions;
@@ -115,11 +90,9 @@ const generateId = () => `scan-${Date.now()}-${Math.random().toString(36).slice(
 
 export const useScanHistoryStore = create<ScanHistoryStore>()(
   persist(
-    (set, get) => ({
-      // Initial state
+    (set) => ({
       entries: [],
 
-      // Add a scan to history
       addScan: (
         raw: string,
         processed: string,
@@ -161,52 +134,6 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
         });
       },
 
-      // Get all entries
-      getEntries: () => {
-        return get().entries;
-      },
-
-      // Get entries filtered by type
-      getEntriesByType: (type: ScanType) => {
-        return get().entries.filter((entry) => entry.type === type);
-      },
-
-      // Get most recent scans
-      getRecentScans: (limit = 20) => {
-        const { entries } = get();
-        return [...entries].sort((a, b) => b.scannedAt - a.scannedAt).slice(0, limit);
-      },
-
-      // Get most recent scans of a specific type
-      getRecentScansByType: (type: ScanType, limit = 20) => {
-        const { entries } = get();
-        return [...entries]
-          .filter((entry) => entry.type === type)
-          .sort((a, b) => b.scannedAt - a.scannedAt)
-          .slice(0, limit);
-      },
-
-      // Check if a raw string has been scanned
-      hasScanned: (raw: string) => {
-        return get().entries.some((entry) => entry.raw === raw);
-      },
-
-      // Find by raw string
-      findByRaw: (raw: string) => {
-        return get().entries.find((entry) => entry.raw === raw);
-      },
-
-      // Find by processed string
-      findByProcessed: (processed: string) => {
-        return get().entries.find((entry) => entry.processed === processed);
-      },
-
-      // Find by transaction ID
-      findByTransactionId: (transactionId: string) => {
-        return get().entries.find((entry) => entry.transactionId === transactionId);
-      },
-
-      // Link a scan entry to a transaction by matching the processed string
       linkTransaction: (processed: string, transactionId: string) => {
         if (!processed || !transactionId) return;
         storeLog.debug('store.scan_history.link_transaction', { transactionId });
@@ -218,34 +145,6 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
           updated[index] = { ...updated[index], transactionId };
           return { entries: updated };
         });
-      },
-
-      // Remove entry by id
-      removeEntry: (id: string) => {
-        storeLog.debug('store.scan_history.remove', { id });
-        set((state) => ({ entries: state.entries.filter((entry) => entry.id !== id) }));
-      },
-
-      // Clear all history
-      clearHistory: () => {
-        storeLog.info('store.scan_history.clear');
-        set({ entries: [] });
-      },
-
-      // Clear history for a specific type
-      clearHistoryByType: (type: ScanType) => {
-        storeLog.info('store.scan_history.clear_by_type', { type });
-        set((state) => ({ entries: state.entries.filter((entry) => entry.type !== type) }));
-      },
-
-      // Clear all stored data (state + AsyncStorage)
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useScanHistoryStore, { entries: [] });
-        } catch (error) {
-          storeLog.error('store.scan_history.clear_failed', { error: redactError(error) });
-          throw error;
-        }
       },
     }),
     {

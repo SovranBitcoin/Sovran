@@ -6,7 +6,6 @@ import { redactError, storeLog } from '@/shared/lib/logger';
 
 import type { MintRecommendation } from '@/shared/lib/apiClient';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface CachedKYMData {
@@ -25,7 +24,6 @@ interface KYMMintActions {
   clearCache: () => void;
   clearMintCache: (mintUrl: string) => void;
   isStale: (mintUrl: string, maxAgeMinutes?: number) => boolean;
-  clearAllData: () => Promise<void>;
 }
 
 type KYMMintStore = KYMMintState & KYMMintActions;
@@ -98,15 +96,6 @@ export const useKYMMintStore = create<KYMMintStore>()(
 
         const ageMinutes = (Date.now() - cached.timestamp) / (1000 * 60);
         return ageMinutes > maxAgeMinutes;
-      },
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useKYMMintStore, { cache: {} });
-        } catch (error) {
-          storeLog.error('store.kym_mint.clear_failed', { error: redactError(error) });
-          throw error;
-        }
       },
     }),
     {

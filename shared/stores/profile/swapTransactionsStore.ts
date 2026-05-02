@@ -16,7 +16,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { redactError, storeLog } from '@/shared/lib/logger';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 export type SwapGroupState = 'running' | 'finished' | 'cancelled';
@@ -96,8 +95,6 @@ interface SwapTransactionsActions {
   getGroup: (groupId: string) => SwapGroup | null;
   getGroupsForUnit: (unit: string) => SwapGroup[];
   getIndex: () => QuoteIdToGroupIndex;
-
-  clearAllData: () => Promise<void>;
 }
 
 type SwapTransactionsStore = SwapTransactionsState & SwapTransactionsActions;
@@ -315,18 +312,6 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
       },
 
       getIndex: () => get().quoteIdToGroup,
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useSwapTransactionsStore, {
-            groups: {},
-            quoteIdToGroup: {},
-          });
-        } catch (error) {
-          storeLog.error('store.swap_tx.clear_failed', { error: redactError(error) });
-          throw error;
-        }
-      },
     }),
     {
       name: 'swap-transactions-store',

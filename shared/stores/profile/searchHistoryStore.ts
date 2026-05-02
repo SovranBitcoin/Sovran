@@ -2,8 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { redactError, storeLog } from '@/shared/lib/logger';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
+import { storeLog } from '@/shared/lib/logger';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 /** Maximum number of recent searches to store */
@@ -35,24 +34,6 @@ interface SearchHistoryState {
    * @param context The context to get searches for (defaults to 'default')
    */
   getRecentSearches: (context?: string) => SearchHistoryEntry[];
-
-  /**
-   * Remove a specific search from history
-   * @param query The query to remove
-   * @param context The context to remove from
-   */
-  removeSearch: (query: string, context?: string) => void;
-
-  /**
-   * Clear all searches for a context
-   * @param context The context to clear (if not provided, clears all)
-   */
-  clearSearches: (context?: string) => void;
-
-  /**
-   * Clear all stored data
-   */
-  clearAllData: () => Promise<void>;
 }
 
 const PersistedSearchEntry = z.looseObject({
@@ -107,45 +88,6 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
       getRecentSearches: (context: string = 'default') => {
         const state = get();
         return state.recentSearches[context] || [];
-      },
-
-      removeSearch: (query: string, context: string = 'default') => {
-        storeLog.debug('store.search_history.remove', { context });
-        set((state) => {
-          const contextSearches = state.recentSearches[context] || [];
-          const filteredSearches = contextSearches.filter(
-            (entry) => entry.query.toLowerCase() !== query.toLowerCase()
-          );
-
-          return {
-            recentSearches: {
-              ...state.recentSearches,
-              [context]: filteredSearches,
-            },
-          };
-        });
-      },
-
-      clearSearches: (context?: string) => {
-        storeLog.info('store.search_history.clear', { context: context ?? 'all' });
-        if (context) {
-          set((state) => ({
-            recentSearches: {
-              ...state.recentSearches,
-              [context]: [],
-            },
-          }));
-        } else {
-          set({ recentSearches: {} });
-        }
-      },
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useSearchHistoryStore, { recentSearches: {} });
-        } catch (error) {
-          storeLog.error('store.search_history.clear_failed', { error: redactError(error) });
-        }
       },
     }),
     {

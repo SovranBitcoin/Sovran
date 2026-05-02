@@ -7,7 +7,6 @@ import { redactError, storeLog } from '@/shared/lib/logger';
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface CachedMintData {
@@ -26,7 +25,6 @@ interface AuditMintActions {
   clearCache: () => void;
   clearMintCache: (mintUrl: string) => void;
   isStale: (mintUrl: string, maxAgeMinutes?: number) => boolean;
-  clearAllData: () => Promise<void>;
 }
 
 type AuditMintStore = AuditMintState & AuditMintActions;
@@ -98,15 +96,6 @@ export const useAuditMintStore = create<AuditMintStore>()(
 
         const ageMinutes = (Date.now() - cached.timestamp) / (1000 * 60);
         return ageMinutes > maxAgeMinutes;
-      },
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useAuditMintStore, { cache: {} });
-        } catch (error) {
-          storeLog.error('store.audit_mint.clear_failed', { error: redactError(error) });
-          throw error;
-        }
       },
     }),
     {

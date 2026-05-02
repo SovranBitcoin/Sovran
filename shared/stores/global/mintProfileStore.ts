@@ -2,9 +2,8 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { redactError, storeLog } from '@/shared/lib/logger';
+import { storeLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface CachedMintProfile {
@@ -21,7 +20,6 @@ interface MintProfileActions {
   getCached: (mintUrl: string) => CachedMintProfile | undefined;
   setCached: (mintUrl: string, followers: number, reputation: number) => void;
   isStale: (mintUrl: string, maxAgeMinutes?: number) => boolean;
-  clearAllData: () => Promise<void>;
 }
 
 type MintProfileStore = MintProfileState & MintProfileActions;
@@ -67,15 +65,6 @@ export const useMintProfileStore = create<MintProfileStore>()(
         const cached = get().cache[normalizeMintUrlKey(mintUrl)];
         if (!cached) return true;
         return (Date.now() - cached.timestamp) / (1000 * 60) > maxAgeMinutes;
-      },
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useMintProfileStore, { cache: {} });
-        } catch (error) {
-          storeLog.error('store.mint_profile.clear_failed', { error: redactError(error) });
-          throw error;
-        }
       },
     }),
     {

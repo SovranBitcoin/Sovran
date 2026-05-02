@@ -42,7 +42,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { redactError, storeLog } from '@/shared/lib/logger';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 /**
@@ -75,12 +74,6 @@ interface TransactionDistributionActions {
   setDistribution: (key: string, source: DistributionSource) => void;
   /** Get the distribution entry for a key, or null. */
   getDistribution: (key: string) => DistributionEntry | null;
-  /** Remove the distribution entry for a specific key. */
-  removeDistribution: (key: string) => void;
-  /** Clear all stored distributions. */
-  clearAllDistributions: () => void;
-  /** Clear all data from both state and storage. */
-  clearAllData: () => Promise<void>;
 }
 
 type TransactionDistributionStore = TransactionDistributionState & TransactionDistributionActions;
@@ -130,28 +123,6 @@ export const useTransactionDistributionStore = create<TransactionDistributionSto
 
       getDistribution: (key: string) => {
         return get().distributions[key] ?? null;
-      },
-
-      removeDistribution: (key: string) => {
-        storeLog.debug('store.tx_distribution.remove', { key });
-        set((state) => {
-          const { [key]: _, ...rest } = state.distributions;
-          return { distributions: rest };
-        });
-      },
-
-      clearAllDistributions: () => {
-        storeLog.info('store.tx_distribution.clear_all');
-        set({ distributions: {} });
-      },
-
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useTransactionDistributionStore, { distributions: {} });
-        } catch (error) {
-          storeLog.error('store.tx_distribution.clear_failed', { error: redactError(error) });
-          throw error;
-        }
       },
     }),
     {

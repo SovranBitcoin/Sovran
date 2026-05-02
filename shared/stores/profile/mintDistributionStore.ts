@@ -3,7 +3,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { redactError, storeLog } from '@/shared/lib/logger';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 /**
@@ -49,7 +48,6 @@ interface MintDistributionActions {
 
   // Utility
   clearDistribution: (unit: string) => void;
-  clearAllData: () => Promise<void>;
 }
 
 type MintDistributionStore = MintDistributionState & MintDistributionActions;
@@ -505,16 +503,6 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
           const { [normalizedUnit]: _, ...rest } = state.distributions;
           return { distributions: rest };
         });
-      },
-
-      // Clear all data
-      clearAllData: async () => {
-        try {
-          await clearPersistedStore(useMintDistributionStore, { distributions: {} });
-        } catch (error) {
-          storeLog.error('store.mint_dist.clear_failed', { error: redactError(error) });
-          throw error;
-        }
       },
     }),
     {

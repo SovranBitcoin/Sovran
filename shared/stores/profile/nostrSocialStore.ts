@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 // ---------------------------------------------------------------------------
@@ -92,8 +91,6 @@ interface NostrSocialActions {
   clearLikeOptimistic: (eventId: string) => void;
   clearRepostOptimistic: (eventId: string) => void;
   clearSettledEngagementOptimistic: () => void;
-
-  clearAllData: () => Promise<void>;
 }
 
 type NostrSocialStore = NostrSocialState & NostrSocialActions;
@@ -424,13 +421,6 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
           };
         });
       },
-
-      // ---- reset ----
-
-      clearAllData: async () => {
-        storeLog.info('social.clearAll');
-        await clearPersistedStore(useNostrSocialStore, INITIAL_STATE);
-      },
     }),
     {
       name: 'nostr-social-store',
@@ -462,13 +452,4 @@ export const selectIsFollowingPubkey = (pubkey: string) => (state: NostrSocialSt
   const optimistic = state.optimisticFollowsByPubkey[pubkey];
   if (optimistic) return optimistic.value;
   return !!state.followingPubkeys[pubkey];
-};
-
-export const selectFollowingSet = (state: NostrSocialStore) => {
-  const result = new Set<string>(Object.keys(state.followingPubkeys));
-  for (const [pubkey, optimistic] of Object.entries(state.optimisticFollowsByPubkey)) {
-    if (optimistic.value) result.add(pubkey);
-    else result.delete(pubkey);
-  }
-  return result;
 };

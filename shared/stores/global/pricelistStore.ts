@@ -3,7 +3,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { redactError, storeLog } from '@/shared/lib/logger';
-import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface PricelistData {
@@ -40,7 +39,6 @@ interface PricelistActions {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   clearPricelist: () => void;
-  clearAllData: () => Promise<void>;
   getBtcPrice: (currency?: SupportedCurrency) => number | null;
   isStale: (maxAgeMinutes?: number) => boolean;
 }
@@ -122,16 +120,6 @@ export const usePricelistStore = create<PricelistStore>()(
         storeLog.info('store.pricelist.clear');
         set({
           pricelist: null,
-          lastUpdated: null,
-          error: null,
-        });
-      },
-
-      clearAllData: async () => {
-        storeLog.info('store.pricelist.clear_all');
-        await clearPersistedStore(usePricelistStore, {
-          pricelist: null,
-          isLoading: false,
           lastUpdated: null,
           error: null,
         });
