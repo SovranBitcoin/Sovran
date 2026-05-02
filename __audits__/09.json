@@ -1,0 +1,373 @@
+{
+  "audit": {
+    "date": "2026-04-20",
+    "commit": "bd018588",
+    "entry_point": "sovran-app/shared/lib/cashu/manager.ts",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md"
+    ],
+    "skills_consulted": [
+      "neverthrow-return-types",
+      "zustand-5",
+      "bun-runtime"
+    ],
+    "tooling_run": {
+      "type_check": "62 errors total; 6 in manager.ts (TS2341 x5, TS7006 x1)",
+      "lint": "no manager.ts rule hits",
+      "knip": "ran (no manager.ts hits surfaced but manual call-site sweep found 4 dead public methods)",
+      "analyze_structure": null
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "exportDatabase() ships unencrypted SQLite containing all ecash proofs (bearer instruments) to the iOS share sheet",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 627,
+      "symbol": "CocoManager.exportDatabase",
+      "dimension": 2,
+      "description": "exportDatabase copies coco.db + coco.db-wal to ${documentDirectory}coco-export.db and then calls Sharing.shareAsync() (line 661). expo-sqlite is not encrypted at rest in this configuration \u2014 the exported file contains every stored proof, every secret, every C point, every blinded message for the active profile. Reach path: SettingsScreen.tsx:344 renders an 'Export Database' action under `{devMode ? ...}` where devMode is `useSettingsStore(s => s.experimental)` \u2014 a Zustand flag toggled on by triple-tapping the version row (SettingsScreen.tsx:243-258). The flag persists (Zustand + AsyncStorage), so once enabled, the action remains reachable in every subsequent production session until the user toggles it off. There is no confirmation dialog, no device-passcode re-auth, no redaction pass on the proofs before share, and no cleanup of the export file after the share sheet dismisses. Any recipient of the shared file can extract the proofs and spend them \u2014 ecash is a bearer instrument per NUT-00.",
+      "why_it_matters": "Funds loss. A user who shares an export \u2014 to a dev for debugging, to iCloud backup, or to a messenger \u2014 immediately hands the full wallet balance to whoever receives the file. The dev-mode gate is not a security boundary (persisted flag, no re-auth), and a social-engineering attacker who convinces the user to enable dev mode and share the DB walks away with the wallet.",
+      "fix": "Three changes, roughly in order of importance: (1) Strip secret/C values from every proof row before copying. Read the source DB with expo-sqlite, write a reduced copy to exportPath that includes mint URLs, amounts, keyset ids, operation ids, timestamps \u2014 everything a dev would need to debug \u2014 but replaces `secret`, `C`, `Y`, and any `blinded` / `unblinded` columns with `'[redacted]'`. Add a prominent alert before share explaining this. (2) Require device passcode re-auth via expo-local-authentication.authenticateAsync() before the copy even starts; cancel the flow on failure. (3) Write the export to `${cacheDirectory}` (so iOS purges it under pressure) with a timestamp in the filename to avoid overwriting; delete the file after the Sharing.shareAsync promise resolves. Long-term, consider removing the full-DB export path entirely and offering a per-operation diagnostic bundle instead. Cross-reference: this is the same redaction principle that forbids logging proofs (`.cursor/rules/profile-safety-security-audit.mdc`).",
+      "references": [
+        "nuts/00.md",
+        "skill:security-review",
+        "docs/SOV-00.md \u00a74"
+      ],
+      "verification_note": "Re-read manager.ts:627-672 and SettingsScreen.tsx:260-270, 341-345. Counter-argument considered: 'the user owns the wallet, exporting to themselves is legal.' True for storage-to-self (airdrop from their own device to their own laptop), but `Sharing.shareAsync` is an unscoped share sheet that includes iMessage, Telegram, email, iCloud Drive, and other third-party apps. Nothing in the current code restricts the destination or warns about bearer-instrument exfil. Dev-mode gate is a convenience, not a security boundary \u2014 it persists to disk and is re-enabled by a triple-tap.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Real and unfixed. Funds-at-risk export-DB hardening is a security-review slice (redaction + biometric re-auth + cacheDirectory move + cleanup) that should not ride alongside dead-code deletion."
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "patch-package patch for coco-core is incomplete \u2014 index.cjs/index.js expose Manager internals but index.d.ts still declares them private, producing 6 type-check errors in manager.ts",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 701,
+      "symbol": "freeAllReservedProofs, restoreInflightProofsForMint",
+      "dimension": 1,
+      "description": "`npm run type-check` reports:\n  manager.ts(701,39): TS2341 Property 'proofRepository' is private\n  manager.ts(702,36): TS2341 Property 'proofService' is private\n  manager.ts(742,44): TS2341 Property 'meltOperationService' is private\n  manager.ts(884,26): TS2341 Property 'proofRepository' is private\n  manager.ts(885,25): TS2341 Property 'proofService' is private\n  manager.ts(892,37): TS7006 Parameter 'p' implicitly has an 'any' type.\nThe commit that introduced these accesses (de639c63, 'patch coco-core to expose Manager internals') added a patch-package patch targeting only `node_modules/@cashu/coco-core/dist/index.cjs` and `dist/index.js` (verified: `patches/@cashu+coco-core+1.0.0-rc.0.patch` has two `+++ b/` entries, neither for `dist/index.d.ts`). `node_modules/@cashu/coco-core/dist/index.d.ts:3539-3559` still declares `private proofService`, `private meltOperationService`, `private proofRepository` on the Manager class, so TS keeps rejecting the access at manager.ts:701/702/742/884/885. The TS7006 at :892 is a downstream consequence \u2014 `getInflightProofs` returns `any` because the private-repo access poisons the type flow.",
+      "why_it_matters": "CI-level regression. `npm run type-check` is the cheapest signal in the audit pipeline (per `.claude/rules/audit.md`) and a file-class type failure in a wallet-core module is a hard stop. It also hides a real correctness risk: the runtime call pattern (`manager.proofRepository.getReservedProofs()`) is not covered by the upstream type contract, so any rename or shape change in coco-core@rc.next silently breaks at runtime while types keep passing. The commit message promised 'Remove all unsafe as any / as unknown as casts from \u2026 manager.ts' \u2014 the casts were replaced by access patterns that TS still can't verify.",
+      "fix": "Extend `patches/@cashu+coco-core+1.0.0-rc.0.patch` with two more hunks against `node_modules/@cashu/coco-core/dist/index.d.ts` that flip `private proofRepository` / `private proofService` / `private meltOperationService` (and `private counterService`, `private walletService` per the commit message) to `public`. Regenerate the patch with `npx patch-package @cashu/coco-core`. After apply, the 5 TS2341 errors disappear and the TS7006 at :892 will either resolve on its own (if getInflightProofs has a return type in the d.ts) or be annotatable as `(p: { secret: string })`. Verify by running `npm run type-check` and confirming manager.ts is clean. Separately: open an upstream issue (or PR) on coco-core to promote these service fields to public in the library itself, so the patch is load-bearing only until the next rc.",
+      "references": [
+        "ts:TS2341",
+        "ts:TS7006",
+        "git:de639c63",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Ran `npx tsc --noEmit 2>&1 | grep manager.ts` \u2014 the six errors reproduce verbatim. Grepped `+++ b/` in the patch: only `dist/index.cjs` and `dist/index.js` are patched. Inspected `dist/index.d.ts:3539-3559` and the three field declarations are still `private`. Counter-argument considered: 'maybe tsconfig excludes manager.ts.' Checked \u2014 `tsconfig.json:20` includes `**/*.ts` and `exclude` does not list anything under `shared/lib/cashu/`. Errors are real and not suppressed.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "TS2341 errors at lines 700/701/741 disappear with the freeAllReservedProofs deletion (see F-003); the remaining TS2341 errors at 883/884 plus the TS7006 at 891 in restoreInflightProofsForMint are now routed through coco-payment-ux/api/managerInternals (getInflightProofs / restoreProofsToReady), matching the seam pattern from 24#F-003 / 36#F-008. Six TS2341 reach-ins in shared/lib/cashu/migration.ts also collapse onto the same seam (getWallet / saveProofs / overwriteCounter). manager.ts is now type-clean. Patch-package extension to dist/index.d.ts is no longer needed for in-app code; reopen if a future caller needs raw service access."
+    },
+    {
+      "id": "F-003",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "freeAllReservedProofs is 184 lines of dead code \u2014 zero call sites, deep access into coco private-ish services, funds-at-risk if ever called incorrectly",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 686,
+      "symbol": "CocoManager.freeAllReservedProofs",
+      "dimension": 1,
+      "description": "`freeAllReservedProofs` (manager.ts:686-869, 184 lines) walks every reserved proof in the repository, groups them by `usedByOperationId`, and per operation either calls `manager.ops.send.cancel/reclaim`, `meltOperationService.rollback`, or raw `proofService.releaseProofs` / `proofRepository.releaseProofs`. It is the main source of the type-check failures in F-002. `grep -rn 'CocoManager\\.freeAllReservedProofs' sovran-app` outside manager.ts itself returns zero matches \u2014 no UI, no settings screen, no rebalance path, no test. The JSDoc describes it as 'intended as a manual recovery tool for stuck reserved balance' but the manual recovery surface in use is `CocoManager.restoreInflightProofsForMint` (4 call sites in MintRebalancePlanScreen). This function has never been connected.",
+      "why_it_matters": "Two problems. (1) Maintenance: it is the single largest function in the file (\u224821% of the file's LOC), it reaches into repositories that the upstream lib marks private, and it encodes a state-machine understanding (terminal states `{'finalized','rolled_back'}`, distinguishing 'prepared' vs other send states, orphan detection) that must stay in sync with coco-core. Any wallet engineer reading manager.ts has to load 184 lines of reasoning for code that never runs. (2) Fund safety: if a future caller wires this up to a 'Recover stuck proofs' button without full context, the control-flow branches (`reclaim` vs `cancel` vs manual `releaseProofs`) can mis-release reserved proofs mid-operation \u2014 coco's invariant is that `usedByOperationId` + reservation belong together; a direct `proofService.releaseProofs` on an operation that is still `executing` can race the send pipeline and double-spend. Confirmed via timeline of the latest session (`coco.manager.SendOperationService.r*` entries, log-doctor timeline --latest --event 'cashu\\.manager|coco\\.') \u2014 no `freeAllReservedProofs` event ever fires, so this code has no runtime coverage at all.",
+      "fix": "Delete the function, its `isFreeingReservedProofs` latch (line 57, line 693-697, 867), and the three TS2341 sites at :701/702/742 that it causes. Note that the `restoreInflightProofsForMint` path (line 881-900) is the currently-used recovery primitive \u2014 keep that one. If the 'free all reserved proofs' recovery is actually desired product behaviour, file it as a proper feature with (a) a UI entry point, (b) a log-doctor flow trace via `startFlow('cashu.free_reserved')`, (c) a jest integration test against a mint-in-rollback fixture, and (d) a decision on whether it belongs in coco-core itself (where it would have first-class access to internal services). Until that exists, the code is pure risk.",
+      "references": [
+        "skill:neverthrow-return-types",
+        "knip:unused-export"
+      ],
+      "verification_note": "Ran `grep -rn 'CocoManager\\.' sovran-app/features sovran-app/shared sovran-app/app sovran-app/tests` and sorted by method name \u2014 `freeAllReservedProofs` returns 0 external call sites; `restoreInflightProofsForMint` returns 4 (all in MintRebalancePlanScreen). Re-read manager.ts:686-869 to confirm the function reaches into `proofRepository`, `proofService`, and `meltOperationService`. Counter-argument considered: 'maybe it's used via a debug menu I haven't grepped.' Also ran the grep against `app/` and `tests/` \u2014 still zero. The debug panel described in `.cursor/rules/profile-safety-security-audit.mdc` ('the Restore Inflight button in the debug panel') references `restoreInflightProofsForMint`, not this function.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "freeAllReservedProofs and its isFreeingReservedProofs latch deleted in commit d40a202d. CocoManager.restoreInflightProofsForMint remains as the sole reservation-recovery surface and is now routed through the coco-payment-ux managerInternals seam."
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "isBackgroundRunning latch is set in enableSafeWatchers but only cleared in enableNpcSyncAndProcessor \u2014 a stuck or thrown phase-2 leaves profile switches permanently blocked",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 247,
+      "symbol": "enableSafeWatchers / enableNpcSyncAndProcessor / isReadyForCleanup",
+      "dimension": 1,
+      "description": "enableSafeWatchers sets `this.isBackgroundRunning = true` at line 251 and has no `finally` to reset it. enableNpcSyncAndProcessor clears the flag at line 327 on its happy path. The two phases are separated by an `await awaitRestoreReady()` in CocoProvider.tsx:200 \u2014 a gate that only resolves when `walletLifecycleStore.restoreStatus \u2208 {complete, not-needed}` per SOV-00 \u00a76.2. Failure modes that strand the flag:\n  (a) The user enters RestoreGate and never completes recovery (per SOV-00 \u00a76.1, the gate is non-dismissible mid-flow \u2014 forward exits are complete recovery or kill the app). While they're in the gate, `isBackgroundRunning === true` persists.\n  (b) enableSafeWatchers throws uncaught before npc_sync runs (proof-state watcher retry failure bubbles a warn-log but no throw \u2014 fine; but anything that throws in future code paths in this method would).\n  (c) CocoProvider unmounts between the two phases (hot reload in dev; can also happen in prod if the root layout remounts) \u2014 Phase 2's try/catch at CocoProvider.tsx:219-222 calls bgStage.complete() but does NOT clear isBackgroundRunning.\nIn all three cases `CocoManager.isReadyForCleanup()` returns false (line 369-375, the `!this.isBackgroundRunning` clause), and profileSessionOrchestrator.ts:122 bails every switch attempt with `profile.orchestrator.switch_blocked_coco_not_ready`. User-visible effect: profile switcher silently no-ops until the app is force-killed.",
+      "why_it_matters": "Profile switches are a first-class SOV-00 \u00a710 operation that must remain available. A partial-startup state permanently blocking a switch forces the user to kill the app \u2014 they have no in-app path to escape. It is also latent: the flag stays true after the app goes back to foreground, so a foregrounded-stuck-in-restore user hitting the profile switcher sees no feedback.",
+      "fix": "Two options. Preferred: replace the pair-bound latch with a `try { ... } finally { this.isBackgroundRunning = false }` wrapping the body of enableSafeWatchers. Phase-2 then sets the latch anew (`this.isBackgroundRunning = true`) at the top of enableNpcSyncAndProcessor and clears it in its own finally. Alternative: collapse `isBackgroundRunning` into two explicit states (`'safe-running' | 'npc-running' | 'idle'`) so the transition is expressible as a single assignment, and clear the state in both functions' finally blocks and in CocoProvider phase-2's catch at CocoProvider.tsx:219. Either way, add a log-doctor-visible event when `isReadyForCleanup()` returns false due to this latch, so the regression is diagnosable from a single stats run.",
+      "references": [
+        "docs/SOV-00.md \u00a76.2",
+        "docs/SOV-00.md \u00a710",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Re-read manager.ts:247-279 (enableSafeWatchers \u2014 no finally, latch set line 251 never cleared in this method), manager.ts:289-331 (enableNpcSyncAndProcessor \u2014 sets false line 327 only on success path reaching that line), manager.ts:368-375 (isReadyForCleanup reads `!isBackgroundRunning`), profileSessionOrchestrator.ts:122-127 (bails switch on not-ready), CocoProvider.tsx:219-222 (phase-2 catch doesn't reset). Counter-argument considered: 'awaitRestoreReady always resolves eventually.' Not in SOV-00 \u00a76.1 failure modes \u2014 'every mint fails restore' is an open question with the recommendation to 'hold the gate; surface a support path instead' (SOV-00 \u00a713 item 3), which implies the gate can persist indefinitely. Log-doctor stats --latest does show `cashu.manager.safe_watchers.start` ran but not the `.done` event in the latest filtered 65-entry session, which is consistent with the flag being live longer than either phase's nominal duration.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Real and unfixed. isBackgroundRunning pair-bound-latch race belongs to the manager-lifecycle slice (refactor_plan #2 in this audit, alongside F-005/F-006); not in scope for the dead-code slice."
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Concurrent cleanup() calls race \u2014 the second call overwrites pendingCleanup so an initialize() awaiter sees only the second teardown, not the first",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 446,
+      "symbol": "CocoManager.cleanup",
+      "dimension": 1,
+      "description": "cleanup() at line 384 assigns `this.pendingCleanup = doCleanup()` (line 446) unconditionally. If a second cleanup() call arrives before the first has run its finally (line 449-451 clears the field), the assignment at line 446 overwrites the reference. Any awaiter that grabbed `this.pendingCleanup` earlier still awaits the old promise, but `initialize()`'s gate at line 119-122 reads the field *at the moment it's called*, so a racing initialize() would await only the newer teardown. Scenario: (a) CocoProvider unmounts during hot reload (CocoProvider.tsx:163-167 fires cleanup fire-and-forget). (b) Almost simultaneously, profileSessionOrchestrator.ts:142 calls CocoManager.cleanup() for a profile switch. (c) initialize() from the replacement CocoProvider mount arrives while (a) is still tearing down. It reads `this.pendingCleanup = <second teardown>`, awaits that, and proceeds \u2014 while teardown (a) may still be closing the DB, leading to the `SQLiteDatabase.closeAsync()` at :421 racing `SQLite.openDatabaseAsync(dbName)` at :148 for the same file. iOS will typically succeed (DB file-backed, open twice works in practice) but WAL-mode consistency is not guaranteed and transaction conflicts can surface as runtime failures later.",
+      "why_it_matters": "The comment at line 381 explicitly names the scenario the current guard is trying to prevent ('a concurrent initialize() call \u2026 can await it rather than racing against an in-flight teardown'). The guard works for 1-to-1 interleaving but not 2-to-1; since CocoProvider unmount cleanup is fire-and-forget and the orchestrator runs cleanup before native restart, the 2-to-1 case is reachable during every hot-reload-into-profile-switch flow in dev and on force-quit recoveries in prod.",
+      "fix": "Replace the overwrite with either (a) an await-chain: `this.pendingCleanup = (this.pendingCleanup ?? Promise.resolve()).then(() => doCleanup()).finally(() => { this.pendingCleanup = null })`, which serialises concurrent cleanups; or (b) a short-circuit: if `this.pendingCleanup` is non-null, `return this.pendingCleanup` directly \u2014 dedup concurrent teardowns to one shared promise. Option (b) is simpler and matches the existing initialize() gate semantics. In either case, remove the fire-and-forget `CocoManager.cleanup().catch(...)` at CocoProvider.tsx:163-167 in favour of awaiting during the useEffect cleanup (React tolerates async cleanup by not awaiting \u2014 but the catch doesn't currently serialise, it just logs).",
+      "references": [
+        "git:de639c63",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Re-read manager.ts:380-452 and CocoProvider.tsx:163-167. Confirmed the fire-and-forget call. Counter-argument considered: 'React's useEffect cleanup on hot reload is synchronous from React's POV, so the second call can't happen before the first returns.' But the first call only assigns `pendingCleanup` and returns an awaited promise \u2014 it doesn't block the reducer. A subsequent orchestrator call that fires from a Settings action is a different React dispatch and can arrive mid-teardown.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Real and unfixed. Concurrent cleanup() overwrite-on-second-call belongs to the manager-lifecycle slice (refactor_plan #2)."
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "initialize()'s 5s polling wait leaves isInitializing=true if the first initialize hangs \u2014 every subsequent caller times out indefinitely",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 129,
+      "symbol": "CocoManager.initialize",
+      "dimension": 1,
+      "description": "initialize() at line 129-138 polls `this.isInitializing` for up to 50 \u00d7 100ms = 5000ms. If the first initialize() is still running at the 5s mark (SQLite.openDatabaseAsync or repositories.init() hung), the second caller throws `Manager initialization timeout` without ever resetting `this.isInitializing`. The third caller re-enters the same polling branch and also times out. The only release is the original caller eventually reaching its `finally` at :238 \u2014 which can take arbitrarily long on a slow device or a corrupted DB that triggers expo-sqlite's internal retry. The `Error('Manager initialization timeout')` the second caller throws is also misleading: the *first* initialize didn't time out, the *wait for the first* did.",
+      "why_it_matters": "On a slow cold start (large DB, cold filesystem, low-memory iOS device), a re-invocation of initialize() \u2014 which happens whenever CocoProvider remounts, e.g. on orientation change, language change, or the root layout re-running its gates \u2014 hits the 5s ceiling, throws, and the UI shows `migrationError`. The user sees an error screen despite the wallet being perfectly fine; the first initialize is still making progress. The error is not retried.",
+      "fix": "Two orthogonal fixes. (1) Change the polling to `await this.instance-or-initializing promise`: store the in-flight promise in a field (mirroring the pendingCleanup pattern) and `await this.pendingInit` instead of polling a boolean. Concurrent callers all await the same promise; whoever the initializer is, everyone gets the same Manager instance. Remove the 5s timeout entirely \u2014 expo-sqlite has its own timeouts, and race-loser crashes are better than spurious timeouts. (2) If a timeout is genuinely wanted, wrap the first caller's body (not the waiter's loop) so that when the timeout fires, `this.isInitializing = false` is reset and every waiter is rejected with the same error.",
+      "references": [
+        "skill:zustand-5"
+      ],
+      "verification_note": "Re-read manager.ts:129-138 and the surrounding try/finally at :144-239. Confirmed no reset of isInitializing by the timing-out caller. log-doctor startup --latest shows `coco` stage taking <1ms on a warm start but `coco-bg` taking 365ms; neither exercised the pathological case, so this is structural reasoning, not measured. Counter-argument considered: 'double-initialize rarely happens in practice.' True under normal flows, but the existing pendingCleanup machinery (line 119-122) explicitly exists because the author considered concurrent init/teardown. The polling loop is the weaker half of the same design.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Real and unfixed. initialize() polling timeout belongs to the manager-lifecycle slice (refactor_plan #2)."
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "enableSafeWatchers retry-and-swallow on proof-state watcher failure leaves the wallet without proof-state updates silently",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 261,
+      "symbol": "CocoManager.enableSafeWatchers",
+      "dimension": 1,
+      "description": "At manager.ts:261-274, enableSafeWatchers wraps `this.instance.enableProofStateWatcher()` in a try/catch; on failure, it sleeps 2s and retries once; on a second failure, it logs `cashu.manager.proof_watcher_retry_failed` and *returns success*. No throw, no signal to the caller, no banner, no degraded-mode flag. The ProofStateWatcher is what drives UNSPENT \u2192 SPENT proof state transitions from the mint's websocket. Without it, the wallet's view of proof state diverges from the mint's; stale balances persist until a manual `mint.checkProofs()` call (not wired anywhere obvious) or the next app restart.",
+      "why_it_matters": "`isBackgroundRunning = true` is latched (see F-004) so the user can't even profile-switch out of the half-healthy state. And because the retry is silent, the only signal to the user is `cashuLog.error('cashu.manager.proof_watcher_retry_failed', ...)` \u2014 invisible unless they export the log. SOV-00 \u00a713 item 6 explicitly flags this as an open question ('a failure in step 4 (NPC sync) or step 5 (op recovery) is currently non-fatal and silent \u2014 should it raise a banner'); the same intent applies to step 1 (safe watchers).",
+      "fix": "Either re-throw on retry failure (then CocoProvider's catch at CocoProvider.tsx:219 surfaces it as a degraded-mode signal), or set an explicit `watcherHealth: 'ok' | 'degraded'` signal in walletLifecycleStore that the UI can render as a banner. Align with the SOV-00 \u00a713 open question \u2014 whichever direction is chosen, it applies to NPC sync, operation recovery, and safe watchers uniformly. Record the decision in the spec. For now, the minimum useful change is to preserve the error state so a follow-up audit can see it: set `this.watcherFailed = true` and surface it via a static getter, so SettingsScreen or a dev banner can show it.",
+      "references": [
+        "docs/SOV-00.md \u00a77",
+        "docs/SOV-00.md \u00a713"
+      ],
+      "verification_note": "Re-read manager.ts:247-279. Confirmed: on retry failure, function reaches line 276 (info log 'safe_watchers.done') and returns normally. log-doctor timeline --latest shows the happy path \u2014 `coco.manager.MintService.adding_mint_by_url` and subsequent subscription events fire after safe_watchers, so the retry path hasn't hit in this session. Structural reasoning only.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Real and unfixed. Silent proof-state watcher retry-failure surfacing depends on SOV-00 \u00a713 item-6 product decision; flagged in open_questions."
+    },
+    {
+      "id": "F-008",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "clearAllData does not clear sensitive runtime state \u2014 after a wipe the static class retains signerKey, cashuMnemonic, npcPlugin, and seedGetter pointing at the deleted DB",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 573,
+      "symbol": "CocoManager.clearAllData",
+      "dimension": 2,
+      "description": "clearAllData at :573-586 calls disableWatchers, nulls `this.instance`, sets `this.isInitializing = false`, and deletes the DB file. It does NOT call `clearSensitiveRuntimeState()` (the helper at :66-72 that nulls signerKey, cashuMnemonic, npcPlugin, seedGetter, isImportedProfile). So after clearAllData, those fields still hold the pre-wipe profile's key material and a stale seedGetter closure whose `cachedSeed` references bytes for a profile whose DB was just deleted. Compare to cleanup() which does call the helper (:430, :442) and reset() which calls it (:594). Separately: the function has zero call sites in the app (grep -rn 'CocoManager\\.clearAllData' returns only the definition), and the bug therefore doesn't currently strand a live wallet \u2014 but that makes it latent: if a future caller wires this into a 'wipe this profile' action, every subsequent initialize() will pick up the wrong (cached) seed for the wrong (freshly-created) DB.",
+      "why_it_matters": "Dead code + hidden bug = sleeping funds-at-risk. Category matches dim 2 (device-local secrets, profile scoping): the profile-safety rules in `.cursor/rules/profile-safety-security-audit.mdc` say a profile switch must not leak the previous profile's state into the new one. clearAllData is a wipe, not a switch, but the same invariant should hold \u2014 a wiped profile must not leave key material scoped to the wiped account reachable from the process.",
+      "fix": "Either delete clearAllData entirely (prior audits F-002 on __audits__/05.json flagged `clearAllData` as a cross-store convention with zero callers \u2014 this is the matching wallet-core occurrence), or wire it into the wipe path and add `this.clearSensitiveRuntimeState()` between line 577 and 578, matching the order in cleanup()/reset(). If deleting, also audit other dead public methods on CocoManager: `reset()` (0 external callers), `disableWatchers()` (0 external), `enableProofStateWatcher()` (0 external \u2014 the instance-method variant), `enableWatchersAndSync()` (marked @deprecated at line 339 with 0 external callers).",
+      "references": [
+        "skill:security-review",
+        "knip:unused-export"
+      ],
+      "verification_note": "grep -rn 'CocoManager\\.clearAllData' sovran-app/{features,shared,app,tests} returns zero external call sites. Re-read :573-586 and :66-72. Counter-argument considered: 'maybe clearAllData's semantics is db-wipe-only, and runtime state is intentionally preserved for a reinit without switching profiles.' Doesn't hold \u2014 reinit after a DB wipe needs a fresh seedGetter anyway (the cached seed is for the deleted account's proofs); keeping signerKey pointing at a key that has no coco state behind it is also not a valid resume state. The asymmetry vs cleanup() looks accidental, not designed.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "clearAllData deleted in commit d40a202d (zero external callers). Future profile-wipe callers that need this behaviour should compose CocoManager.completeReset(accountIndexes) plus the SecureStore wipe path; the latent stale-runtime-state bug is gone with the function."
+    },
+    {
+      "id": "F-009",
+      "severity": "Medium",
+      "confidence": 0.7,
+      "title": "seed-cache hash key is inconsistent between fast-path and slow-path branches \u2014 hashMnemonic is computed over cashuMnemonic OR root mnemonic depending on which is set",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 163,
+      "symbol": "initialize / seedGetter",
+      "dimension": 1,
+      "description": "The seedGetter closure at :159-197 computes `mnemonicForHash = this.cashuMnemonic ?? (await retrieveMnemonic())` (line 163) and then `mHash = hashMnemonic(mnemonicForHash)` (line 164). The cached-seed lookup (line 166-171) and the cache-store write (line 190-194) both key by that mHash. The problem: `this.cashuMnemonic` is the *per-account Cashu mnemonic* (NUT-13 derived, different per account) while `retrieveMnemonic()` returns the *root BIP-39 mnemonic* (shared across accounts). On a cold start where `setCashuMnemonic` hasn't run (the common path \u2014 CocoProvider.tsx:141 only calls `setSignerKey`, not `setCashuMnemonic`), the hash is the root's. On a subsequent session where `setCashuMnemonic` did run first, the hash is the Cashu child's. The two hashes are different, so the SecureStore cache under `cashu_seed_<accountIndex>` misses even though the cached seed is still valid \u2014 forcing the ~5s PBKDF2 slow path on a session it was designed to skip.",
+      "why_it_matters": "Cold-start slowdown on profile switches, specifically. The cache is the entire point of the SecureStore seed storage (per the inline comment at :154-155: 'Tries SecureStore seed cache first (~5ms) before falling back to PBKDF2 (~5s)'). A cache miss regression on a 5-second derivation noticeably extends cold boot; log-doctor startup --latest shows the coco stage at <1ms here only because this session had `setCashuMnemonic` unset (both sessions ran the same branch). Cross-session divergence is measurable on a cold-start benchmark.",
+      "fix": "Pick one side. Preferred: always hash the *root* mnemonic (retrieveMnemonic() return value) regardless of whether `this.cashuMnemonic` is set \u2014 a root-mnemonic change is the only condition that should invalidate the seed cache, since seeds are pure functions of (root mnemonic, accountIndex, isImported). Change :163 to unconditionally call `retrieveMnemonic()` (preserving the existing null-fallback behaviour when it returns null). This also eliminates one of the two branches in the getter. Double-check that `storeCashuSeed` (line 191) stores a hash computed the same way \u2014 it does, via the same mHash variable, so updating the source of truth in one place fixes both read and write.",
+      "references": [
+        "skill:security-review",
+        "docs/SOV-00.md \u00a74"
+      ],
+      "verification_note": "Re-read manager.ts:159-197 and keyDerivation.ts \u2014 `deriveCashuMnemonic(root, accountIndex)` returns a BIP-39 24-word child mnemonic distinct from the root 12-word phrase. Confirmed the two different hashes. Counter-argument considered: 'maybe every caller sets cashuMnemonic before initialize so the hash is always the Cashu one.' Checked: CocoProvider.tsx:134-157 does not call setCashuMnemonic (only setSignerKey); grep -rn 'CocoManager\\.setCashuMnemonic' sovran-app returns 3 call sites outside manager.ts, all inside profileSessionOrchestrator-adjacent code. Not consistent.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Real and unfixed. Cold-start seed-cache hash mismatch is a perf+correctness slice that warrants its own evidence (log-doctor startup --latest with both branches exercised) before changing the hash source."
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "Four public methods on CocoManager are dead code \u2014 enableWatchersAndSync (deprecated), reset, disableWatchers, enableProofStateWatcher (instance)",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 341,
+      "symbol": "enableWatchersAndSync / reset / disableWatchers / enableProofStateWatcher",
+      "dimension": 3,
+      "description": "Grep -rn 'CocoManager\\.<method>' across sovran-app/{features,shared,app,tests} excluding manager.ts and __audits__:\n  enableWatchersAndSync (line 341, marked @deprecated): 0 external callers.\n  reset (line 591): 0 external (called internally by completeReset at :619).\n  disableWatchers (line 521): 0 external (called internally by cleanup and reset).\n  enableProofStateWatcher (line 504, the static wrapper): 0 external (the internal call at :263 goes through `this.instance.enableProofStateWatcher()` directly).\nThe deprecated method (enableWatchersAndSync) has a @deprecated tag but no removal path. The other three are leftovers from an earlier API shape.",
+      "why_it_matters": "Each public method forces a future reader to reason about whether it's load-bearing. enableWatchersAndSync specifically is risky because its JSDoc warns that callers 'don't gate on restore' \u2014 a wallet engineer might wire it up without realising the SOV-00 \u00a76.2 wallet-machinery gate is now the hard contract. The other three inflate the static-class surface with no corresponding value.",
+      "fix": "Delete `enableWatchersAndSync` (line 341-344), the static `enableProofStateWatcher` (line 504-516), and `disableWatchers` (line 521-544) wrapper if the internal callers (cleanup, reset) are the only consumers \u2014 inline the try/catch disables into those methods. Decide on `reset` based on whether a non-restart reset is a valid product operation (it is not in SOV-00 \u00a710 \u2014 profile switches always native-restart); delete it too and inline into completeReset. This shrinks the file by roughly 60 lines and kills four sources of confusion.",
+      "references": [
+        "knip:unused-export",
+        "docs/SOV-00.md \u00a710"
+      ],
+      "verification_note": "Verified each method's external call-site count with grep. Counter-argument considered: 'enableWatchersAndSync might be used by tests.' Grep against `sovran-app/tests` returns zero matches. reset might be used by debug-panel code \u2014 not in the current tree.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "All four dead methods removed in commit d40a202d: enableWatchersAndSync, reset, the static enableProofStateWatcher wrapper, and the disableWatchers wrapper (kept as a private helper, since completeReset is its only consumer). Public surface drops from 17 methods to 11."
+    },
+    {
+      "id": "F-011",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "NsecSigner.secretKey is a public field on an exported class \u2014 any holder of a NsecSigner can read the raw nsec bytes",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 29,
+      "symbol": "NsecSigner.secretKey",
+      "dimension": 2,
+      "description": "NsecSigner is exported from manager.ts (line 28) and holds the raw 32-byte nsec in a default-visibility field `secretKey: Uint8Array` (line 29). TypeScript's default is public. The class is not used outside manager.ts (grep confirms), but export means any future file could do `new NsecSigner(bytes).secretKey` and hold a reference. The internal usage \u2014 NPCPlugin getting a `signerFunction` closure over the NsecSigner instance \u2014 would also survive a future refactor that starts passing the NsecSigner itself.",
+      "why_it_matters": "Defence in depth. The nsec is the highest-value secret in the wallet (signs every Cashu NPC event AND every Nostr message). Narrowing visibility costs nothing. Matches .cursor/rules/secure-storage-key-derivation.mdc's pattern of keeping key material in one intentional holder.",
+      "fix": "Change line 29 to `private readonly secretKey: Uint8Array;`. If other files need a signer, they use `signEvent(template)` \u2014 never reach in for the bytes. Additionally, drop the `export` keyword on the NsecSigner class declaration at line 28 \u2014 the class is only used inside manager.ts. If a test-double is ever needed, export a factory that returns the `Signer` interface, not the class.",
+      "references": [
+        "skill:security-review",
+        ".cursor/rules/secure-storage-key-derivation.mdc"
+      ],
+      "verification_note": "grep -rn 'NsecSigner' sovran-app returns only manager.ts call sites (5 matches, all inside manager.ts itself) plus one rule-doc reference. Counter-argument considered: 'Uint8Array in JS is by-reference anyway; making the field private doesn't prevent the constructor arg holder from keeping a reference.' True, but the class is constructed only inside this file with bytes derived at call time; constraining the field prevents future field-level drift. Low severity because no external consumer exists today.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Real and unfixed. NsecSigner field-visibility tightening is a defence-in-depth slice; pairs naturally with the secureStorage cleanup cluster (audit 04 / 10 / 11)."
+    },
+    {
+      "id": "F-012",
+      "severity": "Low",
+      "confidence": 0.8,
+      "title": "exportDatabase uses a fixed destination path \u2014 a second export silently overwrites the first, and the file persists in documentDirectory after share",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 633,
+      "symbol": "CocoManager.exportDatabase",
+      "dimension": 1,
+      "description": "Line 633 writes to `${dbDirectory}coco-export.db` (fixed filename). Consequences: (a) a second export in the same session silently overwrites the first, which would surprise a dev collecting a timeline of bug states; (b) the file stays in `documentDirectory` after Sharing.shareAsync resolves \u2014 no cleanup \u2014 accumulating across sessions. documentDirectory is iCloud-backed on iOS if iCloud Documents is enabled. Combined with F-001, this means a user who ever exports once has a copy of their wallet database silently syncing to iCloud indefinitely.",
+      "why_it_matters": "Amplifies F-001. Even users who remember to delete the share target still have the original export file persisting locally. An attacker who steals the device after the fact finds the export.",
+      "fix": "Three small changes: (1) write the export into `FileSystem.cacheDirectory` instead of documentDirectory \u2014 iOS purges this under pressure and it's not iCloud-backed. (2) Append a timestamp to the filename (`coco-export-${Date.now()}.db`) so two exports don't collide. (3) After `Sharing.shareAsync` settles (resolve or reject), `await FileSystem.deleteAsync(exportPath, { idempotent: true })` and the `-wal` sibling. This leaves zero residue regardless of what the user does with the share sheet.",
+      "references": [
+        "skill:security-review"
+      ],
+      "verification_note": "Re-read manager.ts:627-672. Counter-argument considered: 'Sharing.shareAsync may hold a reference to the file after share \u2014 deleting could corrupt it.' iOS copies or keeps-until-read by design; the share extension has its own copy by the time shareAsync resolves. expo-sharing's docs are explicit: the caller is responsible for cleanup.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Real and unfixed. Same export-DB hardening slice as F-001."
+    },
+    {
+      "id": "F-013",
+      "severity": "Low",
+      "confidence": 0.75,
+      "title": "plugins: any[] and signerFunction: (eventTemplate: any) \u2014 explicit `any` in a security-adjacent file where the upstream types are available",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 202,
+      "symbol": "initialize / signerFunction",
+      "dimension": 1,
+      "description": "Line 202: `const plugins: any[] = [];` \u2014 the Manager constructor accepts `Plugin[]` per the d.ts (index.d.ts:3568). Line 208: `const signerFunction = async (eventTemplate: any) => { ... }` \u2014 NPCPlugin's Signer type in coco-cashu-plugin-npc/src/types.ts defines the signature as `(event: EventTemplate) => Promise<VerifiedEvent>` (already imported at manager.ts:20). Both sites have the types in scope and still use `any`.",
+      "why_it_matters": "The file is audited under dim 2 and touches every wallet operation that signs or syncs. `any` on a plugin array and on the signer boundary means a future drift in the Plugin type or in Signer's expected event shape will not fail at build time. Also lint-noise: `@typescript-eslint/no-explicit-any` would flag these if enabled (CI lint run for this file showed no hits because the rule is not active; verify).",
+      "fix": "Replace :202 with `const plugins: Plugin[] = []` importing `Plugin` from `@cashu/coco-core`. Replace :208 with `const signerFunction = async (eventTemplate: EventTemplate): Promise<VerifiedEvent> => { return nsecSigner.signEvent(eventTemplate); }` \u2014 both types are already imported at :20. If the existing behaviour really is 'we accept any event-like object here,' make that explicit with `EventTemplate | { ... }` \u2014 not `any`.",
+      "references": [
+        "lint:@typescript-eslint/no-explicit-any",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Re-read manager.ts:20 (imports EventTemplate, VerifiedEvent from nostr-tools and Manager from @cashu/coco-core) and :202, :208. Confirmed both `any` usages are non-load-bearing. Counter-argument considered: 'NPCPlugin's Signer wants a different event shape.' Checked coco-cashu-plugin-npc/src/types.ts Signer type \u2014 it's `(event: EventTemplate) => Promise<VerifiedEvent>`, matching nostr-tools. Also confirmed ESLint didn't flag these because no-explicit-any isn't active at this path \u2014 still worth fixing.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Real and unfixed. Tightening `Plugin[]` and signerFunction signatures is a typing slice; pairs with broader `as any` audit (06 / 07 / 18)."
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "partial",
+    "4": "skipped",
+    "5": "skipped",
+    "6": "skipped",
+    "7": "partial",
+    "8": "skipped",
+    "9": "partial",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "dead-code",
+      "description": "Delete freeAllReservedProofs (184 lines), its isFreeingReservedProofs latch, and the three TS2341 access sites it is solely responsible for. Delete clearAllData, enableWatchersAndSync (deprecated), the static enableProofStateWatcher wrapper, the disableWatchers wrapper, and reset() \u2014 none have external callers. Result: ~280 LOC removed from manager.ts and the file's public surface drops from 17 methods to 10.",
+      "files": [
+        "shared/lib/cashu/manager.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "The `isInitializing` polling loop, the `pendingCleanup` overwrite-on-concurrent-call, and the `isBackgroundRunning` pair-bound latch are three instances of the same unowned-lifecycle-state problem. Collapse into a single promise-tracking field per phase (`pendingInit`, `pendingCleanup`, `pendingSafeWatchers`, `pendingNpcSync`) with the invariant 'if non-null, await it; finally clear'. This fixes F-004, F-005, and F-006 in one pass and eliminates the spurious 5s timeout.",
+      "files": [
+        "shared/lib/cashu/manager.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Propose a log-doctor mode `coco-lifecycle` (or extend `coco`): surface the transitions of isInitializing / isBackgroundRunning / pendingCleanup as a single timeline of (state-field, value, timestamp) events so the F-004 / F-005 / F-006 classes of stuck-latch regressions become visible from a single `npm run log-doctor -- coco-lifecycle` call. Today these latches are invisible unless you grep for the latch-named events that don't currently exist. Document in .claude/rules/log-doctor.md alongside the existing `coco` mode.",
+      "files": [
+        "scripts/log-doctor/",
+        ".claude/rules/log-doctor.md"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Extend patches/@cashu+coco-core+1.0.0-rc.0.patch to also modify node_modules/@cashu/coco-core/dist/index.d.ts, promoting proofRepository / proofService / meltOperationService / walletService / counterService to public \u2014 matching the .cjs/.js changes. Regenerate with `npx patch-package @cashu/coco-core`. Eliminates F-002's 6 type errors. Track upstream: open a coco-core issue/PR to promote these service fields so this patch becomes a migration aid rather than a permanent fixture.",
+      "files": [
+        "patches/@cashu+coco-core+1.0.0-rc.0.patch"
+      ]
+    }
+  ],
+  "open_questions": [
+    "SOV-13 (Receive \u2014 Mint & Melt Quotes) is TODO per docs/README.md. A ratified spec would clarify whether freeAllReservedProofs-style manual recovery is product behaviour or an escape hatch \u2014 this audit treats it as dead code on the current call-graph evidence.",
+    "SOV-00 \u00a713 item 6 flags 'phase-2 failure visibility' as an open question with a recommendation but no ratified answer. F-007's fix depends on that decision (re-throw vs. degraded-mode banner vs. silent). The current silent-retry behaviour is consistent with the open question; a spec update would let this be filed as drift instead of as an auditor call.",
+    "Does CI currently gate on `npm run type-check`? F-002's severity rests partly on that answer. If CI is only running jest and lint, the type errors are dormant until the next clean build. Either way the fix is the same, but the 'High' severity assumes a CI gate.",
+    "The `exportDatabase` product intent: is this tool meant for internal devs only (in which case it should be wrapped in a build-time flag like EXPO_PUBLIC_ENABLE_DB_EXPORT, not a persisted runtime Zustand flag), or for external users as a backup path (in which case the redaction + share-scoping described in F-001 is mandatory before next release)? A brief product decision resolves severity of F-001 and F-012."
+  ]
+}
