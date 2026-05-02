@@ -49,8 +49,8 @@
       ],
       "verification_note": "Re-checked at popups/payment.ts:75-178. Counter-argument considered: maybe DISPLAY is a feature flag toggled elsewhere — grepped repo-wide, only hits are the declaration and the if-check on the same file. Confirmed unreachable. usePaymentStatusListener.ts is the sole call-site of paymentStatusPopup and never sets the constant.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Dead toast-mode branch in paymentStatusPopup — considered as candidate dead-code slice (cluster C). Excluded; real, unfixed."
+      "completion_status": "complete",
+      "completion_note": "Dead PAYMENT_STATUS_DISPLAY const, the sheet branch, and the now-unused router/log/CocoManager imports were deleted in f0f53d44; paymentStatusPopup is now the showCustomToast call alone."
     },
     {
       "id": "F-002",
@@ -69,7 +69,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-counted: `grep '^export function' popups/*.ts` gave 96 functions; subtracting the actionMenu/copy/emojiPicker/modelPicker/payment.ts special cases leaves ~75 simple wrappers. Counter-argument considered: the named-function shape gives type-safe call sites that catch typos at the call site rather than at the registry — but a typed `PopupKey` union over the registry gives the same compile-time check, plus discoverability through `cmd-click on key` rather than scattered file lookup. Tradeoff favours registry; user explicitly asked for slop reduction.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "f0f53d44 collapses every wrapper through two factories (makeStaticPopup / makeParamPopup) instead of a single namedPopup dispatcher — the structural drift is gone (one place per spec, factory owns the popup() call) but the fix preserves the per-domain modules and per-wrapper named exports rather than centralising into a PopupKey registry. This avoided rippling renames into ~50 caller files; net delta -290 LOC. A future slice could collapse to a registry+dispatcher if the cross-file lookup ever becomes painful."
     },
     {
       "id": "F-003",
@@ -88,7 +90,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-checked both tables side-by-side. Field-for-field overlap: 5/5 variants, 5/5 message field, 5/5 submessageConfirmed, 5/5 history.type+idField, 5/5 route.pathname+paramKey. Drift: PaymentStatusToast.tsx adds submessageDelivered for payment-request only, popups/payment.ts has it nowhere. Counter-argument: maybe popups/payment.ts owns the 'navigate to history' policy and PaymentStatusToast.tsx is a presentational duplicate — checked, both call CocoManager.history.getPaginatedHistory with the same idField match. They're two implementations of one rule.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "PAYMENT_STATUS_CASES table and PaymentStatusCase type deleted from popups/payment.ts in f0f53d44 — PaymentStatusToast.tsx CASES is now the canonical home."
     },
     {
       "id": "F-004",
@@ -108,7 +112,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Diff'd CompactToast.tsx:57-96 against PaymentStatusToast.tsx:258-326 against SwapStatusToast.tsx:123-167. JSX structure (Toast root → optional BlurView → absolute-fill tint → inner row View → icon → title/subtitle column → optional action) matches frame-for-frame. Constants identical (verified with grep: 'BLUR_INTENSITY = 60' appears 3x, 'TINT_ALPHA = 0.3' appears 3x, 'SUCCESS_DARK_BG' / 'DANGER_DARK_BG' appear 2x — only PaymentStatusToast and SwapStatusToast since CompactToast doesn't tween). Counter-argument considered: maybe variance grows to justify three implementations — true today is that the variance is exactly 'animated tint vs static tint' and 'icon source' — both clearly slot-able.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Different seam — three .tsx toast components vs the .ts wrapper modules this slice covers. Out of scope for the wrapper-collapse slice; valid follow-up."
     },
     {
       "id": "F-005",
@@ -127,7 +133,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-checked both dictionaries word-for-word. 9/9 of engine's keys appear in parsePaymentError's set. parsePaymentError adds 'proof already spent', 'already spent', 'invoice already paid', 'quote already issued', 'mint .* is not trusted' (regex), 'not trusted', 'operation already in progress', 'operation not found', 'invalid token', 'network request failed', 'connection failed', 'quote expired'. Counter-argument considered: engine's 9 keys include action-buttons ('Update Wallet') that parsePaymentError can't handle — true. The fix proposal preserves the action-bearing entries in the engine while delegating text-only mapping to parsePaymentError.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "engine.tsx + parsePaymentError.ts are a separate seam from the wrapper modules; not touched by this slice."
     },
     {
       "id": "F-006",
@@ -146,7 +154,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-ran `npm run analyze-structure -- shared/lib/popup` — confirmed 15/15 popups → engine.tsx and 3/4 popups → bridge.ts. Counter-argument considered: maybe engine/bridge are a public API exposed at root for third-party-style consumption — checked, neither is imported anywhere outside shared/lib/popup/ except via the index.ts barrel. The root location is purely vestigial.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Pure relocation — out of scope for the wrapper-collapse slice. After F-002's partial fix the popups/ folder also gained factory.ts, which would move alongside engine + bridge if this is picked up later."
     },
     {
       "id": "F-007",
@@ -166,7 +176,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-grepped 'ActionMenuButton' across the repo: hits in shared/blocks/ActionMenuHost.tsx and several feature files — these import from `@/shared/lib/popup`, which IS the popups/index.ts re-export path. So the index.ts re-exports of ActionMenuButton/Input/Payload/PrimaryAction are NOT actually dead — knip's report is a false positive caused by the barrel + named-import pattern. Confirmed: the 7 popup-tree types from bridge/actionMenu/actionSheets ARE genuinely unused and removable; the 4 popups/index.ts re-exports must stay. Adjusted finding: the actionable cleanup is 7 types, not 11.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Touches actionMenu / actionSheets / bridge surfaces, not the per-domain wrapper modules. Mechanical cleanup remains a valid follow-up."
     },
     {
       "id": "F-008",
@@ -185,7 +197,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Confirmed at popups/payment.ts:51 and PaymentStatusToast.tsx:96 — both omit the function form. Counter-argument: maybe a string-only payload is the cleaner signal that no amount is interpolated. Tradeoff: explicit ignore() is more surface-area than a string, but the payoff is a uniform call shape and a single fork in the handler. Mild — the finding is Low because the current handler does cope correctly.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Moot in popups/payment.ts: the PAYMENT_STATUS_CASES table that hosted the typed-drift was deleted with F-003. The signature drift now lives only in PaymentStatusToast.tsx CASES and is a Low-severity tightening question for a future toast-component pass."
     },
     {
       "id": "F-009",
@@ -204,7 +218,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Counted: popups/index.ts ends at line 130 (per `wc -l`: 129 — close enough). Counter-argument considered: explicit barrels give precise control over public API shape — true, but only meaningful when the surface intentionally hides some symbols; here it exposes every symbol from every wrapper file. Drop to Nit because today's burden is small.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "F-002's chosen partial fix (factory + per-domain modules) preserves named exports, so popups/index.ts still mirrors them one-for-one. Collapsing the barrel would require switching call sites to a registry-key API — out of scope here."
     }
   ],
   "dimensions": {
