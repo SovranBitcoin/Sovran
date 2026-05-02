@@ -4,8 +4,7 @@ import FilterItem from './SearchFilterItem';
 import { SEARCH_FILTERS_HEIGHT } from '../../lib/constants/styles';
 import { Log } from '@/shared/lib/logger';
 
-export const BASE_FILTERS = ['All', 'Recent', 'Requests', 'Mints'] as const;
-export const SEARCH_FILTERS = ['All', 'Recent', 'Requests', 'Mints', 'Groups'] as const;
+const BASE_FILTERS = ['All', 'Recent', 'Requests', 'Mints'] as const;
 
 type SearchFiltersProps = {
   activeFilter: string;

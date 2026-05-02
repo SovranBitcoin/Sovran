@@ -90,21 +90,6 @@ export const supportsLiquidGlass = (): boolean => {
 };
 
 /**
- * React hook variant of `supportsLiquidGlass`. Use this inside components
- * when you want the surface to flip the moment the user toggles the
- * `mockNoGlass` switch (no navigation away/back required).
- */
-export function useSupportsLiquidGlass(): boolean {
-  const mockNoGlass = useSettingsStore((s) => s.mockNoGlass);
-  if (!LIQUID_GLASS_ENABLED || mockNoGlass) return false;
-  return (
-    device.platform('ios').gte(26) ||
-    device.platform('ipados').gte(26) ||
-    device.platform('macos').gte(26)
-  );
-}
-
-/**
  * Conditionally include SwiftUI glass modifiers when liquid glass is
  * enabled. Returns `[]` if either the build-time flag or the runtime
  * `mockNoGlass` toggle is set, so callers spreading the result get

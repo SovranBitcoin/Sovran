@@ -26,8 +26,11 @@ interface Signer {
   signEvent: (e: EventTemplate) => Promise<VerifiedEvent>;
 }
 
-export class NsecSigner implements Signer {
-  secretKey: Uint8Array;
+/** Holds an unencrypted secp256k1 secret key in JS heap. Never exported —
+ *  callers compose against the Manager's `signEvent` boundary, not the raw
+ *  signer instance. The class lives here, beside its only callers. */
+class NsecSigner implements Signer {
+  private readonly secretKey: Uint8Array;
 
   constructor(secretKey: Uint8Array) {
     if (secretKey.length !== 32) {

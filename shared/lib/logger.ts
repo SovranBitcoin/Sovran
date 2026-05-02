@@ -840,15 +840,6 @@ export function useInitMount(tag: string): void {
 }
 
 /**
- * Log every render of a component into the init timeline (deduped by the
- * 50ms window in createLogger). Use on hot-path providers when investigating
- * unnecessary re-renders during boot.
- */
-export function useInitRender(tag: string): void {
-  initLog(tag, 'render');
-}
-
-/**
  * Time an async block. Logs `<label>.start` immediately and `<label>.end`
  * on completion with `durationMs`. Re-throws errors after logging
  * `<label>.error`.
@@ -960,14 +951,13 @@ export function redactError(e: unknown): { name: string; message: string } {
 let _heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
- * Start the JS thread heartbeat monitor.
- * Call once at app startup (e.g. in your root layout or entry point).
+ * Start the JS thread heartbeat monitor. Auto-started below in dev builds.
  *
  * @param intervalMs How often to check (default 200ms — low overhead)
  * @param thresholdMs Block duration that triggers a warning (default 100ms)
  * @returns A stop function to disable the monitor
  */
-export function startJSThreadMonitor(intervalMs = 200, thresholdMs = 100): () => void {
+function startJSThreadMonitor(intervalMs = 200, thresholdMs = 100): () => void {
   if (_heartbeatTimer !== null) return () => {}; // already running
 
   let lastTick = _perfNow();

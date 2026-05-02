@@ -76,7 +76,7 @@ export const AI_TIERS: readonly AiTier[] = [
  * handled by `buildCandidateChain` so a missing entry in any one cell
  * just removes that fallback hop.
  */
-export const TIER_MATRIX: Readonly<Record<AiTierId, Readonly<Record<AiProviderId, string>>>> = {
+const TIER_MATRIX: Readonly<Record<AiTierId, Readonly<Record<AiProviderId, string>>>> = {
   auto: {
     openai: 'gpt-5-nano',
     claude: 'claude-3.5-haiku',
@@ -94,11 +94,11 @@ export const TIER_MATRIX: Readonly<Record<AiTierId, Readonly<Record<AiProviderId
   },
 } as const;
 
-export const DEFAULT_PROVIDER_ID: AiProviderId = 'openai';
+const DEFAULT_PROVIDER_ID: AiProviderId = 'openai';
 
 /** Default tier on app start — also the fallback when a stale (provider,
  *  tier) pair somehow names an id we don't recognise. */
-export const DEFAULT_TIER_ID: AiTierId = 'auto';
+const DEFAULT_TIER_ID: AiTierId = 'auto';
 
 /** Generic glyph used wherever we want to mean "Auto" outside the tier
  *  ladder (e.g. the 402 "Switch to Auto" button). Distinct from the Auto
@@ -284,7 +284,7 @@ export function modelIdForSlot(provider: AiProviderId, tier: AiTierId): string {
  * the same Auto tier) is way better than hard-failing — the user just
  * wants a working chat.
  */
-export function buildCandidateChain(provider: AiProviderId, tier: AiTierId): string[] {
+function buildCandidateChain(provider: AiProviderId, tier: AiTierId): string[] {
   const primary = modelIdForSlot(provider, tier);
   const fallbacks = AI_PROVIDERS.filter((p) => p.id !== provider).map((p) =>
     modelIdForSlot(p.id, tier)

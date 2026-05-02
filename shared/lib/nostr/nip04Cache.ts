@@ -13,5 +13,3 @@ export const getCachedNip04Plaintext = cache.get;
 export const putNip04Plaintext = cache.put;
 export const isKnownFailedNip04 = cache.isKnownFailed;
 export const markNip04Failed = cache.markFailed;
-export const clearNip04Cache = cache.clear;
-export const evictNip04CacheFromMemory = cache.evictFromMemory;

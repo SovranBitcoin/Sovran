@@ -12,16 +12,11 @@ import {
   SearchUsersResponse,
   loggableIssues,
   parseWith,
-  type CatalogResponse as CatalogResponseType,
-  type LatestVersionResponse as LatestVersionResponseType,
   type MintRecommendation,
-  type MintReviewsResponse as MintReviewsResponseType,
-  type MintSearchResponse as MintSearchResponseType,
   type MintSearchResult,
   type NostrProfileResponse as NostrProfileResponseType,
   type UserProfile,
   type ParseError,
-  type SearchUsersResponse as SearchUsersResponseType,
   type TopFollower,
 } from '@sovranbitcoin/schemas';
 
@@ -48,22 +43,16 @@ export const PRICELIST_URL = `wss://ws.sovran.money`;
  * OS reaps the socket — minutes on cellular. Every helper enforces this
  * unless the caller passes a tighter signal.
  */
-export const DEFAULT_TIMEOUT_MS = 10_000;
+const DEFAULT_TIMEOUT_MS = 10_000;
 
 // Re-export schema-derived types for callers that previously imported them
-// from this module. `NostrProfileResponse` and `UserProfile` are re-exported
-// under their canonical schema names so downstream consumers need no changes.
+// from this module.
 export type {
   AuditMintResponseType as AuditMintResponse,
-  CatalogResponseType as WallpaperCatalogResponse,
-  LatestVersionResponseType as LatestVersionResponse,
   MintRecommendation,
-  MintReviewsResponseType as MintReviewsResponse,
   MintSearchResult,
-  MintSearchResponseType as MintSearchResponse,
   NostrProfileResponseType as NostrProfileResponse,
   UserProfile,
-  SearchUsersResponseType as SearchUsersResponse,
   TopFollower,
 };
 
@@ -96,7 +85,7 @@ export function isAbortError(e: unknown): boolean {
  * available on Hermes from RN 0.81+; the listener pattern works everywhere
  * `AbortController` does, which is Sovran's whole runtime range.
  */
-export function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {
+function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {
   const controller = new AbortController();
   const onAbort = (reason: unknown) => controller.abort(reason);
   for (const s of signals) {
@@ -117,7 +106,7 @@ export function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSi
  * tagged with `name = 'TimeoutError'` because Hermes lacks `DOMException`;
  * `isAbortError` duck-types on the name either way.
  */
-export function timeoutSignal(ms: number): AbortSignal {
+function timeoutSignal(ms: number): AbortSignal {
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
     return AbortSignal.timeout(ms);
   }
