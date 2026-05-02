@@ -52,7 +52,7 @@
  * />
  * ```
  *
- * @see {@link ./TouchableOpacity}
+ * @see {@link ./Pressable}
  * @see {@link ./View}
  * @see {@link ./Text}
  */
@@ -65,15 +65,12 @@ import {
   LayoutChangeEvent,
   GestureResponderEvent,
 } from 'react-native';
-import { log } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
-import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
-import { TouchableOpacity } from './TouchableOpacity';
+import { Pressable, type HapticConfig } from './Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { EnhancedHaptics } from './Haptics';
 
 // Buttons sit close to the bottom-bar gradient and the home indicator, where
 // off-by-a-few-pixel taps are common. An 8pt slop on every side is small
@@ -241,26 +238,6 @@ interface BlurConfig {
 }
 
 /**
- * Configuration for haptic feedback
- *
- * @interface HapticConfig
- * @description
- * Controls the type and behavior of haptic feedback when the button is pressed.
- */
-interface HapticConfig {
-  /** Type of haptic feedback to trigger */
-  type?: 'selection' | 'impact' | 'notification';
-  /** Impact style for impact haptic (only applies when type is 'impact') */
-  impactStyle?: 'light' | 'medium' | 'heavy';
-  /** Notification type for notification haptic (only applies when type is 'notification') */
-  notificationType?: 'success' | 'warning' | 'error';
-  /** Whether to trigger haptic feedback on press start (default: true) */
-  onPressStart?: boolean;
-  /** Whether to trigger haptic feedback on press end (default: false) */
-  onPressEnd?: boolean;
-}
-
-/**
  * Props for the Button component
  *
  * @interface ButtonProps
@@ -365,79 +342,6 @@ export const Button = ({
 
   const shouldUseBlur = blur !== false;
 
-  // Haptic config
-  const hapticConfig = typeof haptics === 'object' ? haptics : {};
-  const {
-    type = 'selection',
-    impactStyle = 'medium',
-    notificationType = 'success',
-    onPressStart = true,
-    onPressEnd = false,
-  } = hapticConfig;
-
-  const shouldUseHaptics = haptics !== false;
-
-  /**
-   * Triggers haptic feedback based on configuration
-   *
-   * @description
-   * Executes the appropriate haptic feedback based on the configured type and parameters.
-   * Supports selection, impact, and notification haptic types with customizable options.
-   *
-   * @param {string} trigger - When the haptic should trigger ('start' or 'end')
-   */
-  const triggerHaptic = useCallback(
-    async (trigger: 'start' | 'end') => {
-      if (!shouldUseHaptics) return;
-      if (trigger === 'start' && !onPressStart) return;
-      if (trigger === 'end' && !onPressEnd) return;
-
-      try {
-        switch (type) {
-          case 'selection':
-            await EnhancedHaptics.buttonHaptic();
-            break;
-          case 'impact':
-            switch (impactStyle) {
-              case 'light':
-                await EnhancedHaptics.buttonHaptic();
-                break;
-              case 'medium':
-                await EnhancedHaptics.actionHaptic();
-                break;
-              case 'heavy':
-                await EnhancedHaptics.destructiveHaptic();
-                break;
-              default:
-                await EnhancedHaptics.buttonHaptic();
-            }
-            break;
-          case 'notification':
-            switch (notificationType) {
-              case 'success':
-                await EnhancedHaptics.successHaptic();
-                break;
-              case 'warning':
-                await EnhancedHaptics.warningHaptic();
-                break;
-              case 'error':
-                await EnhancedHaptics.errorHaptic();
-                break;
-              default:
-                await EnhancedHaptics.successHaptic();
-            }
-            break;
-          default:
-            await EnhancedHaptics.buttonHaptic();
-        }
-      } catch (error) {
-        // Silently fail if haptics are not supported
-        log.warn('ui.haptics.not_supported', { type: 'button_press', error });
-      }
-    },
-    [shouldUseHaptics, type, impactStyle, notificationType, onPressStart, onPressEnd]
-  );
-
   /**
    * Gets button styles based on variant and effect configuration
    *
@@ -537,37 +441,21 @@ export const Button = ({
     }
   };
 
-  // Synchronous re-entrancy guard via the shared `useSingleFlight` hook —
-  // `disabled`/`loading` are React state and land one render after the
-  // second tap commits, so they can't catch a rapid double-tap whose
-  // handler awaits. Routing through the same hook every other call site
-  // uses keeps the guard's behaviour in exactly one place.
-  const guardedOnPress = useSingleFlight(async (e: any) => {
-    const result = onPress(e);
-    if (result instanceof Promise) await result;
-  });
-
-  const handlePress = async (e: any) => {
-    if (disabled || loading) return;
-    await triggerHaptic('end');
-    await guardedOnPress(e);
-  };
-
-  const handlePressIn = async (event: any) => {
-    if (disabled || loading) return;
-    await triggerHaptic('start');
-    handleRipplePressIn(event);
-  };
+  // Re-entrancy guard, haptic timing, and opacity feedback all live in
+  // the shared `Pressable` primitive below — Button used to reimplement
+  // each one. `onPressIn` here is purely the ripple-animation hook;
+  // Pressable runs its own haptic('start') ahead of this callback.
 
   // Ripple mode: behaves like original RippleButton (minimal styling, direct content)
   if (ripple) {
     return (
-      <TouchableOpacity
+      <Pressable
         testID={testID}
         disabled={disabled || loading}
-        onPress={handlePress}
+        onPress={onPress}
         onLayout={handleRippleLayout}
-        onPressIn={handlePressIn}
+        onPressIn={handleRipplePressIn}
+        haptics={haptics}
         hitSlop={BUTTON_HIT_SLOP}
         style={[getButtonStyles(), style]}>
         {/* Ripple effect overlay */}
@@ -585,19 +473,20 @@ export const Button = ({
         ) : (
           text || icon
         )}
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
   // Icon only button (no text) - fixed size with centered content
   if (!text && icon) {
     return (
-      <TouchableOpacity
+      <Pressable
         testID={testID}
         disabled={disabled || loading}
-        onPress={handlePress}
+        onPress={onPress}
         onLayout={handleRippleLayout}
-        onPressIn={handlePressIn}
+        onPressIn={handleRipplePressIn}
+        haptics={haptics}
         hitSlop={BUTTON_HIT_SLOP}>
         <View
           style={[getButtonStyles(), { width: 52, height: 52, position: 'relative' }, style]}
@@ -622,18 +511,19 @@ export const Button = ({
             icon
           )}
         </View>
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
   // Text button (with optional icon) - flexible width with proper spacing
   return (
-    <TouchableOpacity
+    <Pressable
       testID={testID}
       disabled={disabled || loading}
-      onPress={handlePress}
+      onPress={onPress}
       onLayout={handleRippleLayout}
-      onPressIn={handlePressIn}
+      onPressIn={handleRipplePressIn}
+      haptics={haptics}
       hitSlop={BUTTON_HIT_SLOP}>
       <View
         style={[getButtonStyles(), { position: 'relative', minHeight: 48 }, style]}
@@ -683,6 +573,6 @@ export const Button = ({
           )}
         </HStack>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 };
