@@ -2,6 +2,8 @@ import * as React from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 export type RestoreStatus =
   | 'unknown'
@@ -31,6 +33,14 @@ interface WalletLifecycleState {
   markRestoreComplete: () => void;
 }
 
+const PersistedWalletLifecycleStore = z.object({
+  seedCreatedAt: z.number().int().nonnegative().nullable().default(null),
+  restoreStatus: z
+    .enum(['unknown', 'not-needed', 'pending', 'in-progress', 'complete', 'failed'])
+    .default('unknown'),
+  lastRestoreAt: z.number().int().nonnegative().nullable().default(null),
+});
+
 export const useWalletLifecycleStore = create<WalletLifecycleState>()(
   persist(
     (set) => ({
@@ -51,11 +61,14 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>()(
     {
       name: 'wallet-lifecycle',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
       partialize: (s) => ({
         seedCreatedAt: s.seedCreatedAt,
         restoreStatus: s.restoreStatus,
         lastRestoreAt: s.lastRestoreAt,
       }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('wallet_lifecycle', PersistedWalletLifecycleStore),
     }
   )
 );
@@ -68,10 +81,7 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>()(
  * @param seedCreatedAt The persisted seedCreatedAt from this store
  * @returns true if restore is needed (seed pre-existed but this app didn't create it)
  */
-export function needsRestore(
-  mnemonicExists: boolean,
-  seedCreatedAt: number | null
-): boolean {
+export function needsRestore(mnemonicExists: boolean, seedCreatedAt: number | null): boolean {
   return mnemonicExists && seedCreatedAt == null;
 }
 

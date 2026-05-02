@@ -9,6 +9,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
 import { log } from '@/shared/lib/logger';
 import {
   registerDownloadedTheme,
@@ -28,6 +29,7 @@ import {
   type WallpaperCatalogEntry as SchemaWallpaperEntry,
   type AlbumMeta as SchemaAlbumMeta,
 } from '@sovranbitcoin/schemas';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -78,11 +80,48 @@ interface WallpaperState {
 
   // Actions
   setCatalog: (wallpapers: WallpaperCatalogEntry[], albums: AlbumMeta[]) => void;
-  downloadWallpaper: (entry: WallpaperCatalogEntry, onProgress?: (p: number) => void) => Promise<boolean>;
+  downloadWallpaper: (
+    entry: WallpaperCatalogEntry,
+    onProgress?: (p: number) => void
+  ) => Promise<boolean>;
   removeDownloaded: (themeName: string) => Promise<void>;
   removeAlbumDownloads: (albumSlug: string) => Promise<void>;
   verifyIntegrity: () => Promise<void>;
 }
+
+// ---------------------------------------------------------------------------
+// Persisted-shape schema (envelope-only validation)
+// ---------------------------------------------------------------------------
+
+// Catalog entries and downloaded wallpapers carry rich nested shapes
+// (palette + dominantColors + gradientColors). Validate the envelope and
+// the identity fields strictly; trust the rest as `unknown` so a single
+// malformed entry doesn't drop the whole catalog on rehydrate.
+const PersistedCatalogEntry = z.looseObject({
+  themeName: z.string().max(64),
+  blossomUrl: z.string().max(2048),
+  albumSlug: z.string().max(64),
+});
+
+const PersistedDownloadedWallpaper = z.looseObject({
+  themeName: z.string().max(64),
+  blossomUrl: z.string().max(2048),
+  albumSlug: z.string().max(64),
+  localUri: z.string().max(4096),
+  downloadedAt: z.number().int().nonnegative(),
+});
+
+const PersistedAlbumMeta = z.looseObject({
+  slug: z.string().max(64),
+  topic: z.string().max(64),
+});
+
+const PersistedWallpaperStore = z.object({
+  catalog: z.array(PersistedCatalogEntry).max(10_000).default([]),
+  albums: z.array(PersistedAlbumMeta).max(1_000).default([]),
+  catalogLastFetched: z.number().int().nonnegative().default(0),
+  downloaded: z.record(z.string().max(64), PersistedDownloadedWallpaper).default({}),
+});
 
 // ---------------------------------------------------------------------------
 // Store
@@ -125,16 +164,12 @@ export const useWallpaperStore = create<WallpaperState>()(
         }));
 
         try {
-          const localUri = await downloadWallpaperFile(
-            entry.blossomUrl,
-            themeName,
-            (progress) => {
-              set((s) => ({
-                activeDownloads: { ...s.activeDownloads, [themeName]: progress },
-              }));
-              onProgress?.(progress);
-            },
-          );
+          const localUri = await downloadWallpaperFile(entry.blossomUrl, themeName, (progress) => {
+            set((s) => ({
+              activeDownloads: { ...s.activeDownloads, [themeName]: progress },
+            }));
+            onProgress?.(progress);
+          });
 
           const downloaded: DownloadedWallpaper = {
             ...entry,
@@ -164,7 +199,11 @@ export const useWallpaperStore = create<WallpaperState>()(
           return true;
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error ?? 'Unknown error');
-          log.error('wallpaper.download.failed', { themeName, error: message, url: entry.blossomUrl });
+          log.error('wallpaper.download.failed', {
+            themeName,
+            error: message,
+            url: entry.blossomUrl,
+          });
 
           // Clear progress
           set((s) => {
@@ -211,9 +250,7 @@ export const useWallpaperStore = create<WallpaperState>()(
 
       removeAlbumDownloads: async (albumSlug) => {
         const { downloaded } = get();
-        const toRemove = Object.values(downloaded).filter(
-          (w) => w.albumSlug === albumSlug,
-        );
+        const toRemove = Object.values(downloaded).filter((w) => w.albumSlug === albumSlug);
 
         for (const w of toRemove) {
           await get().removeDownloaded(w.themeName);
@@ -240,7 +277,7 @@ export const useWallpaperStore = create<WallpaperState>()(
           const orphanSet = new Set(orphans);
           const themeState = useThemeStore.getState();
           const hasAffected = Object.values(themeState.unitWallpapers).some((t) =>
-            orphanSet.has(t),
+            orphanSet.has(t)
           );
           if (hasAffected) {
             useThemeStore.setState((prev) => {
@@ -270,6 +307,7 @@ export const useWallpaperStore = create<WallpaperState>()(
     {
       name: 'wallpaper-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
       partialize: (state) => ({
         catalog: state.catalog,
         albums: state.albums,
@@ -277,6 +315,8 @@ export const useWallpaperStore = create<WallpaperState>()(
         downloaded: state.downloaded,
         // _hasHydrated and activeDownloads are excluded (transient)
       }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('wallpaper', PersistedWallpaperStore),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           log.warn('wallpaper.store.rehydrate_failed', { error });
@@ -304,6 +344,6 @@ export const useWallpaperStore = create<WallpaperState>()(
 
         useWallpaperStore.setState({ _hasHydrated: true });
       },
-    },
-  ),
+    }
+  )
 );

@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
 import { log, storeLog } from '@/shared/lib/logger';
 
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface CachedMintData {
   auditData: AuditMintResponse;
@@ -27,6 +29,22 @@ interface AuditMintActions {
 }
 
 type AuditMintStore = AuditMintState & AuditMintActions;
+
+// Envelope-only validation: `auditData` and `mintInfo` are upstream API
+// shapes whose strict definition lives outside this store; treat them as
+// `unknown` on rehydrate and let the consumers re-fetch on cache miss.
+const PersistedAuditMintStore = z.object({
+  cache: z
+    .record(
+      z.string().max(2048),
+      z.looseObject({
+        auditData: z.unknown(),
+        mintInfo: z.unknown(),
+        timestamp: z.number().int().nonnegative(),
+      })
+    )
+    .default({}),
+});
 
 export const useAuditMintStore = create<AuditMintStore>()(
   persist(
@@ -95,8 +113,11 @@ export const useAuditMintStore = create<AuditMintStore>()(
     {
       name: 'audit-mint-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
       // Only persist the cache data
       partialize: (state) => ({ cache: state.cache }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('audit_mint', PersistedAuditMintStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
           log.warn('store.audit_mint.rehydrate_failed', { error });

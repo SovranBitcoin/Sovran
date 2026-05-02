@@ -13,8 +13,10 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 export interface NostrProfileMetadata {
   displayName?: string;
@@ -103,6 +105,22 @@ interface NostrMetadataCacheState {
   clear: () => void;
 }
 
+const PersistedNostrMetadataEntry = z.looseObject({
+  displayName: z.string().max(512).optional(),
+  name: z.string().max(512).optional(),
+  picture: z.string().max(2048).optional(),
+  banner: z.string().max(2048).optional(),
+  nip05: z.string().max(512).optional(),
+  lud16: z.string().max(512).optional(),
+  website: z.string().max(2048).optional(),
+  about: z.string().max(4096).optional(),
+  fetchedAt: z.number().int().nonnegative(),
+});
+
+const PersistedNostrMetadataCache = z.object({
+  byPubkey: z.record(z.string().max(128), PersistedNostrMetadataEntry).default({}),
+});
+
 export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
   persist(
     (set) => ({
@@ -182,9 +200,12 @@ export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
     {
       name: 'nostr-metadata-cache',
       storage: createJSONStorage(() => createProfileScopedStorage()),
+      version: 1,
       partialize: (state) => ({ byPubkey: state.byPubkey }),
-    },
-  ),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('nostr_metadata', PersistedNostrMetadataCache),
+    }
+  )
 );
 
 export function useCachedNostrProfile(pubkey: string): {

@@ -39,8 +39,10 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -83,6 +85,18 @@ interface TransactionDistributionActions {
 }
 
 type TransactionDistributionStore = TransactionDistributionState & TransactionDistributionActions;
+
+const PersistedTransactionDistributionStore = z.object({
+  distributions: z
+    .record(
+      z.string().max(256),
+      z.looseObject({
+        source: z.enum(['copy', 'share', 'airdrop', 'displayed']),
+        recordedAt: z.number().int().nonnegative(),
+      })
+    )
+    .default({}),
+});
 
 export const useTransactionDistributionStore = create<TransactionDistributionStore>()(
   persist(
@@ -145,9 +159,12 @@ export const useTransactionDistributionStore = create<TransactionDistributionSto
     {
       name: 'transaction-distribution-store',
       storage: createJSONStorage(() => createProfileScopedStorage()),
+      version: 1,
       partialize: (state) => ({
         distributions: state.distributions,
       }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('tx_distribution', PersistedTransactionDistributionStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
           log.warn('store.tx_distribution.rehydrate_failed', { error });

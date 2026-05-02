@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -53,6 +55,18 @@ interface SearchHistoryState {
    */
   clearAllData: () => Promise<void>;
 }
+
+const PersistedSearchEntry = z.looseObject({
+  query: z.string().max(2048),
+  timestamp: z.number().int().nonnegative(),
+  context: z.string().max(64).optional(),
+});
+
+const PersistedSearchHistoryStore = z.object({
+  recentSearches: z
+    .record(z.string().max(64), z.array(PersistedSearchEntry).max(MAX_RECENT_SEARCHES))
+    .default({}),
+});
 
 export const useSearchHistoryStore = create<SearchHistoryState>()(
   persist(
@@ -139,7 +153,10 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
     {
       name: 'search-history-store',
       storage: createJSONStorage(() => createProfileScopedStorage()),
+      version: 1,
       partialize: (state) => ({ recentSearches: state.recentSearches }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('search_history', PersistedSearchHistoryStore),
     }
   )
 );

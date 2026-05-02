@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
 import { log, storeLog } from '@/shared/lib/logger';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface PricelistData {
   usd: {
@@ -43,6 +45,18 @@ interface PricelistActions {
 }
 
 type PricelistStore = PricelistState & PricelistActions;
+
+const PersistedPricelistStore = z.object({
+  pricelist: z
+    .looseObject({
+      usd: z.looseObject({ btc: z.number() }).optional(),
+      eur: z.looseObject({ btc: z.number() }).optional(),
+      gbp: z.looseObject({ btc: z.number() }).optional(),
+    })
+    .nullable()
+    .default(null),
+  lastUpdated: z.number().int().nonnegative().nullable().default(null),
+});
 
 export const usePricelistStore = create<PricelistStore>()(
   persist(
@@ -137,10 +151,13 @@ export const usePricelistStore = create<PricelistStore>()(
     {
       name: 'pricelist-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
       partialize: (state) => ({
         pricelist: state.pricelist,
         lastUpdated: state.lastUpdated,
       }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('pricelist', PersistedPricelistStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
           log.warn('store.pricelist.rehydrate_failed', { error });

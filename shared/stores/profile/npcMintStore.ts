@@ -2,10 +2,12 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { NPCClient, JWTAuthProvider } from 'npubcash-sdk';
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
+import { z } from 'zod';
 import { log, storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const NPC_BASE_URL = 'https://npubx.cash';
 const NPC_DEFAULT_MINT_URL = 'https://mint.minibits.cash/Bitcoin';
@@ -59,6 +61,13 @@ function getActiveProfilePubkey(): string | undefined {
   const { activeAccountIndex, profiles } = useProfileStore.getState();
   return profiles.find((profile) => profile.accountIndex === activeAccountIndex)?.pubkey;
 }
+
+const PersistedNpcMintStore = z.object({
+  mintUrls: z.record(z.string().max(128), z.string().max(2048).optional()).default({}),
+  lastSyncedAt: z
+    .record(z.string().max(128), z.number().int().nonnegative().optional())
+    .default({}),
+});
 
 export const useNpcMintStore = create<NpcMintStore>()(
   persist(
@@ -142,10 +151,13 @@ export const useNpcMintStore = create<NpcMintStore>()(
     {
       name: 'npc-mint-store',
       storage: createJSONStorage(() => createProfileScopedStorage()),
+      version: 1,
       partialize: (state) => ({
         mintUrls: state.mintUrls,
         lastSyncedAt: state.lastSyncedAt,
       }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('npc_mint', PersistedNpcMintStore),
     }
   )
 );

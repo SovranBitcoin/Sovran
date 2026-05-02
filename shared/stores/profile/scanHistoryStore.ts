@@ -12,8 +12,10 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -90,6 +92,23 @@ interface ScanHistoryActions {
 }
 
 type ScanHistoryStore = ScanHistoryState & ScanHistoryActions;
+
+const PersistedScanEntry = z.looseObject({
+  id: z.string().max(128),
+  raw: z.string().max(16_384),
+  processed: z.string().max(16_384),
+  type: z.enum(['npub', 'ecash', 'lightning', 'mint', 'paymentRequest', 'unknown']),
+  source: z.enum(['qr', 'nfc', 'paste', 'deeplink']),
+  inputType: z.string().max(64).optional(),
+  container: z.string().max(64).optional(),
+  optionKinds: z.array(z.string().max(128)).max(64).optional(),
+  scannedAt: z.number().int().nonnegative(),
+  transactionId: z.string().max(256).optional(),
+});
+
+const PersistedScanHistoryStore = z.object({
+  entries: z.array(PersistedScanEntry).max(10_000).default([]),
+});
 
 const generateId = () => `scan-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
@@ -242,6 +261,10 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
     {
       name: 'scan-history-store',
       storage: createJSONStorage(() => profileStorage),
+      version: 1,
+      partialize: (state) => ({ entries: state.entries }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('scan_history', PersistedScanHistoryStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
           log.warn('store.scan_history.rehydrate_failed', { error });

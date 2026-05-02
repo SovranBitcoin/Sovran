@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -52,6 +54,15 @@ interface MintDistributionActions {
 }
 
 type MintDistributionStore = MintDistributionState & MintDistributionActions;
+
+const PersistedMintDistributionStore = z.object({
+  distributions: z
+    .record(
+      z.string().max(16),
+      z.record(z.string().max(2048), z.number().int().min(0).max(TOTAL_BASIS_POINTS))
+    )
+    .default({}),
+});
 
 /**
  * Distributes basis points using largest-remainder method
@@ -511,7 +522,10 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
     {
       name: 'mint-distribution-store',
       storage: createJSONStorage(() => createProfileScopedStorage()),
+      version: 1,
       partialize: (state) => ({ distributions: state.distributions }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('mint_dist', PersistedMintDistributionStore),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           log.warn('store.mint_dist.rehydrate_failed', { error });

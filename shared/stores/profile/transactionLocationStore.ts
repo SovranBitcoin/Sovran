@@ -8,8 +8,10 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -44,6 +46,19 @@ interface TransactionLocationActions {
 }
 
 type TransactionLocationStore = TransactionLocationState & TransactionLocationActions;
+
+const PersistedTransactionLocationStore = z.object({
+  locations: z
+    .record(
+      z.string().max(256),
+      z.looseObject({
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180),
+        createdAt: z.number().int().nonnegative(),
+      })
+    )
+    .default({}),
+});
 
 export const useTransactionLocationStore = create<TransactionLocationStore>()(
   persist(
@@ -99,9 +114,12 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
     {
       name: 'transaction-location-store',
       storage: createJSONStorage(() => createProfileScopedStorage()),
+      version: 1,
       partialize: (state) => ({
         locations: state.locations,
       }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('tx_location', PersistedTransactionLocationStore),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           log.warn('store.tx_location.rehydrate_failed', { error });

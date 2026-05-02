@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
 import { RoutstrModel } from '@/shared/lib/routstr/api';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -183,6 +185,35 @@ interface RoutstrActions {
 
 type RoutstrStore = RoutstrState & RoutstrActions;
 
+const PersistedRoutstrMessage = z.looseObject({
+  id: z.string().max(128),
+  role: z.enum(['user', 'assistant']),
+  content: z.string().max(65_536),
+  timestamp: z.number().int().nonnegative(),
+  parentId: z.string().max(128).nullable().optional(),
+  thinkingDurationSec: z.number().nonnegative().optional(),
+  reasoningContent: z.string().max(65_536).optional(),
+  costSats: z.number().int().nonnegative().optional(),
+});
+
+const PersistedRoutstrSession = z.looseObject({
+  id: z.string().max(128),
+  title: z.string().max(512),
+  createdAt: z.number().int().nonnegative(),
+  messages: z.array(PersistedRoutstrMessage).max(10_000),
+  activeChildren: z.record(z.string().max(128), z.string().max(128)).optional(),
+});
+
+const PersistedRoutstrStore = z.object({
+  apiKey: z.string().max(8192).nullable().default(null),
+  balance: z.number().nullable().default(null),
+  conversationHistory: z.array(PersistedRoutstrMessage).max(10_000).default([]),
+  activeChildren: z.record(z.string().max(128), z.string().max(128)).default({}),
+  selectedModel: z.string().max(256).nullable().default(null),
+  sessions: z.array(PersistedRoutstrSession).max(1024).default([]),
+  currentSessionId: z.string().max(128).nullable().default(null),
+});
+
 export const useRoutstrStore = create<RoutstrStore>()(
   persist(
     (set, get) => ({
@@ -336,9 +367,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
           if (state.isAnonymousMode) return { activeChildren: next };
           if (state.currentSessionId) {
             const updatedSessions = state.sessions.map((session) =>
-              session.id === state.currentSessionId
-                ? { ...session, activeChildren: next }
-                : session
+              session.id === state.currentSessionId ? { ...session, activeChildren: next } : session
             );
             return { activeChildren: next, sessions: updatedSessions };
           }
@@ -552,6 +581,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
     {
       name: 'routstr-store',
       storage: createJSONStorage(() => createProfileScopedStorage()),
+      version: 1,
       partialize: (state) => ({
         apiKey: state.apiKey,
         balance: state.balance,
@@ -561,6 +591,8 @@ export const useRoutstrStore = create<RoutstrStore>()(
         sessions: state.sessions,
         currentSessionId: state.currentSessionId,
       }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('routstr', PersistedRoutstrStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
           log.warn('store.routstr.rehydrate_failed', { error });

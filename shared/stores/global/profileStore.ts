@@ -12,7 +12,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
 import { log, storeLog } from '@/shared/lib/logger';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 export interface ProfileEntry {
   /**
@@ -80,6 +82,23 @@ interface ProfileActions {
 }
 
 type ProfileStore = ProfileState & ProfileActions;
+
+const PersistedProfileEntry = z.looseObject({
+  accountIndex: z.number().int(),
+  pubkey: z.string().max(128),
+  addedAt: z.number().int().nonnegative(),
+  cachedBalanceSats: z.number().int().nonnegative().optional(),
+  source: z.enum(['derived', 'imported']).optional(),
+  externalChain: z.number().int().nonnegative().optional(),
+  cachedDisplayName: z.string().max(512).optional(),
+  cachedPicture: z.string().max(2048).optional(),
+});
+
+const PersistedProfileStore = z.object({
+  activeAccountIndex: z.number().int().default(0),
+  profiles: z.array(PersistedProfileEntry).max(64).default([]),
+  cocoMigrationComplete: z.record(z.string().max(32), z.boolean()).default({}),
+});
 
 export const useProfileStore = create<ProfileStore>()(
   persist(
@@ -203,11 +222,14 @@ export const useProfileStore = create<ProfileStore>()(
     {
       name: 'profile-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
       partialize: (state) => ({
         activeAccountIndex: state.activeAccountIndex,
         profiles: state.profiles,
         cocoMigrationComplete: state.cocoMigrationComplete,
       }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('profile', PersistedProfileStore),
     }
   )
 );

@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
 import { log, storeLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface CachedMintProfile {
   followers: number;
@@ -22,6 +24,19 @@ interface MintProfileActions {
 }
 
 type MintProfileStore = MintProfileState & MintProfileActions;
+
+const PersistedMintProfileStore = z.object({
+  cache: z
+    .record(
+      z.string().max(2048),
+      z.looseObject({
+        followers: z.number().int().nonnegative(),
+        reputation: z.number(),
+        timestamp: z.number().int().nonnegative(),
+      })
+    )
+    .default({}),
+});
 
 export const useMintProfileStore = create<MintProfileStore>()(
   persist(
@@ -66,7 +81,10 @@ export const useMintProfileStore = create<MintProfileStore>()(
     {
       name: 'mint-profile-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
       partialize: (state) => ({ cache: state.cache }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('mint_profile', PersistedMintProfileStore),
     }
   )
 );

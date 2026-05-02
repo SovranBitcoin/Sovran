@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
 import { log, storeLog } from '@/shared/lib/logger';
 
 import type { MintRecommendation } from '@/shared/lib/apiClient';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface CachedKYMData {
   score: number;
@@ -26,6 +28,19 @@ interface KYMMintActions {
 }
 
 type KYMMintStore = KYMMintState & KYMMintActions;
+
+const PersistedKymMintStore = z.object({
+  cache: z
+    .record(
+      z.string().max(2048),
+      z.looseObject({
+        score: z.number(),
+        recommendations: z.array(z.unknown()).max(1024),
+        timestamp: z.number().int().nonnegative(),
+      })
+    )
+    .default({}),
+});
 
 export const useKYMMintStore = create<KYMMintStore>()(
   persist(
@@ -98,8 +113,11 @@ export const useKYMMintStore = create<KYMMintStore>()(
     {
       name: 'kym-mint-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
       // Only persist the cache data
       partialize: (state) => ({ cache: state.cache }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('kym_mint', PersistedKymMintStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
           log.warn('store.kym_mint.rehydrate_failed', { error });
