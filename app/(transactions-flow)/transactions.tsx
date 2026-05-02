@@ -5,18 +5,33 @@
  * Clicking on a transaction navigates horizontally within the modal.
  * Uses native header with liquid glass buttons.
  * Includes filter button in header right that opens filter sheet.
+ *
+ * Validates the deep-link `account` (JSON-encoded) and `filter*` params
+ * at the route boundary per AUDIT.md dim-5 — `account` is fed to
+ * JSON.parse, the filter strings are downcast to closed unions.
  */
 
 import React, { useCallback } from 'react';
 import { TouchableOpacity } from 'react-native';
-import { useLocalSearchParams, router, Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
+import { z } from 'zod';
 import { TransactionsScreen, useTransactionsFilter } from '@/features/transactions';
 import { HistoryEntry, ReceiveHistoryEntry } from '@cashu/coco-core';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import opacity from 'hex-color-opacity';
+
+const ParamsSchema = z.object({
+  account: z.string().min(1).max(64_000).optional(),
+  filterCurrency: z.string().max(16).optional(),
+  filterPaymentType: z.enum(['all', 'lightning', 'ecash']).optional(),
+  filterDirection: z.enum(['all', 'incoming', 'outgoing']).optional(),
+  filterStatus: z.enum(['All', 'Confirmed', 'Pending', 'Expired']).optional(),
+  filterMintUrl: z.string().max(2048).optional(),
+});
 
 function FilterButton() {
   const [foreground, accent, accentForeground] = useThemeColor([
@@ -52,21 +67,7 @@ function FilterButton() {
 }
 
 function TransactionsRoute() {
-  const {
-    account,
-    filterCurrency,
-    filterPaymentType,
-    filterDirection,
-    filterStatus,
-    filterMintUrl,
-  } = useLocalSearchParams<{
-    account: string;
-    filterCurrency?: string;
-    filterPaymentType?: string;
-    filterDirection?: string;
-    filterStatus?: string;
-    filterMintUrl?: string;
-  }>();
+  const params = useRouteParams(ParamsSchema, { where: 'transactions-flow.transactions' });
   const {
     currency,
     paymentType,
@@ -82,12 +83,18 @@ function TransactionsRoute() {
     setMintUrl,
   } = useTransactionsFilter();
 
+  const filterCurrency = params?.filterCurrency;
+  const filterPaymentType = params?.filterPaymentType;
+  const filterDirection = params?.filterDirection;
+  const filterStatus = params?.filterStatus;
+  const filterMintUrl = params?.filterMintUrl;
+
   // Sync filter params from URL to context (when returning from filter flow)
   React.useEffect(() => {
     if (filterCurrency) setCurrency(filterCurrency);
-    if (filterPaymentType) setPaymentType(filterPaymentType as 'all' | 'lightning' | 'ecash');
-    if (filterDirection) setDirection(filterDirection as 'all' | 'incoming' | 'outgoing');
-    if (filterStatus) setStatus(filterStatus as 'All' | 'Confirmed' | 'Pending' | 'Expired');
+    if (filterPaymentType) setPaymentType(filterPaymentType);
+    if (filterDirection) setDirection(filterDirection);
+    if (filterStatus) setStatus(filterStatus);
     if (filterMintUrl) setMintUrl(filterMintUrl);
   }, [
     filterCurrency,
@@ -102,9 +109,8 @@ function TransactionsRoute() {
     setMintUrl,
   ]);
 
-  const initialAccount = account ? JSON.parse(account) : undefined;
-
-  // Handle transaction press
+  // Handle transaction press — declared before the early-return so the hook
+  // order stays stable across renders.
   const handleTransactionPress = useCallback((historyEntry: HistoryEntry) => {
     switch (historyEntry.type) {
       case 'mint': {
@@ -145,6 +151,10 @@ function TransactionsRoute() {
       }
     }
   }, []);
+
+  if (!params) return null;
+
+  const initialAccount = params.account ? JSON.parse(params.account) : undefined;
 
   return (
     <>

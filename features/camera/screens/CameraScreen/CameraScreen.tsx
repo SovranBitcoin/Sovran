@@ -4,9 +4,10 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { z } from 'zod';
 
 import {
   Host,
@@ -24,11 +25,16 @@ import { useWalletContextWithOverride } from '@/shared/providers/WalletContextPr
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Button } from '@/shared/ui/primitives/Button';
 import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 import { CameraLayout } from './CameraLayout';
 import type { CameraScreenProps, ScanningData } from './types';
 
 export type { CameraScreenProps, ScanningData } from './types';
+
+const ParamsSchema = z.object({
+  unit: z.string().max(16).optional(),
+});
 
 function applyScanResult(
   result: { urInProgress?: boolean; progress?: number; lockedPending?: boolean } | undefined,
@@ -48,7 +54,8 @@ function applyScanResult(
 
 export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
   useLifecycleLogger('CameraScreen');
-  const { unit } = useLocalSearchParams<{ unit?: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'camera' });
+  const unit = params?.unit;
   const { keys } = useNostrKeysContext();
   const selectedMints = useMintStore((state) => state.selectedMints);
   const selectedMint = keys?.pubkey ? selectedMints[keys.pubkey] : undefined;

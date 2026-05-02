@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Alert } from 'react-native';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { useSharedValue } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { z } from 'zod';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -28,6 +30,10 @@ const DISTRIBUTION_BAR_HEIGHT = 48;
 const CURRENCY_TABS_HEIGHT = 48;
 const STICKY_CONTENT_HEIGHT = DISTRIBUTION_BAR_HEIGHT + CURRENCY_TABS_HEIGHT;
 
+const ParamsSchema = z.object({
+  unit: z.string().max(16).optional(),
+});
+
 export function MintDistributionScreen() {
   useLifecycleLogger('MintDistributionScreen');
   const [foreground, background, danger] = useThemeColor([
@@ -35,7 +41,7 @@ export function MintDistributionScreen() {
     'background',
     'danger',
   ] as const);
-  const params = useLocalSearchParams<{ unit?: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'mint-flow.distribution' });
   const scrollY = useSharedValue(0);
   const { trustedMints } = useMints();
   const { balances: liveBalanceCtx } = useBalanceContext();
@@ -44,13 +50,13 @@ export function MintDistributionScreen() {
   const [mintInfoMap, setMintInfoMap] = useState<Record<string, any>>({});
 
   const routeCurrency = useMemo(() => {
-    const raw = params.unit;
+    const raw = params?.unit;
     if (!raw) return null;
-    const norm = String(raw).toLowerCase();
+    const norm = raw.toLowerCase();
     // Treat btc as sats in the UI selector
     if (norm === 'btc' || norm === 'sat') return 'SAT';
     return norm.toUpperCase();
-  }, [params.unit]);
+  }, [params?.unit]);
 
   const [selectedCurrency, setSelectedCurrency] = useState<string>('SAT');
 

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import opacity from 'hex-color-opacity';
 import Animated, { LinearTransition } from 'react-native-reanimated';
+import { z } from 'zod';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -50,6 +52,10 @@ import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 // StepState is imported from components/blocks/rebalance (groupSteps.ts)
 
+const ParamsSchema = z.object({
+  unit: z.string().max(16).optional(),
+});
+
 export function MintRebalancePlanScreen() {
   useLifecycleLogger('MintRebalancePlanScreen');
   const [foreground, surfaceTertiary, surfaceSecondary, background] = useThemeColor([
@@ -62,8 +68,8 @@ export function MintRebalancePlanScreen() {
   const fgMuted = opacity(foreground, 0.5);
   const fgDim = opacity(foreground, 0.4);
 
-  const params = useLocalSearchParams<{ unit: string }>();
-  const unit = params.unit?.toLowerCase() || 'sat';
+  const params = useRouteParams(ParamsSchema, { where: 'mint-flow.rebalancePlan' });
+  const unit = params?.unit?.toLowerCase() || 'sat';
 
   const { trustedMints } = useMints();
   const { balances: liveBalanceCtx } = useBalanceContext();

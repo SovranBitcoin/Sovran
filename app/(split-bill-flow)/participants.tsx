@@ -19,8 +19,9 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet } from 'react-native';
-import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { z } from 'zod';
 import opacity from 'hex-color-opacity';
 
 import { useSplitBillPickerContext } from './_layout';
@@ -48,8 +49,17 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const BLUETOOTH_ACCENT = '#0A84FF';
+
+const ParamsSchema = z.object({
+  totalAmount: z
+    .string()
+    .regex(/^\d{1,15}$/)
+    .optional(),
+  unit: z.string().max(16).optional(),
+});
 
 /** Small soft-entry region above the measured bar top. Rows entering this
  *  band begin fading before they ever reach the pills, so the top of the
@@ -74,12 +84,9 @@ export default function SplitBillParticipantsScreen() {
   useLifecycleLogger('SplitBillParticipantsScreen', walletLog);
   useRenderLogger('SplitBillParticipantsScreen', 120, walletLog);
   const router = useRouter();
-  const { totalAmount: totalAmountStr, unit: unitParam } = useLocalSearchParams<{
-    totalAmount?: string;
-    unit?: string;
-  }>();
-  const totalAmount = parseInt(totalAmountStr ?? '0', 10) || 0;
-  const unit = (unitParam as string) || 'sat';
+  const params = useRouteParams(ParamsSchema, { where: 'split-bill-flow.participants' });
+  const totalAmount = params?.totalAmount ? parseInt(params.totalAmount, 10) : 0;
+  const unit = params?.unit ?? 'sat';
 
   const [foreground, background, surfaceSecondary] = useThemeColor([
     'foreground',

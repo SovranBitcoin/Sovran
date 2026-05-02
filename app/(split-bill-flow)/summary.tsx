@@ -12,7 +12,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet } from 'react-native';
 import { LegendList } from '@legendapp/list';
-import { useLocalSearchParams } from 'expo-router';
+import { z } from 'zod';
 
 import { useGuardedRouter as useRouter } from '@/shared/hooks/useGuardedRouter';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -37,6 +37,11 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+
+const ParamsSchema = z.object({
+  groupId: z.string().min(1).max(256).optional(),
+});
 
 function ParticipantStatusIcon({
   participant,
@@ -87,7 +92,8 @@ export default function SplitBillSummaryScreen() {
   // one render per delivery + one per payment flip. Warn past 60.
   useRenderLogger('SplitBillSummaryScreen', 60, walletLog);
   const router = useRouter();
-  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'split-bill-flow.summary' });
+  const groupId = params?.groupId;
   const [foreground, background, danger, success] = useThemeColor([
     'foreground',
     'background',

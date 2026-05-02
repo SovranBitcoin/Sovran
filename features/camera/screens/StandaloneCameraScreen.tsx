@@ -5,24 +5,30 @@
 
 import React, { useEffect, useRef } from 'react';
 import { TouchableOpacity } from 'react-native';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack } from 'expo-router';
+import { z } from 'zod';
 
 import Icon from 'assets/icons';
 import { CameraScreen } from '@/features/camera';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useCocoPaymentUXContext } from 'coco-payment-ux/react';
 import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+
+const ParamsSchema = z.object({
+  unit: z.string().max(16).optional(),
+  action: z.enum(['nfc-pay']).optional(),
+});
 
 export function StandaloneCameraScreen() {
   useLifecycleLogger('StandaloneCameraScreen');
-  const { unit, action } = useLocalSearchParams<{ unit: string; action: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'camera.standalone' });
+  const action = params?.action;
   const foreground = useThemeColor('foreground');
   const { machine } = useCocoPaymentUXContext();
 
   const nfcFiredRef = useRef(false);
-  const shouldAutoStartNfc = Array.isArray(action)
-    ? action.includes('nfc-pay')
-    : action === 'nfc-pay';
+  const shouldAutoStartNfc = action === 'nfc-pay';
 
   useEffect(() => {
     if (!shouldAutoStartNfc) {

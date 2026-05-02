@@ -1,6 +1,7 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react';
 import { ScrollView, Animated, Linking, Easing, StyleSheet, TouchableOpacity } from 'react-native';
-import { Stack, useLocalSearchParams, Link } from 'expo-router';
+import { Stack, Link } from 'expo-router';
+import { z } from 'zod';
 
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -23,7 +24,12 @@ import { useScreenActions } from 'coco-payment-ux/react';
 import opacity from 'hex-color-opacity';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+
+const ParamsSchema = z.object({
+  mintInfoEntry: z.string().min(1).max(64_000).optional(),
+});
 
 function ProgressRingComponent({
   size = 84,
@@ -410,8 +416,8 @@ export function MintInfoScreen() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const [danger, success, warning] = useThemeColor(['danger', 'success', 'yellow-300'] as const);
   const insets = useSafeAreaInsets();
-  const { mintInfoEntry: entryParam } = useLocalSearchParams<{ mintInfoEntry?: string }>();
-  const { entry, actions } = useScreenActions('mintInfo', entryParam);
+  const params = useRouteParams(ParamsSchema, { where: 'mint-flow.info' });
+  const { entry, actions } = useScreenActions('mintInfo', params?.mintInfoEntry);
 
   const mintUrl = (entry?.mintUrl as string) ?? '';
   const displayName = (entry?.displayName as string) ?? mintUrl;

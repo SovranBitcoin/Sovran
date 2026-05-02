@@ -17,9 +17,10 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { LegendList, type LegendListRef } from '@legendapp/list';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useManager } from '@cashu/coco-react';
+import { z } from 'zod';
 import opacity from 'hex-color-opacity';
 
 import {
@@ -42,6 +43,11 @@ import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+
+const ParamsSchema = z.object({
+  groupId: z.string().min(1).max(256).optional(),
+});
 
 function StatusBadge({
   participant,
@@ -87,7 +93,8 @@ function participantSubtitle(p: SplitBillParticipant): string {
 
 export default function SplitBillDetailScreen() {
   useLifecycleLogger('SplitBillDetailScreen', walletLog);
-  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'split-bill-flow.detail' });
+  const groupId = params?.groupId;
   const [foreground, background, danger, success] = useThemeColor([
     'foreground',
     'background',

@@ -1,7 +1,9 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { FlatList } from 'react-native';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router } from 'expo-router';
+import { z } from 'zod';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -18,6 +20,14 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
 import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+
+const ParamsSchema = z.object({
+  mintUrl: z
+    .string()
+    .min(1)
+    .max(2048)
+    .regex(/^https?:\/\//, 'mintUrl must be http(s)'),
+});
 
 const StarRating = React.memo(function StarRating({
   score,
@@ -284,7 +294,8 @@ export function MintReviewsScreen() {
   useLifecycleLogger('MintReviewsScreen');
   const background = useThemeColor('background');
   const insets = useSafeAreaInsets();
-  const { mintUrl } = useLocalSearchParams<{ mintUrl: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'mint-flow.reviews' });
+  const mintUrl = params?.mintUrl;
 
   const [kymLoading, setKymLoading] = useState(true);
   const cached = useKYMMintStore((s) => (mintUrl ? s.getCached(mintUrl) : undefined));

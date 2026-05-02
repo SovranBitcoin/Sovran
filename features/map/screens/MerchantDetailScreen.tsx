@@ -6,9 +6,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import * as Linking from 'expo-linking';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShallow } from 'zustand/react/shallow';
+import { z } from 'zod';
 
 import Icon from 'assets/icons';
 import { Section } from '@/features/settings';
@@ -22,6 +23,11 @@ import { useBTCMapStore, BTCMapPlaceDetails } from '@/shared/stores/global/btcMa
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+
+const ParamsSchema = z.object({
+  placeId: z.string().regex(/^\d{1,15}$/, 'placeId must be a positive integer'),
+});
 
 const CATEGORIES: Record<string, { icons: string[] }> = {
   food: { icons: ['local_cafe', 'lunch_dining', 'restaurant', 'bakery_dining'] },
@@ -59,7 +65,8 @@ export function MerchantDetailScreen() {
     'background',
   ] as const);
   const insets = useSafeAreaInsets();
-  const { placeId } = useLocalSearchParams<{ placeId: string }>();
+  const params = useRouteParams(ParamsSchema, { where: 'map-flow.detail' });
+  const placeId = params?.placeId;
   const { fetchPlaceDetails, getCachedPlaceDetails } = useBTCMapStore(
     useShallow((s) => ({
       fetchPlaceDetails: s.fetchPlaceDetails,

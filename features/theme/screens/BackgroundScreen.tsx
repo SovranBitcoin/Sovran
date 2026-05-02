@@ -8,14 +8,16 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, StyleSheet, useWindowDimensions } from 'react-native';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import PagerView from 'react-native-pager-view';
+import { z } from 'zod';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useLifecycleLogger, log } from '@/shared/lib/logger';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeDraft } from '@/features/theme/lib/themeDraft';
 import { useAlbumList } from '@/features/theme/lib/useAlbumList';
@@ -28,11 +30,15 @@ const GRID_GAP = 10;
 const GRID_HORIZONTAL_PADDING = 20;
 const TABS_AREA_HEIGHT = 56;
 
+const ParamsSchema = z.object({
+  unitId: z.string().max(16).optional(),
+});
+
 export function BackgroundScreen() {
   useLifecycleLogger('BackgroundScreen');
 
-  const { unitId: unitIdParam } = useLocalSearchParams<{ unitId?: string }>();
-  const unitId = unitIdParam ?? 'sat';
+  const params = useRouteParams(ParamsSchema, { where: 'theme-flow.background' });
+  const unitId = params?.unitId ?? 'sat';
 
   const { width: screenWidth, height: windowHeight } = useWindowDimensions();
   const headerHeight = useHeaderHeight();
@@ -80,19 +86,16 @@ export function BackgroundScreen() {
       setActiveIndex(idx);
       pagerRef.current?.setPage(idx);
     },
-    [tabLabels],
+    [tabLabels]
   );
 
-  const onPageSelected = useCallback(
-    (event: { nativeEvent: { position: number } }) => {
-      const idx = event.nativeEvent.position;
-      setActiveIndex(idx);
-    },
-    [],
-  );
+  const onPageSelected = useCallback((event: { nativeEvent: { position: number } }) => {
+    const idx = event.nativeEvent.position;
+    setActiveIndex(idx);
+  }, []);
 
   const cardWidth = Math.floor(
-    (screenWidth - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS,
+    (screenWidth - GRID_HORIZONTAL_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS
   );
   const cardHeight = Math.round(cardWidth * 1.55);
 
@@ -102,14 +105,13 @@ export function BackgroundScreen() {
       setUnitWallpaper(unitId, themeName);
       router.back();
     },
-    [setUnitWallpaper, unitId],
+    [setUnitWallpaper, unitId]
   );
 
   // Pager needs explicit height; carve out the space between tabs and the
   // bottom safe area so each page's grid can scroll vertically inside its
   // own bounds.
-  const pagerHeight =
-    windowHeight - headerHeight - TABS_AREA_HEIGHT - insets.bottom - 8;
+  const pagerHeight = windowHeight - headerHeight - TABS_AREA_HEIGHT - insets.bottom - 8;
 
   return (
     <>
@@ -194,7 +196,7 @@ const AlbumPage = React.memo(function AlbumPage({
         </View>
       );
     },
-    [catalog, draftUnitTheme, cardWidth, cardHeight, onPick],
+    [catalog, draftUnitTheme, cardWidth, cardHeight, onPick]
   );
 
   return (
