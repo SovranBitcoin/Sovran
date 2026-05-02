@@ -13,7 +13,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { log, storeLog } from '@/shared/lib/logger';
+import { storeLog } from '@/shared/lib/logger';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 export interface ProfileEntry {
@@ -141,7 +141,7 @@ export const useProfileStore = create<ProfileStore>()(
         const { profiles } = get();
         // Only switch if the profile exists
         if (!profiles.some((p) => p.accountIndex === accountIndex)) {
-          log.warn('store.profile.unknown_profile', { accountIndex });
+          storeLog.warn('store.profile.unknown_profile', { accountIndex });
           return false;
         }
         storeLog.info('store.profile.switch', { accountIndex });
@@ -153,12 +153,12 @@ export const useProfileStore = create<ProfileStore>()(
         const { profiles, activeAccountIndex } = get();
         // Cannot remove the last profile
         if (profiles.length <= 1) {
-          log.warn('store.profile.cannot_remove_last');
+          storeLog.warn('store.profile.cannot_remove_last');
           return false;
         }
         // Cannot remove the currently active profile
         if (accountIndex === activeAccountIndex) {
-          log.warn('store.profile.cannot_remove_active');
+          storeLog.warn('store.profile.cannot_remove_active');
           return false;
         }
         storeLog.info('store.profile.remove', { accountIndex });

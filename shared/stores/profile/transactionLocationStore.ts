@@ -10,7 +10,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
@@ -104,7 +104,7 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
         try {
           await clearPersistedStore(useTransactionLocationStore, { locations: {} });
         } catch (error) {
-          log.error('store.tx_location.clear_failed', { error });
+          storeLog.error('store.tx_location.clear_failed', { error: redactError(error) });
           throw error;
         }
       },
@@ -120,7 +120,7 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
       merge: createMergeWithSchema('tx_location', PersistedTransactionLocationStore),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
-          log.warn('store.tx_location.rehydrate_failed', { error });
+          storeLog.warn('store.tx_location.rehydrate_failed', { error: redactError(error) });
         }
       },
     }

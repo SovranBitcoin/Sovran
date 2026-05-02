@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
@@ -160,7 +160,7 @@ export const usePricelistStore = create<PricelistStore>()(
       merge: createMergeWithSchema('pricelist', PersistedPricelistStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          log.warn('store.pricelist.rehydrate_failed', { error });
+          storeLog.warn('store.pricelist.rehydrate_failed', { error: redactError(error) });
         }
       },
     }

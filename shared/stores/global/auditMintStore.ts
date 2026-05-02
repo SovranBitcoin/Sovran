@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
@@ -104,7 +104,7 @@ export const useAuditMintStore = create<AuditMintStore>()(
         try {
           await clearPersistedStore(useAuditMintStore, { cache: {} });
         } catch (error) {
-          log.error('store.audit_mint.clear_failed', { error });
+          storeLog.error('store.audit_mint.clear_failed', { error: redactError(error) });
           throw error;
         }
       },
@@ -119,7 +119,7 @@ export const useAuditMintStore = create<AuditMintStore>()(
       merge: createMergeWithSchema('audit_mint', PersistedAuditMintStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          log.warn('store.audit_mint.rehydrate_failed', { error });
+          storeLog.warn('store.audit_mint.rehydrate_failed', { error: redactError(error) });
         }
       },
     }

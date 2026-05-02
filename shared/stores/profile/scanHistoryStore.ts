@@ -14,7 +14,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
@@ -130,26 +130,22 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
         optionKinds?: string[]
       ) => {
         storeLog.info('store.scan_history.add', { type, source, inputType, container });
-        const { entries } = get();
         const now = Date.now();
 
-        // Check if this raw string was already scanned
-        const existingIndex = entries.findIndex((entry) => entry.raw === raw);
-
-        if (existingIndex !== -1) {
-          // Update timestamp and source for existing entry
-          const updated = [...entries];
-          updated[existingIndex] = {
-            ...updated[existingIndex],
-            source,
-            scannedAt: now,
-            ...(inputType != null && { inputType }),
-            ...(container != null && { container }),
-            ...(optionKinds != null && { optionKinds }),
-          };
-          set({ entries: updated });
-        } else {
-          // Add new entry
+        set((state) => {
+          const existingIndex = state.entries.findIndex((entry) => entry.raw === raw);
+          if (existingIndex !== -1) {
+            const updated = [...state.entries];
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              source,
+              scannedAt: now,
+              ...(inputType != null && { inputType }),
+              ...(container != null && { container }),
+              ...(optionKinds != null && { optionKinds }),
+            };
+            return { entries: updated };
+          }
           const newEntry: ScanHistoryEntry = {
             id: generateId(),
             raw,
@@ -161,8 +157,8 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
             ...(optionKinds != null && { optionKinds }),
             scannedAt: now,
           };
-          set({ entries: [...entries, newEntry] });
-        }
+          return { entries: [...state.entries, newEntry] };
+        });
       },
 
       // Get all entries
@@ -215,24 +211,19 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
         if (!processed || !transactionId) return;
         storeLog.debug('store.scan_history.link_transaction', { transactionId });
 
-        const { entries } = get();
-        const index = entries.findIndex((entry) => entry.processed === processed);
-
-        if (index !== -1) {
-          const updated = [...entries];
-          updated[index] = {
-            ...updated[index],
-            transactionId,
-          };
-          set({ entries: updated });
-        }
+        set((state) => {
+          const index = state.entries.findIndex((entry) => entry.processed === processed);
+          if (index === -1) return state;
+          const updated = [...state.entries];
+          updated[index] = { ...updated[index], transactionId };
+          return { entries: updated };
+        });
       },
 
       // Remove entry by id
       removeEntry: (id: string) => {
         storeLog.debug('store.scan_history.remove', { id });
-        const { entries } = get();
-        set({ entries: entries.filter((entry) => entry.id !== id) });
+        set((state) => ({ entries: state.entries.filter((entry) => entry.id !== id) }));
       },
 
       // Clear all history
@@ -244,8 +235,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       // Clear history for a specific type
       clearHistoryByType: (type: ScanType) => {
         storeLog.info('store.scan_history.clear_by_type', { type });
-        const { entries } = get();
-        set({ entries: entries.filter((entry) => entry.type !== type) });
+        set((state) => ({ entries: state.entries.filter((entry) => entry.type !== type) }));
       },
 
       // Clear all stored data (state + AsyncStorage)
@@ -253,7 +243,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
         try {
           await clearPersistedStore(useScanHistoryStore, { entries: [] });
         } catch (error) {
-          log.error('store.scan_history.clear_failed', { error });
+          storeLog.error('store.scan_history.clear_failed', { error: redactError(error) });
           throw error;
         }
       },
@@ -267,7 +257,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       merge: createMergeWithSchema('scan_history', PersistedScanHistoryStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          log.warn('store.scan_history.rehydrate_failed', { error });
+          storeLog.warn('store.scan_history.rehydrate_failed', { error: redactError(error) });
         }
       },
     }

@@ -923,6 +923,28 @@ export const storeLog = log.child({ module: 'store' });
 export const aiLog = log.child({ module: 'ai' });
 export const chatLog = log.child({ module: 'chat' });
 
+/**
+ * Narrow an unknown caught value to a stable `{ name, message }` shape suitable
+ * for the ring buffer. `compactValue` already truncates `Error` instances, but
+ * non-Error throws (third-party SDKs that throw plain objects with `cause`,
+ * `config`, or response payloads attached) flow through as plain objects and
+ * dump every enumerable field. Stores and key-bearing modules see those throws
+ * and a careless `{ error }` spread can leak headers, secrets, or settings
+ * snapshots into the LLM dump. Always route catch sites through this helper.
+ */
+export function redactError(e: unknown): { name: string; message: string } {
+  if (e instanceof Error) return { name: e.name, message: e.message };
+  if (typeof e === 'string') return { name: 'NonError', message: e };
+  if (e && typeof e === 'object') {
+    const o = e as { name?: unknown; message?: unknown };
+    return {
+      name: typeof o.name === 'string' ? o.name : 'NonError',
+      message: typeof o.message === 'string' ? o.message : '[non-error object]',
+    };
+  }
+  return { name: 'NonError', message: String(e) };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // JS Thread Blocking Detector
 // ═══════════════════════════════════════════════════════════════════════════════

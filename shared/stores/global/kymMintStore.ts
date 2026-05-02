@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 
 import type { MintRecommendation } from '@/shared/lib/apiClient';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
@@ -104,7 +104,7 @@ export const useKYMMintStore = create<KYMMintStore>()(
         try {
           await clearPersistedStore(useKYMMintStore, { cache: {} });
         } catch (error) {
-          log.error('store.kym_mint.clear_failed', { error });
+          storeLog.error('store.kym_mint.clear_failed', { error: redactError(error) });
           throw error;
         }
       },
@@ -119,7 +119,7 @@ export const useKYMMintStore = create<KYMMintStore>()(
       merge: createMergeWithSchema('kym_mint', PersistedKymMintStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          log.warn('store.kym_mint.rehydrate_failed', { error });
+          storeLog.warn('store.kym_mint.rehydrate_failed', { error: redactError(error) });
         }
       },
     }

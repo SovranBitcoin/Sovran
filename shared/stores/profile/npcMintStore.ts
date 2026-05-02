@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { NPCClient, JWTAuthProvider } from 'npubcash-sdk';
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
 import { z } from 'zod';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
@@ -112,7 +112,7 @@ export const useNpcMintStore = create<NpcMintStore>()(
 
           return getOrDefault(get().mintUrls, pubkey);
         } catch (error) {
-          log.warn('store.npc_mint.sync_failed', { error });
+          storeLog.warn('store.npc_mint.sync_failed', { error: redactError(error) });
           return getOrDefault(get().mintUrls, pubkey);
         } finally {
           set({ isSyncing: false });
@@ -141,7 +141,7 @@ export const useNpcMintStore = create<NpcMintStore>()(
           }));
           return true;
         } catch (error) {
-          log.error('store.npc_mint.update_failed', { error });
+          storeLog.error('store.npc_mint.update_failed', { error: redactError(error) });
           return false;
         } finally {
           set({ isUpdating: false });

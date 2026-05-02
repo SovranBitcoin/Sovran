@@ -19,7 +19,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
@@ -144,7 +144,7 @@ export const useThemeStore = create<ThemeStore>()(
       applyAlbum: (albumSlug, unitIds) => {
         const pool = getCatalogThemesForAlbum(albumSlug);
         if (pool.length === 0) {
-          log.warn('theme.apply_album.empty_pool', { albumSlug });
+          storeLog.warn('theme.apply_album.empty_pool', { albumSlug });
           return;
         }
         const seed = `${getActiveProfilePubkey()}:${albumSlug}`;
@@ -198,7 +198,7 @@ export const useThemeStore = create<ThemeStore>()(
             mode: DEFAULT_MODE,
           });
         } catch (error) {
-          log.error('store.theme.clear_failed', { error });
+          storeLog.error('store.theme.clear_failed', { error: redactError(error) });
           throw error;
         }
       },
@@ -215,7 +215,7 @@ export const useThemeStore = create<ThemeStore>()(
       migrate: (state, _version) => state,
       merge: createMergeWithSchema('theme', PersistedThemeStore),
       onRehydrateStorage: () => (_state, error) => {
-        if (error) log.warn('store.theme.rehydrate_failed', { error });
+        if (error) storeLog.warn('store.theme.rehydrate_failed', { error: redactError(error) });
         useThemeStore.setState({ _hasHydrated: true });
       },
     }

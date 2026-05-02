@@ -14,7 +14,7 @@
 
 import { create } from 'zustand';
 
-import { log } from '@/shared/lib/logger';
+import { paymentLog } from '@/shared/lib/logger';
 
 export type SwapLegStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
 
@@ -66,7 +66,7 @@ export interface SwapStatusStore {
 export const useSwapStatusStore = create<SwapStatusStore>((set, get) => ({
   active: null,
   start: ({ id, unit, totalAmount, groupId, legs }) => {
-    log.info('swap.status.start', { id, groupId, legCount: legs.length, totalAmount, unit });
+    paymentLog.info('swap.status.start', { id, groupId, legCount: legs.length, totalAmount, unit });
     set({
       active: {
         id,
@@ -114,7 +114,7 @@ export const useSwapStatusStore = create<SwapStatusStore>((set, get) => ({
   complete: () => {
     const cur = get().active;
     if (!cur) return;
-    log.info('swap.status.complete', {
+    paymentLog.info('swap.status.complete', {
       id: cur.id,
       durationMs: Date.now() - cur.startedAt,
       doneLegs: cur.legs.filter((l) => l.status === 'done').length,
@@ -125,7 +125,7 @@ export const useSwapStatusStore = create<SwapStatusStore>((set, get) => ({
   fail: (errorMessage) => {
     const cur = get().active;
     if (!cur) return;
-    log.warn('swap.status.fail', {
+    paymentLog.warn('swap.status.fail', {
       id: cur.id,
       durationMs: Date.now() - cur.startedAt,
       errorMessage,
@@ -133,7 +133,7 @@ export const useSwapStatusStore = create<SwapStatusStore>((set, get) => ({
     set({ active: { ...cur, state: 'failed', errorMessage } });
   },
   clear: () => {
-    if (get().active) log.debug('swap.status.clear');
+    if (get().active) paymentLog.debug('swap.status.clear');
     set({ active: null });
   },
 }));

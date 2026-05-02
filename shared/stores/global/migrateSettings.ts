@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { log } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import { useSettingsStore } from './settingsStore';
 
 /**
@@ -8,12 +8,12 @@ import { useSettingsStore } from './settingsStore';
  */
 export const migrateSettingsFromRedux = async (reduxState?: any) => {
   try {
-    log.info('settings.migration.start');
+    storeLog.info('settings.migration.start');
 
     // Check if we already have Zustand settings
     const existingZustandSettings = await AsyncStorage.getItem('settings-store');
     if (existingZustandSettings) {
-      log.debug('settings.migration.already_exists');
+      storeLog.debug('settings.migration.already_exists');
       return;
     }
 
@@ -22,24 +22,35 @@ export const migrateSettingsFromRedux = async (reduxState?: any) => {
     if (reduxState) {
       // Use the provided Redux state (from migration context)
       settings = reduxState.settings?.settings;
-      log.debug('settings.migration.using_redux_state', { settings });
     } else {
       // Try to get Redux settings from AsyncStorage
       const reduxSettings = await AsyncStorage.getItem('persist:root');
       if (!reduxSettings) {
-        log.debug('settings.migration.no_redux_settings');
+        storeLog.debug('settings.migration.no_redux_settings');
         return;
       }
 
       const parsedReduxSettings = JSON.parse(reduxSettings);
       settings = parsedReduxSettings.settings?.settings;
-      log.debug('settings.migration.found_redux_settings', { settings });
     }
 
     if (!settings) {
-      log.debug('settings.migration.no_settings_in_redux');
+      storeLog.debug('settings.migration.no_settings_in_redux');
       return;
     }
+
+    // Never log the full `settings` object: legacy Redux state can carry a
+    // plaintext passcode, and the ring buffer is exfiltrable via dumpForLLM.
+    // Log only field presence so the migration is debuggable without leakage.
+    storeLog.debug('settings.migration.found_redux_settings', {
+      source: reduxState ? 'context' : 'async_storage',
+      has: {
+        lang: !!settings.lang,
+        display_btc: settings.display_btc !== undefined,
+        experimental: settings.experimental !== undefined,
+        termsAccepted: !!settings.termsAccepted,
+      },
+    });
 
     // Migrate the settings
     const zustandStore = useSettingsStore.getState();
@@ -50,32 +61,34 @@ export const migrateSettingsFromRedux = async (reduxState?: any) => {
 
     // Set language
     if (settings.lang) {
-      log.debug('settings.migration.language', { lang: settings.lang });
+      storeLog.debug('settings.migration.language', { lang: settings.lang });
       zustandStore.setLanguage(settings.lang);
     }
 
     // Set display BTC
     if (settings.display_btc !== undefined) {
-      log.debug('settings.migration.display_btc', { displayBtc: settings.display_btc });
+      storeLog.debug('settings.migration.display_btc', { displayBtc: settings.display_btc });
       zustandStore.setDisplayBtc(settings.display_btc);
     }
 
     // Set experimental
     if (settings.experimental !== undefined) {
-      log.debug('settings.migration.experimental', { experimental: settings.experimental });
+      storeLog.debug('settings.migration.experimental', { experimental: settings.experimental });
       zustandStore.setExperimental(settings.experimental);
     }
 
-    // Set terms accepted
+    // Set terms accepted — log only the date, never the wider structure.
     if (settings.termsAccepted) {
-      log.debug('settings.migration.terms_accepted', { termsAccepted: settings.termsAccepted });
+      storeLog.debug('settings.migration.terms_accepted', {
+        date: settings.termsAccepted.date,
+      });
       zustandStore.acceptTerms(settings.termsAccepted.date);
     }
 
     // Note: Passcode is not migrated for security reasons
 
-    log.info('settings.migration.done');
+    storeLog.info('settings.migration.done');
   } catch (error) {
-    log.error('settings.migration.failed', { error });
+    storeLog.error('settings.migration.failed', { error: redactError(error) });
   }
 };

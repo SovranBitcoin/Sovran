@@ -24,7 +24,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
@@ -481,7 +481,7 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
             quoteIdToSplitBill: {},
           });
         } catch (error) {
-          log.error('store.split_bill.clear_failed', { error });
+          storeLog.error('store.split_bill.clear_failed', { error: redactError(error) });
           throw error;
         }
       },
@@ -498,7 +498,7 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
       merge: createMergeWithSchema('split_bill', PersistedSplitBillStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          log.warn('store.split_bill.rehydrate_failed', { error });
+          storeLog.warn('store.split_bill.rehydrate_failed', { error: redactError(error) });
         }
       },
     }

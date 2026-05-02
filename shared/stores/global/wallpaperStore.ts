@@ -10,7 +10,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { log } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import {
   registerDownloadedTheme,
   unregisterDownloadedTheme,
@@ -149,7 +149,7 @@ export const useWallpaperStore = create<WallpaperState>()(
           albums: normalizedAlbums,
           catalogLastFetched: Date.now(),
         });
-        log.info('wallpaper.catalog.updated', {
+        storeLog.info('wallpaper.catalog.updated', {
           count: wallpapers.length,
           albums: normalizedAlbums.length,
         });
@@ -198,10 +198,9 @@ export const useWallpaperStore = create<WallpaperState>()(
 
           return true;
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error ?? 'Unknown error');
-          log.error('wallpaper.download.failed', {
+          storeLog.error('wallpaper.download.failed', {
             themeName,
-            error: message,
+            error: redactError(error),
             url: entry.blossomUrl,
           });
 
@@ -264,7 +263,7 @@ export const useWallpaperStore = create<WallpaperState>()(
         for (const [themeName, wallpaper] of Object.entries(downloaded)) {
           const exists = await isWallpaperDownloaded(themeName);
           if (!exists) {
-            log.warn('wallpaper.integrity.missing', { themeName });
+            storeLog.warn('wallpaper.integrity.missing', { themeName });
             unregisterDownloadedTheme(themeName);
             orphans.push(themeName);
           }
@@ -319,7 +318,7 @@ export const useWallpaperStore = create<WallpaperState>()(
       merge: createMergeWithSchema('wallpaper', PersistedWallpaperStore),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
-          log.warn('wallpaper.store.rehydrate_failed', { error });
+          storeLog.warn('wallpaper.store.rehydrate_failed', { error: redactError(error) });
           useWallpaperStore.setState({ _hasHydrated: true });
           return;
         }
@@ -336,7 +335,7 @@ export const useWallpaperStore = create<WallpaperState>()(
               gradientColors: wallpaper.gradientColors,
             });
           }
-          log.info('wallpaper.store.rehydrated', {
+          storeLog.info('wallpaper.store.rehydrated', {
             downloaded: Object.keys(state.downloaded).length,
             catalog: state.catalog?.length ?? 0,
           });

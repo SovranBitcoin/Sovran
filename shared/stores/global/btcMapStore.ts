@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import {
   BtcMapPlaceDetails as BtcMapPlaceDetailsSchema,
   BtcMapPlacesResponse,
@@ -278,7 +278,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
 
           return data;
         } catch (error: unknown) {
-          log.error('store.btc_map.fetch_details_failed', { error });
+          storeLog.error('store.btc_map.fetch_details_failed', { error: redactError(error) });
           set({ isLoadingDetails: false });
           throw error;
         }
@@ -310,7 +310,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
             error: null,
           });
         } catch (error) {
-          log.error('store.btc_map.clear_failed', { error });
+          storeLog.error('store.btc_map.clear_failed', { error: redactError(error) });
           throw error;
         }
       },
@@ -327,7 +327,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
       merge: createMergeWithSchema('btc_map', PersistedBtcMapStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          log.warn('store.btc_map.rehydrate_failed', { error });
+          storeLog.warn('store.btc_map.rehydrate_failed', { error: redactError(error) });
         }
       },
     }

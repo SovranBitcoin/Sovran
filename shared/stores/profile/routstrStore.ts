@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import { RoutstrModel } from '@/shared/lib/routstr/api';
 import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
@@ -475,7 +475,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
             activeChildren: session.activeChildren ?? {},
           });
         } else {
-          log.warn('store.routstr.session_not_found', { sessionId });
+          storeLog.warn('store.routstr.session_not_found', { sessionId });
         }
       },
 
@@ -571,7 +571,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
             isAnonymousMode: false,
           });
         } catch (error) {
-          log.error('store.routstr.clear_failed', { error });
+          storeLog.error('store.routstr.clear_failed', { error: redactError(error) });
           throw error;
         }
       },
@@ -593,7 +593,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
       merge: createMergeWithSchema('routstr', PersistedRoutstrStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          log.warn('store.routstr.rehydrate_failed', { error });
+          storeLog.warn('store.routstr.rehydrate_failed', { error: redactError(error) });
         }
       },
     }

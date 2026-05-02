@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { ReactNode } from 'react';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import type { PopupIcon, PopupTextSegment } from '@/shared/lib/popup';
 import type { LiveSheetConfig, LiveSheetStatus } from '@/shared/lib/popup/liveSheetTypes';
 import type { ActionSheetPayloads } from '@/shared/lib/popup/actionSheetTypes';
@@ -75,7 +75,7 @@ export const usePopupStore = create<PopupStore>((set, get) => ({
       try {
         current.onClose({ reason: 'dismiss' });
       } catch (error) {
-        log.error('store.popup.on_close_failed', { error });
+        storeLog.error('store.popup.on_close_failed', { error: redactError(error) });
       }
     }
     set({ current: null, isOpen: false });
@@ -87,7 +87,7 @@ export const usePopupStore = create<PopupStore>((set, get) => ({
       try {
         current.onClose({ reason: 'dismiss' });
       } catch (error) {
-        log.error('store.popup.on_close_failed', { error });
+        storeLog.error('store.popup.on_close_failed', { error: redactError(error) });
       }
     }
     set({ current: null, isOpen: false, destroyed: true });

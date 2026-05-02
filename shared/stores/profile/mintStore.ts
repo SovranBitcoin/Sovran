@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
@@ -55,7 +55,7 @@ export const useMintStore = create<MintStore>()(
         try {
           await clearPersistedStore(useMintStore, { selectedMints: {} });
         } catch (error) {
-          log.error('store.mint.clear_failed', { error });
+          storeLog.error('store.mint.clear_failed', { error: redactError(error) });
           throw error;
         }
       },
@@ -71,7 +71,7 @@ export const useMintStore = create<MintStore>()(
       merge: createMergeWithSchema('mint', PersistedMintStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
-          log.warn('store.mint.rehydrate_failed', { error });
+          storeLog.warn('store.mint.rehydrate_failed', { error: redactError(error) });
         }
       },
     }

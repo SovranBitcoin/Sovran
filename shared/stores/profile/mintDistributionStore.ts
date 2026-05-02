@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
@@ -512,7 +512,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
         try {
           await clearPersistedStore(useMintDistributionStore, { distributions: {} });
         } catch (error) {
-          log.error('store.mint_dist.clear_failed', { error });
+          storeLog.error('store.mint_dist.clear_failed', { error: redactError(error) });
           throw error;
         }
       },
@@ -526,9 +526,9 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
       merge: createMergeWithSchema('mint_dist', PersistedMintDistributionStore),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
-          log.warn('store.mint_dist.rehydrate_failed', { error });
+          storeLog.warn('store.mint_dist.rehydrate_failed', { error: redactError(error) });
         } else if (__DEV__) {
-          log.debug('store.mint_dist.rehydrated', { distributions: state?.distributions });
+          storeLog.debug('store.mint_dist.rehydrated', { distributions: state?.distributions });
         }
       },
     }

@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { isBackgroundImageTheme } from 'config/backgroundImageThemes';
-import { log, storeLog } from '@/shared/lib/logger';
+import { redactError, storeLog } from '@/shared/lib/logger';
 import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
@@ -349,7 +349,7 @@ export const useSettingsStore = create<SettingsStore>()(
         try {
           await clearPersistedStore(useSettingsStore, { ...DEFAULT_SETTINGS, passcode: '' });
         } catch (error) {
-          log.error('store.settings.clear_failed', { error });
+          storeLog.error('store.settings.clear_failed', { error: redactError(error) });
           throw error;
         }
       },
@@ -381,7 +381,7 @@ export const useSettingsStore = create<SettingsStore>()(
       merge: createMergeWithSchema('settings', PersistedSettings),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
-          log.warn('store.settings.rehydrate_failed', { error });
+          storeLog.warn('store.settings.rehydrate_failed', { error: redactError(error) });
           return;
         }
         if (state?.mockMode) {

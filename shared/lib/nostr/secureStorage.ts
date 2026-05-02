@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 
-import { log } from '../logger';
+import { nostrLog, redactError } from '../logger';
 
 // Keys for secure storage
 const STORAGE_KEYS = {
@@ -73,7 +73,7 @@ export async function storeMnemonic(mnemonic: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    log.error('nostr.secure.store_mnemonic_failed', { error });
+    nostrLog.error('nostr.secure.store_mnemonic_failed', { error: redactError(error) });
     return false;
   }
 }
@@ -90,7 +90,7 @@ export async function retrieveMnemonic(): Promise<string | null> {
 
     return mnemonic;
   } catch (error) {
-    log.error('nostr.secure.retrieve_mnemonic_failed', { error });
+    nostrLog.error('nostr.secure.retrieve_mnemonic_failed', { error: redactError(error) });
     return null;
   }
 }
@@ -110,7 +110,7 @@ async function generateMnemonic(): Promise<GeneratedMnemonic> {
   try {
     const debugMnemonic = getDebugMnemonicOverride();
     if (debugMnemonic) {
-      log.debug('nostr.secure.using_debug_mnemonic');
+      nostrLog.debug('nostr.secure.using_debug_mnemonic');
       return { mnemonic: debugMnemonic, source: 'debug' };
     }
 
@@ -121,10 +121,10 @@ async function generateMnemonic(): Promise<GeneratedMnemonic> {
     // Generate mnemonic from entropy
     const mnemonic = bip39.entropyToMnemonic(entropy, wordlist);
 
-    log.info('nostr.secure.mnemonic_generated');
+    nostrLog.info('nostr.secure.mnemonic_generated');
     return { mnemonic, source: 'fresh' };
   } catch (error) {
-    log.error('nostr.secure.generate_mnemonic_failed', { error });
+    nostrLog.error('nostr.secure.generate_mnemonic_failed', { error: redactError(error) });
     throw new Error('Failed to generate mnemonic');
   }
 }
@@ -138,22 +138,22 @@ export async function ensureMnemonicExists(): Promise<string | null> {
     // Check if mnemonic already exists
     const existingMnemonic = await retrieveMnemonic();
     if (existingMnemonic) {
-      log.debug('nostr.secure.mnemonic_exists');
+      nostrLog.debug('nostr.secure.mnemonic_exists');
       return existingMnemonic;
     }
 
     // Generate new mnemonic
-    log.info('nostr.secure.generating_mnemonic');
+    nostrLog.info('nostr.secure.generating_mnemonic');
     const generated = await generateMnemonic();
 
     // Store the new mnemonic
     const stored = await storeMnemonic(generated.mnemonic);
     if (!stored) {
-      log.error('nostr.secure.store_new_mnemonic_failed');
+      nostrLog.error('nostr.secure.store_new_mnemonic_failed');
       return null;
     }
 
-    log.info('nostr.secure.mnemonic_stored', { source: generated.source });
+    nostrLog.info('nostr.secure.mnemonic_stored', { source: generated.source });
 
     // Only mark seedCreatedAt for *fresh* seeds (real user fresh-install path).
     // Debug-injected seeds via EXPO_PUBLIC_DEBUG_MNEMONIC must look like a
@@ -162,21 +162,20 @@ export async function ensureMnemonicExists(): Promise<string | null> {
     // after reinstall / iCloud restore / profile reset.
     if (generated.source === 'fresh') {
       try {
-        const { useWalletLifecycleStore } = await import(
-          '@/shared/stores/global/walletLifecycleStore'
-        );
+        const { useWalletLifecycleStore } =
+          await import('@/shared/stores/global/walletLifecycleStore');
         useWalletLifecycleStore.getState().markSeedCreatedNow();
       } catch (markError) {
-        log.warn('nostr.secure.mark_seed_created_failed', { error: markError });
+        nostrLog.warn('nostr.secure.mark_seed_created_failed', { error: redactError(markError) });
       }
     } else {
-      log.info('nostr.secure.skip_mark_seed_created', {
+      nostrLog.info('nostr.secure.skip_mark_seed_created', {
         reason: 'debug_mnemonic_treated_as_pre_existing',
       });
     }
     return generated.mnemonic;
   } catch (error) {
-    log.error('nostr.secure.ensure_mnemonic_failed', { error });
+    nostrLog.error('nostr.secure.ensure_mnemonic_failed', { error: redactError(error) });
     return null;
   }
 }
@@ -209,17 +208,17 @@ export async function clearAllSecureData(
 
     const clearPromises = keysToDelete.map((key) =>
       SecureStore.deleteItemAsync(key, options).catch((error) => {
-        log.warn('nostr.secure.clear_key_failed', { key, error });
+        nostrLog.warn('nostr.secure.clear_key_failed', { key, error: redactError(error) });
         return false;
       })
     );
 
     await Promise.all(clearPromises);
 
-    log.info('nostr.secure.all_data_cleared');
+    nostrLog.info('nostr.secure.all_data_cleared');
     return true;
   } catch (error) {
-    log.error('nostr.secure.clear_all_failed', { error });
+    nostrLog.error('nostr.secure.clear_all_failed', { error: redactError(error) });
     return false;
   }
 }
@@ -249,15 +248,15 @@ export async function clearPerProfileSecureData(
     await Promise.all(
       keysToDelete.map((key) =>
         SecureStore.deleteItemAsync(key, options).catch((error) => {
-          log.warn('nostr.secure.clear_key_failed', { key, error });
+          nostrLog.warn('nostr.secure.clear_key_failed', { key, error: redactError(error) });
         })
       )
     );
 
-    log.info('nostr.secure.profile_data_cleared');
+    nostrLog.info('nostr.secure.profile_data_cleared');
     return true;
   } catch (error) {
-    log.error('nostr.secure.clear_profile_failed', { error });
+    nostrLog.error('nostr.secure.clear_profile_failed', { error: redactError(error) });
     return false;
   }
 }
@@ -293,7 +292,7 @@ export async function storeDerivedKeys(
     await SecureStore.setItemAsync(derivedKeysKey(accountIndex), JSON.stringify(keys), options);
     return true;
   } catch (error) {
-    log.error('nostr.secure.store_keys_failed', { error });
+    nostrLog.error('nostr.secure.store_keys_failed', { error: redactError(error) });
     return false;
   }
 }
@@ -305,7 +304,7 @@ export async function retrieveDerivedKeys(accountIndex: number): Promise<CachedD
     if (!raw) return null;
     return JSON.parse(raw) as CachedDerivedKeys;
   } catch (error) {
-    log.error('nostr.secure.retrieve_keys_failed', { error });
+    nostrLog.error('nostr.secure.retrieve_keys_failed', { error: redactError(error) });
     return null;
   }
 }
@@ -321,7 +320,7 @@ export async function storeCashuMnemonic(
     await SecureStore.setItemAsync(cashuMnemonicKey(accountIndex), payload, options);
     return true;
   } catch (error) {
-    log.error('nostr.secure.store_cashu_mnemonic_failed', { error });
+    nostrLog.error('nostr.secure.store_cashu_mnemonic_failed', { error: redactError(error) });
     return false;
   }
 }
@@ -335,7 +334,7 @@ export async function retrieveCashuMnemonic(
     if (!raw) return null;
     return JSON.parse(raw) as { value: string; mnemonicHash: string };
   } catch (error) {
-    log.error('nostr.secure.retrieve_cashu_mnemonic_failed', { error });
+    nostrLog.error('nostr.secure.retrieve_cashu_mnemonic_failed', { error: redactError(error) });
     return null;
   }
 }
@@ -361,7 +360,7 @@ export async function storeCashuSeed(
     await SecureStore.setItemAsync(cashuSeedKey(accountIndex), payload, options);
     return true;
   } catch (error) {
-    log.error('nostr.secure.store_cashu_seed_failed', { error });
+    nostrLog.error('nostr.secure.store_cashu_seed_failed', { error: redactError(error) });
     return false;
   }
 }
@@ -380,7 +379,7 @@ export async function retrieveCashuSeed(
     }
     return { seed: bytes, mnemonicHash: parsed.mnemonicHash };
   } catch (error) {
-    log.error('nostr.secure.retrieve_cashu_seed_failed', { error });
+    nostrLog.error('nostr.secure.retrieve_cashu_seed_failed', { error: redactError(error) });
     return null;
   }
 }
@@ -418,7 +417,7 @@ export async function isMigrationsComplete(accountIndex: number = 0): Promise<bo
 
     return false;
   } catch (error) {
-    log.error('nostr.secure.check_migration_flag_failed', { error });
+    nostrLog.error('nostr.secure.check_migration_flag_failed', { error: redactError(error) });
     return false;
   }
 }
@@ -429,7 +428,7 @@ export async function setMigrationsComplete(accountIndex: number = 0): Promise<b
     await SecureStore.setItemAsync(migrationsCompleteKey(accountIndex), 'true', options);
     return true;
   } catch (error) {
-    log.error('nostr.secure.set_migration_flag_failed', { error });
+    nostrLog.error('nostr.secure.set_migration_flag_failed', { error: redactError(error) });
     return false;
   }
 }
@@ -446,7 +445,7 @@ export async function storeImportedNsec(pubkeyHex: string, nsecValue: string): P
     await SecureStore.setItemAsync(importedNsecKey(pubkeyHex), nsecValue, options);
     return true;
   } catch (error) {
-    log.error('nostr.secure.store_nsec_failed', { error });
+    nostrLog.error('nostr.secure.store_nsec_failed', { error: redactError(error) });
     return false;
   }
 }
@@ -456,7 +455,7 @@ export async function retrieveImportedNsec(pubkeyHex: string): Promise<string | 
     const options = Platform.OS === 'ios' ? IOS_SECURE_OPTIONS : {};
     return await SecureStore.getItemAsync(importedNsecKey(pubkeyHex), options);
   } catch (error) {
-    log.error('nostr.secure.retrieve_nsec_failed', { error });
+    nostrLog.error('nostr.secure.retrieve_nsec_failed', { error: redactError(error) });
     return null;
   }
 }
@@ -467,7 +466,7 @@ export async function deleteImportedNsec(pubkeyHex: string): Promise<boolean> {
     await SecureStore.deleteItemAsync(importedNsecKey(pubkeyHex), options);
     return true;
   } catch (error) {
-    log.error('nostr.secure.delete_nsec_failed', { error });
+    nostrLog.error('nostr.secure.delete_nsec_failed', { error: redactError(error) });
     return false;
   }
 }
