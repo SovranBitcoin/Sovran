@@ -5,6 +5,7 @@ import {
   GestureResponderEvent,
 } from 'react-native';
 import { log } from '@/shared/lib/logger';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { EnhancedHaptics } from './Haptics';
 
 interface TouchPosition {
@@ -137,6 +138,23 @@ export const TouchableOpacity: FC<EnhancedTouchableOpacityProps> = ({
     onPressIn?.(e);
   };
 
+  // Single-flight guard so every shared `TouchableOpacity` consumer is
+  // protected against rapid double-taps that re-enter an async `onPress`
+  // before React commits a `setLoading(true)` (or whatever caller-side
+  // disabled flag) — the same pattern the shared `Button` uses, hoisted
+  // here so the ~30 files that use this primitive inherit it without
+  // each call site having to wrap with `useSingleFlight`. Synchronous
+  // handlers (toggles, navigation) pass through untouched because the
+  // hook is a no-op when `onPress` returns a non-Promise.
+  const guardedOnPress = useSingleFlight(async (e: GestureResponderEvent) => {
+    if (!onPress) return;
+    // RN types `onPress` as returning `void`, but callers routinely pass
+    // `async` handlers — cast through `unknown` so the runtime check can
+    // see the Promise the type system doesn't admit.
+    const result = onPress(e) as unknown;
+    if (result instanceof Promise) await result;
+  });
+
   const handlePress = async (e: GestureResponderEvent): Promise<void> => {
     // Skip if no initial position was recorded or no onPress handler
     if (!touchActivatePositionRef.current || !onPress) return;
@@ -156,7 +174,7 @@ export const TouchableOpacity: FC<EnhancedTouchableOpacityProps> = ({
 
     if (!isDragged) {
       await triggerHaptic('end');
-      onPress(e);
+      await guardedOnPress(e);
     }
   };
 
