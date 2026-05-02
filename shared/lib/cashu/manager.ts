@@ -16,6 +16,7 @@ import {
   deriveCashuWalletSeedFromRoot,
   deriveCashuWalletSeedForImported,
 } from '@/shared/lib/nostr/keyDerivation';
+import { getInflightProofs, restoreProofsToReady } from 'coco-payment-ux';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';
@@ -47,14 +48,13 @@ export class CocoManager {
   private static instance: Manager | null = null;
   private static db: SQLite.SQLiteDatabase | null = null;
   private static isInitializing = false;
-  /** True while enableWatchersAndSync / recovery / default mint init are running. */
+  /** True while enableSafeWatchers / recovery / default mint init are running. */
   private static isBackgroundRunning = false;
   /** Tracks an in-flight cleanup() call so initialize() can await it before proceeding. */
   private static pendingCleanup: Promise<void> | null = null;
   private static cashuMnemonic: string | null = null;
   private static signerKey: Uint8Array | null = null;
   private static npcPlugin: NPCPlugin | null = null;
-  private static isFreeingReservedProofs = false;
   /** Stored reference to seed getter for pre-warming during background init */
   private static seedGetter: (() => Promise<Uint8Array>) | null = null;
   /** Current account index — controls which DB file and NPC signer to use */
@@ -105,8 +105,9 @@ export class CocoManager {
   /**
    * Initialize the Coco Manager with database and seed management.
    * This creates the Manager instance only — no network calls, no watchers.
-   * Call {@link enableWatchersAndSync} separately (in a non-blocking phase)
-   * to start watchers, processors, and the initial NPC sync.
+   * Call {@link enableSafeWatchers} and {@link enableNpcSyncAndProcessor}
+   * separately (in a non-blocking phase) — NPC sync must stay gated on the
+   * NUT-13 restore so deterministic counters don't desync from the mint.
    */
   static async initialize(): Promise<Manager> {
     // Activate native crypto (nutpatch) — must run after cashu-ts is imported
@@ -330,19 +331,6 @@ export class CocoManager {
   }
 
   /**
-   * Convenience wrapper preserving the previous one-call behaviour for any
-   * code path that doesn't gate on restore. New callers should prefer
-   * {@link enableSafeWatchers} + {@link enableNpcSyncAndProcessor} so NPC
-   * sync can be deferred until after a NUT-13 wallet restore.
-   *
-   * @deprecated Prefer the split methods so NPC sync stays gated on restore.
-   */
-  static async enableWatchersAndSync(): Promise<void> {
-    await this.enableSafeWatchers();
-    await this.enableNpcSyncAndProcessor();
-  }
-
-  /**
    * Get the initialized Manager instance
    * Throws if not initialized
    */
@@ -497,48 +485,28 @@ export class CocoManager {
     }
   }
 
-  /**
-   * Enable ProofStateWatcher separately to avoid transaction conflicts
-   */
-  static async enableProofStateWatcher(): Promise<void> {
-    if (!this.instance) {
-      throw new Error('Manager not initialized. Call initialize() first.');
+  /** Safely disable all watchers before tearing down the Manager. */
+  private static async disableWatchers(): Promise<void> {
+    if (!this.instance) return;
+    try {
+      await this.instance.disableProofStateWatcher();
+      cashuLog.debug('cashu.manager.proof_watcher_disabled');
+    } catch (error) {
+      cashuLog.warn('cashu.manager.proof_watcher_disable_failed', { error });
     }
 
     try {
-      await this.instance.enableProofStateWatcher();
-      cashuLog.debug('cashu.manager.proof_watcher_enabled');
+      await this.instance.disableMintOperationWatcher();
+      cashuLog.debug('cashu.manager.quote_watcher_disabled');
     } catch (error) {
-      cashuLog.warn('cashu.manager.proof_watcher_enable_failed', { error });
-      throw error;
+      cashuLog.warn('cashu.manager.quote_watcher_disable_failed', { error });
     }
-  }
 
-  /**
-   * Safely disable all watchers before resetting
-   */
-  static async disableWatchers(): Promise<void> {
-    if (this.instance) {
-      try {
-        await this.instance.disableProofStateWatcher();
-        cashuLog.debug('cashu.manager.proof_watcher_disabled');
-      } catch (error) {
-        cashuLog.warn('cashu.manager.proof_watcher_disable_failed', { error });
-      }
-
-      try {
-        await this.instance.disableMintOperationWatcher();
-        cashuLog.debug('cashu.manager.quote_watcher_disabled');
-      } catch (error) {
-        cashuLog.warn('cashu.manager.quote_watcher_disable_failed', { error });
-      }
-
-      try {
-        await this.instance.disableMintOperationProcessor();
-        cashuLog.debug('cashu.manager.quote_processor_disabled');
-      } catch (error) {
-        cashuLog.warn('cashu.manager.quote_processor_disable_failed', { error });
-      }
+    try {
+      await this.instance.disableMintOperationProcessor();
+      cashuLog.debug('cashu.manager.quote_processor_disabled');
+    } catch (error) {
+      cashuLog.warn('cashu.manager.quote_processor_disable_failed', { error });
     }
   }
 
@@ -566,46 +534,15 @@ export class CocoManager {
   }
 
   /**
-   * Clear all data from the SQLite database (current account only).
-   * This will delete the entire database file and all associated files.
-   */
-  static async clearAllData(): Promise<void> {
-    try {
-      if (this.instance) {
-        await this.disableWatchers();
-        this.instance = null;
-        this.isInitializing = false;
-      }
-      const dbName = this.getDbName();
-      await this.deleteDatabase(dbName);
-    } catch (error) {
-      cashuLog.error('cashu.manager.clear_data_failed', { error });
-      throw error;
-    }
-  }
-
-  /**
-   * Reset the manager (useful for testing or logout)
-   */
-  static async reset(): Promise<void> {
-    await this.disableWatchers();
-    this.instance = null;
-    this.clearSensitiveRuntimeState();
-    this.isInitializing = false;
-  }
-
-  /**
    * Complete reset: delete ALL coco databases (all profiles including imported)
    * and reset the manager. Used for "Delete Account" / full app reset.
    * @param accountIndexes All profile account indexes (derived 0,1,2... and imported npubNumbers).
    */
   static async completeReset(accountIndexes: number[]): Promise<void> {
     try {
-      if (this.instance) {
-        await this.disableWatchers();
-        this.instance = null;
-        this.isInitializing = false;
-      }
+      await this.disableWatchers();
+      this.instance = null;
+      this.isInitializing = false;
 
       const dbNames = new Set<string>();
       for (const i of accountIndexes) {
@@ -615,7 +552,7 @@ export class CocoManager {
         await this.deleteDatabase(dbName);
       }
 
-      await this.reset();
+      this.clearSensitiveRuntimeState();
       cashuLog.info('cashu.manager.reset_done');
     } catch (error) {
       cashuLog.error('cashu.manager.reset_failed', { error });
@@ -671,203 +608,6 @@ export class CocoManager {
   }
 
   /**
-   * Find all currently reserved (ready + usedByOperationId) proofs and free them.
-   *
-   * Strategy:
-   * - Group reserved proofs by `usedByOperationId`
-   * - If the operation is a **send** op, use the public API: `manager.send.rollback(operationId)`
-   * - If the operation is a **melt** op, use the underlying service rollback (not currently exposed
-   *   on `QuotesApi`) via a safe runtime access.
-   * - If the operation no longer exists, release the reservations directly via the proof repository.
-   *
-   * This is intended as a manual recovery tool for “stuck reserved balance”.
-   */
-  static async freeAllReservedProofs(): Promise<{
-    totalReservedProofs: number;
-    rolledBackSendOperations: number;
-    rolledBackMeltOperations: number;
-    releasedOrphanedReservations: number;
-    errors: { operationId: string; reason: string }[];
-  }> {
-    if (this.isFreeingReservedProofs) {
-      throw new Error('Reserved proof recovery is already running');
-    }
-
-    this.isFreeingReservedProofs = true;
-    const manager = this.getInstance();
-
-    try {
-      const proofRepository = manager.proofRepository;
-      const proofService = manager.proofService;
-
-      if (!proofRepository?.getReservedProofs || !proofRepository?.releaseProofs) {
-        throw new Error('Coco proof repository does not expose reserved proof access');
-      }
-
-      const reservedProofs = await proofRepository.getReservedProofs();
-      const totalReservedProofs = reservedProofs.length;
-
-      if (totalReservedProofs === 0) {
-        return {
-          totalReservedProofs: 0,
-          rolledBackSendOperations: 0,
-          rolledBackMeltOperations: 0,
-          releasedOrphanedReservations: 0,
-          errors: [],
-        };
-      }
-
-      const proofsByOperationId = new Map<
-        string,
-        { mintUrl: string; secret: string; usedByOperationId?: string }[]
-      >();
-      const noOperationId: { mintUrl: string; secret: string }[] = [];
-
-      for (const p of reservedProofs) {
-        const opId = p.usedByOperationId;
-        if (!opId) {
-          noOperationId.push({ mintUrl: p.mintUrl, secret: p.secret });
-          continue;
-        }
-        const existing = proofsByOperationId.get(opId) ?? [];
-        existing.push(p);
-        proofsByOperationId.set(opId, existing);
-      }
-
-      let rolledBackSendOperations = 0;
-      let rolledBackMeltOperations = 0;
-      let releasedOrphanedReservations = 0;
-      const errors: { operationId: string; reason: string }[] = [];
-      const meltOperationService = manager.meltOperationService;
-
-      // Release any “corrupt” reserved rows that somehow lack an operationId.
-      if (noOperationId.length > 0) {
-        const byMint = new Map<string, string[]>();
-        for (const p of noOperationId) {
-          const list = byMint.get(p.mintUrl) ?? [];
-          list.push(p.secret);
-          byMint.set(p.mintUrl, list);
-        }
-        for (const [mintUrl, secrets] of byMint.entries()) {
-          if (secrets.length === 0) continue;
-          if (proofService?.releaseProofs) {
-            await proofService.releaseProofs(mintUrl, secrets);
-          } else {
-            await proofRepository.releaseProofs(mintUrl, secrets);
-          }
-          releasedOrphanedReservations += secrets.length;
-        }
-      }
-
-      for (const [operationId, proofs] of proofsByOperationId.entries()) {
-        try {
-          // Prefer “proper rollback” (it may need to swap/recover), rather than simply unreserving.
-          const sendOp = (await manager.ops.send.get(operationId).catch(() => null)) as {
-            state?: string;
-          } | null;
-          if (sendOp) {
-            // Skip rollback for terminal states (finalized, rolled_back) - just release proofs
-            const terminalStates = new Set(['finalized', 'rolled_back']);
-            if (terminalStates.has(sendOp.state ?? '')) {
-              const secretsByMint = new Map<string, string[]>();
-              for (const p of proofs) {
-                const list = secretsByMint.get(p.mintUrl) ?? [];
-                list.push(p.secret);
-                secretsByMint.set(p.mintUrl, list);
-              }
-              for (const [mintUrl, secrets] of secretsByMint.entries()) {
-                if (secrets.length === 0) continue;
-                if (proofService?.releaseProofs) {
-                  await proofService.releaseProofs(mintUrl, secrets);
-                } else {
-                  await proofRepository.releaseProofs(mintUrl, secrets);
-                }
-                releasedOrphanedReservations += secrets.length;
-              }
-              continue;
-            }
-            if (sendOp.state === 'prepared') {
-              await manager.ops.send.cancel(operationId);
-            } else {
-              await manager.ops.send.reclaim(operationId);
-            }
-            rolledBackSendOperations++;
-            continue;
-          }
-
-          const meltOp = meltOperationService?.getOperation
-            ? ((await meltOperationService.getOperation(operationId).catch(() => null)) as {
-                state?: string;
-              } | null)
-            : null;
-          if (meltOp) {
-            // Skip rollback for terminal states (finalized, rolled_back) - just release proofs
-            const meltTerminalStates = new Set(['finalized', 'rolled_back']);
-            if (meltTerminalStates.has(meltOp.state ?? '')) {
-              const secretsByMint = new Map<string, string[]>();
-              for (const p of proofs) {
-                const list = secretsByMint.get(p.mintUrl) ?? [];
-                list.push(p.secret);
-                secretsByMint.set(p.mintUrl, list);
-              }
-              for (const [mintUrl, secrets] of secretsByMint.entries()) {
-                if (secrets.length === 0) continue;
-                if (proofService?.releaseProofs) {
-                  await proofService.releaseProofs(mintUrl, secrets);
-                } else {
-                  await proofRepository.releaseProofs(mintUrl, secrets);
-                }
-                releasedOrphanedReservations += secrets.length;
-              }
-              continue;
-            }
-            if (!meltOperationService?.rollback) {
-              throw new Error('Melt rollback is unavailable');
-            }
-            await meltOperationService.rollback(operationId, 'Manual rollback via settings');
-            rolledBackMeltOperations++;
-            continue;
-          }
-
-          // Orphaned reservation: operation no longer exists (or was never persisted).
-          // Release reservations (prefer ProofService so events fire).
-          const secretsByMint = new Map<string, string[]>();
-          for (const p of proofs) {
-            const list = secretsByMint.get(p.mintUrl) ?? [];
-            list.push(p.secret);
-            secretsByMint.set(p.mintUrl, list);
-          }
-
-          for (const [mintUrl, secrets] of secretsByMint.entries()) {
-            if (secrets.length === 0) continue;
-            if (proofService?.releaseProofs) {
-              await proofService.releaseProofs(mintUrl, secrets);
-            } else {
-              await proofRepository.releaseProofs(mintUrl, secrets);
-            }
-            releasedOrphanedReservations += secrets.length;
-          }
-        } catch (e) {
-          errors.push({
-            operationId,
-            reason: e instanceof Error ? e.message : String(e),
-          });
-        }
-      }
-
-      return {
-        totalReservedProofs,
-        rolledBackSendOperations,
-        rolledBackMeltOperations,
-        releasedOrphanedReservations,
-        errors,
-      };
-    } finally {
-      this.isFreeingReservedProofs = false;
-    }
-  }
-
-  /**
    * Restore inflight proofs to "ready" state for a specific mint.
    *
    * Call this after a melt operation fails (e.g. no_route, timeout) to ensure
@@ -880,16 +620,12 @@ export class CocoManager {
   static async restoreInflightProofsForMint(mintUrl: string): Promise<number> {
     const manager = this.getInstance();
 
-    const repo = manager.proofRepository;
-    const svc = manager.proofService;
-    if (!repo?.getInflightProofs || !svc?.restoreProofsToReady) return 0;
-
     try {
-      const inflight = await repo.getInflightProofs([mintUrl]);
+      const inflight = await getInflightProofs(manager, [mintUrl]);
       if (inflight.length === 0) return 0;
 
       const secrets = inflight.map((p) => p.secret);
-      await svc.restoreProofsToReady(mintUrl, secrets);
+      await restoreProofsToReady(manager, mintUrl, secrets);
       cashuLog.info('cashu.manager.proofs_restored', { count: secrets.length, mintUrl });
       return secrets.length;
     } catch (err) {

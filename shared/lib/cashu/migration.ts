@@ -1,5 +1,6 @@
 import { Manager } from '@cashu/coco-core';
 import { CheckStateEnum } from '@cashu/cashu-ts';
+import { getWallet, saveProofs, overwriteCounter } from 'coco-payment-ux';
 import { store } from '@/redux/store/store.deprecated';
 import { RootState } from '@/redux/store/reducer.deprecated';
 import { CashuProfile } from '@/redux/cashu/types.deprecated';
@@ -132,7 +133,7 @@ export class DataMigration {
           continue;
         }
 
-        const wallet = await this.manager.walletService.getWallet(mintUrl);
+        const wallet = await getWallet(this.manager, mintUrl);
         const proofStates = await wallet.checkProofsStates(satProofs);
 
         for (let i = 0; i < satProofs.length; i++) {
@@ -149,9 +150,7 @@ export class DataMigration {
             continue;
           }
 
-          await this.manager.proofService.saveProofs(mintUrl, [
-            { ...proof, mintUrl, state: 'ready' as const },
-          ]);
+          await saveProofs(this.manager, mintUrl, [{ ...proof, mintUrl, state: 'ready' as const }]);
           result.proofsMigrated++;
         }
 
@@ -184,7 +183,7 @@ export class DataMigration {
     for (const [mintUrl, counters] of Object.entries(profile.counters)) {
       for (const [keysetId, counter] of Object.entries(counters)) {
         try {
-          await this.manager.counterService.overwriteCounter(mintUrl, keysetId, counter);
+          await overwriteCounter(this.manager, mintUrl, keysetId, counter);
           result.countersMigrated++;
           cashuLog.debug('cashu.migration.counter_migrated', { mintUrl, keysetId, counter });
         } catch (error) {

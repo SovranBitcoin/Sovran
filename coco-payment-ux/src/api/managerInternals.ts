@@ -21,6 +21,8 @@
 // Refs:
 //   - sovran-app/__audits__/24.json#F-003 (pending-mint-op cleanup cast)
 //   - sovran-app/__audits__/36.json#F-008 (8 TS2341 errors on Manager)
+//   - sovran-app/__audits__/09.json#F-002 (private reach-ins in manager.ts /
+//     migration.ts / useReservedProofs)
 //
 
 import type {
@@ -32,11 +34,24 @@ import type {
 import type { Wallet } from '@cashu/cashu-ts';
 
 interface ManagerInternals {
+  proofRepository: {
+    getReservedProofs(): Promise<CoreProof[]>;
+    getInflightProofs(mintUrls?: string[]): Promise<CoreProof[]>;
+  };
   proofService: {
     getReadyProofs(mintUrl: string): Promise<CoreProof[]>;
+    saveProofs(mintUrl: string, proofs: CoreProof[]): Promise<void>;
+    restoreProofsToReady(mintUrl: string, secrets: string[]): Promise<void>;
   };
   walletService: {
     getWallet(mintUrl: string): Promise<Wallet>;
+  };
+  counterService: {
+    overwriteCounter(
+      mintUrl: string,
+      keysetId: string,
+      counter: number
+    ): Promise<{ mintUrl: string; keysetId: string; counter: number }>;
   };
   meltOperationRepository: {
     getByState(state: MeltOperationState): Promise<MeltOperation[]>;
@@ -58,6 +73,60 @@ export function getReadyProofs(manager: Manager, mintUrl: string): Promise<CoreP
 /** Wallet for one mint, via the private WalletService. */
 export function getWallet(manager: Manager, mintUrl: string): Promise<Wallet> {
   return internals(manager).walletService.getWallet(mintUrl);
+}
+
+/** All proofs reserved by an in-flight operation (have `usedByOperationId`). */
+export function getReservedProofs(manager: Manager): Promise<CoreProof[]> {
+  return internals(manager).proofRepository.getReservedProofs();
+}
+
+/**
+ * Inflight proofs (transient state during mint/melt), optionally filtered by mint.
+ * Used by the per-mint rebalance recovery to clear leftovers after a melt failure.
+ */
+export function getInflightProofs(
+  manager: Manager,
+  mintUrls?: string[]
+): Promise<CoreProof[]> {
+  return internals(manager).proofRepository.getInflightProofs(mintUrls);
+}
+
+/**
+ * Move proofs from `inflight` back to `ready` and clear their operation tag.
+ * Application-level equivalent of the "Restore Inflight" debug button.
+ */
+export function restoreProofsToReady(
+  manager: Manager,
+  mintUrl: string,
+  secrets: string[]
+): Promise<void> {
+  return internals(manager).proofService.restoreProofsToReady(mintUrl, secrets);
+}
+
+/**
+ * Persist proofs in the given mint+state, via the private ProofService.
+ * Used by the legacy Redux→Coco migration to seed the proof table.
+ */
+export function saveProofs(
+  manager: Manager,
+  mintUrl: string,
+  proofs: CoreProof[]
+): Promise<void> {
+  return internals(manager).proofService.saveProofs(mintUrl, proofs);
+}
+
+/**
+ * Force-set a deterministic counter for a (mint, keyset) pair, via the private
+ * CounterService. Used by the legacy Redux→Coco migration to recover counters
+ * the user already burnt before installing the Coco-backed build.
+ */
+export function overwriteCounter(
+  manager: Manager,
+  mintUrl: string,
+  keysetId: string,
+  counter: number
+): Promise<{ mintUrl: string; keysetId: string; counter: number }> {
+  return internals(manager).counterService.overwriteCounter(mintUrl, keysetId, counter);
 }
 
 /**

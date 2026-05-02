@@ -20,6 +20,11 @@ export type { Manager } from '@cashu/coco-core';
 export {
   getReadyProofs,
   getWallet,
+  getReservedProofs,
+  getInflightProofs,
+  restoreProofsToReady,
+  saveProofs,
+  overwriteCounter,
   listMeltOperationsByState,
   deleteMintOperation,
 } from './api/managerInternals';
