@@ -243,7 +243,9 @@
         "prior-audit:open_question_4@13.json"
       ],
       "verification_note": "Grep confirmed the 4 in-subtree occurrences + UserProfileScreen.tsx:971. Already flagged in audit 13 open-questions; promoting to a finding because it's a categorical pattern affecting every new route. Counter-argument considered: 'these could just be poorly-typed one-offs.' Consistent enough across 5 callers to be a pattern, not a slip. Low severity because no current runtime bug.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "All cited sites resolved by the nav refactor: app/(split-bill-flow)/{amount,participants,summary}.tsx, NetworkSheet.tsx, SplitBillTransactionRow.tsx, UserProfileScreen.tsx now pass typed pathnames without `as any`. Note: the original paths `/(user-flow)/splitBill/...` have since been moved to `/(split-bill-flow)/...` — the casts at the new locations are the same finding."
     },
     {
       "id": "F-011",

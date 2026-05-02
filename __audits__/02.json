@@ -1,0 +1,252 @@
+{
+  "audit": {
+    "date": "2026-04-18",
+    "commit": "f797ae15",
+    "entry_point": "sovran-app/features/send/providers/CocoPaymentUX.tsx",
+    "repos_touched": ["sovran-app"],
+    "prior_audits_consulted": ["01.json"]
+  },
+  "completion_status": "partial",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.92,
+      "title": "OfflineProvider is a descendant of CocoPaymentUXProvider; useOfflineStatus() always returns the default { isOffline: false }",
+      "repo": "sovran-app",
+      "path": "features/send/providers/CocoPaymentUX.tsx",
+      "line": 106,
+      "symbol": "CocoPaymentUXProvider",
+      "dimension": 5,
+      "description": "In app/_layout.tsx the provider tree nests AccountScopedProviders (which composes CocoPaymentUXProvider at _layout.tsx:110) as an ANCESTOR of RootLayoutContent; OfflineProvider is mounted inside RootLayoutContent at _layout.tsx:289. CocoPaymentUXProvider calls useOfflineStatus() on line 106 — React context resolves to the default value declared at shared/providers/OfflineProvider.tsx:15 ({ isOffline: false }) because no OfflineContext.Provider exists above it. Therefore contextOffline is permanently false, and isOffline = mockOffline || contextOffline reduces to mockOffline (a dev-only flag in useSettingsStore). The closure passed to createCocoPaymentUX at line 151 (getOffline) then returns false for real-network-offline users in production.",
+      "why_it_matters": "coco-payment-ux/src/machine/createMachine.ts:488 calls getOffline() per event and threads the result into AMOUNT_ENTERED (machine/types.ts:156-165): when true it forces the offline proof-selector path for sendEcash; when false it attempts the online confirmSend that requires mint contact. With this bug, a user who is actually offline cannot trigger the offline sendEcash branch and will hit mint-unreachable errors instead of the NFC/bluetooth-ready proof flow. The visible OfflineProvider banner still works (OfflineProvider itself reads expo-network directly) so the UI claims 'offline' while the send machine treats the session as online — a silent feature regression.",
+      "fix": "Hoist OfflineProvider above CocoPaymentUXProvider. The simplest relocation is into OuterProviders in app/_layout.tsx:83-91 (offline status is device-global, not profile-scoped, so it does not need to live under AccountScopedProviders). A less invasive alternative: promote OfflineProvider into the InnerProviders compose list at _layout.tsx:104-121 before CocoPaymentUXProvider. Verify with a release build: toggle airplane mode while a Sovran-bolt11 send flow is pending and confirm the proof-selector / offline path now engages.",
+      "references": [
+        "sovran-app/coco-payment-ux/src/machine/createMachine.ts:488",
+        "sovran-app/coco-payment-ux/src/machine/types.ts:156-165",
+        "sovran-app/shared/providers/OfflineProvider.tsx:15",
+        "sovran-app/app/_layout.tsx:104-121,289"
+      ],
+      "verification_note": "Re-read CocoPaymentUX.tsx:102-111, OfflineProvider.tsx:15 (default context), and _layout.tsx:110/289 — tree ordering and default confirmed. Counter-argument considered: could useOfflineStatus resolve via a higher-level provider? Grep shows the only OfflineProvider mount is RootLayoutContent.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-002",
+      "severity": "Medium",
+      "confidence": 0.75,
+      "title": "p2pkKeyRefreshedRef is an unkeyed single-slot that can be clobbered by co-mounted receive screens",
+      "repo": "sovran-app",
+      "path": "features/send/providers/CocoPaymentUX.tsx",
+      "line": 395,
+      "symbol": "p2pkKeyRefreshedRef",
+      "dimension": 1,
+      "description": "onEntryUpdate('receive', callback) assigns `p2pkKeyRefreshedRef.current = (newKey) => callback({ _p2pkKeyUpdate: true, p2pkKey: newKey })` at line 395, and pushes an unsubscribe `() => { p2pkKeyRefreshedRef.current = null }` at line 398. When a second receive screen mounts before the first cleans up (modal push/replace transition) it overwrites the ref; when the first screen's cleanup later runs it nulls the ref belonging to the second screen. Subsequent onP2PKReceiveCompleted notifications from sovranPaymentConfig.ts:688 dereference null and drop silently.",
+      "why_it_matters": "Minor — only fires in navigation-transition windows when two receive screens co-exist. Effect is that a p2pk keypair regeneration completes but the receive screen does not get the `_p2pkKeyUpdate` refresh, so it continues to display the stale p2pkKey. No funds risk; worst case the user copies a superseded p2pk pubkey.",
+      "fix": "Replace the single slot with a Set<(newKey: string | null) => void>, have each onEntryUpdate push its own callback into the set, and have the unsubscribe remove exactly that callback. onP2pkKeyRefreshed in the notifications factory iterates the set. Alternatively gate the unsub with identity: `if (p2pkKeyRefreshedRef.current === myCb) p2pkKeyRefreshedRef.current = null`.",
+      "references": [
+        "sovran-app/features/send/lib/sovranPaymentConfig.ts:681-694"
+      ],
+      "verification_note": "Re-read lines 121, 395-400, and 642. Counter-argument considered: receive screens are typically singleton-modal; co-mount window is narrow. Kept as Medium because the failure is silent and the fix is a one-liner.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.7,
+      "title": "subscribeGlobalScreenActions and per-screen store.subscribe() calls fire on every state change, including unrelated settings toggles",
+      "repo": "sovran-app",
+      "path": "features/send/providers/CocoPaymentUX.tsx",
+      "line": 577,
+      "symbol": "subscribeGlobalScreenActions|onEntryUpdate",
+      "dimension": 3,
+      "description": "Zustand v5 `store.subscribe(listener)` fires on any state mutation in the store. Line 577-584 subscribes the screen-actions listener to useScanHistoryStore, useTransactionDistributionStore, and useSettingsStore — useSettingsStore holds language/displayCurrency/mockOffline/regenerateP2PKOnReceive/theme and many more fields, so routine settings changes (theme toggle, language change) re-emit screen-action recomputation across the entire UX. Same pattern at 391-394 (useNpcMintStore), 411-413 (three stores for mintInfo/mintSelector). When a mint is not even in the user's active list, any audit/KYM refresh for an unrelated mint re-invokes pushEnrichment.",
+      "why_it_matters": "Amplifies redraw cost on frequent state mutations. The /stats and /gc modes of log-doctor on the currently-captured session already show 20× `perf.js_thread_blocked` events with blocked_ms ranging 100ms–186s (log.txt latest session), suggesting the JS thread is regularly oversubscribed — over-triggered store subscriptions make this worse, especially during payment flows when users also toggle settings.",
+      "fix": "Wrap the relevant stores with zustand/middleware `subscribeWithSelector` and pass a selector + equalityFn to each .subscribe() call, e.g. `useSettingsStore.subscribe((s) => s.language, listener)`. For onEntryUpdate mintInfo/mintSelector subscribers, narrow to the cache slice keyed by the mintUrl in question.",
+      "references": [
+        "https://zustand.docs.pmnd.rs/middlewares/subscribe-with-selector",
+        "sovran-app/features/send/providers/CocoPaymentUX.tsx:391,411-413,577-584"
+      ],
+      "verification_note": "Verified Zustand v5 behaviour in package.json (zustand@5); confirmed the stores do not already use subscribeWithSelector by grepping their files. Counter-argument considered: listener may be cheap — but screen-actions recomputes potential-action lists, which is not free.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "Payment-adjacent logging uses the generic `log` import instead of `paymentLog` / `nostrLog`",
+      "repo": "sovran-app",
+      "path": "features/send/providers/CocoPaymentUX.tsx",
+      "line": 34,
+      "symbol": "log",
+      "dimension": 10,
+      "description": "Line 34 imports the generic logger; log.info/log.warn/log.debug calls at 238-251, 336-342, 373, 383, 528 all emit under the default scope. Neighbouring sovranPaymentConfig.ts uses paymentLog (shared/lib/logger exports it at 836 as a `payment`-scoped child). `npm run log-doctor -- timeline --event 'payment\\.'` misses every event from this file, which breaks the existing log-doctor workflow for payment-flow debugging.",
+      "why_it_matters": "Observability inconsistency. Reviewers and the log-doctor script can't filter these events by scope, diluting the value of the scoped-logger convention.",
+      "fix": "Import `paymentLog` for the mint-quote and history-update subscriptions, and `nostrLog` for the sendNostrDM path. Rename event keys to the `payment.*` / `nostr.*` namespace already used in sovranPaymentConfig.ts.",
+      "references": [
+        "sovran-app/shared/lib/logger.ts:816,836",
+        "sovran-app/features/send/lib/sovranPaymentConfig.ts:19"
+      ],
+      "verification_note": "Verified log-doctor filters operate on event-name prefixes (scripts/log-doctor.ts `--event` regex). Counter-argument considered: module name prefix on the logger output also helps — but downstream tooling keys off event name.",
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "20662da9 established the seam (redactError + scoped-logger discipline) across all 22 Zustand stores, secureStorage, profileSessionOrchestrator, paymentStatusStore, and swapStatusStore. CocoPaymentUX.tsx itself was out of slice scope — the call sites here remain on generic `log`. Follow-up: sweep CocoPaymentUX.tsx and sendNostrDM in a payment-provider-focused slice."
+    },
+    {
+      "id": "F-005",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "`as any` casts on enrichMintListItem/enrichMintReviewInfo and NUT-06 contact access",
+      "repo": "sovran-app",
+      "path": "features/send/providers/CocoPaymentUX.tsx",
+      "line": 159,
+      "symbol": "enrichMintListItem|fetchMintProfiles",
+      "dimension": 1,
+      "description": "Line 159-160 cast getMintEnrichment()'s return to `any` to satisfy Partial<MintListItem>. Line 165 dereferences `(c: any) => c.method === 'nostr' && c.info`. Lines 432-433 cast the coco mint info to `any` for name/icon_url. Lines 516-525 cast to `any` for display fields. Each `any` silences the type system at the boundary where the field names can drift against coco-payment-ux's MintListItem type (coco-payment-ux/src/types).",
+      "why_it_matters": "Drift between sovran enrichment field names and the MintListItem contract will not surface at compile time; it will surface as `undefined` values in the rendered UI. Repo policy (review_dimensions §1) forbids `any` casts without justification.",
+      "fix": "Import the `MintListItem`, `MintInfo` types from coco-payment-ux (or the public re-export), type `getMintEnrichment(): Partial<MintListItem>` explicitly, and delete the casts. For the NUT-06 contact access, introduce a local zod schema for `{ method: 'nostr', info: string }` (or a plain ts-predicate) and use it in `contacts.filter`.",
+      "references": [],
+      "verification_note": "Verified all four sites read lines; no schema or typed helper is imported. Counter-argument considered: coco-payment-ux's MintListItem allows arbitrary extra fields — still, the cast hides drift.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "NUT-06 mint contact entries are not validated before being passed to fetchNostrProfile",
+      "repo": "sovran-app",
+      "path": "features/send/providers/CocoPaymentUX.tsx",
+      "line": 164,
+      "symbol": "fetchMintProfiles",
+      "dimension": 2,
+      "description": "`contacts.find((c: any) => c.method === 'nostr' && c.info)` at line 165 checks only that `c.info` is truthy; if the mint returns `{ method: 'nostr', info: { evil: true } }`, `info` passes the truthy check and is interpolated into the URL inside fetchNostrProfile (shared/lib/apiClient.ts:259 — raw template literal), stringifying to `[object Object]`. Since fetchNostrProfile also does not URL-encode the parameter (prior audit 01.json F-002, still present), this is a second corruption point on the same path.",
+      "why_it_matters": "A hostile mint could craft contact entries to waste API requests or probe the endpoint. The attack surface is small (mint must already be listed) and the API is Sovran-operated, so impact is low. But defence-in-depth at the mint boundary matters — nuts/06.md treats mint info as untrusted input.",
+      "fix": "Inline filter: `contacts.filter(c => c && c.method === 'nostr' && typeof c.info === 'string' && c.info.length <= 128)`. Ideally move to a zod schema for `MintContact` in the aspirational packages/schemas workspace.",
+      "references": [
+        "nuts/06.md",
+        "sovran-app/__audits__/01.json (F-002)"
+      ],
+      "verification_note": "Verified that apiClient.ts:259 still uses raw `${pubkey}` interpolation (from prior audit). The additional weakness here is the missing `typeof c.info === 'string'` check.",
+      "prior_audit_id": "F-002@01.json"
+    },
+    {
+      "id": "F-007",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "Fire-and-forget fetchMintProfiles / fetchMintAuditData / fetchMintReviewData have no AbortController; swallow all errors",
+      "repo": "sovran-app",
+      "path": "features/send/providers/CocoPaymentUX.tsx",
+      "line": 169,
+      "symbol": "fetchMintProfiles|fetchMintAuditData|fetchMintReviewData",
+      "dimension": 7,
+      "description": "Lines 169-176, 182-189, 195-206 launch `.then(...).catch(() => {})` promises inside `for` loops over mint URLs. Each iteration spawns a request without an AbortSignal; failures are swallowed with zero logging. `isStale` gating to 30-min cache (stores/global/*MintStore) bounds the steady-state rate, but on first-open across a large mint list, many parallel requests go out with no cancellation path on dispose.",
+      "why_it_matters": "Wasted radio/battery on large mint lists and during instance re-creation (profile switch). Silent `.catch(() => {})` hides real server/network errors and makes it impossible to distinguish 'API down' from 'everything fine' in log-doctor. Ties into prior audit 01.json F-004 (no AbortSignal at the apiClient layer) and F-005 (no request timeout): the fix must be plumbed through.",
+      "fix": "Thread an AbortController created in createCocoPaymentUX (aborted on instance.dispose()) into all three fetchers; require the apiClient helpers (safeFetch/safePost) to accept `signal`. Replace `.catch(() => {})` with `.catch((e) => paymentLog.warn('payment.mint_enrichment.failed', { kind, mintUrl, error: e instanceof Error ? e.message : String(e) }))` — still non-fatal, but surfaced.",
+      "references": [
+        "sovran-app/__audits__/01.json (F-004, F-005)"
+      ],
+      "verification_note": "Verified all three helpers launch uncancellable promises. apiClient.ts has no signal parameter (prior audit).",
+      "prior_audit_id": "F-004@01.json"
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.6,
+      "title": "history:updated subscription fires its callback for every history mutation regardless of screen type",
+      "repo": "sovran-app",
+      "path": "features/send/providers/CocoPaymentUX.tsx",
+      "line": 334,
+      "symbol": "onEntryUpdate",
+      "dimension": 7,
+      "description": "Line 334-345 subscribes for all screens except mintSelector and mintInfo. Every `history:updated` event — regardless of entry type — invokes the callback. coco-payment-ux's defaultShouldApply (coco-payment-ux/src/screen-actions/createManager.ts:380) filters by type+id later, so no wrong update sticks, but the per-update dispatch cost is paid on every history mutation (mint, melt, send, receive).",
+      "why_it_matters": "Minor CPU wakeups during history flush storms. Not a correctness issue.",
+      "fix": "Tighten the filter at the emission site: `if (updated?.type !== expectedType) return;` per screenType (receive/meltQuote/mintQuote each have a known entry type). Alternatively use manager.on with a type-scoped event if coco exposes one.",
+      "references": [
+        "sovran-app/coco-payment-ux/src/screen-actions/createManager.ts:380-410"
+      ],
+      "verification_note": "Verified the no-filter dispatch at lines 334-345 and confirmed defaultShouldApply filters downstream.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Nit",
+      "confidence": 0.7,
+      "title": "router.navigate/router.push pathnames cast to `as any`, bypassing expo-router typed routes",
+      "repo": "sovran-app",
+      "path": "features/send/providers/CocoPaymentUX.tsx",
+      "line": 286,
+      "symbol": "navigation",
+      "dimension": 5,
+      "description": "Lines 286, 290, 295, 300 use `pathname: '/(...)' as any`. If `experiments.typedRoutes` is enabled for sovran-app, these casts defeat the route-shape check. Low-severity, but a stylistic drift vs the rest of the codebase that uses typed hrefs (e.g. sovranPaymentConfig.ts:781 passes `'/(receive-flow)/receiveToken'` with no cast).",
+      "why_it_matters": "Loses compile-time protection against stale route renames.",
+      "fix": "Drop the `as any` and let TS infer. If typedRoutes is strict, import `Href` and annotate: `pathname: '/(receive-flow)/camera' satisfies Href`.",
+      "references": [],
+      "verification_note": "Verified casts present at lines 286, 290, 295, 300.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "All five `pathname: '...' as any` casts in CocoPaymentUX.tsx removed; typed-routes now checks every pathname literal."
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "partial",
+    "3": "partial",
+    "4": "skipped",
+    "5": "pass",
+    "6": "skipped",
+    "7": "partial",
+    "8": "skipped",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "relocate",
+      "description": "Hoist OfflineProvider above CocoPaymentUXProvider. Preferred: add it into OuterProviders in app/_layout.tsx:83-91 since offline state is device-global and does not need to live under AccountScopedProviders. Remove useOfflineStatus's default-{isOffline:false} fallback once the provider is guaranteed to wrap — make useOfflineStatus throw if called outside the provider, to surface the same bug immediately next time.",
+      "files": [
+        "sovran-app/app/_layout.tsx",
+        "sovran-app/shared/providers/OfflineProvider.tsx",
+        "sovran-app/features/send/providers/CocoPaymentUX.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Introduce zustand/middleware subscribeWithSelector for useSettingsStore, useScanHistoryStore, useTransactionDistributionStore, useNpcMintStore, useAuditMintStore, useKYMMintStore, useMintProfileStore. Convert the raw store.subscribe(listener) calls in CocoPaymentUX.tsx to selector-scoped subscriptions. This is a store-shape change, not a persist-shape change, so no version bump is required.",
+      "files": [
+        "sovran-app/shared/stores/global/settingsStore.ts",
+        "sovran-app/shared/stores/global/auditMintStore.ts",
+        "sovran-app/shared/stores/global/kymMintStore.ts",
+        "sovran-app/shared/stores/global/mintProfileStore.ts",
+        "sovran-app/shared/stores/profile/scanHistoryStore.ts",
+        "sovran-app/shared/stores/profile/transactionDistributionStore.ts",
+        "sovran-app/shared/stores/profile/npcMintStore.ts",
+        "sovran-app/features/send/providers/CocoPaymentUX.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Replace the p2pkKeyRefreshedRef single-slot with a Set<(key: string|null) => void> owned by the provider. onEntryUpdate('receive') adds its callback; the unsubscribe removes exactly that entry. onP2pkKeyRefreshed in sovranPaymentConfig.ts iterates the set. Eliminates the navigation-transition race.",
+      "files": [
+        "sovran-app/features/send/providers/CocoPaymentUX.tsx",
+        "sovran-app/features/send/lib/sovranPaymentConfig.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Swap the generic `log` import for `paymentLog` and `nostrLog` from shared/lib/logger. Rename emitted events under the payment.* / nostr.* namespaces already used by sovranPaymentConfig.ts so log-doctor's `--event 'payment\\.'` filter catches them.",
+      "files": [
+        "sovran-app/features/send/providers/CocoPaymentUX.tsx"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Consider a log-doctor `offline` helper mode that correlates `perf.js_thread_blocked` (already emitted) with attempted send/melt events during network outages. Would make future audits of offline-capable paths cheaper. Low urgency — revisit after F-001 is fixed and real offline traces exist in log.txt.",
+      "files": [
+        "sovran-app/scripts/log-doctor/"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Does coco-payment-ux's CocoPaymentUXProvider base re-subscribe or dispose any machinery when the screenActionsBridge identity changes (it does re-memoize on every receive-flow mount/unmount via the receiveExtras?.requestCameraPermission dep)? The base provider stores the bridge in propsRef at coco-payment-ux/src/react/CocoPaymentUXProvider.tsx:318 and reads it via ref, so machineRef is stable — but screen-action subscriptions that live outside that ref path could leak. Worth a focused audit of the base provider.",
+    "Is fetchNostrProfile(nostrContact.info) expected to accept an npub or a hex pubkey here? The backend's normalizePubkey accepts both (api.sovran.money/src/nostr.ts:797), but NUT-06 contact info is typically delivered as an npub — worth confirming the success rate in production (check api.sovran.money logs for `/nostr/profile` 400 responses)."
+  ]
+}
