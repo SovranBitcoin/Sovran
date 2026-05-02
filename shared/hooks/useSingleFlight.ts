@@ -38,3 +38,37 @@ export function useSingleFlight<TArgs extends unknown[], TResult>(
     [fn]
   );
 }
+
+/**
+ * Per-key variant of `useSingleFlight`. Concurrent calls with the same key
+ * are dropped; concurrent calls with different keys run in parallel. Use for
+ * domain operations where the work is per-target — e.g. liking post A while
+ * post B is still publishing should not block, but tapping like on post A
+ * twice should drop the duplicate.
+ *
+ * The key extractor reads from the first call argument by convention; pass
+ * a custom one for handlers whose target lives elsewhere in the args.
+ */
+export function useKeyedSingleFlight<TArgs extends unknown[], TResult>(
+  fn: (...args: TArgs) => Promise<TResult>,
+  keyOf: (...args: TArgs) => string
+): (...args: TArgs) => Promise<TResult | undefined> {
+  const inFlightRef = useRef<Map<string, Promise<TResult>>>(new Map());
+
+  return useCallback(
+    async (...args: TArgs) => {
+      const key = keyOf(...args);
+      if (inFlightRef.current.has(key)) return undefined;
+      const promise = fn(...args);
+      inFlightRef.current.set(key, promise);
+      try {
+        return await promise;
+      } finally {
+        if (inFlightRef.current.get(key) === promise) {
+          inFlightRef.current.delete(key);
+        }
+      }
+    },
+    [fn, keyOf]
+  );
+}

@@ -14,6 +14,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import Icon from 'assets/icons';
 import { useManager } from '@cashu/coco-react';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 import {
   keysLoadFailedPopup,
@@ -243,9 +244,11 @@ export const SettingsKeyringScreen: React.FC = () => {
   }, [loadKeypairs]);
 
   /**
-   * Generates a new keypair
+   * Generates a new keypair. `isGenerating` is React state and lands too
+   * late to block a rapid double-tap on Generate, which would otherwise
+   * write two new keypairs into the secure-store keyring.
    */
-  const handleGenerateKey = async () => {
+  const handleGenerateKey = useSingleFlight(async () => {
     if (!manager) return;
 
     try {
@@ -259,7 +262,7 @@ export const SettingsKeyringScreen: React.FC = () => {
     } finally {
       setIsGenerating(false);
     }
-  };
+  });
 
   /**
    * Helper to convert hex string to bytes
@@ -305,39 +308,49 @@ export const SettingsKeyringScreen: React.FC = () => {
   };
 
   /**
-   * Imports an existing private key (nsec or hex format)
+   * Imports an existing private key (nsec or hex format). The single-flight
+   * guard wraps the whole prompt → submit → addKeyPair lifecycle so a
+   * double-tap on the Import row before the alert renders cannot stack two
+   * `addKeyPair` writes against the same nsec.
    */
-  const handleImportNsec = () => {
-    Alert.prompt(
-      'Import Private Key',
-      'Enter your nsec or hex private key',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Import',
-          onPress: async (value: string | undefined) => {
-            if (!value || !manager) return;
+  const handleImportNsec = useSingleFlight(
+    () =>
+      new Promise<void>((resolve) => {
+        Alert.prompt(
+          'Import Private Key',
+          'Enter your nsec or hex private key',
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve() },
+            {
+              text: 'Import',
+              onPress: async (value: string | undefined) => {
+                if (!value || !manager) {
+                  resolve();
+                  return;
+                }
+                try {
+                  const trimmedValue = value.trim();
+                  const success = await tryImportKey(trimmedValue);
 
-            try {
-              const trimmedValue = value.trim();
-              const success = await tryImportKey(trimmedValue);
-
-              if (success) {
-                keyImportedPopup();
-                await loadKeypairs();
-              } else {
-                invalidKeyFormatPopup();
-              }
-            } catch (error) {
-              log.error('settings.keyring.import_failed', { error });
-              keyImportFailedPopup();
-            }
-          },
-        },
-      ],
-      'secure-text'
-    );
-  };
+                  if (success) {
+                    keyImportedPopup();
+                    await loadKeypairs();
+                  } else {
+                    invalidKeyFormatPopup();
+                  }
+                } catch (error) {
+                  log.error('settings.keyring.import_failed', { error });
+                  keyImportFailedPopup();
+                } finally {
+                  resolve();
+                }
+              },
+            },
+          ],
+          'secure-text'
+        );
+      })
+  );
 
   /**
    * Copies a public key to clipboard

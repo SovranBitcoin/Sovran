@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/shallow';
 import type { FeedEvent, NoteMetrics } from '@/features/feed/components/nostr/shared';
 import { log } from '@/shared/lib/logger';
 import { engagementUpdateFailedPopup } from '@/shared/lib/popup';
+import { useKeyedSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useNostrSocialStore } from '@/shared/stores/profile/nostrSocialStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 
@@ -445,7 +446,7 @@ export function useNostrEngagement(
 
   // ---- toggle actions (unified via toggleEngagement) ----
 
-  const toggleLike = useCallback(
+  const toggleLikeInner = useCallback(
     async (target: FeedEvent) => {
       if (!nostrKeys?.pubkey || !ndk) {
         engagementUpdateFailedPopup('like');
@@ -479,7 +480,7 @@ export function useNostrEngagement(
     ]
   );
 
-  const toggleRepost = useCallback(
+  const toggleRepostInner = useCallback(
     async (target: FeedEvent) => {
       if (!nostrKeys?.pubkey || !ndk) {
         engagementUpdateFailedPopup('repost');
@@ -514,6 +515,15 @@ export function useNostrEngagement(
       repostsByEventId,
     ]
   );
+
+  // Per-target single-flight: tapping like on post A while post B is still
+  // publishing must not block — use the target id as the key so concurrent
+  // calls on different posts run in parallel, but a rapid double-tap on the
+  // same post drops the duplicate before the second `ndkEvent.publish()`
+  // can stomp the first call's optimistic state.
+  const targetKey = useCallback((target: FeedEvent) => target.id, []);
+  const toggleLike = useKeyedSingleFlight(toggleLikeInner, targetKey);
+  const toggleRepost = useKeyedSingleFlight(toggleRepostInner, targetKey);
 
   return {
     getDisplayMetrics,

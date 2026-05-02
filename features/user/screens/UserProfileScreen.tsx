@@ -23,6 +23,7 @@ import { Stack, Link } from 'expo-router';
 import { z } from 'zod';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -847,7 +848,7 @@ export function UserProfileScreen() {
     }
   }, []);
 
-  const handleToggleFollow = useCallback(async () => {
+  const handleToggleFollowInner = useCallback(async () => {
     if (!pubkey || !nostrKeys?.pubkey || !ndk) {
       nostrLog.warn('user.profile.follow.precondition_failed', {
         hasPubkey: !!pubkey,
@@ -900,6 +901,11 @@ export function UserProfileScreen() {
     setContactsFromRelay,
     clearFollowOptimistic,
   ]);
+
+  // `followInFlight` is store-derived state and lands a render too late;
+  // a rapid double-tap on Follow runs `setFollowOptimistic` twice and races
+  // a second kind-3 publish with the first's `clearFollowOptimistic`.
+  const handleToggleFollow = useSingleFlight(handleToggleFollowInner);
 
   // ===========================
   // PROFILE INFO ITEMS (data-driven)

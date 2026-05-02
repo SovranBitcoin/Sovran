@@ -18,6 +18,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { TOAST_COPY } from '@/shared/lib/paymentCopy';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
 import { CocoManager } from '@/shared/lib/cashu/manager';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { PaymentStatusIcon } from './PaymentStatusIcon';
 import { fmt, isAmountSegment, type PopupTextSegment } from './format';
 import { useToastSurface } from './useToastSurface';
@@ -212,7 +213,11 @@ export function PaymentStatusToast({
     ),
   }));
 
-  const onPressViewTransaction = async () => {
+  // Wrap in single-flight: a rapid double-tap on the toast's "View" action
+  // would otherwise call `getPaginatedHistory(0, 100)` twice and stack two
+  // copies of the destination screen on the back stack — `guardedRouter`'s
+  // 600ms debounce only catches the navigation, not the history fetch.
+  const onPressViewTransaction = useSingleFlight(async () => {
     try {
       if (!CocoManager.isInitialized()) return;
       const manager = CocoManager.getInstance();
@@ -253,7 +258,7 @@ export function PaymentStatusToast({
       log.warn('popup.open_transaction_failed', { error: e });
     }
     hide();
-  };
+  });
 
   return (
     <Toast

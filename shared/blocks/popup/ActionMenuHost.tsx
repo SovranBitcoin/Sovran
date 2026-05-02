@@ -21,6 +21,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log } from '@/shared/lib/logger';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
@@ -301,7 +302,7 @@ export function ActionMenuHost() {
     void button.onPress?.(() => dismissActionMenuPopup());
   }, []);
 
-  const handlePrimaryPress = useCallback(
+  const handlePrimaryPressInner = useCallback(
     async (action: ActionMenuPrimaryAction): Promise<void> => {
       if (isSubmitting) return;
       setError(null);
@@ -320,6 +321,13 @@ export function ActionMenuHost() {
     },
     [inputValues, isSubmitting]
   );
+
+  // `isSubmitting` is React state — a rapid double-tap on the primary
+  // action button (Import-Nsec, Claim Username, etc.) lands twice into
+  // `action.onPress` and dispatches duplicate side-effects (two profile
+  // imports, two `storeImportedNsec` writes). The synchronous ref guard
+  // closes the window before the second call enters.
+  const handlePrimaryPress = useSingleFlight(handlePrimaryPressInner);
 
   // Defaults-merged input values — when a chained payload introduces
   // new input keys (e.g. profile-switcher → "Import Nostr" with `nsec`),

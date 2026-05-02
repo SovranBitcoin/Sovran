@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { MarmotClient } from '@internet-privacy/marmot-ts';
 import { useWhitenoise } from '../WhitenoiseProvider';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { log } from '@/shared/lib/logger';
 
 const wnLog = log.child({ module: 'whitenoise' });
@@ -57,7 +58,7 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
     };
   }, [client, refresh]);
 
-  const bootstrap = useCallback(async () => {
+  const bootstrapInner = useCallback(async () => {
     if (!client) {
       setError('White Noise client not ready');
       return;
@@ -91,6 +92,11 @@ export function useWhitenoiseSetup(): WhitenoiseSetupState {
       setIsBootstrapping(false);
     }
   }, [client, relays]);
+
+  // Key-package creation is finite-resource work — a duplicate concurrent
+  // bootstrap would publish two key packages per slot and burn relay
+  // round-trips. `isBootstrapping` is React state and lands too late.
+  const bootstrap = useSingleFlight(bootstrapInner);
 
   return {
     isReady: keyPackageCount >= TARGET_KEY_PACKAGE_COUNT,

@@ -33,6 +33,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { EmojiPickerContent } from '@/shared/lib/popup/popups/emojiPicker';
 import { ModelPickerContent } from '@/shared/lib/popup/popups/modelPicker';
@@ -350,34 +351,55 @@ function SheetContent({
 
       {(standardPayload?.buttons?.length ?? 0) > 0 ? (
         <View className="mt-4 gap-2">
-          {standardPayload?.buttons?.map((button, index) => {
-            const variant = index === 0 ? 'primary' : 'tertiary';
-            const className = getSheetButtonClassName(variant);
-            const labelClassName = getSheetButtonLabelClassName(variant);
-
-            return (
-              <Button
-                key={`${button.text}-${index}`}
-                variant={variant}
-                className={className}
-                feedbackVariant={hasLiveStatus ? 'scale' : undefined}
-                onPress={async () => {
-                  if (button.onPress) {
-                    await button.onPress();
-                  } else if (button.page) {
-                    router.navigate(`/${button.page}` as any);
-                  }
-                  close();
-                }}>
-                <Button.Label className={labelClassName}>{button.text}</Button.Label>
-              </Button>
-            );
-          })}
+          {standardPayload?.buttons?.map((button, index) => (
+            <SheetActionButton
+              key={`${button.text}-${index}`}
+              button={button}
+              variant={index === 0 ? 'primary' : 'tertiary'}
+              feedbackVariant={hasLiveStatus ? 'scale' : undefined}
+              close={close}
+            />
+          ))}
         </View>
       ) : null}
 
       {showDuration ? <DurationBar duration={standardPayload!.duration!} /> : null}
     </View>
+  );
+}
+
+// Each sheet button owns its own single-flight slot — declared as a separate
+// component because hooks can't be called inside the parent's `.map` callback.
+// A rapid double-tap on "View Transaction" / "Continue" / etc. would otherwise
+// run `button.onPress` twice and `close()` twice (or run the navigation twice
+// before close lands), which double-stacks the destination on the back stack.
+type SheetActionButtonProps = {
+  button: { text: string; page?: string; onPress?: () => void | Promise<void> };
+  variant: 'primary' | 'tertiary';
+  feedbackVariant: 'scale' | undefined;
+  close: () => void;
+};
+
+function SheetActionButton({ button, variant, feedbackVariant, close }: SheetActionButtonProps) {
+  const className = getSheetButtonClassName(variant);
+  const labelClassName = getSheetButtonLabelClassName(variant);
+  const handlePress = useSingleFlight(async () => {
+    if (button.onPress) {
+      await button.onPress();
+    } else if (button.page) {
+      router.navigate(`/${button.page}` as never);
+    }
+    close();
+  });
+
+  return (
+    <Button
+      variant={variant}
+      className={className}
+      feedbackVariant={feedbackVariant}
+      onPress={handlePress}>
+      <Button.Label className={labelClassName}>{button.text}</Button.Label>
+    </Button>
   );
 }
 

@@ -119,6 +119,7 @@ import { truncateMiddle } from '@/shared/lib/strings';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { chatLog, Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 
@@ -1955,7 +1956,12 @@ export function UserMessagesScreen({
     }
   };
 
-  const handleSendMessage = async () => {
+  // `isSending` is React state — a rapid double-tap on the composer's send
+  // button reads the stale `false` and lands twice into `handleNostrDMSend`,
+  // publishing two NIP-17 gift-wraps and emitting two `pending-${Date.now()}`
+  // optimistic bubbles (audit 33#F-005). Wrap the dispatch in single-flight
+  // so the duplicate is dropped before either branch publishes.
+  const handleSendMessage = useSingleFlight(async () => {
     if (!messageText.trim() || isSending) return;
 
     const text = messageText.trim();
@@ -1972,7 +1978,7 @@ export function UserMessagesScreen({
     } else {
       await handleNostrDMSend(text);
     }
-  };
+  });
 
   // Handle Routstr top-up completion: cleanup on cancel, auto-retry pending message on success
   useFocusEffect(

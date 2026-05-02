@@ -24,6 +24,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
 
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Screen, useLifecycleLogger, log } from '@/shared/lib/logger';
 import { useBitChat } from '../hooks/useBitChat';
@@ -205,7 +206,7 @@ export function GeohashChatScreen({
   // Precompute grouping: consecutive messages from the same sender form a group
   const groupingMap = useMessageGrouping(messages);
 
-  const handleSendMessage = useCallback(async () => {
+  const handleSendMessageInner = useCallback(async () => {
     const text = messageText.trim();
     if (!text || isSending) return;
 
@@ -234,6 +235,11 @@ export function GeohashChatScreen({
       setIsSending(false);
     }
   }, [messageText, isSending, sendMessage, transport, messages.length]);
+
+  // `isSending` flips via React state — a rapid double-tap on the composer
+  // bypasses the guard before the flag commits, broadcasting two BLE-mesh
+  // packets (or two nostr-DM events). Single-flight closes the window.
+  const handleSendMessage = useSingleFlight(handleSendMessageInner);
 
   const handleBack = useCallback(() => {
     if (onBack) {
