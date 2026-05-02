@@ -91,7 +91,7 @@
       "verification_note": "Re-checked at MigrationGate.tsx:93-108; full-tree grep for `migration250Complete` returns only the two read sites; full-tree grep for `_migrationStatus` returns the same two sites. No assignment exists.",
       "prior_audit_id": null,
       "completion_status": "deferred",
-      "completion_note": "MigrationGate dead polling — considered as candidate dead-code slice (cluster C). Excluded; real, unfixed."
+      "completion_note": "MigrationGate poll loop checks `_migrationStatus.migration250Complete`, which is never written; verified during slice survey but not in this slice."
     },
     {
       "id": "F-002",

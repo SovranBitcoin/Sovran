@@ -73,8 +73,8 @@
       ],
       "verification_note": "Re-read each destructuring site. Confirmed each one uses `useRoutstrStore()` without a selector. Counter-argument considered: 'React 19's Compiler handles this.' The compiler memoises WITHIN a component; it cannot downgrade a parent subscription that returns a fresh object every setState. zustand's `useStore(selector)` with an object-returning selector + no equality fn is the documented bad pattern; `useStore()` with no selector is equivalent in v5 because `Object.is(oldState, newState)` fails on every setState (zustand replaces the state object). Log-doctor evidence is suggestive (84× perf.js_thread_blocked in the latest session, though not all are routstr-attributable) — the structural finding stands on its own per <log_doctor_integration> (\"structural races that are self-evident from the code\"). Kept High rather than Critical because the perf damage is bounded to chat screens and not funds-correctness; kept High rather than Medium because chat streaming is an interactive user path where dropped frames are user-visible.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Selector subscriptions to the entire routstr store remain unaddressed. Considered as cluster B candidate for this slice and excluded — picking a different slice (route-boundary param validation) per scope budget."
+      "completion_status": "partial",
+      "completion_note": "UserMessagesScreen no longer subscribes to useRoutstrStore — those 22 selector reads are gone. The other two callers (AiChatScreen, SessionsPanel) still subscribe; full sweep deferred."
     },
     {
       "id": "F-003",

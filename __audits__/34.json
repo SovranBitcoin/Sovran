@@ -24,6 +24,7 @@
       "analyze_structure": "0 cycles, 0 colocate suggestions inside features/ai. Three orphans reported (AiChatScreen.tsx, AiHeaderTitle.tsx, sessionsPopup.ts) are false positives — consumed by app/(drawer)/(tabs)/ai/* via the features/ai/index.ts barrel; orphan analysis was scoped to features/ai only."
     }
   },
+  "completion_status": "partial",
   "findings": [
     {
       "id": "F-001",
@@ -40,7 +41,9 @@
       "fix": "Either rename the call sites at UserMessagesScreen.tsx:1672, 1785 to `setStreamingText`, OR re-export a `setStreaming` alias from streamingBuffer.ts that forwards to `setStreamingText`. The former is preferable — keep one canonical name. After the rename, run `npm run type-check` and confirm TS2724 is gone. Investigate why the type-check error did not block the PR (likely CI gate gap on type-check).",
       "references": ["ts:TS2724", "skill:diagnose"],
       "verification_note": "Re-checked: streamingBuffer.ts:34-105 exports the four named setters and three hooks; none is named `setStreaming`. UserMessagesScreen.tsx:1672 and 1785 both call `setStreaming(...)`. Confirmed via type-check output and direct read.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "TS2724 setStreaming import error resolved by deleting the only call sites in UserMessagesScreen.handleRoutstrSend along with the rest of the Routstr branch. Refactor at 4d36bf1e."
     },
     {
       "id": "F-002",

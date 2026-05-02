@@ -79,8 +79,8 @@
       ],
       "verification_note": "Grepped `= useRoutstrStore\\(\\)` and `} = useRoutstrStore\\(\\)` at this commit. All three sites still use the selector-less form. Log-doctor confirms streaming-rate writes via `store.routstr.set_balance` and `store.routstr.add_message`.",
       "prior_audit_id": "F-002@14.json",
-      "completion_status": "deferred",
-      "completion_note": "Considered selectors cluster as candidate slice; deferred in favour of route-boundary param validation."
+      "completion_status": "partial",
+      "completion_note": "UserMessagesScreen no longer subscribes to useRoutstrStore — those reads are gone. The other two callers (AiChatScreen, SessionsPanel) remain unaddressed."
     },
     {
       "id": "F-003",

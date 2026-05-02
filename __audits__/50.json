@@ -102,8 +102,8 @@
       ],
       "verification_note": "Re-checked at app/userMessages.tsx:21-23 (redirect) and SendMessageMenu.tsx:51-54 (only sets pubkey to recipient.pubkey). Counter-argument considered: maybe an external deep-link or extension launches /(user-flow)/userMessages?pubkey=ROUTSTR_PUBKEY — held: no caller in the audited tree does so, and even if one existed, the canonical AI surface (AiChatScreen) has parity. The dead-branch claim does not depend on every theoretical deep-link being absent; it depends on no in-app surface routing there, which grep confirms.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "~1500 LOC dead Routstr LLM client embedded in UserMessagesScreen — considered as candidate dead-code slice (cluster C). Excluded; real, unfixed."
+      "completion_status": "complete",
+      "completion_note": "Routstr branch deleted from UserMessagesScreen.tsx — file dropped from 2774 to ~830 LOC, ROUTSTR_PUBKEY sentinel + redirect shim retired. Refactor at 4d36bf1e."
     },
     {
       "id": "F-002",
@@ -123,7 +123,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Re-read streamingBuffer.ts in full — confirmed no `setStreaming` export. Grep confirmed `setStreaming` is only called at lines 1672 and 1785, both inside `handleRoutstrSend`. Counter-argument considered: maybe the caller actually calls a different export at runtime via some module-resolution shim. None exists; expo-router and Metro use standard ESM resolution.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "TS2724 setStreaming error resolved by deleting the only call sites (handleRoutstrSend) along with the rest of the Routstr branch. Refactor at 4d36bf1e."
     },
     {
       "id": "F-003",
@@ -143,7 +145,9 @@
         "skill:zod-4"
       ],
       "verification_note": "Re-checked: line 63 `Message` import has zero uses in the file (rg 'Message\\b' confirms only types from 'expo-router' and the local `MessageBubble` component show up; the redux `Message` is dead).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "messages: any[] replaced with messages: DmMessage[]; MessageBubbleProps now takes the typed union; dead `Message` import from redux/nostr/reducer.deprecated dropped. Refactor at 4d36bf1e."
     },
     {
       "id": "F-004",
@@ -162,7 +166,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-checked: grep on `_isFlowContext` and `isFlowContext` in UserMessagesScreen.tsx returns only the prop interface line and the destructure line. No conditional in the file branches on it.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "isFlowContext prop removed from UserMessagesScreenProps and the (user-flow) wrapper. Refactor at 4d36bf1e."
     },
     {
       "id": "F-005",
@@ -181,7 +187,9 @@
         "ts:TS2322"
       ],
       "verification_note": "Re-confirmed via tsc output. The model-switch sheet is gated by `isRoutstrMode && Platform.OS === 'ios'` (line 2531), so the runtime impact is zero today, but the TS error blocks a clean type-check.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "TS2322 waitForInitialLayout error resolved by deleting the model-switch sheet (Routstr-only). Refactor at 4d36bf1e."
     },
     {
       "id": "F-006",
@@ -200,7 +208,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Confirmed by grep — no other reference. The dependency list `[]` makes the hook cheap, so impact is purely cognitive.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Vestigial _bottomSheetDetents useMemo deleted along with the Routstr branch. Refactor at 4d36bf1e."
     },
     {
       "id": "F-007",
@@ -220,7 +230,9 @@
         "skill:vercel-react-native-skills"
       ],
       "verification_note": "UNVERIFIED dynamically — log-doctor latest session has no UserMessages traces. Structural finding only; demoted from High to Medium per dim 7's evidence rule. Counter-argument considered: maybe the streaming bubble breaks under recycling. Plausible but unconfirmed; the right fix is to test with recycling on, not to keep it off forever.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "recycleItems={false} kept on the DM list; reuse-driven layout glitches are a separate investigation."
     },
     {
       "id": "F-008",
@@ -239,7 +251,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Confirmed via direct import grep. The folder-structure rule that previously discouraged feature-to-feature imports (`.cursor/rules/folder-structure.mdc`) was deleted in this branch (per gitStatus). The deletion does not retire the architectural concern — it just removed the documentation of the convention.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Cross-feature import surface was specific to the Routstr branch and shrinks with this slice, but a broader features/user → features/feed/settings/bitchat/whitenoise audit remains."
     },
     {
       "id": "F-009",
@@ -258,7 +272,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Confirmed by reading all three files. The (mint-flow) `handleBack` callback is provably equivalent to the screen's default per UserMessagesScreen.tsx line 889 (`onBack?: () => void` — when missing, `router.back()` is the fallback inferred from the comment).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Three thin route wrappers still exist (app/userMessages.tsx, (user-flow)/userMessages.tsx, (mint-flow)/userMessages.tsx); two of them differ only in onBack — collapse to one wrapper is a follow-up."
     },
     {
       "id": "F-010",
@@ -277,7 +293,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Confirmed by reading the file: the `Message` symbol does not appear after line 63.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Dead `Message` import from redux/nostr/reducer.deprecated dropped along with the rewrite. Refactor at 4d36bf1e."
     },
     {
       "id": "F-011",
@@ -297,7 +315,9 @@
         "knip:unused-export"
       ],
       "verification_note": "knip's unused-exports list shows `extractModelName function features/ai/lib/format.ts:423:17` as unused — meaning the canonical AI version exists and is dead because UserMessagesScreen ships its own copy. Two implementations of the same function, one of them officially unused. This is the doppelgänger pattern that skill:improve-codebase-architecture flags.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "50+ line AI-provider iconMap, getProviderIcon, ModelListItem, extractProviderFromSlug, extractModelName, formatBalance all deleted. Refactor at 4d36bf1e."
     },
     {
       "id": "F-012",
@@ -316,7 +336,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-confirmed by grep on logger.ts and direct read of all three feature/user screen files. The alias `Screen = Log` suggests the export was a typed-pass-through rather than a deliberate UI export.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Screen import path inconsistency is a wider repo pattern; out of this slice."
     },
     {
       "id": "F-013",
@@ -335,7 +357,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Confirmed by reading the three comments. Counter-argument considered: maybe the three surfaces will diverge over time and abstracting now is premature. Held: divergence has been in opposite direction — comments explicitly say 'kept identical' and 'lifted from'. Two adapters already exist; the third makes a real seam.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Two surfaces remain (WhitenoiseDMScreen + GeohashChatScreen) plus this DM screen; consolidating them would be a separate slice."
     },
     {
       "id": "F-014",
@@ -354,7 +378,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Direct read confirms the log call is at the top level of the function body, executed every render.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Lives in features/user/screens/ShareScreen.tsx; out of this slice."
     },
     {
       "id": "F-015",
@@ -374,7 +400,9 @@
         "skill:animating-react-native-expo"
       ],
       "verification_note": "Confirmed by direct read. Counter-argument considered: maybe legacy Animated is intentional for SwiftUI interop (the BottomSheet uses @expo/ui/swift-ui). The animations in question are pure RN views, not SwiftUI bridges, so the interop concern doesn't apply.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "UserProfileScreen Animated migration is separate from UserMessagesScreen scope."
     },
     {
       "id": "F-016",
@@ -414,7 +442,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Count confirmed via grep.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "All 42 isRoutstrMode ternaries removed by branch deletion. Refactor at 4d36bf1e."
     }
   ],
   "dimensions": {
@@ -497,5 +527,6 @@
     "F-008's lift candidates depend on whether `packages/schemas` (or any shared workspace package) is going to exist soon. If yes, batch the lift with the package creation. If no, the lift to `shared/` is still correct.",
     "Why is `Section` (UserProfileScreen.tsx:31) imported from `@/features/settings` rather than from `shared/ui/composed/`? The shape suggests a primitive that grew up inside settings and never moved. F-008's fix presupposes the right answer is to relocate; a counter-narrative (Section is genuinely settings-flavoured and other consumers should fork) is less likely but worth a moment of consideration.",
     "Should features/user even exist as a separate feature folder, or does it represent a 'profile + messaging' concern that crosses into features/profile (does not yet exist) and features/messaging (does not yet exist)? The current split (3 screens + 1 menu component) is small enough to be coherent, but the cross-feature reach into 4 sibling folders argues that the name is a misnomer."
-  ]
+  ],
+  "completion_status": "partial"
 }

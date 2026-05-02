@@ -49,8 +49,8 @@
       ],
       "verification_note": "Re-checked at popups/payment.ts:75-178. Counter-argument considered: maybe DISPLAY is a feature flag toggled elsewhere — grepped repo-wide, only hits are the declaration and the if-check on the same file. Confirmed unreachable. usePaymentStatusListener.ts is the sole call-site of paymentStatusPopup and never sets the constant.",
       "prior_audit_id": null,
-      "completion_status": "complete",
-      "completion_note": "Dead PAYMENT_STATUS_DISPLAY const, the sheet branch, and the now-unused router/log/CocoManager imports were deleted in f0f53d44; paymentStatusPopup is now the showCustomToast call alone."
+      "completion_status": "stale",
+      "completion_note": "Already addressed in commit f0f53d44 (refactor(ui): collapse popup wrappers behind a single factory) — the dead `sheet` branch and PAYMENT_STATUS_DISPLAY constant are gone."
     },
     {
       "id": "F-002",
