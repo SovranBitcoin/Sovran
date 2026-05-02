@@ -52,7 +52,6 @@
     "shared/lib/nostr/secureStorage.ts": ["exports"],
     "shared/hooks/useBeforeRemoveCleanup.ts": ["files"],
     "navigation/**": ["exports"],
-    "features/mint/components/rebalance/demoRunner.ts": ["files"],
     "coco-payment-ux/**": ["files", "exports", "types", "dependencies", "unlisted"],
     "shared/lib/logger.ts": ["duplicates"]
   }

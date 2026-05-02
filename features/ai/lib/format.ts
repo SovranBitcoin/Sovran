@@ -183,10 +183,7 @@ export function estimateMessagesRemaining(
  * and to `null` when the model is unknown to the catalog so the caller
  * can short-circuit to "always affordable until proven otherwise".
  */
-export function estimateTurnCostSats(
-  modelId: string,
-  models: RoutstrModel[]
-): number | null {
+export function estimateTurnCostSats(modelId: string, models: RoutstrModel[]): number | null {
   const model = models.find((m) => m.id === modelId);
   if (!model) return null;
   const pricing = model.sats_pricing;
@@ -196,9 +193,7 @@ export function estimateTurnCostSats(
   const request = typeof pricing.request === 'number' ? pricing.request : 0;
   if (promptPer != null && completionPer != null) {
     const cost =
-      request +
-      promptPer * TYPICAL_PROMPT_TOKENS +
-      completionPer * TYPICAL_COMPLETION_TOKENS;
+      request + promptPer * TYPICAL_PROMPT_TOKENS + completionPer * TYPICAL_COMPLETION_TOKENS;
     return cost;
   }
   if (typeof pricing.max_cost === 'number') {
@@ -260,9 +255,7 @@ export function getAffordabilityDetails(
   };
 }
 
-export function getProviderById(
-  id: AiProviderId | string | null | undefined
-): AiProvider {
+export function getProviderById(id: AiProviderId | string | null | undefined): AiProvider {
   if (id && PROVIDER_BY_ID.has(id as AiProviderId)) {
     return PROVIDER_BY_ID.get(id as AiProviderId)!;
   }
@@ -291,10 +284,7 @@ export function modelIdForSlot(provider: AiProviderId, tier: AiTierId): string {
  * the same Auto tier) is way better than hard-failing — the user just
  * wants a working chat.
  */
-export function buildCandidateChain(
-  provider: AiProviderId,
-  tier: AiTierId
-): string[] {
+export function buildCandidateChain(provider: AiProviderId, tier: AiTierId): string[] {
   const primary = modelIdForSlot(provider, tier);
   const fallbacks = AI_PROVIDERS.filter((p) => p.id !== provider).map((p) =>
     modelIdForSlot(p.id, tier)
@@ -415,13 +405,6 @@ export function getModelDisplayName(modelId: string, models: RoutstrModel[]): st
   const colonIdx = raw.indexOf(':');
   if (colonIdx >= 0 && colonIdx < raw.length - 1) return raw.slice(colonIdx + 1).trim();
   return raw;
-}
-
-/** Pull a short, readable model name. Falls back to the model id itself if
- *  the catalog hasn't loaded — used by callers that just want a label and
- *  don't have a tier in scope. */
-export function extractModelName(modelId: string, availableModels: RoutstrModel[]): string {
-  return getModelDisplayName(modelId, availableModels);
 }
 
 /** Relative timestamp suitable for the conversations list. */

@@ -57,14 +57,11 @@ import {
   type ImageOverlayReplaceLayout,
 } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
-import { StoriesRow } from './nostr/StoriesRow';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 // ============================================================================
 // Types
 // ============================================================================
-
-type HomeFeedListItem = { type: 'stories' } | FeedItem;
 
 interface HomeFeedProps {
   activeFilter?: string;
@@ -371,7 +368,6 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
 
   const listRef = useRef<LegendListRef>(null);
 
-  const storiesHeightRef = useRef(0);
   const scrollOffsetRef = useRef(0);
 
   const categoryFeedSpecs = useMemo<FeedSpec[]>(() => {
@@ -750,8 +746,6 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
     useNostrEngagement(actionableEvents, getMetrics);
 
-  // listData = [tabs, ...feedItems] when stories are hidden, otherwise [stories, tabs, ...feedItems].
-  const FEED_ITEM_OFFSET = SHOW_STORIES_ROW ? 2 : 1;
   const overlaySourceIndexRef = useRef(-1);
   const feedIndicesWithVideo = useMemo(() => computeFeedIndicesWithVideo(feedItems), [feedItems]);
 
@@ -802,7 +796,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
 
   const renderFeedItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<FeedItem, string | undefined>) => {
-      const feedIndex = index - FEED_ITEM_OFFSET;
+      const feedIndex = index;
       if (item.type === 'note') {
         const metrics = getDisplayMetrics(item.event.id);
         const engagement = getEngagementState(item.event.id);
@@ -862,7 +856,6 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
       );
     },
     [
-      FEED_ITEM_OFFSET,
       getDisplayMetrics,
       getEngagementState,
       getMetrics,
@@ -885,30 +878,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
     [isRefreshing, handleRefresh, refreshTintColor]
   );
 
-  const listData = useMemo<HomeFeedListItem[]>(
-    () => (SHOW_STORIES_ROW ? [STORIES_ITEM, ...feedItems] : feedItems),
-    [feedItems]
-  );
-
-  const renderItem = useCallback(
-    ({ item, index }: LegendListRenderItemProps<HomeFeedListItem, string | undefined>) => {
-      if (item.type === 'stories') {
-        return (
-          <View
-            onLayout={(e) => {
-              storiesHeightRef.current = e.nativeEvent.layout.height;
-            }}>
-            <StoriesRow userPubkey={userPubkey} />
-          </View>
-        );
-      }
-      return renderFeedItem({
-        item,
-        index,
-      } as LegendListRenderItemProps<FeedItem, string | undefined>);
-    },
-    [userPubkey, renderFeedItem]
-  );
+  const renderItem = renderFeedItem;
 
   const handleScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
     scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
@@ -934,7 +904,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
         <View style={styles.flex1}>
           <LegendList
             ref={listRef}
-            data={listData}
+            data={feedItems}
             keyExtractor={listKeyExtractor}
             getItemType={listGetItemType}
             estimatedItemSize={300}
@@ -974,15 +944,11 @@ export const HomeFeed = React.memo(HomeFeedComponent);
 // Stable references — defined outside the component to avoid re-creation
 // ============================================================================
 
-const STORIES_ITEM: HomeFeedListItem = { type: 'stories' };
-const SHOW_STORIES_ROW = false;
 const LIST_CONTENT_STYLE = { paddingBottom: 120 };
 
-const listKeyExtractor = (item: HomeFeedListItem) => {
-  if (item.type === 'stories') return '__stories__';
-  return item.type === 'note' ? item.event.id : item.repostEvent.id;
-};
-const listGetItemType = (item: HomeFeedListItem) => item.type;
+const listKeyExtractor = (item: FeedItem) =>
+  item.type === 'note' ? item.event.id : item.repostEvent.id;
+const listGetItemType = (item: FeedItem) => item.type;
 
 export const PRIMAL_FEED_SPECS: FeedSpec[] = [
   {
