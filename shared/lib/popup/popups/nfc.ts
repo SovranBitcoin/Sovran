@@ -1,14 +1,17 @@
-import { popup } from '../engine';
+import { makeStaticPopup, makeParamPopup } from './factory';
 
-export function walletNotReadyPopup(): void {
-  popup({
-    message: 'Wallet not ready',
-    text: 'Please try again.',
-    icon: 'icon:solar:wallet-bold',
+export const walletNotReadyPopup = makeStaticPopup({
+  message: 'Wallet not ready',
+  text: 'Please try again.',
+  icon: 'icon:solar:wallet-bold',
+  type: 'error',
+});
+
+export const nfcErrorPopup = makeParamPopup<{ title: string; message: string }>(
+  ({ title, message }) => ({
+    message: title,
+    text: message,
+    icon: 'icon:lucide:nfc',
     type: 'error',
-  });
-}
-
-export function nfcErrorPopup(params: { title: string; message: string }): void {
-  popup({ message: params.title, text: params.message, icon: 'icon:lucide:nfc', type: 'error' });
-}
+  })
+);

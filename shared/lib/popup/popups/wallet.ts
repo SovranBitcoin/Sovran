@@ -1,63 +1,48 @@
-import { popup } from '../engine';
-import type { BaseOverrides, TextOverrides } from './types';
+import { makeStaticPopup, makeParamPopup } from './factory';
 
-export function insufficientBalancePopup(params: {
+const WALLET_ICON = 'icon:solar:wallet-bold';
+
+export const insufficientBalancePopup = makeParamPopup<{
   amount: number;
   unit: string;
   fee: number;
-}): void {
-  popup({
-    message: 'Insufficient Balance',
-    text: `Not enough funds to send ${params.amount} ${params.unit} with a fee of ${params.fee} ${params.unit}.`,
-    icon: 'icon:solar:wallet-bold',
-    type: 'error',
-  });
-}
+}>(({ amount, unit, fee }) => ({
+  message: 'Insufficient Balance',
+  text: `Not enough funds to send ${amount} ${unit} with a fee of ${fee} ${unit}.`,
+  icon: WALLET_ICON,
+  type: 'error',
+}));
 
 /** For coco-payment-ux INSUFFICIENT_BALANCE / NO_BALANCE when amount/unit/fee are not available. */
-export function balanceTooLowPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Insufficient Balance',
-    text: 'You do not have enough funds to complete this transaction.',
-    icon: 'icon:solar:wallet-bold',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const balanceTooLowPopup = makeStaticPopup({
+  message: 'Insufficient Balance',
+  text: 'You do not have enough funds to complete this transaction.',
+  icon: WALLET_ICON,
+  type: 'error',
+});
 
-export function invalidAddressPopup(params: { address: string }): void {
-  popup({
-    message: 'Invalid Address',
-    text: `The address "${params.address}" is not a valid Ecash or Lightning address.`,
-    icon: 'icon:lucide:link',
-    type: 'error',
-  });
-}
+export const invalidAddressPopup = makeParamPopup<{ address: string }>(({ address }) => ({
+  message: 'Invalid Address',
+  text: `The address "${address}" is not a valid Ecash or Lightning address.`,
+  icon: 'icon:lucide:link',
+  type: 'error',
+}));
 
-export function noClipboardAddressPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'No Address Found',
-    text: 'No valid address was found in your clipboard.',
-    icon: 'icon:mdi:alert-circle-outline',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const noClipboardAddressPopup = makeStaticPopup({
+  message: 'No Address Found',
+  text: 'No valid address was found in your clipboard.',
+  icon: 'icon:mdi:alert-circle-outline',
+  type: 'error',
+});
 
-export function reservedProofsFreedPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Reserved proofs freed',
-    icon: 'icon:mdi:shield-check',
-    type: 'success',
-    ...overrides,
-  });
-}
+export const reservedProofsFreedPopup = makeStaticPopup({
+  message: 'Reserved proofs freed',
+  icon: 'icon:mdi:shield-check',
+  type: 'success',
+});
 
-export function reservedProofsFailedPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Failed to free reserved proofs',
-    icon: 'icon:mdi:shield',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const reservedProofsFailedPopup = makeStaticPopup({
+  message: 'Failed to free reserved proofs',
+  icon: 'icon:mdi:shield',
+  type: 'error',
+});

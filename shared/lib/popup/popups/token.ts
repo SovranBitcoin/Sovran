@@ -1,142 +1,100 @@
-import { popup } from '../engine';
-import type { BaseOverrides, TextOverrides } from './types';
+import { makeStaticPopup, makeParamPopup } from './factory';
 
-export function tokenRedeemedPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Token Redeemed',
-    text: 'All proofs are spent — the recipient has claimed this token.',
-    icon: 'icon:mdi:check-circle',
-    type: 'success',
-    ...overrides,
-  });
-}
+export const tokenRedeemedPopup = makeStaticPopup({
+  message: 'Token Redeemed',
+  text: 'All proofs are spent — the recipient has claimed this token.',
+  icon: 'icon:mdi:check-circle',
+  type: 'success',
+});
 
-export function tokenAlreadyRedeemedPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Token Already Redeemed',
-    text: 'All proofs are spent — the recipient already claimed it. Nothing to reclaim.',
-    icon: 'icon:mdi:information',
-    type: 'info',
-    ...overrides,
-  });
-}
+export const tokenAlreadyRedeemedPopup = makeStaticPopup({
+  message: 'Token Already Redeemed',
+  text: 'All proofs are spent — the recipient already claimed it. Nothing to reclaim.',
+  icon: 'icon:mdi:information',
+  type: 'info',
+});
 
-export function tokenStillPendingPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Token Still Pending',
-    text: 'All proofs are unspent — the recipient has not claimed this token yet. You can cancel to reclaim the funds.',
-    icon: 'icon:mdi:clock-outline',
-    type: 'info',
-    ...overrides,
-  });
-}
+export const tokenStillPendingPopup = makeStaticPopup({
+  message: 'Token Still Pending',
+  text: 'All proofs are unspent — the recipient has not claimed this token yet. You can cancel to reclaim the funds.',
+  icon: 'icon:mdi:clock-outline',
+  type: 'info',
+});
 
-export function tokenMixedStatesPopup(
-  params: { spent: number; unspent: number; pending: number; total: number },
-  overrides?: BaseOverrides
-): void {
-  popup({
-    message: 'Mixed Proof States',
-    text: `${params.spent}/${params.total} spent, ${params.unspent}/${params.total} unspent, ${params.pending}/${params.total} pending.`,
-    icon: 'icon:mdi:alert-circle-outline',
-    type: 'warning',
-    ...overrides,
-  });
-}
+export const tokenMixedStatesPopup = makeParamPopup<{
+  spent: number;
+  unspent: number;
+  pending: number;
+  total: number;
+}>(({ spent, unspent, pending, total }) => ({
+  message: 'Mixed Proof States',
+  text: `${spent}/${total} spent, ${unspent}/${total} unspent, ${pending}/${total} pending.`,
+  icon: 'icon:mdi:alert-circle-outline',
+  type: 'warning',
+}));
 
-export function tokenCheckFailedPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Check Status Failed',
-    text: 'Unable to check the token status.',
-    icon: 'icon:mdi:alert-circle',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const tokenCheckFailedPopup = makeStaticPopup({
+  message: 'Check Status Failed',
+  text: 'Unable to check the token status.',
+  icon: 'icon:mdi:alert-circle',
+  type: 'error',
+});
 
-export function tokenCannotCancelPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Cannot Cancel',
-    text: 'No operation ID and no token available to reclaim.',
-    icon: 'icon:mdi:cancel',
-    type: 'warning',
-    ...overrides,
-  });
-}
+export const tokenCannotCancelPopup = makeStaticPopup({
+  message: 'Cannot Cancel',
+  text: 'No operation ID and no token available to reclaim.',
+  icon: 'icon:mdi:cancel',
+  type: 'warning',
+});
 
-export function tokenCannotReclaimPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Cannot Reclaim Yet',
-    text: 'All proofs are in a pending state at the mint. Try again shortly.',
-    icon: 'icon:mdi:clock-alert-outline',
-    type: 'warning',
-    ...overrides,
-  });
-}
+export const tokenCannotReclaimPopup = makeStaticPopup({
+  message: 'Cannot Reclaim Yet',
+  text: 'All proofs are in a pending state at the mint. Try again shortly.',
+  icon: 'icon:mdi:clock-alert-outline',
+  type: 'warning',
+});
 
-export function fundsReclaimedPopup(
-  params: { amount: number; unit: string },
-  overrides?: BaseOverrides
-): void {
-  popup({
+export const fundsReclaimedPopup = makeParamPopup<{ amount: number; unit: string }>(
+  ({ amount, unit }) => ({
     message: 'Funds Reclaimed',
-    text: `${params.amount} ${params.unit} reclaimed back into your wallet.`,
+    text: `${amount} ${unit} reclaimed back into your wallet.`,
     icon: 'icon:mdi:cash-multiple',
     type: 'success',
-    ...overrides,
-  });
-}
+  })
+);
 
-export function reclaimFailedPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Reclaim Failed',
-    icon: 'icon:mdi:cash-multiple',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const reclaimFailedPopup = makeStaticPopup({
+  message: 'Reclaim Failed',
+  icon: 'icon:mdi:cash-multiple',
+  type: 'error',
+});
 
-export function tokenCannotCheckStatusPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Cannot Check Status',
-    text: 'No operation ID and no token available to verify.',
-    icon: 'icon:mdi:help-circle',
-    type: 'warning',
-    ...overrides,
-  });
-}
+export const tokenCannotCheckStatusPopup = makeStaticPopup({
+  message: 'Cannot Check Status',
+  text: 'No operation ID and no token available to verify.',
+  icon: 'icon:mdi:help-circle',
+  type: 'warning',
+});
 
-export function tokenRedeemedByRecipientPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'Token was redeemed by recipient',
-    icon: 'icon:mdi:check-circle',
-    type: 'success',
-    ...overrides,
-  });
-}
+export const tokenRedeemedByRecipientPopup = makeStaticPopup({
+  message: 'Token was redeemed by recipient',
+  icon: 'icon:mdi:check-circle',
+  type: 'success',
+});
 
-export function tokenPendingNotRedeemedPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'Token is still pending - not yet redeemed',
-    icon: 'icon:mdi:clock-outline',
-    type: 'info',
-    ...overrides,
-  });
-}
+export const tokenPendingNotRedeemedPopup = makeStaticPopup({
+  message: 'Token is still pending - not yet redeemed',
+  icon: 'icon:mdi:clock-outline',
+  type: 'info',
+});
 
-export function transactionAlreadyCancelledPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'Transaction was already cancelled',
-    icon: 'icon:mdi:information',
-    type: 'info',
-    ...overrides,
-  });
-}
+export const transactionAlreadyCancelledPopup = makeStaticPopup({
+  message: 'Transaction was already cancelled',
+  icon: 'icon:mdi:information',
+  type: 'info',
+});
 
-export function transactionCancelledPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'Transaction cancelled successfully',
-    icon: 'icon:mdi:check-circle-outline',
-    ...overrides,
-  });
-}
+export const transactionCancelledPopup = makeStaticPopup({
+  message: 'Transaction cancelled successfully',
+  icon: 'icon:mdi:check-circle-outline',
+});

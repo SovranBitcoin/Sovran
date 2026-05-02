@@ -1,46 +1,42 @@
-import { popup } from '../engine';
-import type { BaseOverrides } from './types';
+import { makeStaticPopup, makeParamPopup } from './factory';
 
-export function cameraPermissionPopup(
-  status: 'granted' | 'denied' | 'blocked',
-  overrides?: BaseOverrides
-): void {
+const CAMERA_ICON = 'icon:mdi:camera';
+const QR_ICON = 'icon:mdi:qrcode';
+
+export const cameraPermissionPopup = makeParamPopup<'granted' | 'denied' | 'blocked'>((status) => {
   if (status === 'granted') {
-    popup({
+    return {
       message: 'Camera Permission Granted',
       text: 'Camera access has been granted.',
-      icon: 'icon:mdi:camera',
+      icon: CAMERA_ICON,
       type: 'success',
-      ...overrides,
-    });
-  } else if (status === 'denied') {
-    popup({
+    };
+  }
+  if (status === 'denied') {
+    return {
       message: 'Camera Permission Denied',
       text: 'Camera access is denied. Please enable it in your device settings.',
-      icon: 'icon:mdi:camera',
+      icon: CAMERA_ICON,
       type: 'error',
-      ...overrides,
-    });
-  } else {
-    popup({
-      message: 'Camera Permission Blocked',
-      text: 'Camera access is blocked. Please enable it in your device settings.',
-      icon: 'icon:mdi:camera',
-      buttons: [{ text: 'Open Settings', page: 'settings' }],
-      type: 'error',
-      ...overrides,
-    });
+    };
   }
-}
-
-export function noQrCodeFoundPopup(): void {
-  popup({ message: 'No QR code found in image', icon: 'icon:mdi:qrcode', type: 'info' });
-}
-
-export function qrScanFailedPopup(): void {
-  popup({
-    message: 'Failed to scan QR code from image',
-    icon: 'icon:mdi:qrcode',
+  return {
+    message: 'Camera Permission Blocked',
+    text: 'Camera access is blocked. Please enable it in your device settings.',
+    icon: CAMERA_ICON,
+    buttons: [{ text: 'Open Settings', page: 'settings' }],
     type: 'error',
-  });
-}
+  };
+});
+
+export const noQrCodeFoundPopup = makeStaticPopup({
+  message: 'No QR code found in image',
+  icon: QR_ICON,
+  type: 'info',
+});
+
+export const qrScanFailedPopup = makeStaticPopup({
+  message: 'Failed to scan QR code from image',
+  icon: QR_ICON,
+  type: 'error',
+});

@@ -1,23 +1,17 @@
-import { popup } from '../engine';
-import type { BaseOverrides } from './types';
+import { makeParamPopup } from './factory';
 
-export function rollbackSuccessPopup(params: { count: number }, overrides?: BaseOverrides): void {
-  popup({
-    message: `Successfully rolled back ${params.count} transaction${params.count !== 1 ? 's' : ''}`,
-    icon: 'icon:mdi:cash-multiple',
-    type: 'success',
-    ...overrides,
-  });
-}
+export const rollbackSuccessPopup = makeParamPopup<{ count: number }>(({ count }) => ({
+  message: `Successfully rolled back ${count} transaction${count !== 1 ? 's' : ''}`,
+  icon: 'icon:mdi:cash-multiple',
+  type: 'success',
+}));
 
-export function rollbackPartialPopup(params: {
+export const rollbackPartialPopup = makeParamPopup<{
   success: number;
   failed: number;
   total: number;
-}): void {
-  popup({
-    message: `Rolled back ${params.success}, failed ${params.failed}`,
-    icon: 'icon:mdi:alert-circle-outline',
-    type: params.failed === params.total ? 'error' : 'warning',
-  });
-}
+}>(({ success, failed, total }) => ({
+  message: `Rolled back ${success}, failed ${failed}`,
+  icon: 'icon:mdi:alert-circle-outline',
+  type: failed === total ? 'error' : 'warning',
+}));

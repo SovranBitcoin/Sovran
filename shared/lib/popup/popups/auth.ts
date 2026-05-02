@@ -1,65 +1,47 @@
-import { popup } from '../engine';
-import type { BaseOverrides, TextOverrides } from './types';
+import { makeStaticPopup } from './factory';
 
-export function keyGeneratedPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'New key generated',
-    type: 'success',
-    icon: 'icon:solar:key-bold',
-    ...overrides,
-  });
-}
+const KEY_ICON = 'icon:solar:key-bold';
 
-export function keyGenerateFailedPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'Failed to generate key',
-    icon: 'icon:solar:key-bold',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const keyGeneratedPopup = makeStaticPopup({
+  message: 'New key generated',
+  icon: KEY_ICON,
+  type: 'success',
+});
 
-export function keysLoadFailedPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'Failed to load keys',
-    icon: 'icon:solar:key-bold',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const keyGenerateFailedPopup = makeStaticPopup({
+  message: 'Failed to generate key',
+  icon: KEY_ICON,
+  type: 'error',
+});
 
-export function keyImportedPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'Key imported successfully',
-    type: 'success',
-    icon: 'icon:solar:key-bold',
-    ...overrides,
-  });
-}
+export const keysLoadFailedPopup = makeStaticPopup({
+  message: 'Failed to load keys',
+  icon: KEY_ICON,
+  type: 'error',
+});
 
-export function keyImportFailedPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Failed to import key',
-    icon: 'icon:solar:key-bold',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const keyImportedPopup = makeStaticPopup({
+  message: 'Key imported successfully',
+  icon: KEY_ICON,
+  type: 'success',
+});
 
-export function invalidKeyFormatPopup(): void {
-  popup({
-    message: 'Invalid Key Format',
-    text: 'Enter nsec or 64-character hex key.',
-    icon: 'icon:solar:key-bold',
-    type: 'error',
-  });
-}
+export const keyImportFailedPopup = makeStaticPopup({
+  message: 'Failed to import key',
+  icon: KEY_ICON,
+  type: 'error',
+});
 
-export function passcodeNotMatchPopup(): void {
-  popup({
-    message: 'Passcode Not Match',
-    text: 'The passcode does not match. Please try again.',
-    icon: 'icon:mdi:shield',
-    type: 'error',
-  });
-}
+export const invalidKeyFormatPopup = makeStaticPopup({
+  message: 'Invalid Key Format',
+  text: 'Enter nsec or 64-character hex key.',
+  icon: KEY_ICON,
+  type: 'error',
+});
+
+export const passcodeNotMatchPopup = makeStaticPopup({
+  message: 'Passcode Not Match',
+  text: 'The passcode does not match. Please try again.',
+  icon: 'icon:mdi:shield',
+  type: 'error',
+});

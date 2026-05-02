@@ -1,100 +1,77 @@
-import { popup } from '../engine';
-import type { BaseOverrides, TextOverrides } from './types';
+import { makeStaticPopup, makeParamPopup } from './factory';
 
-export function mintsAddedPopup(
-  params: { added: number; failed?: number },
-  overrides?: BaseOverrides
-): void {
-  if (params.failed && params.failed > 0) {
-    popup({
-      message: `Added ${params.added}, ${params.failed} failed`,
-      icon: 'icon:mdi:alert-circle-outline',
-      type: 'warning',
-      ...overrides,
-    });
-  } else {
-    popup({
-      message: `Successfully added ${params.added} mint(s)`,
-      icon: 'icon:mdi:bank',
-      type: 'success',
-      ...overrides,
-    });
-  }
-}
+const BANK_ICON = 'icon:mdi:bank';
 
-export function noMintSelectedPopup(overrides?: BaseOverrides): void {
-  popup({ message: 'No mint selected', icon: 'icon:mdi:bank', type: 'error', ...overrides });
-}
+export const mintsAddedPopup = makeParamPopup<{ added: number; failed?: number }>(
+  ({ added, failed }) =>
+    failed && failed > 0
+      ? {
+          message: `Added ${added}, ${failed} failed`,
+          icon: 'icon:mdi:alert-circle-outline',
+          type: 'warning',
+        }
+      : {
+          message: `Successfully added ${added} mint(s)`,
+          icon: BANK_ICON,
+          type: 'success',
+        }
+);
+
+export const noMintSelectedPopup = makeStaticPopup({
+  message: 'No mint selected',
+  icon: BANK_ICON,
+  type: 'error',
+});
 
 /** For coco-payment-ux NO_VALID_MINT — no mint supports this payment. */
-export function noValidMintPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'No Valid Mint',
-    text: 'No mint is available for this payment.',
-    icon: 'icon:mdi:bank',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const noValidMintPopup = makeStaticPopup({
+  message: 'No Valid Mint',
+  text: 'No mint is available for this payment.',
+  icon: BANK_ICON,
+  type: 'error',
+});
 
-export function noMintsSelectedPopup(): void {
-  popup({
-    message: 'Please select at least one mint to add',
-    icon: 'icon:mdi:bank',
-    type: 'warning',
-  });
-}
+export const noMintsSelectedPopup = makeStaticPopup({
+  message: 'Please select at least one mint to add',
+  icon: BANK_ICON,
+  type: 'warning',
+});
 
-export function mintsAddFailedPopup(overrides?: BaseOverrides): void {
-  popup({
-    message: 'Failed to add mints',
-    icon: 'icon:mdi:bank',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const mintsAddFailedPopup = makeStaticPopup({
+  message: 'Failed to add mints',
+  icon: BANK_ICON,
+  type: 'error',
+});
 
-export function managerNotInitializedPopup(): void {
-  popup({
-    message: 'Manager not initialized',
-    text: 'Please try again.',
-    icon: 'icon:mdi:alert-circle',
-    type: 'error',
-  });
-}
+export const managerNotInitializedPopup = makeStaticPopup({
+  message: 'Manager not initialized',
+  text: 'Please try again.',
+  icon: 'icon:mdi:alert-circle',
+  type: 'error',
+});
 
-export function recoverySuccessPopup(
-  params: { mintCount: number; durationSec: string },
-  overrides?: BaseOverrides
-): void {
-  popup({
+export const recoverySuccessPopup = makeParamPopup<{ mintCount: number; durationSec: string }>(
+  ({ mintCount, durationSec }) => ({
     message: 'Recovery Complete',
-    text: `Recovered from ${params.mintCount} mint${params.mintCount !== 1 ? 's' : ''} in ${params.durationSec}s.`,
+    text: `Recovered from ${mintCount} mint${mintCount !== 1 ? 's' : ''} in ${durationSec}s.`,
     icon: 'icon:mdi:shield-check',
     type: 'success',
-    ...overrides,
-  });
-}
+  })
+);
 
-export function recoveryPartialPopup(
-  params: { successCount: number; failureCount: number },
-  overrides?: BaseOverrides
-): void {
-  popup({
-    message: 'Recovery Partial',
-    text: `Recovered from ${params.successCount}, failed for ${params.failureCount}.`,
-    icon: 'icon:mdi:shield',
-    type: 'warning',
-    ...overrides,
-  });
-}
+export const recoveryPartialPopup = makeParamPopup<{
+  successCount: number;
+  failureCount: number;
+}>(({ successCount, failureCount }) => ({
+  message: 'Recovery Partial',
+  text: `Recovered from ${successCount}, failed for ${failureCount}.`,
+  icon: 'icon:mdi:shield',
+  type: 'warning',
+}));
 
-export function recoveryFailedPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Recovery Failed',
-    text: 'An error occurred during recovery.',
-    icon: 'icon:mdi:shield-remove',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const recoveryFailedPopup = makeStaticPopup({
+  message: 'Recovery Failed',
+  text: 'An error occurred during recovery.',
+  icon: 'icon:mdi:shield-remove',
+  type: 'error',
+});

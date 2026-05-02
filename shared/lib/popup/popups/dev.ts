@@ -1,31 +1,22 @@
-import { popup } from '../engine';
-import type { PopupOverrides, TextOverrides } from './types';
+import { makeStaticPopup, makeParamPopup } from './factory';
 
-export function testSheetPopup(overrides?: PopupOverrides): void {
-  popup({
-    message: 'Test Sheet',
-    text: 'If you see this, the popup sheet system is working.',
-    icon: 'icon:mdi:check-circle',
-    type: 'success',
-    variant: 'sheet',
-    buttons: [{ text: 'Close', onPress: () => {} }],
-    ...overrides,
-  });
-}
+export const testSheetPopup = makeStaticPopup({
+  message: 'Test Sheet',
+  text: 'If you see this, the popup sheet system is working.',
+  icon: 'icon:mdi:check-circle',
+  type: 'success',
+  variant: 'sheet',
+  buttons: [{ text: 'Close', onPress: () => {} }],
+});
 
-export function devModePopup(enabled: boolean): void {
-  popup({
-    message: enabled ? 'Developer mode enabled' : 'Developer mode disabled',
-    icon: 'icon:material-symbols:report-rounded',
-    type: 'success',
-  });
-}
+export const devModePopup = makeParamPopup<boolean>((enabled) => ({
+  message: enabled ? 'Developer mode enabled' : 'Developer mode disabled',
+  icon: 'icon:material-symbols:report-rounded',
+  type: 'success',
+}));
 
-export function deeplinkFailedPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Failed to process link',
-    icon: 'icon:lucide:link',
-    type: 'error',
-    ...overrides,
-  });
-}
+export const deeplinkFailedPopup = makeStaticPopup({
+  message: 'Failed to process link',
+  icon: 'icon:lucide:link',
+  type: 'error',
+});

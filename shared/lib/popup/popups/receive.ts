@@ -1,32 +1,34 @@
-import { popup } from '../engine';
-import type { TextOverrides } from './types';
+import { makeStaticPopup, makeParamPopup } from './factory';
 
-export function receiveFailedPopup(overrides?: TextOverrides): void {
-  popup({
-    message: 'Failed to receive ecash',
-    icon: 'icon:ri:close-circle-line',
-    type: 'error',
-    ...overrides,
-  });
-}
+const BANK_ICON = 'icon:mdi:bank';
 
-export function noUnitSetPopup(): void {
-  popup({ message: 'No unit set', icon: 'icon:mdi:alert-circle', type: 'error' });
-}
+export const receiveFailedPopup = makeStaticPopup({
+  message: 'Failed to receive ecash',
+  icon: 'icon:ri:close-circle-line',
+  type: 'error',
+});
 
-export function unsupportedTokenUnitPopup(params: { unit: string }): void {
-  popup({
-    message: 'Unsupported Token Unit',
-    text: `"${params.unit}" tokens cannot be redeemed. Only sat tokens are supported.`,
-    icon: 'icon:mdi:currency-usd',
-    type: 'error',
-  });
-}
+export const noUnitSetPopup = makeStaticPopup({
+  message: 'No unit set',
+  icon: 'icon:mdi:alert-circle',
+  type: 'error',
+});
 
-export function receiveMintUpdatedPopup(): void {
-  popup({ message: 'Receive mint updated', icon: 'icon:mdi:bank', type: 'success' });
-}
+export const unsupportedTokenUnitPopup = makeParamPopup<{ unit: string }>(({ unit }) => ({
+  message: 'Unsupported Token Unit',
+  text: `"${unit}" tokens cannot be redeemed. Only sat tokens are supported.`,
+  icon: 'icon:mdi:currency-usd',
+  type: 'error',
+}));
 
-export function receiveMintUpdateFailedPopup(): void {
-  popup({ message: 'Failed to update receive mint', icon: 'icon:mdi:bank', type: 'error' });
-}
+export const receiveMintUpdatedPopup = makeStaticPopup({
+  message: 'Receive mint updated',
+  icon: BANK_ICON,
+  type: 'success',
+});
+
+export const receiveMintUpdateFailedPopup = makeStaticPopup({
+  message: 'Failed to update receive mint',
+  icon: BANK_ICON,
+  type: 'error',
+});
