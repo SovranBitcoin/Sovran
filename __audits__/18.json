@@ -123,7 +123,9 @@
         "skill:neverthrow-return-types"
       ],
       "verification_note": "Re-read useSplitBillOrchestrator.ts:231-247 (confirm path) and :460-504 (watcher). Confirmed no import from coco for the result shape. Re-read useLightningOperations.ts:17-37 — `requestLightningInvoice` returns `any` by inference (just `return result;` from `manager.ops.mint.prepare(...)`). Counter-argument considered: 'the triple fallback is a pragmatic decision because coco's shape has changed historically.' Exactly the problem — the triple fallback is a workaround for the absence of a typed contract, not a solution. Medium severity because the visible symptom is delivery failure (user can retry) not fund loss. Skill:typescript-advanced-types covers the fix path (type narrowing and typed return signatures).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Triple `(mintOp as any)?.quoteId ?? ?.quote ?? ?.id` (and matching `request`/`expiresAt` chains) at useSplitBillOrchestrator.ts:320-323 dropped — destructured `{ quoteId, request }` from coco-inferred `PendingMintOperation` instead. The dead `expiresAt` field (always undefined; coco uses `expiry`) plumbed out of orchestrator → store interface → persist schema. Sweep extended to MintRebalancePlanScreen.tsx (two more identical fallback chains) which read the same return shape from `requestLightningInvoice`. The watcher and detail.tsx `getPaginatedHistory` call sites cited in the description were already typed in current code."
     },
     {
       "id": "F-005",
@@ -142,7 +144,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-read useSplitBillOrchestrator.ts:201-377 (confirm), :380-441 (retryDelivery). Re-read summary.tsx:98-113 (hasStarted guard) and detail.tsx:113-135 (handleRowPress / retryDelivery invocation). Confirmed retryDelivery's silent return at line 385. Grepped for `cancelGroup` across sovran-app — only definition-site hits in splitBillTransactionsStore.ts; no caller UI. Counter-argument considered: 'in practice the mint is reliable, and this edge case won't trigger.' Fair-weather assumption; log-doctor slow mode in the latest session shows 5000ms+ gaps on `mint_response_success` (see Log-doctor evidence), indicating realistic mint-side latency. Also considered: 'maybe the log is already warning the user via a toast.' No toast wired — `paymentLog.error('split_bill.confirm.mint_quote_failed', ...)` is silent to the user. Severity Medium because the failure mode is recoverable by deleting the app and reinstalling (destroying profile-scoped storage), but that's not a reasonable workflow.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Out of scope for the as-any/dead-code slice; mint-quote burst rollback semantics is its own correctness concern."
     },
     {
       "id": "F-006",
@@ -162,7 +166,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-read detail.tsx:150-186. Confirmed triple-cast + JSON.stringify router param. Confirmed `p.bolt11` + `p.mintQuoteId` are already persisted on the participant (shared/stores/profile/splitBillTransactionsStore.ts:71-73). So the 200-row fetch is entirely avoidable — the data the target screen needs is already in the current screen's store. Counter-argument considered: 'the HistoryEntry passed through has fields the mintQuote screen needs beyond bolt11/quoteId.' Possibly, but the mintQuote screen itself is the natural owner of that resolution — pushing it down removes the roundtrip. Also considered: 'maybe 200 rows is enough in practice.' True for low-volume wallets; falls over for heavy users. Marked UNVERIFIED for the perf claim because log.txt contains no `split_bill.detail.view` events (the flow was not exercised in the latest session); the structural finding stands regardless.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Type-narrowing concern already addressed in current code — `manager.history.getPaginatedHistory(0, 200)` and the subsequent `history.find(h => h.type === \"mint\" && h.quoteId === ...)` at detail.tsx:162-163 are typed without `as any`. The structural perf concern (200-row scan + JSON.stringify entry through router params on every View tap) is deferred — the proposed fix to push lookup into the target /mintQuote screen requires changes to the target screen and is out of slice scope."
     },
     {
       "id": "F-007",
@@ -184,7 +190,9 @@
         "lint:@typescript-eslint/no-unused-vars"
       ],
       "verification_note": "Re-ran `npm run lint` scoped to the subtree — output captured verbatim in the audit's `tooling_run.lint` field. Confirmed by line-for-line inspection that every cited rule ID fires on the cited line. Counter-argument considered: 'prettier errors are cosmetic, not substantive.' Partially true for the 9 pure-formatting ones, but the 2 exhaustive-deps warnings and the 2 unused-import/variable errors are substantive (potential stale-closure bugs and incomplete-refactor signals). Severity Medium because the exhaustive-deps hits are named dim-7 heuristics for stale closures.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Lint baseline cleanup is out of scope for the type-narrowing slice."
     },
     {
       "id": "F-008",
@@ -204,7 +212,9 @@
         "skill:vercel-react-native-skills"
       ],
       "verification_note": "wc -l confirmed: UserMessagesScreen.tsx 2683, UserProfileScreen.tsx 1166, ShareScreen.tsx 190, ThreadScreen.tsx 22, GeohashChatScreen.tsx 492, NetworkSheet.tsx 185. Counter-argument considered: 'big files are easier to grep.' Weak — the IDE's symbol jump is strictly better, and tooling (knip, analyze-structure) already struggle to report confidently across files this large. Also considered: 'splitting adds perceived complexity with more files.' True if the split is artificial; the splits proposed track real concerns (Routstr ≠ NIP-17 DM ≠ photo picker). Severity Medium because the files function today — but a refactor becomes easier the earlier it happens, and every new feature (payment-request per SOV-18, attachments per SOV-23) will compound the bloat.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "UserMessagesScreen / UserProfileScreen file-size split is out of scope; orthogonal to the as-any pattern."
     },
     {
       "id": "F-009",
@@ -223,7 +233,9 @@
         "knip:unused-export"
       ],
       "verification_note": "Captured from `npm run knip` raw output; cross-checked each symbol via grep for external importers — none found. Counter-argument considered: 'these may be used by tests.' Grepped `__tests__/` and `*.test.tsx` — no matches in sovran-app for these symbols. Counter-argument: 'knip misreports dynamic-require targets.' Not applicable to these specifically — they're plain named exports from static imports.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Five of six unused exports in scope for this slice are removed: DECK_CARD_WIDTH (deleted), ParticipantCardProps (export keyword dropped), ParticipantCardDeckProps (export keyword dropped), QuoteIdToSplitBillIndex (export keyword dropped), SplitBillStore (export keyword dropped). The sixth — UseSplitBillParticipantPickerResult — is in fact externally consumed by app/(split-bill-flow)/_layout.tsx for the PickerContext type; the audit was stale on that item."
     },
     {
       "id": "F-010",
@@ -264,7 +276,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-read NetworkSheet.tsx:82. Confirmed single-argument call. Compared to 5 siblings using the scoped pattern. Counter-argument considered: 'maybe BitchatNetworkSheet was created before the scoped-logger convention landed.' Likely — git log on the file would confirm. Not a reason to keep the inconsistency, just context. Low severity.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Added `bitchatLog` as a shared scoped child in shared/lib/logger.ts and wired NetworkSheet `useLifecycleLogger(\"BitchatNetworkSheet\", bitchatLog)`. The other bitchat surfaces still declare local `bitchatLog` consts — that consolidation is a follow-up captured in audit 49 F-013/F-023."
     },
     {
       "id": "F-012",
@@ -284,7 +298,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-read useSplitBillParticipantPicker.ts:261-291. Confirmed diff covers only nickname/avatar/subtitle — other fields (id, source, channel, pubkey, peerID) are stable per candidate-id by construction and don't need diff tracking. Counter-argument considered: 'the diff fields are exactly the mutable ones.' Correct today, but a single future change that adds a fourth mutable field regresses silently. Severity Low.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Already fixed before this session: useSplitBillParticipantPicker.ts:119 declares `shallowEqualCandidate(a, b)` that iterates BOTH keysets so any new field on PickerCandidate participates automatically; the effect at line 697-723 already calls `shallowEqualCandidate(fresh, s)` instead of the field-by-field diff the audit describes."
     }
   ],
   "dimensions": {
