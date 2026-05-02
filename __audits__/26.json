@@ -175,7 +175,9 @@
       "fix": "Either (a) delete the dead stories branch entirely (see F-010) and set FEED_ITEM_OFFSET = 0 with a direct feedIndex = index, or (b) if the intent is to leave the stories flag hot-swappable, fix the formula to 'SHOW_STORIES_ROW ? 1 : 0' and update the comment at :753 to describe the actual composition.",
       "references": [],
       "verification_note": "Verified by tracing through the four SHOW_STORIES_ROW references (HomeFeed.tsx:60, :754, :889, :978). Counter-argument considered: the comment may intend a future tabs row that has not been built yet. If so, the comment should say 'planned' and FEED_ITEM_OFFSET should be derived rather than hardcoded.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "FEED_ITEM_OFFSET removed; feedIndex is now `index` directly, matching UserFeed."
     },
     {
       "id": "F-010",
@@ -192,7 +194,9 @@
       "fix": "Delete the SHOW_STORIES_ROW flag and the import of StoriesRow from HomeFeed.tsx. Simplify FEED_ITEM_OFFSET and listData. If stories are intentionally gated behind a future rollout, wire the flag to a settings store or a remote-config value and document the rollout plan in a research note. Either remove the flag or make it observable.",
       "references": ["knip:unused-but-imported"],
       "verification_note": "Verified: grep 'SHOW_STORIES_ROW' returns only the 4 read sites; no writes. knip did not flag StoriesRow (per its output sections 'Unused files/exports' scanned at audit time — no features/feed hits). Manual inspection confirms dead branch.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "SHOW_STORIES_ROW flag, STORIES_ITEM, HomeFeedListItem stories branch, and StoriesRow.tsx all deleted."
     },
     {
       "id": "F-011",
@@ -279,7 +283,9 @@
       "fix": "Replace the empty catches with 'catch (error) { feedLog.warn(feed.stories.profile_fetch_failed, { error }) }'. Redact error.message if it could contain URLs or pubkeys.",
       "references": ["skill:react-native-best-practices"],
       "verification_note": "Verified at StoriesRow.tsx:193 and :235-237. StoriesRow is currently dead per F-010 but fixing the log pattern is cheap and sets the right example.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Moot — StoriesRow.tsx deleted with F-010."
     },
     {
       "id": "F-016",

@@ -130,7 +130,9 @@
       "fix": "Bump partialize-shape with a `version: 1` and write a `migrate(persisted, version)` function that no-ops at v1 (current shape). Add a zod schema per version (ideally in a future packages/schemas) and validate the rehydrated blob in `onRehydrateStorage` — fall back to defaults on parse failure. Keep `isAnonymousMode` excluded from partialize per audit 14 F-001's still-open finding.",
       "references": ["__audits__/14.json#F-006", "research:zustand-zod-playbook", "skill:zustand-5", "skill:zod-4"],
       "verification_note": "Re-read L552-569. Confirmed missing version/migrate. The new partialize fields (`activeChildren`) are correctly merged on rehydrate via Zustand's shallow-merge default, which is why they round-trip safely as long as fields are only ADDED.",
-      "prior_audit_id": "F-006@14.json"
+      "prior_audit_id": "F-006@14.json",
+      "completion_status": "stale",
+      "completion_note": "routstrStore now declares `version: 1` plus migrate/partialize before this session."
     },
     {
       "id": "F-007",
@@ -215,7 +217,9 @@
       "fix": "Remove `export` from the 10 type/const/function declarations whose only consumers are inside their own file. Delete `extractModelName` outright; if any external caller exists later, they can use `getModelDisplayName` directly. Re-run `npm run knip` after the change.",
       "references": ["knip:unused-export"],
       "verification_note": "Verified by direct read of each declaration site. extractModelName at L423-425 is literally `return getModelDisplayName(modelId, availableModels)`.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "extractModelName deleted; the over-exported types/consts (TIER_MATRIX, DEFAULT_PROVIDER_ID, DEFAULT_TIER_ID, buildCandidateChain, BranchInfo, RoutstrTierId/ProviderId/Session, TopUpResult/Failure) remain in scope for a follow-up sweep."
     },
     {
       "id": "F-012",
