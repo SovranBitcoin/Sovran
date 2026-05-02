@@ -54,7 +54,7 @@ function waitForDrawerClose(): Promise<void> {
 
 type MenuRoute =
   | '/(drawer)/(tabs)/feed'
-  | '/(drawer)/(tabs)'
+  | '/(drawer)/(tabs)/index'
   | '/(drawer)/(tabs)/contacts'
   | '/(settings-flow)';
 
@@ -75,7 +75,7 @@ const MENU_ITEMS: MenuItem[] = [
   {
     icon: 'fluent:wallet-20-filled',
     label: 'Wallet',
-    route: '/(drawer)/(tabs)',
+    route: '/(drawer)/(tabs)/index',
     drawerLabel: 'wallet',
   },
   {
@@ -302,7 +302,7 @@ function CustomDrawerContent(props: DrawerContentComponentProps) {
 
   const isRouteActive = useCallback(
     (route: MenuRoute) => {
-      if (route === '/(drawer)/(tabs)') {
+      if (route === '/(drawer)/(tabs)/index') {
         return (
           pathname === '/' ||
           pathname === '/index' ||

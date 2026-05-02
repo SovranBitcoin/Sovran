@@ -6,7 +6,7 @@
  * Reuses the same UI primitives for a consistent look.
  */
 
-import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -38,13 +38,12 @@ import {
 
 const bitchatLog = log.child({ module: 'bitchat' });
 import type { ChatMessage } from 'bitchat-module';
-import { LOCATION_TIERS } from '../lib/constants';
 
 // ===========================
 // MAIN COMPONENT
 // ===========================
 
-export interface GeohashChatScreenProps {
+interface GeohashChatScreenProps {
   geohash: string;
   tierLabel?: string;
   /**
@@ -200,8 +199,6 @@ export function GeohashChatScreen({
     });
     prevMsgRef.current = next;
   }, [messages, perfSurface]);
-
-  const tierDef = useMemo(() => LOCATION_TIERS.find((t) => t.label === tierLabel), [tierLabel]);
 
   // Precompute grouping: consecutive messages from the same sender form a group
   const groupingMap = useMessageGrouping(messages);

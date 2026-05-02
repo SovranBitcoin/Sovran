@@ -34,14 +34,14 @@ const bitchatLog = log.child({ module: 'bitchat' });
  * Private 1:1 transports: `'ble-dm'` = Noise-encrypted mesh DM,
  * `'nostr-dm'` = NIP-17 gift-wrapped geohash DM.
  */
-export type BitChatTransport = 'nostr' | 'ble' | 'ble-dm' | 'nostr-dm';
+type BitChatTransport = 'nostr' | 'ble' | 'ble-dm' | 'nostr-dm';
 
 /**
  * For `'ble-dm'`: pass the peer's 16-hex PeerID.
  * For `'nostr-dm'`: pass the peer's Nostr hex pubkey (from an
  * `onNostrMessage` `senderPubkey`).
  */
-export interface DMTarget {
+interface DMTarget {
   peerID: string;
   /** Optional display nickname for UI + outbound message stamp. */
   nickname?: string;
@@ -58,9 +58,6 @@ interface UseBitChatResult {
   sendMessage: (content: string) => Promise<void>;
 }
 
-const isDMTransport = (t: BitChatTransport): t is 'ble-dm' | 'nostr-dm' =>
-  t === 'ble-dm' || t === 'nostr-dm';
-
 export function useBitChat(
   geohash: string,
   transport: BitChatTransport = 'nostr',
@@ -71,7 +68,6 @@ export function useBitChat(
   const [isConnected, setIsConnected] = useState(false);
 
   const dmPeerID = options.dm?.peerID;
-  const dmNickname = options.dm?.nickname;
 
   // ===========================================================
   //  BLE public chat — transport === 'ble'
@@ -408,10 +404,6 @@ export function useBitChat(
     },
     [transport, nickname, dmPeerID]
   );
-
-  // Silence the unused-import warning in `isDMTransport` — it's exported for
-  // consumers of the hook that want to branch on transport type.
-  void isDMTransport;
 
   return { messages, isConnected, sendMessage };
 }

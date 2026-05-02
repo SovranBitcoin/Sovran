@@ -39,9 +39,9 @@ describe('guardedRouter', () => {
   });
 
   it('forwards a single push to the underlying router', () => {
-    guardedRouter.push('/home');
+    guardedRouter.push('/feed');
     expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith('/home');
+    expect(mockPush).toHaveBeenCalledWith('/feed');
   });
 
   it('suppresses a duplicate push within the cooldown window', () => {
@@ -61,9 +61,9 @@ describe('guardedRouter', () => {
     try {
       const start = Date.now();
       jest.setSystemTime(start);
-      guardedRouter.push('/wallet');
+      guardedRouter.push('/share');
       jest.setSystemTime(start + 700);
-      guardedRouter.push('/wallet');
+      guardedRouter.push('/share');
       expect(mockPush).toHaveBeenCalledTimes(2);
     } finally {
       jest.useRealTimers();
@@ -71,8 +71,8 @@ describe('guardedRouter', () => {
   });
 
   it('treats push and navigate to the same href as distinct gates', () => {
-    guardedRouter.push('/x');
-    guardedRouter.navigate('/x');
+    guardedRouter.push('/contacts');
+    guardedRouter.navigate('/contacts');
     expect(mockPush).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
