@@ -68,7 +68,9 @@
       "fix": "Two-step. (1) Short-term: replace the `as unknown as` cast with `const repo = manager['mintOperationRepository'] as { delete?: (id: string) => Promise<void> } | undefined` and upgrade the 'no repo access' warn to a cashuLog.error('recovery.cleanup.repo_shape_changed') so a coco upgrade that breaks this lands as an explicit finding in the next audit. (2) Upstream: open a coco-core PR exposing `manager.ops.mint.abandon(id: string): Promise<Result<void, AbandonError>>` that atomically moves the op to an 'abandoned' terminal state; patch-package the wallet to use it once merged. Reference this in sovran-app/patches/ per CLAUDE.md.",
       "references": ["skill:neverthrow-return-types", "docs/SOV-00.md §6.3"],
       "verification_note": "Re-read lines 509–543. The comment at line 513 is candid about the private-API reach. Counter-argument considered: coco is sovran-upstream and changes are coordinated, so silent drift is unlikely. Rejected — the whole point of the `as unknown as` cast is to defeat type-checking, which means a future refactor won't catch the break at compile time. Flagged High because the failure mode is silent and the cleanup is load-bearing for recovery.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Routed through coco-payment-ux/src/api/managerInternals.ts deleteMintOperation(); the inline `as unknown as { mintOperationRepository?: ... }` cast is gone. Cluster: typed coco-manager seam."
     },
     {
       "id": "F-004",

@@ -155,7 +155,9 @@
       "fix": "Either coco exposes a public `manager.fees.computeInputFee(mintUrl)` / `manager.fees.probeMeltQuote(mintUrl, invoice)` API (preferred — needs a sovran-app/patches/ change against coco), or this screen accepts the static fee-headroom and drops the private probes entirely (worse UX on fragmented proof sets per the inline rationale at MintRebalancePlanScreen.tsx:383–407). The patches/ option is cheaper and aligns with CLAUDE.md's coco-edits-via-patches rule.",
       "references": ["ts:TS2341", "skill:typescript-advanced-types"],
       "verification_note": "Phase B: re-ran `bun run type-check` and confirmed all eight private-access errors at the cited lines. The errors localize to the orchestrator inside the audit's blast radius; outside-blast-radius TS errors (33 total project-wide) were noted in audit.tooling_run.type_check but not filed.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "All 8 TS2341 errors fixed. Routed through coco-payment-ux/src/api/managerInternals.ts getReadyProofs/getWallet helpers (40 → 32 baseline tsc errors). Cluster: typed coco-manager seam."
     },
     {
       "id": "F-009",
