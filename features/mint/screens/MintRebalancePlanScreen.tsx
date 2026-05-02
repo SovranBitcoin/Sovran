@@ -12,7 +12,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useMints, useBalanceContext, useManager } from '@cashu/coco-react';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
@@ -1889,7 +1889,7 @@ export function MintRebalancePlanScreen() {
 
       {runStatus === 'finished' && plan.steps.length > 0 && swapGroupIdRef.current && (
         <View className="px-4 pb-2 pt-3">
-          <TouchableOpacity
+          <Pressable
             haptics
             onPress={() => {
               router.navigate({
@@ -1908,7 +1908,7 @@ export function MintRebalancePlanScreen() {
                 </View>
               </BlurCardFrame>
             </View>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       )}
     </Screen>

@@ -17,7 +17,7 @@ import { Platform, StyleSheet } from 'react-native';
 import { View } from '@/shared/ui/primitives/View/View';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { AppleMaps, GoogleMaps } from 'expo-maps';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -140,7 +140,7 @@ function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
   };
 
   return (
-    <TouchableOpacity onPress={onReveal} activeOpacity={0.7}>
+    <Pressable onPress={onReveal} activeOpacity={0.7}>
       <View className={MAP_CONTAINER_CN}>
         <View className="absolute inset-0" pointerEvents="none">
           {isIOS ? (
@@ -176,7 +176,7 @@ function LocationPrivacyPlaceholder({ onReveal }: { onReveal: () => void }) {
           </VStack>
         </View>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

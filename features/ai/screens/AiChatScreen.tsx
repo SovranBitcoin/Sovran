@@ -1,11 +1,11 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
-  Pressable,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Reanimated, { useAnimatedStyle, useDerivedValue, runOnJS } from 'react-native-reanimated';
 import {
   KeyboardAvoidingView,

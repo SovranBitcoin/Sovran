@@ -25,7 +25,7 @@
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
 import { StyleSheet, InteractionManager, ActivityIndicator } from 'react-native';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { log, Log } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
@@ -384,7 +384,7 @@ export const RepostCard = React.memo(function RepostCard({
     <GestureDetector gesture={tapGesture}>
       <Reanimated.View style={animStyle}>
         {/* Repost header */}
-        <TouchableOpacity
+        <Pressable
           activeOpacity={0.7}
           onPressIn={suppressThreadTapStart}
           onPressOut={suppressThreadTapEnd}
@@ -403,7 +403,7 @@ export const RepostCard = React.memo(function RepostCard({
               {reposterName} reposted
             </Text>
           </HStack>
-        </TouchableOpacity>
+        </Pressable>
 
         {originalEvent ? (
           <PostCard

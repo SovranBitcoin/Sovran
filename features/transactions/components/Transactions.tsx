@@ -20,7 +20,7 @@ import { SplitBillTransactionRow } from '@/features/transactions/components/Spli
 import { Transaction } from '@/features/transactions/components/Transaction';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -554,7 +554,7 @@ export const Transactions = React.memo(
                           },
                         }}
                         asChild>
-                        <TouchableOpacity>
+                        <Pressable>
                           <View style={[styles.viewAllButton, { borderColor }]}>
                             <BlurCardFrame accentColor={muted}>
                               <View style={styles.viewAllContent}>
@@ -564,7 +564,7 @@ export const Transactions = React.memo(
                               </View>
                             </BlurCardFrame>
                           </View>
-                        </TouchableOpacity>
+                        </Pressable>
                       </Link>
                     )}
                   </VStack>

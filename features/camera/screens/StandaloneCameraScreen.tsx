@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { router, Stack } from 'expo-router';
 import { z } from 'zod';
 
@@ -54,7 +54,7 @@ export function StandaloneCameraScreen() {
             headerTintColor: foreground,
             headerTitleStyle: { color: foreground },
             headerLeft: () => (
-              <TouchableOpacity
+              <Pressable
                 onPress={() => {
                   if (router.canGoBack()) {
                     router.back();
@@ -64,7 +64,7 @@ export function StandaloneCameraScreen() {
                 }}
                 style={{ padding: 8 }}>
                 <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-              </TouchableOpacity>
+              </Pressable>
             ),
           }}
         />

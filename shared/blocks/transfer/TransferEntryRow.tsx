@@ -22,7 +22,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { Log } from '@/shared/lib/logger';
 
@@ -140,9 +140,9 @@ export const TransferEntryRow = React.memo(
     if (onPress) {
       return (
         <Log name="TransferEntryRow">
-          <TouchableOpacity style={styles.entryRow} onPress={onPress}>
+          <Pressable style={styles.entryRow} onPress={onPress}>
             {content}
-          </TouchableOpacity>
+          </Pressable>
         </Log>
       );
     }

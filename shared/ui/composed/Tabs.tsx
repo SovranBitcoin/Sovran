@@ -5,7 +5,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import opacity from 'hex-color-opacity';
 
@@ -26,7 +26,7 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
   }, [tab, index, onPress]);
 
   return (
-    <TouchableOpacity className={isScrollable ? '' : 'flex-1'} key={tab} onPress={handlePress}>
+    <Pressable className={isScrollable ? '' : 'flex-1'} key={tab} onPress={handlePress}>
       <View
         className="shrink-0 flex-row items-center justify-center rounded-3xl px-4 py-2.5"
         style={{
@@ -63,7 +63,7 @@ function Tab({ tab, index, isSelected, amount, onPress, isScrollable }: TabProps
           ) : null}
         </HStack>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

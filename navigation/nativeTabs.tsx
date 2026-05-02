@@ -6,7 +6,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   InteractionManager,
-  Pressable,
   Platform,
   StyleProp,
   Text,
@@ -15,6 +14,7 @@ import {
   ViewStyle,
   StyleSheet,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { LiquidButtonView } from 'expo-liquid-glass-native';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';

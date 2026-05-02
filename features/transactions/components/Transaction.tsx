@@ -22,7 +22,7 @@ import {
   useIsReclaiming,
 } from '@/shared/stores/runtime/rollbackStore';
 import { UntranslatedText } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { formatAmount } from '@/shared/lib/currency';
@@ -234,7 +234,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
   const collapsedStyle = isCollapsing ? { height: 0, opacity: 0 } : null;
 
   const row = (
-    <TouchableOpacity
+    <Pressable
       key={historyEntry?.id}
       testID={testID}
       className="flex-row items-center justify-between bg-transparent px-4 py-5"
@@ -308,7 +308,7 @@ export const Transaction = React.memo(({ historyEntry, onPress, onCancel }: Tran
           </HStack>
         </VStack>
       </HStack>
-    </TouchableOpacity>
+    </Pressable>
   );
 
   return (

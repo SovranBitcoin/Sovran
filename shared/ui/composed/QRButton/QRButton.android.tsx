@@ -19,7 +19,7 @@ import {
   setQRButtonAnchor,
   useBootMorphCompleted,
 } from '@/shared/lib/qrButtonAnchor';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
 export interface QRButtonProps {
@@ -106,7 +106,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
         onLayout={publishAnchor}
         collapsable={false}
         style={[{ width: size, height: size }, visibilityStyle]}>
-      <TouchableOpacity
+      <Pressable
         style={[styles.touchable, { ...containerStyle, shadowColor: accentColor }]}
         className="items-center justify-center"
         haptics={{ type: 'impact', impactStyle: 'light' }}
@@ -158,7 +158,7 @@ export function QRButton(props: QRButtonProps): React.ReactElement {
           pointerEvents="none">
           <Icon name="stash:qr-code" size={24} color={surfaceForeground} />
         </View>
-      </TouchableOpacity>
+      </Pressable>
       </Animated.View>
     </Log>
   );

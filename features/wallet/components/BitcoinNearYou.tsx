@@ -5,7 +5,7 @@ import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurCardFrame } from '@/shared/ui/composed/BlurCardFrame';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
@@ -248,7 +248,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
   return (
     <Log name="BitcoinNearYou">
       <Link href="/(map-flow)" asChild>
-        <TouchableOpacity activeOpacity={0.85}>
+        <Pressable activeOpacity={0.85}>
           <RNView
             className="overflow-hidden rounded-[20px] border"
             style={{ borderCurve: 'continuous', borderColor: opacity(muted, 0.3) }}>
@@ -283,7 +283,7 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
               </RNView>
             </BlurCardFrame>
           </RNView>
-        </TouchableOpacity>
+        </Pressable>
       </Link>
     </Log>
   );

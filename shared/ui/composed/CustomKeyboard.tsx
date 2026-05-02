@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, memo } from 'react';
 import { View } from '@/shared/ui/primitives/View/View';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -71,7 +71,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
 
   const renderButton = useCallback(
     (value: KeyboardValue) => (
-      <TouchableOpacity
+      <Pressable
         key={String(value)}
         className="bg-background mx-0.5 w-1/3 items-center justify-center overflow-hidden"
         style={{ opacity: loading ? 0.5 : 1 }}
@@ -88,7 +88,7 @@ const CustomKeyboard: React.FC<CustomKeyboardProps> = ({
             {value}
           </Text>
         )}
-      </TouchableOpacity>
+      </Pressable>
     ),
     [compact, handlePress, loading]
   );

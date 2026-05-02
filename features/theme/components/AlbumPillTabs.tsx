@@ -6,7 +6,7 @@
 
 import React, { useCallback } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -43,7 +43,7 @@ export function AlbumPillTabs({ tabs, selectedTab, onSelect }: AlbumPillTabsProp
           {tabs.map((tab) => {
             const isSelected = selectedTab === tab;
             return (
-              <TouchableOpacity
+              <Pressable
                 key={tab}
                 onPress={() => handlePress(tab)}
                 activeOpacity={0.7}>
@@ -61,7 +61,7 @@ export function AlbumPillTabs({ tabs, selectedTab, onSelect }: AlbumPillTabsProp
                     {tab}
                   </Text>
                 </View>
-              </TouchableOpacity>
+              </Pressable>
             );
           })}
         </View>

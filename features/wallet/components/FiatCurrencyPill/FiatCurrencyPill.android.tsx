@@ -3,7 +3,7 @@ import opacity from 'hex-color-opacity';
 
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
 import { Log } from '@/shared/lib/logger';
 
@@ -13,7 +13,7 @@ export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactEleme
 
   return (
     <Log name="FiatCurrencyPill">
-      <TouchableOpacity disabled={!onPress} onPress={onPress}>
+      <Pressable disabled={!onPress} onPress={onPress}>
         <HStack
           align="center"
           justify="center"
@@ -31,7 +31,7 @@ export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactEleme
             {text}
           </Text>
         </HStack>
-      </TouchableOpacity>
+      </Pressable>
     </Log>
   );
 }

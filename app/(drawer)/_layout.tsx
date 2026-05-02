@@ -19,7 +19,7 @@ import { BackgroundProvider, useBackgroundContext } from '@/shared/providers/Bac
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -175,7 +175,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
         .map((profile: ProfileEntry) => {
           const isActive = profile.accountIndex === activeAccountIndex;
           return (
-            <TouchableOpacity
+            <Pressable
               key={profile.accountIndex}
               onPress={() => {
                 if (profile.accountIndex === activeAccountIndex) return;
@@ -201,10 +201,10 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
                 })}
                 size={30}
               />
-            </TouchableOpacity>
+            </Pressable>
           );
         })}
-      <TouchableOpacity
+      <Pressable
         onPress={handleOpenProfileSheet}
         style={[
           styles.profileAvatarButton,
@@ -215,7 +215,7 @@ function ProfileSelector({ closeDrawer }: { closeDrawer: () => void }) {
           },
         ]}>
         <Icon name="tabler:dots" size={24} color={foreground} />
-      </TouchableOpacity>
+      </Pressable>
     </HStack>
   );
 }
@@ -243,7 +243,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
     <View style={[styles.gradientContainer, { paddingTop: isOffline ? 0 : insets.top }]}>
       <View style={styles.headerContent}>
         <ProfileSelector closeDrawer={closeDrawer} />
-        <TouchableOpacity style={styles.profileTouchable} onPress={handlePress}>
+        <Pressable style={styles.profileTouchable} onPress={handlePress}>
           {nostrKeys?.pubkey && (
             <VStack align="center" spacing={16}>
               <Avatar
@@ -261,7 +261,7 @@ function ProfileHeader({ closeDrawer }: { closeDrawer: () => void }) {
               </VStack>
             </VStack>
           )}
-        </TouchableOpacity>
+        </Pressable>
       </View>
       <Spacer size={58} />
     </View>

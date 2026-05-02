@@ -3,8 +3,8 @@ import {
   Clipboard,
   Alert,
   ActivityIndicator,
-  TouchableOpacity as RNTouchableOpacity,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, router } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -367,13 +367,13 @@ export const SettingsKeyringScreen: React.FC = () => {
           title: 'P2PK Keys',
           headerRight: () => (
             <HStack spacing={4}>
-              <RNTouchableOpacity
+              <Pressable
                 onPress={handleImportNsec}
                 style={{ padding: 8 }}
                 disabled={isGenerating}>
                 <Icon name="mdi:key-arrow-right" size={22} color={foreground} />
-              </RNTouchableOpacity>
-              <RNTouchableOpacity
+              </Pressable>
+              <Pressable
                 onPress={handleGenerateKey}
                 style={{ padding: 8 }}
                 disabled={isGenerating}>
@@ -382,7 +382,7 @@ export const SettingsKeyringScreen: React.FC = () => {
                 ) : (
                   <Icon name="mdi:key-plus" size={22} color={foreground} />
                 )}
-              </RNTouchableOpacity>
+              </Pressable>
             </HStack>
           ),
         }}

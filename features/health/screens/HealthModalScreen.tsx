@@ -12,7 +12,7 @@ import { useSharedValue } from 'react-native-reanimated';
 import opacity from 'hex-color-opacity';
 
 import Icon from 'assets/icons';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { WalletHealthModalContent } from '@/features/health/components/WalletHealthModalContent';
 import type { HealthCta } from '@/features/health/lib/walletHealth';
@@ -115,9 +115,9 @@ export function HealthModalScreen() {
           headerBlurEffect: 'none',
           headerBackground: () => null,
           headerLeft: () => (
-            <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
+            <Pressable onPress={handleClose} style={{ padding: 8 }}>
               <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-            </TouchableOpacity>
+            </Pressable>
           ),
         }}
       />

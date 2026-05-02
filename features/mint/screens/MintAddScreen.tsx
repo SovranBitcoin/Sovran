@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   Platform,
   TextInput,
   useWindowDimensions,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSharedValue } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';

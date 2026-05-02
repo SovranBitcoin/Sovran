@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
@@ -22,12 +22,12 @@ export function ScreenHeaderAction({
 }: ScreenHeaderActionProps) {
   const foreground = useThemeColor('foreground');
   return (
-    <TouchableOpacity
+    <Pressable
       onPress={onPress}
       style={{ padding: 8, opacity: disabled ? 0.4 : 1 }}
       disabled={disabled}
       testID={testID}>
       <Icon name={icon} size={size} color={color ?? foreground} />
-    </TouchableOpacity>
+    </Pressable>
   );
 }

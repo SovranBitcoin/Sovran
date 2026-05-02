@@ -25,7 +25,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheet, Menu } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
@@ -250,7 +250,7 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
           {AI_PROVIDERS.map((p) => {
             const isSelected = activeProviderTab === p.id;
             return (
-              <TouchableOpacity
+              <Pressable
                 key={p.id}
                 testID={`model-tab-${p.id}`}
                 onPress={() => {
@@ -269,7 +269,7 @@ export function ModelPickerContent({ close }: ModelPickerContentProps) {
                   style={{ color: isSelected ? foreground : opacity(foreground, 0.7) }}>
                   {p.label}
                 </Text>
-              </TouchableOpacity>
+              </Pressable>
             );
           })}
         </ScrollView>

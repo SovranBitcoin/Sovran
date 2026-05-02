@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { router, Stack } from 'expo-router';
 import { z } from 'zod';
 import { TransactionsScreen, useTransactionsFilter } from '@/features/transactions';
@@ -42,7 +42,7 @@ function FilterButton() {
   const { openFilterSheet, hasActiveFilters, activeFilterCount } = useTransactionsFilter();
 
   return (
-    <TouchableOpacity onPress={openFilterSheet} className="relative p-2">
+    <Pressable onPress={openFilterSheet} className="relative p-2">
       <Icon
         name="fluent:filter-16-filled"
         size={22}
@@ -62,7 +62,7 @@ function FilterButton() {
           </Text>
         </View>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

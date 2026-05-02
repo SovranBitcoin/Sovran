@@ -51,9 +51,9 @@ import {
   ScrollViewProps,
   StyleProp,
   StyleSheet,
-  TouchableOpacity,
   ViewStyle,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { LegendList, type LegendListRef, type ViewToken } from '@legendapp/list';
 import opacity from 'hex-color-opacity';
 
@@ -540,7 +540,7 @@ export function SectionAnchorList<T>({
                 {sections.map((s) => {
                   const isSelected = activeAnchor === s.id;
                   return (
-                    <TouchableOpacity
+                    <Pressable
                       key={s.id}
                       testID={s.anchor.testID}
                       onPress={() => handleAnchorPress(s.id)}
@@ -562,7 +562,7 @@ export function SectionAnchorList<T>({
                         style={{ color: isSelected ? foreground : opacity(foreground, 0.7) }}>
                         {s.anchor.label}
                       </Text>
-                    </TouchableOpacity>
+                    </Pressable>
                   );
                 })}
               </ScrollView>

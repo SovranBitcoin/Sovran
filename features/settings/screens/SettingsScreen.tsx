@@ -12,7 +12,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { CocoManager } from '@/shared/lib/cashu/manager';
@@ -156,15 +156,15 @@ export const RowButton: React.FC<{
   if (href) {
     return (
       <Link href={href} asChild>
-        <TouchableOpacity>{content}</TouchableOpacity>
+        <Pressable>{content}</Pressable>
       </Link>
     );
   }
 
   return (
-    <TouchableOpacity onPress={onPress} disabled={!onPress}>
+    <Pressable onPress={onPress} disabled={!onPress}>
       {content}
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
@@ -449,7 +449,7 @@ export const SettingsScreen = () => {
           </ListGroup>
         </Section>
 
-        <TouchableOpacity onPress={handleVersionPress}>
+        <Pressable onPress={handleVersionPress}>
           <VStack spacing={4}>
             <Text className="text-foreground/50 text-center" bold size={13}>
               {name}
@@ -458,7 +458,7 @@ export const SettingsScreen = () => {
               App Version {version} ({buildNumber})
             </Text>
           </VStack>
-        </TouchableOpacity>
+        </Pressable>
       </ScrollView>
     </ScreenWrapper>
   );

@@ -9,12 +9,12 @@ import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   GestureResponderEvent,
-  Pressable,
   Platform,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Animated, {
   SharedValue,
   useSharedValue,

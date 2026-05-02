@@ -15,7 +15,7 @@ initLog('Module', '_layout loaded');
 import Icon from 'assets/icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Dimensions, Image, LogBox, StyleSheet, Platform, View } from 'react-native';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Animated, { cubicBezier } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supportsLiquidGlass } from '@/shared/lib/version';
@@ -244,9 +244,9 @@ function RootLayoutContent() {
 
   // Close button component for modal presentations
   const CloseButton = () => (
-    <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+    <Pressable onPress={() => router.back()} style={{ padding: 8 }}>
       <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-    </TouchableOpacity>
+    </Pressable>
   );
 
   // Screen options builder

@@ -27,7 +27,7 @@ import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Checkbox } from '@/shared/ui/primitives/Checkbox';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { ListRow, type ListRowAvatar, type ListRowIconCircle } from '@/shared/ui/composed/ListRow';
@@ -729,12 +729,12 @@ export function ContactRow({
   ) : null;
 
   const inspectNode = onInspectPress ? (
-    <TouchableOpacity
+    <Pressable
       onPress={onInspectPress}
       hitSlop={8}
       style={{ padding: 8, borderRadius: 999, backgroundColor: opacity(foreground, 0.06) }}>
       <Icon name="bx:dots-vertical-rounded" size={18} color={foreground} />
-    </TouchableOpacity>
+    </Pressable>
   ) : null;
 
   const bleConnectionNode =

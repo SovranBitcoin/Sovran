@@ -19,7 +19,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Spinner } from '@/shared/ui/primitives/Spinner';
 import {
   TransferCard,
@@ -232,7 +232,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
               )}
               <HStack gap={8} className="px-4">
                 {routeSuggestion?.status === 'found' && routeSuggestion?.path && onRouteThrough ? (
-                  <TouchableOpacity
+                  <Pressable
                     onPress={onRouteThrough}
                     haptics
                     style={{
@@ -254,9 +254,9 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                         </Text>
                       )}
                     </VStack>
-                  </TouchableOpacity>
+                  </Pressable>
                 ) : onRetry ? (
-                  <TouchableOpacity
+                  <Pressable
                     onPress={onRetry}
                     haptics
                     style={{
@@ -271,10 +271,10 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                         Retry
                       </Text>
                     </HStack>
-                  </TouchableOpacity>
+                  </Pressable>
                 ) : null}
                 {onSkip && (
-                  <TouchableOpacity
+                  <Pressable
                     onPress={onSkip}
                     haptics
                     style={{
@@ -289,7 +289,7 @@ export const RebalanceStepRow: React.FC<RebalanceStepRowProps> = ({
                         Skip
                       </Text>
                     </HStack>
-                  </TouchableOpacity>
+                  </Pressable>
                 )}
               </HStack>
             </VStack>

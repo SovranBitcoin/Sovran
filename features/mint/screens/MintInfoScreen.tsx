@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react';
 import { ScrollView, Animated, Linking, Easing, StyleSheet } from 'react-native';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, Link } from 'expo-router';
 import { z } from 'zod';
 
@@ -466,9 +466,9 @@ export function MintInfoScreen() {
                       params: { mintUrl },
                     }}
                     asChild>
-                    <TouchableOpacity style={{ padding: 8 }}>
+                    <Pressable style={{ padding: 8 }}>
                       <Icon name="ic:round-star" size={24} color={warning} />
-                    </TouchableOpacity>
+                    </Pressable>
                   </Link>
                 ),
         }}

@@ -14,10 +14,10 @@ import {
   Animated,
   Easing,
   StyleSheet,
-  TouchableOpacity,
   useWindowDimensions,
   Linking,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Image as ExpoImage } from 'expo-image';
 import { Stack, Link } from 'expo-router';
 import { z } from 'zod';
@@ -299,7 +299,7 @@ function TopFollowersComponent({
   };
 
   const renderItem = (follower: TopFollower) => (
-    <TouchableOpacity
+    <Pressable
       key={follower.pubkey}
       style={[styles.topFollowerGridItem, { width: itemWidth }]}
       onPress={() => handleFollowerPress(follower)}
@@ -323,7 +323,7 @@ function TopFollowersComponent({
         }}>
         {getFollowerDisplayName(follower)}
       </Text>
-    </TouchableOpacity>
+    </Pressable>
   );
 
   const renderSkeleton = (index: number) => (
@@ -583,9 +583,9 @@ function BannerWithAvatarComponent({
       <Animated.View
         style={[styles.avatarContainer, { opacity: fadeAnim, transform: [{ scale: fadeAnim }] }]}>
         {hasStories && onAvatarPress ? (
-          <TouchableOpacity activeOpacity={0.8} onPress={onAvatarPress}>
+          <Pressable activeOpacity={0.8} onPress={onAvatarPress}>
             {avatarContent}
-          </TouchableOpacity>
+          </Pressable>
         ) : (
           avatarContent
         )}
@@ -630,7 +630,7 @@ function BannerWithAvatarComponent({
               style={{ marginTop: 10 }}
             />
           ) : (
-            <TouchableOpacity
+            <Pressable
               activeOpacity={0.8}
               onPress={onToggleFollow}
               disabled={isFollowLoading}
@@ -650,7 +650,7 @@ function BannerWithAvatarComponent({
                 }}>
                 {isFollowing ? 'Following' : 'Follow'}
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           ))}
       </VStack>
     </View>
@@ -984,9 +984,9 @@ export function UserProfileScreen() {
                     },
                   }}
                   asChild>
-                  <TouchableOpacity style={{ padding: 8 }}>
+                  <Pressable style={{ padding: 8 }}>
                     <Icon name="mdi:bank" size={24} color={foreground} />
-                  </TouchableOpacity>
+                  </Pressable>
                 </Link>
               )}
               <Link
@@ -999,9 +999,9 @@ export function UserProfileScreen() {
                   },
                 }}
                 asChild>
-                <TouchableOpacity style={{ padding: 8 }}>
+                <Pressable style={{ padding: 8 }}>
                   <Icon name="mdi:qrcode" size={24} color={foreground} />
-                </TouchableOpacity>
+                </Pressable>
               </Link>
             </HStack>
           ),

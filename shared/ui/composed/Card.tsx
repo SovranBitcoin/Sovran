@@ -1,6 +1,6 @@
 import React from 'react';
 import { Log } from '@/shared/lib/logger';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -45,7 +45,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
 
   return (
     <Log name="Card">
-      <TouchableOpacity onPress={onPress}>
+      <Pressable onPress={onPress}>
         <View
           className="rounded-lg border-l-[5px] shadow-sm"
           style={{
@@ -78,7 +78,7 @@ export const Card = ({ title, message, variant, icon, onPress }: CardProps) => {
             </HStack>
           </VStack>
         </View>
-      </TouchableOpacity>
+      </Pressable>
     </Log>
   );
 };

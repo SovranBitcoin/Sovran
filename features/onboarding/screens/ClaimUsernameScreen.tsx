@@ -11,7 +11,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  TouchableOpacity,
   TextInput,
   ActivityIndicator,
   Keyboard,
@@ -19,6 +18,7 @@ import {
   Linking,
   View as RNView,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -172,7 +172,7 @@ function DomainOption({
   const status = getStatusInfo();
 
   return (
-    <TouchableOpacity
+    <Pressable
       activeOpacity={0.7}
       onPress={onSelect}
       style={[
@@ -226,7 +226,7 @@ function DomainOption({
           {isSelected && <View style={[styles.radioInner, { backgroundColor: accent }]} />}
         </View>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -283,9 +283,9 @@ export function ClaimUsernameScreen() {
 
   const CloseButton = useCallback(
     () => (
-      <TouchableOpacity onPress={handleClose} style={{ padding: 8 }}>
+      <Pressable onPress={handleClose} style={{ padding: 8 }}>
         <Icon name="material-symbols:close-rounded" size={24} color={foreground} />
-      </TouchableOpacity>
+      </Pressable>
     ),
     [foreground, handleClose]
   );

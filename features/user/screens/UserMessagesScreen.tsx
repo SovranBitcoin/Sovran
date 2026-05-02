@@ -8,7 +8,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   ScrollView,
-  Pressable,
   Platform,
   StatusBar,
   Dimensions,
@@ -22,6 +21,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
   KeyboardAvoidingView,
   useKeyboardState,

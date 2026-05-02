@@ -9,7 +9,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { BlurView } from 'expo-blur';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 
@@ -118,7 +118,7 @@ export function Section({ items, style, camera = false, special, gradient }: Sec
             }}>
             {truncateMiddle(username, 8)}
           </Text>
-          <TouchableOpacity className="flex-row items-center">
+          <Pressable className="flex-row items-center">
             <StyledText
               primary
               size={24}
@@ -133,7 +133,7 @@ export function Section({ items, style, camera = false, special, gradient }: Sec
               }}>
               @{domain}
             </StyledText>
-          </TouchableOpacity>
+          </Pressable>
           {titleText !== '' && <Spacer size={8} />}
         </VStack>
       );

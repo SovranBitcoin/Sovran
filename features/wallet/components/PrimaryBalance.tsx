@@ -8,7 +8,7 @@ import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import { UntranslatedText } from '@/shared/ui/primitives/Text';
 import { useBtcPrice } from '@/shared/stores/global/pricelistStore';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { FiatCurrencyPill } from '@/features/wallet/components/FiatCurrencyPill';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
@@ -141,7 +141,7 @@ function EcashStatusPill({
   }
 
   return (
-    <TouchableOpacity onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
+    <Pressable onPress={onPress} disabled={!onPress} activeOpacity={0.9}>
       <HStack
         align="center"
         justify="center"
@@ -164,7 +164,7 @@ function EcashStatusPill({
           {text}
         </UntranslatedText>
       </HStack>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -273,7 +273,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
     <Log name="PrimaryBalance">
       <VStack align="center" gap={8} className="z-9">
         <FiatCurrencyPill displayText={displayText} textSize={12} />
-        <TouchableOpacity
+        <Pressable
           onPress={toggleUnit}
           style={{
             alignSelf: 'stretch',
@@ -289,7 +289,7 @@ export function PrimaryBalance({ account }: PrimaryBalanceProps): React.ReactEle
             glassVariant={LIQUID_GLASS_BALANCE_VARIANT}
             color={balanceTint}
           />
-        </TouchableOpacity>
+        </Pressable>
         <EcashStatusPill
           label="PENDING"
           totalAmount={pendingTotal}

@@ -6,7 +6,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import Icon from 'assets/icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -257,7 +257,7 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
         </View>
 
         <HStack gap={8} className="justify-start">
-          <TouchableOpacity
+          <Pressable
             onPress={handleMax}
             disabled={disabled || isAtMax}
             haptics
@@ -277,9 +277,9 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
                 Max
               </Text>
             </HStack>
-          </TouchableOpacity>
+          </Pressable>
 
-          <TouchableOpacity
+          <Pressable
             onPress={handleMin}
             disabled={disabled || isAtMin}
             haptics
@@ -299,7 +299,7 @@ export const MintDistributionItem: FC<MintDistributionItemProps> = ({
                 Min
               </Text>
             </HStack>
-          </TouchableOpacity>
+          </Pressable>
         </HStack>
       </View>
     </Log>

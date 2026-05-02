@@ -50,7 +50,7 @@ import { getMintDisplayName } from '@/shared/lib/url';
 import { useMintManagement } from '@/features/mint';
 import Icon from 'assets/icons';
 import { router } from 'expo-router';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
@@ -425,7 +425,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
           </HStack>
 
           {/* ── Disclosure toggle (animated chevron, like SwiftUI DisclosureGroup) ── */}
-          <TouchableOpacity onPress={toggleExpanded} style={{ marginHorizontal: 16 }}>
+          <Pressable onPress={toggleExpanded} style={{ marginHorizontal: 16 }}>
             <HStack align="center" justify="space-between" style={styles.toggleHeader}>
               <UntranslatedText bold size={13} color={opacity(foreground, 0.66)}>
                 Transactions
@@ -439,7 +439,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
                 />
               </Animated.View>
             </HStack>
-          </TouchableOpacity>
+          </Pressable>
 
           {/* ── Leg cards: expanded or collapsed (Reanimated layout transition) ── */}
           <Animated.View layout={LinearTransition.duration(280)}>

@@ -8,11 +8,11 @@
 
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
-  Pressable,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import { router, Stack } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';

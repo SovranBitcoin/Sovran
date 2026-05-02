@@ -12,7 +12,7 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { MintCurrencyTabs } from '@/features/mint/components/MintCurrencyTabs';
 import { MintDistributionItem, DistributionBar } from '@/features/mint/components/distribution';
@@ -245,7 +245,7 @@ export function MintDistributionScreen() {
           options={{
             title: 'Balance split',
             headerRight: () => (
-              <TouchableOpacity
+              <Pressable
                 onPress={() => {
                   Alert.alert(
                     'Balance Split',
@@ -259,7 +259,7 @@ export function MintDistributionScreen() {
                 }}
                 className="p-2">
                 <Icon name="mdi:help-circle" size={24} color={foreground} />
-              </TouchableOpacity>
+              </Pressable>
             ),
           }}
         />

@@ -4,7 +4,7 @@ import opacity from 'hex-color-opacity';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import Icon from 'assets/icons';
 import { UntranslatedText } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -41,7 +41,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
 
   return (
     <Log name="SwapTransactionRow">
-      <TouchableOpacity
+      <Pressable
         className="flex-row items-center justify-between bg-transparent px-4 py-5"
         onPress={handlePress}>
         <HStack spacing={12} flex={1}>
@@ -69,7 +69,7 @@ export const SwapTransactionRow = React.memo(({ group }: Props) => {
             </HStack>
           </VStack>
         </HStack>
-      </TouchableOpacity>
+      </Pressable>
     </Log>
   );
 });

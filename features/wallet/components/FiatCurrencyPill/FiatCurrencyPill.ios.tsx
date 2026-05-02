@@ -4,7 +4,7 @@ import opacity from 'hex-color-opacity';
 
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { supportsLiquidGlass } from '@/shared/lib/version';
 import { FiatCurrencyPillLiquid } from './FiatCurrencyPill.liquid';
 import { useFiatCurrencyPill, type FiatCurrencyPillProps } from './useFiatCurrencyPill';
@@ -49,7 +49,7 @@ export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactEleme
 
   return (
     <Log name="FiatCurrencyPill">
-      <TouchableOpacity
+      <Pressable
         disabled={!primaryHandler && !longPressHandler}
         onPress={primaryHandler}
         onLongPress={longPressHandler}>
@@ -70,7 +70,7 @@ export function FiatCurrencyPill(props: FiatCurrencyPillProps): React.ReactEleme
             {text}
           </Text>
         </HStack>
-      </TouchableOpacity>
+      </Pressable>
     </Log>
   );
 }

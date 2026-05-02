@@ -4,7 +4,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import opacity from 'hex-color-opacity';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { HistoryEntry } from '@cashu/coco-core';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { log, Log } from '@/shared/lib/logger';
@@ -51,7 +51,7 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
   }, [item.key, item.label, onPress]);
 
   return (
-    <TouchableOpacity onPress={handlePress}>
+    <Pressable onPress={handlePress}>
       <View
         className="mr-2 shrink-0 flex-row items-center justify-center rounded-2xl px-4 py-2"
         style={{ backgroundColor: isSelected ? surfaceSecondary : 'transparent' }}>
@@ -65,7 +65,7 @@ function MonthTab({ item, isSelected, onPress, showYear }: MonthTabProps) {
           {showYear ? item.fullLabel : item.label}
         </Text>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

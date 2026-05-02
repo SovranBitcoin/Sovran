@@ -14,7 +14,7 @@
 
 import Icon from 'assets/icons';
 import { Text } from '@/shared/ui/primitives/Text';
-import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import * as Location from 'expo-location';
@@ -278,15 +278,15 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
   // Android fallback
   return (
     <VStack style={styles.floatingButtons} spacing={8}>
-      <TouchableOpacity onPress={onMyLocation} style={styles.androidCircleButton}>
+      <Pressable onPress={onMyLocation} style={styles.androidCircleButton}>
         <Icon name="mdi:crosshairs-gps" size={22} color={foreground} />
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onZoomIn} style={styles.androidCircleButton}>
+      </Pressable>
+      <Pressable onPress={onZoomIn} style={styles.androidCircleButton}>
         <Icon name="mdi:plus" size={22} color={foreground} />
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onZoomOut} style={styles.androidCircleButton}>
+      </Pressable>
+      <Pressable onPress={onZoomOut} style={styles.androidCircleButton}>
         <Icon name="mdi:minus" size={22} color={foreground} />
-      </TouchableOpacity>
+      </Pressable>
     </VStack>
   );
 });
@@ -655,13 +655,13 @@ export function MapScreen() {
               ? 'Google Maps is not configured for Android. Set EXPO_PUBLIC_GOOGLE_MAPS_API_KEY and rebuild.'
               : error}
           </Text>
-          <TouchableOpacity
+          <Pressable
             onPress={mapUnavailableOnAndroid ? () => router.back() : () => setError(null)}
             style={[styles.retryButton, { backgroundColor: accent }]}>
             <Text size={14} heavy style={{ color: '#fff' }}>
               {mapUnavailableOnAndroid ? 'Go back' : 'Retry'}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </Screen>
     );
