@@ -1,9 +1,7 @@
 import { bytesToHex } from '@noble/hashes/utils.js';
-import {
-  deserializeApplicationRumor,
-  type BaseGroupHistory,
-} from '@internet-privacy/marmot-ts';
+import { deserializeApplicationRumor, type BaseGroupHistory } from '@internet-privacy/marmot-ts';
 import { AsyncStorageKVBackend } from './asyncStorageBackend';
+import { WhitenoiseNamespace, whitenoisePrefix } from './namespaces';
 
 /**
  * Marmot saves every sent + received application-message rumor (as bytes) to
@@ -12,7 +10,7 @@ import { AsyncStorageKVBackend } from './asyncStorageBackend';
  * them per group via AsyncStorage and exposes a `loadMessages()` method our
  * UI calls on mount.
  */
-export type StoredApplicationRumor = {
+type StoredApplicationRumor = {
   bytes: Uint8Array;
   receivedAt: number;
 };
@@ -23,7 +21,7 @@ export class WhitenoiseGroupHistory implements BaseGroupHistory {
 
   constructor(accountIndex: number, groupId: Uint8Array) {
     this.backend = new AsyncStorageKVBackend<StoredApplicationRumor[]>(
-      `whitenoise:${accountIndex}:history`
+      whitenoisePrefix(accountIndex, WhitenoiseNamespace.History)
     );
     this.storageKey = bytesToHex(groupId);
   }

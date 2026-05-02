@@ -27,7 +27,7 @@ export type WhitenoiseDmMessage = {
   isPending?: boolean;
 };
 
-export type UseWhitenoiseDMState = {
+type UseWhitenoiseDMState = {
   isClientReady: boolean;
   isLoading: boolean;
   isCreatingGroup: boolean;
@@ -202,9 +202,7 @@ export function useWhitenoiseDM(
             { kinds: [KEY_PACKAGE_KIND], authors: [counterpartyPubkey], limit: 1 },
           ]);
           if (events.length === 0) {
-            throw new Error(
-              "Recipient hasn't published a White Noise key package yet."
-            );
+            throw new Error("Recipient hasn't published a White Noise key package yet.");
           }
           const keyPackageEvent = events[0];
 

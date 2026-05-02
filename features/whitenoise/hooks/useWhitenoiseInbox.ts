@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
-import { useWhitenoise } from '../WhitenoiseProvider';
+import { useWhitenoise } from '../WhitenoiseContext';
 import { log } from '@/shared/lib/logger';
 
 const wnLog = log.child({ module: 'whitenoise' });
@@ -83,9 +83,7 @@ export function useWhitenoiseInbox() {
 
       // Stage 1: ingest into the `received` store. Returns false if we've
       // seen this event before (deduped via the InviteReader's `seen` map).
-      const fresh = await reader.ingestEvent(
-        event as Parameters<typeof reader.ingestEvent>[0]
-      );
+      const fresh = await reader.ingestEvent(event as Parameters<typeof reader.ingestEvent>[0]);
       if (!fresh) return;
 
       // Stage 2: decrypt now. Our signer is local (no hardware prompt), so

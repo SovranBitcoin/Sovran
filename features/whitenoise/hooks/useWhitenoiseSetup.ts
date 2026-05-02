@@ -7,7 +7,7 @@ const wnLog = log.child({ module: 'whitenoise' });
 
 const TARGET_KEY_PACKAGE_COUNT = 2;
 
-export type WhitenoiseSetupState = {
+type WhitenoiseSetupState = {
   isReady: boolean;
   keyPackageCount: number;
   isLoading: boolean;

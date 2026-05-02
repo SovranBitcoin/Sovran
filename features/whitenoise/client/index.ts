@@ -16,7 +16,7 @@ import { createWhitenoiseSigner } from './signer';
 // importing it from an applesauce subpath that marmot-ts doesn't re-export.
 type MarmotSigner = ConstructorParameters<typeof MarmotClient>[0]['signer'];
 
-export type WhitenoiseClientOptions = {
+type WhitenoiseClientOptions = {
   accountIndex: number;
   privateKey: Uint8Array;
   ndk: NDK;
@@ -38,6 +38,3 @@ export function createWhitenoiseClient(
     historyFactory: createWhitenoiseGroupHistoryFactory(opts.accountIndex),
   });
 }
-
-export { createWhitenoiseNetwork } from './network';
-export { createWhitenoiseSigner } from './signer';

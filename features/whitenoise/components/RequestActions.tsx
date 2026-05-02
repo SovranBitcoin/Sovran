@@ -4,7 +4,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Text } from '@/shared/ui/primitives/Text';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 
-export interface RequestActionsProps {
+interface RequestActionsProps {
   onAccept: () => void;
   onDecline: () => void;
   isBusy?: boolean;

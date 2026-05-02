@@ -1,27 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { log } from '@/shared/lib/logger';
+import { WhitenoiseNamespace, whitenoisePrefix } from './namespaces';
 
 const wnLog = log.child({ module: 'whitenoise' });
-
-// All AsyncStorage prefixes Whitenoise writes under, namespaced per account.
-// Keep this list in sync with:
-//   - storage/index.ts          (group-state, key-package)
-//   - storage/inviteStore.ts    (invite-received, invite-unread, invite-seen)
-//   - storage/groupHistory.ts   (history)
-//   - storage/dmIndex.ts        (dm-index)
-const WHITENOISE_NAMESPACES = [
-  'group-state',
-  'key-package',
-  'invite-received',
-  'invite-unread',
-  'invite-seen',
-  'history',
-  'dm-index',
-] as const;
-
-function prefixFor(accountIndex: number, namespace: string): string {
-  return `whitenoise:${accountIndex}:${namespace}:`;
-}
 
 /**
  * Wipe every AsyncStorage key Whitenoise wrote under the given account.
@@ -32,12 +13,12 @@ function prefixFor(accountIndex: number, namespace: string): string {
  * AFTER tearing down the provider tree, or accept that the app is about to
  * restart anyway and a few orphaned keys are harmless.
  */
-export async function wipeWhitenoiseStorage(accountIndex: number): Promise<void> {
+async function wipeWhitenoiseStorage(accountIndex: number): Promise<void> {
   try {
     const allKeys = await AsyncStorage.getAllKeys();
     const toRemove: string[] = [];
-    for (const ns of WHITENOISE_NAMESPACES) {
-      const prefix = prefixFor(accountIndex, ns);
+    for (const ns of Object.values(WhitenoiseNamespace)) {
+      const prefix = `${whitenoisePrefix(accountIndex, ns)}:`;
       for (const k of allKeys) {
         if (k.startsWith(prefix)) toRemove.push(k);
       }

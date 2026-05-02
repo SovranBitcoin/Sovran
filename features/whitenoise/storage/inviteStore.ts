@@ -1,9 +1,6 @@
-import type {
-  InviteStore,
-  ReceivedGiftWrap,
-  UnreadInvite,
-} from '@internet-privacy/marmot-ts';
+import type { InviteStore, ReceivedGiftWrap, UnreadInvite } from '@internet-privacy/marmot-ts';
 import { AsyncStorageKVBackend } from './asyncStorageBackend';
+import { WhitenoiseNamespace, whitenoisePrefix } from './namespaces';
 
 /**
  * Three persisted key-value backends marmot-ts's `InviteReader` needs:
@@ -18,13 +15,13 @@ import { AsyncStorageKVBackend } from './asyncStorageBackend';
 export function createWhitenoiseInviteStore(accountIndex: number): InviteStore {
   return {
     received: new AsyncStorageKVBackend<ReceivedGiftWrap>(
-      `whitenoise:${accountIndex}:invite-received`
+      whitenoisePrefix(accountIndex, WhitenoiseNamespace.InviteReceived)
     ),
     unread: new AsyncStorageKVBackend<UnreadInvite>(
-      `whitenoise:${accountIndex}:invite-unread`
+      whitenoisePrefix(accountIndex, WhitenoiseNamespace.InviteUnread)
     ),
     seen: new AsyncStorageKVBackend<boolean>(
-      `whitenoise:${accountIndex}:invite-seen`
+      whitenoisePrefix(accountIndex, WhitenoiseNamespace.InviteSeen)
     ),
   };
 }

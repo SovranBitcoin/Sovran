@@ -19,7 +19,7 @@ export type WhitenoiseRequest = {
   rumor: UnreadInvite;
 };
 
-export type UseWhitenoiseRequestsState = {
+type UseWhitenoiseRequestsState = {
   requests: WhitenoiseRequest[];
   isReady: boolean;
   busyId: string | null;

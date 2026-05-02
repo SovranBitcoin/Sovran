@@ -1,29 +1,17 @@
-import React, { createContext, useContext, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useNDK } from '@nostr-dev-kit/ndk-mobile';
-import {
-  InviteReader,
-  type MarmotClient,
-} from '@internet-privacy/marmot-ts';
+import { InviteReader } from '@internet-privacy/marmot-ts';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { relays as defaultRelays } from '@/shared/ndk';
 import { log } from '@/shared/lib/logger';
 import { createWhitenoiseClient } from './client';
-import { WhitenoiseGroupHistory } from './storage/groupHistory';
 import { createWhitenoiseInviteStore } from './storage/inviteStore';
 import { useWhitenoiseInbox } from './hooks/useWhitenoiseInbox';
+import { WhitenoiseContext, type WhitenoiseContextValue } from './WhitenoiseContext';
+
+export { useWhitenoise } from './WhitenoiseContext';
 
 const wnLog = log.child({ module: 'whitenoise' });
-
-type WnClient = MarmotClient<WhitenoiseGroupHistory>;
-
-type WhitenoiseContextValue = {
-  client: WnClient | null;
-  inviteReader: InviteReader | null;
-  relays: readonly string[];
-  accountIndex: number;
-};
-
-const WhitenoiseContext = createContext<WhitenoiseContextValue | null>(null);
 
 export function WhitenoiseProvider({
   accountIndex,
@@ -98,16 +86,4 @@ export function WhitenoiseProvider({
 function InboxWatcher() {
   useWhitenoiseInbox();
   return null;
-}
-
-export function useWhitenoise(): WhitenoiseContextValue {
-  const value = useContext(WhitenoiseContext);
-  if (!value) {
-    throw new Error('useWhitenoise must be used inside WhitenoiseProvider');
-  }
-  return value;
-}
-
-export function useWhitenoiseClient(): WnClient | null {
-  return useWhitenoise().client;
 }
