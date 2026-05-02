@@ -922,6 +922,7 @@ export const apiLog = log.child({ module: 'api' });
 export const storeLog = log.child({ module: 'store' });
 export const aiLog = log.child({ module: 'ai' });
 export const chatLog = log.child({ module: 'chat' });
+export const bitchatLog = log.child({ module: 'bitchat' });
 
 /**
  * Narrow an unknown caught value to a stable `{ name, message }` shape suitable

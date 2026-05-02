@@ -13,7 +13,7 @@ import { LegendList } from '@legendapp/list';
 import { router, Stack } from 'expo-router';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Screen, useLifecycleLogger } from '@/shared/lib/logger';
+import { Screen, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -60,7 +60,7 @@ function PeerRow({ peer }: PeerRowProps) {
 }
 
 export default function NetworkSheet() {
-  useLifecycleLogger('BitchatNetworkSheet');
+  useLifecycleLogger('BitchatNetworkSheet', bitchatLog);
   const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
     'surface-secondary',

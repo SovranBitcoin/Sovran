@@ -72,8 +72,6 @@ export interface SplitBillParticipant {
   mintQuoteId?: string;
   /** The raw BOLT11 invoice string for manual share / QR render. */
   bolt11?: string;
-  /** Mint quote expiry (ms since epoch) if available. */
-  expiresAt?: number;
 
   deliveryState: SplitBillDeliveryState;
   deliveryError?: string;
@@ -95,7 +93,7 @@ export interface SplitBillGroup {
 /** Reverse index: mint quote id → (groupId, participantId). Lets the
  *  Transactions list hide individual mint entries that belong to a group
  *  by filtering on quoteId, same pattern as `swapTransactionsStore`. */
-export type QuoteIdToSplitBillIndex = Record<string, { groupId: string; participantId: string }>;
+type QuoteIdToSplitBillIndex = Record<string, { groupId: string; participantId: string }>;
 
 // ---------------------------------------------------------------------------
 // Store
@@ -113,13 +111,7 @@ interface StartGroupInput {
   title?: string;
   participants: (Omit<
     SplitBillParticipant,
-    | 'id'
-    | 'mintQuoteId'
-    | 'bolt11'
-    | 'expiresAt'
-    | 'deliveryState'
-    | 'deliveryError'
-    | 'paymentState'
+    'id' | 'mintQuoteId' | 'bolt11' | 'deliveryState' | 'deliveryError' | 'paymentState'
   > & {
     id?: string;
   })[];
@@ -132,7 +124,7 @@ interface SplitBillStoreActions {
   tagMintQuote: (
     groupId: string,
     participantId: string,
-    params: { mintQuoteId: string; bolt11?: string; expiresAt?: number }
+    params: { mintQuoteId: string; bolt11?: string }
   ) => void;
 
   markDelivered: (groupId: string, participantId: string, ok: boolean, error?: string) => void;
@@ -157,7 +149,7 @@ interface SplitBillStoreActions {
   clearAllData: () => Promise<void>;
 }
 
-export type SplitBillStore = SplitBillStoreState & SplitBillStoreActions;
+type SplitBillStore = SplitBillStoreState & SplitBillStoreActions;
 
 const generateGroupId = () => `sb-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 const generateParticipantId = () => `p-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -212,7 +204,6 @@ const PersistedParticipant = z.looseObject({
   amount: z.number().int().nonnegative(),
   mintQuoteId: z.string().max(256).optional(),
   bolt11: z.string().max(8192).optional(),
-  expiresAt: z.number().int().nonnegative().optional(),
   deliveryState: DeliveryStateSchema,
   deliveryError: z.string().max(2048).optional(),
   paymentState: PaymentStateSchema,
@@ -306,7 +297,7 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
         });
       },
 
-      tagMintQuote: (groupId, participantId, { mintQuoteId, bolt11, expiresAt }) => {
+      tagMintQuote: (groupId, participantId, { mintQuoteId, bolt11 }) => {
         if (!mintQuoteId) return;
         storeLog.debug('store.split_bill.tag_mint_quote', {
           groupId,
@@ -319,7 +310,7 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
           if (!group) return state;
 
           const participants = group.participants.map((p) =>
-            p.id === participantId ? { ...p, mintQuoteId, bolt11, expiresAt } : p
+            p.id === participantId ? { ...p, mintQuoteId, bolt11 } : p
           );
 
           return {

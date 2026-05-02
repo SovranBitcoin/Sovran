@@ -7,7 +7,7 @@
  *      `requestLightningInvoice(group.mintUrl, p.amount)` for each. Every
  *      invoice mints into the USER's wallet — each participant pays their
  *      share of the bill, total sats arrive at our mint.
- *   3. Tags the quote id + bolt11 + expiresAt on each participant.
+ *   3. Tags the quote id + bolt11 on each participant.
  *   4. Delivers the invoice via the participant's channel:
  *        - `nostr-dm` → NIP-17 gift-wrap (BitChatNostrBridge)
  *        - `ble-dm`   → Noise private message (BitChatBLEBridge)
@@ -317,15 +317,12 @@ export function useSplitBillOrchestrator() {
               warnThresholdMs: 3000,
             }
           );
-          const mintQuoteId =
-            (mintOp as any)?.quoteId ?? (mintOp as any)?.quote ?? (mintOp as any)?.id;
-          const bolt11 = (mintOp as any)?.request ?? (mintOp as any)?.invoice ?? undefined;
-          const expiresAt = (mintOp as any)?.expiresAt ?? undefined;
+          const { quoteId: mintQuoteId, request: bolt11 } = mintOp;
 
           if (mintQuoteId) {
             useSplitBillTransactionsStore
               .getState()
-              .tagMintQuote(groupId, p.id, { mintQuoteId: String(mintQuoteId), bolt11, expiresAt });
+              .tagMintQuote(groupId, p.id, { mintQuoteId, bolt11 });
             quoteSuccessCount++;
           }
         } catch (err) {

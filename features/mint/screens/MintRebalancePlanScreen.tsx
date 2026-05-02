@@ -463,9 +463,8 @@ export function MintRebalancePlanScreen() {
         const createInvoiceForAmount = async (amt: number) => {
           const mq = await requestLightningInvoice(toMintUrl, amt);
           const legId = ensureLegId();
-          const mqId = (mq as any)?.quote ?? (mq as any)?.quoteId ?? (mq as any)?.id;
-          if (groupId && legId && mqId) {
-            useSwapTransactionsStore.getState().tagMintQuote(groupId, legId, String(mqId));
+          if (groupId && legId && mq.quoteId) {
+            useSwapTransactionsStore.getState().tagMintQuote(groupId, legId, mq.quoteId);
           }
           return mq;
         };
@@ -1003,12 +1002,10 @@ export function MintRebalancePlanScreen() {
                   : null;
 
                 if (groupId && hopLegId) {
-                  const mqId =
-                    (hopMq as any)?.quote ?? (hopMq as any)?.quoteId ?? (hopMq as any)?.id;
-                  if (mqId) {
+                  if (hopMq.quoteId) {
                     useSwapTransactionsStore
                       .getState()
-                      .tagMintQuote(groupId, hopLegId, String(mqId));
+                      .tagMintQuote(groupId, hopLegId, hopMq.quoteId);
                   }
                   useSwapTransactionsStore
                     .getState()

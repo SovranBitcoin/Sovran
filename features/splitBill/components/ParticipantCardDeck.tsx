@@ -66,7 +66,7 @@ export interface ParticipantCardDeckRef {
   scrollToIndex: (index: number, animated?: boolean) => void;
 }
 
-export interface ParticipantCardDeckProps {
+interface ParticipantCardDeckProps {
   group: SplitBillGroup;
   /** Called whenever the focused card changes (at momentum end). */
   onFocusChange?: (index: number) => void;
@@ -207,5 +207,3 @@ const styles = StyleSheet.create({
     paddingVertical: ITEM_MARGIN,
   },
 });
-
-export const DECK_CARD_WIDTH = CARD_W - ITEM_MARGIN * 2;

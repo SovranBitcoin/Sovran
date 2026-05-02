@@ -52,7 +52,7 @@ import type {
 // pill legible on any seeded gradient regardless of theme.
 const BTC_ORANGE = '#F7931A';
 
-export interface ParticipantCardProps {
+interface ParticipantCardProps {
   group: SplitBillGroup;
   participant: SplitBillParticipant;
   /** Called when the user taps the retry CTA on a failed card. */
