@@ -23,6 +23,7 @@
       "analyze_structure": "no cycles; colocate suggestions for shared/lib/logger (13/15 importers in components) are codebase-wide not wallet-specific; 3 false-positive orphans (WalletScreen, FiatCurrencyPill.ios.tsx, MintSelector.ios.tsx) are platform-resolved consumers of the barrel"
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

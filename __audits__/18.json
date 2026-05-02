@@ -33,6 +33,7 @@
       "analyze_structure": "app/(user-flow): 13 files, ~500 code-LOC at the route layer. Zero cycles. Cross-folder coupling: splitBill/ imports 48 symbols from parent (shared/ui, shared/stores, features/splitBill) vs 0 from siblings. 14 colocate suggestions, strongest: shared/stores/profile/splitBillTransactionsStore.ts (3/3 importers in splitBill/), features/splitBill/hooks/useSplitBillOrchestrator.ts (2/2 in splitBill/). Expected file-based-route 'orphans' ignored."
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

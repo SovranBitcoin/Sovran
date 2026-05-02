@@ -23,6 +23,7 @@
       "analyze_structure": "9 files, 806 LOC code, 0 cycles, 6 'orphans' (all confirmed externally-imported), 3 colocate suggestions"
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

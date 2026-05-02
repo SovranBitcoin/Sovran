@@ -23,6 +23,7 @@
       "analyze_structure": "features/feed: ~10,556 LOC; HomeFeed.tsx highest fan-in hub; AnimatedImageOverlay 1,292 LOC and shared.tsx 1,635 LOC are the heavyweight files"
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

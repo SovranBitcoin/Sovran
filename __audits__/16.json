@@ -38,6 +38,7 @@
       "analyze_structure": "26 files, 4146 LOC, 1 cycle (themeStore ↔ wallpaperStore), 4 colocate suggestions, high fan-in on shared/lib/logger (24) and profileScopedStorage (12)"
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

@@ -23,6 +23,7 @@
       "analyze_structure": "21 files, 1824 LOC; 1 import cycle (WhitenoiseProvider.tsx ↔ hooks/useWhitenoiseInbox.ts); 7 'orphan' files all reachable via app/(user-flow) routes, ContactsScreen, or tabs banner — false positives; 2 colocate suggestions (WhitenoiseProvider.tsx → hooks 83%, storage/dmIndex.ts → hooks 100%)."
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

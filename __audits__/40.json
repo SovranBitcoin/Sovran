@@ -70,6 +70,7 @@
       "analyze_structure": "no cycles; InitializationProvider fan-in 3, plus 4 gates outside subtree"
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

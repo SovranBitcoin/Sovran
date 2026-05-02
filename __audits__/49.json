@@ -79,6 +79,7 @@
       "analyze_structure": "0 cycles, 5 colocate suggestions (all hooks→screens, mostly intra-screen reuse), 0 within-feature orphans relative to external app/ importers"
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

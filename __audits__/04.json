@@ -12,6 +12,7 @@
       "03.json"
     ]
   },
+  "completion_status": "partial",
   "findings": [
     {
       "id": "F-001",

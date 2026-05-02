@@ -58,6 +58,7 @@
       "analyze_structure": "no cycles; 2 in-feature orphans (ContactsScreen entry, useAllSearchResults consumed by shared/ui — false positive in feature scope)"
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

@@ -79,6 +79,7 @@
       "analyze_structure": "2 cycles=0; orphans flagged WalletHealthCard.tsx (true) + HealthModalScreen.tsx (false — barrel-imported); 1 colocate suggestion (useWalletHealthData → components, not actioned)"
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

@@ -36,6 +36,7 @@
       "analyze_structure": "10 files / 821 LOC / no cycles; all six _layout.tsx flagged 'orphan' (false positive — expo-router file-based routing imports them implicitly)"
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

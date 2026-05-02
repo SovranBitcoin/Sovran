@@ -18,6 +18,7 @@
       "analyze_structure": "shared/lib/popup: zero cycles, zero orphans in the audited surface (popups/payment.ts is a barrel false-positive — knip confirms it's imported via popups/index.ts). Colocate suggestions: engine.tsx (root → popups/, 100%), bridge.ts (root → popups/, 75%) — pre-existing, out of scope."
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

@@ -24,6 +24,7 @@
       "analyze_structure": "8 files, 472 code lines, no cycles, adapter.ts and write-token.ts both flagged orphans (no internal cross-imports — confirms duplication)"
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

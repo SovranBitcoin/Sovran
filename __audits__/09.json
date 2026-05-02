@@ -31,6 +31,7 @@
       "analyze_structure": null
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",

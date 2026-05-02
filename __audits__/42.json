@@ -29,6 +29,7 @@
       "analyze-structure": "37 files / 4769 code-LOC, 0 cycles, 18 reported orphans (all verified false-positives — consumed through popups/index.ts re-exports), 6 colocate suggestions (engine.tsx 100% from popups, bridge.ts 75% from popups, BlurView/version/HStack/currency leaning toward popup root)"
     }
   },
+  "completion_status": "deferred",
   "findings": [
     {
       "id": "F-001",
