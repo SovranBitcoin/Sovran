@@ -23,15 +23,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useLifecycleLogger, log } from '@/shared/lib/logger';
 import { UnitPreviewCard } from '@/features/theme/components/UnitPreviewCard';
 import { useThemeDraft } from '@/features/theme/lib/themeDraft';
-import { useThemeStore } from '@/shared/stores/profile/themeStore';
 import { useAlbumList } from '@/features/theme/lib/useAlbumList';
-
-function shallowEqual(a: Record<string, string>, b: Record<string, string>): boolean {
-  const ak = Object.keys(a);
-  const bk = Object.keys(b);
-  if (ak.length !== bk.length) return false;
-  return ak.every((k) => a[k] === b[k]);
-}
 
 // Preview unit list — broader than the wallet's live ACCOUNTS so users can
 // theme units that don't exist yet.
@@ -57,6 +49,33 @@ const CARD_GUTTER = 12;
 const CARD_MAX_WIDTH = 200;
 const CARD_SCREEN_RATIO = 0.56;
 
+interface UnitPreviewSlotProps {
+  unit: PreviewUnit;
+  width: number;
+  height: number;
+  onPress: (unitId: string) => void;
+}
+
+// Subscribes per-unit so editing one unit's wallpaper only re-renders that
+// card, not the parent screen or its siblings. `resolveUnitTheme` returns
+// a primitive ThemeName, so Zustand only triggers a render when this
+// specific unit's resolved theme actually changes.
+function UnitPreviewSlot({ unit, width, height, onPress }: UnitPreviewSlotProps) {
+  const theme = useThemeDraft((s) => s.resolveUnitTheme(unit.id));
+  log.debug('theme.preview.card.resolve', { unitId: unit.id, theme });
+  return (
+    <UnitPreviewCard
+      themeName={theme}
+      label={unit.label}
+      sublabel={unit.sublabel}
+      width={width}
+      height={height}
+      onPress={() => onPress(unit.id)}
+      testID={`unit-card-${unit.id}`}
+    />
+  );
+}
+
 export function ThemePreviewScreen() {
   useLifecycleLogger('ThemePreviewScreen');
 
@@ -69,20 +88,15 @@ export function ThemePreviewScreen() {
 
   const draftActive = useThemeDraft((s) => s.active);
   const activeAlbumSlug = useThemeDraft((s) => s.activeAlbumSlug);
-  const unitWallpapers = useThemeDraft((s) => s.unitWallpapers);
-  const draftMode = useThemeDraft((s) => s.mode);
   const beginDraft = useThemeDraft((s) => s.beginDraft);
   const discard = useThemeDraft((s) => s.discard);
   const commit = useThemeDraft((s) => s.commit);
-  const getUnitWallpaperFromStore = useThemeStore((s) => s.getUnitWallpaper);
-  const storeActiveAlbum = useThemeStore((s) => s.activeAlbumSlug);
-  const storeUnitWallpapers = useThemeStore((s) => s.unitWallpapers);
-  const storeMode = useThemeStore((s) => s.mode);
-
-  const isDirty =
-    activeAlbumSlug !== storeActiveAlbum ||
-    draftMode !== storeMode ||
-    !shallowEqual(unitWallpapers, storeUnitWallpapers);
+  // Invoking the action inside the selector returns a primitive boolean —
+  // re-renders only fire when the dirty status actually flips, regardless
+  // of how many fields shift inside the draft or store underneath. Per-unit
+  // wallpaper subscriptions live on each `<UnitPreviewSlot>`, so the screen
+  // body itself does not re-render on individual unit edits.
+  const isDirty = useThemeDraft((s) => s.isDirty());
 
   const { getAlbum } = useAlbumList();
   const album = activeAlbumSlug ? getAlbum(activeAlbumSlug) : undefined;
@@ -110,23 +124,15 @@ export function ThemePreviewScreen() {
     });
   }, []);
 
-  const cards = PREVIEW_UNITS.map((unit) => {
-    const theme =
-      unitWallpapers[unit.id] || storeUnitWallpapers[unit.id] || getUnitWallpaperFromStore(unit.id);
-    log.debug('theme.preview.card.resolve', { unitId: unit.id, theme });
-    return (
-      <UnitPreviewCard
-        key={unit.id}
-        themeName={theme}
-        label={unit.label}
-        sublabel={unit.sublabel}
-        width={cardWidth}
-        height={cardHeight}
-        onPress={() => handleUnitPress(unit.id)}
-        testID={`unit-card-${unit.id}`}
-      />
-    );
-  });
+  const cards = PREVIEW_UNITS.map((unit) => (
+    <UnitPreviewSlot
+      key={unit.id}
+      unit={unit}
+      width={cardWidth}
+      height={cardHeight}
+      onPress={handleUnitPress}
+    />
+  ));
 
   return (
     <>

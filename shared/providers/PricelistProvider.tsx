@@ -1,4 +1,5 @@
-import React, { useEffect, createContext } from 'react';
+import React, { useEffect, createContext, useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { usePricelistStore, BitcoinPrices } from '@/shared/stores/global/pricelistStore';
 import { PRICELIST_URL } from '@/shared/lib/apiClient';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
@@ -19,15 +20,19 @@ const PricelistContext = createContext<PricelistContextType | null>(null);
 
 export const PricelistProvider = ({ children }: { children: React.ReactNode }) => {
   useInitMount('PricelistProvider');
-  const {
-    pricelist,
-    isLoading,
-    error,
-    setBtcPrices,
-    setLoading,
-    setError,
-    isStale: isDataStale,
-  } = usePricelistStore();
+  // Reactive slices: useShallow so the provider only re-renders when one of
+  // these three actually changes (each WS price tick rewrites `pricelist`,
+  // but `isLoading` and `error` stay equal — without useShallow we'd churn
+  // on every frame regardless).
+  const { pricelist, isLoading, error } = usePricelistStore(
+    useShallow((s) => ({ pricelist: s.pricelist, isLoading: s.isLoading, error: s.error }))
+  );
+  // Actions and `isStale` (a pure derivation) are stable references — pull
+  // them individually so they never contribute to re-renders.
+  const setBtcPrices = usePricelistStore((s) => s.setBtcPrices);
+  const setLoading = usePricelistStore((s) => s.setLoading);
+  const setError = usePricelistStore((s) => s.setError);
+  const isDataStale = usePricelistStore((s) => s.isStale);
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -122,12 +127,15 @@ export const PricelistProvider = ({ children }: { children: React.ReactNode }) =
     };
   }, [setBtcPrices, setLoading, setError]);
 
-  const contextValue: PricelistContextType = {
-    btcPrice: pricelist?.usd?.btc,
-    isLoading,
-    error,
-    isStale: isDataStale(5), // Consider data stale after 5 minutes
-  };
+  const contextValue = useMemo<PricelistContextType>(
+    () => ({
+      btcPrice: pricelist?.usd?.btc,
+      isLoading,
+      error,
+      isStale: isDataStale(5), // Consider data stale after 5 minutes
+    }),
+    [pricelist, isLoading, error, isDataStale]
+  );
 
   return <PricelistContext.Provider value={contextValue}>{children}</PricelistContext.Provider>;
 };

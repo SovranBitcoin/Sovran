@@ -1065,29 +1065,35 @@ export function UserMessagesScreen({
   // ===========================
   // ROUTSTR STORE
   // ===========================
-  const {
-    balance,
-    setBalance,
-    setApiKey,
-    addMessage,
-    getConversationHistory,
-    updateMessage,
-    clearConversation,
-    removeMessages,
-    getSelectedModel,
-    createSession,
-    switchSession,
-    getCurrentSessionId,
-    getAllSessions,
-    updateCurrentSessionTitle,
-    setAnonymousMode,
-    getAnonymousMode,
-    getCachedModels,
-    setCachedModels,
-    setSelectedModel,
-    apiKey,
-    selectedModel, // Subscribe directly to selectedModel for reactivity
-  } = useRoutstrStore();
+  // Reactive slices: per-field selectors so each one re-renders only when
+  // its own primitive changes. The previous `useRoutstrStore()` (no
+  // selector) re-rendered the screen on every store mutation — message
+  // adds, session switches, balance polls, anonymous-mode toggles — even
+  // when none of the state this screen reads had changed.
+  const balance = useRoutstrStore((s) => s.balance);
+  const apiKey = useRoutstrStore((s) => s.apiKey);
+  const selectedModel = useRoutstrStore((s) => s.selectedModel);
+  // Actions and getter helpers are stable references on the Zustand
+  // store object — subscribing to them never triggers a re-render, so
+  // pulling them via individual selectors is the cheapest form.
+  const setBalance = useRoutstrStore((s) => s.setBalance);
+  const setApiKey = useRoutstrStore((s) => s.setApiKey);
+  const addMessage = useRoutstrStore((s) => s.addMessage);
+  const getConversationHistory = useRoutstrStore((s) => s.getConversationHistory);
+  const updateMessage = useRoutstrStore((s) => s.updateMessage);
+  const clearConversation = useRoutstrStore((s) => s.clearConversation);
+  const removeMessages = useRoutstrStore((s) => s.removeMessages);
+  const getSelectedModel = useRoutstrStore((s) => s.getSelectedModel);
+  const createSession = useRoutstrStore((s) => s.createSession);
+  const switchSession = useRoutstrStore((s) => s.switchSession);
+  const getCurrentSessionId = useRoutstrStore((s) => s.getCurrentSessionId);
+  const getAllSessions = useRoutstrStore((s) => s.getAllSessions);
+  const updateCurrentSessionTitle = useRoutstrStore((s) => s.updateCurrentSessionTitle);
+  const setAnonymousMode = useRoutstrStore((s) => s.setAnonymousMode);
+  const getAnonymousMode = useRoutstrStore((s) => s.getAnonymousMode);
+  const getCachedModels = useRoutstrStore((s) => s.getCachedModels);
+  const setCachedModels = useRoutstrStore((s) => s.setCachedModels);
+  const setSelectedModel = useRoutstrStore((s) => s.setSelectedModel);
 
   // ===========================
   // NOSTR SUBSCRIPTIONS

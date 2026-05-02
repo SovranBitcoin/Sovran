@@ -31,7 +31,7 @@ export function ProfileWallpaperProvider({ children }: { children: React.ReactNo
 
   const value = useMemo<ProfileWallpaperContextValue>(
     () => ({ getUnitWallpaper }),
-    [getUnitWallpaper],
+    [getUnitWallpaper]
   );
 
   // No hydration gate: this provider sits inside AccountScopedProviders,
@@ -39,27 +39,18 @@ export function ProfileWallpaperProvider({ children }: { children: React.ReactNo
   // we mount and themeStore hydrates lazily. The resolver tolerates the
   // pre-hydration window by falling back to 'dark'.
   return (
-    <ProfileWallpaperContext.Provider value={value}>
-      {children}
-    </ProfileWallpaperContext.Provider>
+    <ProfileWallpaperContext.Provider value={value}>{children}</ProfileWallpaperContext.Provider>
   );
 }
 
 /**
  * Read the wallpaper for a specific unit, or the profile primary if no unit.
  *
- * Subscribes to the underlying store slices so the hook re-runs when
- * overrides or the active album changes. Use this hook everywhere a
- * component needs "the wallpaper for this surface" — prefer it over a raw
- * `useThemeStore((s) => s.getUnitWallpaper(...))` call, which wouldn't
- * re-run on action mutations.
+ * Runs the resolver inside the Zustand selector so the result is a primitive
+ * `ThemeName`. Zustand re-runs the selector on every themeStore mutation but
+ * only triggers a render when the resolved theme for *this* unit changes —
+ * unrelated unit edits no longer re-render every consumer of this hook.
  */
 export function useUnitWallpaper(unitId?: UnitId): ThemeName {
-  const unitWallpapers = useThemeStore((s) => s.unitWallpapers);
-  const activeAlbumSlug = useThemeStore((s) => s.activeAlbumSlug);
-  // Referenced so React's exhaustive-deps keeps us tethered to the slices
-  // we actually depend on; the resolver reads from getState() directly.
-  void unitWallpapers;
-  void activeAlbumSlug;
-  return useThemeStore.getState().getUnitWallpaper(unitId);
+  return useThemeStore((s) => s.getUnitWallpaper(unitId));
 }

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeStore, type ThemeMode } from '@/shared/stores/profile/themeStore';
@@ -36,18 +36,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // lower in the tree. Gating ThemeProvider on themeStore._hasHydrated
   // here would deadlock the splash screen.
   const wallpaperHydrated = useWallpaperStore((s) => s._hasHydrated);
-  const unitWallpapers = useThemeStore((s) => s.unitWallpapers);
-  const activeAlbumSlug = useThemeStore((s) => s.activeAlbumSlug);
+  // Run the resolver inside the selector so the chrome theme is derived
+  // straight from store state. The selector re-runs on every themeStore
+  // change, but Zustand only triggers a render when the resolved primitive
+  // (a ThemeName string) actually changes — flipping a unit other than the
+  // first override no longer re-renders the whole provider subtree.
+  const currentTheme = useThemeStore((s) => s.getUnitWallpaper());
   const mode = useThemeStore((s) => s.mode);
-  const getUnitWallpaper = useThemeStore((s) => s.getUnitWallpaper);
-
-  // Chrome theme = resolver with no unit id (walks fallback chain).
-  // Re-runs whenever per-unit map or active album changes.
-  const currentTheme = useMemo(
-    () => getUnitWallpaper(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [getUnitWallpaper, unitWallpapers, activeAlbumSlug],
-  );
 
   const lastApplied = useRef<string | null>(null);
 
@@ -77,7 +72,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   if (!wallpaperHydrated) return null;
 
   return (
-    <ThemeContext.Provider value={{ currentTheme, mode, availableThemes: Object.keys(THEMES) as ThemeName[] }}>
+    <ThemeContext.Provider
+      value={{ currentTheme, mode, availableThemes: Object.keys(THEMES) as ThemeName[] }}>
       <View className="flex-1">{children}</View>
     </ThemeContext.Provider>
   );
