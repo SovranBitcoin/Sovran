@@ -113,8 +113,8 @@
       ],
       "verification_note": "Diff'd CompactToast.tsx:57-96 against PaymentStatusToast.tsx:258-326 against SwapStatusToast.tsx:123-167. JSX structure (Toast root → optional BlurView → absolute-fill tint → inner row View → icon → title/subtitle column → optional action) matches frame-for-frame. Constants identical (verified with grep: 'BLUR_INTENSITY = 60' appears 3x, 'TINT_ALPHA = 0.3' appears 3x, 'SUCCESS_DARK_BG' / 'DANGER_DARK_BG' appear 2x — only PaymentStatusToast and SwapStatusToast since CompactToast doesn't tween). Counter-argument considered: maybe variance grows to justify three implementations — true today is that the variance is exactly 'animated tint vs static tint' and 'icon source' — both clearly slot-able.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Different seam — three .tsx toast components vs the .ts wrapper modules this slice covers. Out of scope for the wrapper-collapse slice; valid follow-up."
+      "completion_status": "complete",
+      "completion_note": "Extracted shared/lib/popup/ToastSlab.tsx (Toast root + BlurView + tint slot + row container) and moved BLUR_INTENSITY / TINT_ALPHA / SUCCESS_DARK_BG / DANGER_DARK_BG into the primitive. CompactToast, PaymentStatusToast, and SwapStatusToast now render the slab and only own their row content; the duplicated frame and constants are gone."
     },
     {
       "id": "F-005",
