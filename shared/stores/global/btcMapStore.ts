@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
 import { log, storeLog } from '@/shared/lib/logger';
 import {
   BtcMapPlaceDetails as BtcMapPlaceDetailsSchema,
@@ -8,6 +9,7 @@ import {
   loggableIssues,
   parseWith,
 } from '@sovranbitcoin/schemas';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface BTCMapPlace {
   id: number;
@@ -116,6 +118,29 @@ type BTCMapStore = BTCMapState & BTCMapActions;
 // tabs) used to each kick off their own fetch + parse. Sharing the in-flight
 // promise eliminates duplicate work and the second 3s blocker.
 let inflightPlacesFetch: Promise<BTCMapPlace[]> | null = null;
+
+// Persisted-shape schema. Envelope-only validation on `placesCache.data` —
+// per-item parse against `BtcMapPlace` is a 2–3s JS-thread block on a 40k
+// array (audit __audits__/44.json F-001), and a corrupt cache is recoverable
+// via refetch, so the cost-benefit favours the envelope check. The fetch
+// path still parses each item before writing to the store.
+const PersistedPlacesCache = z
+  .object({
+    data: z.array(z.unknown()).max(200_000),
+    timestamp: z.number().int().nonnegative(),
+  })
+  .nullable()
+  .default(null);
+
+const PersistedPlaceDetailEntry = z.looseObject({
+  data: z.unknown(),
+  timestamp: z.number().int().nonnegative(),
+});
+
+const PersistedBtcMapStore = z.object({
+  placesCache: PersistedPlacesCache,
+  placeDetailsCache: z.record(z.string().max(32), PersistedPlaceDetailEntry).default({}),
+});
 
 export const useBTCMapStore = create<BTCMapStore>()(
   persist(
@@ -293,10 +318,13 @@ export const useBTCMapStore = create<BTCMapStore>()(
     {
       name: 'btcmap-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
       partialize: (state) => ({
         placesCache: state.placesCache,
         placeDetailsCache: state.placeDetailsCache,
       }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('btc_map', PersistedBtcMapStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
           log.warn('store.btc_map.rehydrate_failed', { error });

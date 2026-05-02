@@ -27,11 +27,8 @@ import {
   BUILTIN_COLORS_ALBUM_SLUG,
   BUILTIN_COLOR_THEME_NAMES,
 } from '@/shared/lib/theme/builtinAlbums';
-import {
-  PersistedThemeStore,
-  type ThemeMode,
-  loggableIssues,
-} from '@sovranbitcoin/schemas';
+import { PersistedThemeStore, type ThemeMode } from '@sovranbitcoin/schemas';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -81,9 +78,7 @@ function getCatalogThemesForAlbum(albumSlug: string): ThemeName[] {
 
 function getActiveProfilePubkey(): string {
   const state = useProfileStore.getState();
-  return (
-    state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey ?? ''
-  );
+  return state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey ?? '';
 }
 
 /**
@@ -120,7 +115,7 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
 function distributeWallpapers(
   pool: ThemeName[],
   unitIds: UnitId[],
-  seed: string,
+  seed: string
 ): Record<UnitId, ThemeName> {
   if (pool.length === 0 || unitIds.length === 0) return {};
   const shuffled = seededShuffle(pool, seed);
@@ -207,29 +202,18 @@ export const useThemeStore = create<ThemeStore>()(
     {
       name: 'theme-store',
       storage: createJSONStorage(() => profileStorage),
+      version: 1,
       partialize: (state) => ({
         activeAlbumSlug: state.activeAlbumSlug,
         unitWallpapers: state.unitWallpapers,
         mode: state.mode,
       }),
-      // Defensive Zod validation on rehydrate. Drop the persisted blob to the
-      // initial state if it doesn't pass safeParse — never throws, never
-      // swallows unknown fields (looseObject).
-      merge: (persisted, current) => {
-        if (!persisted || typeof persisted !== 'object') return current;
-        const r = PersistedThemeStore.safeParse(persisted);
-        if (!r.success) {
-          log.warn('store.theme.merge_rejected', {
-            issues: loggableIssues({ type: 'schema/zod', where: 'theme-store', issues: r.error.issues }),
-          });
-          return current;
-        }
-        return { ...current, ...r.data };
-      },
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('theme', PersistedThemeStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) log.warn('store.theme.rehydrate_failed', { error });
         useThemeStore.setState({ _hasHydrated: true });
       },
-    },
-  ),
+    }
+  )
 );

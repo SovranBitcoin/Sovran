@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { z } from 'zod';
 import { isBackgroundImageTheme } from 'config/backgroundImageThemes';
 import { log, storeLog } from '@/shared/lib/logger';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface TermsAccepted {
   termsAccepted: boolean;
@@ -67,6 +69,50 @@ const DEFAULT_MIDDLEMAN_ROUTING: MiddlemanRoutingSettings = {
   trustMode: 'trusted_only',
 };
 
+// Persisted-shape schema (defensive rehydrate validation). All fields are
+// optional + carry a default so adding a new field doesn't drop the user's
+// existing settings on first launch (audit __audits__/06.json F-007).
+const PersistedTermsAccepted = z
+  .object({
+    termsAccepted: z.boolean(),
+    date: z.string().max(64),
+  })
+  .nullable();
+
+const PersistedMiddlemanRouting = z.looseObject({
+  maxHops: z.number().int().min(1).max(8),
+  maxFee: z.number().int().nonnegative(),
+  minSuccessRate: z.number().min(0).max(1),
+  requireLastOk: z.boolean(),
+  trustMode: z.enum(['trusted_only', 'allow_untrusted']),
+});
+
+const PersistedSettings = z.object({
+  language: z.string().max(16).default('en'),
+  displayBtc: z.number().int().min(0).max(8).default(3),
+  displayCurrency: z.enum(['usd', 'eur', 'gbp']).default('usd'),
+  experimental: z.boolean().default(false),
+  mockMode: z.boolean().default(false),
+  mockOffline: z.boolean().default(false),
+  mockFailSend: z.boolean().default(false),
+  mockFailMelt: z.boolean().default(false),
+  mockFailPaymentRequest: z.boolean().default(false),
+  mockNoGlass: z.boolean().default(false),
+  termsAccepted: PersistedTermsAccepted.default(null),
+  hasSeenOnboarding: z.boolean().default(false),
+  quickAccessP2PK: z.boolean().default(false),
+  regenerateP2PKOnReceive: z.boolean().default(true),
+  sendLocationEnabled: z.boolean().default(false),
+  minTransferThreshold: z.number().int().nonnegative().default(5),
+  middlemanRouting: PersistedMiddlemanRouting.default({
+    maxHops: 2,
+    maxFee: 5,
+    minSuccessRate: 0.9,
+    requireLastOk: true,
+    trustMode: 'trusted_only',
+  }),
+});
+
 /** Default settings used for initialization and reset. Passcode excluded (never persisted). */
 const DEFAULT_SETTINGS: Omit<SettingsState, 'passcode'> = {
   language: 'en',
@@ -89,7 +135,6 @@ const DEFAULT_SETTINGS: Omit<SettingsState, 'passcode'> = {
 };
 
 interface SettingsActions {
-
   // Language management
   setLanguage: (language: string) => void;
   getLanguage: () => string;
@@ -312,6 +357,7 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: 'settings-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
       partialize: (state) => ({
         language: state.language,
         displayBtc: state.displayBtc,
@@ -331,6 +377,8 @@ export const useSettingsStore = create<SettingsStore>()(
         minTransferThreshold: state.minTransferThreshold,
         middlemanRouting: state.middlemanRouting,
       }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('settings', PersistedSettings),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
           log.warn('store.settings.rehydrate_failed', { error });

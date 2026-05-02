@@ -22,8 +22,10 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -182,6 +184,64 @@ function deriveGroupState(group: SplitBillGroup): SplitBillGroupState {
   if (paid > 0) return 'partially-paid';
   return 'awaiting';
 }
+
+// ---------------------------------------------------------------------------
+// Persisted-shape schema (defensive rehydrate validation)
+// ---------------------------------------------------------------------------
+
+const ParticipantSourceSchema = z.enum(['nostr', 'ble', 'search', 'self']);
+const DeliveryChannelSchema = z.enum(['nostr-dm', 'ble-dm', 'qr-only', 'self']);
+const DeliveryStateSchema = z.enum(['pending', 'sent', 'failed']);
+const PaymentStateSchema = z.enum(['pending', 'paid', 'expired']);
+const GroupStateSchema = z.enum([
+  'draft',
+  'awaiting',
+  'partially-paid',
+  'paid',
+  'expired',
+  'cancelled',
+]);
+
+const PersistedParticipant = z.looseObject({
+  id: z.string().max(128),
+  source: ParticipantSourceSchema,
+  channel: DeliveryChannelSchema,
+  pubkey: z.string().max(128).optional(),
+  peerID: z.string().max(64).optional(),
+  nickname: z.string().max(256).optional(),
+  avatarUrl: z.string().max(2048).optional(),
+  amount: z.number().int().nonnegative(),
+  mintQuoteId: z.string().max(256).optional(),
+  bolt11: z.string().max(8192).optional(),
+  expiresAt: z.number().int().nonnegative().optional(),
+  deliveryState: DeliveryStateSchema,
+  deliveryError: z.string().max(2048).optional(),
+  paymentState: PaymentStateSchema,
+});
+
+const PersistedGroup = z.looseObject({
+  id: z.string().max(128),
+  unit: z.string().max(16),
+  mintUrl: z.string().max(2048),
+  totalAmount: z.number().int().nonnegative(),
+  title: z.string().max(512),
+  createdAt: z.number().int().nonnegative(),
+  state: GroupStateSchema,
+  participants: z.array(PersistedParticipant).max(256),
+});
+
+const PersistedSplitBillStore = z.object({
+  groups: z.record(z.string().max(128), PersistedGroup).default({}),
+  quoteIdToSplitBill: z
+    .record(
+      z.string().max(256),
+      z.looseObject({
+        groupId: z.string().max(128),
+        participantId: z.string().max(128),
+      })
+    )
+    .default({}),
+});
 
 // ---------------------------------------------------------------------------
 
@@ -428,10 +488,13 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
     {
       name: 'split-bill-transactions-store',
       storage: createJSONStorage(() => createProfileScopedStorage()),
+      version: 1,
       partialize: (state) => ({
         groups: state.groups,
         quoteIdToSplitBill: state.quoteIdToSplitBill,
       }),
+      migrate: (state, _version) => state,
+      merge: createMergeWithSchema('split_bill', PersistedSplitBillStore),
       onRehydrateStorage: () => (_state, error) => {
         if (error) {
           log.warn('store.split_bill.rehydrate_failed', { error });
