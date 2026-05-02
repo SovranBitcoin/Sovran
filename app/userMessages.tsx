@@ -9,11 +9,9 @@
  * counterparty.
  */
 
-import React, { useEffect } from 'react';
-import { router } from 'expo-router';
+import React from 'react';
 import { z } from 'zod';
 import { UserMessagesScreen } from '@/features/user';
-import { ROUTSTR_PUBKEY } from '@/shared/lib/constants';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const ParamsSchema = z.object({
@@ -22,17 +20,7 @@ const ParamsSchema = z.object({
 
 function ModalScreen() {
   const params = useRouteParams(ParamsSchema, { where: 'app.userMessages' });
-  const pubkey = params?.pubkey;
-
-  // Legacy deep-link: opening the AI agent as a DM now redirects to the AI
-  // tab — the standalone DM screen no longer hosts the AI experience.
-  useEffect(() => {
-    if (pubkey !== ROUTSTR_PUBKEY) return;
-    router.replace('/(drawer)/(tabs)/ai');
-  }, [pubkey]);
-
   if (!params) return null;
-  if (params.pubkey === ROUTSTR_PUBKEY) return null;
 
   return <UserMessagesScreen pubkey={params.pubkey} />;
 }

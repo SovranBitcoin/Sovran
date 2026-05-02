@@ -24,7 +24,7 @@ function ModalScreen() {
   const params = useRouteParams(ParamsSchema, { where: 'user-flow.userMessages' });
   if (!params) return null;
 
-  return <UserMessagesScreen pubkey={params.pubkey} onBack={() => router.back()} isFlowContext />;
+  return <UserMessagesScreen pubkey={params.pubkey} onBack={() => router.back()} />;
 }
 
 export default ModalScreen;
