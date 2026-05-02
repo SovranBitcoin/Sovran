@@ -56,7 +56,9 @@
       "fix": "Add a useRef<boolean> or component-level 'running' flag set before calling `manager.ops.send.recovery.run()` and cleared in finally. When the flag is set, either disable the pill (pass an undefined onPress or grey out via tintColor), or swap the label for 'Recovering…'. Reading `manager.ops.send.recovery.inProgress()` from coco (SendOpsApi.ts:51) is a second-best option — it lets multiple components sync but still needs UI feedback. Either way, do not show an Alert while a recovery is running.",
       "references": ["skill:react-native-best-practices", "docs/SOV-00.md §6.2"],
       "verification_note": "Verified coco's lock at SendOperationService.ts:497-500 throws on reentry. Counter-argument considered: Alert auto-dismisses after button tap so a user cannot double-fire the SAME alert — correct, but they can open a second Alert because the pill remains tappable. Downgraded from initial High (counter-corruption) to Medium (UX only) after reading coco.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "`handleReservedPress` is now wrapped in `useSingleFlight`. The Alert opens inside a Promise that resolves on Close, on Recover-button completion, or on Android dismiss, so a second tap on the RESERVED pill is dropped while the alert (or its recovery work) is still live."
     },
     {
       "id": "F-003",

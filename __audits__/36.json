@@ -51,7 +51,9 @@
       "fix": "Don't clear the store from a non-terminal toast dismissal. Two pieces: (1) In SwapStatusToast.tsx:50–58, drop the `clear()` call and replace `hide()` with a navigate-only that doesn't fire the popup's onHide — or wrap the navigation so the toast stays mounted (sub-page push, not full dismiss). (2) In popups/payment.ts:192–197, gate the `onHide` clear on `state !== 'running'` — mid-flight dismissals should leave the store intact so AccountPagerViewLayout stays disabled. When the swap reaches terminal state, the orchestrator at MintRebalancePlanScreen.tsx:1345–1350 still flips state→done/failed and the listener can re-pop the terminal toast.",
       "references": ["skill:zustand-5", "skill:improve-codebase-architecture", "log:hook.payment_status.suppressed_for_swap (32 occurrences confirming gate is load-bearing)"],
       "verification_note": "Phase B: traced through swapStatusPopup → showCustomToast → onHide → clear. Counter-argument: maybe View is intended to be a 'dismiss the swap from the user's mental model' action. Rejected — the orchestration loop continues in the background per the deliberate comment at MintRebalancePlanScreen.tsx:146–152, and AccountPagerViewLayout's gate is the user-visible compensation for that. Clearing the store while the loop runs is a contract violation.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Different pattern from this slice. The bug is a state-machine clear during a still-running swap (the toast's `onPress` should not call `clear()` while `state === 'running'`), not async re-entrancy in `onPress`. Belongs with a separate swap-status-store lifecycle slice."
     },
     {
       "id": "F-003",
