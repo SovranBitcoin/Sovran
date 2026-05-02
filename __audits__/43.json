@@ -1,0 +1,465 @@
+{
+  "audit": {
+    "date": "2026-05-01",
+    "commit": "38797b50",
+    "entry_point": "sovran-app/features/splitBill",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Score 6 (slice-fresh +3, dim-fresh +1, churn ≥5 +1, partial substring overlap +1) vs features/send (5 — heavy substring overlap with covered app/(send-flow)) and features/bitchat (4 — only 3 commits in 90d, no churn bonus). Farthest from the covered slice features/* clusters because no prior audit opened features/splitBill/* — only modal comparisons (audit 21) and a branch-wide review (audit 31).",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json",
+      "28.json",
+      "29.json",
+      "30.json",
+      "31.json",
+      "32.json",
+      "33.json",
+      "34.json",
+      "35.json",
+      "36.json",
+      "37.json",
+      "38.json",
+      "39.json",
+      "40.json",
+      "41.json",
+      "42.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "typescript-advanced-types",
+      "react-native-best-practices",
+      "neverthrow-return-types"
+    ],
+    "process_skills_consulted": [
+      "zoom-out",
+      "improve-codebase-architecture",
+      "diagnose"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "1 error in features/splitBill (TS2551 display_name)",
+      "lint": "3 issues in app/(split-bill-flow): 1 unused-import, 2 prettier",
+      "knip": "2 unused exports in splitBillTransactionsStore",
+      "analyze_structure": "0 cycles, 0 colocate suggestions for splitBill itself, 2 hooks > 400 LOC"
+    }
+  },
+  "completion_status": "partial",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "splitBillTransactionsStore persists without version or migrate",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/splitBillTransactionsStore.ts",
+      "line": 428,
+      "symbol": "useSplitBillTransactionsStore.persist",
+      "dimension": 3,
+      "description": "The persist config sets `name` and `partialize` but not `version` or `migrate` (lines 428-440). Persisted shape includes `groups` (deeply nested participants with `mintQuoteId`, `paymentState`, `deliveryState`, `bolt11`, `expiresAt`) and `quoteIdToSplitBill` (an implementation-detail reverse index). Any future field rename, removal, or shape change will silently rehydrate older blobs into the new schema with no error and no fallback. The store ships in an app version already in TestFlight (commit 28bf7713, 2026-04-21).",
+      "why_it_matters": "AUDIT.md ground rule #8 makes a persist-shape change without `version` + `migrate` a Critical regression. This store is funds-adjacent — the participant's `mintQuoteId` is the correlation key for matching coco history to the split-bill row. Silent rehydration of a stale shape would either drop the field (participants stuck pending forever) or leave a phantom field the new code reads as undefined. The same gap exists on every sibling profile store (mintStore, swapTransactionsStore, etc.), so this is a project-wide pattern — but splitBill is the newest store and the easiest place to set the precedent before the first field rename forces a painful migration.",
+      "fix": "Add `version: 1` to the persist config and a no-op `migrate: (state, version) => state` baseline now. When the next field changes, bump version and write the migrator; the boilerplate is then in place. Recommend a project-wide sweep adding the same baseline to every profile store as a follow-up — but file separately so this audit's diff stays scoped.",
+      "references": [
+        "skill:zustand-5",
+        "docs/SOV-00.md §11"
+      ],
+      "verification_note": "Re-checked at line 428-440: persist config has only {name, storage, partialize, onRehydrateStorage}. Confirmed via grep that swapTransactionsStore has the same gap (project-wide). Counter-argument: 'no field has changed yet, so no migration is needed' — but the rule is to ship the boilerplate before the first change forces a heroic migration, not after.",
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Already addressed by commits 95c14ea3/520c57a1 (splitBillTransactionsStore has version + migrate + zod merge)."
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "Payment state never reconciles unless user opens the Detail screen",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+      "line": 671,
+      "symbol": "useSplitBillPaymentWatcher",
+      "dimension": 1,
+      "description": "`useSplitBillPaymentWatcher(groupId)` polls coco's history every 8s and flips participants to `paid`. It is mounted in exactly two places: `app/(split-bill-flow)/summary.tsx:101` and `app/(split-bill-flow)/detail.tsx:105`. After the user finalizes a group and dismisses the flow, the watcher unmounts. Participants who pay later never flip; the group state stays at `awaiting`; the `SplitBillTransactionRow` in the unified Transactions list keeps showing `0/N paid` until the user manually re-opens the detail screen.",
+      "why_it_matters": "The Transactions list is the wallet's primary surface for 'did this transaction complete'. A row that displays stale fund-adjacent state is a correctness failure — the user has no signal that participants have actually paid (the proofs ARE in coco's history, but the meta-row above the hidden child mints shows 'pending'). Worst case: user sends reminders to participants who paid hours ago. The orchestrator (line 565) calls `finalizeGroup` once at the end of the await chain, but `deriveGroupState` only flips to `paid`/`partially-paid` based on `participants[].paymentState` — and that flag only flips through the watcher.",
+      "fix": "Hoist a single watcher into a top-level provider that walks every group with `state ∈ {awaiting, partially-paid}` and reconciles them on a single 8s tick. Alternative: subscribe once at app boot to coco history changes (`manager.history.subscribe(...)` if available) instead of polling. Either way, the watcher must run independent of the split-bill flow's mount state.",
+      "references": [
+        "skill:improve-codebase-architecture",
+        "skill:diagnose"
+      ],
+      "verification_note": "Confirmed via grep: useSplitBillPaymentWatcher has 3 references — definition + summary.tsx + detail.tsx. log-doctor timeline --event split_bill returned 0 events in the latest session, so this is unverified at runtime, but the static argument is conclusive: no mount point outside the flow exists.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "participant.expiresAt is dead-on-arrival — wrong coco field name",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+      "line": 323,
+      "symbol": "confirm/tagMintQuote",
+      "dimension": 1,
+      "description": "Line 323 reads `(mintOp as any)?.expiresAt`. Coco's `PendingMintOperation` exposes the field as `expiry: number` (`coco/packages/core/operations/mint/MintOperation.ts:44`, in the `MintQuoteSnapshot` interface). The `as any` cast hides the mismatch; the OR fallback chain has no other slot for this field, so `participant.expiresAt` is always undefined in the persisted store.",
+      "why_it_matters": "The `SplitBillParticipant` type advertises `expiresAt?: number` (store line 75); future code that reads it (e.g. an 'expires in N min' badge on the participant card or a 'sweep expired' job) will quietly fail because the field never populates. Inert today, actively misleading tomorrow. Also, real expiry data DOES exist on the source operation but is silently dropped — the 'expired' state (lines 711, 359-383) only reaches participants through the watcher's poll of mint history, which is async and approximate.",
+      "fix": "Read `mintOp.expiry` directly. Drop the `as any` and the unused fallback. The cleanest version: type the awaited result as `PendingMintOperation<'bolt11'>` (per coco's `MintMethodHandler.prepare` return) and extract `quoteId`, `request`, `expiry` with no fallbacks.",
+      "references": [
+        "coco/packages/core/operations/mint/MintOperation.ts:44",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Confirmed: grepped MintOperation.ts for `expiresAt` (no match) and `expiry` (line 44, MintQuoteSnapshot). Grepped sovran-app for any consumer of `participant.expiresAt` — zero matches. Field is dead on both ends.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Operation id used as fallback for quoteId would corrupt reverse index",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+      "line": 321,
+      "symbol": "confirm",
+      "dimension": 1,
+      "description": "Line 321: `const mintQuoteId = (mintOp as any)?.quoteId ?? (mintOp as any)?.quote ?? (mintOp as any)?.id;`. Coco's `MintOperationBase.id` (MintOperation.ts:21) is the OPERATION id — distinct from `MintQuoteSnapshot.quoteId` (line 42). The two are different identifiers; only the latter matches what `manager.history.getPaginatedHistory()` returns on `h.quoteId`. If the first two fallbacks ever miss (e.g. coco renames `quoteId`, or a partial response with no quote attached is somehow returned), the orchestrator silently writes the operation id into `participant.mintQuoteId` AND into the reverse index `quoteIdToSplitBill`. Every downstream lookup — watcher's `h.quoteId === p.mintQuoteId`, Transactions' `quoteIdToSplitBill[quoteId]` filter (Transactions.tsx:179), `markPaymentPaidByQuoteId` — silently fails to match.",
+      "why_it_matters": "Funds-adjacent indirection. The participant payment never flips to paid (waits forever); the corresponding mint history row is NOT hidden in the Transactions list (so the user sees a 'phantom' mint above the now-orphan split-bill row). The defensive cast pretends to add resilience but actually masks a meaningful failure mode. Today the first slot likely always wins, so impact is theoretical — but the cast is doing harm.",
+      "fix": "Drop the `as any` chain. Type the result as `PendingMintOperation<'bolt11'>` and read `mintOp.quoteId` directly. If TypeScript flags a missing import, the right answer is to import the coco types, not to widen back to `any`.",
+      "references": [
+        "coco/packages/core/operations/mint/MintOperation.ts:21",
+        "coco/packages/core/operations/mint/MintOperation.ts:42",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Re-checked at line 321; confirmed coco type at MintOperation.ts:42 (MintQuoteSnapshot.quoteId) and :21 (MintOperationBase.id). Counter-argument: 'the chain is purely defensive, the first slot always wins' — granted, today; but the cost of a defensive cast is the type system can no longer prevent the failure mode it's defending against.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 1.0,
+      "title": "Search profile reads non-existent display_name field (TS2551)",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillParticipantPicker.ts",
+      "line": 460,
+      "symbol": "searchProfilesByPubkey",
+      "dimension": 6,
+      "description": "Line 460: `display_name: r.profile?.display_name`. The `r.profile` type (per the API client's response shape) only declares camelCase `displayName`. `npm run type-check` reports `error TS2551: Property 'display_name' does not exist on type ... Did you mean 'displayName'?`. Result: the snake_case fallback intended for kind-0 events that use `display_name` (the historic Nostr convention) never actually fires through the search-hit path, because the API has already normalised to camelCase by the time `displayResults` are typed.",
+      "why_it_matters": "The picker drops a user-facing display name on every Nostr search hit whose only display name is in the (now unreachable) snake_case slot. Combined with `resolveIdentityName`'s fallback to truncated pubkey, search results that do have a display name available may render with the pubkey prefix instead of the readable name.",
+      "fix": "Drop the `display_name` line — the relay subscription path (`profilesByPubkey`, lines 418-444) parses kind-0 JSON directly and DOES carry both camel and snake; the search-hit normaliser does not need to. If a snake_case pass-through is genuinely needed, fix the upstream type so both spellings are declared.",
+      "references": [
+        "ts:TS2551"
+      ],
+      "verification_note": "Reproduced via `npm run type-check` — exact error quoted in tooling output. Counter-argument: 'maybe the API does return snake_case at runtime, the type is just incomplete' — possible, but if so the fix is to widen the type, not to read a property TS says doesn't exist.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "searchCandidates rebuild defeats ParticipantRow memo on every keystroke",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillParticipantPicker.ts",
+      "line": 615,
+      "symbol": "searchCandidates",
+      "dimension": 7,
+      "description": "`nostrCandidates` (line 567) maintains a per-pubkey ref cache so unchanged (profile, stats) tuples reuse the previous `PickerCandidate` instance — this is what lets `ParticipantRow.memo` skip render. `searchCandidates` (line 615) does NOT have an equivalent cache; `searchCandidate(...)` is called inline inside the memo and constructs a fresh object on every change to `displayResults`. Every keystroke therefore produces N fresh references, ParticipantRow's shallow prop compare misses on every row, and the entire visible search list reconciles per character.",
+      "why_it_matters": "The search modal is an interactive surface where re-render storms are most visible. The fix is the same shape as the cache that already exists three blocks up — there's a clear template for the right answer. UNVERIFIED at runtime: `log-doctor renders --latest` was not consulted because no split-bill events appeared in the latest session (`log-doctor timeline --event split_bill` returned 0 of 333 events).",
+      "fix": "Mirror the `nostrCandidateCache` ref: keep a `searchCandidateCache` keyed on pubkey, store `(profile, stats, candidate)`, reuse when both fields match by `Object.is`. ~15 lines.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Static argument is clean — the code structurally constructs a fresh object every render of search results. Marked as Medium not High because the search modal is short-lived and per-keystroke reconciliation of <20 rows is not catastrophic. UNVERIFIED at runtime.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Watcher only inspects the most recent 200 history rows",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+      "line": 689,
+      "symbol": "useSplitBillPaymentWatcher.tick",
+      "dimension": 1,
+      "description": "`tick()` calls `manager.history?.getPaginatedHistory?.(0, 200)` and looks for each participant's quote in the returned page. For a heavy user (a wallet with > 200 mint/melt/send/receive entries since a split bill was created), the participant's quote is no longer in the first page and never matches, so its `paymentState` never flips to `paid`.",
+      "why_it_matters": "Compounds with F-002: not only does the watcher need to be mounted, the first 200 entries must contain the relevant rows. For an active wallet this could fail silently within a day. UNVERIFIED at runtime — depends on how many history rows a user has accumulated, which the audit can't measure.",
+      "fix": "Either (a) filter coco's history by `quoteId IN (group.participantQuoteIds)` if such an API exists; (b) page through history until each participant's quoteId is found or the cursor exhausts; or (c) ask coco for a history-by-quoteId index. The current implementation conflates 'most recent activity' with 'all relevant activity', which is a distinct failure mode from F-002 and won't be fixed by the same hoist.",
+      "references": [
+        "skill:diagnose"
+      ],
+      "verification_note": "Static — confirmed limit at line 689. Counter-argument: 'paginated read with offset is enough; users won't have > 200 entries within a bill's lifetime' — possible for low-volume users, but the spec doesn't promise a low-volume audience and a Bitcoin wallet's history grows. UNVERIFIED.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "Three `as any` casts launder coco's typed return values",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+      "line": 321,
+      "symbol": "confirm + watcher + handleCardView",
+      "dimension": 1,
+      "description": "Three sites cast coco return types to `any` to read fields off them: (1) line 321-323 `(mintOp as any)?.{quoteId,quote,id}` etc.; (2) line 689 `(manager as any).history?.getPaginatedHistory?.(0, 200)`; (3) `app/(split-bill-flow)/detail.tsx:156-161` same `manager` cast plus `(h as any).quoteId`. Each cast is an admission that the code does not know coco's actual interface — and each one disables the type checker on a fund-adjacent code path.",
+      "why_it_matters": "F-003 and F-004 are direct consequences of #1. The pattern repeats because there is no single typed wrapper for `manager.history` and `manager.ops.mint.prepare`. Fixing the casts surfaces real bugs (already two found in the same file).",
+      "fix": "Introduce a thin typed wrapper around coco's `manager` that exposes `getPaginatedHistory(offset, limit): Promise<HistoryEntry[]>` and re-exports the mint operation types. Replace every `as any` in features/splitBill with the typed import. Recommend the wrapper live alongside `useLightningOperations` since it already wraps `manager.ops.mint.prepare`.",
+      "references": [
+        "skill:typescript-advanced-types",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Re-checked all three sites; confirmed all three are reading documented coco fields (quoteId, request, expiry, history.getPaginatedHistory) that real types exist for upstream. The casts are removing type safety, not earning their keep.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Same coco-typed-payload-laundering pattern, but in features/splitBill — out of scope for this slice. Sister-pattern fixed in shared/hooks/usePaymentStatusListener.ts and coco-payment-ux/src/operations/defaultOperations.ts (commit 27ea51ec)."
+    },
+    {
+      "id": "F-009",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "Two hooks exceed 400 LOC; orchestrator interleaves five distinct modules",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+      "line": 1,
+      "symbol": "useSplitBillOrchestrator",
+      "dimension": 3,
+      "description": "`useSplitBillOrchestrator.ts` is 749 LOC (526 code + 180 comment + 43 blank); `useSplitBillParticipantPicker.ts` is 783 LOC (484 code + 251 comment + 48 blank). Both exceed the 400-LOC threshold from <dim 3>. The orchestrator file is structurally five distinct modules collapsed into one: BIP-321 URI assembly + UTF-8 chunking; NIP-17 build/publish + deferred self-copy; BLE handshake choreography + chunk send loop; mint-quote sequencing + per-participant tagging; payment watcher polling. Each is independently testable with a small interface.",
+      "why_it_matters": "AI-navigability and locality: a future change to (e.g.) the UTF-8 chunking algorithm requires reading all 749 lines to know what else depends on it. The picker hook has a similar structure problem (4 candidate-builder functions, 2 caches, 6 useMemo blocks, 1 selection refresh effect). Apply the deletion test: extracting the orchestrator's URI/chunking helpers into `features/splitBill/lib/deliveryFormat.ts` removes ~70 lines and the comment explaining BIP-321 URI rules from the orchestrator entirely; an external reader can understand 'how invoices are formatted for delivery' without learning anything about NIP-17.",
+      "fix": "Extract these new modules in `features/splitBill/lib/`: (a) `deliveryFormat.ts` — `buildBip321`, `chunkUtf8`, `formatDeliveryBody`; (b) `nostrDelivery.ts` — `sendNostrDM` (the deferred self-copy logic and its hydrate helper); (c) `bleDelivery.ts` — handshake + chunked send. Keep the orchestrator as a thin coordinator (~150 LOC) and `useSplitBillPaymentWatcher` as its own hook in a new file. For the picker: extract `useNostrProfileSubscription` (lines 380-468), `useSplitBillCandidateCaches` (lines 533-598+615-656), and `usePromotedPubkeys` (lines 340-362).",
+      "references": [
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "LOC counts come from `npm run analyze-structure -- features/splitBill`. The 'five distinct modules' claim is based on the documented blocks in the file (each with a banner comment). Counter-argument: 'comments inflate the count' — true, but code count alone is 526/484, both still over 400.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-010",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "Duplicate ParticipantStatusIcon and participantSubtitle helpers across summary + detail",
+      "repo": "sovran-app",
+      "path": "app/(split-bill-flow)/summary.tsx",
+      "line": 41,
+      "symbol": "ParticipantStatusIcon / participantSubtitle",
+      "dimension": 4,
+      "description": "`summary.tsx:41-83` defines `ParticipantStatusIcon` + `participantSubtitle`; `detail.tsx:46-86` defines `StatusBadge` + `participantSubtitle`. The two icon components are byte-identical except for the function name; the two subtitle helpers differ only in two strings: 'Delivery failed' vs 'Delivery failed · tap to retry', and 'Awaiting payment · tap for QR' vs 'Awaiting payment · QR only'. The diverging strings are themselves a smell — one of them is wrong (the detail screen actually does retry on row tap, the summary screen doesn't).",
+      "why_it_matters": "Low fan-in finding (`SplitBillTransactionRow.tsx`'s aggregate status uses different copy entirely), but it's a textbook deepening opportunity per skill:improve-codebase-architecture: a 50-line shared module with a tight interface (`(participant, retryable: boolean) => ReactElement`) replaces two 40-line near-duplicates. Single locality for 'how do we render a participant's pending/sent/paid/failed/expired state'.",
+      "fix": "Promote both helpers into `features/splitBill/components/ParticipantStatusIcon.tsx` and `features/splitBill/lib/participantSubtitle.ts`. The subtitle helper takes a `mode: 'detail' | 'summary'` param to switch the two diverging strings — that diff is now visible in one file.",
+      "references": [
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Diffed both files; confirmed near-identical bodies. Two-string drift is the only divergence.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-011",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "Hardcoded brand hex (BTC orange + bluetooth blue) repeated across splitBill files",
+      "repo": "sovran-app",
+      "path": "features/splitBill/components/ParticipantCard.tsx",
+      "line": 52,
+      "symbol": "BTC_ORANGE / BLUETOOTH_ACCENT",
+      "dimension": 8,
+      "description": "BTC orange `#F7931A` is hardcoded at `ParticipantCard.tsx:52` (with a comment acknowledging it's also in `themeEngine.ts` and `mapClustering.ts`). Bluetooth blue `#0A84FF` is hardcoded at `participants.tsx:52`, `participants.tsx:417,469`, `summary.tsx:221`, `detail.tsx:263`. Five files hold three copies of two brand constants.",
+      "why_it_matters": "Cross-feature inconsistency. A theme tweak (or a dark-mode contrast adjustment) requires editing every site. Both colours are semantic: 'bitcoin-accepting' and 'bluetooth-mesh peer' — they belong in the theme token vocabulary.",
+      "fix": "Add `bitcoinOrange` and `bluetoothAccent` tokens to `themes.ts` (or the equivalent `themeEngine.ts` semantic vars). Replace every site.",
+      "references": [],
+      "verification_note": "Greps confirm 5 sites for #0A84FF (3 in splitBill, 2 in detail/summary), 1 site for #F7931A in ParticipantCard. The ParticipantCard comment explicitly notes the cross-file duplication exists.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-012",
+      "severity": "Low",
+      "confidence": 0.8,
+      "title": "Pressable elements in ParticipantCard lack accessibilityLabel/accessibilityRole",
+      "repo": "sovran-app",
+      "path": "features/splitBill/components/ParticipantCard.tsx",
+      "line": 138,
+      "symbol": "retryCTA / viewButton",
+      "dimension": 8,
+      "description": "Two `Pressable` elements — the retry CTA (line 138) and the View pill (line 236) — have only `testID` and no `accessibilityLabel` or `accessibilityRole`. Adjacent `Pressable` usages in `participants.tsx` and `search.tsx` have the same gap.",
+      "why_it_matters": "Screen-reader users hit the card and hear nothing meaningful. Per <dim 8>, every Pressable has accessibilityLabel + accessibilityRole.",
+      "fix": "Add `accessibilityRole='button'` and an `accessibilityLabel` derived from the card state — e.g. `Retry sending invoice to ${name}`, `View split bill participant ${name}, ${amount} ${unit}, ${state}`.",
+      "references": [],
+      "verification_note": "Re-checked at lines 138 and 236; both Pressables have only testID and onPress. WCAG 2.2 'Non-text Content'.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-013",
+      "severity": "Low",
+      "confidence": 0.8,
+      "title": "Watcher polls every 8s with no AppState gate; foreground-only polling would halve battery",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+      "line": 737,
+      "symbol": "useSplitBillPaymentWatcher",
+      "dimension": 7,
+      "description": "`setInterval(tick, 8_000)` runs unconditionally while the screen is mounted, including when the app is backgrounded (the JS thread is paused but the timer reschedules on foreground). For long-running awaiting groups this is steady ~7 fetches/min that the watcher itself cannot use because the user isn't looking.",
+      "why_it_matters": "Battery consideration per <dim 7>; minor but cumulative. Combined with F-002's recommended hoist into a global watcher, the gating becomes more important — a globally-mounted watcher polls forever otherwise.",
+      "fix": "Subscribe to `AppState`; pause the interval when state !== 'active' and resume on next 'active' (with one immediate tick to catch up). Alternatively use `useFocusEffect` to bind to screen focus when the watcher stays per-screen.",
+      "references": [],
+      "verification_note": "Re-checked at line 737. UNVERIFIED at runtime — would need a `log-doctor gc --latest` over a backgrounded session to measure. Static argument is conservative.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-014",
+      "severity": "Low",
+      "confidence": 1.0,
+      "title": "Lint hygiene: unused Pressable import + 2 prettier issues in split-bill-flow screens",
+      "repo": "sovran-app",
+      "path": "app/(split-bill-flow)/participants.tsx",
+      "line": 21,
+      "symbol": "imports / formatting",
+      "dimension": 3,
+      "description": "`participants.tsx:21` imports `Pressable` from react-native but never uses it (`error unused-imports/no-unused-imports`). `_layout.tsx:60` and `search.tsx:78` have prettier line-break violations (`error prettier/prettier`). All three reproduce on `npm run lint`.",
+      "why_it_matters": "Hygiene only — but `unused-imports/no-unused-imports` is a CI-blocking rule on this repo, so this would fail a lint gate.",
+      "fix": "Remove the unused `Pressable` import. Run `npx prettier --write app/(split-bill-flow)/_layout.tsx app/(split-bill-flow)/search.tsx`.",
+      "references": [
+        "lint:unused-imports/no-unused-imports",
+        "lint:prettier/prettier"
+      ],
+      "verification_note": "Reproduced via `npm run lint` — exact output quoted in tooling section.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-015",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "Fire-and-forget setTimeout(0) self-copy holds nostr private key in closure with no cancellation",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+      "line": 202,
+      "symbol": "sendNostrDM (deferred branch)",
+      "dimension": 2,
+      "description": "After the recipient wrap publishes, a `setTimeout(() => { ... }, 0)` (lines 202-229) builds and publishes the sender self-copy in a fire-and-forget tail. The closure captures `senderPrivateKey: Uint8Array` and the NDK reference. There is no cancellation token: if the orchestrator is unmounted (user dismisses flow), the timer still runs ~500-1000ms later, holds the key in memory, and tries to publish through a possibly-disposed NDK. Failures are caught and logged, never surfaced.",
+      "why_it_matters": "Soft <dim 2> finding — not a key leak (the key is GC'd after the closure resolves), but a key-handling pattern that drifts from the rest of the app, where every signing operation runs on the awaited path inside a guarded provider scope. The 'best-effort' comment acknowledges the failure mode (sender's own thread silently misses the sent invoice) but the user is never told.",
+      "fix": "Either (a) drop the deferral and pay the latency on the awaited path — a 1s delay on the orchestrator's confirm() is well within the user's expectation for a multi-recipient send; (b) move the deferred work into a queued background task that has explicit lifecycle hooks (cancel on unmount); or (c) at minimum, surface a toast when the self-copy fails so the user knows their thread is incomplete.",
+      "references": [
+        "skill:security-review"
+      ],
+      "verification_note": "Re-checked at lines 202-229. Counter-argument: 'closure captures the key reference, not the key data, and React/JS GC will reclaim it once the timer resolves' — true, but the same logic accepts orphan unhandled state changes that the rest of the wallet rejects (cf. AbortController patterns in coco-payment-ux). Confidence dropped to 0.7 because no current-day attack surface exists; this is a pattern-drift finding.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-016",
+      "severity": "Low",
+      "confidence": 1.0,
+      "title": "Knip: 2 unused exports in splitBillTransactionsStore (QuoteIdToSplitBillIndex, SplitBillStore)",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/splitBillTransactionsStore.ts",
+      "line": 97,
+      "symbol": "QuoteIdToSplitBillIndex / SplitBillStore",
+      "dimension": 3,
+      "description": "`npm run knip` reports `QuoteIdToSplitBillIndex` (line 97) and `SplitBillStore` (line 159) as exported but never imported externally. Both are internal type aliases that could be made non-exported.",
+      "why_it_matters": "Type clutter; nothing functional. Same pattern shows up across many stores in the repo — knip flagged ~40+ unused exports project-wide.",
+      "fix": "Remove `export` from both type aliases. They're still usable inside the file.",
+      "references": [
+        "knip:unused-export"
+      ],
+      "verification_note": "Knip output verified by re-running `npm run knip`; both names appear in the unused-exports list.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "partial",
+    "3": "pass",
+    "4": "partial",
+    "5": "skipped",
+    "6": "pass",
+    "7": "partial",
+    "8": "partial",
+    "9": "skipped",
+    "10": "skipped"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Promote ParticipantStatusIcon (rename from inconsistent ParticipantStatusIcon/StatusBadge) and participantSubtitle into features/splitBill/components/ParticipantStatusIcon.tsx + features/splitBill/lib/participantSubtitle.ts. Replace duplicate definitions in summary.tsx and detail.tsx. F-010.",
+      "files": [
+        "app/(split-bill-flow)/summary.tsx",
+        "app/(split-bill-flow)/detail.tsx",
+        "features/splitBill/components/ParticipantStatusIcon.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Split the orchestrator hook into five modules per F-009: features/splitBill/lib/deliveryFormat.ts (buildBip321, chunkUtf8, formatDeliveryBody), features/splitBill/lib/nostrDelivery.ts (sendNostrDM with deferred self-copy), features/splitBill/lib/bleDelivery.ts (handshake + chunk send), features/splitBill/hooks/useSplitBillOrchestrator.ts (coordinator only), features/splitBill/hooks/useSplitBillPaymentWatcher.ts. Each new module has a tight interface and an obvious test seam.",
+      "files": [
+        "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+        "features/splitBill/lib/deliveryFormat.ts",
+        "features/splitBill/lib/nostrDelivery.ts",
+        "features/splitBill/lib/bleDelivery.ts",
+        "features/splitBill/hooks/useSplitBillPaymentWatcher.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Add a typed wrapper around coco's Manager (e.g. shared/lib/cashu/cocoTyped.ts) exposing getPaginatedHistory, prepareMintQuote, etc. with proper imports of PendingMintOperation / MintHistoryEntry. Replace every (manager as any) and (mintOp as any) cast in features/splitBill — this also closes F-003, F-004, F-008.",
+      "files": [
+        "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+        "app/(split-bill-flow)/detail.tsx",
+        "shared/lib/cashu/cocoTyped.ts"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Hoist useSplitBillPaymentWatcher (or its replacement after F-009 split) into a top-level provider that walks every awaiting/partially-paid group on a single 8s tick gated by AppState. Closes F-002, F-007, F-013 in one pass. Suggested location: shared/providers/SplitBillReconciler.tsx, mounted from app/_layout.tsx alongside CocoProvider.",
+      "files": [
+        "shared/providers/SplitBillReconciler.tsx",
+        "app/_layout.tsx",
+        "features/splitBill/hooks/useSplitBillOrchestrator.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Add bitcoinOrange and bluetoothAccent semantic theme tokens (themes.ts / themeEngine.ts). Replace 5 hardcoded #0A84FF sites and 1 #F7931A site in features/splitBill + app/(split-bill-flow). F-011.",
+      "files": [
+        "features/splitBill/components/ParticipantCard.tsx",
+        "app/(split-bill-flow)/participants.tsx",
+        "app/(split-bill-flow)/summary.tsx",
+        "app/(split-bill-flow)/detail.tsx",
+        "shared/lib/themeEngine.ts"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Open a research note (sovran-app/__research__/zustand-persist-versioning.md, status: draft) capturing the project-wide pattern that NO profile store sets `version` or `migrate`. Splitbill is one instance; mintStore, swapTransactionsStore, nostrSocialStore, etc. all share the gap. The note should propose a baseline migration discipline before the first field rename forces a heroic migration. Closes the question of whether F-001 should escalate from a per-store fix to a project sweep.",
+      "files": [
+        "__research__/zustand-persist-versioning.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Does coco's Manager expose a per-quoteId history lookup (or a subscription API for history changes)? F-002 + F-007's fix shape depends on the answer; if not, the global watcher is the only realistic path.",
+    "Should every profile store's missing `version`/`migrate` be filed as one project-wide finding (recommend a SOV-XX spec) or separately per store? F-001 takes the per-store view; the research note in the refactor plan keeps the option open.",
+    "Is `unstable_settings.anchor` set on the (split-bill-flow) layout? AUDIT.md <dim 5> requires it for back-nav after deep links; this audit did not check, since the entry is not deep-linked today."
+  ]
+}

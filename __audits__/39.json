@@ -1,0 +1,284 @@
+{
+  "audit": {
+    "date": "2026-05-01",
+    "commit": "38797b50",
+    "entry_point": "sovran-app/shared/hooks/usePaymentStatusListener.ts",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Slice shared/hooks scored +7 (16 of 17 files never audited; only useSecureStore.ts cited in 04/10/11/24); tied with shared/blocks (+7, 8 commits, 3386 LOC) and app/(drawer) (+7, 20 commits, 811 LOC); broke tie on most-recent commit (shared/hooks last touched 2026-05-01 04:46 vs 03:10 for the other two). Within the slice, picked the in-diff payment-flow listener over useSecureStore.ts (audited 4x) and zero-fan-in helpers — payment status is funds-relevant, never cited in prior audits, and currently being modified on fix/twelve-reported-issues.",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json",
+      "28.json",
+      "29.json",
+      "30.json",
+      "31.json",
+      "32.json",
+      "33.json",
+      "34.json",
+      "35.json",
+      "36.json",
+      "37.json",
+      "38.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "typescript-advanced-types",
+      "neverthrow-return-types"
+    ],
+    "process_skills_consulted": [
+      "zoom-out",
+      "improve-codebase-architecture",
+      "diagnose",
+      "grill-with-docs"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "clean for blast radius (28 errors elsewhere, none in shared/hooks/, shared/stores/runtime/, shared/lib/popup/popups/payment.ts, shared/lib/popup/SwapStatusToast.tsx)",
+      "lint": null,
+      "knip": "no blast-radius hits (30 unused files reported elsewhere)",
+      "analyze_structure": "shared/hooks: usePaymentStatusListener.ts is the largest hook at 316 code lines; no orphans, no cycles in subtree"
+    }
+  },
+  "completion_status": "partial",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "NPC-paid receive popups silently suppressed because op.paidAt is stripped during coco prepare",
+      "repo": "sovran-app",
+      "path": "shared/hooks/usePaymentStatusListener.ts",
+      "line": 167,
+      "symbol": "shouldShowNpcReceivePopup",
+      "dimension": 1,
+      "description": "The `mint-op:pending` handler at line 142 reads `op.paidAt ?? op.quote?.paidAt` to decide whether to surface a 'Payment received' toast. `op.paidAt` is always undefined: the NPC plugin's transformed quote (NPCQuote → MintQuote at coco-cashu-plugin-npc/src/plugins/NPCPlugin.ts:485-496) carries paidAt in seconds, but coco's bolt11 prepare handler at coco/packages/core/infra/handlers/mint/MintBolt11Handler.ts:52-64 explicitly maps a fixed shape onto the PendingMintOperation — `quoteId, amount, unit, request, expiry, pubkey, lastObservedRemoteState, lastObservedRemoteStateAt, outputData, state` — paidAt is dropped. The wider PendingMintOperation interface (coco/packages/core/operations/mint/MintOperation.ts:63-71) has no paidAt either; a repo-wide grep across coco/packages/core returns zero matches for paidAt. The fallback `op.quote?.paidAt` is acknowledged dead code (the comment at lines 151-152 says the legacy `op.quote.*` namespace 'never existed and silently fell back to defaults'). Net effect: every NPC-imported PAID quote takes the `paidAt == null` branch in shouldShowNpcReceivePopup → returns false → handler returns at line 176 → no toast is ever shown. Funds DO arrive (the importQuote path completes and the processor mints proofs); the user just never gets a notification and has to open the wallet to discover the new balance.",
+      "why_it_matters": "Wallet-receive notification is the primary signal that 'someone sent me money via Lightning Address.' Silently suppressing it on the only path that ever generates these events (per the file's own comment, 'Only NPC sync produces these events') breaks the receive UX for the wallet's flagship Lightning-Address feature. Not a fund-loss bug, but a Critical-adjacent UX regression on a funds-touching code path.",
+      "fix": "Replace `op.paidAt` with `op.lastObservedRemoteStateAt` and drop the `* 1000` conversion in getNpcQuoteTimestampMs — the field is already a Date.now() millisecond timestamp set by MintBolt11Handler.prepare. Update the RawMintQuote type at lines 47-52 to mirror the actual PendingMintOperation shape (or, better, import `PendingMintOperation<'bolt11'>` from `@cashu/coco-core` and remove the local type). Once this lands, run npm run log-doctor -- timeline --latest --event \"hook.payment_status.npc_receive_processing\" against a session where an NPC-paid quote arrived to confirm the popup fires.",
+      "references": [
+        "coco/packages/core/infra/handlers/mint/MintBolt11Handler.ts:52",
+        "coco/packages/core/operations/mint/MintOperation.ts:63",
+        "coco/packages/core/operations/mint/MintOperationService.ts:272",
+        "coco-cashu-plugin-npc/src/plugins/NPCPlugin.ts:485",
+        "coco-cashu-plugin-npc/src/types.ts:7",
+        "skill:diagnose",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Re-checked at usePaymentStatusListener.ts:167 against PendingMintOperation type and bolt11 prepare's explicit field map. Counter-argument: a separate emit could fire mint-op:quote-state-changed with state=PAID and paidAt populated. Refuted — the watcher at MintOperationWatcherService.ts only emits state-changed via observePendingOperation (MintOperationService.ts:845), which builds the payload from the operation in storage (no paidAt), and the processor's enqueue path runs handler.execute() and emits mint-op:quote-state-changed with state='ISSUED' (filtered out at line 84). Repo-wide grep for paidAt across coco/packages/core returns zero hits, confirming the field is never on the operation.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "shouldShowNpcReceivePopup now keys on operation.lastObservedRemoteStateAt (already in milliseconds via MintBolt11Handler.prepare); the paidAt fallback chain is gone."
+    },
+    {
+      "id": "F-002",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "operation: any escape hatch on every event handler defeats coco's typed event payloads",
+      "repo": "sovran-app",
+      "path": "shared/hooks/usePaymentStatusListener.ts",
+      "line": 78,
+      "symbol": "usePaymentStatusListener",
+      "dimension": 1,
+      "description": "Every coco event handler in this file types its argument as `operation: any` (lines 78, 148, 216) and then narrows via `operation as any` at line 150 and access patterns like `op.quoteId ?? op.quote?.quoteId ?? operationId`. Coco's `CoreEvents` type at coco/packages/core/events/types.ts:65-75 already declares the canonical payload shape: `'mint-op:pending': { mintUrl: string; operationId: string; operation: MintOperation }`. Importing that type and letting TypeScript narrow the discriminated union would have caught F-001 at compile time — `op.paidAt` is not a member of any `MintOperation` variant. The `any` cast is also what allows the dead-code fallbacks `op.quote?.*` and `op.intent?.*` (lines 153, 154, 167, 179, 220) to survive — they would otherwise fail typecheck.",
+      "why_it_matters": "The `any` is causally connected to F-001: removing it would have prevented the regression. Going forward, every new coco event subscription in this hook re-pays the same tax until the types are imported.",
+      "fix": "Import `MintOperation`, `MeltOperation`, `SendOperation`, `ReceiveOperation` from `@cashu/coco-core` (or via `@cashu/coco-react` re-exports). Type each handler's argument as the typed payload from `CoreEvents`. Use the `state` discriminator to narrow before accessing state-specific fields; the union forces the compiler to check that we only access `lastObservedRemoteState`/`lastObservedRemoteStateAt` on PendingOrLater variants.",
+      "references": [
+        "coco/packages/core/events/types.ts:65",
+        "coco/packages/core/operations/mint/MintOperation.ts:103",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Re-checked at lines 78, 148, 216 — three separate `operation: any` declarations, plus `(operation as any)?` at line 220. Counter-argument: the discriminated-union narrowing might be ergonomically painful in a single hook. Refuted — the file already restricts itself to one branch per event (state==='PAID' on the receive paths, etc.), so narrowing is a one-line `if (op.state !== 'pending') return;` idiom.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "All three mint event handlers (mint-op:quote-state-changed, mint-op:pending, mint-op:finalized) plus send:finalized and melt-op:rolled-back now let TypeScript infer the payload from the event-name literal; mint-op:pending narrows via the state discriminant before reading quote fields."
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.7,
+      "title": "Async handlers leak state writes after manager teardown — cancelledRef checked only in receive-op:finalized",
+      "repo": "sovran-app",
+      "path": "shared/hooks/usePaymentStatusListener.ts",
+      "line": 97,
+      "symbol": "mint-op:quote-state-changed handler",
+      "dimension": 7,
+      "description": "The `mint-op:quote-state-changed` handler at lines 66-137 awaits `manager.history.getPaginatedHistory(0, 100)` (line 97) and then unconditionally calls `usePaymentStatusStore.getState().setActive(...)` (line 117) and `paymentStatusPopup(...)` (line 135). If the `useEffect` cleanup runs during the await — the cleanup at line 369 sets `cancelledRef.current = true` and unsubscribes — the in-flight handler resolves and writes to the runtime store with the OLD manager's data. The runtime store survives manager swaps (it's app-global), so the write lands and the popup fires referring to a quote that belongs to the previous manager. Same pattern at lines 139-212 (`mint-op:pending` handler). Only the `receive-op:finalized` handler at lines 226-251 checks `cancelledRef.current` after its await.",
+      "why_it_matters": "Profile switch (per docs/SOV-00.md §10) does a native app restart, so this is narrow — but manager teardown can also occur during in-app re-init paths (untrust mint, mid-session manager rebuild) and during dev-mode hot reload. When it triggers, the user sees a popup for a payment from the previous session/profile.",
+      "fix": "Move the `cancelledRef.current` check to after every `await` that precedes a store write or popup call. Better: thread an `AbortController` from the effect's outer scope into each handler and check `signal.aborted` after each await. Best: collapse to `const isCancelled = () => cancelledRef.current;` and call after every await, before any side effect.",
+      "references": [
+        "docs/SOV-00.md §10",
+        "skill:diagnose"
+      ],
+      "verification_note": "Re-checked at lines 64, 97, 117, 226-251, 369-371. Counter-argument: profile switch is a native restart (SOV-00 §10), so manager swap mid-session is rare. Held — this is Medium because the window exists in dev hot-reload and manager re-init paths, and the failure mode is a cross-session toast (user-visible regression but not data loss).",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Race window untouched in this slice; AbortController/cancelledRef threading is its own change."
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.75,
+      "title": "Magic 50ms setTimeout hopes HistoryService has flushed — slow devices lose the View Transaction button",
+      "repo": "sovran-app",
+      "path": "shared/hooks/usePaymentStatusListener.ts",
+      "line": 241,
+      "symbol": "receive-op:finalized handler",
+      "dimension": 7,
+      "description": "The `receive-op:finalized` handler at line 241 sleeps 50ms before querying paginated history with the comment 'Brief delay so HistoryService.handleReceiveOperationUpdated can persist the entry'. HistoryService at coco/packages/core/services/HistoryService.ts is the consumer of the same event — the 50ms is racing two sibling subscribers on the same emit. On a fast-path iOS session this is fine; on Android with SQLite contention or under load, 50ms is a coin flip. The failure mode is silent: `realEntry` is undefined, the `if (realEntry?.id)` guard skips the `setConfirmed` write, and the receive-ecash toast's 'View Transaction' button has no target.",
+      "why_it_matters": "User-visible: tap on the toast goes nowhere. Not a fund-loss bug, but an asymmetric failure (works on iOS, fails on slow Android) that's painful to reproduce in dev.",
+      "fix": "Replace the setTimeout with an event-driven wait: subscribe once to `history:updated` (declared at coco/packages/core/events/types.ts:60) for the matching mintUrl/amount with a hard timeout (e.g. 500ms). On match, resolve and proceed; on timeout, log and continue with the no-View fallback. Alternatively, ask coco to expose a `await manager.history.findReceiveByMintAndAmount(mintUrl, amount)` that internally waits for the persistence write — a coco patch under sovran-app/patches/ would localise the change.",
+      "references": [
+        "coco/packages/core/services/HistoryService.ts",
+        "coco/packages/core/events/types.ts:60"
+      ],
+      "verification_note": "Re-checked at line 241. Counter-argument: amount+mintUrl matching could collide if two identical receives are in flight. Acknowledged — that's a separate fragility (the matching key is non-unique), but the 50ms race is the primary failure mode. The match-by-amount issue is a follow-up worth noting in open_questions.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "50ms setTimeout still in place; replacing with history:updated subscription is a separate slice."
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "melt-op:rolled-back / melt-op:finalized handlers cross-contaminate when matched by variant only",
+      "repo": "sovran-app",
+      "path": "shared/hooks/usePaymentStatusListener.ts",
+      "line": 305,
+      "symbol": "melt-op:rolled-back handler",
+      "dimension": 1,
+      "description": "The `melt-op:rolled-back` handler at lines 300-313 fires `setFailed(store.active.id, ...)` whenever any melt rolls back AND the active toast is a melt in 'processing' state — there is no operationId / quoteId match between the rolled-back operation and the active toast. Same pattern at lines 337-339 in `melt-op:finalized`: `hadActive = store.active?.variant === 'melt' && (state === 'processing' || 'confirmed')`. If a background coco process — for example, the MeltOperationService recovery path on a previously-stuck quote — rolls back or finalises a different melt while the user has another melt in flight, the listener flips the user-visible toast to failed/confirmed for the wrong operation.",
+      "why_it_matters": "The user sees 'Payment failed' on a melt that did not actually fail (or 'Payment confirmed' on one that's still processing). With ecash being a bearer instrument and melts being the route by which sats leave the wallet, a false-failed toast is alarming UX even when no funds are lost.",
+      "fix": "Match on operationId or quoteId, not variant. For melt-op:rolled-back, the payload type per coco/packages/core/events/types.ts:64 includes operationId and operation — narrow `operation` to MeltOperation, read its quoteId, and only call setFailed when `store.active.id === operation.quoteId` (or a matching operationId). Same for melt-op:finalized at line 337.",
+      "references": [
+        "coco/packages/core/events/types.ts:61",
+        "coco/packages/core/operations/melt"
+      ],
+      "verification_note": "Re-checked at lines 305, 337-339. Counter-argument: in practice the user can only initiate one melt at a time; mint-scoped locking in coco prevents parallel melts. Partial — that's true for foreground initiations, but the coco MeltOperationService also runs background recovery for stuck quotes (sovran-app/AUDIT.md cites 'Pending-operation recovery' as part of post-mount lane step 5 in SOV-00 §7). Background rollbacks of stuck melts are exactly the case this matches incorrectly.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Variant-only matching unchanged; quoteId/operationId match needs its own behavioural change."
+    },
+    {
+      "id": "F-006",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "Dead-code legacy fallbacks op.quote?.* and op.intent?.* contradict the file's own comment",
+      "repo": "sovran-app",
+      "path": "shared/hooks/usePaymentStatusListener.ts",
+      "line": 153,
+      "symbol": "mint-op:pending handler",
+      "dimension": 3,
+      "description": "Lines 151-152 carry an explicit comment: 'PendingMintOperation is flat: read top-level fields; the legacy `op.quote.*` / `op.intent.*` namespaces never existed and silently fell back to defaults.' Yet the very next lines retain those fallbacks: line 153 (`op.quoteId ?? op.quote?.quoteId ?? operationId`), line 154 (`op.lastObservedRemoteState ?? op.quote?.state`), line 167 (`op.paidAt ?? op.quote?.paidAt` — see F-001), lines 179-180 (`op.amount ?? op.intent?.amount ?? 0`, `op.unit ?? op.intent?.unit ?? 'sat'`), and line 220 (`(operation as any)?.quoteId ?? (operation as any)?.quote?.quoteId ?? operationId`). Removing the dead branches would be a small typed cleanup; leaving them is a foot-gun, because a future coco schema change could re-introduce `op.quote` with subtly different semantics and silently start matching.",
+      "why_it_matters": "Style and maintainability — but also a future correctness risk if coco evolves.",
+      "fix": "Delete the dead fallbacks. After F-002 lands (importing the typed payload), the access patterns become `op.quoteId`, `op.lastObservedRemoteState`, `op.amount`, `op.unit` — all required fields on PendingMintOperation, no fallback needed. The default `?? operationId` for quoteId at line 153 stays defensible for the InitMintOperation case (which has optional quoteId), but the typed narrow lets you reject InitMintOperation early.",
+      "references": [
+        "coco/packages/core/operations/mint/MintOperation.ts:63"
+      ],
+      "verification_note": "Re-checked across the file — six dead-code fallback expressions in total. Confidence high; severity low because the symptom is silent rather than user-visible.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "All six op.quote?.* / op.intent?.* fallbacks plus the (operation as any)?.quote?.quoteId chain in mint-op:finalized are gone; typed narrowing via state discriminant replaces them."
+    },
+    {
+      "id": "F-007",
+      "severity": "Low",
+      "confidence": 0.5,
+      "title": "getPaginatedHistory(0, 100) on a hot-path event handler blocks coco's sequential EventBus",
+      "repo": "sovran-app",
+      "path": "shared/hooks/usePaymentStatusListener.ts",
+      "line": 97,
+      "symbol": "mint-op:quote-state-changed handler",
+      "dimension": 7,
+      "description": "Inside the `mint-op:quote-state-changed` handler, line 97 awaits `manager.history.getPaginatedHistory(0, 100)` and then `.find` on the result to locate the matching mint entry. The same pattern is at line 243 with `(0, 20)` for receive-ecash. Coco's EventBus defaults to sequential concurrency (coco/packages/core/events/EventBus.ts:57 — `concurrency = this.options.concurrency ?? 'sequential'`), and within a single emit the handlers are awaited one at a time (lines 78-89 of the same file). That means our hook's history scan delays every other listener on the emit, including coco-internal ones such as MintOperationService.ts:86 which also subscribes to mint-op:quote-state-changed. UNVERIFIED on magnitude — the latest log session (sovran-app/log.txt) contained zero mint-op:* entries (only ISSUED quote-state-changed events), so the actual blocking time hasn't been measured. With a wallet of 100+ history entries the scan is a full DB read per event.",
+      "why_it_matters": "If the blocking ever exceeds a frame (16ms), the user sees jank when receiving. More importantly, it can starve coco's own subscribers and slow the operation pipeline.",
+      "fix": "Replace `getPaginatedHistory(0, 100).find(...)` with a typed lookup. Either (a) propose a coco patch under sovran-app/patches/ adding `manager.history.findMintByQuoteId(mintUrl, quoteId): Promise<MintHistoryEntry | null>` and `findReceiveByMintAndAmount(mintUrl, amount): Promise<ReceiveHistoryEntry | null>`, or (b) skip the history lookup entirely on the hot path — the listener already has `quoteId`, `mintUrl`, `amount`, `unit` from the event payload; the only field it gains from history is the entry id, used for the View button. Defer that work to the toast's onPress (lazy). After landing, run `npm run log-doctor -- slow --latest --threshold 50` over a session that exercises mint-op:quote-state-changed to confirm the gap is gone.",
+      "references": [
+        "coco/packages/core/events/EventBus.ts:57"
+      ],
+      "verification_note": "Re-checked at lines 97 and 243. UNVERIFIED — log.txt shows the listener was idle in the latest session, so no measured timing. Confidence 0.5 on the perf magnitude; the blocking is real (sequential EventBus is documented at EventBus.ts:78-89), but the user-visible cost is unmeasured. Severity Low for now; promote to Medium if a follow-up audit measures > 100ms gaps in the timeline.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Hot-path getPaginatedHistory still in place; coco patch / lazy lookup is a follow-up."
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "skipped",
+    "3": "pass",
+    "4": "skipped",
+    "5": "skipped",
+    "6": "skipped",
+    "7": "pass",
+    "8": "skipped",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Replace the local RawMintQuote type at usePaymentStatusListener.ts:47-52 with the canonical PendingMintOperation<'bolt11'> from @cashu/coco-core (or coco's CoreEvents['mint-op:pending']['operation']). Drives F-001, F-002, F-006 simultaneously: typed narrowing surfaces the missing-paidAt bug, removes the any escape hatch, and makes the dead-code fallbacks fail compile.",
+      "files": [
+        "shared/hooks/usePaymentStatusListener.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Hoist the receive-by-mint-and-amount lookup out of the hook. Add a coco patch under sovran-app/patches/ exposing manager.history.findReceiveByMintAndAmount(mintUrl, amount) (or findMintByQuoteId) so the 50ms setTimeout (F-004) and the 100-row scan (F-007) collapse into a single typed call.",
+      "files": [
+        "shared/hooks/usePaymentStatusListener.ts",
+        "sovran-app/patches/"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Add a log-doctor mode `payment-flows` that traces the four async chains in this listener (mint-receive, npc-receive, ecash-receive, send-finalize, melt-finalize, melt-rollback) so cross-event races (F-003, F-005) become visible without per-event grep. Document under .claude/rules/log-doctor.md alongside the existing modes.",
+      "files": [
+        "scripts/log-doctor.ts",
+        ".claude/rules/log-doctor.md"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Open a research note 'payment-status-listener-event-matching' (status: draft) capturing the open question raised by F-005: should melt cross-confirm match by quoteId, operationId, or both? The answer interacts with NPC pending behaviour (F-001) and how recovery flows reuse quoteIds across sessions.",
+      "files": [
+        "__research__/payment-status-listener-event-matching.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Does the NPC plugin produce any other event path (custom emit, pre-import shim) that might still surface paidAt to the listener? Repo-wide grep on coco-cashu-plugin-npc/src returned no eventBus or emit calls, but the patches/ folder might contain wallet-side instrumentation worth a separate sweep.",
+    "Receive-ecash duplicate detection (lines 234-237) matches by (variant, amount, mintUrl) — non-unique. If the user receives two equal-amount ecash tokens from the same mint within seconds, the second receive will alias to the first's active toast and the first will never get its View button. Worth a separate finding once the matching strategy is decided.",
+    "MintOperationProcessor (coco/packages/core/services/watchers/MintOperationProcessor.ts:101) enqueues NPC pending ops on `mint-op:pending` with `lastObservedRemoteState === 'PAID'`. Does the processor's eventual finalize emit `mint-op:quote-state-changed` with state='PAID' before state='ISSUED'? If yes, the listener's quote-state-changed handler also fires for NPC quotes — masking F-001 partially. The latest log session has only ISSUED entries; needs a session with an NPC import to confirm.",
+    "SOV-XX coverage gap: this hook's payment-status responsibilities cross multiple bands (1X Cashu wallet, possibly 5X surfaces). No SOV-1X is Ratified yet. Recommend a SOV-13 'Payment Status Notifications' covering the contract between coco events and the user-visible toast surface — the bug in F-001 would be regressionable against such a spec."
+  ]
+}
