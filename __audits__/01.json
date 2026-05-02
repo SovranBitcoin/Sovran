@@ -1,0 +1,284 @@
+{
+  "audit": {
+    "date": "2026-04-18",
+    "commit": "f797ae15",
+    "entry_point": "sovran-app/shared/lib/apiClient.ts",
+    "repos_touched": [
+      "sovran-app",
+      "api.sovran.money"
+    ]
+  },
+  "completion_status": "complete",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Medium",
+      "confidence": 0.98,
+      "title": "searchUsers silently drops the `limit` argument",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 90,
+      "symbol": "searchUsers",
+      "dimension": 1,
+      "description": "`limit` is destructured from the argument object but never added to URLSearchParams; backend defaults to 5 (api.sovran.money/src/nostr.ts:488).",
+      "why_it_matters": "Contact-picker screens request 10 results (useContactSearch.ts:44) but always receive 5, narrowing the pay-flow search surface.",
+      "fix": "Add `limit: String(limit)` to the URLSearchParams construction; clamp client-side Math.min(limit, 100).",
+      "references": [
+        "api.sovran.money/src/nostr.ts:476-496",
+        "sovran-app/features/payments/hooks/useContactSearch.ts:44"
+      ],
+      "verification_note": "Re-read shared/lib/apiClient.ts:90-93 and api.sovran.money/src/nostr.ts:488-495 — confirmed limit param is read server-side and default is 5."
+    },
+    {
+      "id": "F-002",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "Mint URL and pubkey interpolated into query strings without URL-encoding",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 124,
+      "symbol": "auditMint|reviewMint|fetchNostrProfile",
+      "dimension": 1,
+      "description": "`${BASE_URL}/.../?mintUrl=${mintUrl}` at lines 124, 143 and `?pubkey=${pubkey}` at 259 do not percent-encode the value; URLs containing '?', '#', '&' or whitespace will corrupt the query.",
+      "why_it_matters": "Mint URLs routinely carry trailing queries; the backend's map lookup silently 404s on a mint that really exists in the auditor set. Also weakens the boundary against future SSRF/parameter-injection bugs.",
+      "fix": "Route all three through URLSearchParams (as `searchMints` already does at line 175). Push `normalizeUrlForApi` from shared/lib/url.ts into the helpers so callers can't skip it.",
+      "references": [
+        "sovran-app/shared/lib/apiClient.ts:167-181 (searchMints does it right)",
+        "sovran-app/shared/lib/url.ts:72"
+      ],
+      "verification_note": "Verified all three sites use raw template interpolation; contrast with line 175 confirms the codebase convention is URLSearchParams."
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "All responses blind-cast `as T` with no runtime schema",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 61,
+      "symbol": "safeFetch|safePost|fetchMintInfo",
+      "dimension": 6,
+      "description": "Lines 61, 83, 220 do `ok(data as T)` / `ok(data as GetInfoResponse)` with no Zod validation. fetchMintInfo talks to arbitrary user-supplied mints — malformed responses flow untyped into coco-facing paths.",
+      "why_it_matters": "A hostile or misconfigured mint can return `{ name: [1,2,3] }` and useDebouncedMintValidation still marks it valid (it only checks `value !== null`). Zero boundary validation violates review_dimensions §6.",
+      "fix": "Declare Zod schemas alongside each TS interface (future packages/schemas). Replace `data as T` with `schema.safeParse(data)`. Apply `.max()` caps on strings/arrays for DoS mitigation against bloated mint responses.",
+      "references": [
+        "review_dimensions §6"
+      ],
+      "verification_note": "Re-read lines 60-61, 82-83, 218-220; no schema call anywhere in the file. Counter-argument considered (trusted api.sovran.money) — doesn't hold for fetchMintInfo which dials arbitrary hosts.",
+      "completion_status": "deferred",
+      "completion_note": "apiClient blind-cast pattern is Slice C (coco event handler typing); not in this PR."
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "No AbortSignal plumbing — cancelled callers still pay network cost",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 52,
+      "symbol": "safeFetch|safePost|fetchMintInfo",
+      "dimension": 7,
+      "description": "None of the three helpers accept a signal. Callers (useContactSearch.ts:37, useMintSearch.ts:40, useAuditedMints.ts:144) use a `cancelled` boolean that only gates setState — the fetch still runs to completion.",
+      "why_it_matters": "Debounced search fires N in-flight requests per typing burst; battery/radio waste and out-of-order resolution can surface stale results.",
+      "fix": "Thread `signal?: AbortSignal` through all three helpers; callers allocate an AbortController per effect. Swallow AbortError in catch so it doesn't log as `api.fetch_failed`.",
+      "references": [],
+      "verification_note": "Confirmed no signal parameter exists; confirmed cancelled-flag pattern in all three listed call sites.",
+      "completion_status": "stale"
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "safeFetch/safePost have no request timeout",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 55,
+      "symbol": "safeFetch|safePost",
+      "dimension": 7,
+      "description": "Only fetchMintInfo (line 197-199) has a 10s timeout. React Native fetch has no default timeout — requests can hang until the OS kills them.",
+      "why_it_matters": "Any screen using getLatestVersion, auditMint, reviewMint, searchMints, fetchNostrProfile, fetchWallpaperCatalog, or searchUsers can wedge its loading state indefinitely on a bad network.",
+      "fix": "Add `signal: AbortSignal.timeout(10_000)` inside the helpers. Prefer this over Promise.race because it actually releases the socket.",
+      "references": [],
+      "verification_note": "Re-read lines 52-88; no timeout mechanism.",
+      "completion_status": "stale"
+    },
+    {
+      "id": "F-006",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "fetchMintInfo timeout races fetch but never aborts it; setTimeout handle leaks",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 197,
+      "symbol": "fetchMintInfo",
+      "dimension": 7,
+      "description": "Promise.race([fetchPromise, timeoutPromise]) — when timeout wins, fetch isn't aborted (socket continues, JSON still parsed). When fetch wins, the 10s setTimeout handle is never cleared.",
+      "why_it_matters": "Debounced validation (useDebouncedMintValidation.ts:88) can accumulate zombie requests on slow networks. The hanging timer pins the closure.",
+      "fix": "Use `AbortSignal.timeout(10000)` as fetch option; drop the Promise.race. Catch AbortError and return a typed TimeoutError.",
+      "references": [],
+      "verification_note": "Verified at lines 197-209 — no clearTimeout on the success path, no signal passed to fetch.",
+      "completion_status": "stale"
+    },
+    {
+      "id": "F-007",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Default type parameter `<T = any>` and `body: any`",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 52,
+      "symbol": "safeFetch|safePost",
+      "dimension": 1,
+      "description": "Line 52 `<T = any>`, line 68 `<T = any>` and `body: any`. Callers can omit the type and lose all type-safety.",
+      "why_it_matters": "Weakens TypeScript strictness in the core API layer; the repo otherwise forbids `any`.",
+      "fix": "`<T>` without a default; `body: unknown` (or `<T, B = unknown>`). Only one POST caller (getLatestVersion), tiny churn.",
+      "references": [],
+      "verification_note": "Verified at lines 52, 68."
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.8,
+      "title": "Public types use `any[]` / `any`",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 266,
+      "symbol": "WallpaperCatalogResponse|MintSearchResult.info",
+      "dimension": 1,
+      "description": "WallpaperCatalogResponse.wallpapers and .albums are `any[]` (line 266-268). MintSearchResult.info is `any` (line 159).",
+      "why_it_matters": "Types don't propagate into the wallpaper store or mint-search UI; runtime surprises land far from the source.",
+      "fix": "Declare the wallpaper catalog shape explicitly (align with useWallpaperStore types); for `info`, narrow to `{ name?: string; icon_url?: string; description?: string; nuts?: Record<string, unknown> }` matching the backend projection surface.",
+      "references": [],
+      "verification_note": "Verified at lines 159, 266-268."
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "api.fetch debug log includes full query string (may contain PII)",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 54,
+      "symbol": "safeFetch",
+      "dimension": 10,
+      "description": "apiLog.debug('api.fetch', { url }) at line 54 and apiLog.warn at 57 record the full URL including query string. searchUsers query strings are user-entered PII (names, nip-05 addresses).",
+      "why_it_matters": "Ring buffer can be exported via dumpForLLM; PII leak through logs is a soft-compliance issue.",
+      "fix": "Log `{ host, path }` from new URL(url); separately hash the query (`qHash: sha256(q).slice(0,8)`) or drop it for /nostr/search specifically.",
+      "references": [
+        "sovran-app/shared/lib/logger.ts"
+      ],
+      "verification_note": "Downgraded from Medium in Phase B: debug level is gated by __DEV__ in the logger, so production builds don't emit. Kept as Low because dumpForLLM still captures dev-session PII."
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "fetchMintInfo accepts any URL scheme",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 191,
+      "symbol": "fetchMintInfo",
+      "dimension": 2,
+      "description": "No scheme check — only URL.parse at caller site (useDebouncedMintValidation.ts:39). A raw `http://` or `file://` URL would be fetched.",
+      "why_it_matters": "This is the boundary that dials arbitrary user-supplied hosts. Defence in depth: refuse non-https explicitly.",
+      "fix": "Inside fetchMintInfo, assert `new URL(normalizedUrl).protocol === 'https:'` and return err('SchemeNotAllowed') otherwise.",
+      "references": [],
+      "verification_note": "Verified at lines 191-207; no scheme assertion in the helper itself."
+    },
+    {
+      "id": "F-011",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "BASE_URL hard-coded, no env override",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 4,
+      "symbol": "BASE_URL|PRICELIST_URL",
+      "dimension": 9,
+      "description": "Line 4/6 hardcode production URLs. No expo-constants/EAS-profile injection.",
+      "why_it_matters": "Staging or local-backend testing requires editing source. Classic foot-gun: devs ship local-pointing URLs to production.",
+      "fix": "Read Constants.expoConfig?.extra?.apiBaseUrl with prod fallback; wire EAS build profiles to inject staging vs prod.",
+      "references": [],
+      "verification_note": "Verified at lines 4, 6."
+    },
+    {
+      "id": "F-012",
+      "severity": "Nit",
+      "confidence": 0.6,
+      "title": "PRICELIST_URL (WebSocket) lives in an HTTP-client module",
+      "repo": "sovran-app",
+      "path": "shared/lib/apiClient.ts",
+      "line": 6,
+      "symbol": "PRICELIST_URL",
+      "dimension": 1,
+      "description": "WebSocket URL exported from an HTTP-façade file; one consumer (PricelistProvider).",
+      "why_it_matters": "Transport-layer concern unrelated to the HTTP client. Tidy-up only.",
+      "fix": "Move to shared/lib/websockets.ts or colocate with PricelistProvider.",
+      "references": [],
+      "verification_note": "Verified PRICELIST_URL has exactly one import site."
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "skipped",
+    "4": "skipped",
+    "5": "skipped",
+    "6": "pass",
+    "7": "partial",
+    "8": "skipped",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Collapse safeFetch, safePost, and the Promise.race in fetchMintInfo into a single http helper that takes url/method/body/signal/timeoutMs and runs a caller-supplied schema.safeParse before ok(value).",
+      "files": [
+        "sovran-app/shared/lib/apiClient.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Introduce Zod response schemas alongside each endpoint function; flag as a candidate for the aspirational packages/schemas workspace.",
+      "files": [
+        "sovran-app/shared/lib/apiClient.ts"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Move PRICELIST_URL out of the HTTP client into a websockets module or colocate with PricelistProvider.",
+      "files": [
+        "sovran-app/shared/lib/apiClient.ts",
+        "sovran-app/shared/providers/PricelistProvider.tsx"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Push normalizeUrlForApi inside auditMint, reviewMint, and fetchMintInfo so callers can't skip it; delete the hand-rolled https:// prefix in useAuditedMints.ts:166.",
+      "files": [
+        "sovran-app/shared/lib/apiClient.ts",
+        "sovran-app/features/mint/hooks/useAuditedMints.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "transformAuditData duplicated verbatim between useAuditedMint.ts:42-77 and useAuditedMints.ts:44-76 — promote to features/mint/lib/transformAuditData.ts.",
+      "files": [
+        "sovran-app/features/mint/hooks/useAuditedMint.ts",
+        "sovran-app/features/mint/hooks/useAuditedMints.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Optional log-doctor `api` mode grouping api.fetch* events with per-host failure rate and median duration; low-urgency unless the no-timeout and no-abort findings reveal production pain.",
+      "files": [
+        "sovran-app/scripts/log-doctor/"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Does packages/schemas exist as a workspace yet, or is the shared-schemas package still aspirational? Answer shifts the Zod finding from 'create package' to 'move types'.",
+    "Any other callers of searchUsers besides useContactSearch? If a future caller depends on limit>5, the silent-truncation bug re-surfaces."
+  ]
+}

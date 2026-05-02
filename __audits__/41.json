@@ -352,7 +352,8 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-checked the body and the docstring. Counter-argument considered: it's a documented intentional pattern. Verdict: nit-level — the pattern works; it's just confusing.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale"
     },
     {
       "id": "F-015",
