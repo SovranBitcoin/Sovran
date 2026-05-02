@@ -96,8 +96,8 @@
       ],
       "verification_note": "Re-grepped `applyAlbum`, `setMode`, `resetToDefault`, `getAllUnitWallpapers` in sovran-app/ with --include='*.ts' --include='*.tsx' — no callers outside the defining file. Counter-argument considered: actions could be reached via a debug menu or external integration. Checked modules/, scripts/, tests/, app/(drawer)/ — no hits. Counter-argument fails.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Pile of dead actions on themeStore — considered as candidate dead-code slice (cluster C). Excluded; real, unfixed."
+      "completion_status": "partial",
+      "completion_note": "themeStore side cleared: setMode, resetToDefault, clearAllData, getAllUnitWallpapers all deleted. applyAlbum and themeDraft.resolveUnitTheme remain — applyAlbum has a real semantic question (the docstring/code mismatch the audit flagged) that is bigger than the dead-action slice; deferred as a separate slice."
     },
     {
       "id": "F-002",
@@ -374,7 +374,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-checked all three shim files. Counter-argument considered: maybe expo-router doesn't import them statically. Checked `app/_layout.tsx` for Stack.Screen registrations — yes, they're registered. The analyzer just doesn't model that.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Considered as Slice C (parallel-route-wrapper consolidation). Not picked. Real and unfixed; analyze-structure tooling fix is the cleaner path than route-shim consolidation."
     }
   ],
   "dimensions": {

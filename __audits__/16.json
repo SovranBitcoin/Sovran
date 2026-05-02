@@ -287,7 +287,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Grepped each symbol across sovran-app/{app,features,shared}. getAllSettings: only definition + type. selectFollowingSet: only definition. getEntries/getEntriesByType/hasScanned/findByRaw/findByProcessed: only the store itself; consumers use `state.entries` directly or inline filters.",
-      "prior_audit_id": "F-007@03.json"
+      "prior_audit_id": "F-007@03.json",
+      "completion_status": "complete",
+      "completion_note": "All cited dead exports deleted plus uncited siblings (resetSettings, getAllUnitWallpapers, resetToDefault, setMode on themeStore; getRecentScans/getRecentScansByType/findByTransactionId/removeEntry/clearHistory/clearHistoryByType on scanHistoryStore; removeSearch/clearSearches on searchHistoryStore; removeTransactionLocation/clearAllLocations; removeDistribution/clearAllDistributions; setSelectedPlace/clearCache on btcMapStore)."
     },
     {
       "id": "F-014",
@@ -306,7 +308,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-read every cited file. Same pattern in all 8+ stores; no use of _skipPersistWrite.",
-      "prior_audit_id": "F-003@05.json"
+      "prior_audit_id": "F-003@05.json",
+      "completion_status": "complete",
+      "completion_note": "clearAllData removed from all 17 stores (the cited 8 plus auditMintStore, btcMapStore, kymMintStore, mintProfileStore, pricelistStore — uncited but same pattern). The shared clearPersistedStore helper consolidating the pattern was orphaned and deleted alongside its test."
     }
   ],
   "dimensions": {

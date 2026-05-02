@@ -401,7 +401,9 @@
       "fix": "For each type, decide: KEEP-exported if it is intentionally part of the public primitive API (document with a `/** @public */` JSDoc tag if so), or drop the `export` keyword if it's internal-only. CircleActionButtonProps specifically: the 3-declaration pattern (ios/android/generic) is an artefact of platform-extension plumbing — pick one as the canonical declaration and have the others import-and-re-export instead of re-declaring. For DecorationIcon, LayoutDebugWrapperProps, ListRowProps: these are plausibly intended as public — keep the export and add a JSDoc note explaining their intended use.",
       "references": ["knip:unused-export", "skill:typescript-advanced-types"],
       "verification_note": "Confirmed by `npm run knip` output captured in audit.tooling_run.knip. Cross-checked with grep for each symbol's external usage — zero matches for ListRowProps, CircleActionButtonProps, etc. Confidence 0.95 — knip is authoritative for this class of finding and I manually verified the top three.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Considered as Slice B (knip orphan-export sweep). Not picked — slice A (dead store actions) was the cleaner pattern fix. Real and unfixed."
     },
     {
       "id": "F-022",

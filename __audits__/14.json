@@ -116,7 +116,9 @@
         "https://docs.pmnd.rs/zustand/integrations/persisting-store-data#api"
       ],
       "verification_note": "Re-read L343-360. Same pattern as mintStore.ts L47-55 (audit 05.json F-003). Counter-argument considered: 'removeItem provides a hedge against a failed middleware setItem.' If setItem throws after removeItem succeeds, the key is absent (fine); if setItem succeeds the key is re-created (the removeItem was redundant). Kept Medium because the routstr store persists `apiKey` (Routstr balance authenticator or cashu token — see F-006) — a clearAllData that fails mid-operation could leave credential residue that the user expected to be wiped.",
-      "prior_audit_id": "F-003@05.json"
+      "prior_audit_id": "F-003@05.json",
+      "completion_status": "complete",
+      "completion_note": "clearAllData deleted from routstrStore alongside the rest of the dead-action sweep; the orphaned shared clearPersistedStore helper went with it."
     },
     {
       "id": "F-005",
