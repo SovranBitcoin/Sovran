@@ -176,7 +176,9 @@
         "knip:dead-code"
       ],
       "verification_note": "Re-read line 71 and renderer switch at 554-559; confirmed const is hard-coded with no toggle. Counter-argument: someone may flip this for dev debugging — accepted as the rationale for option (b).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Boot-path dead branches gated by INITIALIZATION_DISPLAY_TYPE === 'splash' — considered as candidate slice (Slice B). Excluded in favor of the bitchat orphan deletion; real and unfixed."
     },
     {
       "id": "F-006",
@@ -196,7 +198,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Grep confirms zero external callers. Re-read 436-511; setTimeout chain has no cleanup ref.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "startTestAnimation/testMode dev-loop dead code — considered as part of Slice B. Excluded; real and unfixed."
     },
     {
       "id": "F-007",
@@ -232,7 +236,9 @@
       "fix": "Remove `isActive` from the type or actually consume it (e.g. only render the icon when `isCompleted || isActive`).",
       "references": [],
       "verification_note": "Re-read 563-587 and 662-666; prop is unused. Severity Nit.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "AnimatedCheckmark.isActive dead prop — folded into the unreachable splash overlay (F-005); deferred with that cluster as Slice B."
     },
     {
       "id": "F-009",
@@ -249,7 +255,9 @@
       "fix": "Delete the first guard at each site (lines 800 and 992).",
       "references": [],
       "verification_note": "Direct logic inspection. Both sites verified.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Redundant shouldRender guards live inside the unreachable splash overlay (F-005); deferred with that cluster as Slice B."
     },
     {
       "id": "F-010",

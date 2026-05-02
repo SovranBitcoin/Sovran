@@ -99,8 +99,8 @@
       ],
       "verification_note": "Re-checked at app/(bitchat-flow)/[geohash].tsx:1-22 and config/modalScreens.ts:97-128. Counter-argument: maybe the route is reserved for future external linking. Refuted — even if so, it currently has no validation or guard, so the finding stands until either the route is wired into MODAL_SCREENS with guards or deleted.",
       "prior_audit_id": null,
-      "completion_status": "stale",
-      "completion_note": "Confirmed migrated in prior commit 7df64614 — app/(bitchat-flow)/[geohash].tsx now wraps params via useRouteParams. No work needed in this slice."
+      "completion_status": "complete",
+      "completion_note": "(bitchat-flow)/[geohash].tsx and (bitchat-flow)/_layout.tsx deleted in 52d0d887. The orphan deep-link is gone; future bitchat surfaces should register through config/modalScreens.ts and reuse GeohashChatScreen. Cluster: orphan parallel chat implementation."
     },
     {
       "id": "F-002",
@@ -122,8 +122,8 @@
       ],
       "verification_note": "Re-checked importers via grep 'BitChatScreen|MessageList|MessageBubble|ChannelHeader|ComposeBar' — only internal cross-references plus the dead route. Counter-argument: maybe these components are kept as a fallback if react-native-keyboard-controller fails to load. Refuted — the new arch + keyboard-controller has been the standard since the SDK 55 migration (commits 28bf7713, 90f1326a) and there is no fallback wiring anywhere.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "BitChatScreen + 4 components, ~470 LOC parallel chat dead code — considered as candidate dead-code slice (cluster C). Excluded; real, unfixed."
+      "completion_status": "complete",
+      "completion_note": "BitChatScreen.tsx + ChannelHeader/ComposeBar/MessageBubble/MessageList deleted in 52d0d887 along with the only consuming route. Cluster: orphan parallel chat implementation."
     },
     {
       "id": "F-003",
@@ -362,7 +362,9 @@
         "knip:unused-file"
       ],
       "verification_note": "Re-checked grep for './lib/geohash' and '@/features/bitchat/lib/geohash' — zero matches. Counter-argument: maybe a barrel-import was planned. None has materialized in 2+ months.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "features/bitchat/lib/geohash.ts deleted in 52d0d887. Cluster: orphan parallel chat implementation."
     },
     {
       "id": "F-015",
@@ -382,7 +384,9 @@
         "nips/01.md"
       ],
       "verification_note": "Re-checked grep for each name across the repo — zero internal consumers.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "BITCHAT_EVENT_KIND_EPHEMERAL/PRESENCE/TEXT_NOTE deleted from features/bitchat/lib/constants.ts in 52d0d887. Cluster: orphan parallel chat implementation."
     },
     {
       "id": "F-016",
@@ -402,7 +406,9 @@
         "knip:unused-export"
       ],
       "verification_note": "Re-checked the `const isDMTransport` declaration and confirmed no `export` keyword. Counter-argument: maybe the comment is forward-looking. Either way, the current state is wrong.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "isDMTransport function and the `void isDMTransport` workaround deleted in 52d0d887; BitChatTransport, DMTarget, UseBLEPeersResult, and GeohashChatScreenProps narrowed from `export` to module-internal. Cluster: orphan parallel chat implementation."
     },
     {
       "id": "F-017",
@@ -422,7 +428,9 @@
         "lint:unused-imports/no-unused-vars"
       ],
       "verification_note": "Re-checked at GeohashChatScreen.tsx:206-209 and useBitChat.ts:73-74. ESLint output cited verbatim above.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "tierDef useMemo and LOCATION_TIERS import dropped from GeohashChatScreen.tsx; dmNickname destructure dropped from useBitChat.ts options. Both in 52d0d887. Cluster: orphan parallel chat implementation."
     },
     {
       "id": "F-018",
