@@ -257,7 +257,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-checked all four files. Counter-argument considered: Zustand v5 uses useSyncExternalStore which de-duplicates with Object.is per-slice — so a fresh `unitWallpapers` ref triggers a re-render only when the parent record changes shape, which is exactly what setUnitWallpaper does at every call. The dynamic cost is UNVERIFIED — flagged in the report.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "ThemePreviewScreen swaps the multi-slice snapshot for useThemeDraft((s) => s.isDirty()) and pushes per-unit theme resolution into a small <UnitPreviewSlot> child that subscribes via s.resolveUnitTheme(unitId). ThemeProvider derives currentTheme via s.getUnitWallpaper() inside the selector. ProfileWallpaperProvider's useUnitWallpaper collapses to a single useThemeStore((s) => s.getUnitWallpaper(unitId)) call. All return primitives, so unrelated unit edits no longer re-render consumers."
     },
     {
       "id": "F-010",

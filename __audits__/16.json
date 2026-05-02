@@ -136,7 +136,9 @@
       "references": [
         "skill:zustand-5"
       ],
-      "verification_note": "Re-read PricelistProvider.tsx lines 19-27 and log-doctor timeline bursts for `store.pricelist.set_btc_prices`. Full-store subscription + context provider is textbook re-render storm."
+      "verification_note": "Re-read PricelistProvider.tsx lines 19-27 and log-doctor timeline bursts for `store.pricelist.set_btc_prices`. Full-store subscription + context provider is textbook re-render storm.",
+      "completion_status": "complete",
+      "completion_note": "PricelistProvider now uses useShallow over the reactive triple (pricelist, isLoading, error) and pulls actions individually; context value is memoised so consumers see a stable reference."
     },
     {
       "id": "F-006",

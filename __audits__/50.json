@@ -393,7 +393,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "UNVERIFIED dynamically — no log-doctor renders trace for UserMessages in latest session, so the re-render storm is not measured. Demoted to Low confidence per dim 7's evidence rule. The pattern is structurally clear regardless.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Replaced the 22-field useRoutstrStore() destructure with per-field selectors. Reactive primitives (balance, apiKey, selectedModel) subscribe individually so each re-renders only on its own change; the eighteen action references are stable and contribute no re-renders."
     },
     {
       "id": "F-017",
