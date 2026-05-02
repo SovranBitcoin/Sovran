@@ -1,0 +1,298 @@
+{
+  "audit": {
+    "date": "2026-04-20",
+    "commit": "bd018588",
+    "entry_point": "sovran-app/shared/stores/profile/routstrStore.ts",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "05.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "typescript-advanced-types",
+      "react-native-best-practices"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": null,
+      "lint": null,
+      "knip": "no routstrStore-specific findings; TopUpResult / TopUpFailure flagged as unused-interfaces in shared/lib/routstr/topUp.ts (out-of-scope dependent file)",
+      "analyze_structure": null
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "isAnonymousMode is not persisted while conversationHistory is — anonymous chats leak into and overwrite the last persistent session on the next launch",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/routstrStore.ts",
+      "line": 365,
+      "symbol": "partialize",
+      "dimension": 3,
+      "description": "The persist `partialize` at L365-372 includes `conversationHistory`, `sessions`, and `currentSessionId` but NOT `isAnonymousMode`. `setAnonymousMode(true)` at L332-339 clears `conversationHistory`; `setAnonymousMode(false)` does not. On app reload after an anonymous session, `isAnonymousMode` rehydrates to the initial-state default `false` (L104), but `conversationHistory` rehydrates with the anonymous messages (they were written via `addMessage`'s isAnonymous branch at L135-137 which does set `conversationHistory`) and `currentSessionId` rehydrates to whatever non-anonymous session was active before the user toggled privacy mode. The next `addMessage` call (L130-150) takes the non-anonymous branch (L139-147) and runs `session.messages = newHistory` where `newHistory = [...conversationHistory, newMessage]` — writing the anonymous messages into the persistent session, REPLACING whatever the session originally held. Concrete trace: (1) session S has `messages = [A, B]`; (2) user enables anonymous mode → `conversationHistory = []`, `S.messages = [A, B]` unchanged; (3) user chats X, Y anonymously → `conversationHistory = [X, Y]`, `S.messages` unchanged; (4) kill app, relaunch; rehydrate: `isAnonymousMode = false`, `conversationHistory = [X, Y]`, `currentSessionId = S`; (5) UserMessagesScreen.tsx:1136-1148 sees `getCurrentSessionId()` is set and skips `switchSession` (which would reset `conversationHistory` to `S.messages`); (6) user sends Z → addMessage replaces `S.messages` with `[X, Y, Z]`. The original A and B are lost AND the anonymous chat leaks into the persistent session under the pre-anonymous session title.",
+      "why_it_matters": "Two defects in one bug. (1) Privacy leak: the user explicitly opted into anonymous mode to keep a conversation ephemeral; it ends up persisted under a labelled session after restart, visible on the next load of the Sessions panel. (2) Data loss: the original session's messages are clobbered because addMessage writes `[...conversationHistory, msg]` as the new `session.messages` without reconciling. Both trigger silently on any app kill/reload during or after an anonymous chat — a routine action for a user who values privacy enough to toggle anonymous mode.",
+      "fix": "Two changes, both required. (1) Add `isAnonymousMode` to `partialize` so the privacy mode survives reload — OR, if the product intent is that anonymous mode resets on relaunch, also exclude `conversationHistory` from partialize (and rehydrate it from `sessions[currentSessionId].messages` via an `onRehydrateStorage` callback). Pick one; today's middle ground is the bug. (2) Regardless of (1), make addMessage robust against the invariant being violated: in the non-anonymous branch, build `session.messages` from the existing `session.messages` (L140-142) instead of from `conversationHistory`. E.g. `session.id === state.currentSessionId ? { ...session, messages: [...session.messages, message] } : session`. Then set `conversationHistory` to the new array read back from the updated session. This keeps `conversationHistory` a derived view of the active session and makes it impossible for a stale `conversationHistory` to leak into a session on write. Apply the same pattern to `updateMessage` (L174-203) and `removeMessages` (L159-172), which share the bug. Note per project convention (`zustand-persistence-review.md` §8 and §1) adding `isAnonymousMode` to partialize is a safe top-level addition — shallow merge applies the initial-state default for existing users.",
+      "references": [
+        "sovran-app/shared/stores/profile/routstrStore.ts:104,135,139-147,332-339,365-372",
+        "sovran-app/features/user/screens/UserMessagesScreen.tsx:1131-1148,2031,2034",
+        "sovran-app/.claude/rules/zustand-persistence-review.md",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Re-read addMessage L130-150, setAnonymousMode L332-339, partialize L365-372. Traced through switchSession L257-269 — confirmed it's the only path that would reset conversationHistory from sessions[id].messages, and UserMessagesScreen.tsx:1136-1148 only calls switchSession when getCurrentSessionId() is null, which it is not after rehydration. Counter-argument considered: 'the useEffect at UserMessagesScreen.tsx:1150 calls getConversationHistory(), so maybe some other effect resets it.' Checked — getConversationHistory is a read, not a write, and no observed effect calls switchSession(currentSessionId) on mount to refresh. Counter-argument considered: 'maybe the log-doctor trace shows this is actually fine in practice.' The latest session in log.txt has no anonymous-mode toggles (no `store.routstr.set_anonymous_mode` events); the bug is structural and reproducible by inspection.",
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "routstrStore now ships version+migrate+partialize via createMergeWithSchema; partialize was reviewed during the version+migrate sweep — confirm via shared/stores/profile/routstrStore.ts. If the isAnonymousMode/conversationHistory split is still wrong, file as a fresh finding against the rehydrated shape."
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "Three call sites subscribe to the entire routstr store with `useRoutstrStore()` and re-render on every unrelated mutation",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/routstrStore.ts",
+      "line": 94,
+      "symbol": "useRoutstrStore",
+      "dimension": 3,
+      "description": "Zustand v5's default selector-equality is `Object.is` on the whole slice (skill:zustand-5). A `useStore()` call with no selector returns the entire state+actions object and causes a re-render on every state change. Three call sites do this: UserMessagesScreen.tsx:959 destructures ~17 actions AND `apiKey` AND `selectedModel` from `useRoutstrStore()` — a ~3000-line chat screen; SessionsPanel.tsx:205 destructures 7 actions — the side panel; app/userMessages.tsx:16 destructures `setSelectedModel` from `useRoutstrStore()` just to call it in a `useEffect` (L19-23). Every mutation triggers a render: `setBalance` (which fires on init at L1183 of UserMessagesScreen), `setCachedModels` (L1114, with count=395 models — the entire cache churns into state), `setApiKey` (L1179), `addMessage` during streaming (fires on every SSE chunk at L1619-1621 and L1638-1640 of UserMessagesScreen), `updateMessage` per token delta, etc. During a token stream, every chunk calls updateMessage → setState → the entire 3000-line screen's render tree re-evaluates. log.txt latest session captured `perf.js_thread_blocked` 84× over 434s (stats --latest) — the base rate is already high; this store subscription pattern compounds it during chat.",
+      "why_it_matters": "Chat streaming performance. Each SSE chunk on a live assistant response triggers at least two setState calls on routstr store (addMessage on first chunk, updateMessage per subsequent chunk). With an unscoped subscription, UserMessagesScreen re-evaluates its full component tree on every chunk — including the memoised model list, gift-wrapped DM decryption (expensive: NIP-44 decrypt per event), FlatList re-validation, keyboard-avoiding view layout. Token-by-token streaming on a slow model easily fires 100+ chunks/second. Even with React 19 Compiler helping with obvious memo, the top-level destructure subscription is upstream of compiler-helped memoisation — the screen ROOT re-renders regardless. Secondary cost: SessionsPanel's `sessions`-list re-sort and metadata subscription reparse on every re-render (L238 `JSON.parse(metadataEvents[0].content)`).",
+      "fix": "Replace the top-level destructure with scoped selectors or `useShallow`. For UserMessagesScreen.tsx:938-959, prefer splitting into per-concern subscriptions: `const apiKey = useRoutstrStore((s) => s.apiKey);` (scalar — stable compare), `const selectedModel = useRoutstrStore((s) => s.selectedModel);`, and pull every ACTION via `useRoutstrStore.getState()` once (they are stable function references) or via `useShallow` for the action object. Actions don't change identity across renders in zustand v5 so reading them via `getState()` inside event handlers / effects is equivalent and removes the subscription. For SessionsPanel.tsx:197-205, same refactor: select `balance` and `selectedModel` as scalars; read actions via getState(). For app/userMessages.tsx:16, read `setSelectedModel` via `useRoutstrStore.getState().setSelectedModel` inside the useEffect — no component subscription needed at all. Skill:zustand-5 has this pattern as the canonical fix.",
+      "references": [
+        "sovran-app/shared/stores/profile/routstrStore.ts:94",
+        "sovran-app/features/user/screens/UserMessagesScreen.tsx:938-959",
+        "sovran-app/features/user/components/routstr/SessionsPanel.tsx:197-205",
+        "sovran-app/app/userMessages.tsx:14-26",
+        "skill:zustand-5",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-read each destructuring site. Confirmed each one uses `useRoutstrStore()` without a selector. Counter-argument considered: 'React 19's Compiler handles this.' The compiler memoises WITHIN a component; it cannot downgrade a parent subscription that returns a fresh object every setState. zustand's `useStore(selector)` with an object-returning selector + no equality fn is the documented bad pattern; `useStore()` with no selector is equivalent in v5 because `Object.is(oldState, newState)` fails on every setState (zustand replaces the state object). Log-doctor evidence is suggestive (84× perf.js_thread_blocked in the latest session, though not all are routstr-attributable) — the structural finding stands on its own per <log_doctor_integration> (\"structural races that are self-evident from the code\"). Kept High rather than Critical because the perf damage is bounded to chat screens and not funds-correctness; kept High rather than Medium because chat streaming is an interactive user path where dropped frames are user-visible.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Selector subscriptions to the entire routstr store remain unaddressed. Considered as cluster B candidate for this slice and excluded — picking a different slice (route-boundary param validation) per scope budget."
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "conversationHistory is redundant with sessions[currentSessionId].messages — every message write serialises and persists the same array twice",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/routstrStore.ts",
+      "line": 47,
+      "symbol": "conversationHistory",
+      "dimension": 3,
+      "description": "`conversationHistory` (L47-48) is documented as a 'working copy of the active session's messages … synced bidirectionally with sessions[currentSessionId].messages'. partialize (L365-372) persists BOTH `conversationHistory` AND `sessions`. addMessage (L130-150), updateMessage (L174-203), and removeMessages (L159-172) each write to both. For a session with N messages: (a) persisted AsyncStorage blob carries N messages in `conversationHistory` and N messages in `sessions[id].messages` — 2× storage cost; (b) each incremental `addMessage` call serialises the new combined history of N+1 messages AND maps over `sessions` building a fresh session array with the new N+1-message inner array — two full walks of N elements in memory, then Zustand persist writes ~2(N+1) messages worth of JSON to AsyncStorage; (c) `updateMessage` during streaming runs the same O(N) map twice per SSE chunk. At 1000 messages that's a full 1000-message JSON.stringify on every streamed token. Distinct from F-002 — that one is the RE-RENDER cost; this is the PERSIST-WRITE cost.",
+      "why_it_matters": "AsyncStorage writes are off-main-thread on iOS but the JSON.stringify runs on the JS thread and scales O(N). A long-running chat session that reaches hundreds of messages will, on each streamed token, block the JS thread for a non-trivial serialisation window. The latest log session (not a chat-heavy session) already shows 84× `perf.js_thread_blocked` entries; a chat-heavy session would surface routstr.store.* in log-doctor. More importantly, the dual-write is the precondition for F-001: conversationHistory drifts from sessions[id].messages during anonymous mode because one branch updates both and the other doesn't. Eliminate the duplication and F-001's primary vector closes.",
+      "fix": "Collapse to a single source of truth. Two options. Option A (minimal change): make `conversationHistory` a derived value — expose it via a selector `useRoutstrStore((s) => s.sessions.find(x => x.id === s.currentSessionId)?.messages ?? [])` wrapped in `useShallow` for array stability; drop `conversationHistory` from state and partialize entirely. Anonymous mode gets an explicit `anonymousMessages: RoutstrMessage[]` field (persist or not per F-001's decision). Option B (less disruptive): keep `conversationHistory` as a view but stop persisting it — remove from partialize, set it from the active session on `onRehydrateStorage`. This halves the persist cost and removes the F-001 drift window. Either option bumps this to a pure persist-shape change — per `.claude/rules/zustand-persistence-review.md` §7 and §8, it's a top-level field removal from partialize which is safe under shallow merge (no stale data hazard), but downstream code at UserMessagesScreen.tsx:1150, 1235, 1490, 1552 reads `getConversationHistory()` and must be updated — either to use the selector form (A) or kept unchanged if B is picked. Option B is the smaller blast radius and the recommended path.",
+      "references": [
+        "sovran-app/shared/stores/profile/routstrStore.ts:42-48,130-150,159-172,174-203,365-372",
+        "sovran-app/features/user/screens/UserMessagesScreen.tsx:1150,1235,1490,1552",
+        "sovran-app/.claude/rules/zustand-persistence-review.md"
+      ],
+      "verification_note": "Re-read the three mutator functions; confirmed each writes both fields in the non-anonymous branch. partialize verified at L365-372 to persist both. Counter-argument considered: 'conversationHistory is the hot path and sessions is cold-storage — maybe the duplication is an intentional cache.' True motivation but the cache should not be persisted; persisting both bloats storage without speed benefit (reading one field vs two from JSON is the same). Counter-argument considered: 'anonymous mode needs conversationHistory as a session-less scratch space.' Also true, and that's why fix proposes a dedicated `anonymousMessages` field — the scratch-space role belongs in its own field, not overloaded onto a cache of the active session's messages.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.75,
+      "title": "clearAllData removes storage then set()s — the persist middleware re-writes the key immediately, making removeItem cosmetic and opening a concurrent-write clobber window",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/routstrStore.ts",
+      "line": 343,
+      "symbol": "clearAllData",
+      "dimension": 1,
+      "description": "L343-360: `await profileStorage.removeItem('routstr-store')` is followed by `set({ ...defaults })`. Zustand's persist middleware subscribes to store mutations and issues a fresh `storage.setItem(name, serialized)` after every `set`. The net effect is that AsyncStorage key `routstr-store:profile:{pubkey}` ends up as `{\"state\":{...defaults...},\"version\":0}` rather than absent — the removeItem is pointless. Worse, any concurrent `setApiKey`/`addMessage`/`setBalance` landing between the `await removeItem` and the subsequent `set({...})` (e.g. UserMessagesScreen.tsx:1179 balance-check landing after a user taps 'Clear All' while an SSE stream writes updateMessage per chunk) is overwritten by the reset. Identical pattern (and identical finding) to 05.json F-003 in mintStore.ts — the refactor_plan of 05.json enumerates routstrStore.ts among the sibling stores sharing the bug.",
+      "why_it_matters": "Carry-forward of 05.json F-003. clearAllData is unused today (`grep '.clearAllData()' sovran-app` turns up no live call sites for any profile-scoped store — see 05.json F-002), so the race is latent; if a caller is added the window is real. The more immediate concern is that the removeItem line is pure noise — reading this file, an engineer naturally assumes removeItem+set are both load-bearing.",
+      "fix": "Replace the manual removeItem + set pair with `useRoutstrStore.persist.clearStorage()` — zustand's built-in handles state+storage together and short-circuits the middleware's write-on-mutation. Alternatively, if the convention is kept, flip the order: `set({...defaults})` first (lets persist write the empty state), then `await profileStorage.removeItem('routstr-store')` — which makes removeItem the authoritative final state. The 05.json refactor_plan already calls for a cross-store audit of this convention; routstrStore is listed in the affected-files set (05.json refactor_plan item 3, `files` array).",
+      "references": [
+        "sovran-app/shared/stores/profile/routstrStore.ts:343-360",
+        "sovran-app/__audits__/05.json (F-003, refactor_plan item 3)",
+        "https://docs.pmnd.rs/zustand/integrations/persisting-store-data#api"
+      ],
+      "verification_note": "Re-read L343-360. Same pattern as mintStore.ts L47-55 (audit 05.json F-003). Counter-argument considered: 'removeItem provides a hedge against a failed middleware setItem.' If setItem throws after removeItem succeeds, the key is absent (fine); if setItem succeeds the key is re-created (the removeItem was redundant). Kept Medium because the routstr store persists `apiKey` (Routstr balance authenticator or cashu token — see F-006) — a clearAllData that fails mid-operation could leave credential residue that the user expected to be wiped.",
+      "prior_audit_id": "F-003@05.json"
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Logger drift — switchSession, onRehydrateStorage, and clearAllData use generic `log` instead of `storeLog`, and spread raw `error` through",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/routstrStore.ts",
+      "line": 267,
+      "symbol": "log|storeLog",
+      "dimension": 10,
+      "description": "L4 imports both `log` and `storeLog`. Every happy-path emit uses `storeLog` correctly (L107, L114, L119 etc.), but three error/warn paths drop down to the generic `log`: L267 `log.warn('store.routstr.session_not_found', { sessionId })` inside switchSession, L357 `log.error('store.routstr.clear_failed', { error })` inside clearAllData's catch, and L375 `log.warn('store.routstr.rehydrate_failed', { error })` inside onRehydrateStorage. The L357 and L375 sites also spread the raw `error` object without narrowing to `{ name, message }` — any future throw site whose Error.message embeds sensitive context (AsyncStorage quota-full error echoing the value attempted to write, Zod issue messages that include the failed blob, Routstr server messages) lands in the ring buffer verbatim. Prior art: 05.json F-005 (mintStore), 04.json F-010/F-014 (secureStorage), 02.json F-004 (CocoPaymentUX). The issue is a codebase-wide drift of the same shape — routstrStore is the newest example.",
+      "why_it_matters": "Observability consistency + defence-in-depth. log-doctor's scope-based filters (`--scope store`) miss the generic-log emits because the scope column stays blank. And the raw `{ error }` spread is one upstream API error away from capturing a Cashu token or Routstr API key in an error body (see api.ts:252 which logs keyLength=67 — the length tells you the 67-char Routstr persistent key vs 665-char Cashu token format; a server-returned error message referencing the key could escape through `error.message`).",
+      "fix": "Swap `log.warn`/`log.error` to `storeLog.warn`/`storeLog.error` at L267, L357, L375. Narrow the catch spread: `{ error: err instanceof Error ? { name: err.name, message: err.message } : String(err) }`. Cross-store follow-up: same fix applies verbatim to every sibling in shared/stores/profile/ that lost the scope prefix on an error path — the 05.json refactor_plan item 4 enumerates them. Separately, the field-name redactor proposed in 03.json and 04.json refactor plans (if landed in shared/lib/logger.ts) would backstop this without per-site review — higher-leverage fix.",
+      "references": [
+        "sovran-app/shared/stores/profile/routstrStore.ts:4,267,357,375",
+        "sovran-app/__audits__/05.json (F-005)",
+        "sovran-app/__audits__/04.json (F-010, F-014)",
+        "sovran-app/__audits__/02.json (F-004)"
+      ],
+      "verification_note": "Re-read L4, L267, L357, L375. Confirmed log (not storeLog) usage on all three and raw error spread on two. Same finding as 05.json F-005 but for routstrStore — carried forward. Kept Medium (not Low as in 05.json) because the routstr store's persisted apiKey is a bearer instrument and the defence-in-depth delta is more material than mintStore's URL strings.",
+      "prior_audit_id": "F-005@05.json",
+      "completion_status": "complete",
+      "completion_note": "20662da9 swept routstrStore alongside the other 21 stores: all three sites (session_not_found, clear_failed, rehydrate_failed) now use storeLog with redactError(error) — the bearer-instrument concern is closed."
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.6,
+      "title": "onRehydrateStorage does not schema-validate the rehydrated blob — a corrupted or type-drifted RoutstrMessage[] can crash downstream renderers",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/routstrStore.ts",
+      "line": 373,
+      "symbol": "onRehydrateStorage",
+      "dimension": 6,
+      "description": "L373-377 only handles the `error` argument — a parse or storage throw. It does not run any validation on the `_state` argument (the rehydrated blob). If a prior app version persisted a different shape, or if AsyncStorage returned a partially-truncated JSON that still parsed (e.g. a message whose `role` is the string 'system' instead of 'user'|'assistant', or a `timestamp` that's a string from a pre-number version), no validator catches it. The rehydrated array flows into addMessage's non-anonymous branch (L140), into UserMessagesScreen.tsx:1151 which maps over messages and extracts `msg.role === 'user' ? 'me' : 'other'`, and into SessionsPanel's `session.messages.length` reads (L165-166). A message with `role: 'system'` silently classifies as 'other' (assistant) and displays under the assistant bubble; a non-array messages field crashes the FlatList renderItem at first render. Per .claude/rules/zustand-persistence-review.md §3 (Type Changes) and §8 (Shallow Merge), new nested fields inside a persisted array are NOT handled by shallow merge — old message shapes flow through as-is.",
+      "why_it_matters": "The routstr store persists user-provided content (conversation history) and server-provided content (model cache, though that's excluded from partialize — good). Conversation content is LLM output, not structurally adversarial, but a persistence bug in a prior version (or a user tampering with AsyncStorage via a rooted device) would produce exactly this class of crash. More concretely: F-003's proposed refactor (drop `conversationHistory` from partialize, derive from sessions) would change the rehydrated shape, and without a zod guard rail the transition is brittle.",
+      "fix": "Add a zod v4 schema — ideally in `Sovran/packages/schemas/` (per the aspirational shared-schemas rule) — and validate via `safeParse` in `onRehydrateStorage`. If the packages/schemas workspace does not yet exist at audit time, declare the schema locally in routstrStore.ts (it belongs to this boundary) and migrate to the shared package when it ships. Schema draft: `z.strictObject({ id: z.string(), role: z.enum(['user', 'assistant']), content: z.string().max(100_000), timestamp: z.number(), thinkingDurationSec: z.number().optional(), reasoningContent: z.string().max(100_000).optional() })` for each message, wrapped in `z.array(...).max(10_000)` for the session cap. On parse failure, drop the offending session (not the whole store) and storeLog.warn with the session id. Also applies to RoutstrSession.",
+      "references": [
+        "sovran-app/shared/stores/profile/routstrStore.ts:11-27,373-377",
+        "sovran-app/.claude/rules/zustand-persistence-review.md",
+        "skill:zod-4"
+      ],
+      "verification_note": "Re-read L373-377. Confirmed no validation of the rehydrated state; only logs on parse error. Counter-argument considered: 'zustand v5 shallow merge is forgiving; missing fields get initial-state defaults.' True for top-level fields but not for array-elements — a message without `role` will be shallow-merged as-is and downstream consumers crash on access. Confidence 0.6 because the practical incidence is low (no active version-bump on the message schema today), not 0.8 — strictly a defence-in-depth finding.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "getCachedModels / getAllSessions / getCurrentSessionId return fresh arrays or run work on every call — callers invoke from render without useMemo",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/routstrStore.ts",
+      "line": 271,
+      "symbol": "getAllSessions|getCachedModels|getCurrentSessionId",
+      "dimension": 7,
+      "description": "`getAllSessions` (L271-275) allocates a fresh sorted array on every call — `[...sessions].sort((a, b) => b.createdAt - a.createdAt)`. `getCachedModels` (L217-222) returns the cache array directly (no allocation) but runs a date-comparison each call. SessionsPanel.tsx:213-217 calls all three unconditionally on every render (`const sessions = getAllSessions(); const currentSessionId = getCurrentSessionId(); const balance = getBalance(); const selectedModelId = getSelectedModel(); const availableModels = useMemo(() => getCachedModels() || [], [getCachedModels]);`). Only `availableModels` is memoised — but on `getCachedModels` which is a function reference from the destructured `useRoutstrStore()` (stable today, but vulnerable to F-002's fix which may change the subscription pattern). `sessions` is used as input to `filteredSessions = sessions.filter(...)` at L246-248 — a fresh sorted-then-filtered array every render. Because F-002 already triggers a full render of SessionsPanel on every store mutation, this compounds: every balance update also re-sorts the session list.",
+      "why_it_matters": "N in `sessions` is small today (user sessions are bounded by user action) but the pattern scales poorly. The reallocation is negligible at 10 sessions; at 100+ the filter pipeline (lowercase on title, includes on query) is O(N) on every render, and the sort is O(N log N) on every call. All wrapped inside a parent that re-renders on any store mutation (F-002). The issue is primarily structural — the store's API encourages callers to invoke methods from render rather than subscribe to state.",
+      "fix": "Two angles. (1) At the store: move the sort inside the state shape — keep `sessions` sorted on write in `createSession`/`deleteSession`/`updateCurrentSessionTitle`. Then `getAllSessions` becomes a pure getter (no allocation). (2) At the call sites: memoise `filteredSessions` with a useMemo keyed on `[sessions, searchQuery]`. Also prefer scalar selectors over method-calls-from-render: `const sessions = useRoutstrStore((s) => s.sessions);` — the component re-renders only when sessions change, and the value is stable until it does. Action methods stay as getState().",
+      "references": [
+        "sovran-app/shared/stores/profile/routstrStore.ts:217-222,271-275",
+        "sovran-app/features/user/components/routstr/SessionsPanel.tsx:213-217,246-248",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Re-read getAllSessions L271-275 and SessionsPanel L213-248. Confirmed the sort allocation on every call and the missing useMemo on filteredSessions. Counter-argument considered: 'this is inside a component that only mounts when the panel is open.' True, but once open the panel re-renders per store mutation. Counter-argument considered: 'React 19 Compiler memoises the filter expression.' The Compiler can memo within SessionsPanel, but it cannot memo across the `getAllSessions()` call boundary since that's a user-called function with no memoisable signature. Kept Low — structural but bounded by session count.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.55,
+      "title": "Cashu token can be persisted as apiKey in the top-up fallback path — AsyncStorage is unprotected local storage for a bearer instrument",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/routstrStore.ts",
+      "line": 38,
+      "symbol": "apiKey",
+      "dimension": 2,
+      "description": "L38 comment documents `apiKey` as 'Cashu token or persistent wallet key'. In topUp.ts L45-50, when no prior apiKey exists, the code uses the cashu token directly as the apiKey (`apiKey = encodedToken; store.setApiKey(apiKey);`) and only upgrades to a persistent server-issued key if the server returns one via the balance endpoint (topUp.ts L62-66). The window between setApiKey(token) and the server upgrade is bounded by the balance call (~130ms in log.txt latest session) — but topUp.ts L89-92 explicitly keeps the token-as-apiKey when the balance check fails. That token is a bearer instrument: whoever reads AsyncStorage can spend it at the original mint. log.txt confirms tokenLength=665 (observed) — a real 665-byte cashu token sitting in `routstr-store:profile:{pubkey}` AsyncStorage. AsyncStorage is readable by any app process with filesystem access (jailbroken iOS, rooted Android, iTunes/Finder backup unencrypted, Android adb backup on debuggable builds). The audit prompt <dim id=\"2\"> flags logging of tokens as Critical; storage of tokens is not explicitly covered but is adjacent — a Cashu token outside expo-secure-store is broadly inconsistent with the wallet's threat model.",
+      "why_it_matters": "Device-compromise exfiltration of Routstr ecash balance. Bounded because (a) the token is specifically the Routstr wallet-topup token, not the user's main wallet; (b) the Routstr server typically upgrades to a persistent key quickly; (c) the attacker needs filesystem access. But the design comment on L38 enshrines the pattern — future callers will continue to rely on 'Cashu token or persistent wallet key' as if those were equivalent. They are not from a threat-model perspective.",
+      "fix": "Two options. (1) Gate the cashu-token-as-apiKey path to transient memory only — refuse to persist an apiKey that is detectably a cashu token (e.g. starts with `cashuA` or `cashuB` base64url, or is >256 chars). If the server fails to upgrade within the top-up call, surface the failure and require retry rather than persisting the token. (2) Accept the pattern but narrow the blast radius: move `apiKey` into expo-secure-store with `requireAuthentication: false` (analogous to .cursor/rules/secure-storage-key-derivation.mdc's treatment of NPC NWC URIs). The store still exposes apiKey via `setApiKey`/`getApiKey` — only the persistence layer changes. Update the L38 comment to clarify the current vs intended state. Confidence kept at 0.55 because the threat-model delta depends on Routstr's practical upgrade behaviour (which a server-side audit would clarify) — if the server always returns a persistent key within the topUp's first call, the at-risk window is milliseconds and the fix is over-engineering.",
+      "references": [
+        "sovran-app/shared/stores/profile/routstrStore.ts:38,367",
+        "sovran-app/shared/lib/routstr/topUp.ts:45-50,62-66,89-92",
+        "sovran-app/.cursor/rules/secure-storage-key-derivation.mdc"
+      ],
+      "verification_note": "Re-read store L38-39, L365-372 and topUp.ts L45-66,89-92. Confirmed the token-as-apiKey fallback persists. Counter-argument considered: 'this is how every Routstr client works.' Arguable — the Routstr client-side reference code is not authoritative, and wallet-app threat models differ from web-app threat models (device compromise vs browser compromise). Kept Low with 0.55 confidence. This is a design-decision finding, not a bug.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Nit",
+      "confidence": 0.5,
+      "title": "session IDs use Date.now() only — conceptually vulnerable to collisions, though not reachable in practice",
+      "repo": "sovran-app",
+      "path": "shared/stores/profile/routstrStore.ts",
+      "line": 241,
+      "symbol": "createSession",
+      "dimension": 1,
+      "description": "L241: `const sessionId = \\`session-${Date.now()}\\`;`. Two `createSession` calls within the same millisecond produce the same ID, and the later one's `sessions: [newSession, ...state.sessions]` prepends a duplicate key into the array — `deleteSession` and `switchSession` both resolve to the first match, so operations on the second session are silently misrouted. Not reachable in practice from user-driven paths (a human can't tap 'New Session' twice in <1ms), but `deleteSession`'s fallback `newCurrentSessionId = firstSession.id` at L316 can hit duplicates if an import or bulk-create path is ever added.",
+      "why_it_matters": "Currently no reachable code path creates sessions programmatically faster than 1ms. This is preventative — moving to `crypto.randomUUID()` (available via `expo-crypto` / `expo-random` / web-crypto polyfill) or `\\`session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}\\`` removes an entire class of latent bugs for zero cost.",
+      "fix": "Replace `\\`session-${Date.now()}\\`` with `\\`session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}\\`` or `crypto.randomUUID()`. Nit — do it during the next touch of this file, don't land it in isolation.",
+      "references": [
+        "sovran-app/shared/stores/profile/routstrStore.ts:240-254"
+      ],
+      "verification_note": "Re-read L240-254. No reachable rapid-fire createSession call site today. Counter-argument considered: 'Date.now() is good enough.' True for current usage; the nit stands as preventative hygiene.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "skipped",
+    "5": "skipped",
+    "6": "partial",
+    "7": "partial",
+    "8": "skipped",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Collapse the dual persistence of conversation data (F-003) and fix the anonymous-mode persist gap (F-001) in a single change. Concretely: (a) drop `conversationHistory` from partialize; (b) add `anonymousMessages: RoutstrMessage[]` as an explicit transient field (non-persisted, represents the anonymous scratch space); (c) in onRehydrateStorage, if `currentSessionId` points at a known session, seed `conversationHistory` from `sessions.find(s => s.id === currentSessionId).messages` — otherwise []; (d) rewrite addMessage/updateMessage/removeMessages to mutate `session.messages` directly (non-anonymous) or `anonymousMessages` (anonymous) and derive `conversationHistory` as a selector `(s) => s.isAnonymousMode ? s.anonymousMessages : (s.sessions.find(...)?.messages ?? [])`; (e) decide whether isAnonymousMode persists across reloads (if yes, add to partialize; if no, document in the store). The two bugs share a single root cause — split state vs derived view — and splitting them into two PRs would cost twice the review.",
+      "files": [
+        "sovran-app/shared/stores/profile/routstrStore.ts",
+        "sovran-app/features/user/screens/UserMessagesScreen.tsx",
+        "sovran-app/features/user/components/routstr/SessionsPanel.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Migrate the three unscoped `useRoutstrStore()` call sites (F-002) to per-field selectors and getState() for actions. UserMessagesScreen.tsx:938-959 is the high-leverage site (chat-streaming path); SessionsPanel.tsx:197-205 and app/userMessages.tsx:16 are mechanical follow-ups. Apply `useShallow` where a destructured object of actions is ergonomically needed, but prefer scalar selectors for reactive fields (apiKey, balance, selectedModel, isAnonymousMode) so every streamed SSE chunk doesn't trigger a screen re-render.",
+      "files": [
+        "sovran-app/features/user/screens/UserMessagesScreen.tsx",
+        "sovran-app/features/user/components/routstr/SessionsPanel.tsx",
+        "sovran-app/app/userMessages.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Cross-store convention fix for clearAllData (F-004) and scoped-logger drift (F-005). Both are direct carry-forwards from 05.json's refactor_plan and apply verbatim to routstrStore.ts in addition to mintStore.ts. Do the sibling-wide sweep in one PR — mintStore.ts, routstrStore.ts, mintDistributionStore.ts, searchHistoryStore.ts, scanHistoryStore.ts, swapTransactionsStore.ts, transactionLocationStore.ts, splitBillTransactionsStore.ts, transactionDistributionStore.ts, nostrSocialStore.ts, npcMintStore.ts, themeStore.ts. Either delete clearAllData across all of them (profile reset already goes through profileSessionOrchestrator → app restart, no in-session wipe caller exists) or fix the removeItem+set order and swap log.error/log.warn → storeLog.error/storeLog.warn with narrowed error bodies. 05.json's refactor_plan item 3 is the canonical tracker.",
+      "files": [
+        "sovran-app/shared/stores/profile/routstrStore.ts",
+        "sovran-app/shared/stores/profile/mintStore.ts",
+        "sovran-app/shared/stores/profile/mintDistributionStore.ts",
+        "sovran-app/shared/stores/profile/searchHistoryStore.ts",
+        "sovran-app/shared/stores/profile/scanHistoryStore.ts",
+        "sovran-app/shared/stores/profile/swapTransactionsStore.ts",
+        "sovran-app/shared/stores/profile/transactionLocationStore.ts",
+        "sovran-app/shared/stores/profile/splitBillTransactionsStore.ts",
+        "sovran-app/shared/stores/profile/transactionDistributionStore.ts",
+        "sovran-app/shared/stores/profile/nostrSocialStore.ts",
+        "sovran-app/shared/stores/profile/npcMintStore.ts",
+        "sovran-app/shared/stores/profile/themeStore.ts",
+        "sovran-app/shared/lib/logger.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Declare zod v4 schemas for RoutstrMessage and RoutstrSession in a dedicated module — initially local to routstrStore.ts, migrated into Sovran/packages/schemas/ when that workspace package lands. Wire safeParse into onRehydrateStorage and into topUp.ts / api.ts error-path boundaries. Combined with F-006's validation fix, this also clears the path for the F-003 rehydration refactor where the shape shifts.",
+      "files": [
+        "sovran-app/shared/stores/profile/routstrStore.ts"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Open a research note at `sovran-app/__research__/routstr-wallet-credential-storage.md` (status: exploring) documenting the decision around the cashu-token-as-apiKey pattern (F-008) and whether apiKey should live in expo-secure-store vs AsyncStorage. Authority of this decision is currently implicit (line 38 comment only) — a note makes it explicit and invites ratification into SOV-19 (Routstr Top-Up & Model Catalogue, currently TODO in docs/README.md).",
+      "files": [
+        "sovran-app/__research__/"
+      ]
+    }
+  ],
+  "open_questions": [
+    "What is the intended behaviour of isAnonymousMode across app restarts — ephemeral (resets on launch) or persistent (survives launch)? The code chose the former by omitting it from partialize, but the comment at L52 does not say, and F-001's data-loss branch follows from the middle-ground state. The product decision belongs in SOV-19 (Routstr top-up & model catalogue) — currently TODO.",
+    "Does the Routstr server reliably upgrade a cashu-token-as-apiKey to a persistent key on the first balance call, or is the token-only path a supported steady state? F-008's severity depends on this. A ping to the Routstr team or a look at their server source would close it.",
+    "Does any Jest / .sov test exercise the anonymous-mode → reload → new-message interleaving described in F-001? A grep of tests/ and __tests__/ would confirm. If not, this is a regression-test gap worth closing."
+  ]
+}

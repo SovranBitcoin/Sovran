@@ -1,0 +1,461 @@
+{
+  "audit": {
+    "date": "2026-05-01",
+    "commit": "38797b50",
+    "entry_point": "sovran-app/features/health",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Score ~8 on diversity-from-prior-audits: the features/health depth-2 slice is absent from all 44 prior audits' covered_slices (+3); 'health' substring never appears in any prior audit's covered_paths (+2); recent churn — 7 source files all touched in last 90 days, including a 458-line WalletHealthModalContent.tsx that is a slop magnet (+1); review dimensions 3/7/8 underrepresented across the last six audits (39-44) (+1); high fan-in via app/healthModal.tsx and HeroTransitionProvider (+1). Top disqualified: features/camera (~7 — uncovered slice but only ~580 LOC and fewer architecture seams) and modules/liquid-glass-text (~6 — uncovered but native-Swift heavy and orthogonal to the requested architecture+slop lens).",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json",
+      "28.json",
+      "29.json",
+      "30.json",
+      "31.json",
+      "32.json",
+      "33.json",
+      "34.json",
+      "35.json",
+      "36.json",
+      "37.json",
+      "38.json",
+      "39.json",
+      "40.json",
+      "41.json",
+      "42.json",
+      "43.json",
+      "44.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "zod-4",
+      "react-native-best-practices",
+      "vercel-react-native-skills",
+      "animating-react-native-expo"
+    ],
+    "process_skills_consulted": [
+      "zoom-out",
+      "improve-codebase-architecture",
+      "diagnose"
+    ],
+    "research_consulted": [
+      "zustand-zod-playbook"
+    ],
+    "tooling_run": {
+      "type_check": "clean (no errors in features/health or app/healthModal)",
+      "lint": "clean for features/health (repo-wide: 7 errors / 50 warnings, none in this subtree)",
+      "knip": "no health-related hits (knip considers barrel re-exports as 'used' — confirmed dead-ness via direct grep)",
+      "analyze_structure": "2 cycles=0; orphans flagged WalletHealthCard.tsx (true) + HealthModalScreen.tsx (false — barrel-imported); 1 colocate suggestion (useWalletHealthData → components, not actioned)"
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "Wallet-health feature is unreachable from the app UI",
+      "repo": "sovran-app",
+      "path": "features/health/components/WalletHealthCard.tsx",
+      "line": 38,
+      "symbol": "WalletHealthCard",
+      "dimension": 1,
+      "description": "WalletHealthCard.tsx:71 is the only caller of hero.startWalletHealth, which is the only navigator to /healthModal (HeroTransitionProvider.tsx:176, 195). Repo-wide grep confirms WalletHealthCard is imported only by the barrel features/health/index.ts:4; nothing imports the barrel's WalletHealthCard re-export. ExploreScreen, the original host, was deleted in commit 90f1326a ('retire explore') without re-homing the card. Net effect: HealthModalScreen, WalletHealthModalContent, useWalletHealthData, most of lib/walletHealth.ts, the walletHealth hero phase, and the FullWindowOverlay path are all dead from the user's perspective.",
+      "why_it_matters": "Silent feature regression — a wallet-health surface users had on Explore is gone, and the orphan code is drifting (see F-002, F-004, F-016). Either the entry point needs to be rewired or the dead code needs to be deleted; sitting in limbo lets the divergence grow.",
+      "fix": "Decide explicitly. (a) Re-host WalletHealthCard on Account / AccountPagerViewLayout's secondary action row (the comment at AccountPagerViewLayout.tsx:83 already treats HealthModalScreen as a live route), or another visible surface; or (b) delete features/health/, the /healthModal route in config/modalScreens.ts:113, the walletHealth case in HeroTransitionProvider.tsx, and the import of WalletHealthCardFrame at HeroTransitionProvider.tsx:15.",
+      "references": [
+        "git:90f1326a",
+        "git:19388f0e",
+        "git:38797b50",
+        "skill:zoom-out",
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Grep for 'WalletHealthCard' returns only the definition, the barrel re-export, and a doc-comment in useWalletHealthData; 'startWalletHealth' is called only from WalletHealthCard.tsx:71. Counter-argument considered: maybe re-hosting is imminent — rejected because the audit reports current state, and PR #189's body explicitly retires Explore without re-homing wallet-health.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Wallet-health unreachable from app UI — considered as candidate dead-code slice (cluster C). Excluded in favour of route-boundary param validation. Real, unfixed."
+    },
+    {
+      "id": "F-002",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "computeWalletHealth and the HealthSignal/HealthChip/WalletHealthResult types are dead; modal silently re-implements the rules with a regression",
+      "repo": "sovran-app",
+      "path": "features/health/lib/walletHealth.ts",
+      "line": 106,
+      "symbol": "computeWalletHealth",
+      "dimension": 3,
+      "description": "computeWalletHealth (lib/walletHealth.ts:106-220) is only called from the orphan WalletHealthCard.tsx:55-63. chipIconName (WalletHealthCard.tsx:27-36) is also dead. WalletHealthModalContent.tsx:93-158 recomputes the same severity branches (no balance / not configured / needs rebalance / balanced) inline using identical primitives but does not reproduce the lib's 'Concentrated' chip (largestShareBp >= 8000 → warn at lib/walletHealth.ts:187-196). It also never builds an openPendingEcash CTA. The lib's signal-driven design has been bypassed in favour of duplicated inline branches that have already drifted.",
+      "why_it_matters": "The bigger truth (lib) is unreachable; the reachable truth (modal) silently dropped a warning users used to see. As long as both versions exist, fixes will land in only one and the divergence widens.",
+      "fix": "Make computeWalletHealth the single source of truth: have WalletHealthModalContent consume { chips, signals } and render hero stats from chips, action-rows from signals.filter(s => s.cta). Delete the inline re-derivation in WalletHealthModalContent.tsx:93-158. This collapses three places that compute health (lib, modal, dead card) into one and naturally reintroduces the Concentrated and pending-ecash CTAs.",
+      "references": [
+        "skill:improve-codebase-architecture",
+        "skill:diagnose"
+      ],
+      "verification_note": "Read both implementations side by side; rules are textually similar but the lib emits an extra Concentrated chip and a CTA-bearing signals array that the modal never produces. Grep confirms computeWalletHealth has only one caller (WalletHealthCard).",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "pendingOutgoingCount undercounts when history > 100 entries",
+      "repo": "sovran-app",
+      "path": "features/health/hooks/useWalletHealthData.ts",
+      "line": 48,
+      "symbol": "pendingOutgoingCount",
+      "dimension": 1,
+      "description": "useWalletHealthData reads usePaginatedHistory() from coco-react (default pageSize=100, see coco/packages/react/src/lib/hooks/usePaginatedHistory.ts:14) and filters that paginated slice for entry.type==='send' && (state==='pending'|'prepared') per-unit. On initial mount only the first 100 entries are loaded; pending sends older than that are missed. The manager.on('history:updated') listener inside usePaginatedHistory (lines 75-83) refreshes only the first page, not the entire history.",
+      "why_it_matters": "The modal hero shows 'Pending: N' and the pendingStat colour toggles severity on it; both lie when the user's history exceeds 100 entries. Pending outgoing tokens that are old (long-running offline send recipients) are exactly the ones that should drive the warning — and they're the ones that get hidden.",
+      "fix": "Replace usePaginatedHistory with useReservedProofs (shared/hooks/useReservedProofs.ts:18). It queries manager.proofRepository.getReservedProofs() with no pagination, returns proofs annotated by usedByOperationId, and is already debounced against proofs:reserved/released/state-changed events. Aggregate by mint URL → unit (using getMintsForUnit) to derive a per-unit count of distinct outgoing operations.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:diagnose"
+      ],
+      "verification_note": "Confirmed default pageSize=100 in coco/packages/react/src/lib/hooks/usePaginatedHistory.ts:14 and that history:updated only re-fetches the current page (lines 49-68). useReservedProofs already exists and is used by PrimaryBalance.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "HealthCta.openPendingEcash is a dead branch — modal never produces it",
+      "repo": "sovran-app",
+      "path": "features/health/components/WalletHealthModalContent.tsx",
+      "line": 229,
+      "symbol": "actionRows",
+      "dimension": 1,
+      "description": "HealthCta enumerates openPendingEcash (lib/walletHealth.ts:8-11) and HealthModalScreen.handleAction handles it (HealthModalScreen.tsx:75-80). But WalletHealthModalContent.actionRows builds rows for only 'rebalance' and 'split' (lines 229-269); pendingOutgoingCount is shown as a stat pill in the hero but is never tappable.",
+      "why_it_matters": "The whole reason to surface 'Pending: 3' on a health card is to drive remediation; the action that completes the loop is wired but unreachable from the user.",
+      "fix": "Add a row to actionRows when pendingOutgoingCount > 0 calling onAction({ type: 'openPendingEcash' }). This collapses naturally with F-002 if actionRows becomes signals.filter(s => s.cta).map(...).",
+      "references": [
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Read both files end-to-end; the modal pushes only two row keys ('rebalance', 'split'). The HealthModalScreen handler for openPendingEcash is therefore unreachable through the UI even when the modal is reachable.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.7,
+      "title": "Deep-link param `unit` is not zod-validated at the route boundary",
+      "repo": "sovran-app",
+      "path": "features/health/screens/HealthModalScreen.tsx",
+      "line": 43,
+      "symbol": "useLocalSearchParams",
+      "dimension": 5,
+      "description": "useLocalSearchParams<{ unit?: string }>() is TypeScript-only typing — no runtime guarantee on the value shape. /healthModal is registered in config/modalScreens.ts:113 as a deep-link target. The downstream casing round-trip on lines 44/53-55/57 is the symptom of unconstrained input.",
+      "why_it_matters": "Today's only producer is the internal HeroTransitionProvider, but routes registered in modalScreens.ts survive UI refactors and any external link could pass arbitrary strings. Per dim 5/6 rules, deep-link params must be zod-validated regardless of caller trust.",
+      "fix": "Declare HealthModalParams = z.strictObject({ unit: z.enum(['sat','usd','eur','gbp']).optional() }), parse useLocalSearchParams once, and consume the lowercase validated unit everywhere. Eliminates the casing round-trip described in F-015.",
+      "references": [
+        "skill:zod-4",
+        "research:zustand-zod-playbook"
+      ],
+      "verification_note": "UNVERIFIED — depends on whether the route is intended to remain deep-linkable (resolved by F-001). Kept as Medium because route registration outlives any internal-only assumption.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "HealthModalScreen now validates unit via zod at the route boundary; invalid units coerce to sat via .catch()."
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "getCurrenciesFromMints uses any[] and duplicates logic that belongs beside getMintsForUnit",
+      "repo": "sovran-app",
+      "path": "features/health/screens/HealthModalScreen.tsx",
+      "line": 25,
+      "symbol": "getCurrenciesFromMints",
+      "dimension": 1,
+      "description": "Helper walks mint.mintInfo?.nuts?.['4']?.methods to gather supported NUT-4 units and filters to ['SAT','USD','EUR','GBP']. Mint type is already imported by lib/walletHealth.ts:1 for getMintsForUnit. (a) any[] violates @typescript-eslint/no-explicit-any and the code-quality rule against any. (b) The function is the inverse of getMintsForUnit; both compute over the same source data.",
+      "why_it_matters": "Two issues: weak typing at a screen boundary, and a duplication-in-waiting (the next screen showing per-unit dashboards will redefine the allowlist a second time).",
+      "fix": "Move getCurrenciesFromMints into lib/walletHealth.ts typed as (trustedMints: Mint[]) => Unit[] (with Unit a discriminated literal), beside getMintsForUnit. Have HealthModalScreen import it.",
+      "references": [
+        "nuts/04.md:32",
+        "lint:@typescript-eslint/no-explicit-any",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Grep confirms no other file defines a similar helper. Mint type already in lib's import set.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Low",
+      "confidence": 0.75,
+      "title": "WalletHealthModalContent.tsx is 459 lines and combines four concerns",
+      "repo": "sovran-app",
+      "path": "features/health/components/WalletHealthModalContent.tsx",
+      "line": 47,
+      "symbol": "WalletHealthModalContent",
+      "dimension": 3,
+      "description": "Single responsibility broken across: hero state computation (lines 65-227), action-row construction (229-269), useEffect-driven staggered fade-in (271-303), hero/tabs/body render glue (305-413). Just under the codebase 400-line guideline by 59 lines but each concern is independently testable.",
+      "why_it_matters": "Slop accumulates — the file is already over the recommended size, drifting against lib/walletHealth.ts (F-002), and any future change to one concern forces the reviewer to re-prove the others.",
+      "fix": "Extract useWalletHealthHero(unit) returning { hero, accent, heroStats, driftStat, pendingStat, splitStat }; an ActionRow component wrapping the heroui ListGroup recipe; a useStaggeredFadeIn(stages) hook for the choreography. Remaining shell becomes ~120 lines of layout. Lands cleanly on top of F-002.",
+      "references": [
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Read top-to-bottom; each concern starts and ends at a clear seam. Counter-argument: React components do tend to be larger when they juggle state + layout + animations — accepted but the four concerns here have natural separation.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.75,
+      "title": "Render-prop children with an inline-layout fallback that is never reached",
+      "repo": "sovran-app",
+      "path": "features/health/components/WalletHealthModalContent.tsx",
+      "line": 415,
+      "symbol": "children",
+      "dimension": 3,
+      "description": "Component takes children?: (layout: WalletHealthLayout) => React.ReactNode (line 64) and falls back to its own <Log><VStack>...</VStack></Log> when missing (lines 419-428). The only caller (HealthModalScreen.tsx:124-170) always passes children.",
+      "why_it_matters": "Premature flexibility for a single consumer; the fallback path is dead and adds nesting depth without reuse value.",
+      "fix": "Drop the optional marker on children and delete the fallback, or invert: WalletHealthModalContent returns the three slots directly and the screen does the composition.",
+      "references": [
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Grep for WalletHealthModalContent usages returns one caller (HealthModalScreen.tsx) which always passes children. No storybook in the repo.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "gradientAccent = red is a no-op alias",
+      "repo": "sovran-app",
+      "path": "features/health/components/WalletHealthModalContent.tsx",
+      "line": 80,
+      "symbol": "gradientAccent",
+      "dimension": 3,
+      "description": "const gradientAccent = red; on line 80; red is never used after — gradientAccent is the only consumer. The comment (lines 78-80) explains intent ('consistently red-warm even when hero.accent is white') but renaming to gradientAccent does no work; the comment is the intent, not the variable.",
+      "why_it_matters": "Slop-level noise; trains readers to expect aliasing as a pattern.",
+      "fix": "Delete the alias, use red directly. Or, if 'gradient accent always tracks the danger token' is the actual invariant, lift it to a useHealthAccent() hook reading from the theme.",
+      "references": [],
+      "verification_note": "Grep within the file confirms red is only read once (the assignment to gradientAccent).",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Magic threshold 200 (=2% rebalance trigger) duplicated in two files",
+      "repo": "sovran-app",
+      "path": "features/health/components/WalletHealthModalContent.tsx",
+      "line": 117,
+      "symbol": "needsRebalance",
+      "dimension": 1,
+      "description": "WalletHealthModalContent.tsx:117 (`maxDriftBp >= 200`) mirrors lib/walletHealth.ts:166 (`const needsRebalance = maxDriftBp >= 200;`). Both have a comment explaining the 2% choice but no shared constant.",
+      "why_it_matters": "Threshold drift waiting to happen; one site updates, the other lies.",
+      "fix": "Export REBALANCE_DRIFT_THRESHOLD_BP = 200 from lib/walletHealth.ts and import it in both places. Becomes a non-issue if F-002 is fixed.",
+      "references": [],
+      "verification_note": "Both literals confirmed; no other 200-bp threshold exists in the feature.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-011",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "onLayout re-registers the hero ref on every layout pass",
+      "repo": "sovran-app",
+      "path": "features/health/components/WalletHealthCard.tsx",
+      "line": 98,
+      "symbol": "onLayout",
+      "dimension": 7,
+      "description": "onLayout={() => hero.registerRef('walletHealth', 'source', cardRef.current)} allocates a fresh closure per render and writes to the refs dict on every layout. Same pattern in WalletHealthModalContent.tsx:308 via handleHeroLayout. Cheap individually, but the layout dependency means every theme change / parent layout / reanimated-driven resize triggers the registration. The dict entry also leaks past unmount (no symmetric clear).",
+      "why_it_matters": "Slop — pattern looks like 'register ref' but actually 'spam the registry'. Future readers may copy it.",
+      "fix": "Register once in a useEffect keyed on [hero, ref] with explicit cleanup (registerRef('...','source', null) on unmount). Drop the per-layout closure.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:vercel-react-native-skills"
+      ],
+      "verification_note": "Counter-argument: hero.registerRef is stable (useCallback), so the inline closure equality is irrelevant for its consumer; the only cost is allocation. Confidence kept Low.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-012",
+      "severity": "Low",
+      "confidence": 0.6,
+      "title": "<ListGroup.Item disabled> wrapped in a tappable <PressableFeedback> is an a11y mismatch",
+      "repo": "sovran-app",
+      "path": "features/health/components/WalletHealthModalContent.tsx",
+      "line": 392,
+      "symbol": "ListGroup.Item",
+      "dimension": 8,
+      "description": "Action rows render <PressableFeedback onPress={r.onPress}> around a <ListGroup.Item disabled>. The disabled prop on heroui-native's ListGroup.Item likely sets accessibilityState.disabled: true, telling VoiceOver/TalkBack the row is non-interactive — yet the outer wrapper still fires the press.",
+      "why_it_matters": "Screen-reader users get a wrong signal — the row reads as disabled but tapping it acts.",
+      "fix": "Drop disabled (the visual must come from a non-aria prop) or move the disabled semantics to the outer wrapper consistently. Verify against heroui-native's ListGroup.Item source before final fix.",
+      "references": [
+        "skill:building-native-ui"
+      ],
+      "verification_note": "UNVERIFIED — depends on heroui-native's accessibilityState propagation. If disabled is purely visual styling there, demote to Nit.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-013",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "StyleSheet.create mixed with Uniwind className in the same component",
+      "repo": "sovran-app",
+      "path": "features/health/components/WalletHealthModalContent.tsx",
+      "line": 339,
+      "symbol": "className",
+      "dimension": 8,
+      "description": "Inline className=\"px-2\" (339), \"w-full\" (351), \"px-4\" (388) coexist with a StyleSheet.create({...}) block (431-458) and style={[...]} props throughout. Per dim 8 sovran-app convention is Uniwind className for layout tokens; StyleSheet only where StyleSheet uniquely provides something (e.g. absoluteFill).",
+      "why_it_matters": "Inconsistency at the edge of two styling systems makes future contributors guess the right surface.",
+      "fix": "Convert the StyleSheet entries to className where they map to tokens (heroWrap → w-full self-stretch rounded-3xl border p-[18px] overflow-hidden; statPill → flex-1 border rounded-2xl py-2.5 px-3 items-center justify-center). Keep StyleSheet for absoluteFill/absoluteFillObject.",
+      "references": [],
+      "verification_note": "Both styling systems present at the cited lines; codebase rule is Uniwind for sovran-app.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-014",
+      "severity": "Low",
+      "confidence": 0.6,
+      "title": "Reanimated v4 sharedValue API used inconsistently across the feature",
+      "repo": "sovran-app",
+      "path": "features/health/components/WalletHealthModalContent.tsx",
+      "line": 283,
+      "symbol": "tabsOpacity.value",
+      "dimension": 4,
+      "description": "WalletHealthCard uses the v4 canonical pressed.set(withTiming(...)) (lines 78, 81). WalletHealthModalContent uses the legacy tabsOpacity.value = withDelay(...) (lines 283-291) for the same kind of write. Both work in Reanimated 4.2.2; .set() is canonical going forward.",
+      "why_it_matters": "Style drift inside one feature; new code copying the wrong neighbour will continue the legacy form.",
+      "fix": "Unify on .set() in this feature; do not propagate .value = to new code.",
+      "references": [
+        "skill:animating-react-native-expo",
+        "skill:creating-reanimated-animations"
+      ],
+      "verification_note": "react-native-reanimated 4.2.2 confirmed in package.json:148. Both APIs work; .set() is the v4 idiom.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-015",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "unit casing round-trip in HealthModalScreen is brittle",
+      "repo": "sovran-app",
+      "path": "features/health/screens/HealthModalScreen.tsx",
+      "line": 44,
+      "symbol": "selectedCurrency",
+      "dimension": 1,
+      "description": "lines 44, 53-55, 57: lower → upper → maybe-back-to-sat → lower. Three transformations to defend against an unvalidated input.",
+      "why_it_matters": "Brittleness compounds: each new caller passes a slightly different shape, and the screen accumulates more coercions to compensate.",
+      "fix": "Combined with F-005: parse unit as a lowercase enum once at the boundary, store lowercase in state, present uppercase only at render. Drop the selectedCurrency uppercase mirror — let MintCurrencyTabs handle display casing internally or accept a lowercase token.",
+      "references": [],
+      "verification_note": "Read the cited lines; three transformations confirmed. Counter-argument: MintCurrencyTabs may require uppercase — accepted as a constraint, but it can uppercase internally instead of forcing the screen to.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-016",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "Concentration-risk warning is silently dropped on the modal path",
+      "repo": "sovran-app",
+      "path": "features/health/lib/walletHealth.ts",
+      "line": 187,
+      "symbol": "computeWalletHealth",
+      "dimension": 1,
+      "description": "lib/walletHealth.ts:187-196 emits a Concentrated chip + signal when one mint holds >= 80% of the unit's balance. WalletHealthModalContent never surfaces this. A user with one mint at 95% sees Balanced or Needs rebalance but never the Concentration risk warning the lib was designed to raise.",
+      "why_it_matters": "The lib's defensive heuristic is unreachable from the UI — users are not warned about a single mint holding most of their funds (a real loss-of-funds risk if that mint goes offline).",
+      "fix": "Subsumed by F-002 (route the modal through computeWalletHealth.signals).",
+      "references": [],
+      "verification_note": "Lib code confirmed; modal code reviewed end-to-end and there is no Concentrated branch.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "partial",
+    "3": "pass",
+    "4": "partial",
+    "5": "partial",
+    "6": "partial",
+    "7": "partial",
+    "8": "partial",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "dead-code",
+      "description": "Decide F-001 first. If wallet-health is being retired, delete features/health/, the /healthModal entry in config/modalScreens.ts, the walletHealth case in HeroTransitionProvider, and the WalletHealthCardFrame import there. If it is being re-hosted, the rest of this plan applies.",
+      "files": [
+        "features/health/components/WalletHealthCard.tsx",
+        "features/health/index.ts",
+        "config/modalScreens.ts",
+        "shared/providers/hero-transition/HeroTransitionProvider.tsx",
+        "app/healthModal.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Make computeWalletHealth the single source of truth for severity → chips → signals. WalletHealthModalContent consumes { chips, signals } instead of recomputing the rules inline; actionRows becomes signals.filter(s => s.cta).map(...). Naturally restores the Concentrated chip and the openPendingEcash CTA. Lift REBALANCE_DRIFT_THRESHOLD_BP = 200 into lib/walletHealth.ts.",
+      "files": [
+        "features/health/lib/walletHealth.ts",
+        "features/health/components/WalletHealthModalContent.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Move getCurrenciesFromMints from HealthModalScreen into lib/walletHealth.ts beside getMintsForUnit, typed as (trustedMints: Mint[]) => Unit[]. Drop any[] at the screen boundary. Adopt a route-level zod schema for /healthModal and consume the parsed lowercase unit; remove the casing round-trip in HealthModalScreen.",
+      "files": [
+        "features/health/screens/HealthModalScreen.tsx",
+        "features/health/lib/walletHealth.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Replace usePaginatedHistory in useWalletHealthData with useReservedProofs. Aggregate reservedProofs by mint URL → unit (using getMintsForUnit) for the per-unit pending count.",
+      "files": [
+        "features/health/hooks/useWalletHealthData.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Split WalletHealthModalContent into useWalletHealthHero(unit), an ActionRow component (or inline rows back into the screen once the data is signal-driven), and useStaggeredFadeIn(stages). Drop the unused render-prop fallback. Unify on Reanimated v4 .set() API.",
+      "files": [
+        "features/health/components/WalletHealthModalContent.tsx"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Open a docs/SOV-1X spec under the 1X Cashu wallet band describing the wallet-health surfacing model — what counts as health, where it surfaces, what severities fire which CTAs. Today there is no Ratified spec for it; F-001 has no authoritative tiebreaker.",
+      "files": [
+        "docs/README.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Is the wallet-health surface coming back on Account / AccountPagerView, or being retired? F-001 stops short of a recommendation because the answer changes the rest of the plan.",
+    "Does heroui-native's <ListGroup.Item disabled> propagate accessibilityState.disabled to the rendered host? Resolves whether F-012 is Low or Nit.",
+    "Should the currency allowlist ['SAT','USD','EUR','GBP'] live in features/health, or in a shared currency-config beside the pricelist provider? No shared allowlist found via grep.",
+    "Would the user prefer the consolidation of severity logic (F-002) to land in lib/walletHealth.ts, or to move the lib functions into a custom hook that owns the data dependencies as well? Open architecture choice."
+  ]
+}

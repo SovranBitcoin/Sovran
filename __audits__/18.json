@@ -1,0 +1,394 @@
+{
+  "audit": {
+    "date": "2026-04-20",
+    "commit": "bd018588",
+    "entry_point": "sovran-app/app/(user-flow)",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "07.json",
+      "09.json",
+      "12.json",
+      "13.json",
+      "17.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md",
+      "docs/README.md"
+    ],
+    "skills_consulted": [
+      "zod-4",
+      "zustand-5",
+      "security-review",
+      "typescript-advanced-types",
+      "react-native-best-practices"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "project-wide errors in unrelated files (mint/, theme/, transactions/, navigation/, shared/lib/cashu/manager.ts, shared/providers/WalletContextProvider.tsx, settings/); zero TS errors inside app/(user-flow)/**, features/splitBill/**, features/bitchat/**. features/user/screens/UserMessagesScreen.tsx:2464 raises one `waitForInitialLayout` LegendList prop error (pre-existing, unrelated to this audit's scope).",
+      "lint": "21 problems inside the blast radius: 12 prettier errors + 9 warnings across splitBill/detail.tsx (3 errors), splitBill/participants.tsx (5 errors + 3 warnings), splitBill/summary.tsx (3 errors + 1 warning), features/bitchat/screens/GeohashChatScreen.tsx (2 warnings incl. `'muted' assigned but never used`). `react-hooks/exhaustive-deps` on participants.tsx:115 and :137 warns about missing `picker` dep; `unused-imports/no-unused-imports` fires on summary.tsx:12 `useEffect`.",
+      "knip": "Unused exports inside the blast radius: DECK_CARD_WIDTH at features/splitBill/components/ParticipantCardDeck.tsx:211; ParticipantCardProps interface at features/splitBill/components/ParticipantCard.tsx:57; ParticipantCardDeckProps interface at features/splitBill/components/ParticipantCardDeck.tsx:69; UseSplitBillParticipantPickerResult at features/splitBill/hooks/useSplitBillParticipantPicker.ts:135; QuoteIdToSplitBillIndex + SplitBillStore types at shared/stores/profile/splitBillTransactionsStore.ts:97/162. The prior audit-13 bitchat dead-code (BitChatScreen, MessageBubble, MessageList, ChannelHeader, ComposeBar, BITCHAT_EVENT_KIND_* constants) is still present — carried over from audit 13's refactor_plan.",
+      "analyze_structure": "app/(user-flow): 13 files, ~500 code-LOC at the route layer. Zero cycles. Cross-folder coupling: splitBill/ imports 48 symbols from parent (shared/ui, shared/stores, features/splitBill) vs 0 from siblings. 14 colocate suggestions, strongest: shared/stores/profile/splitBillTransactionsStore.ts (3/3 importers in splitBill/), features/splitBill/hooks/useSplitBillOrchestrator.ts (2/2 in splitBill/). Expected file-based-route 'orphans' ignored."
+    }
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "Critical",
+      "confidence": 0.92,
+      "title": "share.tsx renders QR + clipboard-copies attacker-controlled `data` param with a spoofed `type` label — direct funds-theft vector via `sovran://(user-flow)/share?type=lud16&data=attacker@evil.com`",
+      "repo": "sovran-app",
+      "path": "app/(user-flow)/share.tsx",
+      "line": 22,
+      "symbol": "SharePage / useLocalSearchParams",
+      "dimension": 2,
+      "description": "Line 15-29 reads `{ type = 'npub', data, npub, lud16 }` directly from `useLocalSearchParams<{ type?: ShareType; data: string; npub?: string; lud16?: string }>()`. The TypeScript narrowing is compile-time only; at runtime every field is whatever the URL provides. No zod schema, no allowlist on `type`, no bech32 check on `npub`, no Lightning-Address format check on `lud16`, no length cap on `data`. SharePage forwards those raw params straight into `ShareScreen` at features/user/screens/ShareScreen.tsx:78, which (a) renders the selected value as a QR via `PaymentInfo` (ShareScreen.tsx:157), (b) displays it verbatim under a semantic section label derived from `SHARE_CONFIGS[type].sectionTitle` (ShareScreen.tsx:159), and (c) writes it to the system clipboard on tap via `Clipboard.setStringAsync(activeData)` (ShareScreen.tsx:141-145). Deep-link routing is live: `app.json:7` declares `\"scheme\": [\"sovran\", \"cashu\"]`, and expo-router ~55 file-based routing exposes every file-named route to `sovran://(user-flow)/share?...` without a consent gate. The attack is a one-hop phishing link: craft `sovran://(user-flow)/share?type=lud16&data=attacker@evil.com` (or `type=npub&data=npub1<attacker_pubkey>`), convince the victim to tap it (QR in the wild, link in a hostile app, href from any web page, in-band inside a Nostr DM), victim's own wallet UI then displays `attacker@evil.com` under the `LIGHTNING` heading with the title 'Lightning Address', renders a payable QR of the attacker's address, and on tap copies the attacker string to the clipboard. The victim's next move — 'send me some sats, here's my lightning address' — hands the tokens to the attacker. No cryptographic indicator to the user that the displayed address isn't theirs. The same exploit with `type=npub&data=<attacker_pubkey>` spoofs the user's 'own' npub, which is the recipient identity for every incoming Nostr DM / zap forwarded against that pubkey. This is the outbound-identity analogue of audit 13's F-002 on bitchatDM.tsx (spoofed inbound DM sender); together the two make external deep links the primary attack surface on the user-flow group.",
+      "why_it_matters": "Funds-at-risk per the severity rubric: the QR is a bearer credential (Lightning address = payer-redirectable account). The user tells a paying counterparty 'pay to my QR', and the payment goes to the attacker. Because the displayed UI is the victim's own Sovran, the deception survives any normal user-side vigilance — they're looking at a screen inside their wallet, labelled 'Lightning Address', with their wallet's chrome. No cryptographic sig check, no domain confirmation, no warning. The QR exchange is also a common offline pattern (point-of-sale, peer-to-peer IRL), so social engineering doesn't require the attacker to be physically present — a QR code on a sticker, a NFC tag, or a preceding link is sufficient. The attack also chains with audit 13's F-001 (NIP-17 impersonation) and F-002 (bitchatDM peerID spoof): an attacker who forges a DM from 'Alice' via F-001 can include a `sovran://(user-flow)/share?type=lud16&data=attacker@evil.com` link with the text 'hey, share your QR with Bob so he can pay you back', tricking Alice into opening the phishing share screen then forwarding the QR to Bob.",
+      "fix": "Hoist validation into the route BEFORE passing to ShareScreen. (A) Define a zod schema — ideally in packages/schemas (still aspirational per AUDIT.md) or near-term in `features/user/lib/schemas.ts`: `const ShareParams = z.discriminatedUnion('type', [z.strictObject({ type: z.literal('npub'), data: z.string().regex(/^npub1[02-9ac-hj-np-z]{58}$/), npub: z.string().optional(), lud16: z.string().max(254).regex(/^[a-z0-9._-]+@[a-z0-9.-]+$/i).optional() }), z.strictObject({ type: z.literal('lud16'), data: z.string().max(254).regex(/^[a-z0-9._-]+@[a-z0-9.-]+$/i), npub: z.string().regex(/^npub1[02-9ac-hj-np-z]{58}$/).optional(), lud16: z.undefined() }), z.strictObject({ type: z.literal('p2pk'), data: z.string().regex(/^02[0-9a-f]{64}$/i) }), z.strictObject({ type: z.literal('profile'), data: z.string().regex(/^npub1[02-9ac-hj-np-z]{58}$/) })]);` then `const parsed = ShareParams.safeParse(params); if (!parsed.success) return <InvalidShareError/>;`. (B) Defence-in-depth at the ShareScreen level: always render a prominent 'This is data from outside your wallet — verify before sharing' banner when the mounting path is a deep link rather than an internal `router.push` with a validated source. A hoisted `source` param (`source: 'internal' | 'deep-link'`) lets the screen distinguish. (C) At the expo-router layer, add a global deep-link consent interstitial for any `sovran://` URI that lands on a screen that will display an identity artifact (share, bitchatDM, userMessages) — see audit 13's F-002 open-questions section for the parallel discussion of this at the DM surface. Cite `skill:zod-4` (z.discriminatedUnion, regex + strictObject), `skill:security-review`.",
+      "references": [
+        "luds/16.md",
+        "nips/19.md",
+        "skill:zod-4",
+        "skill:security-review"
+      ],
+      "verification_note": "Re-read share.tsx:13-50 (raw useLocalSearchParams, no validation), ShareScreen.tsx:78-146 (activeData flows into PaymentInfo QR + Clipboard.setStringAsync). Confirmed app.json:7 declares `scheme: [\"sovran\", \"cashu\"]` making sovran://(user-flow)/share?... externally reachable. Grepped internal callers: UserProfileScreen.tsx:971 (routes with verified `npub` + kind-0-sourced `lud16` — internal use is safe; the relay-verified kind-0 is BIP-340 Schnorr-checked), UserMessagesScreen.tsx:2327 and SettingsKeyringScreen.tsx:71,164 (same). All internal callers supply sanitised values; the attack vector is the external deep-link path. Counter-argument considered: 'iOS universal links typically require associatedDomains + an apple-app-site-association file, limiting remote attackers.' True for universal links, but `scheme: [...]` handles custom-scheme invocations (`sovran://...`) WITHOUT associatedDomains — any tappable `sovran://` from any source (another app, a Nostr DM message rendered as a link, a QR, a webpage's a-href) lands on the screen. Counter-argument considered: 'the user chose to tap the link.' They chose to OPEN the app at that route; they did NOT consent to 'this data is mine.' The phishing is that the UI presents as though it was. Severity Critical per AUDIT.md funds-at-risk rule — the primary exploit path is direct user-initiated payment to a misdirected recipient. Confidence 0.92: the residual 0.08 is the unverified claim that no upstream consent sheet or deep-link parser sits between the OS and the route (I did not read expo-router's internal initialURL handler).",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "share routes (user-flow + standalone) now allowlist type and validate data per-type via zod superRefine; lud16 funds-theft vector closed."
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "Every route in app/(user-flow) reads useLocalSearchParams without runtime validation — categorical dim-5 violation across the full user-flow subtree",
+      "repo": "sovran-app",
+      "path": "app/(user-flow)",
+      "line": 1,
+      "symbol": "useLocalSearchParams across the subtree",
+      "dimension": 5,
+      "description": "Grep for z.strictObject / z.object / z.safeParse across app/(user-flow) returns zero matches. Inventory of unvalidated route-param sinks in the subtree: app/(user-flow)/bitchatDM.tsx:21 (`{ transport, peerID, nickname, geohash }` — already filed as audit 13 F-002); app/(user-flow)/geohashChat.tsx:13 (`{ geohash, tierLabel, transport }` — `transport` typed as literal union `'nostr' | 'ble'` but no runtime check, `geohash` not checked against the base32 geohash alphabet `[0-9bcdefghjkmnpqrstuvwxyz]{1,12}`); app/(user-flow)/share.tsx:16 (`{ type, data, npub, lud16 }` — escalated as F-001 above); features/user/screens/UserProfileScreen.tsx:652 via app/(user-flow)/profile.tsx (`{ npub, pubkey, mintUrl }` — `npub` is passed straight to `npubToPubkey()` which throws on invalid bech32, see F-003); app/(user-flow)/userMessages.tsx:14 (`{ pubkey }` — forwarded to UserMessagesScreen as the NIP-17 DM counterparty without any 64-hex validation); app/(user-flow)/thread.tsx via features/feed/screens/ThreadScreen.tsx:11 (`{ eventId }` — logged verbatim to `feed.thread.view` and passed to ThreadView as the event ID to subscribe to, no length/hex validation); app/(user-flow)/splitBill/participants.tsx:40 (`{ totalAmount, unit }` — `totalAmount` parsed with `parseInt(...,10) || 0` which silently coerces `NaN`/`Infinity`/negative strings to 0, and `unit` is typed as literal `'sat'|'usd'` but accepts any string at runtime); app/(user-flow)/splitBill/summary.tsx:84 (`{ groupId }`); app/(user-flow)/splitBill/detail.tsx:89 (`{ groupId }`). Audit 13 F-002 flagged this exact pattern for bitchatDM.tsx as High. Every other route in the group has the same class of defect; the resulting attack surface is categorical. AUDIT.md dim-5 explicitly forbids the pattern: 'Deep-link params are parsed through a zod schema; flag direct use of useLocalSearchParams() without validation.'",
+      "why_it_matters": "Enumerates the attack surface across the subtree rather than route-by-route. Most individual exploits are specific to their route (F-001 on share, audit-13 F-002 on bitchatDM, F-003 on profile) but the shared root cause means fixes must be applied everywhere at once to avoid regression. A per-schema hoist (per-route) partially works; a centralised packages/schemas module is the correct long-term home because the same schemas — bech32 npub, 64-hex pubkey, 16-hex BLE peerID, geohash alphabet, Lightning Address, mint URL — are re-used across the user-flow and mint-flow subtrees (see audit 12 F-008 for the mint-flow unit-param analogue). Without ratification, every new route added to (user-flow) inherits the same hole. SOV-34 (Deep Links & Payment URIs — TODO per docs/README.md) is the missing spec; a ratified SOV-34 would codify the 'every route parses via a schema registered in packages/schemas' regression rule.",
+      "fix": "Single consolidated fix: create `features/<domain>/lib/schemas.ts` per domain (or the aspirational packages/schemas once the monorepo seam exists) and rewrite each route to (a) import the relevant schema, (b) `safeParse` on the raw useLocalSearchParams result, (c) render a 'Missing or invalid link parameters' fallback on failure. Inventory of schemas to write: `BitchatDMParams` (per audit 13 F-002), `GeohashChatParams` (geohash + transport discriminated), `ShareParams` (per F-001 above), `UserProfileParams` (npub XOR pubkey required, mintUrl optional https URL), `UserMessagesParams` (64-hex pubkey required), `ThreadParams` (64-hex eventId required), `SplitBillAmountParams` (N/A — no params), `SplitBillParticipantsParams` (totalAmount positive integer ≤ 1e12, unit ∈ {sat, usd}), `SplitBillSummaryParams` (groupId regex /^sb-[0-9]+-[0-9a-z]{8}$/), `SplitBillDetailParams` (same groupId regex). Cite skill:zod-4 for `z.strictObject` + `z.discriminatedUnion`, skill:security-review, LUDS/NIPs for the format specs.",
+      "references": [
+        "docs/README.md (SOV-34 TODO)",
+        "skill:zod-4",
+        "skill:security-review",
+        "prior-audit:F-002@13.json"
+      ],
+      "verification_note": "Re-ran Grep with pattern `z\\.(strictObject|object|string|safeParse)` across app/(user-flow) — zero matches. Re-read every `useLocalSearchParams` call site listed in the description and confirmed none validate. Counter-argument considered: 'maybe validation happens inside the downstream components (UserProfileScreen, ShareScreen, ThreadScreen, UserMessagesScreen).' Partially — UserMessagesScreen does run downstream sanity but the routing layer is where the trust boundary sits, and downstream validation post-render still renders whatever the URL said, leaving the phishing affordances intact. Also considered: 'typedRoutes at build time catches many shape errors.' True for internal router.push calls, useless for external sovran:// invocations. Severity High (not Critical) because the categorical finding is a collection of smaller findings of varying severity; the highest-severity specific exploit (F-001) is already filed Critical separately.",
+      "prior_audit_id": "F-002@13.json",
+      "completion_status": "complete",
+      "completion_note": "All split-bill routes cited by this finding (now under app/(split-bill-flow)) plus the remaining (mint-flow), (transactions-flow), (filter-flow), (theme-flow), (stories-flow), (map-flow) entry points and standalone camera screens migrated to useRouteParams + zod in commit 17e87fd7. The categorical pattern is closed across every route handler reading useLocalSearchParams."
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "UserProfileScreen crashes on render when `npub` deep-link param is malformed bech32 — nip19.decode throws unhandled, taking down the screen",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserProfileScreen.tsx",
+      "line": 660,
+      "symbol": "UserProfileScreen pubkey useMemo",
+      "dimension": 1,
+      "description": "Line 652-662: `const { npub: npubParam, ... } = useLocalSearchParams<{ npub?: string; ... }>(); const pubkey = useMemo(() => { if (pubkeyParam) return pubkeyParam; if (npubParam) return npubToPubkey(npubParam); return ''; }, [npubParam, pubkeyParam]);`. `npubToPubkey` at `shared/lib/nostr/client.ts:9-19` calls `nip19.decode(npub)` directly with no try/catch. Per nostr-tools, `nip19.decode` throws on bech32-malformed input (invalid checksum, wrong prefix, non-base32 characters). A deep link `sovran://(user-flow)/profile?npub=npub1garbage` triggers `nip19.decode` → throws — and because the call lives inside a `useMemo` during render, the throw bubbles up as an uncaught render error. React renders the app-level error boundary (if any) or crashes the mount. The later `npub` useMemo at line 664-674 DOES try/catch nip19.npubEncode but the crash fires in the earlier one first. Reproducible in two taps: attacker sends a link, user taps, app navigates to the route, React attempts to render UserProfileScreen, useMemo evaluates, nip19.decode throws, screen crash.",
+      "why_it_matters": "Denial-of-service on the profile surface reachable from any external deep link. Not a funds-loss vector directly but a trust/availability defect: the app appears to crash or white-screen for no visible reason when the user taps a shared profile link. Composes with F-002 (no schema validation anywhere) — fixing F-002 resolves this automatically, but while F-002 is outstanding F-003 is a concrete, reproducible crash. The crash also corrupts the app-router back stack because the crashing screen has already been mounted into the stack — swipe-back may not reliably recover on iOS.",
+      "fix": "Two paths. (A, coupled with F-002) Zod-validate the route params: `npub: z.string().regex(/^npub1[02-9ac-hj-np-z]{58}$/).optional()` rejects malformed strings before `npubToPubkey` runs. (B, belt-and-suspenders) Wrap `npubToPubkey` in a try/catch inside shared/lib/nostr/client.ts and return `''` on decode failure, so it matches the function's existing 'returns empty on no input' contract. Preferred approach is both — (A) stops the bad data at the boundary, (B) prevents any future caller from triggering the same crash. Additionally worth adding a try/catch around the outer useMemo so a future `nip19` version change that introduces a new throw path can't crash the render.",
+      "references": [
+        "nips/19.md",
+        "skill:zod-4",
+        "skill:neverthrow-wrap-exceptions"
+      ],
+      "verification_note": "Re-read UserProfileScreen.tsx:646-674. Re-read shared/lib/nostr/client.ts:9-19 — confirmed no try/catch, confirmed direct call to `nip19.decode`. nostr-tools' nip19.decode per its source throws `Error('Invalid prefix')` / `Error('Invalid checksum')` / similar on malformed input. Counter-argument considered: 'the user would only see this if they tapped an attacker-crafted link.' Exactly — that's the threat model per F-001/F-002. Also considered: 'maybe the outer error boundary (App-level) catches it.' Likely yes, but that's degraded UX (the screen flashes, the user sees a generic error state or a blank screen), not a fix. Confidence 0.9 because I didn't verify the exact exception type from nostr-tools' current version — residual risk is that the current version swallows errors, but historically nip19.decode has thrown and no changelog suggests otherwise.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "UserProfileScreen now validates npub/pubkey/mintUrl with zod at the route boundary before npubToPubkey runs."
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "Split-Bill orchestrator extracts mint-quote shape via triple `(mintOp as any)?.quoteId ?? ?.quote ?? ?.id` — silently drops tagging when coco's PendingMintOperation<'bolt11'> field names change",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+      "line": 233,
+      "symbol": "confirm mint-quote result extraction",
+      "dimension": 1,
+      "description": "Lines 233-241: `const mintQuoteId = (mintOp as any)?.quoteId ?? (mintOp as any)?.quote ?? (mintOp as any)?.id; const bolt11 = (mintOp as any)?.request ?? (mintOp as any)?.invoice ?? undefined; const expiresAt = (mintOp as any)?.expiresAt ?? undefined;`. Three `as any` casts in three consecutive lines. The actual return type — `PendingMintOperation<'bolt11'>` per the coco surface (type-check output at features/send/providers/CocoPaymentUX.tsx:185 and features/send/lib/sovranPaymentConfig.ts:313-319 references `PendingMintOperation<'bolt11'>` concretely) — is well-typed and imported elsewhere in the codebase. The triple fallback chain is load-bearing: if coco renames `quoteId` to `quote_id` in a future version, all three branches miss, `mintQuoteId` is undefined, `tagMintQuote(...)` is skipped (line 243 guard), and every subsequent branch silently no-ops — the participant keeps a `mintQuoteId: undefined`, the delivery loop hits `if (!p.bolt11)` at line 270 and marks delivery failed. The user sees 'Failed to generate invoice' for every participant with no indication that the root cause is a coco-side rename. AUDIT.md dim-1 rule: 'any casts, @ts-ignore without a reason'. Also: `useSplitBillPaymentWatcher` at line 467 has the same pattern — `(await (manager as any).history?.getPaginatedHistory?.(0, 200))` with its own ruleset for `h.type === 'mint'` and `h.quoteId === p.mintQuoteId` derived via duck typing, so a coco rename cascades into the watcher too.",
+      "why_it_matters": "Fragility that couples Sovran's split-bill feature to coco's internal field names without a typed contract. Silent failures (no type error at build, no runtime warning) make the eventual breakage hard to diagnose: the orchestrator logs `split_bill.confirm.mint_quote_failed` only when `requestLightningInvoice` throws, not when it returns a shape mismatch. The defensive triple-fallback itself is a signal that at least one of these field names has already shifted once during development — which means another shift is likely. Also composes with the watcher's duck-typing (lines 476-481) so a single coco rename breaks the ENTIRE split-bill flow at once. Medium because no funds are lost — the user sees delivery failures and can retry manually — but the mitigation is trivial.",
+      "fix": "Import the coco result type: `import type { PendingMintOperation, MintHistoryEntry } from '@cashu/coco-core';`. Change `requestLightningInvoice` in features/receive/hooks/useLightningOperations.ts to be explicitly typed: `async (mintUrl: string, amount: number): Promise<PendingMintOperation<'bolt11'>>`. In the orchestrator drop the cast and read fields by name: `const { quoteId: mintQuoteId, request: bolt11, expiresAt } = mintOp;`. In the watcher, type the history array as `MintHistoryEntry[]` (or whatever the concrete coco history item type is) and drop the `as any` + duck-typing; `const row = history.find((h): h is MintHistoryEntry => h.type === 'mint' && h.quoteId === p.mintQuoteId);`. If the coco types are not yet exported, open an upstream issue or add a patch under `sovran-app/patches/@cashu+coco-core+*.patch` to export them — this is the codebase convention per CLAUDE.md. Also drop the defensive `?? ?.quote ?? ?.id` fallbacks once the type is concrete; if a future coco version renames, the build will fail loudly instead of silently.",
+      "references": [
+        "skill:typescript-advanced-types",
+        "skill:neverthrow-return-types"
+      ],
+      "verification_note": "Re-read useSplitBillOrchestrator.ts:231-247 (confirm path) and :460-504 (watcher). Confirmed no import from coco for the result shape. Re-read useLightningOperations.ts:17-37 — `requestLightningInvoice` returns `any` by inference (just `return result;` from `manager.ops.mint.prepare(...)`). Counter-argument considered: 'the triple fallback is a pragmatic decision because coco's shape has changed historically.' Exactly the problem — the triple fallback is a workaround for the absence of a typed contract, not a solution. Medium severity because the visible symptom is delivery failure (user can retry) not fund loss. Skill:typescript-advanced-types covers the fix path (type narrowing and typed return signatures).",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Split-Bill orchestrator has no rollback for a failed mint-quote burst — group transitions to 'awaiting' synchronously, and if every participant's mint-quote call fails, the group is stuck with no bolt11 and `retryDelivery` silently no-ops",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+      "line": 224,
+      "symbol": "confirm lifecycle",
+      "dimension": 1,
+      "description": "Line 224: `store.transitionGroup(groupId, 'awaiting');` runs before the per-participant loop. Inside the loop (230-260) any throw from `requestLightningInvoice` is caught locally — the participant is marked `deliveryState: 'failed'` with the error, and the outer loop continues. After the loop, `finalizeGroup` at line 373 re-runs `deriveGroupState`, which, if NO participant is paid or expired, keeps the group at `'awaiting'`. The `confirm` guard at line 209 rejects non-draft groups: `if (group.state !== 'draft') { paymentLog.info('split_bill.confirm.already_started', ...); return; }`. So a second tap of 'Confirm & Send' from the summary screen does nothing — but the summary screen at summary.tsx:99 computes `hasStarted = group.state !== 'draft'` and hides the confirm button once `hasStarted` is true, swapping in a 'Done' button. User-visible effect when every mint-quote fails: group participants show 'Delivery failed' chips, no bolt11s exist, confirm button is gone, only 'Done' is available. Tapping 'Done' dismisses the flow. Later: the detail screen is reached from Transactions. `handleRowPress` at detail.tsx:121 sees `p.deliveryState === 'failed' && p.channel !== 'qr-only'` and calls `retryDelivery(...)`. `retryDelivery` at line 380 checks `if (!p.bolt11) return;` — silently returns. NOTHING happens on tap. The user has NO user-visible path to re-request the mint quote for that participant. The group is permanently stuck.",
+      "why_it_matters": "Dim-1 state-machine correctness. A mint outage that coincides with a confirm tap creates a zombie split-bill group the user can see but can't resolve. Not a funds-loss vector (no tokens have moved) but a trust-and-UX defect that requires the user to cancel the group from somewhere — and the cancel UI is not wired in (grep for `cancelGroup` returns only the store action, no caller). So the group sits in the Transactions list indefinitely, branded 'Delivery failed'. Medium because the common-case happy path works and the store does have `cancelGroup` to wire up; the fix is a UI surface for 'retry quote' + 'cancel group'.",
+      "fix": "Two coordinated changes. (A) In `useSplitBillOrchestrator`, extend `retryDelivery` to first request a fresh mint quote if `!p.bolt11`: `if (!p.bolt11) { const mintOp = await requestLightningInvoice(group.mintUrl, p.amount); /* tagMintQuote, refresh p */ }`. (B) Add a user-facing 'Retry quote' affordance on the detail card when `p.deliveryState === 'failed' && !p.bolt11` (currently the card shows no CTA for this state) — the existing `onRetry` prop on `ParticipantCard` already routes to `handleCardRetry` at detail.tsx:136, so the UI wire is in place, only the orchestrator branch is missing. (C) Wire `cancelGroup(groupId)` to a UI affordance (three-dot menu on the detail screen, or a bottom-sheet with 'Cancel bill' on long-press of the meta-row in Transactions) so a permanently-stuck group can be cleared. Optional: also fire `cancelGroup` on summary's 'back' gesture if every participant's delivery is 'failed' and no bolt11s exist, so the user doesn't have to do it manually.",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-read useSplitBillOrchestrator.ts:201-377 (confirm), :380-441 (retryDelivery). Re-read summary.tsx:98-113 (hasStarted guard) and detail.tsx:113-135 (handleRowPress / retryDelivery invocation). Confirmed retryDelivery's silent return at line 385. Grepped for `cancelGroup` across sovran-app — only definition-site hits in splitBillTransactionsStore.ts; no caller UI. Counter-argument considered: 'in practice the mint is reliable, and this edge case won't trigger.' Fair-weather assumption; log-doctor slow mode in the latest session shows 5000ms+ gaps on `mint_response_success` (see Log-doctor evidence), indicating realistic mint-side latency. Also considered: 'maybe the log is already warning the user via a toast.' No toast wired — `paymentLog.error('split_bill.confirm.mint_quote_failed', ...)` is silent to the user. Severity Medium because the failure mode is recoverable by deleting the app and reinstalling (destroying profile-scoped storage), but that's not a reasonable workflow.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "detail.tsx `handleCardView` fetches coco's full history (200 rows) on every 'View' tap, then does an untyped linear scan via triple `as any`",
+      "repo": "sovran-app",
+      "path": "app/(user-flow)/splitBill/detail.tsx",
+      "line": 157,
+      "symbol": "handleCardView",
+      "dimension": 7,
+      "description": "Lines 150-185: `handleCardView` is called when the user taps a participant card's 'View' pill. It does `await (manager as any).history?.getPaginatedHistory?.(0, 200)` (three-cast: `manager as any`, optional chain, optional method call), then linearly scans the 200 results looking for `h.type === 'mint' && h.quoteId === p.mintQuoteId`. The result is serialised via `JSON.stringify(entry)` and passed as a router param (`mintHistoryEntry: JSON.stringify(entry)` at line 175) to `/mintQuote`. Two issues: (1) Fetching 200 rows to locate one row is N² work across repeated taps — for a wallet with many mint operations, the 200-row cap also means older quotes go undetected (the watcher has the same cap issue). Coco exposes a direct quote-lookup API via `manager.quotes.get(quoteId)` (see shared/lib/cashu/manager.ts references) which would replace the 200-row scan with an O(1) read. (2) The triple `as any` hides the coco-side API shape the same way F-004 does, and compounds with it — a rename cascades into detail.tsx too. (3) URL-param size: `JSON.stringify(MintHistoryEntry)` on a mint quote with a bolt11 invoice (~200+ chars) and proof metadata pushes the router URL into multi-hundred-byte territory, which expo-router encodes but at the cost of double URL-encoding. Fragile.",
+      "why_it_matters": "Perf + correctness compound. Per-tap 200-row fetch + scan on a screen the user typically revisits multiple times (they scroll the deck, re-tap View on different cards). The JS-thread cost of the scan itself is small (~200 linear comparisons), but the `getPaginatedHistory` call goes through coco's storage layer (SQLite) — synchronous hop through the bridge. The `as any` path also couples the route file to coco's internal shape, which is a dim-4 consistency violation (the rest of the codebase imports coco types by name).",
+      "fix": "Replace `(manager as any).history?.getPaginatedHistory?.(0, 200)` with a direct quote-lookup API: if coco exposes `manager.quotes.getById(quoteId)` or similar, use that. If not, add one to `manager.quotes` via the patches/ mechanism and import its type. Remove the triple cast, import `MintHistoryEntry` from coco, type the result. Simpler alternative: the split-bill store already persists the bolt11 on the participant (`p.bolt11`), so the View pill doesn't strictly need coco's history entry at all — it can construct the mintQuote detail screen's input from the participant state already in hand (participantId + p.mintQuoteId + p.bolt11 + p.amount + group.mintUrl). Reimagine `handleCardView` as a pure local-state routing call: `router.navigate({ pathname: '/mintQuote', params: { mintQuoteId: p.mintQuoteId, mintUrl: group.mintUrl, ... } })` and have the mintQuote screen itself do the one-row coco lookup on its own mount. That removes the 200-row scan entirely. Also: serialising an entire HistoryEntry through a URL param is a dim-5 anti-pattern; pass the id and let the target screen resolve.",
+      "references": [
+        "skill:typescript-advanced-types",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-read detail.tsx:150-186. Confirmed triple-cast + JSON.stringify router param. Confirmed `p.bolt11` + `p.mintQuoteId` are already persisted on the participant (shared/stores/profile/splitBillTransactionsStore.ts:71-73). So the 200-row fetch is entirely avoidable — the data the target screen needs is already in the current screen's store. Counter-argument considered: 'the HistoryEntry passed through has fields the mintQuote screen needs beyond bolt11/quoteId.' Possibly, but the mintQuote screen itself is the natural owner of that resolution — pushing it down removes the roundtrip. Also considered: 'maybe 200 rows is enough in practice.' True for low-volume wallets; falls over for heavy users. Marked UNVERIFIED for the perf claim because log.txt contains no `split_bill.detail.view` events (the flow was not exercised in the latest session); the structural finding stands regardless.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "app/(user-flow)/splitBill/* carries 12 lint errors + 9 warnings including unused `useEffect` import and `react-hooks/exhaustive-deps` on picker callbacks",
+      "repo": "sovran-app",
+      "path": "app/(user-flow)/splitBill",
+      "line": 12,
+      "symbol": "lint regressions across splitBill subtree",
+      "dimension": 3,
+      "description": "`npm run lint` flags: summary.tsx:12 `unused-imports/no-unused-imports` (`useEffect` imported but not used after a prior refactor dropped the post-start auto-navigate), plus 3 prettier/prettier errors (lines 92, 101, 183). participants.tsx has 5 prettier errors (66, 70, 102, 121, 212) + 3 `react-hooks/exhaustive-deps` warnings on :115 (`useMemo`) and :137 (`useCallback`) for missing `picker` dep — the callsites destructure `picker.isSelected` / `picker.toggle` / `picker.sections` inside the memo bodies without listing `picker` in the deps, so a future change to the picker hook that returns a non-stable object would silently fail to reflect in these memos. detail.tsx: 3 prettier errors (102, 156, 189). GeohashChatScreen.tsx (in the blast radius via geohashChat.tsx and bitchatDM.tsx): `'muted' assigned but never used` at :273:22 — a destructured theme token that's no longer referenced after a theme-token cleanup. Total: 12 errors + 9 warnings.",
+      "why_it_matters": "Baseline hygiene that CI is catching but the branch ships anyway. Two of the warnings (the exhaustive-deps ones) are real correctness exposure: if `useSplitBillParticipantPicker` ever returns a non-stable identity from `isSelected` / `toggle`, the memoised `renderItem` will render with a stale callback. The prettier errors compound with every merge conflict because auto-formatters rewrite those blocks on every editor save, producing noisy diffs. The unused import and unused variable are dim-3 signals of an incomplete refactor.",
+      "fix": "Run `npm run lint -- --fix` once to take 11 of 12 errors automatically. Fix the remaining error and 9 warnings manually: (a) delete `useEffect` from summary.tsx:12 imports; (b) delete `muted` from the GeohashChatScreen useThemeColor tuple destructuring; (c) add `picker` to the useMemo / useCallback deps on participants.tsx — because `picker` is a fresh object from the hook each render, this will force the memos to re-run every render unless the hook returns a stable identity; the cleaner fix is to destructure what's needed into locals at the top (`const { isSelected, toggle, sections, selected } = picker;`) and list only those primitives in the deps. Run `npm run lint` in CI as a pre-merge gate per AUDIT.md dim-9 — it's already a script, absence of enforcement is a finding on its own.",
+      "references": [
+        "lint:prettier/prettier",
+        "lint:unused-imports/no-unused-imports",
+        "lint:react-hooks/exhaustive-deps",
+        "lint:@typescript-eslint/no-unused-vars"
+      ],
+      "verification_note": "Re-ran `npm run lint` scoped to the subtree — output captured verbatim in the audit's `tooling_run.lint` field. Confirmed by line-for-line inspection that every cited rule ID fires on the cited line. Counter-argument considered: 'prettier errors are cosmetic, not substantive.' Partially true for the 9 pure-formatting ones, but the 2 exhaustive-deps warnings and the 2 unused-import/variable errors are substantive (potential stale-closure bugs and incomplete-refactor signals). Severity Medium because the exhaustive-deps hits are named dim-7 heuristics for stale closures.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "UserMessagesScreen.tsx is 2683 LOC and UserProfileScreen.tsx is 1166 LOC — both in the (user-flow) blast radius, both well over AUDIT.md dim-3's 400-line split threshold",
+      "repo": "sovran-app",
+      "path": "features/user/screens/UserMessagesScreen.tsx",
+      "line": 1,
+      "symbol": "file size",
+      "dimension": 3,
+      "description": "`wc -l`: `features/user/screens/UserMessagesScreen.tsx` → 2683 lines, `features/user/screens/UserProfileScreen.tsx` → 1166 lines. Both are rendered by routes in app/(user-flow) (profile.tsx → UserProfileScreen, userMessages.tsx → UserMessagesScreen). AUDIT.md dim-3 rule: 'files > 400 lines that should be split'. UserMessagesScreen.tsx pulls in 20+ disparate concerns in a single component file: NIP-17 DM send/receive, routstr LLM session management (SessionsPanel, useRoutstrStore, useRoutstrTopUpStore, ROUTSTR_PUBKEY), mint operations, Swift UI expo/ui bottom-sheet plumbing, keyboard-avoiding view, unwrap gift-wrap, balance refresh popups, photo picker, message decryption, ecash token detection. The file conflates three separable regression surfaces: SOV-19 (Routstr top-up — TODO), SOV-23 (Encrypted Messaging — TODO), and SOV-33 (Camera & QR — TODO). UserProfileScreen is similarly overloaded: profile banner, stats grid, top-followers grid, feed, story viewer integration, follow/unfollow, contact-list publish, nip19 decoding, colour extraction.",
+      "why_it_matters": "Files at this size are effectively unmaintainable without local structural knowledge. A type-check run over the project already shows one TS error concentrated in the file at `UserMessagesScreen.tsx(2464,25)` (LegendList prop type mismatch) — the surface area alone makes that error hard to attribute to a specific concern. The blast radius of every change is the entire file. Refactor-risk also compounds with audit 13's recommendation to introduce a `bitchatDMStore` — any such store will need to interoperate with UserMessagesScreen's own message plumbing, which is far easier against a split-apart screen. Dim-3 structural rot.",
+      "fix": "Split into focused concerns. For UserMessagesScreen.tsx: extract `RoutstrSession` (LLM session / top-up UI) into `features/user/components/routstr/RoutstrMessagesView.tsx` — the ROUTSTR_PUBKEY branch is clearly a separate sub-flow. Extract NIP-17 send/receive into `features/user/hooks/useNip17DMThread.ts`. Extract the photo-picker coming-soon popup into `features/user/components/PhotoPickerStub.tsx`. Extract the BottomSheet + Swift-UI overlays into `features/user/components/UserMessagesOverlays.tsx`. For UserProfileScreen.tsx: extract `ProfileBanner`, `ProfileStatsGrid`, `ProfileTopFollowers`, `ProfileInfoSection` each as own sibling components under `features/user/components/`. Aim for the screen file to be under 400 lines after the split; the extracted pieces are each under 300. Pair the refactor with dim-3 `React.memo` boundaries so the typing path doesn't thrash the profile section. When SOV-19/SOV-23 are ratified, the split lines itself will be easier to justify.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:vercel-react-native-skills"
+      ],
+      "verification_note": "wc -l confirmed: UserMessagesScreen.tsx 2683, UserProfileScreen.tsx 1166, ShareScreen.tsx 190, ThreadScreen.tsx 22, GeohashChatScreen.tsx 492, NetworkSheet.tsx 185. Counter-argument considered: 'big files are easier to grep.' Weak — the IDE's symbol jump is strictly better, and tooling (knip, analyze-structure) already struggle to report confidently across files this large. Also considered: 'splitting adds perceived complexity with more files.' True if the split is artificial; the splits proposed track real concerns (Routstr ≠ NIP-17 DM ≠ photo picker). Severity Medium because the files function today — but a refactor becomes easier the earlier it happens, and every new feature (payment-request per SOV-18, attachments per SOV-23) will compound the bloat.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "Six unused exports in the splitBill subtree (knip-confirmed): DECK_CARD_WIDTH, ParticipantCardProps, ParticipantCardDeckProps, UseSplitBillParticipantPickerResult, QuoteIdToSplitBillIndex, SplitBillStore",
+      "repo": "sovran-app",
+      "path": "features/splitBill",
+      "line": 1,
+      "symbol": "dead exports",
+      "dimension": 3,
+      "description": "`npm run knip` flagged inside the blast radius: features/splitBill/components/ParticipantCardDeck.tsx:211 `DECK_CARD_WIDTH` (exported constant — no importer); features/splitBill/components/ParticipantCard.tsx:57 `ParticipantCardProps` (interface — used only internally); features/splitBill/components/ParticipantCardDeck.tsx:69 `ParticipantCardDeckProps` (interface — used only internally, `forwardRef` generic); features/splitBill/hooks/useSplitBillParticipantPicker.ts:135 `UseSplitBillParticipantPickerResult` (exported return type — no external consumer); shared/stores/profile/splitBillTransactionsStore.ts:97 `QuoteIdToSplitBillIndex` (exported type — no importer); shared/stores/profile/splitBillTransactionsStore.ts:162 `SplitBillStore` (exported type — no importer). Cross-check: grepped sovran-app for each symbol, confirmed zero external imports. Four additional bitchat hits are already captured in audit 13 F-009.",
+      "why_it_matters": "Dead export surface area. Each exported symbol is a contract the next developer has to assume is load-bearing until proven otherwise. Dim-3 structural rot. Low severity because the code works today — but pruning is a one-PR change that makes every subsequent refactor cheaper. `ParticipantCardProps` / `ParticipantCardDeckProps` in particular would otherwise turn into drift vectors if another feature starts consuming them based on what the type-name implies rather than what the implementation guarantees.",
+      "fix": "Remove the `export` keyword from the six symbols (or delete entirely if truly unused). For interfaces referenced by `forwardRef<RefType, PropsType>` generics, they can be declared non-exported and still used locally. For `DECK_CARD_WIDTH`, verify no lint-suppressed importer exists via `grep -rn DECK_CARD_WIDTH` — if none, delete. Run `npm run knip` post-cleanup and confirm the diff drops these hits without regressing on anything else.",
+      "references": [
+        "knip:unused-export"
+      ],
+      "verification_note": "Captured from `npm run knip` raw output; cross-checked each symbol via grep for external importers — none found. Counter-argument considered: 'these may be used by tests.' Grepped `__tests__/` and `*.test.tsx` — no matches in sovran-app for these symbols. Counter-argument: 'knip misreports dynamic-require targets.' Not applicable to these specifically — they're plain named exports from static imports.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "`as any` pathname casts on router.push/navigate/replace across the user-flow subtree mask typedRoutes gaps — 4 occurrences in the blast radius alone",
+      "repo": "sovran-app",
+      "path": "app/(user-flow)/splitBill/amount.tsx",
+      "line": 44,
+      "symbol": "router pathname cast",
+      "dimension": 5,
+      "description": "Grep finds four `as any` pathname casts in the blast radius: amount.tsx:44 (`pathname: '/(user-flow)/splitBill/participants' as any`), participants.tsx:99 (`pathname: '/(user-flow)/splitBill/summary' as any`), bitchatNetwork's caller NetworkSheet.tsx:61 (`pathname: '/(user-flow)/bitchatDM'`, cast wrapping `as any` at the outer object), features/transactions/components/SplitBillTransactionRow.tsx:84 (`pathname: '/(user-flow)/splitBill/detail' as any`). UserProfileScreen.tsx:971 does the same for `/(user-flow)/share`. Audit 13 open-question #4 already noted this as a typedRoutes gap around (user-flow)-prefixed paths with dynamic params. The casts are a workaround — `experiments.typedRoutes` is ENABLED (app.json:117 per audit 13's finding), and the cast indicates expo-router's generated types don't yet recognise nested grouped routes. Each cast disables type-checking for the params object that follows it, so param-name typos, missing-required-params, and wrong-param-types (e.g. `totalAmount: number` vs `String(number)`) fail silently at build time.",
+      "why_it_matters": "Compile-time typedRoutes was the specific guarantee that params match their target. Casting it away per-callsite hollows out the guarantee. Low severity individually (these callers all DO pass valid params today), but each cast is load-bearing against the next refactor: if `splitBill/summary` renames `groupId` → `groupid`, none of the callers fail-at-compile.",
+      "fix": "Two paths. (A) Upgrade expo-router to the smallest version whose typedRoutes recognises grouped-path params (audit 13's open question #4 suggests this is a known upstream issue). (B) While waiting, hoist route constants + a typed helper to `shared/lib/routes.ts`: `export const routes = { splitBillParticipants: { pathname: '/(user-flow)/splitBill/participants' as const, params: (p: { totalAmount: string; unit: string }) => p }, ...}; router.push({ ...routes.splitBillParticipants, params: routes.splitBillParticipants.params({ totalAmount: String(amount), unit: 'sat' }) });`. The helper gives run-time-checkable param shapes without depending on typedRoutes. Importantly, update each cast with a comment linking to the upstream issue so a future reader knows it's temporary.",
+      "references": [
+        "skill:typescript-advanced-types",
+        "prior-audit:open_question_4@13.json"
+      ],
+      "verification_note": "Grep confirmed the 4 in-subtree occurrences + UserProfileScreen.tsx:971. Already flagged in audit 13 open-questions; promoting to a finding because it's a categorical pattern affecting every new route. Counter-argument considered: 'these could just be poorly-typed one-offs.' Consistent enough across 5 callers to be a pattern, not a slip. Low severity because no current runtime bug.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-011",
+      "severity": "Low",
+      "confidence": 0.8,
+      "title": "NetworkSheet uses `useLifecycleLogger('BitchatNetworkSheet')` with no scoped log child — inconsistent with the rest of (user-flow) where useLifecycleLogger takes a module-scoped logger",
+      "repo": "sovran-app",
+      "path": "features/bitchat/screens/NetworkSheet.tsx",
+      "line": 82,
+      "symbol": "useLifecycleLogger",
+      "dimension": 4,
+      "description": "Line 82: `useLifecycleLogger('BitchatNetworkSheet');` — one-argument call, no scoped child logger. Compare to the convention used by every other route in the blast radius: amount.tsx:28 `useLifecycleLogger('SplitBillAmountScreen', walletLog);`, detail.tsx:88 `useLifecycleLogger('SplitBillDetailScreen', walletLog);`, ShareScreen.tsx:79 `useLifecycleLogger('ShareScreen', nostrLog);`, UserProfileScreen.tsx:647 `useLifecycleLogger('UserProfileScreen', nostrLog);`, ThreadScreen.tsx:9 `useLifecycleLogger('ThreadScreen', feedLog);`. Without the scoped logger, the lifecycle event goes to the default `log` instance and mixes with unrelated event traffic — dumpForLLM / log-doctor mode filters by child module won't find these entries under a `bitchat`-scoped query. Dim-4 consistency (file conforms to one half of the codebase convention, diverges on the other).",
+      "why_it_matters": "Pure observability consistency. AUDIT.md dim-10 rule: `'Logs never include secrets, seeds, or full proofs — use the scoped loggers from shared/lib/logger'`. NetworkSheet is a BLE surface; its lifecycle events should surface under `bitchatLog` so the `bitchat` log-doctor mode (audit 13's proposed helper) or any future scoped query finds them. Low severity because the data exists — just under the wrong scope.",
+      "fix": "One-line change: `import { Screen, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';` then `useLifecycleLogger('BitchatNetworkSheet', bitchatLog);`. Confirm by running `npm run log-doctor -- timeline --event 'ui.lifecycle.BitchatNetworkSheet'` post-change — should appear under the `bitchat` module attribution.",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-read NetworkSheet.tsx:82. Confirmed single-argument call. Compared to 5 siblings using the scoped pattern. Counter-argument considered: 'maybe BitchatNetworkSheet was created before the scoped-logger convention landed.' Likely — git log on the file would confirm. Not a reason to keep the inconsistency, just context. Low severity.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-012",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "useSplitBillParticipantPicker: `useEffect` at line 271 refreshes selectedList from flatCandidates on every pool change — infinite loop risk if a future pool-building path returns fresh references each render",
+      "repo": "sovran-app",
+      "path": "features/splitBill/hooks/useSplitBillParticipantPicker.ts",
+      "line": 271,
+      "symbol": "refresh-selected effect",
+      "dimension": 1,
+      "description": "Lines 271-291: `useEffect(() => { setSelectedList((prev) => { const pool = new Map<string, PickerCandidate>(); for (const c of flatCandidates) pool.set(c.id, c); let changed = false; const next = prev.map(...); return changed ? next : prev; }); }, [flatCandidates]);`. The effect DOES short-circuit (`return changed ? next : prev;`) so if no selected candidate's nickname/avatar/subtitle differs from the pool, the setState is a no-op and React skips re-render. That's the safe path. BUT: the effect depends on `flatCandidates`, which is a useMemo of `sections.flatMap((s) => s.data)`, which in turn is derived from `bleCandidates` + `nostrCandidates` + `searchCandidates` — each constructed from `bleCandidate(peer)` / `nostrCandidate(pubkey, profile)` / `searchCandidate(pubkey, merged)`. Each of these builder functions allocates a fresh object per call; if `blePeers` is a Zustand selector that returns a fresh array reference per mutation, `bleCandidates` rebuilds, `flatCandidates` gets a new reference, the effect fires, it diff-checks nickname/avatar/subtitle and short-circuits — but the diff check is a SHALLOW equality of three fields only. A future change that adds another mutable field to PickerCandidate (e.g. `lastSeenFormatted`) without adding it to the diff check would not detect 'changed' properly, leaving selected items with stale data. More directly: if `useBLEPeers` / `useRecentContacts` / `useContactSearch` ever return a non-stable identity for unchanged data, the effect re-runs needlessly on every keystroke in the search input.",
+      "why_it_matters": "Mild dim-1 invariant concern. The current safety comes from the shallow diff happening to cover exactly the three fields that currently mutate (nickname/avatar/subtitle). Adding a fourth mutable field without updating the diff is a future-regression trap. Low severity because no current correctness bug.",
+      "fix": "Replace the manual field-by-field diff with a shallow equality helper that checks every PickerCandidate field: `import { shallowEqual } from '@/shared/lib/shallow';` (or use `useShallow` / `shallow` from zustand) `if (shallowEqual(fresh, s)) return s; changed = true; return fresh;`. Alternative: encode the identity-check using `JSON.stringify(s) === JSON.stringify(fresh)` — coarser but immune to new-field regressions. Also worth adding a `useMemo`-wrapped version of `flatCandidates` that computes a content-hash signature, so the effect can short-circuit before iterating `selected` at all.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Re-read useSplitBillParticipantPicker.ts:261-291. Confirmed diff covers only nickname/avatar/subtitle — other fields (id, source, channel, pubkey, peerID) are stable per candidate-id by construction and don't need diff tracking. Counter-argument considered: 'the diff fields are exactly the mutable ones.' Correct today, but a single future change that adds a fourth mutable field regresses silently. Severity Low.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "partial",
+    "5": "pass",
+    "6": "partial",
+    "7": "partial",
+    "8": "skipped",
+    "9": "partial",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Hoist a deep-link params schema layer for every route under app/(user-flow) into features/<domain>/lib/schemas.ts (or packages/schemas once the workspace seam lands). Write the 8 missing schemas: BitchatDMParams (from audit 13 F-002), GeohashChatParams, ShareParams (F-001), UserProfileParams (F-003), UserMessagesParams, ThreadParams, SplitBill{Participants,Summary,Detail}Params (F-002). Each route replaces its raw useLocalSearchParams() with a safeParse + error fallback. Fixes F-001, F-002, F-003, and closes audit 13 F-002/F-005 in one pass. Also define an 'external vs internal' param convention: every route accepts a hidden `source` param set by internal router.push callers; external sovran:// invocations leave it unset, and the route renders a 'verify before sharing' banner for the external case. Cross-references: docs/README.md SOV-34 (Deep Links — TODO) would codify the 'every route parses via schema' rule as a regression surface.",
+      "files": [
+        "app/(user-flow)/share.tsx",
+        "app/(user-flow)/profile.tsx",
+        "app/(user-flow)/userMessages.tsx",
+        "app/(user-flow)/thread.tsx",
+        "app/(user-flow)/geohashChat.tsx",
+        "app/(user-flow)/bitchatDM.tsx",
+        "app/(user-flow)/splitBill/participants.tsx",
+        "app/(user-flow)/splitBill/summary.tsx",
+        "app/(user-flow)/splitBill/detail.tsx",
+        "features/user/lib/schemas.ts",
+        "features/splitBill/lib/schemas.ts",
+        "features/bitchat/lib/schemas.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Type the coco mint-quote + history surface end-to-end. Replace the 6 `as any` casts in useSplitBillOrchestrator.ts:233-241 + 467 + detail.tsx:157 with typed reads against coco's PendingMintOperation<'bolt11'> and MintHistoryEntry. Return-type the useLightningOperations hook (features/receive/hooks/useLightningOperations.ts:17) as Promise<PendingMintOperation<'bolt11'>>. If coco doesn't export those types, open an upstream PR or add a sovran-app/patches/@cashu+coco-core+*.patch that re-exports them — the codebase convention per CLAUDE.md. Fixes F-004 and F-006. While there, simplify detail.tsx handleCardView to pass `{mintQuoteId, mintUrl, bolt11}` through the router param rather than the full JSON-stringified history entry (F-006).",
+      "files": [
+        "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+        "app/(user-flow)/splitBill/detail.tsx",
+        "features/receive/hooks/useLightningOperations.ts",
+        "sovran-app/patches/"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Fix the Split-Bill mint-quote failure path. Extend useSplitBillOrchestrator.retryDelivery to re-request a fresh mint quote when !p.bolt11 before retrying delivery, so a mint-outage-during-confirm can be recovered per-participant from the detail screen. Wire up the already-exposed cancelGroup store action to a user-visible affordance (long-press in Transactions or three-dot menu on the detail card). Fixes F-005. Cross-references: the eventual SOV-15 (Split Bill — TODO per docs/README.md) would codify the 'every stuck group must have a user path to cancel OR retry' regression rule.",
+      "files": [
+        "features/splitBill/hooks/useSplitBillOrchestrator.ts",
+        "app/(user-flow)/splitBill/detail.tsx",
+        "features/splitBill/components/ParticipantCard.tsx",
+        "features/transactions/components/SplitBillTransactionRow.tsx"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Split UserMessagesScreen (2683 LOC) and UserProfileScreen (1166 LOC) per the proposed decomposition in F-008. UserMessagesScreen → Nip17DMThread + RoutstrMessagesView + UserMessagesOverlays + useNip17DMThread hook. UserProfileScreen → ProfileBanner + ProfileStatsGrid + ProfileTopFollowers + ProfileInfoSection. Target < 400 LOC per screen file. Pair with React.memo boundaries on each extracted component. Aligns with audit 13's bitchatDMStore recommendation (the DM surfaces benefit from the same kind of separable-concerns refactor). Fixes F-008.",
+      "files": [
+        "features/user/screens/UserMessagesScreen.tsx",
+        "features/user/screens/UserProfileScreen.tsx",
+        "features/user/components/routstr/RoutstrMessagesView.tsx",
+        "features/user/hooks/useNip17DMThread.ts",
+        "features/user/components/UserMessagesOverlays.tsx",
+        "features/user/components/ProfileBanner.tsx",
+        "features/user/components/ProfileStatsGrid.tsx",
+        "features/user/components/ProfileTopFollowers.tsx",
+        "features/user/components/ProfileInfoSection.tsx"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Remove 6 unused exports in the splitBill subtree flagged by knip (F-009): DECK_CARD_WIDTH, ParticipantCardProps, ParticipantCardDeckProps, UseSplitBillParticipantPickerResult, QuoteIdToSplitBillIndex, SplitBillStore. Cross-reference audit 13's still-outstanding refactor_plan entry for the bitchat dead-code (BitChatScreen, MessageBubble, MessageList, ChannelHeader, ComposeBar, BITCHAT_EVENT_KIND_* constants) — if the bitchat refactor ships first, re-run knip before this PR.",
+      "files": [
+        "features/splitBill/components/ParticipantCardDeck.tsx",
+        "features/splitBill/components/ParticipantCard.tsx",
+        "features/splitBill/hooks/useSplitBillParticipantPicker.ts",
+        "shared/stores/profile/splitBillTransactionsStore.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Introduce shared/lib/routes.ts (typed pathname constants + param helpers) so router.push / router.navigate / router.replace callers stop needing `as any` casts. Rewrites callers in amount.tsx:44, participants.tsx:99, NetworkSheet.tsx:54-61, SplitBillTransactionRow.tsx:83, UserProfileScreen.tsx:971 to use the typed helper. Fixes F-010 and resolves audit 13 open_question 4.",
+      "files": [
+        "shared/lib/routes.ts",
+        "app/(user-flow)/splitBill/amount.tsx",
+        "app/(user-flow)/splitBill/participants.tsx",
+        "features/bitchat/screens/NetworkSheet.tsx",
+        "features/transactions/components/SplitBillTransactionRow.tsx",
+        "features/user/screens/UserProfileScreen.tsx"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Extend log-doctor with a `splitbill` mode (or a parameterised `flows --feature splitbill`) that groups `split_bill.confirm.*` / `split_bill.deliver.*` / `split_bill.retry_delivery.*` / `split_bill.watcher.*` events into per-group timelines showing: confirm start → mint-quote per-participant → delivery per-channel → payment state flips. Crucial for diagnosing F-005 (stuck group) and F-006 (watcher perf) in the field. Complements audit 13's proposed `bitchat` mode. Depends on startFlow() adoption in useSplitBillOrchestrator — currently the orchestrator uses loose `paymentLog.info/error` calls, not a named flow.",
+      "files": [
+        "scripts/log-doctor/",
+        ".claude/rules/log-doctor.md",
+        "features/splitBill/hooks/useSplitBillOrchestrator.ts"
+      ]
+    }
+  ],
+  "open_questions": [
+    "SOV-34 (Deep Links & Payment URIs — TODO per docs/README.md) would codify the 'every route parses via a zod schema' regression rule that F-001/F-002/F-003 all violate. Recommendation: ratify SOV-34 before F-001's Critical status is locked in — without the spec, each new deep-link-reachable screen inherits the same hole.",
+    "SOV-15 (Split Bill — TODO) would anchor the mint-quote-failure recovery path (F-005) and the retry semantics. The cancelGroup store action is present but unwired — is it intended to surface in the Transactions meta-row three-dot menu, on the detail screen, or both? A ratified SOV-15 would pick the affordance.",
+    "SOV-18 (Payment Requests — TODO) overlaps the split-bill delivery flow (F-005 retryDelivery) in semantics: both are 'requestor creates a request, receiver fulfils or declines.' Should split-bill be rewritten on top of SOV-18's payment-request primitive once ratified? Or remain a parallel mechanism with its own state machine (current design)? The orchestrator's per-participant bolt11 delivery could be collapsed into N payment-requests each linked to the same group.",
+    "log.txt in the current session (device iOS 26.1, Sovran 0.0.63, 6723s span) contains ZERO `split_bill.*` events — the split-bill flow was not exercised. Every dynamic claim in F-004, F-005, F-006 is UNVERIFIED-at-runtime and rests on structural reading. F-001, F-002, F-003 are structural-evident (deep-link validation absence is a grep result; nip19.decode throw is well-documented). Recommendation: exercise the full split-bill flow (amount → participants → summary → confirm → detail → retry) in a phone-test run, then re-audit to confirm the orchestrator perf and recovery claims.",
+    "Audit 13 findings F-001 through F-013 on bitchatDM.tsx / useBitChat.ts / BitChatNostrBridge.swift / seenGiftWrapIDs Swift trim / (bitchat-flow) dead code remain OPEN — none have been addressed per the current branch state (commit bd018588). The primary Critical (NIP-17 impersonation via seal.pubkey == rumor.pubkey check) is still live; it remains the single highest-priority item in the user-flow blast radius and dwarfs every finding filed in this audit.",
+    "app.json:7 declares `scheme: [\"sovran\", \"cashu\"]` but no associatedDomains / universal-links configuration is visible in the file. Confirm whether iOS universal links are deliberately absent (narrowing the attack surface to custom-scheme invocations only) or a planned future addition (which would widen the F-001 / F-002 attack surface to any website with a malicious a-href)."
+  ]
+}
