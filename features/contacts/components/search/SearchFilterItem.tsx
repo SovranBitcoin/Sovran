@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { Pressable, Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Feather } from '@expo/vector-icons';
 import type { RefObject } from 'react';
 import type { FlatList } from 'react-native';

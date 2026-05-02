@@ -6,7 +6,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Pressable } from 'react-native';
+import { LayoutChangeEvent } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Menu } from 'heroui-native';
 import {

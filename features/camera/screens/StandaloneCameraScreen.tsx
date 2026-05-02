@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { router, Stack } from 'expo-router';
 import { z } from 'zod';
 

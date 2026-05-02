@@ -3,7 +3,8 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { router } from 'expo-router';
 import { HistoryEntry, MintHistoryEntry } from '@cashu/coco-core';
 import { useMints } from '@cashu/coco-react';

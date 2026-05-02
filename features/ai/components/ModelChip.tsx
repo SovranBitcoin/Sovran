@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Keyboard, Pressable } from 'react-native';
+import { Keyboard } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 import { getModels, type RoutstrModel } from '@/shared/lib/routstr/api';

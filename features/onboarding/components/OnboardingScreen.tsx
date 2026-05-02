@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Pressable, View, useWindowDimensions } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { PressableFeedback } from 'heroui-native';
 
 import Animated, {

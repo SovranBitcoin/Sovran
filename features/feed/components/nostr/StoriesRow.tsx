@@ -6,7 +6,8 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Svg, { Defs, LinearGradient, Stop, Circle as SvgCircle } from 'react-native-svg';
 import { Metadata } from 'nostr-tools/kinds';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';

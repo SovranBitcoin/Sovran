@@ -24,7 +24,8 @@
  */
 
 import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition } from 'react';
-import { StyleSheet, InteractionManager, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, InteractionManager, ActivityIndicator } from 'react-native';
+import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { log, Log } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';

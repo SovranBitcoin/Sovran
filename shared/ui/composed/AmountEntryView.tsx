@@ -8,7 +8,8 @@
  */
 
 import { useMemo } from 'react';
-import { Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { ScrollView, useWindowDimensions } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useRef } from 'react';
-import { Pressable, TextInput, View, type LayoutChangeEvent } from 'react-native';
+import { TextInput, View, type LayoutChangeEvent } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Icon from 'assets/icons';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

@@ -20,7 +20,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { BottomSheet } from 'heroui-native';
 import { LegendList } from '@legendapp/list';

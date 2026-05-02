@@ -18,7 +18,8 @@
  */
 
 import React from 'react';
-import { Platform, Pressable, StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
   Host,
   Button as SwiftUIButton,

@@ -24,7 +24,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { BottomSheet, Menu } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 

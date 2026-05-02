@@ -1,5 +1,6 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react';
-import { ScrollView, Animated, Linking, Easing, StyleSheet, TouchableOpacity } from 'react-native';
+import { ScrollView, Animated, Linking, Easing, StyleSheet } from 'react-native';
+import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { Stack, Link } from 'expo-router';
 import { z } from 'zod';
 

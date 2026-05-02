@@ -8,7 +8,7 @@
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import type { ParamListBase, NavigationProp } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import Icon from 'assets/icons';
 
 interface FlowColors {

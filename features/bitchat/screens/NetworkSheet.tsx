@@ -7,7 +7,8 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { LegendList } from '@legendapp/list';
 import { router, Stack } from 'expo-router';
 

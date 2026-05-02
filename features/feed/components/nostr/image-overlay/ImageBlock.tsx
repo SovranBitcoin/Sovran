@@ -5,7 +5,8 @@
  */
 
 import React, { useCallback, useRef, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import Reanimated, { useAnimatedProps, useSharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { BlurView } from '@/shared/ui/primitives/BlurView';

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import * as Clipboard from 'expo-clipboard';
 import Icon from 'assets/icons';
 import type { RoutstrMessage } from '@/shared/stores/profile/routstrStore';

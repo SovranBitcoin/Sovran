@@ -4,7 +4,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import {
   type GestureType,
   Gesture,

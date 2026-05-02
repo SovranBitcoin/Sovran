@@ -7,7 +7,8 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';

@@ -1,5 +1,6 @@
 import { createContext, useContext, useCallback, useMemo } from 'react';
-import { Pressable, useWindowDimensions } from 'react-native';
+import { useWindowDimensions } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack } from 'expo-router';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';

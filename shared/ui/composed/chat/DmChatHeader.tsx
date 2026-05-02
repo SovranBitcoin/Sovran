@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
-import { Pressable, useWindowDimensions } from 'react-native';
+import { useWindowDimensions } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Stack, router } from 'expo-router';
 import { nip19 } from 'nostr-tools';
 import Icon from 'assets/icons';

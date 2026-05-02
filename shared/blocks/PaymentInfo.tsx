@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Pressable, Text } from 'react-native';
+import { Text } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import ViewShot from 'react-native-view-shot';
 import * as Clipboard from 'expo-clipboard';
 import {

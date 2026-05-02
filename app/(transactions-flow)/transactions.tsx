@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity } from '@/shared/ui/primitives/TouchableOpacity';
 import { router, Stack } from 'expo-router';
 import { z } from 'zod';
 import { TransactionsScreen, useTransactionsFilter } from '@/features/transactions';

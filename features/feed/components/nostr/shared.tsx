@@ -6,7 +6,8 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Pressable, Linking, Dimensions, Platform } from 'react-native';
+import { StyleSheet, Linking, Dimensions, Platform } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { useVideoPlayer, VideoView } from 'expo-video';

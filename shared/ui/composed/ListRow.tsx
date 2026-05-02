@@ -20,7 +20,8 @@
  */
 
 import React, { ReactNode } from 'react';
-import { Pressable, View, StyleProp, ViewStyle, StyleSheet } from 'react-native';
+import { View, StyleProp, ViewStyle, StyleSheet } from 'react-native';
+import { Pressable } from '@/shared/ui/primitives/Pressable';
 import opacity from 'hex-color-opacity';
 
 import { Avatar, AvatarState } from '@/shared/ui/primitives/Avatar';
