@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 
-import { fetchMintInfo } from '@/shared/lib/apiClient';
+import { fetchJson, fetchMintInfo } from '@/shared/lib/apiClient';
 import { cashuLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey, normalizeUrlForApi } from '@/shared/lib/url';
-import { MintListResponse, loggableIssues, parseWith } from '@sovranbitcoin/schemas';
+import { MintListResponse, parseWith } from '@sovranbitcoin/schemas';
 
 const parseMintList = parseWith(MintListResponse, 'cashu/mints');
 
@@ -62,21 +62,16 @@ export const useSovranDiscoveredMints = (): UseSovranDiscoveredMintsResult => {
         setError(null);
         processedUrls.current.clear();
 
-        const response = await fetch(SOVRAN_MINTS_API_URL, { signal: controller.signal });
-        if (!response.ok) {
-          throw new Error(`Failed to fetch mints: ${response.statusText}`);
-        }
-
-        const raw = await response.json();
+        const result = await fetchJson(
+          SOVRAN_MINTS_API_URL,
+          parseMintList,
+          'cashu/mints',
+          undefined,
+          { signal: controller.signal }
+        );
         if (controller.signal.aborted) return;
-        const parsed = parseMintList(raw);
-        if (parsed.isErr()) {
-          cashuLog.warn('mint.sovran.list.parse_failed', {
-            issues: loggableIssues(parsed.error),
-          });
-          throw new Error('Invalid Sovran mint list response');
-        }
-        const mintUrls = parsed.value;
+        if (result.isErr()) throw result.error;
+        const mintUrls = result.value;
         cashuLog.info('mint.sovran.fetched', { mintCount: mintUrls.length });
 
         if (mintUrls.length === 0) {

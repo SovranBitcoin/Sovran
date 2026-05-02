@@ -37,24 +37,28 @@ import {
   recoveryPartialPopup,
   recoveryFailedPopup,
 } from '@/shared/lib/popup';
+import { fetchJson } from '@/shared/lib/apiClient';
+import { MintListResponse, parseWith } from '@sovranbitcoin/schemas';
 
 // ─── Deep probe: discover mints from audit API ─────────────────────────────
 
 const SOVRAN_MINTS_API = 'https://api.sovran.money/api/cashu/mints';
 
-async function fetchDiscoveredMintUrls(knownUrls: string[]): Promise<string[]> {
+const parseMintList = parseWith(MintListResponse, 'cashu/mints');
+
+async function fetchDiscoveredMintUrls(
+  knownUrls: string[],
+  signal?: AbortSignal
+): Promise<string[]> {
   const known = new Set(knownUrls.map((u) => u.replace(/\/$/, '')));
-  try {
-    const res = await fetch(SOVRAN_MINTS_API);
-    if (!res.ok) return [];
-    const urls: string[] = await res.json();
-    return urls
-      .filter((u) => u.startsWith('https://'))
-      .map((u) => u.replace(/\/$/, ''))
-      .filter((u) => !known.has(u));
-  } catch {
-    return [];
-  }
+  const result = await fetchJson(SOVRAN_MINTS_API, parseMintList, 'cashu/mints', undefined, {
+    signal,
+  });
+  if (result.isErr()) return [];
+  return result.value
+    .filter((u) => u.startsWith('https://'))
+    .map((u) => u.replace(/\/$/, ''))
+    .filter((u) => !known.has(u));
 }
 
 type RecoveryState = 'idle' | 'recovering' | 'complete' | 'error';
@@ -81,7 +85,8 @@ interface RecoveryConfig {
 // ─── Animated shield with spinner → checkmark/cross transition ───────────────
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
-const CIRCLE_PATH = 'M3 12c0-4.97 4.03-9 9-9c4.97 0 9 4.03 9 9c0 4.97-4.03 9-9 9c-4.97 0-9-4.03-9-9Z';
+const CIRCLE_PATH =
+  'M3 12c0-4.97 4.03-9 9-9c4.97 0 9 4.03 9 9c0 4.97-4.03 9-9 9c-4.97 0-9-4.03-9-9Z';
 const CHECKMARK_PATH = 'M8 12l3 3l5-5';
 const CROSS_PATH = 'M12 12l4 4M12 12l-4-4M12 12l-4 4M12 12l4-4';
 const CIRCLE_LENGTH = 60;
@@ -142,9 +147,10 @@ const ShieldStatusIcon: React.FC<{
 
   const circleProps = useAnimatedProps(() => ({
     strokeDashoffset: circleOffset.value,
-    stroke: status === 'loading'
-      ? color
-      : interpolateColor(colorProgress.value, [0, 1], [color, targetColor]),
+    stroke:
+      status === 'loading'
+        ? color
+        : interpolateColor(colorProgress.value, [0, 1], [color, targetColor]),
   }));
 
   const checkmarkProps = useAnimatedProps(() => ({
@@ -177,7 +183,13 @@ const ShieldStatusIcon: React.FC<{
       {/* Spinner → checkmark/cross overlay */}
       <Animated.View
         style={[
-          { position: 'absolute', left: spinnerLeft, top: spinnerTop, width: spinnerSize, height: spinnerSize },
+          {
+            position: 'absolute',
+            left: spinnerLeft,
+            top: spinnerTop,
+            width: spinnerSize,
+            height: spinnerSize,
+          },
           spinnerStyle,
         ]}>
         <Svg width={spinnerSize} height={spinnerSize} viewBox="0 0 24 24">
@@ -375,17 +387,17 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
       setDiscoveredMintUrls([]);
       return;
     }
-    let cancelled = false;
+    const controller = new AbortController();
     setDiscoveryLoading(true);
-    fetchDiscoveredMintUrls(mints.map((m) => m.mintUrl)).then((urls) => {
-      if (!cancelled) {
-        setDiscoveredMintUrls(urls);
-        setDiscoveryLoading(false);
-      }
+    fetchDiscoveredMintUrls(
+      mints.map((m) => m.mintUrl),
+      controller.signal
+    ).then((urls) => {
+      if (controller.signal.aborted) return;
+      setDiscoveredMintUrls(urls);
+      setDiscoveryLoading(false);
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [deepProbe, mints]);
 
   // Lock navigation when recovery is in progress.
@@ -506,9 +518,11 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           // Coco doesn't expose a public abandon API for pending operations,
           // so reach into the private repository — same pattern this manager
           // already uses for proofRepository / proofService elsewhere.
-          const repo = (manager as unknown as {
-            mintOperationRepository?: { delete(id: string): Promise<void> };
-          }).mintOperationRepository;
+          const repo = (
+            manager as unknown as {
+              mintOperationRepository?: { delete(id: string): Promise<void> };
+            }
+          ).mintOperationRepository;
           if (repo?.delete) {
             for (const op of pendingOps) {
               await repo.delete(op.id).catch((e) =>
@@ -811,7 +825,13 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
           <View
             className="h-24 w-24 items-center justify-center self-center rounded-full"
             style={{ backgroundColor: surfaceSecondary }}>
-            <ShieldStatusIcon size={48} color={foreground} successColor={green400} errorColor={red400} status="error" />
+            <ShieldStatusIcon
+              size={48}
+              color={foreground}
+              successColor={green400}
+              errorColor={red400}
+              status="error"
+            />
           </View>
 
           <VStack spacing={8} className="items-center">
@@ -888,15 +908,15 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
 
   return (
     <ScreenWrapper name="SettingsRecoveryScreen" scroll="custom" safeArea>
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ flexGrow: 1 }}
-          scrollEnabled={recoveryState !== 'recovering'}>
-          {recoveryState === 'idle' && renderIdleState()}
-          {(recoveryState === 'recovering' || recoveryState === 'complete') &&
-            renderActiveOrCompleteState()}
-          {recoveryState === 'error' && renderErrorState()}
-        </ScrollView>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ flexGrow: 1 }}
+        scrollEnabled={recoveryState !== 'recovering'}>
+        {recoveryState === 'idle' && renderIdleState()}
+        {(recoveryState === 'recovering' || recoveryState === 'complete') &&
+          renderActiveOrCompleteState()}
+        {recoveryState === 'error' && renderErrorState()}
+      </ScrollView>
     </ScreenWrapper>
   );
 };

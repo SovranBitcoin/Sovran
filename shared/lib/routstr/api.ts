@@ -1,7 +1,52 @@
 import OpenAI from 'openai';
+import { z } from 'zod';
 import { apiLog } from '../logger';
+import { buildAbortSignal, isAbortError, type RequestControls } from '../apiClient';
 
 const ROUTSTR_BASE_URL = 'https://api.routstr.com/v1';
+
+/**
+ * Per-request budget for routstr endpoints. The chat APIs can take longer
+ * than the wallet's `DEFAULT_TIMEOUT_MS` (10s) — the OpenAI SDK already
+ * uses 60s for streaming. Match that for the bare-fetch endpoints so a
+ * slow upstream doesn't surface as a fake timeout.
+ */
+const ROUTSTR_TIMEOUT_MS = 30_000;
+
+/**
+ * Spine validators for the JSON envelopes routstr returns. Like
+ * `apiClient.MintInfoSpine`, these intentionally validate only the fields
+ * we read — Postel's Law leaves room for the upstream to add fields without
+ * forcing a Sovran release. Hostile or misconfigured upstreams that mangle
+ * `balance` or `data` into non-numbers/non-arrays are rejected before they
+ * reach the wallet UI.
+ */
+const ModelsResponseSpine = z
+  .object({
+    data: z.array(
+      z
+        .object({
+          enabled: z.boolean().optional(),
+        })
+        .passthrough()
+    ),
+  })
+  .passthrough();
+
+const BalanceSpine = z
+  .object({
+    balance: z.number().optional(),
+    total_spent: z.number().optional(),
+    api_key: z.string().optional(),
+    reserved: z.number().optional(),
+  })
+  .passthrough();
+
+const TopUpSpine = z
+  .object({
+    msats: z.number().optional(),
+  })
+  .passthrough();
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -153,6 +198,12 @@ async function throwResponseError(response: Response): Promise<never> {
 /** Wrap a caught unknown into a RoutstrError (re-throws if already one). */
 function toRoutstrError(error: unknown): never {
   if (error && typeof error === 'object' && 'status' in error) throw error;
+  if (isAbortError(error)) {
+    throw {
+      status: 0,
+      error: { message: 'Request cancelled', type: 'aborted' },
+    } as RoutstrError;
+  }
   const message =
     error instanceof Error ? error.message : typeof error === 'string' ? error : 'Network error';
   throw { status: 0, error: { message, type: 'network_error' } } as RoutstrError;
@@ -222,17 +273,26 @@ function createRoutstrClient(apiKey: string): OpenAI {
 
 // ── Public API ───────────────────────────────────────────────────────────
 
-export async function getModels(): Promise<RoutstrModel[]> {
+export async function getModels(controls: RequestControls = {}): Promise<RoutstrModel[]> {
   apiLog.info('api.routstr.models.start');
   const start = performance.now();
   try {
     const response = await fetch(`${ROUTSTR_BASE_URL}/models`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
+      signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
     });
     if (!response.ok) await throwResponseError(response);
 
-    const data: ModelsResponse = await response.json();
+    const raw = await response.json();
+    const validated = ModelsResponseSpine.safeParse(raw);
+    if (!validated.success) {
+      apiLog.warn('api.routstr.models.invalid_shape', {
+        issues: validated.error.issues.length,
+      });
+      throw new Error('Routstr /models returned a malformed envelope');
+    }
+    const data = validated.data as unknown as ModelsResponse;
     const enabled = data.data.filter((model) => model.enabled);
     apiLog.info('api.routstr.models.success', {
       count: enabled.length,
@@ -248,7 +308,10 @@ export async function getModels(): Promise<RoutstrModel[]> {
   }
 }
 
-export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
+export async function checkBalance(
+  apiKey: string,
+  controls: RequestControls = {}
+): Promise<BalanceResponse> {
   apiLog.debug('api.routstr.balance.start', { hasApiKey: !!apiKey, keyLength: apiKey?.length });
   const start = performance.now();
   try {
@@ -257,6 +320,7 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
       headers: {
         Authorization: `Bearer ${apiKey}`,
       },
+      signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
     });
     apiLog.debug('api.routstr.balance.response', {
       status: response.status,
@@ -264,12 +328,20 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
     });
     if (!response.ok) await throwResponseError(response);
 
-    const data = await response.json();
+    const raw = await response.json();
+    const validated = BalanceSpine.safeParse(raw);
+    if (!validated.success) {
+      apiLog.warn('api.routstr.balance.invalid_shape', {
+        issues: validated.error.issues.length,
+      });
+      throw new Error('Routstr /wallet/info returned a malformed envelope');
+    }
+    const data = validated.data;
     const result = {
-      balance: data.balance || 0,
-      total_spent: data.total_spent || 0,
+      balance: data.balance ?? 0,
+      total_spent: data.total_spent ?? 0,
       api_key: data.api_key,
-      reserved: data.reserved || 0,
+      reserved: data.reserved ?? 0,
     };
     apiLog.info('api.routstr.balance.success', {
       balance: result.balance,
@@ -288,7 +360,11 @@ export async function checkBalance(apiKey: string): Promise<BalanceResponse> {
   }
 }
 
-export async function topUpBalance(apiKey: string, cashuToken: string): Promise<TopUpResponse> {
+export async function topUpBalance(
+  apiKey: string,
+  cashuToken: string,
+  controls: RequestControls = {}
+): Promise<TopUpResponse> {
   apiLog.info('api.routstr.wallet.topup.start', { tokenLength: cashuToken?.length });
   const start = performance.now();
   try {
@@ -299,6 +375,7 @@ export async function topUpBalance(apiKey: string, cashuToken: string): Promise<
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ cashu_token: cashuToken }),
+      signal: buildAbortSignal({ timeoutMs: ROUTSTR_TIMEOUT_MS, ...controls }),
     });
     apiLog.debug('api.routstr.wallet.topup.response', {
       status: response.status,
@@ -306,8 +383,15 @@ export async function topUpBalance(apiKey: string, cashuToken: string): Promise<
     });
     if (!response.ok) await throwResponseError(response);
 
-    const data = await response.json();
-    const result = { added_amount: data.msats || 0 };
+    const raw = await response.json();
+    const validated = TopUpSpine.safeParse(raw);
+    if (!validated.success) {
+      apiLog.warn('api.routstr.wallet.topup.invalid_shape', {
+        issues: validated.error.issues.length,
+      });
+      throw new Error('Routstr /wallet/topup returned a malformed envelope');
+    }
+    const result = { added_amount: validated.data.msats ?? 0 };
     apiLog.info('api.routstr.wallet.topup.success', {
       addedAmount: result.added_amount,
       duration_ms: Math.round(performance.now() - start),

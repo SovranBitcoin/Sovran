@@ -48,7 +48,7 @@ export const PRICELIST_URL = `wss://ws.sovran.money`;
  * OS reaps the socket — minutes on cellular. Every helper enforces this
  * unless the caller passes a tighter signal.
  */
-const DEFAULT_TIMEOUT_MS = 10_000;
+export const DEFAULT_TIMEOUT_MS = 10_000;
 
 // Re-export schema-derived types for callers that previously imported them
 // from this module. `NostrProfileResponse` and `UserProfile` are re-exported
@@ -84,7 +84,7 @@ function toError(e: FetchOrParseError): Error {
  * here, but Hermes doesn't ship `DOMException`, so duck-type on `.name`
  * instead of using `instanceof`.
  */
-function isAbortError(e: unknown): boolean {
+export function isAbortError(e: unknown): boolean {
   if (typeof e !== 'object' || e === null) return false;
   const name = (e as { name?: unknown }).name;
   return name === 'AbortError' || name === 'TimeoutError';
@@ -96,7 +96,7 @@ function isAbortError(e: unknown): boolean {
  * available on Hermes from RN 0.81+; the listener pattern works everywhere
  * `AbortController` does, which is Sovran's whole runtime range.
  */
-function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {
+export function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {
   const controller = new AbortController();
   const onAbort = (reason: unknown) => controller.abort(reason);
   for (const s of signals) {
@@ -117,7 +117,7 @@ function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {
  * tagged with `name = 'TimeoutError'` because Hermes lacks `DOMException`;
  * `isAbortError` duck-types on the name either way.
  */
-function timeoutSignal(ms: number): AbortSignal {
+export function timeoutSignal(ms: number): AbortSignal {
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
     return AbortSignal.timeout(ms);
   }
@@ -141,6 +141,17 @@ export interface RequestControls {
 }
 
 /**
+ * Compose a caller's abort signal with the per-request timeout into the
+ * `signal` to hand to `fetch`. Throw-style callers (e.g. shared/lib/routstr,
+ * which surfaces errors via thrown `RoutstrError`) reach for this so they
+ * stop bypassing the timeout while keeping their existing exception flow.
+ */
+export function buildAbortSignal(controls: RequestControls = {}): AbortSignal {
+  const { signal: callerSignal, timeoutMs = DEFAULT_TIMEOUT_MS } = controls;
+  return combineSignals(callerSignal, timeoutSignal(timeoutMs));
+}
+
+/**
  * Core fetch-parse helper. Network or HTTP errors surface as `Error`;
  * shape validation failures are logged with paths+codes (never raw input)
  * and collapsed into `Error` to preserve the existing caller signature.
@@ -149,7 +160,7 @@ export interface RequestControls {
  * `controls.timeoutMs` defaults to `DEFAULT_TIMEOUT_MS`. The two are
  * combined so whichever fires first wins.
  */
-async function fetchParsed<T>(
+export async function fetchJson<T>(
   url: string,
   parser: (input: unknown) => Result<T, ParseError>,
   where: string,
@@ -229,7 +240,7 @@ export const searchUsers = ({
   signal?: AbortSignal;
 }) => {
   const params = new URLSearchParams({ query, limit: String(limit) });
-  return fetchParsed(
+  return fetchJson(
     `${BASE_URL}/nostr/search?${params}`,
     parseSearchUsers,
     'nostr/search',
@@ -239,7 +250,7 @@ export const searchUsers = ({
 };
 
 export const auditMint = ({ mintUrl, signal }: { mintUrl: string; signal?: AbortSignal }) =>
-  fetchParsed(
+  fetchJson(
     `${BASE_URL}/cashu/mint/audit?mintUrl=${encodeURIComponent(mintUrl)}`,
     parseAuditMint,
     'cashu/mint/audit',
@@ -248,7 +259,7 @@ export const auditMint = ({ mintUrl, signal }: { mintUrl: string; signal?: Abort
   );
 
 export const reviewMint = ({ mintUrl, signal }: { mintUrl: string; signal?: AbortSignal }) =>
-  fetchParsed(
+  fetchJson(
     `${BASE_URL}/cashu/mint/reviews?mintUrl=${encodeURIComponent(mintUrl)}`,
     parseMintReviews,
     'cashu/mint/reviews',
@@ -270,7 +281,7 @@ export const searchMints = ({
   fields?: string;
   signal?: AbortSignal;
 }) =>
-  fetchParsed(
+  fetchJson(
     `${BASE_URL}/cashu/mints/search?${new URLSearchParams({
       ...(query && { q: query }),
       ...(currency && currency !== 'ALL' && { currency }),
@@ -290,7 +301,7 @@ export const getLatestVersion = ({
   storage: { version: string };
   signal?: AbortSignal;
 }) =>
-  fetchParsed(
+  fetchJson(
     `${BASE_URL}/app/latest-version`,
     parseLatestVersion,
     'app/latest-version',
@@ -303,7 +314,7 @@ export const getLatestVersion = ({
   );
 
 export const fetchNostrProfile = (pubkey: string, controls: RequestControls = {}) =>
-  fetchParsed(
+  fetchJson(
     `${BASE_URL}/nostr/profile?pubkey=${encodeURIComponent(pubkey)}`,
     parseNostrProfile,
     'nostr/profile',
@@ -318,7 +329,7 @@ export const fetchNostrProfile = (pubkey: string, controls: RequestControls = {}
  * UI layer and the detail is logged via `loggableIssues`.
  */
 export const fetchWallpaperCatalog = (controls: RequestControls = {}) =>
-  fetchParsed(
+  fetchJson(
     `${BASE_URL}/wallpapers/catalog`,
     parseCatalog,
     'wallpapers/catalog',
@@ -332,7 +343,7 @@ export const fetchWallpaperCatalog = (controls: RequestControls = {}) =>
 // We rely on cashu-ts for the structural type, but apply `MintInfoSpine` at
 // runtime so a hostile or misconfigured mint can't ship a non-string `name`
 // past the boundary. Cancellation and timeout share the same plumbing as
-// `fetchParsed`.
+// `fetchJson`.
 // ---------------------------------------------------------------------------
 
 export const fetchMintInfo = async (
