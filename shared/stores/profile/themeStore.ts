@@ -28,6 +28,7 @@ import {
   BUILTIN_COLOR_THEME_NAMES,
 } from '@/shared/lib/theme/builtinAlbums';
 import { PersistedThemeStore, type ThemeMode } from '@sovranbitcoin/schemas';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
@@ -191,8 +192,11 @@ export const useThemeStore = create<ThemeStore>()(
 
       clearAllData: async () => {
         try {
-          await profileStorage.removeItem('theme-store');
-          set({ activeAlbumSlug: null, unitWallpapers: {}, mode: DEFAULT_MODE });
+          await clearPersistedStore(useThemeStore, {
+            activeAlbumSlug: null,
+            unitWallpapers: {},
+            mode: DEFAULT_MODE,
+          });
         } catch (error) {
           log.error('store.theme.clear_failed', { error });
           throw error;

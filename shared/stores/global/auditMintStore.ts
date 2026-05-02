@@ -7,6 +7,7 @@ import { log, storeLog } from '@/shared/lib/logger';
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface CachedMintData {
@@ -99,11 +100,9 @@ export const useAuditMintStore = create<AuditMintStore>()(
         return ageMinutes > maxAgeMinutes;
       },
 
-      // Clear all data from both state and storage
       clearAllData: async () => {
         try {
-          await AsyncStorage.removeItem('audit-mint-store');
-          set({ cache: {} });
+          await clearPersistedStore(useAuditMintStore, { cache: {} });
         } catch (error) {
           log.error('store.audit_mint.clear_failed', { error });
           throw error;

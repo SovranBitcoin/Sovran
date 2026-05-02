@@ -42,9 +42,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
-
-const profileStorage = createProfileScopedStorage();
 
 /**
  * Possible outbound-distribution sources for a transaction. These are
@@ -148,8 +147,7 @@ export const useTransactionDistributionStore = create<TransactionDistributionSto
 
       clearAllData: async () => {
         try {
-          await profileStorage.removeItem('transaction-distribution-store');
-          set({ distributions: {} });
+          await clearPersistedStore(useTransactionDistributionStore, { distributions: {} });
         } catch (error) {
           log.error('store.tx_distribution.clear_failed', { error });
           throw error;

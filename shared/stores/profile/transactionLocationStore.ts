@@ -11,9 +11,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
-
-const profileStorage = createProfileScopedStorage();
 
 export interface TransactionLocation {
   latitude: number;
@@ -103,8 +102,7 @@ export const useTransactionLocationStore = create<TransactionLocationStore>()(
 
       clearAllData: async () => {
         try {
-          await profileStorage.removeItem('transaction-location-store');
-          set({ locations: {} });
+          await clearPersistedStore(useTransactionLocationStore, { locations: {} });
         } catch (error) {
           log.error('store.tx_location.clear_failed', { error });
           throw error;

@@ -9,6 +9,7 @@ import {
   loggableIssues,
   parseWith,
 } from '@sovranbitcoin/schemas';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface BTCMapPlace {
@@ -300,8 +301,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
 
       clearAllData: async () => {
         try {
-          await AsyncStorage.removeItem('btcmap-store');
-          set({
+          await clearPersistedStore(useBTCMapStore, {
             placesCache: null,
             placeDetailsCache: {},
             isLoading: false,

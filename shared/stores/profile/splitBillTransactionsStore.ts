@@ -25,9 +25,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
-
-const profileStorage = createProfileScopedStorage();
 
 // ---------------------------------------------------------------------------
 // Types
@@ -477,8 +476,10 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
 
       clearAllData: async () => {
         try {
-          await profileStorage.removeItem('split-bill-transactions-store');
-          set({ groups: {}, quoteIdToSplitBill: {} });
+          await clearPersistedStore(useSplitBillTransactionsStore, {
+            groups: {},
+            quoteIdToSplitBill: {},
+          });
         } catch (error) {
           log.error('store.split_bill.clear_failed', { error });
           throw error;

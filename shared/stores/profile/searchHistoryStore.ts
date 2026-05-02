@@ -3,9 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
-
-const profileStorage = createProfileScopedStorage();
 
 /** Maximum number of recent searches to store */
 const MAX_RECENT_SEARCHES = 10;
@@ -143,8 +142,7 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
 
       clearAllData: async () => {
         try {
-          await profileStorage.removeItem('search-history-store');
-          set({ recentSearches: {} });
+          await clearPersistedStore(useSearchHistoryStore, { recentSearches: {} });
         } catch (error) {
           log.error('store.search_history.clear_failed', { error });
         }

@@ -3,9 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
-
-const profileStorage = createProfileScopedStorage();
 
 /**
  * @fileoverview Mint Distribution Store
@@ -511,8 +510,7 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
       // Clear all data
       clearAllData: async () => {
         try {
-          await profileStorage.removeItem('mint-distribution-store');
-          set({ distributions: {} });
+          await clearPersistedStore(useMintDistributionStore, { distributions: {} });
         } catch (error) {
           log.error('store.mint_dist.clear_failed', { error });
           throw error;

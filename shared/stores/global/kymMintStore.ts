@@ -6,6 +6,7 @@ import { log, storeLog } from '@/shared/lib/logger';
 
 import type { MintRecommendation } from '@/shared/lib/apiClient';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface CachedKYMData {
@@ -99,11 +100,9 @@ export const useKYMMintStore = create<KYMMintStore>()(
         return ageMinutes > maxAgeMinutes;
       },
 
-      // Clear all data from both state and storage
       clearAllData: async () => {
         try {
-          await AsyncStorage.removeItem('kym-mint-store');
-          set({ cache: {} });
+          await clearPersistedStore(useKYMMintStore, { cache: {} });
         } catch (error) {
           log.error('store.kym_mint.clear_failed', { error });
           throw error;

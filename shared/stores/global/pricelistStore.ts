@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { log, storeLog } from '@/shared/lib/logger';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface PricelistData {
@@ -128,8 +129,7 @@ export const usePricelistStore = create<PricelistStore>()(
 
       clearAllData: async () => {
         storeLog.info('store.pricelist.clear_all');
-        await AsyncStorage.removeItem('pricelist-store');
-        set({
+        await clearPersistedStore(usePricelistStore, {
           pricelist: null,
           isLoading: false,
           lastUpdated: null,

@@ -4,9 +4,8 @@ import { z } from 'zod';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
-
-const profileStorage = createProfileScopedStorage();
 
 // ---------------------------------------------------------------------------
 // Types
@@ -430,8 +429,7 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
 
       clearAllData: async () => {
         storeLog.info('social.clearAll');
-        await profileStorage.removeItem('nostr-social-store');
-        set(INITIAL_STATE);
+        await clearPersistedStore(useNostrSocialStore, INITIAL_STATE);
       },
     }),
     {

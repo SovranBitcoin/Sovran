@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { log, storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
@@ -52,8 +53,7 @@ export const useMintStore = create<MintStore>()(
 
       clearAllData: async () => {
         try {
-          await profileStorage.removeItem('mint-store');
-          set({ selectedMints: {} });
+          await clearPersistedStore(useMintStore, { selectedMints: {} });
         } catch (error) {
           log.error('store.mint.clear_failed', { error });
           throw error;

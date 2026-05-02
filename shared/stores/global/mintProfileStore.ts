@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { log, storeLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface CachedMintProfile {
@@ -70,8 +71,7 @@ export const useMintProfileStore = create<MintProfileStore>()(
 
       clearAllData: async () => {
         try {
-          await AsyncStorage.removeItem('mint-profile-store');
-          set({ cache: {} });
+          await clearPersistedStore(useMintProfileStore, { cache: {} });
         } catch (error) {
           log.error('store.mint_profile.clear_failed', { error });
           throw error;

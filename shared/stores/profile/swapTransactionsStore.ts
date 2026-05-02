@@ -16,9 +16,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
-
-const profileStorage = createProfileScopedStorage();
 
 export type SwapGroupState = 'running' | 'finished' | 'cancelled';
 
@@ -319,8 +318,10 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
 
       clearAllData: async () => {
         try {
-          await profileStorage.removeItem('swap-transactions-store');
-          set({ groups: {}, quoteIdToGroup: {} });
+          await clearPersistedStore(useSwapTransactionsStore, {
+            groups: {},
+            quoteIdToGroup: {},
+          });
         } catch (error) {
           log.error('store.swap_tx.clear_failed', { error });
           throw error;

@@ -4,9 +4,8 @@ import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
 import { RoutstrModel } from '@/shared/lib/routstr/api';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
-
-const profileStorage = createProfileScopedStorage();
 
 // Last-resort model id used by the legacy `UserMessagesScreen` flow when no
 // `selectedModel` has been set. The AI tab does NOT consume this — it
@@ -558,8 +557,7 @@ export const useRoutstrStore = create<RoutstrStore>()(
 
       clearAllData: async () => {
         try {
-          await profileStorage.removeItem('routstr-store');
-          set({
+          await clearPersistedStore(useRoutstrStore, {
             apiKey: null,
             balance: null,
             conversationHistory: [],

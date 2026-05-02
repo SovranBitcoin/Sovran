@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { isBackgroundImageTheme } from 'config/backgroundImageThemes';
 import { log, storeLog } from '@/shared/lib/logger';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 interface TermsAccepted {
@@ -346,8 +347,7 @@ export const useSettingsStore = create<SettingsStore>()(
 
       clearAllData: async () => {
         try {
-          await AsyncStorage.removeItem('settings-store');
-          set({ ...DEFAULT_SETTINGS, passcode: '' });
+          await clearPersistedStore(useSettingsStore, { ...DEFAULT_SETTINGS, passcode: '' });
         } catch (error) {
           log.error('store.settings.clear_failed', { error });
           throw error;

@@ -15,6 +15,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { log, storeLog } from '@/shared/lib/logger';
+import { clearPersistedStore } from '@/shared/lib/persist/clearPersistedStore';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
 const profileStorage = createProfileScopedStorage();
@@ -250,8 +251,7 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
       // Clear all stored data (state + AsyncStorage)
       clearAllData: async () => {
         try {
-          await profileStorage.removeItem('scan-history-store');
-          set({ entries: [] });
+          await clearPersistedStore(useScanHistoryStore, { entries: [] });
         } catch (error) {
           log.error('store.scan_history.clear_failed', { error });
           throw error;
