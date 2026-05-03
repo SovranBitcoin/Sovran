@@ -273,8 +273,8 @@
       ],
       "verification_note": "Confirmed by reading all three files. The (mint-flow) `handleBack` callback is provably equivalent to the screen's default per UserMessagesScreen.tsx line 889 (`onBack?: () => void` — when missing, `router.back()` is the fallback inferred from the comment).",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Three thin route wrappers still exist (app/userMessages.tsx, (user-flow)/userMessages.tsx, (mint-flow)/userMessages.tsx); two of them differ only in onBack — collapse to one wrapper is a follow-up."
+      "completion_status": "complete",
+      "completion_note": "All three route files (app/userMessages.tsx, (user-flow)/userMessages.tsx, (mint-flow)/userMessages.tsx) are now one-line `export { default } from '@/features/user/screens/UserMessagesRoute'` re-exports per the audit's Option (a). The schema and render body live in a single canonical wrapper; the no-op (mint-flow) `handleBack` and the dead (user-flow) `() => router.back()` are gone. Refactor at 70d209e6."
     },
     {
       "id": "F-010",
