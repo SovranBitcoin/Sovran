@@ -204,7 +204,8 @@
         "sovran-app/.claude/rules/zustand-persistence-review.md \u00a78"
       ],
       "verification_note": "Re-read splitBillTransactionsStore.ts:55-80 (participant/group types) and 408-420 (persist config). Confirmed no merge strategy. Counter-argument considered: existing users won't have split-bill groups yet \u2014 true today, but the feature is live on the feat branch and any persisted data from here forward is exposed to the hazard.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-010",
@@ -225,7 +226,8 @@
         "sovran-app/shared/stores/global/wallpaperStore.ts:255-260"
       ],
       "verification_note": "Re-read three store persist configs. None of them runs schema validation on rehydrate. Counter-argument considered: server never changes these shapes \u2014 not a guarantee, and the whole point is forward compatibility.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale"
     },
     {
       "id": "F-011",
@@ -364,7 +366,8 @@
         "sovran-app/.claude/rules/zustand-persistence-review.md \u00a75"
       ],
       "verification_note": "Re-read settingsStore.ts:14,56-62. Counter-argument: today the set is frozen. Kept Nit.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     }
   ],
   "dimensions": {
