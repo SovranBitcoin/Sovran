@@ -153,7 +153,7 @@
       ],
       "verification_note": "Verified at HomeFeed.tsx:119. CATEGORY_PUBKEYS is currently sourced from a local module (features/feed/components/nostr/categoryNpubs), so no active exploit today. Flagged as trust-boundary hygiene.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "partial"
     },
     {
       "id": "F-006",

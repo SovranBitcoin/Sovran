@@ -364,7 +364,7 @@
       ],
       "verification_note": "Re-checked at lines 73–104.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
+      "completion_status": "partial",
       "completion_note": "MerchantDetailScreen lives under (map-flow); the deep-link zod-validation slice (commit 0dddea5f) covered the payment-flow and top-level token/quote routes only. parseInt → z.coerce.number on placeId remains a follow-up."
     },
     {
