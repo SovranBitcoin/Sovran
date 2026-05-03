@@ -70,7 +70,7 @@
       "analyze_structure": "no cycles; InitializationProvider fan-in 3, plus 4 gates outside subtree"
     }
   },
-  "completion_status": "deferred",
+  "completion_status": "partial",
   "findings": [
     {
       "id": "F-001",
@@ -91,8 +91,8 @@
       ],
       "verification_note": "Re-checked at MigrationGate.tsx:93-108; full-tree grep for `migration250Complete` returns only the two read sites; full-tree grep for `_migrationStatus` returns the same two sites. No assignment exists.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "MigrationGate poll loop checks `_migrationStatus.migration250Complete`, which is never written; verified during slice survey but not in this slice."
+      "completion_status": "stale",
+      "completion_note": "MigrationGate poll loop and `_migrationStatus.migration250Complete` no longer present in the repo (verified by full-tree grep on 2026-05-03). MigrationGate now awaits Redux rehydration directly via `awaitReduxRehydration` and persists per-account completion via `setMigrationsComplete`. Resolved before this session."
     },
     {
       "id": "F-002",
@@ -115,7 +115,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-checked at InitializationProvider.tsx:382-389; log-doctor timeline confirms multiple toggles. Counter-argument: white splash overlay in NativeSplashLayoutGate masks the gap visually today, so user-visible severity is currently low. Kept Medium because the structural race exists and removes a degree of safety SOV-00 §8 expects.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "isInitializing flicker (new blocking stage registers one render after parent gate completes) was considered but not addressed in this slice. Touches `canStageStart` semantics and the gate-registration order in OuterProviders/InnerProviders; out of scope for the dead-code deletion."
     },
     {
       "id": "F-003",
@@ -137,7 +139,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Re-checked CocoProvider.tsx:25-37; the race is theoretical given current Zustand v5 synchronous semantics, but the recheck pattern is canonical. Confidence held at 0.55.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "TOCTOU on `awaitRestoreReady` lives in `shared/providers/CocoProvider.tsx`, not InitializationProvider; out of scope for this slice."
     },
     {
       "id": "F-004",
@@ -157,7 +161,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-checked InitializationProvider.tsx:536-547 and 1147-1152; both allocate fresh objects per render. Type-check clean, lint clean for this code.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Context value is now wrapped in `useMemo` so consumers do not re-render on every parent render. Full fix would require lifting `canStageStart` off the `stages` closure (e.g. read from a ref) so the memo only invalidates on isInitializing transitions; deferred."
     },
     {
       "id": "F-005",
@@ -178,8 +184,8 @@
       ],
       "verification_note": "Re-read line 71 and renderer switch at 554-559; confirmed const is hard-coded with no toggle. Counter-argument: someone may flip this for dev debugging — accepted as the rationale for option (b).",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Boot-path dead branches gated by INITIALIZATION_DISPLAY_TYPE === 'splash' — considered as candidate slice (Slice B). Excluded in favor of the bitchat orphan deletion; real and unfixed."
+      "completion_status": "complete",
+      "completion_note": "Deleted `INITIALIZATION_DISPLAY_TYPE` and the conditional render that selected it; deleted `LogoInitializationScreen`, `InitializationScreenInternal`, `AnimatedLogoSplash`, `AnimatedStepItem`, `PulsingText`, `AnimatedCheckmark`, the SVG/path constants, and the Reanimated/Svg/Dimensions imports they consumed. `app/_layout.tsx` drops the orphaned `INITIALIZATION_DISPLAY_TYPE` import and the three branches that gated on it. Native splash (`expo-splash-screen`) remains the only splash mechanism."
     },
     {
       "id": "F-006",
@@ -200,8 +206,8 @@
       ],
       "verification_note": "Grep confirms zero external callers. Re-read 436-511; setTimeout chain has no cleanup ref.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "startTestAnimation/testMode dev-loop dead code — considered as part of Slice B. Excluded; real and unfixed."
+      "completion_status": "complete",
+      "completion_note": "Deleted `startTestAnimation`, `testMode` prop, `isTestMode` state, and the 16-step mock animation. The dev-only test surface no longer ships."
     },
     {
       "id": "F-007",
@@ -220,7 +226,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Re-read 189, 232-248, 416-429; confirmed no clear. Native-restart path masks production impact, but dev/hot-reload paths exhibit the bug.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "`stageStartTimes` ref is now cleared inside `resetStages` alongside `blockingFlagsRef` and the stage map; stale start timestamps no longer survive in-process resets."
     },
     {
       "id": "F-008",
@@ -238,8 +246,8 @@
       "references": [],
       "verification_note": "Re-read 563-587 and 662-666; prop is unused. Severity Nit.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "AnimatedCheckmark.isActive dead prop — folded into the unreachable splash overlay (F-005); deferred with that cluster as Slice B."
+      "completion_status": "complete",
+      "completion_note": "Resolved by deleting `AnimatedCheckmark` (only lived inside the unreachable splash overlay)."
     },
     {
       "id": "F-009",
@@ -257,8 +265,8 @@
       "references": [],
       "verification_note": "Direct logic inspection. Both sites verified.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Redundant shouldRender guards live inside the unreachable splash overlay (F-005); deferred with that cluster as Slice B."
+      "completion_status": "complete",
+      "completion_note": "Resolved by deleting the splash-overlay components that contained the redundant null-render guards."
     },
     {
       "id": "F-010",
@@ -277,7 +285,9 @@
         "lint:import/first"
       ],
       "verification_note": "`npm run lint -- shared/providers/* shared/blocks/*` confirms warnings; grep for `initLog('Module'` enumerates 16 files.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "`initLog(\"Module\", \"X loaded\")` import-first warnings span 16 boot files; cross-cutting cleanup, deferred. The pattern still appears in `InitializationProvider.tsx` and `app/_layout.tsx` after this slice — eslint warnings unchanged."
     }
   ],
   "dimensions": {
