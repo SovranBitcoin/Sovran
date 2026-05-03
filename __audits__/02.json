@@ -32,7 +32,9 @@
         "sovran-app/app/_layout.tsx:104-121,289"
       ],
       "verification_note": "Re-read CocoPaymentUX.tsx:102-111, OfflineProvider.tsx:15 (default context), and _layout.tsx:110/289 — tree ordering and default confirmed. Counter-argument considered: could useOfflineStatus resolve via a higher-level provider? Grep shows the only OfflineProvider mount is RootLayoutContent.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Re-verified 2026-05-03 — OfflineProvider still mounted inside RootLayoutContent (app/_layout.tsx:324) below CocoPaymentUXProvider in AccountScopedProviders, so getOffline still always returns false. Considered as an alternative slice but kept separate from the render-time ref-mirror consolidation; provider tree-ordering is a different architectural seam."
     },
     {
       "id": "F-002",
@@ -51,7 +53,9 @@
         "sovran-app/features/send/lib/sovranPaymentConfig.ts:681-694"
       ],
       "verification_note": "Re-read lines 121, 395-400, and 642. Counter-argument considered: receive screens are typically singleton-modal; co-mount window is narrow. Kept as Medium because the failure is silent and the fix is a one-liner.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "p2pkKeyRefreshedRef is a single-slot callback registry, not a render-time ref mirror — its writes happen inside onEntryUpdate's subscribe/unsubscribe callbacks. Different pattern from the useLatestRef slice; the fix here is to convert the slot to a Set keyed on subscriber identity."
     },
     {
       "id": "F-003",

@@ -261,7 +261,9 @@
         "https://react.dev/reference/react/useRef#avoiding-recreating-the-ref-contents"
       ],
       "verification_note": "Re-read CocoPaymentUXProvider.tsx:451-471. Confirmed ref writes are in the function body, not in an effect. Counter-argument considered: ref writes are cheap and don't trigger re-renders \u2014 correct, but the semantic issue is read-during-render, which is what breaks.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Fixed in commit c2932a64 \u2014 usePaymentMachine now mirrors walletContext/handlers/unit through `useLatestRef` (a `useInsertionEffect`-backed helper) so the writes happen after commit, before any user-space useLayoutEffect/useEffect. Same canonical helper is now used across coco-payment-ux and sovran-app for the broader render-time-ref-mirror pattern."
     },
     {
       "id": "F-012",
