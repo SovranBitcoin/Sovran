@@ -7,25 +7,31 @@
  * default exports, named exports, React components, hooks, types, constants.
  *
  * Usage:
- *   node scripts/analyze-structure.mjs              # whole project
+ *   node scripts/analyze-structure.mjs              # whole project, full verbose report
  *   node scripts/analyze-structure.mjs app          # subtree
  *   node scripts/analyze-structure.mjs components/screens
- *   node scripts/analyze-structure.mjs --imports    # also show imports per file
- *   node scripts/analyze-structure.mjs --loc        # show code/blank/comment breakdown per file
- *   node scripts/analyze-structure.mjs --no-types   # hide type/interface exports
- *   node scripts/analyze-structure.mjs --no-ext     # hide external package imports
  *   node scripts/analyze-structure.mjs --json       # machine-readable JSON
  *
- * Dependency analysis flags:
- *   node scripts/analyze-structure.mjs --fanin              # reverse dependency ranking
- *   node scripts/analyze-structure.mjs --fanin --fanin-min 3  # only show fanin >= 3
- *   node scripts/analyze-structure.mjs --coupling           # inter-folder dependency matrix
- *   node scripts/analyze-structure.mjs --coupling-depth 2   # folder depth for coupling (default: 1)
- *   node scripts/analyze-structure.mjs --cycles             # circular import detection
- *   node scripts/analyze-structure.mjs --orphans            # files never imported by anything
- *   node scripts/analyze-structure.mjs --colocate           # suggest file moves based on importer distribution
- *   node scripts/analyze-structure.mjs --colocate-threshold 0.8  # importer % threshold (default: 0.7)
- *   node scripts/analyze-structure.mjs --boundary features/mints features/payments  # cross-boundary report
+ * By default the report includes: tree, per-file imports, per-file LOC breakdown,
+ * fan-in, coupling matrix, cycles, orphans, and colocate suggestions.
+ *
+ * Opt-out flags (disable parts of the verbose report):
+ *   --no-imports     # hide per-file import lines
+ *   --no-loc         # show "N loc" badge instead of code/blank/comment breakdown
+ *   --no-types       # hide type/interface exports
+ *   --no-ext         # hide external package imports
+ *   --no-reexport    # hide pass-through re-exports
+ *   --no-fanin       # skip reverse-dependency ranking
+ *   --no-coupling    # skip inter-folder dependency matrix
+ *   --no-cycles      # skip circular import detection
+ *   --no-orphans     # skip never-imported files
+ *   --no-colocate    # skip move suggestions
+ *
+ * Tuning:
+ *   --fanin-min 3              # only show fanin >= 3 (default: 1)
+ *   --coupling-depth 2         # folder depth for coupling matrix (default: 1)
+ *   --colocate-threshold 0.8   # importer % threshold (default: 0.7)
+ *   --boundary features/mints features/payments  # cross-boundary report (opt-in)
  */
 
 import { readdirSync, readFileSync, statSync, existsSync } from 'fs';
@@ -77,16 +83,16 @@ const args = process.argv.slice(2);
 const showJson = args.includes('--json');
 const hideTypes = args.includes('--no-types');
 const hideSame = args.includes('--no-reexport');
-const showImports = args.includes('--imports');
+const showImports = !args.includes('--no-imports');
 const hideExternal = args.includes('--no-ext');
-const showLoc = args.includes('--loc');
+const showLoc = !args.includes('--no-loc');
 
-// New dependency analysis flags
-const showFanin = args.includes('--fanin');
-const showCoupling = args.includes('--coupling');
-const showCycles = args.includes('--cycles');
-const showOrphans = args.includes('--orphans');
-const showColocate = args.includes('--colocate');
+// Dependency analysis sections (default ON; pass --no-X to disable)
+const showFanin = !args.includes('--no-fanin');
+const showCoupling = !args.includes('--no-coupling');
+const showCycles = !args.includes('--no-cycles');
+const showOrphans = !args.includes('--no-orphans');
+const showColocate = !args.includes('--no-colocate');
 
 // --boundary <folderA> <folderB>
 const boundaryIdx = args.indexOf('--boundary');
@@ -128,14 +134,14 @@ const allFlags = new Set([
   '--json',
   '--no-types',
   '--no-reexport',
-  '--imports',
+  '--no-imports',
   '--no-ext',
-  '--loc',
-  '--fanin',
-  '--coupling',
-  '--cycles',
-  '--orphans',
-  '--colocate',
+  '--no-loc',
+  '--no-fanin',
+  '--no-coupling',
+  '--no-cycles',
+  '--no-orphans',
+  '--no-colocate',
   '--fanin-min',
   '--coupling-depth',
   '--colocate-threshold',
