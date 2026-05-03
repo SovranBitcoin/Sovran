@@ -29,9 +29,8 @@ export interface CachedDerivedKeys {
 
 // iOS-specific options for enhanced security
 const IOS_SECURE_OPTIONS = {
-  requireAuthentication: false, // Set to false to avoid biometric requirement in development
+  requireAuthentication: true,
   authenticatePrompt: 'Authenticate to access your Sovran wallet',
-  // For production, you might want to set requireAuthentication: true
 } as const;
 
 const secureOptions = (): SecureStore.SecureStoreOptions =>
