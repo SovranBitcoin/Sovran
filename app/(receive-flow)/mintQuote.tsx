@@ -7,19 +7,24 @@
  */
 
 import React, { useCallback } from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { z } from 'zod';
 
 import { MintQuoteRoute } from '@/features/receive';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
+import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+
+const ParamsSchema = z.object({
+  unit: z.string().min(1).max(16).optional(),
+});
 
 export default function ModalScreen() {
   // Bind unit to the machine each render so the active flow tracks the
   // currency the route was opened with. MintQuoteRoute revalidates the
-  // full param shape; pulling `unit` off the raw params here is just for
+  // full param shape; pulling `unit` off the validated params here is for
   // the always-on machine binding.
-  const rawParams = useLocalSearchParams<{ unit?: string }>();
-  const unit = typeof rawParams.unit === 'string' ? rawParams.unit : 'sat';
+  const params = useRouteParams(ParamsSchema, { where: 'receive-flow.mintQuote' });
+  const unit = params?.unit ?? 'sat';
 
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit });
@@ -33,6 +38,8 @@ export default function ModalScreen() {
   const handleRequestMintList = useCallback(() => {
     void machine.requestMintSelector();
   }, [machine]);
+
+  if (!params) return null;
 
   return (
     <MintQuoteRoute

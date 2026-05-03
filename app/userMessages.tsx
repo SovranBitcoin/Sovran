@@ -11,11 +11,12 @@
 
 import React from 'react';
 import { z } from 'zod';
+import { Hex64 } from '@sovranbitcoin/schemas';
 import { UserMessagesScreen } from '@/features/user';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const ParamsSchema = z.object({
-  pubkey: z.string().regex(/^[0-9a-f]{64}$/, 'pubkey must be 64-hex'),
+  pubkey: Hex64,
 });
 
 function ModalScreen() {

@@ -17,10 +17,10 @@
 import React from 'react';
 import { router } from 'expo-router';
 import { z } from 'zod';
+import { Hex64 } from '@sovranbitcoin/schemas';
 import { GeohashChatScreen } from '@/features/bitchat/screens/GeohashChatScreen';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
-const HEX_64 = /^[0-9a-f]{64}$/;
 const HEX_16 = /^[0-9a-f]{16}$/;
 const GEOHASH = /^[0-9bcdefghjkmnpqrstuvwxyz]{1,12}$/;
 
@@ -31,10 +31,13 @@ const ParamsSchema = z
     nickname: z.string().max(64).optional(),
     geohash: z.string().regex(GEOHASH).optional(),
   })
-  .refine((v) => (v.transport === 'ble-dm' ? HEX_16.test(v.peerID) : HEX_64.test(v.peerID)), {
-    message: 'peerID shape does not match transport',
-    path: ['peerID'],
-  })
+  .refine(
+    (v) => (v.transport === 'ble-dm' ? HEX_16.test(v.peerID) : Hex64.safeParse(v.peerID).success),
+    {
+      message: 'peerID shape does not match transport',
+      path: ['peerID'],
+    }
+  )
   .refine((v) => v.transport === 'ble-dm' || typeof v.geohash === 'string', {
     message: 'nostr-dm requires geohash',
     path: ['geohash'],

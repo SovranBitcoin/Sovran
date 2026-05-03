@@ -24,6 +24,8 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
 
+import { Hex64 } from '@sovranbitcoin/schemas';
+
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Log, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
@@ -255,7 +257,7 @@ export function GeohashChatScreen({
   // For nostr-dm the dmPeerID is a 64-hex Nostr pubkey (per-geohash ephemeral
   // identity). For ble-dm it's a 16-hex BitChat peer ID — no Nostr identity,
   // so DmChatHeader falls back to nickname-only and hides the npub/QR.
-  const isNostrPubkey = !!dmPeerID && /^[0-9a-f]{64}$/.test(dmPeerID);
+  const isNostrPubkey = !!dmPeerID && Hex64.safeParse(dmPeerID).success;
 
   return (
     <KeyboardAvoidingView

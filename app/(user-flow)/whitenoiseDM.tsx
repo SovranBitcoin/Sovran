@@ -9,12 +9,13 @@
 import React from 'react';
 import { Stack } from 'expo-router';
 import { z } from 'zod';
+import { Hex64 } from '@sovranbitcoin/schemas';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { WhitenoiseDMScreen } from '@/features/whitenoise/screens/WhitenoiseDMScreen';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const ParamsSchema = z.object({
-  pubkey: z.string().regex(/^[0-9a-f]{64}$/, 'pubkey must be 64-hex'),
+  pubkey: Hex64,
 });
 
 export default function WhitenoiseDMPage() {

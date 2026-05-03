@@ -10,17 +10,12 @@
  */
 
 import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  StyleSheet,
-  useWindowDimensions,
-  Linking,
-} from 'react-native';
+import { Animated, Easing, StyleSheet, useWindowDimensions, Linking } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Image as ExpoImage } from 'expo-image';
 import { Stack, Link } from 'expo-router';
 import { z } from 'zod';
+import { Hex64 } from '@sovranbitcoin/schemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
@@ -78,14 +73,13 @@ const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
 const AVATAR_OVERLAP = AVATAR_SIZE / 4;
 
-const HEX_64 = /^[0-9a-f]{64}$/;
 const NPUB = /^npub1[02-9ac-hj-np-z]{58,}$/;
 const HTTPS_URL = /^https:\/\/[^\s]+$/;
 
 const UserProfileParamsSchema = z
   .object({
     npub: z.string().regex(NPUB, 'invalid npub').optional(),
-    pubkey: z.string().regex(HEX_64, 'pubkey must be 64-hex').optional(),
+    pubkey: Hex64.optional(),
     mintUrl: z.string().regex(HTTPS_URL, 'mintUrl must be https').max(2048).optional(),
   })
   .refine((v) => !!(v.npub || v.pubkey), {

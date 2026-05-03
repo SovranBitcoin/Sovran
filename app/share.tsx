@@ -11,21 +11,18 @@
 import React, { useCallback, useState } from 'react';
 import { router } from 'expo-router';
 import { z } from 'zod';
+import { Hex64 } from '@sovranbitcoin/schemas';
 
 import { ShareScreen, SHARE_CONFIGS, ShareType } from '@/features/user';
 import { useScreenOptions } from '@/shared/ui/composed/Screen';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
-const HEX_PUBKEY = /^[0-9a-f]{64}$/;
 const COMPRESSED_PUBKEY = /^0[23][0-9a-f]{64}$/;
 const NPUB = /^npub1[02-9ac-hj-np-z]{58,}$/;
 const LUD16 = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,}$/;
 
-const npubData = z
-  .string()
-  .regex(NPUB, 'invalid npub')
-  .or(z.string().regex(HEX_PUBKEY, 'invalid hex pubkey'));
+const npubData = z.string().regex(NPUB, 'invalid npub').or(Hex64);
 const p2pkData = z.string().regex(COMPRESSED_PUBKEY, 'invalid p2pk');
 const lud16Data = z.string().regex(LUD16, 'invalid lightning address').max(320);
 
