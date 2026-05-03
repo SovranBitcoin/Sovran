@@ -5,6 +5,7 @@ import type { LiveSheetConfig } from './liveSheetTypes';
 import type { PopupIcon } from './icons';
 import type { PopupTextSegment } from './format';
 import { flattenSegments } from './format';
+import type { SheetCloseEvent } from '@/shared/stores/runtime/popupStore';
 
 const popupLog = log.child({ module: 'popup' });
 
@@ -109,7 +110,7 @@ interface popupConfig {
   duration?: number;
   buttons?: MessageButton[];
   onOpen?: () => void;
-  onClose?: (data: unknown) => void;
+  onClose?: (event: SheetCloseEvent) => void;
   type?: MessageType;
   live?: LiveSheetConfig;
 }
