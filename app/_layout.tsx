@@ -26,7 +26,6 @@ import LegacyMigrationGate from '@/shared/blocks/LegacyMigrationGate';
 import MigrationGate from '@/shared/blocks/MigrationGate';
 import {
   InitializationProvider,
-  INITIALIZATION_DISPLAY_TYPE,
   useInitializationState,
   useInitializationReset,
 } from '@/shared/providers/InitializationProvider';
@@ -115,7 +114,7 @@ const PROFILE_SWITCH_SPLASH_BOX_SIZE =
 // while PersistGate waits for Redux rehydration (avoids blank screen gap).
 const OuterProviders = compose([
   KeyboardProvider,
-  [InitializationProvider, { forceVisible: false }],
+  InitializationProvider,
   [PersistGate, { loading: null, persistor }],
   [Provider, { store }],
   ThemeProvider,
@@ -384,10 +383,8 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   // overlay at that exact spot we need to subtract our own window offset
   // (a parent View further up may not start at window (0,0)).
   const [parentOffset, setParentOffset] = useState({ x: 0, y: 0 });
-  const [morphPhase, setMorphPhase] = useState<'idle' | 'morphing' | 'fading' | 'done'>(
-    'idle'
-  );
-  const showSplash = INITIALIZATION_DISPLAY_TYPE === 'splash' && overlayMounted;
+  const [morphPhase, setMorphPhase] = useState<'idle' | 'morphing' | 'fading' | 'done'>('idle');
+  const showSplash = overlayMounted;
 
   useEffect(() => {
     const unsub = subscribeQRButtonAnchor((next) => {
@@ -398,7 +395,6 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   const maybeHideNativeSplash = useCallback(() => {
-    if (INITIALIZATION_DISPLAY_TYPE !== 'splash') return;
     if (
       isInitializing ||
       !hasBeenInitializing.current ||
@@ -654,10 +650,7 @@ function NativeSplashLayoutGate({ children }: { children: React.ReactNode }) {
           <Animated.View pointerEvents="none" style={gradientLayerStyle}>
             <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#0f0f12' }]} />
             <View
-              style={[
-                StyleSheet.absoluteFillObject,
-                { backgroundColor: 'rgba(255,255,255,0.35)' },
-              ]}
+              style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(255,255,255,0.35)' }]}
             />
             <LinearGradient
               colors={[
@@ -712,17 +705,6 @@ export default function RootLayout() {
     'RootLayout',
     `render — fontsLoaded=${fontsLoaded} fontError=${!!fontError} account=${activeAccountIndex}`
   );
-
-  // In 'splash' mode the native splash stays visible until initialization
-  // finishes and the root view has produced a layout (NativeSplashLayoutGate).
-  // For 'text' and 'logo' modes we hide it as soon as fonts are ready so
-  // the custom React overlay can take over.
-  useEffect(() => {
-    if ((fontsLoaded || fontError) && INITIALIZATION_DISPLAY_TYPE !== 'splash') {
-      initLog('RootLayout', 'fonts ready — calling SplashScreen.hideAsync');
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
 
   // Don't render anything until fonts are loaded
   if (!fontsLoaded && !fontError) {
