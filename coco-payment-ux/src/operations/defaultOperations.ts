@@ -131,7 +131,7 @@ export interface DefaultOperationsConfig {
   getManager: () => Manager | null;
   getProofAmounts?: () => Record<string, number[]>;
   getPreferredMintUrl?: () => string | undefined;
-  /** Required for Nostr payment request transport. Wallet wraps sendDirectMessageToRelays with the user's private key. */
+  /** Required for Nostr payment request transport. Wallet supplies a NIP-17 publisher bound to the user's private key. */
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
   /**
    * Bulk catalog fetcher for mint list items. Awaited inside `buildMintListItems`

@@ -155,15 +155,6 @@ export {
   type LnurlErrorCode,
 } from './lnurl';
 
-// Nostr (NIP-17 gift wrap + relay publishing)
-export {
-  sendDirectMessageToRelays,
-  buildGiftWrappedDM,
-  buildGiftWrappedDMPair,
-  unwrapGiftWrap,
-  type UnwrappedDM,
-} from './nostr';
-
 // Cancellable-fetch primitives (timeout + AbortSignal). Hermes lacks
 // `DOMException`, so callers must duck-type aborts via `isAbortError`
 // rather than `instanceof DOMException`. The same primitives back the

@@ -1,24 +1,28 @@
 /**
- * @fileoverview Pure TS operation for sending NIP-17 direct messages
+ * @fileoverview Sovran-side NIP-17 direct-message publisher.
  *
- * Uses nostr-tools (SimplePool, nip19, buildGiftWrappedDM) instead of NDK.
- * No React hooks or NDK dependency — works as an injectable operation.
+ * Decodes an nprofile, builds a kind-1059 gift wrap via `buildRecipientGiftWrap`
+ * (no sender self-copy — payment-request DMs don't need one), and publishes
+ * through nostr-tools' `SimplePool`. Resolves once the first relay accepts;
+ * rejects once every relay rejects, or with a `TimeoutError` if no relay
+ * accepts within `timeoutMs`.
  *
  * Real-world relay availability is poor: relay.damus.io, nos.lol, and
- * relay.primal.net all regularly stall on publish under load. nostr-tools
- * `pool.publish` returns per-relay promises that may never settle when the
- * socket stalls (no heartbeat). `Promise.any` only rejects when every
- * relay rejects, so a fully-stalled relay set leaves the caller's await
- * hanging until TCP eventually fails — minutes, sometimes never. We bound
- * the publish with `withTimeout` so the machine's `sendLocked` flow always
- * gets a definite answer.
+ * relay.primal.net all regularly stall on publish under load. nostr-tools'
+ * per-relay promises may never settle when the socket stalls (no heartbeat),
+ * and `Promise.any` only rejects when every relay rejects, so a fully-stalled
+ * relay set leaves the caller's await hanging until TCP eventually fails. We
+ * bound the publish with `withTimeout` so the caller always gets a definite
+ * answer.
  */
 
 import { nip19, SimplePool } from 'nostr-tools';
 
-import { logger } from '../logger';
-import { withTimeout } from '../safeFetch';
-import { buildGiftWrappedDM } from './nip17';
+import { withTimeout } from 'coco-payment-ux';
+
+import { nostrLog } from '@/shared/lib/logger';
+
+import { buildRecipientGiftWrap } from './nip17';
 
 const DEFAULT_PAYMENT_RELAY = 'wss://relay.vertexlab.io';
 
@@ -32,14 +36,6 @@ const FALLBACK_PAYMENT_RELAYS = [
 /** How long to wait for the first relay OK before failing the publish. */
 const DEFAULT_PUBLISH_TIMEOUT_MS = 15_000;
 
-/**
- * Send a NIP-17 gift-wrapped direct message to an nprofile.
- *
- * Decodes nprofile, builds kind 1059 event via buildGiftWrappedDM,
- * publishes to relays using nostr-tools SimplePool. Resolves once the
- * first relay accepts; rejects if every relay rejects, or with a
- * `TimeoutError` if no relay accepts within `timeoutMs`.
- */
 export async function sendDirectMessageToRelays(params: {
   senderPrivateKey: Uint8Array;
   nprofile: string;
@@ -48,7 +44,7 @@ export async function sendDirectMessageToRelays(params: {
 }): Promise<void> {
   const decoded = nip19.decode(params.nprofile);
   if (decoded.type !== 'nprofile') {
-    logger.warn('nostr.sendDirectMessage.invalidNprofile', {
+    nostrLog.warn('nostr.sendDirectMessage.invalidNprofile', {
       decodedType: decoded.type,
       inputPreview: params.nprofile.slice(0, 30),
     });
@@ -56,7 +52,7 @@ export async function sendDirectMessageToRelays(params: {
   }
 
   const { pubkey, relays } = decoded.data;
-  logger.info('nostr.sendDirectMessage.publish', {
+  nostrLog.info('nostr.sendDirectMessage.publish', {
     pubkeyPreview: pubkey.slice(0, 12) + '…',
     relayCount: relays?.length ?? 0,
     usingDefaults: !relays?.length,
@@ -67,7 +63,7 @@ export async function sendDirectMessageToRelays(params: {
       : [DEFAULT_PAYMENT_RELAY, ...FALLBACK_PAYMENT_RELAYS];
   const uniqueRelays = [...new Set(relayUrls)];
 
-  const wrap = buildGiftWrappedDM({
+  const { recipientWrap } = buildRecipientGiftWrap({
     content: params.message,
     senderPrivateKey: params.senderPrivateKey,
     recipientPublicKey: pubkey,
@@ -76,11 +72,11 @@ export async function sendDirectMessageToRelays(params: {
   const pool = new SimplePool();
   try {
     await withTimeout(
-      Promise.any(pool.publish(uniqueRelays, wrap)),
+      Promise.any(pool.publish(uniqueRelays, recipientWrap)),
       params.timeoutMs ?? DEFAULT_PUBLISH_TIMEOUT_MS,
       'sendDirectMessage publish'
     );
-    logger.info('nostr.sendDirectMessage.published');
+    nostrLog.info('nostr.sendDirectMessage.published');
   } finally {
     pool.close(uniqueRelays);
   }

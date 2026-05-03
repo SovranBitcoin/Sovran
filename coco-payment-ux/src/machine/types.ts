@@ -419,7 +419,11 @@ export type NotificationHandlerMap = {
   onSendCancelled?: (data: { operationId: string }) => MaybeAsync;
 
   /** Called when a send token cancellation fails. */
-  onSendCancelFailed?: (data: { operationId: string; message: string; mintUnreachable?: boolean }) => MaybeAsync;
+  onSendCancelFailed?: (data: {
+    operationId: string;
+    message: string;
+    mintUnreachable?: boolean;
+  }) => MaybeAsync;
 
   /**
    * Called when an ecash receive starts processing.
@@ -461,7 +465,11 @@ export type NotificationHandlerMap = {
   onMeltCancelled?: (data: { operationId: string }) => MaybeAsync;
 
   /** Called when a melt cancellation fails. */
-  onMeltCancelFailed?: (data: { operationId: string; message: string; mintUnreachable?: boolean }) => MaybeAsync;
+  onMeltCancelFailed?: (data: {
+    operationId: string;
+    message: string;
+    mintUnreachable?: boolean;
+  }) => MaybeAsync;
 
   /** Called when a received token has an unsupported unit (not 'sat'). */
   onUnsupportedTokenUnit?: (data: { unit: string }) => MaybeAsync;
@@ -658,8 +666,9 @@ export interface MachineOperations {
   /**
    * Send a NIP-17 gift-wrapped direct message to an nprofile.
    * Used internally by `executePaymentRequest` for Nostr transport.
-   * The wallet provides this by wrapping `sendDirectMessageToRelays`
-   * with the user's private key.
+   * The wallet supplies its own publisher (decode nprofile, build kind-1059
+   * gift wrap, publish) — the package no longer ships its own to keep
+   * NIP-17 / NIP-44 implementation a consumer concern.
    */
   sendNostrDM?: (nprofile: string, message: string) => Promise<void>;
 }

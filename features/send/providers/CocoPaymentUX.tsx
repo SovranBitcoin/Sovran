@@ -23,7 +23,6 @@ import {
   meltOperationToScreenActionEntry,
   shouldApplyEntryUpdate as defaultShouldApply,
   mergeEntryUpdate as defaultMerge,
-  sendDirectMessageToRelays,
 } from 'coco-payment-ux';
 import {
   CocoPaymentUXProvider as PaymentUXProviderBase,
@@ -32,6 +31,7 @@ import {
 } from 'coco-payment-ux/react';
 
 import { paymentLog } from '@/shared/lib/logger';
+import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import { useReceivePaymentUXExtras } from '@/features/receive/providers/ReceivePaymentUXExtras';
 import {
   createSovranExecuteMintQuote,
