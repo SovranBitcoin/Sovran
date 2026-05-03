@@ -14,7 +14,6 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-import { ShortTextNote, Repost, GenericRepost, Metadata } from 'nostr-tools/kinds';
 import { log, Log } from '@/shared/lib/logger';
 import { LegendList, type LegendListRenderItemProps, type LegendListRef } from '@legendapp/list';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -23,28 +22,19 @@ import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
 import {
   type FeedEvent,
   type FeedItem,
-  type FeedParseResult,
   type NoteMetrics,
   type ProfileInfo,
-  type RawPrimalEvent,
   DEFAULT_METRICS,
   PRIMAL_CACHE_RELAY_URL,
-  PRIMAL_KIND_NOTE_STATS,
-  PRIMAL_KIND_MENTIONS,
   PRIMAL_KIND_FEED_RANGE,
   MAX_VIDEO_FEED_PAGES,
   createPrimalRelayClient,
-  collectReferencedIds,
-  normalizeFeedEvent,
   parseJson,
-  getFirstTagValue,
-  parseProfileFromRaw,
-  parseNoteMetrics,
   tryNpubEncode,
-  getEmbeddedRepostEvent,
   buildVideoOverlayLayout,
   computeFeedIndicesWithVideo,
   enrichFeedPage,
+  parseFeedPage,
 } from './nostr/shared';
 import { CATEGORY_PUBKEYS } from './nostr/categoryNpubs';
 
@@ -119,189 +109,6 @@ function getCategoryPubkeysFromSpec(spec: string): string[] {
     pubkeys.push(value);
   }
   return pubkeys;
-}
-
-function parseMegaFeedResponse(feedRawEvents: RawPrimalEvent[]): FeedParseResult {
-  const t0 = performance.now();
-  const eventMap = new Map<string, FeedEvent>();
-  const notes: FeedEvent[] = [];
-  const reposts: FeedEvent[] = [];
-  const embeddedMentionEvents = new Map<string, FeedEvent>();
-  const metricsMap = new Map<string, NoteMetrics>();
-  const profilesMap = new Map<string, ProfileInfo>();
-  let feedOrder: string[] = [];
-  let paginationUntil = 0;
-
-  for (const raw of feedRawEvents) {
-    if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-      const parsed = parseJson<Record<string, unknown>>(raw.content);
-      const eventId = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-      if (!eventId || !parsed) continue;
-      metricsMap.set(eventId, parseNoteMetrics(parsed));
-      continue;
-    }
-
-    if (raw.kind === PRIMAL_KIND_FEED_RANGE) {
-      const parsed = parseJson<Record<string, unknown>>(raw.content);
-      if (Array.isArray(parsed?.elements)) {
-        feedOrder = parsed.elements
-          .map((el: unknown) => {
-            if (typeof el === 'string') return el;
-            if (
-              el &&
-              typeof el === 'object' &&
-              'id' in el &&
-              typeof (el as Record<string, unknown>).id === 'string'
-            )
-              return (el as Record<string, unknown>).id as string;
-            return null;
-          })
-          .filter((id): id is string => id !== null);
-      }
-      const rawUntil = parsed?.until;
-      if (typeof rawUntil === 'number' && rawUntil > 0) {
-        paginationUntil = rawUntil;
-      } else if (typeof rawUntil === 'string') {
-        const num = Number(rawUntil);
-        if (num > 0) paginationUntil = num;
-      }
-      continue;
-    }
-
-    if (raw.kind === PRIMAL_KIND_MENTIONS) {
-      const mentionEvent = normalizeFeedEvent(parseJson<unknown>(raw.content));
-      if (!mentionEvent) continue;
-      embeddedMentionEvents.set(mentionEvent.id, mentionEvent);
-      eventMap.set(mentionEvent.id, mentionEvent);
-      continue;
-    }
-
-    const ev = normalizeFeedEvent(raw);
-    if (!ev) continue;
-
-    if (ev.kind === ShortTextNote) {
-      eventMap.set(ev.id, ev);
-      notes.push(ev);
-      continue;
-    }
-
-    if (ev.kind === Repost || ev.kind === GenericRepost) {
-      eventMap.set(ev.id, ev);
-      reposts.push(ev);
-      continue;
-    }
-
-    if (ev.kind === Metadata) {
-      const result = parseProfileFromRaw(raw);
-      if (result) profilesMap.set(result[0], result[1]);
-      continue;
-    }
-  }
-
-  const nextFeedItems: FeedItem[] = [];
-  const feedItemsByEventId = new Map<string, FeedItem>();
-
-  for (const note of notes) {
-    const item: FeedItem = { type: 'note', event: note, timestamp: note.created_at || 0 };
-    nextFeedItems.push(item);
-    feedItemsByEventId.set(note.id, item);
-  }
-
-  for (const repostEvent of reposts) {
-    const originalEventId = getFirstTagValue(repostEvent, 'e');
-    if (!originalEventId) continue;
-    let originalEvent = eventMap.get(originalEventId);
-    if (!originalEvent) {
-      originalEvent = getEmbeddedRepostEvent(repostEvent, originalEventId);
-      if (originalEvent) eventMap.set(originalEvent.id, originalEvent);
-    }
-
-    const item: FeedItem = {
-      type: 'repost',
-      repostEvent,
-      originalEvent,
-      originalEventId,
-      timestamp: repostEvent.created_at || 0,
-    };
-    nextFeedItems.push(item);
-    feedItemsByEventId.set(repostEvent.id, item);
-  }
-
-  const orderedFeedItems =
-    feedOrder.length > 0
-      ? [
-          ...feedOrder
-            .map((id) => feedItemsByEventId.get(id))
-            .filter((item): item is FeedItem => item !== undefined),
-          ...nextFeedItems.filter(
-            (item) =>
-              !feedOrder.includes(item.type === 'note' ? item.event.id : item.repostEvent.id)
-          ),
-        ]
-      : nextFeedItems;
-
-  if (feedOrder.length === 0) {
-    orderedFeedItems.sort((a, b) => b.timestamp - a.timestamp);
-  }
-
-  const repostedOriginalEvents = orderedFeedItems
-    .filter((item): item is Extract<FeedItem, { type: 'repost' }> => item.type === 'repost')
-    .map((item) => item.originalEvent)
-    .filter((ev): ev is FeedEvent => ev !== undefined);
-
-  const contentSources = [...notes, ...repostedOriginalEvents];
-  const { eventIds: referencedEventIds, pubkeys: inlineMentionPubkeys } =
-    collectReferencedIds(contentSources);
-
-  const quotedEventsMap = new Map<string, FeedEvent>(embeddedMentionEvents);
-  const missingQuotedIds = referencedEventIds.filter((id) => !quotedEventsMap.has(id));
-
-  const neededPubkeys = new Set(inlineMentionPubkeys);
-  for (const ev of embeddedMentionEvents.values()) neededPubkeys.add(ev.pubkey);
-  for (const ev of repostedOriginalEvents) neededPubkeys.add(ev.pubkey);
-  for (const note of notes) neededPubkeys.add(note.pubkey);
-  const missingProfilePubkeys = Array.from(neededPubkeys).filter((pk) => !profilesMap.has(pk));
-
-  for (const item of orderedFeedItems) {
-    const metricId = item.type === 'note' ? item.event.id : item.originalEventId;
-    if (!metricsMap.has(metricId)) metricsMap.set(metricId, { ...DEFAULT_METRICS });
-  }
-
-  // Fallback cursor: use oldest item timestamp when FeedRange didn't provide `until`
-  if (paginationUntil === 0 && orderedFeedItems.length > 0) {
-    for (const item of orderedFeedItems) {
-      if (paginationUntil === 0 || item.timestamp < paginationUntil) {
-        paginationUntil = item.timestamp;
-      }
-    }
-  }
-
-  const duration = Math.round((performance.now() - t0) * 100) / 100;
-  if (duration > 50) {
-    log.warn('feed.parse.slow', {
-      duration_ms: duration,
-      rawEvents: feedRawEvents.length,
-      feedItems: orderedFeedItems.length,
-      profiles: profilesMap.size,
-    });
-  } else {
-    log.debug('feed.parse.done', {
-      duration_ms: duration,
-      rawEvents: feedRawEvents.length,
-      feedItems: orderedFeedItems.length,
-    });
-  }
-
-  return {
-    orderedFeedItems,
-    metricsMap,
-    profilesMap,
-    quotedEventsMap,
-    missingQuotedIds,
-    missingProfilePubkeys,
-    paginationUntil,
-    paginationOffset: feedOrder.length || orderedFeedItems.length,
-  };
 }
 
 // ============================================================================
@@ -450,7 +257,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
                 });
               })();
 
-        const phase1 = parseMegaFeedResponse(feedRawEvents);
+        const phase1 = parseFeedPage(feedRawEvents, { perfLogTag: 'feed.parse' });
 
         paginationUntilRef.current = phase1.paginationUntil;
         hasMoreRef.current = phase1.paginationUntil > 0 && phase1.orderedFeedItems.length > 0;
@@ -603,7 +410,7 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
                 cache: ['mega_feed_directive', payload],
               });
             })();
-      const page = parseMegaFeedResponse(rawEvents);
+      const page = parseFeedPage(rawEvents, { perfLogTag: 'feed.parse' });
 
       if (page.orderedFeedItems.length === 0) {
         hasMoreRef.current = false;
