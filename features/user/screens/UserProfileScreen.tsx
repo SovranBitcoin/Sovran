@@ -72,7 +72,7 @@ import type { VideoPostRecord, StoryUser } from '@/features/feed';
 import { ListGroup, PressableFeedback, Skeleton as HeroSkeleton } from 'heroui-native';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Screen, nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, nostrLog, useLifecycleLogger } from '@/shared/lib/logger';
 
 const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
@@ -967,7 +967,7 @@ export function UserProfileScreen() {
   }, [npub, cachedProfile, handleCopy, handleOpenLink, iconColor]);
 
   return (
-    <Screen name="UserProfileScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="UserProfileScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: isMetadataLoading ? 'Profile' : displayName,
@@ -1098,7 +1098,7 @@ export function UserProfileScreen() {
       <BottomButtons>
         <SendMessageMenu pubkey={pubkey} displayName={displayName} />
       </BottomButtons>
-    </Screen>
+    </Log>
   );
 }
 

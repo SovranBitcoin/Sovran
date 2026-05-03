@@ -22,7 +22,7 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBTCMapStore, BTCMapPlaceDetails } from '@/shared/stores/global/btcMapStore';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
-import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { getMarkerColor } from '@/shared/lib/map/categories';
 
@@ -162,32 +162,32 @@ export function MerchantDetailScreen() {
 
   if (isLoading) {
     return (
-      <Screen name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+      <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#F7931A" />
           <Text size={14} style={{ color: opacity(foreground, 0.5), marginTop: 12 }}>
             Loading merchant details...
           </Text>
         </View>
-      </Screen>
+      </Log>
     );
   }
 
   if (!place) {
     return (
-      <Screen name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+      <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.loadingContainer}>
           <Icon name="mdi:alert-circle" size={48} color={opacity(foreground, 0.4)} />
           <Text size={14} style={{ color: opacity(foreground, 0.5), marginTop: 12 }}>
             No merchant data available
           </Text>
         </View>
-      </Screen>
+      </Log>
     );
   }
 
   return (
-    <Screen name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="MerchantDetailScreen" style={{ flex: 1, backgroundColor: background }}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={{
@@ -329,7 +329,7 @@ export function MerchantDetailScreen() {
           </Text>
         </View>
       </ScrollView>
-    </Screen>
+    </Log>
   );
 }
 

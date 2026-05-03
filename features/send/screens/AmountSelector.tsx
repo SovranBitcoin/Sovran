@@ -14,7 +14,7 @@ import {
   AmountEntryView,
   type AmountEntryTransactionType,
 } from '@/shared/ui/composed/AmountEntryView';
-import { Screen, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger, walletLog } from '@/shared/lib/logger';
 import { useRoutstrTopUpStore } from '@/shared/stores/runtime/routstrTopUpStore';
 
 import type { ButtonHandlerProps } from '@/shared/ui/composed/ButtonHandler';
@@ -164,7 +164,7 @@ export function AmountSelector({
   const transactionTypeForView: AmountEntryTransactionType = transactionType;
 
   return (
-    <Screen name="AmountSelector" style={{ flex: 1 }}>
+    <Log name="AmountSelector" style={{ flex: 1 }}>
       <AmountEntryView
         rawInput={rawInput}
         numericValue={numericValue}
@@ -185,6 +185,6 @@ export function AmountSelector({
         nextVariants={nextVariants}
         transactionType={transactionTypeForView}
       />
-    </Screen>
+    </Log>
   );
 }

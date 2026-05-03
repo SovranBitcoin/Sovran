@@ -10,7 +10,7 @@ import { HomeFeed } from '@/features/feed/components/HomeFeed';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import Icon from '@/assets/icons';
-import { Screen, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { SearchResultsList } from '@/shared/ui/composed/SearchResultsList';
 
 export function FeedScreen() {
@@ -34,7 +34,7 @@ export function FeedScreen() {
   const showSearchPrompt = isSearching && !hasSearchQuery;
 
   return (
-    <Screen name="FeedScreen" style={styles.root}>
+    <Log name="FeedScreen" style={styles.root}>
       <View
         style={[
           styles.filtersRow,
@@ -74,7 +74,7 @@ export function FeedScreen() {
           </VStack>
         )}
       </ScreenContainer>
-    </Screen>
+    </Log>
   );
 }
 

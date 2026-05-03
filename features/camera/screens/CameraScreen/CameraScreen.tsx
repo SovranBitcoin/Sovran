@@ -24,7 +24,7 @@ import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useWalletContextWithOverride } from '@/shared/providers/WalletContextProvider';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Button } from '@/shared/ui/primitives/Button';
-import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 import { CameraLayout } from './CameraLayout';
@@ -286,8 +286,8 @@ export function CameraScreen({ scanLocked = false }: CameraScreenProps) {
   );
 
   return (
-    <Screen name="CameraScreen">
+    <Log name="CameraScreen">
       <CameraLayout {...shared}>{Platform.OS === 'ios' ? iosButtons : androidButtons}</CameraLayout>
-    </Screen>
+    </Log>
   );
 }

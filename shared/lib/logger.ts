@@ -1301,6 +1301,3 @@ export function Log({
   }
   return React.createElement(UIPathContext.Provider, { value: path }, children);
 }
-
-/** @deprecated Use `Log` instead — same component, better name. */
-export const Screen = Log;

@@ -16,7 +16,7 @@ import { prefetchImages } from '@/shared/lib/imageCache';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
-import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { SearchResultsList } from '@/shared/ui/composed/SearchResultsList';
 import {
   ContactRow,
@@ -570,7 +570,7 @@ export const ContactsScreen = () => {
     activeTab === 'contacts' && activeFilter === 'All' && isSearching && trimmedQuery.length > 0;
 
   return (
-    <Screen name="ContactsScreen" style={styles.root}>
+    <Log name="ContactsScreen" style={styles.root}>
       {/* Outer tabs — hidden while searching; search scope is the pill bar below. */}
       {!isSearching && (
         <View
@@ -619,7 +619,7 @@ export const ContactsScreen = () => {
           renderContactsList()
         )}
       </ScreenContainer>
-    </Screen>
+    </Log>
   );
 };
 

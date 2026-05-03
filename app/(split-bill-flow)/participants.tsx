@@ -42,7 +42,7 @@ import { supportsLiquidGlass } from '@/shared/lib/version';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import { HistoryEntryHeader } from '@/features/transactions';
 import Icon from 'assets/icons';
-import { Screen, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -297,7 +297,7 @@ export default function SplitBillParticipantsScreen() {
   }, [anchorSections.length, foreground]);
 
   return (
-    <Screen name="SplitBillParticipantsScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="SplitBillParticipantsScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: 'Who Pays',
@@ -370,7 +370,7 @@ export default function SplitBillParticipantsScreen() {
           />
         </HStack>
       </BottomButtons>
-    </Screen>
+    </Log>
   );
 }
 

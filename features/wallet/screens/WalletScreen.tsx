@@ -18,7 +18,7 @@ import { LayoutDebugWrapper } from '@/shared/ui/composed/LayoutDebugWrapper';
 import { View } from '@/shared/ui/primitives/View/View';
 import { isAndroidLiquidHeaderSupported } from '@/navigation/nativeTabs';
 import { HEADER_LAYOUT } from '@/features/wallet/lib/walletHeader';
-import { Screen, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger } from '@/shared/lib/logger';
 
 const ACCOUNTS = [{ unit: 'sat' }];
 
@@ -49,7 +49,7 @@ export function WalletScreen() {
         onContentSizeChange={onContentSizeChange}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}
         contentContainerStyle={{ padding: 0, paddingTop: androidHeaderPadding }}>
-        <Screen name="WalletScreen">
+        <Log name="WalletScreen">
           <ScrollableGradientOverlay contentHeight={contentHeight} />
 
           <AccountPagerView accounts={ACCOUNTS} setAccount={setAccount} account={account} />
@@ -65,7 +65,7 @@ export function WalletScreen() {
             <ReceivedThisMonth history={history} unit={account.unit} />
             <BitcoinNearYou />
           </View>
-        </Screen>
+        </Log>
       </LayoutDebugWrapper>
     </BootEntrance>
   );

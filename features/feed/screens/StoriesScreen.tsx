@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { StoriesCarousel, type StoryUser } from '@/features/feed/components/nostr/StoriesCarousel';
-import { Screen, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, feedLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const CLOSE_DELAY_MS = 350;
@@ -71,7 +71,7 @@ export function StoriesScreen() {
   }
 
   return (
-    <Screen
+    <Log
       name="StoriesScreen"
       style={{
         flex: 1,
@@ -85,6 +85,6 @@ export function StoriesScreen() {
         onClose={handleClose}
         isClosing={isClosing}
       />
-    </Screen>
+    </Log>
   );
 }

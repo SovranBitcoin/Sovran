@@ -17,7 +17,7 @@ import { useWalletContextWithOverride } from '@/shared/providers/WalletContextPr
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import { View } from '@/shared/ui/primitives/View/View';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
 
 import { AmountSelector } from './AmountSelector';
 
@@ -78,7 +78,7 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
   const isSendOperation = entry.destination !== 'mintQuote';
 
   return (
-    <Screen name="AmountFlowScreen">
+    <Log name="AmountFlowScreen">
       <Stack.Screen
         options={{
           title: 'Select Amount',
@@ -113,6 +113,6 @@ export function AmountFlowScreen({ amountEntry }: AmountFlowScreenProps) {
           machineBusy={isExecuting}
         />
       </View>
-    </Screen>
+    </Log>
   );
 }

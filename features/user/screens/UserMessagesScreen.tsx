@@ -67,7 +67,7 @@ import { useProfileDisplay } from '@/shared/hooks/useProfileDisplay';
 import { useNostrProfileMetadata } from '@/shared/hooks/useNostrProfileMetadata';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { chatLog, Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { chatLog, Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 
 const PERF_SURFACE = 'nostr-dm' as const;
 
@@ -895,7 +895,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
       style={{ flex: 1 }}
       behavior="padding"
       keyboardVerticalOffset={headerHeight}>
-      <Screen name="UserMessagesScreen">
+      <Log name="UserMessagesScreen">
         <Stack.Screen
           options={{
             headerShown: true,
@@ -1091,7 +1091,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
             </View>
           )}
         </View>
-      </Screen>
+      </Log>
     </KeyboardAvoidingView>
   );
 }

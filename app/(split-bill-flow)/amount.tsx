@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 
 import { AmountEntryView } from '@/shared/ui/composed/AmountEntryView';
 import { useLocalAmountEntry } from '@/shared/hooks/useLocalAmountEntry';
-import { Screen, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
 
 export default function SplitBillAmountScreen() {
   useLifecycleLogger('SplitBillAmountScreen', walletLog);
@@ -47,7 +47,7 @@ export default function SplitBillAmountScreen() {
   }, [effectiveSatAmount, inputMode, router]);
 
   return (
-    <Screen name="SplitBillAmountScreen" style={{ flex: 1 }}>
+    <Log name="SplitBillAmountScreen" style={{ flex: 1 }}>
       <AmountEntryView
         rawInput={rawInput}
         numericValue={numericValue}
@@ -63,6 +63,6 @@ export default function SplitBillAmountScreen() {
         secondaryDisplay={secondaryDisplay}
         onToggleMode={onToggleMode}
       />
-    </Screen>
+    </Log>
   );
 }

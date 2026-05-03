@@ -13,7 +13,7 @@ import { LegendList } from '@legendapp/list';
 import { router, Stack } from 'expo-router';
 
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Screen, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
@@ -88,7 +88,7 @@ export default function NetworkSheet() {
   }, [peers.length, connectedCount]);
 
   return (
-    <Screen name="BitchatNetworkSheet" style={{ flex: 1 }}>
+    <Log name="BitchatNetworkSheet" style={{ flex: 1 }}>
       <Stack.Screen
         options={{
           headerShown: true,
@@ -139,7 +139,7 @@ export default function NetworkSheet() {
           </VStack>
         }
       />
-    </Screen>
+    </Log>
   );
 }
 

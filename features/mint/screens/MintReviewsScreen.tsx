@@ -19,7 +19,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
 
 const ParamsSchema = z.object({
   mintUrl: z
@@ -372,7 +372,7 @@ export function MintReviewsScreen() {
   const showEmptyState = !isLoading && totalReviews === 0;
 
   return (
-    <Screen name="MintReviewsScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="MintReviewsScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen options={{ title: 'Reviews' }} />
 
       {showEmptyState ? (
@@ -410,6 +410,6 @@ export function MintReviewsScreen() {
           ]}
         />
       </BottomButtons>
-    </Screen>
+    </Log>
   );
 }

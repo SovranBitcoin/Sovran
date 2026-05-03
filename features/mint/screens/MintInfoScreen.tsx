@@ -26,7 +26,7 @@ import opacity from 'hex-color-opacity';
 import { ListGroup, PressableFeedback } from 'heroui-native';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
-import { log, useLifecycleLogger, Screen } from '@/shared/lib/logger';
+import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
 
 const ParamsSchema = z.object({
   mintInfoEntry: z.string().min(1).max(64_000).optional(),
@@ -452,7 +452,7 @@ export function MintInfoScreen() {
     | undefined;
 
   return (
-    <Screen name="MintInfoScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="MintInfoScreen" style={{ flex: 1, backgroundColor: background }}>
       <Stack.Screen
         options={{
           title: entry?.fromAccepter ? 'Verify Mint' : displayName || 'Mint Details',
@@ -654,7 +654,7 @@ export function MintInfoScreen() {
           }
         />
       </BottomButtons>
-    </Screen>
+    </Log>
   );
 }
 

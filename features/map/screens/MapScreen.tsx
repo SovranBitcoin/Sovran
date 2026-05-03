@@ -53,7 +53,7 @@ import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { useShallow } from 'zustand/react/shallow';
 import { getOrBuildBTCMapClusterManager } from '@/shared/lib/map/btcMapClusterCache';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
-import { Screen, log, deferWork, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, log, deferWork, useLifecycleLogger } from '@/shared/lib/logger';
 
 // ============================================================================
 // Types & Constants
@@ -567,7 +567,7 @@ export function MapScreen() {
 
   if (error || mapUnavailableOnAndroid) {
     return (
-      <Screen name="MapScreen" style={{ flex: 1, backgroundColor: background }}>
+      <Log name="MapScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.errorContainer}>
           <Icon name="mdi:alert-circle" size={48} color={opacity(foreground, 0.4)} />
           <Text size={16} style={{ color: opacity(foreground, 0.5), marginTop: 16 }}>
@@ -583,12 +583,12 @@ export function MapScreen() {
             </Text>
           </Pressable>
         </View>
-      </Screen>
+      </Log>
     );
   }
 
   return (
-    <Screen name="MapScreen" style={styles.container}>
+    <Log name="MapScreen" style={styles.container}>
       {/* Show a placeholder background immediately while map loads */}
       {!isMapReady && (
         <View style={[StyleSheet.absoluteFillObject, styles.mapSkeleton]}>
@@ -645,7 +645,7 @@ export function MapScreen() {
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
       />
-    </Screen>
+    </Log>
   );
 }
 

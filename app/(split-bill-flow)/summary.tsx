@@ -32,7 +32,7 @@ import { ButtonHandler, type ButtonHandlerButton } from '@/shared/ui/composed/Bu
 import { HistoryEntryHeader } from '@/features/transactions';
 import { ListRow } from '@/shared/ui/composed/ListRow';
 import Icon from 'assets/icons';
-import { Screen, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -177,18 +177,18 @@ export default function SplitBillSummaryScreen() {
 
   if (!group) {
     return (
-      <Screen name="SplitBillSummaryScreen" style={{ flex: 1, backgroundColor: background }}>
+      <Log name="SplitBillSummaryScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.emptyCenter}>
           <Text size={14} style={{ color: opacity(foreground, 0.5) }}>
             Split bill not found.
           </Text>
         </View>
-      </Screen>
+      </Log>
     );
   }
 
   return (
-    <Screen name="SplitBillSummaryScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="SplitBillSummaryScreen" style={{ flex: 1, backgroundColor: background }}>
       <View style={{ flex: 1, paddingTop: headerHeight }}>
         {/* Shared amount header — same component used by Mint/Melt/Send/ReceiveToken. */}
         <HistoryEntryHeader
@@ -278,7 +278,7 @@ export default function SplitBillSummaryScreen() {
           />
         </HStack>
       </BottomButtons>
-    </Screen>
+    </Log>
   );
 }
 

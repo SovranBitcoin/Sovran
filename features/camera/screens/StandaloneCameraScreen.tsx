@@ -12,7 +12,7 @@ import Icon from 'assets/icons';
 import { CameraScreen } from '@/features/camera';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useCocoPaymentUXContext } from 'coco-payment-ux/react';
-import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const ParamsSchema = z.object({
@@ -44,7 +44,7 @@ export function StandaloneCameraScreen() {
   }, [shouldAutoStartNfc, machine]);
 
   return (
-    <Screen name="StandaloneCameraScreen">
+    <Log name="StandaloneCameraScreen">
       <>
         <Stack.Screen
           options={{
@@ -70,6 +70,6 @@ export function StandaloneCameraScreen() {
         />
         <CameraScreen />
       </>
-    </Screen>
+    </Log>
   );
 }

@@ -8,7 +8,7 @@ import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-co
 import { router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { LegendList } from '@legendapp/list';
-import { wnLog, Screen, useLifecycleLogger } from '@/shared/lib/logger';
+import { wnLog, Log, useLifecycleLogger } from '@/shared/lib/logger';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -174,7 +174,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
       behavior="padding"
       keyboardVerticalOffset={headerHeight}
       style={{ flex: 1 }}>
-      <Screen name="WhitenoiseDMScreen">
+      <Log name="WhitenoiseDMScreen">
         <DmChatHeader pubkey={pubkey} onBack={() => router.back()} />
 
         <View style={{ flex: 1, backgroundColor: surface }}>
@@ -251,7 +251,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
             surface={perfSurface}
           />
         </View>
-      </Screen>
+      </Log>
     </KeyboardAvoidingView>
   );
 }

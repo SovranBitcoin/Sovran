@@ -26,7 +26,7 @@ import Icon from 'assets/icons';
 
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Screen, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
 import { useBitChat } from '../hooks/useBitChat';
 import { useBLEPeers } from '../hooks/useBLEPeers';
 import {
@@ -262,7 +262,7 @@ export function GeohashChatScreen({
       behavior="padding"
       keyboardVerticalOffset={headerHeight}
       style={{ flex: 1 }}>
-      <Screen name="GeohashChatScreen">
+      <Log name="GeohashChatScreen">
         {isDM ? (
           <DmChatHeader
             pubkey={isNostrPubkey ? dmPeerID : undefined}
@@ -419,7 +419,7 @@ export function GeohashChatScreen({
             surface={perfSurface}
           />
         </View>
-      </Screen>
+      </Log>
     </KeyboardAvoidingView>
   );
 }

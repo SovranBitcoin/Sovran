@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderHeightContext } from '@react-navigation/elements';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
-import { Screen as LogScreen } from '@/shared/lib/logger';
+import { Log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { ModalLayoutWrapper } from './ModalLayoutWrapper';
 import { ScreenBackgroundContext, ScreenFooterContext } from './ScreenFooterContext';
@@ -151,7 +151,7 @@ export function Screen({
     );
 
   return (
-    <LogScreen name={name} style={{ flex: 1 }}>
+    <Log name={name} style={{ flex: 1 }}>
       <ScreenBackgroundContext.Provider value={resolvedBgColor}>
         <ScreenFooterContext.Provider value={footerContextValue}>
           <ModalLayoutWrapper
@@ -174,7 +174,7 @@ export function Screen({
           </ModalLayoutWrapper>
         </ScreenFooterContext.Provider>
       </ScreenBackgroundContext.Provider>
-    </LogScreen>
+    </Log>
   );
 }
 

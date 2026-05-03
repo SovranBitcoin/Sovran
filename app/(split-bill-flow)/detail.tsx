@@ -38,7 +38,7 @@ import {
   type ParticipantCardDeckRef,
 } from '@/features/splitBill/components/ParticipantCardDeck';
 import Icon from 'assets/icons';
-import { Screen, useLifecycleLogger, walletLog, paymentLog } from '@/shared/lib/logger';
+import { Log, useLifecycleLogger, walletLog, paymentLog } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -216,18 +216,18 @@ export default function SplitBillDetailScreen() {
 
   if (!group) {
     return (
-      <Screen name="SplitBillDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+      <Log name="SplitBillDetailScreen" style={{ flex: 1, backgroundColor: background }}>
         <View style={styles.emptyCenter}>
           <Text size={14} style={{ color: opacity(foreground, 0.5) }}>
             Split bill not found.
           </Text>
         </View>
-      </Screen>
+      </Log>
     );
   }
 
   return (
-    <Screen name="SplitBillDetailScreen" style={{ flex: 1, backgroundColor: background }}>
+    <Log name="SplitBillDetailScreen" style={{ flex: 1, backgroundColor: background }}>
       <LegendList
         ref={listRef}
         data={group.participants}
@@ -291,7 +291,7 @@ export default function SplitBillDetailScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={listContent}
       />
-    </Screen>
+    </Log>
   );
 }
 
