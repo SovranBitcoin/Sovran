@@ -94,10 +94,7 @@ export function MeltQuoteScreen({
               text: actions.pay.loading ? 'Sending...' : 'Pay',
               icon: actions.pay.loading ? 'ri:loader-line' : 'ri:send-plane-2-fill',
               variant: 'primary',
-              onPress: async (close: any) => {
-                await actions.pay.execute();
-                close({});
-              },
+              onPress: () => actions.pay.execute(),
               condition: actions.pay.available,
               disabled: anyLoading,
             },
@@ -106,10 +103,9 @@ export function MeltQuoteScreen({
               text: actions.cancel.loading ? 'Cancelling...' : 'Cancel',
               icon: actions.cancel.loading ? 'ri:loader-line' : 'ri:close-circle-line',
               variant: 'secondary',
-              onPress: async (close: any) => {
+              onPress: async () => {
                 await actions.cancel.execute();
                 onCancel();
-                close({});
               },
               condition: actions.cancel.available,
               disabled: anyLoading,

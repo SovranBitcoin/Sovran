@@ -342,7 +342,7 @@ export function AmountEntryView({
                     variant={extraButtons[0].variant}
                     loading={extraButtons[0].loading}
                     disabled={extraButtons[0].disabled}
-                    onPress={() => extraButtons[0].onPress?.(() => {})}
+                    onPress={() => extraButtons[0].onPress?.()}
                   />
                 </View>
               ) : null}
@@ -360,7 +360,7 @@ export function AmountEntryView({
                     variant={extraButtons[1].variant ?? 'secondary'}
                     loading={extraButtons[1].loading}
                     disabled={extraButtons[1].disabled}
-                    onPress={() => extraButtons[1].onPress?.(() => {})}
+                    onPress={() => extraButtons[1].onPress?.()}
                   />
                 </View>
               ) : null}

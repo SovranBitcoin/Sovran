@@ -55,7 +55,7 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
+import { StyleProp, ViewStyle } from 'react-native';
 import { Menu, type MenuTriggerRef } from 'heroui-native';
 import { Log } from '@/shared/lib/logger';
 import { Button } from '@/shared/ui/primitives/Button';
@@ -91,8 +91,11 @@ export interface ButtonHandlerButton {
   /** Optional secondary caption shown under the button text in the overflow
    *  Menu (has no effect on inline buttons). */
   description?: string;
-  /** Press event handler with close function parameter */
-  onPress?: (close: (event: GestureResponderEvent) => void) => Promise<void>;
+  /** Press event handler. ButtonHandler renders inline buttons (and an
+   *  overflow Menu); neither host owns a dismissal seam to forward, so the
+   *  handler takes no arguments. Callers that need to dismiss a parent
+   *  surface should do it explicitly inside the body. */
+  onPress?: () => void | Promise<void>;
   /** Whether the button should be visible (default: true) */
   condition?: boolean;
 }
@@ -182,12 +185,12 @@ export function ButtonHandler({
     setTimeout(() => moreMenuTriggerRef.current?.open(), 0);
   }, []);
 
-  // Fires the button's onPress with a no-op close since the Menu closes
-  // itself on select (shouldCloseOnSelect default). Any async work runs in
-  // the background — callers still get their own per-button `loading` state.
+  // The Menu closes itself on select (shouldCloseOnSelect default); async
+  // work runs in the background — callers still get their own per-button
+  // `loading` state.
   const handleMenuItemPress = (button: ButtonHandlerActionButton): void => {
     if (button.disabled) return;
-    void button.onPress?.(() => {});
+    void button.onPress?.();
   };
 
   // The inner shared `Button` already routes its onPress through
@@ -195,7 +198,7 @@ export function ButtonHandler({
   // this wrapper. We only own the spinner-coordination boolean here.
   const handleButtonPress = async (button: ButtonHandlerActionButton) => {
     if (button.disabled) return;
-    const result = button.onPress?.(() => {});
+    const result = button.onPress?.();
     if (!(result instanceof Promise)) return;
     setLoading(true);
     try {

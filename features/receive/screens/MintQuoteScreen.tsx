@@ -84,20 +84,14 @@ export function MintQuoteScreen({
               text: 'Copy',
               icon: 'lets-icons:copy',
               variant: 'primary',
-              onPress: async (close: any) => {
-                await actions.copy.execute();
-                close({});
-              },
+              onPress: () => actions.copy.execute(),
               condition: actions.copy.available,
             },
             {
               text: 'Share',
               icon: 'ri:share-fill',
               variant: 'secondary',
-              onPress: async (close: any) => {
-                close({});
-                await actions.share.execute();
-              },
+              onPress: () => actions.share.execute(),
               condition: actions.share.available,
             },
             ...extraButtons.map((button) => ({ ...button, condition: !isPaid })),
@@ -110,19 +104,19 @@ export function MintQuoteScreen({
   return (
     <Screen name="MintQuoteScreen" contentPadding={0} footer={bottomButtons}>
       {/*
-         * Id marker wraps the screen body — lets `phone test` capture
-         * the entry id of the mint currently being viewed via
-         * `capture #mint-quote-id-* suffix`. Without this, tests have
-         * to guess which row on the wallet home corresponds to the one
-         * they just created, and `findByTestIDPrefix` returns the
-         * visually topmost match — which on the wallet home is a
-         * pending mint, not the newly confirmed one (home renders
-         * Pending → Confirmed top-to-bottom). Wrapping the VStack
-         * (rather than a zero-sized sibling) guarantees a non-zero rect
-         * so the node appears in the iOS AX tree. Snapshots comparing
-         * this screen to itself within the same run see the same id on
-         * both sides so snapshot equality holds.
-         */}
+       * Id marker wraps the screen body — lets `phone test` capture
+       * the entry id of the mint currently being viewed via
+       * `capture #mint-quote-id-* suffix`. Without this, tests have
+       * to guess which row on the wallet home corresponds to the one
+       * they just created, and `findByTestIDPrefix` returns the
+       * visually topmost match — which on the wallet home is a
+       * pending mint, not the newly confirmed one (home renders
+       * Pending → Confirmed top-to-bottom). Wrapping the VStack
+       * (rather than a zero-sized sibling) guarantees a non-zero rect
+       * so the node appears in the iOS AX tree. Snapshots comparing
+       * this screen to itself within the same run see the same id on
+       * both sides so snapshot equality holds.
+       */}
       <View testID={`mint-quote-id-${entry.id}`}>
         <VStack gap={12}>
           <HistoryEntryHeader historyEntry={entry} />
@@ -159,9 +153,7 @@ export function MintQuoteScreen({
               bip321.isBip321 && { title: 'Format', value: 'BIP 321' },
               bip321.optionKinds && {
                 title: 'Payment Methods',
-                value: (
-                  <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />
-                ),
+                value: <Bip321MethodIcons optionKinds={bip321.optionKinds} usedKind="lightning" />,
               },
               { title: 'Date', value: entry.createdAt.datetime },
               {
