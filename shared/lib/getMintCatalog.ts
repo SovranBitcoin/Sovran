@@ -33,13 +33,21 @@ interface ContactEntry {
   info: string;
 }
 
+// NUT-06 `contact[].info` for a `nostr` method is supposed to be a 64-char
+// hex pubkey. A hostile or careless mint can ship anything in that slot
+// (npub, lightning address, attacker-controlled pubkey, arbitrary URL); we
+// fetch and display the resolved profile under the mint operator's identity,
+// so an unvalidated value lets a mint impersonate someone else's reputation.
+const NOSTR_HEX_PUBKEY_REGEX = /^[0-9a-f]{64}$/i;
+
 function extractNostrPubkey(info: unknown): string | undefined {
   const contacts = (info as { contact?: ContactEntry[] } | null | undefined)?.contact;
   if (!Array.isArray(contacts)) return undefined;
   for (const c of contacts) {
-    if (c?.method === 'nostr' && typeof c.info === 'string' && c.info.length > 0) {
-      return c.info;
-    }
+    if (c?.method !== 'nostr') continue;
+    if (typeof c.info !== 'string') continue;
+    if (!NOSTR_HEX_PUBKEY_REGEX.test(c.info)) continue;
+    return c.info.toLowerCase();
   }
   return undefined;
 }

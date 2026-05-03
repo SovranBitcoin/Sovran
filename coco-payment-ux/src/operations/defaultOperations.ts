@@ -152,7 +152,12 @@ export interface DefaultOperationsConfig {
    * needed the same audit data earlier in the session).
    */
   enrichMintReviewInfo?: (mintUrl: string) => Partial<MintReviewInfo>;
-  /** When true, executePaymentRequest simulates a delivery failure to test rollback. */
+  /**
+   * Dev-only: when true, executePaymentRequest simulates a delivery failure
+   * to test rollback. Ignored unless NODE_ENV !== 'production' so a hostile
+   * config object in a release build cannot induce spurious delivery
+   * failures.
+   */
   shouldMockFailPaymentRequest?: () => boolean;
   /**
    * Per-request timeout for external lightning calls (LNURL pay-params,
@@ -180,6 +185,20 @@ export function createDefaultOperations(
     }
     return mgr;
   }
+
+  // Dev-only kill-switch for the rollback test path. We do not trust
+  // `config.shouldMockFailPaymentRequest` in a release build: a misconfigured
+  // wallet (or a hostile config object passed in via deep link / config
+  // hydration) could otherwise force every send into the rollback branch in
+  // production. Metro and Bun both define `process.env.NODE_ENV`; we treat
+  // anything other than 'production' as dev. `process` is read off
+  // `globalThis` so this compiles in both the React Native (no @types/node)
+  // and Bun build contexts.
+  const mockFailEnabled = (): boolean => {
+    const proc = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process;
+    if (proc?.env?.NODE_ENV === 'production') return false;
+    return config.shouldMockFailPaymentRequest?.() === true;
+  };
 
   return {
     executeSend: async (mintUrl, amount) => {
@@ -446,23 +465,31 @@ export function createDefaultOperations(
       const mgr = getManager();
       if (!mgr) return;
       logger.info('operations.rollbackSend.start', { operationId });
-      try {
-        const operation = await mgr.ops.send.get(operationId);
-        if (operation && operation.state === 'prepared') {
-          logger.info('operations.rollbackSend.cancelPrepared', { operationId });
-          await mgr.ops.send.cancel(operationId);
-        } else if (operation && ['executing', 'pending'].includes(operation.state)) {
-          logger.info('operations.rollbackSend.reclaim', {
-            state: operation.state,
-            operationId,
-          });
-          await mgr.ops.send.reclaim(operationId);
-        }
-      } catch (e) {
-        logger.warn('operations.rollbackSend.failed', {
+      const operation = await mgr.ops.send.get(operationId).catch((e) => {
+        logger.warn('operations.rollbackSend.lookupFailed', {
           operationId,
           error: errField(e),
         });
+        return null;
+      });
+      if (!operation) {
+        logger.info('operations.rollbackSend.notFound', { operationId });
+        return;
+      }
+      // Only swallow "already gone" — surface every other reclaim/cancel
+      // failure so the caller can warn the user that the mint may still
+      // hold the spent proofs in pending state. Silently telling the user
+      // a send was cancelled when reclaim failed leaves wallet state and
+      // mint state divergent.
+      if (operation.state === 'prepared') {
+        logger.info('operations.rollbackSend.cancelPrepared', { operationId });
+        await mgr.ops.send.cancel(operationId);
+      } else if (['executing', 'pending'].includes(operation.state)) {
+        logger.info('operations.rollbackSend.reclaim', {
+          state: operation.state,
+          operationId,
+        });
+        await mgr.ops.send.reclaim(operationId);
       }
     },
 
@@ -507,6 +534,10 @@ export function createDefaultOperations(
       if (historyEntry) return { historyEntry, hadP2PKProofs: hadP2PK };
 
       logger.warn('operations.executeReceive.historyMissing', { mintUrl });
+      // Synthetic fallback only — coco-core's history row is the canonical
+      // store of the encoded token. Echoing it here would put a bearer
+      // instrument into notifications.onTransactionCreated subscribers and
+      // every entry-update listener that doesn't read from the DB.
       const entry = {
         id: `redeemed-${Date.now()}`,
         type: 'receive' as const,
@@ -514,7 +545,6 @@ export function createDefaultOperations(
         mintUrl,
         unit: 'sat',
         amount: tokenAmount,
-        metadata: { rawToken: tokenString },
       };
       return { historyEntry: JSON.stringify(entry), hadP2PKProofs: hadP2PK };
     },
@@ -544,7 +574,27 @@ export function createDefaultOperations(
         methodData: { invoice: bolt11 },
       });
       logger.info('operations.executeMelt.execute', { operationId: operation.id });
-      const result = await mgr.ops.melt.execute(operation.id);
+      // prepare() reserves proofs at the mint. If execute() throws — mint
+      // unreachable mid-flight, network drop, mint 5xx — the reservation
+      // stays live until the next manager restart unless we cancel here.
+      // Without this rescue, the user cannot send those sats again until
+      // background reconciliation eventually frees them.
+      let result: Awaited<ReturnType<typeof mgr.ops.melt.execute>>;
+      try {
+        result = await mgr.ops.melt.execute(operation.id);
+      } catch (e) {
+        logger.warn('operations.executeMelt.executeFailed', {
+          operationId: operation.id,
+          error: errField(e),
+        });
+        await mgr.ops.melt.cancel(operation.id, 'Execute failed').catch((cancelErr) => {
+          logger.warn('operations.executeMelt.cancelAfterFailureFailed', {
+            operationId: operation.id,
+            error: errField(cancelErr),
+          });
+        });
+        throw e;
+      }
       logger.info('operations.executeMelt.complete', {
         operationId: result.id,
         state: result.state,
@@ -670,7 +720,7 @@ export function createDefaultOperations(
           proofs: token.proofs,
         };
         try {
-          if (config.shouldMockFailPaymentRequest?.()) {
+          if (mockFailEnabled()) {
             throw new Error('Mock delivery failure (dev)');
           }
           await sendNostrDM(nostrTransport.target, JSON.stringify(payload));
@@ -703,7 +753,7 @@ export function createDefaultOperations(
         const transaction = await mgr.paymentRequests.prepare(parsed, { mintUrl, amount });
         operationId = transaction.sendOperation.id;
         try {
-          if (config.shouldMockFailPaymentRequest?.()) {
+          if (mockFailEnabled()) {
             throw new Error('Mock delivery failure (dev)');
           }
           await mgr.paymentRequests.execute(transaction);

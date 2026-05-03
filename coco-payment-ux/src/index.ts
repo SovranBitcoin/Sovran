@@ -30,7 +30,13 @@ export { resolveIntent } from './intent';
 export { defaultDetectors } from './detectors';
 export { annotateOptions } from './annotate';
 export { selectMint, selectMintForMelt, type MintSelectionConfig } from './mint-selection';
-export { validateIntent, checkWalletCapabilities, checkAllCapabilities } from './guards';
+export {
+  validateIntent,
+  checkWalletCapabilities,
+  checkAllCapabilities,
+  isValidSatAmount,
+  MAX_SAT_AMOUNT,
+} from './guards';
 export { getNfcFallback, getAllFallbacks } from './nfc-fallback';
 
 // Normalization

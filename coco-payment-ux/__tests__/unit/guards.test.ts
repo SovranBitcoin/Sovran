@@ -48,7 +48,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { validateIntent, checkWalletCapabilities, checkAllCapabilities } from '../../src/guards';
+import {
+  validateIntent,
+  checkWalletCapabilities,
+  checkAllCapabilities,
+  isValidSatAmount,
+  MAX_SAT_AMOUNT,
+} from '../../src/guards';
 import { WALLETS, MINT1, UNTRUSTED_MINT } from '../_harness/fixtures';
 import type { ResolvedIntent, PaymentOption, WalletCapability } from '../../src/types';
 
@@ -71,7 +77,10 @@ function makeOption(kind: PaymentOption['kind'], value: string, amount?: number)
  */
 describe('validateIntent — receiveToken', () => {
   it('produces no guards', () => {
-    const intent: ResolvedIntent = { type: 'receiveToken', option: makeOption('ecashToken', 'tok') };
+    const intent: ResolvedIntent = {
+      type: 'receiveToken',
+      option: makeOption('ecashToken', 'tok'),
+    };
     const results = validateIntent(intent, WALLETS.default);
     // Empty array = all clear, proceed with the flow
     expect(results).toHaveLength(0);
@@ -449,5 +458,43 @@ describe('checkAllCapabilities', () => {
     expect(gaps.length).toBeGreaterThan(0);
     // sendPaymentRequest requires multiple capabilities we didn't provide
     expect(gaps.some((g) => g.intentType === 'sendPaymentRequest')).toBe(true);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// isValidSatAmount — boundary-input validator
+//
+// Used at every flow-context entry point that accepts a sat amount from an
+// untrusted source (payment requests, BIP321 amount params, intent options).
+// Rejects anything that isn't a positive safe-integer within the Bitcoin
+// supply so downstream sat-mode math (composeSatoshis, mint melt prepare)
+// never sees a NaN, infinity, float, negative, or out-of-range value.
+// ───────────────────────────────────────────────────────────────────────────
+describe('isValidSatAmount', () => {
+  it('accepts positive safe integers up to MAX_SAT_AMOUNT', () => {
+    expect(isValidSatAmount(1)).toBe(true);
+    expect(isValidSatAmount(100_000)).toBe(true);
+    expect(isValidSatAmount(MAX_SAT_AMOUNT)).toBe(true);
+  });
+
+  it('rejects zero, negatives, NaN, and infinity', () => {
+    expect(isValidSatAmount(0)).toBe(false);
+    expect(isValidSatAmount(-1)).toBe(false);
+    expect(isValidSatAmount(Number.NaN)).toBe(false);
+    expect(isValidSatAmount(Number.POSITIVE_INFINITY)).toBe(false);
+  });
+
+  it('rejects floats and amounts above MAX_SAT_AMOUNT', () => {
+    expect(isValidSatAmount(0.5)).toBe(false);
+    expect(isValidSatAmount(100.0001)).toBe(false);
+    expect(isValidSatAmount(MAX_SAT_AMOUNT + 1)).toBe(false);
+    expect(isValidSatAmount(1e20)).toBe(false);
+  });
+
+  it('rejects non-numbers', () => {
+    expect(isValidSatAmount('100')).toBe(false);
+    expect(isValidSatAmount(null)).toBe(false);
+    expect(isValidSatAmount(undefined)).toBe(false);
+    expect(isValidSatAmount({})).toBe(false);
   });
 });

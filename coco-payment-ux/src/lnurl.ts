@@ -60,7 +60,12 @@ export type LnurlErrorCode =
   | 'LNURL_INVOICE_FETCH_FAILED'
   | 'LNURL_INVALID_INVOICE_RESPONSE'
   | 'LNURL_INVOICE_AMOUNT_MISMATCH'
+  | 'LNURL_TOR_REQUIRED'
   | 'LNURL_TIMEOUT';
+
+function isOnionHost(host: string): boolean {
+  return host.toLowerCase().endsWith('.onion');
+}
 
 export class LnurlError extends Error {
   readonly code: LnurlErrorCode;
@@ -153,6 +158,23 @@ export async function getLnurlPayParams(
 ): Promise<LnurlPayParams | null> {
   const url = decodeUrlOrAddress(meltTarget);
   if (!url) return null;
+
+  // RN/iOS/Android can't resolve .onion at the OS level, so the fetch fails
+  // with a generic "Network request failed" error that the wallet surfaces
+  // as a parse-style error. Reject up-front with a distinct code so the UI
+  // can show "Tor is not supported" instead of a misleading generic failure.
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return null;
+  }
+  if (isOnionHost(parsedUrl.hostname)) {
+    throw new LnurlError(
+      'LNURL_TOR_REQUIRED',
+      `LNURL target requires Tor (.onion host): ${parsedUrl.hostname}`
+    );
+  }
 
   let response: Response;
   try {

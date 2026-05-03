@@ -362,7 +362,14 @@ export function CocoPaymentUXProvider({
     const scheme = match[1].toLowerCase();
     const host = match[2];
 
-    const accepted = new Set(['cashu', ...(deepLinks.customSchemes ?? [])]);
+    // URI schemes are case-insensitive (RFC 3986 §3.1) and we already
+    // lowercased the parsed scheme — so the lookup set must be lowercase
+    // too. A wallet passing `customSchemes: ['Cashu']` would otherwise
+    // never match.
+    const accepted = new Set([
+      'cashu',
+      ...(deepLinks.customSchemes ?? []).map((s) => s.toLowerCase()),
+    ]);
     if (!accepted.has(scheme)) return;
 
     const ignored = new Set(deepLinks.ignoredHosts ?? []);

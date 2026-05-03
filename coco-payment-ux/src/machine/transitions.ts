@@ -3,6 +3,7 @@ import { logger } from '../logger';
 import { composeSatoshis } from '../offline';
 import { parsePaymentInput } from '../parse';
 import { selectMint, getValidMintCandidates } from '../mint-selection';
+import { isValidSatAmount } from '../guards';
 import type { Detectors, WalletContext } from '../types';
 import { resolveNext, type StepResult } from './resolveNext';
 import type { FlowContext, FlowEvent, FlowStep } from './types';
@@ -44,16 +45,26 @@ function handleExecute(
     case 'sendPaymentRequest': {
       ctx.paymentRequest = intent.option.value;
       ctx.supportedMintUrls = intent.info.mints.length > 0 ? intent.info.mints : undefined;
-      if (intent.info.amount != null && intent.info.amount > 0) {
+      if (isValidSatAmount(intent.info.amount)) {
         ctx.amount = intent.info.amount;
+      } else if (intent.info.amount != null) {
+        logger.warn('transitions.execute.invalidAmount', {
+          source: 'sendPaymentRequest',
+          amount: intent.info.amount,
+        });
       }
       if (intent.info.unit) ctx.unit = intent.info.unit;
       break;
     }
     case 'meltLightningInvoice':
       ctx.meltTarget = intent.option.value;
-      if (intent.option.amount != null && intent.option.amount > 0) {
+      if (isValidSatAmount(intent.option.amount)) {
         ctx.amount = intent.option.amount;
+      } else if (intent.option.amount != null) {
+        logger.warn('transitions.execute.invalidAmount', {
+          source: 'meltLightningInvoice',
+          amount: intent.option.amount,
+        });
       }
       break;
     case 'meltLightningAddress':
@@ -104,12 +115,25 @@ function handleOptionChosen(
     case 'sendPaymentRequest':
       ctx.paymentRequest = intent.option.value;
       ctx.supportedMintUrls = intent.info.mints.length > 0 ? intent.info.mints : undefined;
-      if (intent.info.amount != null && intent.info.amount > 0) ctx.amount = intent.info.amount;
+      if (isValidSatAmount(intent.info.amount)) {
+        ctx.amount = intent.info.amount;
+      } else if (intent.info.amount != null) {
+        logger.warn('transitions.optionChosen.invalidAmount', {
+          source: 'sendPaymentRequest',
+          amount: intent.info.amount,
+        });
+      }
       break;
     case 'meltLightningInvoice':
       ctx.meltTarget = intent.option.value;
-      if (intent.option.amount != null && intent.option.amount > 0)
+      if (isValidSatAmount(intent.option.amount)) {
         ctx.amount = intent.option.amount;
+      } else if (intent.option.amount != null) {
+        logger.warn('transitions.optionChosen.invalidAmount', {
+          source: 'meltLightningInvoice',
+          amount: intent.option.amount,
+        });
+      }
       break;
     case 'meltLightningAddress':
     case 'meltLnurlp':
@@ -250,8 +274,11 @@ function handleMintSelectorRequested(
     balance: walletCtx.mintBalances[mintUrl] ?? 0,
   }));
   const needsBalanceFilter =
-    ctx.destination === 'paymentRequest' || ctx.destination === 'meltQuote' || ctx.destination === 'sendEcash';
-  const skipBalanceFilter = !needsBalanceFilter || event.scope === 'selected' || event.scope === 'npc';
+    ctx.destination === 'paymentRequest' ||
+    ctx.destination === 'meltQuote' ||
+    ctx.destination === 'sendEcash';
+  const skipBalanceFilter =
+    !needsBalanceFilter || event.scope === 'selected' || event.scope === 'npc';
   const finalCandidates = skipBalanceFilter ? allTrustedCandidates : candidates;
 
   return {
@@ -274,7 +301,11 @@ function handleMintSelectorRequested(
 // Flow entry handlers — reset context and resolve first step
 // ---------------------------------------------------------------------------
 
-function handleStartSendEcash(walletCtx: WalletContext, unit: string, offline?: boolean): TransitionResult {
+function handleStartSendEcash(
+  walletCtx: WalletContext,
+  unit: string,
+  offline?: boolean
+): TransitionResult {
   logger.info('transitions.startSendEcash', { unit, offline: offline ?? false });
   const ctx: FlowContext = { unit, destination: 'sendEcash', offline };
   const selection = selectMint(walletCtx);

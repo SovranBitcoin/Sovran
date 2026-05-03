@@ -251,6 +251,30 @@ describe('requestInvoiceFromLnurl — boundary checks', () => {
     expect(error).toBeInstanceOf(LnurlError);
     expect(error.code).toBe('LNURL_TIMEOUT');
   });
+
+  it('rejects .onion targets up-front with LNURL_TOR_REQUIRED', async () => {
+    // RN/iOS/Android can't resolve .onion at the OS level; surface a
+    // distinct code so the wallet can show a Tor-specific message rather
+    // than a generic "Network request failed".
+    installFetch({
+      payParams: {
+        callback: 'https://example.com/lnurl-pay/cb',
+        minSendable: 1000,
+        maxSendable: 1_000_000_000,
+        metadata: '[]',
+        tag: 'payRequest',
+      },
+      invoiceResponse: { pr: BOLT11_21_SATS },
+    });
+
+    const error = (await requestInvoiceFromLnurl('alice@abc123def456.onion', 21).catch(
+      (e) => e
+    )) as LnurlError;
+    expect(error).toBeInstanceOf(LnurlError);
+    expect(error.code).toBe('LNURL_TOR_REQUIRED');
+    // Must not have actually fetched anything — Tor isn't reachable.
+    expect(fetchCalls).toHaveLength(0);
+  });
 });
 
 // Suppress the warn we emit on invalid pay params shapes — tests assert
