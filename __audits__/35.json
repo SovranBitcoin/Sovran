@@ -197,7 +197,8 @@
         "skill:hono"
       ],
       "verification_note": "Re-read cashu.ts:14-50; verified the absence. Counter-argument: cachedCall serves stale (age < swr) so the only path that hits the unguarded fetch is age ≥ swr or an empty cache. True, but a cold container start hits exactly that path.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-007",

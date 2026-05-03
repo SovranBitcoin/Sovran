@@ -112,7 +112,8 @@
       "fix": "Import the `MintListItem`, `MintInfo` types from coco-payment-ux (or the public re-export), type `getMintEnrichment(): Partial<MintListItem>` explicitly, and delete the casts. For the NUT-06 contact access, introduce a local zod schema for `{ method: 'nostr', info: string }` (or a plain ts-predicate) and use it in `contacts.filter`.",
       "references": [],
       "verification_note": "Verified all four sites read lines; no schema or typed helper is imported. Counter-argument considered: coco-payment-ux's MintListItem allows arbitrary extra fields — still, the cast hides drift.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-006",

@@ -186,7 +186,8 @@
         "ts:TS2352"
       ],
       "verification_note": "Confirmed five TS2352 diagnostics at the cited lines via tsc run.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete"
     },
     {
       "id": "F-009",
@@ -334,7 +335,8 @@
         "skill:zod-4"
       ],
       "verification_note": "Same line as prior audit 02.json F-005 plus additional occurrences.",
-      "prior_audit_id": "F-005@02.json"
+      "prior_audit_id": "F-005@02.json",
+      "completion_status": "deferred"
     },
     {
       "id": "F-017",

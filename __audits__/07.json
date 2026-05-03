@@ -344,7 +344,8 @@
         "coco-payment-ux/src/machine/createMachine.ts:176,256-313,616-620,685-686,747,780-797,806-812,817,845-852"
       ],
       "verification_note": "Re-read createMachine.ts \u2014 confirmed pervasive as-any casts. Counter-argument considered: discriminated-union narrowing is awkward in mutating assignments \u2014 the setStep helper above is the standard resolution and is a lightweight refactor.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-016",

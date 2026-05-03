@@ -286,7 +286,8 @@
         "sovran-app/__audits__/01.json (F-007)"
       ],
       "verification_note": "Re-read apiClient.ts:52,68 — confirmed still present.",
-      "prior_audit_id": "F-007@01.json"
+      "prior_audit_id": "F-007@01.json",
+      "completion_status": "deferred"
     },
     {
       "id": "F-014",
