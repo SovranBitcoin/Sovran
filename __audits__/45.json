@@ -124,7 +124,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Read both implementations side by side; rules are textually similar but the lib emits an extra Concentrated chip and a CTA-bearing signals array that the modal never produces. Grep confirms computeWalletHealth has only one caller (WalletHealthCard).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Wallet-health subtree clusters with the canonical-primitive pattern but lives behind an unreachable entry point (45.F-001). Out of scope for the map-subtree slice; revisit alongside the F-001 reach-or-delete decision."
     },
     {
       "id": "F-003",
@@ -163,7 +165,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Read both files end-to-end; the modal pushes only two row keys ('rebalance', 'split'). The HealthModalScreen handler for openPendingEcash is therefore unreachable through the UI even when the modal is reachable.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Wallet-health subtree dead-branch — distinct seam from map subtree. Bundled with the F-002 reach-or-delete decision."
     },
     {
       "id": "F-005",
@@ -206,7 +210,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Grep confirms no other file defines a similar helper. Mint type already in lib's import set.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Same canonical-primitive pattern as the map slice (helper-belongs-with-its-pair) but in the wallet-health subtree. Bundled with the F-001 reach-or-delete decision."
     },
     {
       "id": "F-007",
@@ -278,7 +284,9 @@
       "fix": "Export REBALANCE_DRIFT_THRESHOLD_BP = 200 from lib/walletHealth.ts and import it in both places. Becomes a non-issue if F-002 is fixed.",
       "references": [],
       "verification_note": "Both literals confirmed; no other 200-bp threshold exists in the feature.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Threshold-constant duplication; tracked alongside the wallet-health rule consolidation (45.F-002). Out of scope for the map-subtree slice."
     },
     {
       "id": "F-011",

@@ -1,0 +1,637 @@
+{
+  "audit": {
+    "date": "2026-05-01",
+    "commit": "38797b50",
+    "entry_point": "sovran-app/features/map",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Score +6 (uncovered slice +3, name absent from prior audits +2, churn 10 commits/90d +1); largest LOC of three tied candidates (1178 vs features/health 1060, features/camera 571). features/map has never appeared in any of __audits__/01-43; the closest prior touch is the same parent app/(map-flow) which is also uncovered. MapScreen.tsx alone is 793 LOC — highest single-file slop target in the workspace not yet audited.",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json",
+      "28.json",
+      "29.json",
+      "30.json",
+      "31.json",
+      "32.json",
+      "33.json",
+      "34.json",
+      "35.json",
+      "36.json",
+      "37.json",
+      "38.json",
+      "39.json",
+      "40.json",
+      "41.json",
+      "42.json",
+      "43.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md",
+      "docs/README.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "zod-4",
+      "react-native-best-practices",
+      "security-review",
+      "neverthrow-return-types"
+    ],
+    "process_skills_consulted": [
+      "zoom-out",
+      "improve-codebase-architecture",
+      "diagnose"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "clean for blast radius",
+      "lint": "clean (expo lint --quiet) — 0 errors, 0 warnings on features/map, shared/lib/map, shared/stores/global/btcMapStore.ts, features/wallet/components/BitcoinNearYou.tsx",
+      "knip": "1 unused export in blast radius (ClusterBuildOptions @ shared/lib/map/btcMapClusterCache.ts:28:13)",
+      "analyze_structure": "features/map: 3 files, 997 code LOC, 0 cycles, 0 colocate suggestions for the feature itself; MapScreen.tsx 794 LOC dominates"
+    }
+  },
+  "completion_status": "partial",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "fetchPlaces blocks the JS thread for ~2.7s parsing 40k merchants",
+      "repo": "sovran-app",
+      "path": "shared/stores/global/btcMapStore.ts",
+      "line": 152,
+      "symbol": "fetchPlaces",
+      "dimension": 7,
+      "description": "fetchPlaces awaits response.json() then synchronously runs parseWith(BtcMapPlacesResponse) over a 39,425-element array. log-doctor confirms duration_ms=2669.93 for fetch_places.success in the latest session. The store comment at lines 116–117 explicitly admits '2–3s of JS-thread work'. The morphCompleted gate in BitcoinNearYou.tsx delays WHEN the parse runs, not its cost.",
+      "why_it_matters": "Whenever the cache TTL expires (1h), the next foreground sets up a 2.7s JS-thread block. The dim-7 evidence rule from AUDIT.md is satisfied via log-doctor timeline output: store.btc_map.fetch_places.success duration_ms=2669.93. Per-frame budget (16ms) is exceeded by ~170×. perf.js_thread_blocked blocked_ms=613.74 also fires nearby in the session.",
+      "fix": "Three options, ranked: (1) move the per-item zod parse to the server. api.sovran.money already proxies BTCMap; have the proxy validate, gzip-stream a stable shape, and the client parses only the array envelope. (2) Skip per-item zod parse for the 40k array fast-path: validate first/last/random-N items as a sanity check, trust the rest. (3) Chunk the parse: split into 1000-item batches with `await new Promise(r => setTimeout(r, 0))` between to release the thread. Option (1) eliminates the cost permanently; (2) keeps it but cuts to <100ms; (3) keeps total cost but unblocks frames.",
+      "references": [
+        "skill:zustand-5",
+        "skill:zod-4",
+        "skill:diagnose",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-checked at lines 152–194; counter-argument 'cache TTL of 1h limits frequency' considered — each occurrence still blocks a frame budget by 170×. log-doctor evidence cited verbatim.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Perf finding outside the canonical-primitive consolidation slice."
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "btcmap-store persists with no version, no migrate, and no rehydrate-time schema validation",
+      "repo": "sovran-app",
+      "path": "shared/stores/global/btcMapStore.ts",
+      "line": 293,
+      "symbol": "persist",
+      "dimension": 3,
+      "description": "The persist config sets name='btcmap-store', uses createJSONStorage on AsyncStorage, partializes placesCache + placeDetailsCache, but declares no `version` and no `migrate`. onRehydrateStorage only handles AsyncStorage error — it does not validate the rehydrated shape against BtcMapPlacesResponse / BtcMapPlaceDetails from @sovranbitcoin/schemas.",
+      "why_it_matters": "AUDIT.md ground rule 8 and dim 3 forbid persist-shape changes without `version` + `migrate`. The current shape is not yet versioned, so the FIRST shape change — e.g. adding a field to BTCMapPlace, switching to a Map for placeDetailsCache, or upstream BTCMap renaming `osm:*` keys — will silently corrupt every prior install. The cache is regenerable, so this is High not Critical, but the next PR that touches this shape becomes a Critical finding the moment it ships without a migrator.",
+      "fix": "Add `version: 1`. Add `migrate: (persisted, version) => version < 1 ? { placesCache: null, placeDetailsCache: {} } : persisted`. Add a rehydrate-time validator: in onRehydrateStorage, run `BtcMapPlacesResponse.safeParse(state.placesCache?.data ?? [])` and clear the cache on Err — a simple sanity gate that converts schema drift into a free refetch instead of runtime breakage.",
+      "references": [
+        "skill:zustand-5",
+        "skill:zod-4",
+        "research:zustand-zod-playbook"
+      ],
+      "verification_note": "Re-checked at lines 293–305; confirmed no version, no migrate, only AsyncStorage-error handling in onRehydrateStorage.",
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Already addressed by commits 95c14ea3/520c57a1 (btcMapStore has version + migrate + zod merge)."
+    },
+    {
+      "id": "F-003",
+      "severity": "High",
+      "confidence": 0.85,
+      "title": "Untrusted external URLs from BTCMap pass to Linking.openURL with no scheme allowlist",
+      "repo": "sovran-app",
+      "path": "features/map/screens/MerchantDetailScreen.tsx",
+      "line": 112,
+      "symbol": "handleContactPress",
+      "dimension": 2,
+      "description": "BTCMap data is OSM-sourced — anyone can edit merchant `contact:website`, `contact:instagram`, etc. The detail screen feeds those raw strings into Linking.openURL. The website branch does `url.startsWith('http') ? url : `https://${url}``, which (a) accepts any scheme starting with 'http' (e.g. `httpfoo://...`) and (b) prefixes 'https://' to non-http strings without validating, so `website='//evil.com'` becomes `https:////evil.com` (a protocol-relative escape). Instagram/Twitter handlers concat into URL paths after stripping a leading '@' — a value containing '/' or '?' escapes the path.",
+      "why_it_matters": "Phishing surface from public OSM data targeting a Bitcoin wallet. A malicious OSM editor can craft a merchant whose 'Website' opens an attacker-controlled domain, with the user trusting the source because the wallet displayed it. tel: and mailto: are also unsanitised — 'tel:911' and unbounded mailto bodies are minor but worth covering.",
+      "fix": "Add a URL guard module: parse with `new URL(...)`, reject schemes other than https:; reject hosts that resolve to RFC1918/loopback/.internal; validate Instagram/Twitter handles with `/^[A-Za-z0-9_.]{1,30}$/`; sanitise tel: with `/^[+0-9 \\-()]{1,32}$/`. Wrap calls in `await Linking.canOpenURL(url)`. Move the guard to shared/lib/url/ so other features (LNURL, NIP-05, social cards) reuse it.",
+      "references": [
+        "skill:security-review",
+        "luds/16.md"
+      ],
+      "verification_note": "Re-checked at lines 112–178; counter-argument 'iOS URL-encodes the input' considered — iOS does encode but does not refuse protocol-relative `//host` constructions. Instagram redirect surface is real.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Security/URL-guard concern — distinct seam from canonical-primitive consolidation slice."
+    },
+    {
+      "id": "F-004",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "FloatingActionButtons reinvents the canonical CircleActionButton primitive",
+      "repo": "sovran-app",
+      "path": "features/map/screens/MapScreen.tsx",
+      "line": 199,
+      "symbol": "FloatingActionButtons",
+      "dimension": 4,
+      "description": "Lines 199–292 inline ~90 LOC of SwiftUI Host/Button/HStack/Image plus a parallel Android TouchableOpacity branch. shared/ui/composed/CircleActionButton/CircleActionButton.ios.tsx already provides exactly this: 52×52 glass circle, systemIcon for SF Symbols, blur fallback for non-liquid-glass iOS, Pressable Android variant via .android.tsx re-export, disabled state, testID, Log wrapper. PR #182 created the platform-extension primitive; map predates the migration.",
+      "why_it_matters": "dim 4 inconsistency (canonical-primitive convention from .cursor/rules/text-typography-skeleton-guidelines and the broader UI consolidation in audit 17). dim 8 — the inline implementation uses 48×48 (still ≥44pt but smaller than the system) and ships no testID, accessibilityLabel, or accessibilityRole on either branch. dim 7 — Host modifiers re-allocate on every render of MapScreen (no useMemo on the modifiers array); CircleActionButton hoists this work into its own boundary.",
+      "fix": "Replace the FloatingActionButtons component body with three CircleActionButton calls: { systemIcon: 'location.fill', icon: 'mdi:crosshairs-gps', onPress: handleMyLocation, testID: 'map-locate' }, similarly for plus/minus. Delete the Platform.OS branch, the styles.androidCircleButton entry, and the unused styles.circleButtonContent block. Net: −90 LOC, +consistency.",
+      "references": [
+        "skill:improve-codebase-architecture",
+        "skill:building-native-ui",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-checked CircleActionButton.ios.tsx at lines 56–134; props (icon, systemIcon, onPress, disabled, testID, color) cover every use case in MapScreen. Counter-argument 'maybe the size 48 vs 52 was deliberate' — no comment in MapScreen explains 48; no other consumer in the repo uses 48.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "FloatingActionButtons inline body replaced with three CircleActionButton calls; styles.androidCircleButton dropped. Size now 52x52 with testIDs (map-locate / map-zoom-in / map-zoom-out)."
+    },
+    {
+      "id": "F-005",
+      "severity": "High",
+      "confidence": 0.95,
+      "title": "Icon→category→colour mapping duplicated across three files with diverging shapes",
+      "repo": "sovran-app",
+      "path": "features/map/screens/MapScreen.tsx",
+      "line": 65,
+      "symbol": "CATEGORIES",
+      "dimension": 4,
+      "description": "Three independent encodings of the same ontology: features/map/screens/MapScreen.tsx:65–94 (CATEGORIES with labels + 'all' + icons), features/map/screens/MerchantDetailScreen.tsx:26–41 (CATEGORIES with icons-only, no 'all', then a getMarkerColor function at lines 43–50 that encodes colours per category), shared/lib/map/mapClustering.ts:44–63 (flat icon→hex COLORS map). Adding a new merchant icon requires three edits; missing one yields silent rendering bugs (an uncategorised icon falls back to defaults).",
+      "why_it_matters": "dim 4 inconsistency at scale; dim 5 navigability (per the improve-codebase-architecture skill: scattered domain knowledge is the canonical AI-navigability blocker). The shapes already disagree — MerchantDetailScreen is missing the 'all' bucket and labels.",
+      "fix": "Introduce shared/lib/map/categories.ts exporting one canonical `MERCHANT_CATEGORIES` const: `{ id, label, icons: readonly string[], colour: string }[]` plus helpers `getCategoryByIcon(icon)` and `getMarkerColour(icon)`. Have MapScreen, MerchantDetailScreen, and mapClustering all import from there. Even better candidate: hoist into @sovranbitcoin/schemas as a shared enum since BtcMapPlace.icon is wire format — keeps server and client in lockstep.",
+      "references": [
+        "skill:improve-codebase-architecture",
+        "skill:zoom-out"
+      ],
+      "verification_note": "Confirmed via Grep on 'CATEGORIES|^const COLORS' across features/map and shared/lib/map. Three encodings present.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "shared/lib/map/categories.ts is now the single source of truth: MERCHANT_CATEGORIES + getMarkerColor + getCategoryByIcon + getIconsForCategory. MapScreen, MerchantDetailScreen, and mapClustering all consume it."
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "btcMapStore exposes dead state (selectedPlace, isLoadingDetails) and dead actions (setSelectedPlace, clearCache, clearAllData)",
+      "repo": "sovran-app",
+      "path": "shared/stores/global/btcMapStore.ts",
+      "line": 96,
+      "symbol": "useBTCMapStore",
+      "dimension": 1,
+      "description": "Repo-wide grep for selectedPlace / setSelectedPlace / isLoadingDetails / btcmap-store.clearAllData / btcmap-store.clearCache returns only the store's own definitions. clearAllData is referenced via shared/lib/debug/storageInventory.ts:11 only as a string in GLOBAL_ZUSTAND_STORE_KEYS — the inventory module reads keys, never invokes the action. getCachedPlaces (the public action) is called only internally by fetchPlaces; no external reader.",
+      "why_it_matters": "dim 1 — dead surface enlarges the audit blast radius unnecessarily and confuses Phase 1 dependency mapping. dim 4 — the dead state is also serialisation surface (selectedPlace would land in partialize if it weren't excluded; the current partialize already excludes it but the field still costs memory and confuses future consumers).",
+      "fix": "Trim BTCMapState to { placesCache, placeDetailsCache, isLoading, error }; trim BTCMapActions to { fetchPlaces, fetchPlaceDetails, getCachedPlaceDetails, setError }. Remove selectedPlace, setSelectedPlace, isLoadingDetails, clearCache, clearAllData. Make getCachedPlaces a private module helper instead of a store action. If a workspace-wide wipe sweeper is planned, name it explicitly elsewhere.",
+      "references": [
+        "knip:unused-export",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Cross-checked via grep across features/, shared/, app/, sheets/, navigation/. Only btcMapStore.ts itself references these symbols.",
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Dead actions deleted: setSelectedPlace, clearCache, clearAllData. Dead state fields (selectedPlace, isLoadingDetails) left in place — internal writes inside fetchPlaceDetails still set them, so removing the fields requires touching that body and was kept out of the dead-action slice."
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "MapScreen.tsx is 794 LOC with three components and state machinery in one file",
+      "repo": "sovran-app",
+      "path": "features/map/screens/MapScreen.tsx",
+      "line": 1,
+      "symbol": "MapScreen",
+      "dimension": 4,
+      "description": "Single file contains: CATEGORIES const (65–94), module-level Dimensions snapshot (96–108), StatsCard component (115–191), FloatingActionButtons component (193–292), MapScreen orchestrator with 6 useEffect blocks + 8 useCallback closures + camera/marker/timer refs (294–729), and a styles block (731–793). AUDIT.md dim-4 calls files >400 LOC a finding.",
+      "why_it_matters": "dim 4 structural rot. The orchestrator function alone is 432 lines (298–729). The blast radius from a future tweak to camera-debounce or category-filter logic is the entire screen. Not testable in isolation; not reusable.",
+      "fix": "Split: features/map/screens/MapScreen.tsx becomes the orchestrator (≤200 LOC). features/map/components/StatsCard.tsx (uses CapsuleButton primitive). features/map/components/FloatingActionButtons.tsx becomes three CircleActionButton calls (kills the file). features/map/hooks/useMapCamera.ts owns cameraRef + setMapCamera + handleCameraChange + the debounce timers. features/map/hooks/useMapMarkers.ts owns clusterManagerRef + updateMarkersForCamera + filteredPoints + clusterCacheKey. features/map/lib/categories.ts holds CATEGORIES. Net: orchestrator ≤200 LOC; each helper ≤120 LOC; reusable across BitcoinNearYou.",
+      "references": [
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "analyze-structure reports MapScreen.tsx 794 total / 649 code lines. Each split target is independently coherent.",
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "MapScreen shrank from ~794 to ~617 LOC after FloatingActionButtons inlining was replaced and CATEGORIES + dead styles dropped. The orchestrator + StatsCard + camera/marker hook split is still pending."
+    },
+    {
+      "id": "F-008",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "Module-level Dimensions.get('window') snapshot does not react to rotation, foldables, or split-screen",
+      "repo": "sovran-app",
+      "path": "features/map/screens/MapScreen.tsx",
+      "line": 96,
+      "symbol": "SCREEN_WIDTH",
+      "dimension": 5,
+      "description": "Lines 96–97 capture { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } at module evaluation time. STATS_CARD_WIDTH = SCREEN_WIDTH − 32 (line 108) is then passed as a numeric width to a SwiftUI Host (line 139, 155, 167). If the device rotates, the window resizes (split-screen, Stage Manager, foldable unfold), or the modal is presented at a non-default width, the SwiftUI Host stays at the original snapshot — the stats card mis-sizes.",
+      "why_it_matters": "dim 5 / dim 8 — layout correctness across orientations and form factors. iPad / iPhone-Mini / split-screen will visibly mis-size the card.",
+      "fix": "Replace the module-level constants with `const { width } = useWindowDimensions()` inside MapScreen. Pass STATS_CARD_WIDTH as a prop to StatsCard (or have StatsCard read its own dimensions). For ASPECT_RATIO inside cameraToBbox calls, recompute on resize.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:building-native-ui"
+      ],
+      "verification_note": "Confirmed at lines 96–108 and the three Host width references.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Layout-correctness fix; outside the canonical-primitive consolidation slice."
+    },
+    {
+      "id": "F-009",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "placeDetailsCache grows unboundedly and is persisted to AsyncStorage on every set",
+      "repo": "sovran-app",
+      "path": "shared/stores/global/btcMapStore.ts",
+      "line": 69,
+      "symbol": "placeDetailsCache",
+      "dimension": 7,
+      "description": "PlaceDetailsCache is a Record<number, { data, timestamp }> with no eviction policy. Every fetchPlaceDetails call writes to it (lines 244–251), and partialize keeps the full cache (line 296–299). Each write triggers a full AsyncStorage serialise of placesCache (40k items, several MB) + placeDetailsCache. Over time the user accumulates entries; nothing prunes them.",
+      "why_it_matters": "dim 7 perf + memory. AsyncStorage write is async but the JSON.stringify of a multi-MB blob is sync; this fires on every merchant detail open. Android AsyncStorage has historically had per-key size issues (~6MB sqlite-row limits depending on version).",
+      "fix": "Cap placeDetailsCache to LRU N=50 most-recent entries. Either implement an LRU manually in the store (track id→timestamp, evict oldest beyond cap) or move details to a separate, non-persisted in-memory cache (refetch on cold start — 24h TTL meant most are stale anyway). Drop placeDetailsCache from partialize entirely; keep only placesCache.",
+      "references": [
+        "skill:zustand-5",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Confirmed lines 69–74, 244–251, 296–299. No eviction.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Cache-eviction / persist-shape concern; not part of the canonical-primitive consolidation slice."
+    },
+    {
+      "id": "F-010",
+      "severity": "Medium",
+      "confidence": 0.7,
+      "title": "Module-level inflightPlacesFetch survives clearAllData() — cleared store gets re-populated by in-flight fetch",
+      "repo": "sovran-app",
+      "path": "shared/stores/global/btcMapStore.ts",
+      "line": 118,
+      "symbol": "inflightPlacesFetch",
+      "dimension": 1,
+      "description": "inflightPlacesFetch is a module-level singleton (line 118). clearAllData (line 276–291) nulls placesCache + placeDetailsCache and removes the AsyncStorage key, but does not abort or invalidate inflightPlacesFetch. If clearAllData runs while a fetch is mid-parse, the fetch's set({ placesCache: { data, timestamp } }) at line 173–177 fires after clearAllData and re-writes the cache.",
+      "why_it_matters": "dim 1 — clearAllData is intended for wipe scenarios (profile delete, KYC reset, debug). Race violates its contract. Self-evident structural race per AUDIT.md log_doctor_integration rule.",
+      "fix": "Track an epoch counter alongside inflightPlacesFetch: `let epoch = 0; const myEpoch = ++epoch`. The run() closure captures myEpoch; before set, check `if (myEpoch !== epoch) return data` — deliver to caller but skip the store write. clearAllData does `epoch++; inflightPlacesFetch = null;`.",
+      "references": [
+        "skill:diagnose"
+      ],
+      "verification_note": "clearAllData is currently unused (see F-006), so the practical race window is zero today. Kept Medium because removing dead code without fixing the race risks reintroducing it at the next wipe-sweeper feature.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Race-condition concern; outside the canonical-primitive consolidation slice."
+    },
+    {
+      "id": "F-011",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "MerchantDetailScreen has no AbortController / isMounted guard — stale fetch wins on rapid re-mount",
+      "repo": "sovran-app",
+      "path": "features/map/screens/MerchantDetailScreen.tsx",
+      "line": 73,
+      "symbol": "loadDetails",
+      "dimension": 1,
+      "description": "useEffect at lines 73–104 awaits fetchPlaceDetails and then calls setPlace + setIsLoading on resolve. On rapid back/forward (place A → place B → place A), the previous promise can resolve AFTER the new one and overwrite the current state. No isMounted ref, no AbortController, no cancellation token.",
+      "why_it_matters": "dim 1 race; dim 7 cancellation hygiene. AUDIT.md dim-7 lists 'navigation + setState race' and 'Promise.race without loser cancellation' as named patterns.",
+      "fix": "Standard pattern: `let cancelled = false; loadDetails(); return () => { cancelled = true };` and gate the setState calls on !cancelled. Or scope an AbortController and pass to fetchPlaceDetails (which would need to forward it to fetch()).",
+      "references": [
+        "skill:native-data-fetching",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Re-checked at 73–104; no cancellation guard.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Cancellation hygiene; distinct seam from canonical-primitive consolidation."
+    },
+    {
+      "id": "F-012",
+      "severity": "Medium",
+      "confidence": 0.9,
+      "title": "Explicit `any` on map ref and camera config in a strict-TS codebase",
+      "repo": "sovran-app",
+      "path": "features/map/screens/MapScreen.tsx",
+      "line": 329,
+      "symbol": "mapRef",
+      "dimension": 1,
+      "description": "Line 329: `const mapRef = useRef<any>(null)`. Line 337: `const config: any = Platform.OS === 'android' ? {...} : {...}`. expo-maps exports types for AppleMaps.View and GoogleMaps.View that cover both ref methods and the cameraPosition shape.",
+      "why_it_matters": "dim 1 / dim 6. The camera-config any erases the structural difference between iOS (no duration) and Android (duration:250) at the type level — a future bug where the wrong shape is passed to the wrong platform compiles silently.",
+      "fix": "`useRef<React.ComponentRef<typeof AppleMaps.View> | React.ComponentRef<typeof GoogleMaps.View>>(null)`. Type setMapCamera's input as `{ lat: number; lon: number; zoom: number }` and split into platform-specific config types via `Platform.select<{ ios: AppleCameraConfig, android: GoogleCameraConfig }>`.",
+      "references": [
+        "lint:@typescript-eslint/no-explicit-any",
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Confirmed at lines 329 and 337–344. Lint did not flag because expo lint runs without --max-warnings strict; the `any` is technically allowed but violates the codebase's own dim-1 invariant.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Typing hygiene; distinct from canonical-primitive consolidation slice."
+    },
+    {
+      "id": "F-013",
+      "severity": "Medium",
+      "confidence": 0.7,
+      "title": "parseInt instead of zod-coerce on placeId from useLocalSearchParams",
+      "repo": "sovran-app",
+      "path": "features/map/screens/MerchantDetailScreen.tsx",
+      "line": 80,
+      "symbol": "loadDetails",
+      "dimension": 6,
+      "description": "Line 80: `const id = parseInt(placeId, 10); if (isNaN(id)) ...`. parseInt accepts garbage suffixes: `parseInt('123abc', 10) === 123`. Sovran's research note `zustand-zod-playbook` and AUDIT.md dim-6 prefer `z.coerce.number().int().positive().safeParse(placeId)` for params crossing a boundary.",
+      "why_it_matters": "dim 6 — deep-link params are a trust boundary; placeId may originate from a `cashu:` / `lightning:` / `nostr:` URI with attacker-controlled content (per AUDIT.md \"Deep-link params are parsed through a zod schema; flag direct use of useLocalSearchParams() without validation\").",
+      "fix": "`const parsed = z.coerce.number().int().positive().safeParse(placeId); if (!parsed.success) { setIsLoading(false); return; } const id = parsed.data;`. Promote to a shared param-parsing helper if other map-flow screens want it.",
+      "references": [
+        "skill:zod-4",
+        "research:zustand-zod-playbook"
+      ],
+      "verification_note": "Re-checked at lines 73–104.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "MerchantDetailScreen lives under (map-flow); the deep-link zod-validation slice (commit 0dddea5f) covered the payment-flow and top-level token/quote routes only. parseInt → z.coerce.number on placeId remains a follow-up."
+    },
+    {
+      "id": "F-014",
+      "severity": "Medium",
+      "confidence": 0.7,
+      "title": "BitcoinNearYou filters merchants on TRUE coords but renders camera at offset coords — user position becomes inferrable",
+      "repo": "sovran-app",
+      "path": "features/wallet/components/BitcoinNearYou.tsx",
+      "line": 208,
+      "symbol": "nearbyMarkers",
+      "dimension": 2,
+      "description": "Lines 215–227 filter places using `coords.latitude` / `coords.longitude` (true user position). Line 241–244 then computes `applySafetyOffset(coords.latitude, coords.longitude)` for the camera position. Net effect: pins are positioned at their TRUE merchant coordinates, the camera is shifted ~750–1800m, so the user sees pins clustered off-centre toward their actual location — visually triangulating their position.",
+      "why_it_matters": "dim 2. The privacy offset (locationPrivacy.ts) exists to hide the user's exact position; this leak makes the offset cosmetic. Anyone who screen-shares their wallet inadvertently reveals their neighbourhood with ~1×1 km resolution.",
+      "fix": "Either (a) apply the offset to the FILTER centre too (so both pins and camera shift together — the user sees a 'nearby' map of merchants near the offset point, lying about their location to themselves), or (b) drop the offset entirely (it doesn't add privacy when markers reveal it). Option (b) is the honest fix.",
+      "references": [
+        "skill:security-review"
+      ],
+      "verification_note": "Confirmed lines 208–244. The map preview is a non-interactive teaser — the practical leak surface is screenshots / screen-shares of the wallet home.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Privacy/security finding; outside the canonical-primitive consolidation slice."
+    },
+    {
+      "id": "F-015",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "Linking.openURL fire-and-forget swallows rejections",
+      "repo": "sovran-app",
+      "path": "features/map/screens/MerchantDetailScreen.tsx",
+      "line": 113,
+      "symbol": "handleOpenURL",
+      "dimension": 1,
+      "description": "Six call sites (lines 113, 117, 121, 165, 171, 174) invoke Linking.openURL without await/catch. iOS rejects malformed schemes via promise rejection; the error never reaches the logger. Users see a tap with no effect.",
+      "why_it_matters": "dim 1 / dim 10 — invisible failures. Amplified by F-003: when the URL guard rejects a scheme, the user wants to know.",
+      "fix": "`Linking.openURL(url).catch((err) => log.warn('map.merchant.openurl.failed', { method, url: redact(url), error: err }))`. Combine with F-003's guard so the toast/popup tells the user 'This link looks unsafe' instead of failing silently.",
+      "references": [
+        "skill:neverthrow-wrap-exceptions",
+        "skill:diagnose"
+      ],
+      "verification_note": "Confirmed all six call sites.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Error-handling cleanup; outside the canonical-primitive consolidation slice."
+    },
+    {
+      "id": "F-016",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "Cluster cache MAX_ENTRIES=3 evicts categories the user is actively cycling, forcing 100ms+ rebuilds",
+      "repo": "sovran-app",
+      "path": "shared/lib/map/btcMapClusterCache.ts",
+      "line": 11,
+      "symbol": "MAX_ENTRIES",
+      "dimension": 7,
+      "description": "Six categories ('all', food, retail, atm, accommodation, services) each generate a separate Supercluster manager keyed by `${timestamp}:${category}`. MAX_ENTRIES=3 evicts the oldest on insert. Cycling all six categories causes three evictions; each rebuild calls Supercluster.load synchronously (mapClustering.ts:99–126 explicitly warns: 'JS thread blocked'). The console.warn at btcMapClusterCache.ts:46–50 fires on duration > 50ms.",
+      "why_it_matters": "dim 7 perf. Category cycling is a normal user motion in a merchant-discovery feature. log-doctor would catch this if the user exercised the map (not in current session); the structural pattern is self-evident.",
+      "fix": "Two options: (1) bump MAX_ENTRIES to 6 (one per category) — simple, costs ~6× manager memory but each manager is ~5–10MB so we're talking 60MB at the upper bound. Acceptable but heavy. (2) Better: key the cache only by `${timestamp}` (one manager for all 40k places, no category split) and have getClusters apply a category filter at query time via Supercluster's `filter` option. This builds the index once.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:diagnose"
+      ],
+      "verification_note": "Confirmed line 11; mapClustering.ts:118–126 confirms sync load with thread-block warning.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Cluster-cache sizing/perf; not part of the canonical-primitive consolidation slice."
+    },
+    {
+      "id": "F-017",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "console.warn for perf signals instead of structured logger",
+      "repo": "sovran-app",
+      "path": "shared/lib/map/mapClustering.ts",
+      "line": 121,
+      "symbol": "load",
+      "dimension": 10,
+      "description": "mapClustering.ts:121–125 and btcMapClusterCache.ts:46–50 emit `console.warn('[perf] ...')`. Rest of codebase uses scoped loggers (storeLog, log, paymentLog) from shared/lib/logger — those flow through log-doctor, the ring buffer, and Sentry redaction.",
+      "why_it_matters": "dim 10 observability — these warnings are invisible to log-doctor and never surface in shared diagnostics exports.",
+      "fix": "`log.warn('map.cluster.slow_load', { points, duration_ms })` and `log.warn('map.cluster.cache_miss_rebuild', { points, duration_ms, cacheKey })`. Then a future `log-doctor timeline --event 'map.cluster'` is informative.",
+      "references": [
+        "skill:diagnose"
+      ],
+      "verification_note": "Confirmed both call sites.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Logger-namespace migration; tracked under the cross-cutting logger-drift cluster, not this slice."
+    },
+    {
+      "id": "F-018",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "Dead style entry circleButtonContent and unused exports getClusterLeaves, ClusterBuildOptions",
+      "repo": "sovran-app",
+      "path": "features/map/screens/MapScreen.tsx",
+      "line": 779,
+      "symbol": "styles.circleButtonContent",
+      "dimension": 4,
+      "description": "MapScreen.tsx:779–784 defines styles.circleButtonContent; only styles.androidCircleButton is referenced in JSX (lines 281, 284, 287). mapClustering.ts:186–202 exports getClusterLeaves; zero callers repo-wide. btcMapClusterCache.ts:28 exports type ClusterBuildOptions; flagged unused by `npm run knip`.",
+      "why_it_matters": "dim 4 dead code.",
+      "fix": "Delete circleButtonContent. Delete getClusterLeaves (or move into the future MapList screen if planned). Inline ClusterBuildOptions into the function signature.",
+      "references": [
+        "knip:unused-export"
+      ],
+      "verification_note": "circleButtonContent confirmed via Grep. ClusterBuildOptions confirmed via knip output. getClusterLeaves confirmed via Grep — zero callers.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "All three deletions landed: styles.circleButtonContent removed, ClusterManager.getClusterLeaves removed, ClusterBuildOptions inlined into the function signature."
+    },
+    {
+      "id": "F-019",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "btcMapStore redefines BTCMapPlace and BTCMapPlaceDetails interfaces despite shared schemas package",
+      "repo": "sovran-app",
+      "path": "shared/stores/global/btcMapStore.ts",
+      "line": 12,
+      "symbol": "BTCMapPlace",
+      "dimension": 6,
+      "description": "Lines 12–62 declare local interfaces BTCMapPlace (private) and BTCMapPlaceDetails (exported). The store imports BtcMapPlacesResponse and BtcMapPlaceDetails from @sovranbitcoin/schemas (lines 6–10) — i.e. the schema package is already wired — but only uses the parsers, not the inferred types. The local interface enumerates osm:* keys that the schema covers via .passthrough(), so the local TS type and the runtime-validated type drift.",
+      "why_it_matters": "dim 6 — two sources of truth on the same wire shape. Adding a new field requires editing both.",
+      "fix": "`import { BtcMapPlace, BtcMapPlaceDetails } from '@sovranbitcoin/schemas'; export type { BtcMapPlaceDetails };`. Delete the local interfaces. If consumers want autocomplete on osm:* keys, extend the schema with a typed osm record (still passthrough-friendly) instead of duplicating in the app.",
+      "references": [
+        "skill:zod-4"
+      ],
+      "verification_note": "Confirmed schema exists at sovran-schemas/src/btcmap.ts with BtcMapPlace, BtcMapPlacesResponse, BtcMapPlaceDetails. Local store redeclares with overlapping fields.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Local BTCMapPlace deleted; the store now uses the schema-inferred BtcMapPlace directly. BTCMapPlaceDetails reduced to a thin Partial<Record<OsmContact|OsmPayment|OsmMeta, string>> extension on top of the schema's BtcMapPlaceDetails so consumers keep typed access to the osm:* keys without re-declaring the base shape."
+    },
+    {
+      "id": "F-020",
+      "severity": "Low",
+      "confidence": 0.85,
+      "title": "BitcoinNearYou redefines a MapMarker type that already exists in shared/lib/map/mapClustering",
+      "repo": "sovran-app",
+      "path": "features/wallet/components/BitcoinNearYou.tsx",
+      "line": 49,
+      "symbol": "MapMarker",
+      "dimension": 4,
+      "description": "Line 49–54 declares a local `interface MapMarker { id; coordinates; tintColor; title }`. shared/lib/map/mapClustering.ts:28–38 already exports a MapMarker interface with a superset of those fields plus `type`, `count`, `clusterId`, `placeId`. The wallet teaser uses the subset shape but the name collision is asking for confusion.",
+      "why_it_matters": "dim 4 inconsistency.",
+      "fix": "Either rename the local type (e.g. `WalletMapMarker`) or import the shared type and use it as-is (the extra fields are optional anyway in the interface). The deeper fix is part of F-005's `shared/lib/map/categories.ts` consolidation — the marker type belongs alongside.",
+      "references": [
+        "skill:improve-codebase-architecture"
+      ],
+      "verification_note": "Confirmed via Grep on `MapMarker`.",
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Renamed BitcoinNearYou's local interface to NearbyMapMarker to remove the name collision and added a comment noting the shape difference (nested `coordinates` vs the clustering MapMarker's flat lat/lon — distinct on purpose because the wallet teaser feeds the AppleMaps/GoogleMaps `markers` prop directly). Importing the clustering MapMarker would change the prop shape, so the deeper unification stays as follow-up."
+    },
+    {
+      "id": "F-021",
+      "severity": "Low",
+      "confidence": 0.7,
+      "title": "Missing version + AsyncStorage write on every detail-fetch makes hot paths storage-bound",
+      "repo": "sovran-app",
+      "path": "shared/stores/global/btcMapStore.ts",
+      "line": 244,
+      "symbol": "fetchPlaceDetails",
+      "dimension": 7,
+      "description": "Set call at line 244–251 triggers persist middleware to write the entire partialize blob (placesCache 40k items + placeDetailsCache) on every single merchant detail fetch — not just the new entry. Each tap on a marker causes a multi-MB JSON.stringify + AsyncStorage.setItem.",
+      "why_it_matters": "dim 7 perf. Compounded with F-009.",
+      "fix": "Move placeDetailsCache out of partialize — keep it RAM-only (24h TTL was already short enough that disk persistence buys little). Or: switch to a SQLite-backed cache via expo-sqlite for selective writes.",
+      "references": [
+        "skill:zustand-5"
+      ],
+      "verification_note": "Inferred from persist semantics; not directly confirmed via log-doctor (no map session in current log.txt).",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Persist/perf concern; not part of the canonical-primitive consolidation slice."
+    },
+    {
+      "id": "F-022",
+      "severity": "Nit",
+      "confidence": 0.5,
+      "title": "Cluster expansion zoom unexplained '+1' overshoot",
+      "repo": "sovran-app",
+      "path": "features/map/screens/MapScreen.tsx",
+      "line": 535,
+      "symbol": "handleMarkerClick",
+      "dimension": 1,
+      "description": "Line 535 computes `Math.min(expansionZoom + 1, 18)` after Supercluster's getClusterExpansionZoom returns the zoom at which a cluster expands. The +1 has no comment.",
+      "why_it_matters": "Reader confusion only. May be deliberate to overshoot the breakup threshold.",
+      "fix": "Either remove the `+1` or add a one-line comment: `+1 because Supercluster's expansionZoom is the threshold, not the post-break zoom`.",
+      "references": [],
+      "verification_note": "Cosmetic.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Nit comment-add; not part of the canonical-primitive consolidation slice."
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "pass",
+    "5": "partial",
+    "6": "pass",
+    "7": "pass",
+    "8": "partial",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "consolidate",
+      "description": "Replace FloatingActionButtons inline implementation with three CircleActionButton calls. Delete features/map/screens/MapScreen.tsx:193–292 and the unused styles.androidCircleButton + styles.circleButtonContent. Net −90 LOC of glass/SwiftUI duplication.",
+      "files": [
+        "features/map/screens/MapScreen.tsx",
+        "shared/ui/composed/CircleActionButton/CircleActionButton.ios.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Single source of truth for merchant icon→category→colour. Create shared/lib/map/categories.ts (or hoist into @sovranbitcoin/schemas) exporting MERCHANT_CATEGORIES + getMarkerColour(icon) + getCategoryByIcon(icon). Replace the three encodings in MapScreen.tsx:65–94, MerchantDetailScreen.tsx:26–41+43–50, and mapClustering.ts:44–63.",
+      "files": [
+        "features/map/screens/MapScreen.tsx",
+        "features/map/screens/MerchantDetailScreen.tsx",
+        "shared/lib/map/mapClustering.ts"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Split MapScreen.tsx (794 LOC) into orchestrator + components/StatsCard.tsx + hooks/useMapCamera.ts + hooks/useMapMarkers.ts + lib/categories.ts. Each piece independently coherent and testable.",
+      "files": [
+        "features/map/screens/MapScreen.tsx"
+      ]
+    },
+    {
+      "type": "dead-code",
+      "description": "Trim btcMapStore: remove selectedPlace, setSelectedPlace, isLoadingDetails, clearCache, clearAllData (and getCachedPlaces as a public action — keep only as a private helper). Delete shared/lib/map/mapClustering.ts:getClusterLeaves and shared/lib/map/btcMapClusterCache.ts:ClusterBuildOptions. Delete features/map/screens/MapScreen.tsx:styles.circleButtonContent.",
+      "files": [
+        "shared/stores/global/btcMapStore.ts",
+        "shared/lib/map/mapClustering.ts",
+        "shared/lib/map/btcMapClusterCache.ts",
+        "features/map/screens/MapScreen.tsx"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Hoist the URL safety guard (scheme allowlist, host validation, Instagram/Twitter handle regex, tel/mailto sanitiser) into shared/lib/url/safeOpenUrl.ts. Reuse from MerchantDetailScreen, future LNURL surfaces, and any user-content link rendering. Combine with neverthrow-style Result return so callers can show 'unsafe link' toasts.",
+      "files": [
+        "features/map/screens/MerchantDetailScreen.tsx"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Propose a `npm run log-doctor -- map` mode: aggregate `store.btc_map.*`, `map.cluster.*`, and `map.merchant.*` events with timing breakdowns. Particularly useful for the F-001 perf fix evaluation — the operator wants to see fetch parse / cluster build / camera-change debounce timings on one timeline. Documented in .claude/rules/log-doctor.md.",
+      "files": [
+        "scripts/log-doctor.ts",
+        ".claude/rules/log-doctor.md"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Worth a draft research note: `__research__/btcmap-storage-strategy.md` — captures the tradeoff between AsyncStorage-persisted full cache (current), in-memory only with 1h refetch, server-pre-validated, and SQLite-backed details cache. Anchors the F-001 / F-009 / F-021 conversation. Tags: dim-3, dim-7, btcmap.",
+      "files": [
+        "sovran-app/__research__"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Is api.sovran.money's /api/btcmap/places endpoint the right place to push per-item zod validation, or should the client trust the proxy and skip validation entirely on the 40k-item array?",
+    "Was the 48×48 size in FloatingActionButtons deliberate (vs CircleActionButton's 52×52), or just predates PR #182's primitive consolidation?",
+    "Should placeDetailsCache stay persisted at all? 24h TTL means most rehydrated entries are stale anyway.",
+    "Filter-flow route (app/(filter-flow)/) is currently transactions-only; would map's category filter benefit from being lifted there too, with a shared filter store, instead of local screen state?",
+    "An SOV-XX spec is unwritten for the Bitcoin Map feature — SOV-1X band (Cashu wallet mechanics) covers payments, but BTCMap is more of a discovery surface. Should it slot into a new SOV-2X (identity & social) entry, or its own band?"
+  ]
+}
