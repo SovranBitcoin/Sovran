@@ -36,7 +36,7 @@
       "analyze_structure": "10 files / 821 LOC / no cycles; all six _layout.tsx flagged 'orphan' (false positive — expo-router file-based routing imports them implicitly)"
     }
   },
-  "completion_status": "deferred",
+  "completion_status": "partial",
   "findings": [
     {
       "id": "F-001",
@@ -56,7 +56,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-read app/(drawer)/_layout.tsx:297-327. Counter-argument: today no shipped route triggers a false positive, so severity could be Low. Counter-counter: the substring 'ai' is two characters and shippable routes that contain it are already in the design space (audit 34 covers /ai). Leaving the bug latent in a navigation seam is the kind of thing that surfaces months later. Keeping at Medium because it's a regression trap, not an active bug.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "isRouteActive now reads useSegments() and matches each MENU_ITEMS entry against a declared activeSegments prefix via a tiny segmentsMatch helper. Wallet (the (tabs) default) keeps its 'undefined trailing segment' carve-out. The 8 pathname.includes branches and the 'ai/feed/contacts' negation chain are gone."
     },
     {
       "id": "F-002",
@@ -76,7 +78,9 @@
         "skill:zoom-out"
       ],
       "verification_note": "Verified by reading the file end-to-end. Counter-argument: file size alone is not a finding; co-location of related components in one route file is acceptable when they're never reused. Counter-counter: ProfileSelector's call into profileSessionOrchestrator and profileStore IS shared concern — the next audit that touches profile switching (likely soon — multi-profile is in active development per audit 09's findings) will need to find this code. Keeping at Medium.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "ProfileSelector + ProfileHeader extracted to shared/blocks/DrawerProfileChrome.tsx (~175 LOC of profile-domain wiring + waitForDrawerClose + the drawer-mounted header card now live next to the rest of profile-domain code). MenuButton kept inline in the drawer route file because it depends on the drawer's active-state semantics and has no other consumer; CustomDrawerContent / DrawerContentInner pair preserved (BackgroundProvider must wrap useBackgroundContext)."
     },
     {
       "id": "F-003",
@@ -95,7 +99,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-read both branches. Counter-argument: the two APIs have different prop shapes (`<Tabs.Screen options={{ tabBarIcon }}>` vs `<Expo55NativeTabs.Trigger><Trigger.Icon sf=.../><Trigger.Label/></Trigger>`), so a single map function has to render different JSX per branch. Counter-counter: that's exactly what the map's render-fn parameter handles; data still lives in one TAB_DEFS array.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "TAB_DEFS: readonly TabDef[] declared at the top of (tabs)/_layout.tsx. Both branches map over it: native uses tab.sf for Trigger.Icon, fallback uses tab.sf.default as IconSymbol's name. Adding a tab is now one entry."
     },
     {
       "id": "F-004",
@@ -115,7 +121,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-read app.json:117 (typedRoutes: true) and the three sites in (tabs)/_layout.tsx. Counter-argument: redundant defenses are sometimes correct in routing layers, where misbehaving one path can ship a black-box bug. UNVERIFIED: latest log.txt session doesn't include a cold-start that exercises the redirect; cannot confirm whether the redirect is dead code or actively firing. Marking confidence 0.7 because the redirect's necessity is empirically unverified.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Anchor reduced to one mechanism: unstable_settings.initialRouteName = 'index'. The useEffect router.replace redirect is gone (along with its usePathname read) and the duplicate <Tabs initialRouteName='index'> prop is dropped. If a future cold-start regression surfaces, the segment-aware isRouteActive (F-001) covers the 'tabs root before index resolves' case via the wallet's undefined-segment carve-out."
     },
     {
       "id": "F-005",
@@ -158,7 +166,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "UNVERIFIED dynamically: latest log.txt session doesn't exercise the drawer (only 22.6s of foreground time). No evidence the 400ms is too short or too long in practice. Confidence at 0.75 because the structural concern (time-based vs signal-based) is real but the symptom is unverified.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Wall-clock 400ms guard preserved. Replacing it with a navigation-state listener is a separate slice — touches react-navigation event wiring and would benefit from log-doctor instrumentation first."
     },
     {
       "id": "F-007",
@@ -177,7 +187,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "UNVERIFIED: react-navigation/drawer's exact event names not checked at audit time. Counter-argument: the existing 300ms ships fine and may be fine for years. Confidence 0.5 because the timer is conservative — if drawer-animation gets faster the timer over-waits (harmless), and if it gets slower it under-waits (visible). Either way it's hand-tuned brittleness, just not a confirmed bug.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "waitForDrawerClose moved to shared/blocks/DrawerProfileChrome.tsx alongside the executeProfileAction caller; still uses the 300ms timer. Same signal-driven follow-up as F-006."
     },
     {
       "id": "F-008",
@@ -219,7 +231,9 @@
         "knip:unused-export (knip doesn't analyse StyleSheet keys — log-helper opportunity)"
       ],
       "verification_note": "Confirmed via grep: only one match of 'moreProfilesButton' in the file (the definition).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "styles.moreProfilesButton deleted along with the rest of the StyleSheet during the chrome extraction; profile-avatar styling now lives inline in DrawerProfileChrome."
     },
     {
       "id": "F-010",
@@ -236,7 +250,9 @@
       "fix": "Drop both the style entry (lines 499-501) and the `style={styles.menuButtonContent}` reference at line 283.",
       "references": [],
       "verification_note": "Confirmed via direct read.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "styles.menuButtonContent and the `style={styles.menuButtonContent}` reference on the inner HStack both gone. MenuButton now passes the HStack no extra style at all."
     },
     {
       "id": "F-011",
@@ -255,7 +271,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-read app/(drawer)/(tabs)/index/index.tsx. Counter-argument: memo here was likely added defensively when a parent re-rendered too often; if so the right fix is upstream. Confidence at 0.85 because the wrapper is harmless but uninformative.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "memo(WalletRoute) sits in the per-tab route file (index/index.tsx), not the drawer chrome. Outside the drawer-cleanup slice; mechanical follow-up."
     },
     {
       "id": "F-012",
@@ -275,7 +293,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Confirmed via `grep MOCK_NFC_SUCCESS_SATS` (only the route file re-exports it — no other importer in app/, features/, or shared/). HEADER_LAYOUT has external importers (BalancePill, MintSelector). Both can move into features/wallet/index.ts cleanly.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Re-export line in app/(drawer)/(tabs)/index/_layout.tsx removed. Confirmed both constants had zero remaining importers anywhere; deleted `MOCK_NFC_SUCCESS_SATS` and the equally-orphan `PAYMENT_TIERS` from features/wallet/lib/walletHeader.ts. HEADER_LAYOUT keeps its 4 direct importers and stays in walletHeader."
     }
   ],
   "dimensions": {
