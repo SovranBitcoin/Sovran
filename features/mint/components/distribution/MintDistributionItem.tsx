@@ -11,7 +11,7 @@ import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import Icon from 'assets/icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DistributionSlider } from './DistributionSlider';
-import { hexToRgb, useExtractedColors } from './colorUtils';
+import { hexToRgb, useExtractedColors } from '@/shared/lib/colorExtraction';
 import { bpToPercent, TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 import { extractDomain } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';

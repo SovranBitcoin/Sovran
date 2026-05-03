@@ -1,32 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
-import { auditMint, fetchMintInfo, type AuditMintResponse } from '@/shared/lib/apiClient';
+import { auditMint, fetchMintInfo } from '@/shared/lib/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
-import { log } from '@/shared/lib/logger';
-
-interface AuditInfo {
-  url: string;
-  name: string;
-  state: string;
-  score?: number;
-  /** Swap success rate in range [0..1], computed from recent swaps (typically last 100) */
-  successRate?: number;
-  /** Recent swap window size used for successRate (e.g. 100) */
-  swapTotal?: number;
-  /** Successful swaps (state === 'OK') in the recent window */
-  swapSuccess?: number;
-  /** Average time_taken (ms) for successful swaps with time_taken > 0 */
-  avgTimeMs?: number;
-  auditorData: {
-    name: string;
-    state: string;
-    mints: number;
-    melts: number;
-    errors: number;
-  };
-}
+import { cashuLog } from '@/shared/lib/logger';
+import { transformAuditData, type AuditInfo } from '../lib/auditInfo';
 
 export interface AuditedMintData {
   auditInfo?: AuditInfo;
@@ -40,40 +19,6 @@ interface UseAuditedMintsResult {
   loading: boolean;
   getAuditData: (mintUrl: string) => AuditedMintData;
 }
-
-const transformAuditData = (auditData: AuditMintResponse): AuditInfo => {
-  const swaps = auditData.swaps || [];
-  const swapTotal = swaps.length;
-  const swapSuccess = swaps.reduce((acc, s) => acc + (s.state === 'OK' ? 1 : 0), 0);
-  const successRate = swapTotal > 0 ? swapSuccess / swapTotal : undefined;
-  const score = typeof successRate === 'number' ? successRate * 5 : undefined;
-
-  const successfulTimes = swaps
-    .filter((s) => s.state === 'OK' && typeof s.time_taken === 'number' && s.time_taken > 0)
-    .map((s) => s.time_taken);
-  const avgTimeMs =
-    successfulTimes.length > 0
-      ? successfulTimes.reduce((sum, t) => sum + t, 0) / successfulTimes.length
-      : undefined;
-
-  return {
-    url: auditData.url,
-    name: auditData.name,
-    state: auditData.state,
-    score,
-    successRate,
-    swapTotal,
-    swapSuccess,
-    avgTimeMs,
-    auditorData: {
-      name: auditData.name,
-      state: auditData.state,
-      mints: auditData.n_mints,
-      melts: auditData.n_melts,
-      errors: auditData.n_errors,
-    },
-  };
-};
 
 const CONCURRENT_LIMIT = 5;
 
@@ -125,7 +70,7 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
         urlsToFetch.push({ normalized, original: url });
       }
     });
-    log.debug('mint.audit.batch.init', {
+    cashuLog.debug('mint.audit.batch.init', {
       total: mintUrls.length,
       cacheHits,
       toFetch: urlsToFetch.length,
@@ -184,7 +129,7 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
           setCached(normalized, auditResult.value, mintInfo);
         }
 
-        log.debug('mint.audit.fetch.success', {
+        cashuLog.debug('mint.audit.fetch.success', {
           mintUrl: normalized,
           hasAudit: !!auditInfo,
           hasMintInfo: !!mintInfo,
@@ -198,7 +143,7 @@ export const useAuditedMints = (mintUrls: string[]): UseAuditedMintsResult => {
         }
       } catch {
         if (controller.signal.aborted) return;
-        log.warn('mint.audit.fetch.error', { mintUrl: normalized });
+        cashuLog.warn('mint.audit.fetch.error', { mintUrl: normalized });
         if (mountedRef.current) {
           setData((prev) => ({
             ...prev,

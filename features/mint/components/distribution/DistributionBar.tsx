@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { TOTAL_BASIS_POINTS } from '@/shared/stores/profile/mintDistributionStore';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { getContrastColors, FALLBACK_COLORS, useDominantColor } from './colorUtils';
+import { getContrastColors, FALLBACK_COLORS, useDominantColor } from '@/shared/lib/colorExtraction';
 import { Log } from '@/shared/lib/logger';
 
 const MIN_PERCENTAGE_FOR_AVATAR = 12;
