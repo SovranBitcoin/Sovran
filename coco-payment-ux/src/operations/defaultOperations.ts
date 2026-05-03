@@ -585,7 +585,6 @@ export function createDefaultOperations(
         mgr.mint.isTrustedMint(mintUrl),
       ]);
 
-      const info: any = mintInfo ?? {};
       const preferredMintUrl = config.getPreferredMintUrl?.();
       const enrichment = config.enrichMintReviewInfo?.(mintUrl) ?? {};
 
@@ -602,13 +601,13 @@ export function createDefaultOperations(
 
       const result: MintReviewInfo = {
         mintUrl,
-        displayName: info.name ?? item?.displayName ?? mintUrl,
-        iconUrl: info.icon_url ?? item?.iconUrl,
-        description: info.description ?? undefined,
-        longDescription: info.description_long ?? undefined,
-        motd: info.motd ?? undefined,
-        contact: info.contact ?? undefined,
-        nuts: info.nuts ? Object.keys(info.nuts).map(Number) : undefined,
+        displayName: mintInfo?.name ?? item?.displayName ?? mintUrl,
+        iconUrl: mintInfo?.icon_url ?? item?.iconUrl,
+        description: mintInfo?.description,
+        longDescription: mintInfo?.description_long,
+        motd: mintInfo?.motd,
+        contact: mintInfo?.contact,
+        nuts: mintInfo?.nuts ? Object.keys(mintInfo.nuts).map(Number) : undefined,
         balance: balancesByMint[mintUrl]?.total ?? item?.balance ?? 0,
         unit: item?.unit ?? 'sat',
         isPreferred: item?.isPreferred ?? mintUrl === preferredMintUrl,

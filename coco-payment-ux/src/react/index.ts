@@ -7,8 +7,6 @@ export {
   CocoPaymentUXProvider,
   useCocoPaymentUXContext,
   usePaymentFlowMachine,
-  usePaymentFlowMint,
-  usePaymentFlowMintContext,
   type CocoPaymentUXContextValue,
   type CocoPaymentUXProviderProps,
   type DeepLinkConfig,

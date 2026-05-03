@@ -212,6 +212,8 @@ export interface MintReviewInfo {
   isPreferred: boolean;
   isTrusted: boolean;
   kymScore?: number;
+  /** Number of community reviews behind `kymScore`. */
+  reviewCount?: number;
   auditScore?: number;
   auditState?: string;
   successRate?: number;
@@ -220,6 +222,10 @@ export interface MintReviewInfo {
   swapTotal?: number;
   totalMints?: number;
   totalMelts?: number;
+  /** Follower count of the mint operator's Nostr identity (NUT-06 contact). */
+  contactFollowers?: number;
+  /** Reputation score (0-100) of the mint operator's Nostr identity. */
+  contactReputation?: number;
 }
 
 export type MintSelectionResult =

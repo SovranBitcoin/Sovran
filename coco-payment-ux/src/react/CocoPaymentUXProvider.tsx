@@ -10,22 +10,13 @@
 //   - actions: post-terminal screen action handlers for useScreenActions
 // ---------------------------------------------------------------------------
 
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useSyncExternalStore,
-} from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef } from 'react';
 
 import { useLatestRef } from './useLatestRef';
 import { registerLocale } from '../formatting/locales';
 import { errField, logger } from '../logger';
 import { createPaymentMachine } from '../machine/createMachine';
-import { selectMintContext } from '../machine/selectMintContext';
 import type {
-  FlowContext,
   MachineOperations,
   NfcIOAdapter,
   NotificationHandlerMap,
@@ -34,7 +25,6 @@ import type {
   StepHandlerMap,
   URDecoderLike,
 } from '../machine/types';
-import type { MintResolutionContext } from '../machine/selectMintContext';
 import type { ScreenActionHandlerMap, ScreenType } from '../screen-actions/types';
 import type { NavigationCallbacks } from '../screen-actions/defaultHandlers';
 import type { Detectors, WalletContext } from '../types';
@@ -459,31 +449,4 @@ export function usePaymentFlowMachine({
   }, [ctx, onOptionDismiss]);
 
   return ctx.machine;
-}
-
-/**
- * Returns the mint URL currently tracked by the active payment flow.
- */
-export function usePaymentFlowMint(): string | undefined {
-  const ctx = usePaymentFlowContext();
-  const flowCtx = useSyncExternalStore(
-    ctx.machine.subscribe,
-    ctx.machine.getContext,
-    ctx.machine.getContext
-  ) as FlowContext;
-  return flowCtx.mintUrl;
-}
-
-/**
- * Returns the full mint resolution context for the current flow.
- */
-export function usePaymentFlowMintContext({
-  walletContext,
-  unit = 'sat',
-  onOptionDismiss,
-}: UsePaymentFlowMachineConfig): MintResolutionContext | null {
-  const machine = usePaymentFlowMachine({ walletContext, unit, onOptionDismiss });
-  const flowCtx = useSyncExternalStore(machine.subscribe, machine.getContext, machine.getContext);
-
-  return useMemo(() => selectMintContext(flowCtx, walletContext), [flowCtx, walletContext]);
 }

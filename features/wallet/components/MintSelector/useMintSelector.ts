@@ -22,7 +22,7 @@ export interface MintSelectorProps {
   onMintSelected: (mintUrl: string) => void;
   /** Called when user taps to open the full mint list. */
   onRequestMintList: () => void;
-  /** Availability info from MintResolutionContext.trustedMints. Filters the dropdown. */
+  /** Availability info per trusted mint. Filters the dropdown. */
   trustedMints?: MintAvailability[];
   /** Unit for balance display. Default: 'sat'. */
   unit?: string;

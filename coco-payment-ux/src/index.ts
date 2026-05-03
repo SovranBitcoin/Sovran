@@ -23,7 +23,6 @@ export { setLogger, type Logger } from './logger';
 // Machine (state machine core)
 export { createPaymentMachine } from './machine/createMachine';
 export { resolveNext } from './machine/resolveNext';
-export { selectMintContext, buildMintAvailability } from './machine/selectMintContext';
 
 // Pipeline utilities (usable standalone)
 export { parsePaymentInput, isBip321 } from './parse';
@@ -74,12 +73,7 @@ export type {
   NfcIOAdapter,
 } from './machine/types';
 
-export type {
-  MintAvailability,
-  MintAvailabilityStatus,
-  MintAvailabilityReason,
-  MintResolutionContext,
-} from './machine/selectMintContext';
+export type { MintAvailability } from './machine/selectMintContext';
 
 // Amount actions (amount screen action system)
 export {

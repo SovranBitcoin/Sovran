@@ -17,7 +17,12 @@ import { URDecoder } from '@gandlaf21/bc-ur';
 
 import { useManager } from '@cashu/coco-react';
 
-import type { MachineOperations, MeltOperationLike, NavigationCallbacks } from 'coco-payment-ux';
+import type {
+  MachineOperations,
+  MeltOperationLike,
+  MintReviewInfo,
+  NavigationCallbacks,
+} from 'coco-payment-ux';
 import {
   createCocoPaymentUX,
   meltOperationToScreenActionEntry,
@@ -71,12 +76,12 @@ type EntryRecord = Record<string, unknown>;
  * into a mint's detail view. The Select-Mint list path goes through
  * `getMintCatalog` instead and never calls this.
  */
-function getMintEnrichment(mintUrl: string): EntryRecord {
+function getMintEnrichment(mintUrl: string): Partial<MintReviewInfo> {
   const normalized = normalizeMintUrlKey(mintUrl);
   const audit = useAuditMintStore.getState().getCached(normalized);
   const kym = useKYMMintStore.getState().getCached(normalized);
 
-  const enrichment: EntryRecord = {};
+  const enrichment: Partial<MintReviewInfo> = {};
   if (kym) {
     enrichment.kymScore = kym.score;
     enrichment.reviewCount = kym.recommendations?.length;
@@ -180,7 +185,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
           getMintCatalog(mintUrls, (url) => manager.mint.getMintInfo(url)),
         // Trust-review screen still pulls per-mint detail (swap-by-swap timing)
         // from the local audit / KYM caches populated by `useAuditedMint`.
-        enrichMintReviewInfo: (url) => getMintEnrichment(url) as any,
+        enrichMintReviewInfo: getMintEnrichment,
         shouldMockFailPaymentRequest: () => useSettingsStore.getState().mockFailPaymentRequest,
         logger: paymentLog,
       }),
@@ -440,8 +445,8 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
                     _mintItemAdded: true,
                     _newMintItem: {
                       mintUrl,
-                      displayName: (info as any)?.name ?? mintUrl,
-                      iconUrl: (info as any)?.icon_url ?? undefined,
+                      displayName: info?.name ?? mintUrl,
+                      iconUrl: info?.icon_url,
                       balance: balances[mintUrl]?.total ?? 0,
                       unit: 'sat',
                       status: 'available',
@@ -511,15 +516,14 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
                   manager.mint.getMintInfo(mintUrl).catch(() => undefined),
                   manager.mint.isTrustedMint(mintUrl).catch(() => false),
                 ]);
-                const info: any = mintInfo ?? {};
                 cb({
                   _mintInfoFetched: true,
-                  displayName: info.name ?? mintUrl,
-                  iconUrl: info.icon_url,
-                  description: info.description,
-                  longDescription: info.description_long,
-                  motd: info.motd,
-                  contact: info.contact,
+                  displayName: mintInfo?.name ?? mintUrl,
+                  iconUrl: mintInfo?.icon_url,
+                  description: mintInfo?.description,
+                  longDescription: mintInfo?.description_long,
+                  motd: mintInfo?.motd,
+                  contact: mintInfo?.contact,
                   isTrusted,
                 } as EntryRecord);
               } catch (e) {
