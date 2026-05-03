@@ -1,13 +1,13 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { redactError, storeLog } from '@/shared/lib/logger';
+import { storeLog } from '@/shared/lib/logger';
 
 import type { AuditMintResponse } from '@/shared/lib/apiClient';
 import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 interface CachedMintData {
   auditData: AuditMintResponse;
@@ -98,19 +98,13 @@ export const useAuditMintStore = create<AuditMintStore>()(
         return ageMinutes > maxAgeMinutes;
       },
     }),
-    {
+    persistConfig({
       name: 'audit-mint-store',
-      storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      storage: AsyncStorage,
+      schema: PersistedAuditMintStore,
+      logKey: 'audit_mint',
       // Only persist the cache data
       partialize: (state) => ({ cache: state.cache }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('audit_mint', PersistedAuditMintStore),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          storeLog.warn('store.audit_mint.rehydrate_failed', { error: redactError(error) });
-        }
-      },
-    }
+    })
   )
 );

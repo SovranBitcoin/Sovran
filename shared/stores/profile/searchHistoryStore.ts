@@ -1,9 +1,9 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 /** Maximum number of recent searches to store */
 const MAX_RECENT_SEARCHES = 10;
@@ -90,13 +90,11 @@ export const useSearchHistoryStore = create<SearchHistoryState>()(
         return state.recentSearches[context] || [];
       },
     }),
-    {
+    persistConfig({
       name: 'search-history-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
-      version: 1,
+      storage: createProfileScopedStorage(),
+      schema: PersistedSearchHistoryStore,
       partialize: (state) => ({ recentSearches: state.recentSearches }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('search_history', PersistedSearchHistoryStore),
-    }
+    })
   )
 );

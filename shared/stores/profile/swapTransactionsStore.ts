@@ -12,11 +12,11 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { redactError, storeLog } from '@/shared/lib/logger';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 export type SwapGroupState = 'running' | 'finished' | 'cancelled';
 
@@ -313,21 +313,15 @@ export const useSwapTransactionsStore = create<SwapTransactionsStore>()(
 
       getIndex: () => get().quoteIdToGroup,
     }),
-    {
+    persistConfig({
       name: 'swap-transactions-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
-      version: 1,
+      storage: createProfileScopedStorage(),
+      schema: PersistedSwapStore,
+      logKey: 'swap_tx',
       partialize: (state) => ({
         groups: state.groups,
         quoteIdToGroup: state.quoteIdToGroup,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('swap_tx', PersistedSwapStore),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          storeLog.warn('store.swap_tx.rehydrate_failed', { error: redactError(error) });
-        }
-      },
-    }
+    })
   )
 );

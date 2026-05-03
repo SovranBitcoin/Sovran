@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { storeLog } from '@/shared/lib/logger';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 interface CachedMintProfile {
   followers: number;
@@ -67,13 +67,12 @@ export const useMintProfileStore = create<MintProfileStore>()(
         return (Date.now() - cached.timestamp) / (1000 * 60) > maxAgeMinutes;
       },
     }),
-    {
+    persistConfig({
       name: 'mint-profile-store',
-      storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      storage: AsyncStorage,
+      schema: PersistedMintProfileStore,
+      logKey: 'mint_profile',
       partialize: (state) => ({ cache: state.cache }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('mint_profile', PersistedMintProfileStore),
-    }
+    })
   )
 );

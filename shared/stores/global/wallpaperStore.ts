@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { redactError, storeLog } from '@/shared/lib/logger';
@@ -29,7 +29,7 @@ import {
   type WallpaperCatalogEntry as SchemaWallpaperEntry,
   type AlbumMeta as SchemaAlbumMeta,
 } from '@sovranbitcoin/schemas';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -303,10 +303,10 @@ export const useWallpaperStore = create<WallpaperState>()(
         await cleanupOrphanedFiles(trackedNames);
       },
     }),
-    {
+    persistConfig({
       name: 'wallpaper-store',
-      storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      storage: AsyncStorage,
+      schema: PersistedWallpaperStore,
       partialize: (state) => ({
         catalog: state.catalog,
         albums: state.albums,
@@ -314,17 +314,8 @@ export const useWallpaperStore = create<WallpaperState>()(
         downloaded: state.downloaded,
         // _hasHydrated and activeDownloads are excluded (transient)
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('wallpaper', PersistedWallpaperStore),
-      onRehydrateStorage: () => (state, error) => {
-        if (error) {
-          storeLog.warn('wallpaper.store.rehydrate_failed', { error: redactError(error) });
-          useWallpaperStore.setState({ _hasHydrated: true });
-          return;
-        }
-
-        if (state?.downloaded) {
-          // Re-register all downloaded themes into the theme engine
+      afterHydrate: (state, error) => {
+        if (!error && state?.downloaded) {
           for (const [themeName, wallpaper] of Object.entries(state.downloaded)) {
             registerDownloadedTheme({
               themeName,
@@ -335,14 +326,13 @@ export const useWallpaperStore = create<WallpaperState>()(
               gradientColors: wallpaper.gradientColors,
             });
           }
-          storeLog.info('wallpaper.store.rehydrated', {
+          storeLog.info('store.wallpaper.rehydrated', {
             downloaded: Object.keys(state.downloaded).length,
             catalog: state.catalog?.length ?? 0,
           });
         }
-
         useWallpaperStore.setState({ _hasHydrated: true });
       },
-    }
+    })
   )
 );

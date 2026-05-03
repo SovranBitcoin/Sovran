@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { isBackgroundImageTheme } from 'config/backgroundImageThemes';
-import { redactError, storeLog } from '@/shared/lib/logger';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 interface TermsAccepted {
   termsAccepted: boolean;
@@ -331,10 +331,10 @@ export const useSettingsStore = create<SettingsStore>()(
       },
       getMiddlemanRouting: () => get().middlemanRouting,
     }),
-    {
+    persistConfig({
       name: 'settings-store',
-      storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      storage: AsyncStorage,
+      schema: PersistedSettings,
       partialize: (state) => ({
         language: state.language,
         displayBtc: state.displayBtc,
@@ -354,13 +354,8 @@ export const useSettingsStore = create<SettingsStore>()(
         minTransferThreshold: state.minTransferThreshold,
         middlemanRouting: state.middlemanRouting,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('settings', PersistedSettings),
-      onRehydrateStorage: () => (state, error) => {
-        if (error) {
-          storeLog.warn('store.settings.rehydrate_failed', { error: redactError(error) });
-          return;
-        }
+      afterHydrate: (state, error) => {
+        if (error) return;
         if (state?.mockMode) {
           const { useMockDataStore } = require('../runtime/mockDataStore') as {
             useMockDataStore: { getState: () => { activate: () => void } };
@@ -368,7 +363,7 @@ export const useSettingsStore = create<SettingsStore>()(
           useMockDataStore.getState().activate();
         }
       },
-    }
+    })
   )
 );
 

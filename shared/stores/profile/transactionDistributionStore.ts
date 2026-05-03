@@ -38,11 +38,11 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { redactError, storeLog } from '@/shared/lib/logger';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 /**
  * Possible outbound-distribution sources for a transaction. These are
@@ -125,20 +125,14 @@ export const useTransactionDistributionStore = create<TransactionDistributionSto
         return get().distributions[key] ?? null;
       },
     }),
-    {
+    persistConfig({
       name: 'transaction-distribution-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
-      version: 1,
+      storage: createProfileScopedStorage(),
+      schema: PersistedTransactionDistributionStore,
+      logKey: 'tx_distribution',
       partialize: (state) => ({
         distributions: state.distributions,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('tx_distribution', PersistedTransactionDistributionStore),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          storeLog.warn('store.tx_distribution.rehydrate_failed', { error: redactError(error) });
-        }
-      },
-    }
+    })
   )
 );

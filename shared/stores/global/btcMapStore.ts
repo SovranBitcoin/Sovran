@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { redactError, storeLog } from '@/shared/lib/logger';
@@ -11,7 +11,7 @@ import {
   parseWith,
 } from '@sovranbitcoin/schemas';
 import { fetchJson, type RequestControls } from '@/shared/lib/apiClient';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 // Upstream BTCMap exposes colon-keyed `osm:*` properties under the schema's
 // `passthrough()` envelope; surface the ones the detail screen actually
@@ -259,21 +259,15 @@ export const useBTCMapStore = create<BTCMapStore>()(
         set({ error });
       },
     }),
-    {
+    persistConfig({
       name: 'btcmap-store',
-      storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      storage: AsyncStorage,
+      schema: PersistedBtcMapStore,
+      logKey: 'btc_map',
       partialize: (state) => ({
         placesCache: state.placesCache,
         placeDetailsCache: state.placeDetailsCache,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('btc_map', PersistedBtcMapStore),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          storeLog.warn('store.btc_map.rehydrate_failed', { error: redactError(error) });
-        }
-      },
-    }
+    })
   )
 );

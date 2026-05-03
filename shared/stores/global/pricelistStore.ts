@@ -1,9 +1,9 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { redactError, storeLog } from '@/shared/lib/logger';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 interface PricelistData {
   usd: {
@@ -136,22 +136,15 @@ export const usePricelistStore = create<PricelistStore>()(
         return (Date.now() - lastUpdated) / (1000 * 60) > maxAgeMinutes;
       },
     }),
-    {
+    persistConfig({
       name: 'pricelist-store',
-      storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      storage: AsyncStorage,
+      schema: PersistedPricelistStore,
       partialize: (state) => ({
         pricelist: state.pricelist,
         lastUpdated: state.lastUpdated,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('pricelist', PersistedPricelistStore),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          storeLog.warn('store.pricelist.rehydrate_failed', { error: redactError(error) });
-        }
-      },
-    }
+    })
   )
 );
 

@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 export type RestoreStatus =
   | 'unknown'
@@ -58,18 +58,17 @@ export const useWalletLifecycleStore = create<WalletLifecycleState>()(
       markRestoreComplete: () =>
         set({ restoreStatus: 'complete', lastRestoreAt: Date.now(), lastRestoreError: null }),
     }),
-    {
+    persistConfig({
       name: 'wallet-lifecycle',
-      storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      storage: AsyncStorage,
+      schema: PersistedWalletLifecycleStore,
+      logKey: 'wallet_lifecycle',
       partialize: (s) => ({
         seedCreatedAt: s.seedCreatedAt,
         restoreStatus: s.restoreStatus,
         lastRestoreAt: s.lastRestoreAt,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('wallet_lifecycle', PersistedWalletLifecycleStore),
-    }
+    })
   )
 );
 

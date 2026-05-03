@@ -21,11 +21,11 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { redactError, storeLog } from '@/shared/lib/logger';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -462,21 +462,15 @@ export const useSplitBillTransactionsStore = create<SplitBillStore>()(
         return groups.sort((a, b) => b.createdAt - a.createdAt);
       },
     }),
-    {
+    persistConfig({
       name: 'split-bill-transactions-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
-      version: 1,
+      storage: createProfileScopedStorage(),
+      schema: PersistedSplitBillStore,
+      logKey: 'split_bill',
       partialize: (state) => ({
         groups: state.groups,
         quoteIdToSplitBill: state.quoteIdToSplitBill,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('split_bill', PersistedSplitBillStore),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          storeLog.warn('store.split_bill.rehydrate_failed', { error: redactError(error) });
-        }
-      },
-    }
+    })
   )
 );

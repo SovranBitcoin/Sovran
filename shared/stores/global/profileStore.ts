@@ -10,11 +10,11 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { storeLog } from '@/shared/lib/logger';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 export interface ProfileEntry {
   /**
@@ -219,17 +219,15 @@ export const useProfileStore = create<ProfileStore>()(
         return profiles.find((p) => p.accountIndex === activeAccountIndex);
       },
     }),
-    {
+    persistConfig({
       name: 'profile-store',
-      storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      storage: AsyncStorage,
+      schema: PersistedProfileStore,
       partialize: (state) => ({
         activeAccountIndex: state.activeAccountIndex,
         profiles: state.profiles,
         cocoMigrationComplete: state.cocoMigrationComplete,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('profile', PersistedProfileStore),
-    }
+    })
   )
 );

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { NPCClient, JWTAuthProvider } from 'npubcash-sdk';
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from 'nostr-tools';
 import { z } from 'zod';
@@ -7,7 +7,7 @@ import { redactError, storeLog } from '@/shared/lib/logger';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 const NPC_BASE_URL = 'https://npubx.cash';
 const NPC_DEFAULT_MINT_URL = 'https://mint.minibits.cash/Bitcoin';
@@ -148,16 +148,15 @@ export const useNpcMintStore = create<NpcMintStore>()(
         }
       },
     }),
-    {
+    persistConfig({
       name: 'npc-mint-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
-      version: 1,
+      storage: createProfileScopedStorage(),
+      schema: PersistedNpcMintStore,
+      logKey: 'npc_mint',
       partialize: (state) => ({
         mintUrls: state.mintUrls,
         lastSyncedAt: state.lastSyncedAt,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('npc_mint', PersistedNpcMintStore),
-    }
+    })
   )
 );

@@ -18,8 +18,8 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { redactError, storeLog } from '@/shared/lib/logger';
+import { persist } from 'zustand/middleware';
+import { storeLog } from '@/shared/lib/logger';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
@@ -28,7 +28,7 @@ import {
   BUILTIN_COLOR_THEME_NAMES,
 } from '@/shared/lib/theme/builtinAlbums';
 import { PersistedThemeStore, type ThemeMode } from '@sovranbitcoin/schemas';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -168,21 +168,16 @@ export const useThemeStore = create<ThemeStore>()(
         return FALLBACK_THEME;
       },
     }),
-    {
+    persistConfig({
       name: 'theme-store',
-      storage: createJSONStorage(() => profileStorage),
-      version: 1,
+      storage: profileStorage,
+      schema: PersistedThemeStore,
       partialize: (state) => ({
         activeAlbumSlug: state.activeAlbumSlug,
         unitWallpapers: state.unitWallpapers,
         mode: state.mode,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('theme', PersistedThemeStore),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) storeLog.warn('store.theme.rehydrate_failed', { error: redactError(error) });
-        useThemeStore.setState({ _hasHydrated: true });
-      },
-    }
+      afterHydrate: () => useThemeStore.setState({ _hasHydrated: true }),
+    })
   )
 );

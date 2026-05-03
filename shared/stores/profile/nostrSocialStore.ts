@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -422,10 +422,11 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         });
       },
     }),
-    {
+    persistConfig({
       name: 'nostr-social-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
-      version: 1,
+      storage: createProfileScopedStorage(),
+      schema: PersistedNostrSocialStore,
+      logKey: 'nostr_social',
       partialize: (state) => ({
         contactsTags: state.contactsTags,
         contactsContent: state.contactsContent,
@@ -438,9 +439,7 @@ export const useNostrSocialStore = create<NostrSocialStore>()(
         optimisticLikesByEventId: state.optimisticLikesByEventId,
         optimisticRepostsByEventId: state.optimisticRepostsByEventId,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('nostr_social', PersistedNostrSocialStore),
-    }
+    })
   )
 );
 

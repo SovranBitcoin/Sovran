@@ -12,11 +12,11 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 export interface NostrProfileMetadata {
   displayName?: string;
@@ -197,14 +197,13 @@ export const useNostrMetadataCache = create<NostrMetadataCacheState>()(
 
       clear: () => set({ byPubkey: {} }),
     }),
-    {
+    persistConfig({
       name: 'nostr-metadata-cache',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
-      version: 1,
+      storage: createProfileScopedStorage(),
+      schema: PersistedNostrMetadataCache,
+      logKey: 'nostr_metadata',
       partialize: (state) => ({ byPubkey: state.byPubkey }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('nostr_metadata', PersistedNostrMetadataCache),
-    }
+    })
   )
 );
 

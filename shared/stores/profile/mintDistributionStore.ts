@@ -1,9 +1,9 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { redactError, storeLog } from '@/shared/lib/logger';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 /**
  * @fileoverview Mint Distribution Store
@@ -505,21 +505,18 @@ export const useMintDistributionStore = create<MintDistributionStore>()(
         });
       },
     }),
-    {
+    persistConfig({
       name: 'mint-distribution-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
-      version: 1,
+      storage: createProfileScopedStorage(),
+      schema: PersistedMintDistributionStore,
+      logKey: 'mint_dist',
       partialize: (state) => ({ distributions: state.distributions }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('mint_dist', PersistedMintDistributionStore),
-      onRehydrateStorage: () => (state, error) => {
-        if (error) {
-          storeLog.warn('store.mint_dist.rehydrate_failed', { error: redactError(error) });
-        } else if (__DEV__) {
+      afterHydrate: (state, error) => {
+        if (!error && __DEV__) {
           storeLog.debug('store.mint_dist.rehydrated', { distributions: state?.distributions });
         }
       },
-    }
+    })
   )
 );
 

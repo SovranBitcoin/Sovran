@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { redactError, storeLog } from '@/shared/lib/logger';
+import { storeLog } from '@/shared/lib/logger';
 import { RoutstrModel } from '@/shared/lib/routstr/api';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 // Last-resort model id used by the legacy `UserMessagesScreen` flow when no
 // `selectedModel` has been set. The AI tab does NOT consume this — it
@@ -552,10 +552,10 @@ export const useRoutstrStore = create<RoutstrStore>()(
 
       getAnonymousMode: () => get().isAnonymousMode,
     }),
-    {
+    persistConfig({
       name: 'routstr-store',
-      storage: createJSONStorage(() => createProfileScopedStorage()),
-      version: 1,
+      storage: createProfileScopedStorage(),
+      schema: PersistedRoutstrStore,
       partialize: (state) => ({
         apiKey: state.apiKey,
         balance: state.balance,
@@ -565,13 +565,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
         sessions: state.sessions,
         currentSessionId: state.currentSessionId,
       }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('routstr', PersistedRoutstrStore),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          storeLog.warn('store.routstr.rehydrate_failed', { error: redactError(error) });
-        }
-      },
-    }
+    })
   )
 );

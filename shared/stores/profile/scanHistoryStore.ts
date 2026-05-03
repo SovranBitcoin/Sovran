@@ -11,11 +11,11 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { redactError, storeLog } from '@/shared/lib/logger';
-import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
+import { storeLog } from '@/shared/lib/logger';
+import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 const profileStorage = createProfileScopedStorage();
 
@@ -147,18 +147,11 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
         });
       },
     }),
-    {
+    persistConfig({
       name: 'scan-history-store',
-      storage: createJSONStorage(() => profileStorage),
-      version: 1,
+      storage: profileStorage,
+      schema: PersistedScanHistoryStore,
       partialize: (state) => ({ entries: state.entries }),
-      migrate: (state, _version) => state,
-      merge: createMergeWithSchema('scan_history', PersistedScanHistoryStore),
-      onRehydrateStorage: () => (_state, error) => {
-        if (error) {
-          storeLog.warn('store.scan_history.rehydrate_failed', { error: redactError(error) });
-        }
-      },
-    }
+    })
   )
 );
