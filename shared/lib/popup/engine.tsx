@@ -1,13 +1,11 @@
 import type { ReactNode } from 'react';
-import { log } from '../logger';
+import { popupLog } from '../logger';
 import { showToast, showSheet, type ToastConfig, type SheetConfig } from './bridge';
 import type { LiveSheetConfig } from './liveSheetTypes';
 import type { PopupIcon } from './icons';
 import type { PopupTextSegment } from './format';
 import { flattenSegments } from './format';
 import type { SheetCloseEvent } from '@/shared/stores/runtime/popupStore';
-
-const popupLog = log.child({ module: 'popup' });
 
 type PopupVariant = 'toast' | 'sheet';
 

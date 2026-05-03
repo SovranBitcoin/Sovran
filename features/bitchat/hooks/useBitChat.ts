@@ -24,9 +24,7 @@ import {
   type NostrPrivateMessageEvent,
 } from 'bitchat-module';
 import { useBitchatNickname } from './useBitchatNickname';
-import { log } from '@/shared/lib/logger';
-
-const bitchatLog = log.child({ module: 'bitchat' });
+import { bitchatLog } from '@/shared/lib/logger';
 
 /**
  * Public channel transports: `'ble'` = BLE mesh public chat,

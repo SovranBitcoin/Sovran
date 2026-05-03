@@ -10,9 +10,7 @@ import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { WhitenoiseDmIndex } from '../storage/dmIndex';
 import { WhitenoiseGroupHistory } from '../storage/groupHistory';
-import { log } from '@/shared/lib/logger';
-
-const wnLog = log.child({ module: 'whitenoise' });
+import { wnLog } from '@/shared/lib/logger';
 
 const KEY_PACKAGE_KIND = 443;
 const GROUP_EVENT_KIND = 445;

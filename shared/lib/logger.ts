@@ -914,6 +914,8 @@ export const storeLog = log.child({ module: 'store' });
 export const aiLog = log.child({ module: 'ai' });
 export const chatLog = log.child({ module: 'chat' });
 export const bitchatLog = log.child({ module: 'bitchat' });
+export const wnLog = log.child({ module: 'whitenoise' });
+export const popupLog = log.child({ module: 'popup' });
 
 /**
  * Narrow an unknown caught value to a stable `{ name, message }` shape suitable

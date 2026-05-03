@@ -26,11 +26,9 @@
 import React, { useEffect } from 'react';
 import { startBLE } from 'bitchat-module';
 import { useBitchatNickname } from '@/features/bitchat/hooks/useBitchatNickname';
-import { log, initLog, useInitMount } from '@/shared/lib/logger';
+import { bitchatLog, initLog, useInitMount } from '@/shared/lib/logger';
 
 initLog('Module', 'BitchatBLEProvider loaded');
-
-const bleLog = log.child({ module: 'bitchat' });
 
 /**
  * Invisible component. Mount inside `AccountScopedProviders` (not outer
@@ -50,14 +48,14 @@ export function BitchatBLEProvider({ children }: { children: React.ReactNode }) 
     // re-announce that happens when nickname changes post-start.
     if (!nickname) return;
 
-    bleLog.info('bitchat.provider.ble_start', { hasNickname: !!nickname });
+    bitchatLog.info('bitchat.provider.ble_start', { hasNickname: !!nickname });
     startBLE(nickname)
       .then(() => {
         if (cancelled) return;
-        bleLog.info('bitchat.provider.ble_started');
+        bitchatLog.info('bitchat.provider.ble_started');
       })
       .catch((err) => {
-        bleLog.error('bitchat.provider.ble_start_failed', {
+        bitchatLog.error('bitchat.provider.ble_start_failed', {
           error: err instanceof Error ? err.message : String(err),
         });
       });

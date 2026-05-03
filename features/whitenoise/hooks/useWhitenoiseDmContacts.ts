@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { WhitenoiseDmIndex, type WhitenoiseDmIndexEntry } from '../storage/dmIndex';
-import { log } from '@/shared/lib/logger';
-
-const wnLog = log.child({ module: 'whitenoise' });
+import { wnLog } from '@/shared/lib/logger';
 
 /**
  * Returns the list of counterparty pubkeys we've established a 1:1 White

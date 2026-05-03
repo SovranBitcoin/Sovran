@@ -3,13 +3,11 @@ import { useNDK } from '@nostr-dev-kit/ndk-mobile';
 import { InviteReader } from '@internet-privacy/marmot-ts';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { relays as defaultRelays } from '@/shared/ndk';
-import { log } from '@/shared/lib/logger';
+import { wnLog } from '@/shared/lib/logger';
 import { createWhitenoiseClient } from './client';
 import { createWhitenoiseInviteStore } from './storage/inviteStore';
 import { useWhitenoiseInbox } from './hooks/useWhitenoiseInbox';
 import { WhitenoiseContext, type WhitenoiseContextValue } from './WhitenoiseContext';
-
-const wnLog = log.child({ module: 'whitenoise' });
 
 export function WhitenoiseProvider({
   accountIndex,

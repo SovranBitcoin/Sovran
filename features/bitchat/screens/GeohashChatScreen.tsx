@@ -26,7 +26,7 @@ import Icon from 'assets/icons';
 
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { Screen, useLifecycleLogger, log } from '@/shared/lib/logger';
+import { Screen, useLifecycleLogger, bitchatLog } from '@/shared/lib/logger';
 import { useBitChat } from '../hooks/useBitChat';
 import { useBLEPeers } from '../hooks/useBLEPeers';
 import {
@@ -35,8 +35,6 @@ import {
   DmChatHeader,
   useMessageGrouping,
 } from '@/shared/ui/composed/chat';
-
-const bitchatLog = log.child({ module: 'bitchat' });
 import type { ChatMessage } from 'bitchat-module';
 
 // ===========================
@@ -225,7 +223,7 @@ export function GeohashChatScreen({
       bitchatLog.warn('chat.send.failed', {
         surface: `bitchat-${transport}`,
         duration_ms: Math.round((performance.now() - sendStart) * 100) / 100,
-        err,
+        error: err instanceof Error ? err.message : String(err),
       });
       throw err;
     } finally {

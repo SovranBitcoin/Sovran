@@ -1,8 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { log } from '@/shared/lib/logger';
+import { wnLog } from '@/shared/lib/logger';
 import { WhitenoiseNamespace, whitenoisePrefix } from './namespaces';
-
-const wnLog = log.child({ module: 'whitenoise' });
 
 /**
  * Wipe every AsyncStorage key Whitenoise wrote under the given account.

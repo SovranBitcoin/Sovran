@@ -1,9 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useWhitenoise } from '../WhitenoiseContext';
-import { log } from '@/shared/lib/logger';
-
-const wnLog = log.child({ module: 'whitenoise' });
+import { wnLog } from '@/shared/lib/logger';
 
 const GIFT_WRAP_KIND = 1059;
 

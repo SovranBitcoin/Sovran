@@ -2,9 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { MarmotClient } from '@internet-privacy/marmot-ts';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { log } from '@/shared/lib/logger';
-
-const wnLog = log.child({ module: 'whitenoise' });
+import { wnLog } from '@/shared/lib/logger';
 
 const TARGET_KEY_PACKAGE_COUNT = 2;
 

@@ -5,9 +5,7 @@ import type { UnreadInvite } from '@internet-privacy/marmot-ts';
 import { useWhitenoise } from '../WhitenoiseContext';
 import { WhitenoiseDmIndex } from '../storage/dmIndex';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
-import { log } from '@/shared/lib/logger';
-
-const wnLog = log.child({ module: 'whitenoise' });
+import { wnLog } from '@/shared/lib/logger';
 
 export type WhitenoiseRequest = {
   /** Rumor ID — stable across the lifetime of the unread entry. */
