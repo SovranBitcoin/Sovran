@@ -198,8 +198,8 @@
       ],
       "verification_note": "Re-read defaultOperations.ts:676-702,710-739. Confirmed no __DEV__ gate. Counter-argument considered: the wallet is responsible for only calling shouldMockFailPaymentRequest when appropriate \u2014 defensive-coding practice says the library should not honour a mock-failure request in production builds.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "__DEV__ gate around shouldMockFailPaymentRequest is independent of the trust-boundary slice."
+      "completion_status": "complete",
+      "completion_note": "Now gated by NODE_ENV \u2014 release builds ignore shouldMockFailPaymentRequest entirely."
     },
     {
       "id": "F-009",
@@ -283,8 +283,8 @@
       ],
       "verification_note": "Re-read CocoPaymentUXProvider.tsx:378-388. Confirmed no lowercasing of customSchemes/ignoredHosts. Counter-argument considered: maybe the package docs tell wallets to lowercase \u2014 README does not mention this invariant.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "CocoPaymentUXProvider deeplink scheme normalisation is a separate seam (provider, not parse)."
+      "completion_status": "complete",
+      "completion_note": "customSchemes is lowercased before set insertion in CocoPaymentUXProvider \u2014 case-mismatched schemes now resolve."
     },
     {
       "id": "F-013",
@@ -369,7 +369,9 @@
         "coco-payment-ux/src/screen-actions/createManager.ts:365-378"
       ],
       "verification_note": "Re-read defaultOperations.ts:502-542 \u2014 confirmed synthetic entry's metadata contains rawToken. Counter-argument considered: this field mirrors coco-core's own schema and is not a novel surface \u2014 correct, which is why this is Low not Medium.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Synthetic receive history fallback no longer carries rawToken in metadata."
     },
     {
       "id": "F-017",
@@ -389,7 +391,9 @@
         "https://github.com/lnurl/luds/blob/luds/04.md"
       ],
       "verification_note": "Re-read lnurl.ts:34-56. Confirmed onion branch returns http://. Counter-argument considered: platform DNS will error out \u2014 true today, but fragile as a security property.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": ".onion targets reject up-front with LNURL_TOR_REQUIRED so callers can show a Tor-specific message."
     },
     {
       "id": "F-018",

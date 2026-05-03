@@ -138,7 +138,9 @@
         "sovran-app/__audits__/01.json (F-002)"
       ],
       "verification_note": "Verified that apiClient.ts:259 still uses raw `${pubkey}` interpolation (from prior audit). The additional weakness here is the missing `typeof c.info === 'string'` check.",
-      "prior_audit_id": "F-002@01.json"
+      "prior_audit_id": "F-002@01.json",
+      "completion_status": "complete",
+      "completion_note": "extractNostrPubkey now requires 64-char hex; mints can no longer launder unrelated Nostr pubkeys into the operator-reputation surface."
     },
     {
       "id": "F-007",
