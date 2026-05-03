@@ -162,7 +162,7 @@ export function computeQuickSendSuggestions(
   // Append "Send all" as the last suggestion (always composable — uses all proofs)
   if (totalBalance > 0) {
     sorted.push({
-      label: `Send all ${satFormatter.format(totalBalance)}`,
+      label: `Send all ${satFormatter.format(totalBalance)} sats`,
       inputValue: String(totalBalance),
       inputMode: 'sat',
       satoshis: totalBalance,

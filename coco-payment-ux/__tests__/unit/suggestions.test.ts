@@ -144,4 +144,11 @@ describe('computeQuickSendSuggestions', () => {
       expect(composition.exactMatch).toBe(true);
     }
   });
+
+  it('"Send all" label includes the sat-mode "sats" suffix', () => {
+    const result = computeQuickSendSuggestions(DEFAULT_PROOFS, 100_000);
+    const sendAll = result.find((s) => s.sendAll);
+    expect(sendAll).toBeDefined();
+    expect(sendAll!.label.endsWith(' sats')).toBe(true);
+  });
 });
