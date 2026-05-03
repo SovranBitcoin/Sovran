@@ -9,8 +9,6 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { buildExpoRouterHeaderOptions } from '@/navigation/nativeTabs';
 
-export { HEADER_LAYOUT, MOCK_NFC_SUCCESS_SATS } from '@/features/wallet/lib/walletHeader';
-
 export default function HomeLayout() {
   const iconColor = useThemeColor('foreground');
   const navigation = useNavigation();

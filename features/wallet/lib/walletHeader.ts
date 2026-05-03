@@ -59,14 +59,3 @@ export function getContentWidthFromButtonWidth(
 export function getHeaderContentHeight(): number {
   return getHeaderTitleHeight() - HEADER_LAYOUT.CONTENT_PADDING_VERTICAL;
 }
-
-/** NFC payment limit tiers for the header action menu. */
-export const PAYMENT_TIERS = [
-  { label: 'Up to $10', usdLimit: 10, icon: 'cup.and.saucer.fill' },
-  { label: 'Up to $50', usdLimit: 50, icon: 'fork.knife' },
-  { label: 'Up to $100', usdLimit: 100, icon: 'cart.fill' },
-  { label: 'No limit', usdLimit: undefined, icon: 'exclamationmark.triangle.fill' },
-] as const;
-
-/** Mock amount (sats) shown in NFC success overlay when triggered from dev "Preview" button. */
-export const MOCK_NFC_SUCCESS_SATS = 21;

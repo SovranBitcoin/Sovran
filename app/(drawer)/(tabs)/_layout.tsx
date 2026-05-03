@@ -1,8 +1,8 @@
-import { router, Tabs, usePathname } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { BackgroundProvider } from '@/shared/providers/BackgroundProvider';
 import { DynamicColorIOS, Platform, StyleSheet, View } from 'react-native';
-import { useEffect } from 'react';
+import type { SFSymbol } from 'expo-symbols';
 import { IconSymbol } from '@/shared/ui/primitives/icon-symbol';
 import {
   GlobalLiquidGlassTabsOverlay,
@@ -15,20 +15,29 @@ export const unstable_settings = {
   initialRouteName: 'index',
 };
 
+type TabName = 'feed' | 'index' | 'contacts' | 'ai';
+
+type TabDef = {
+  name: TabName;
+  title: string;
+  /** SF Symbol pair for iOS native tabs. `default` doubles as the icon name on the fallback Tabs path. */
+  sf: { default: SFSymbol; selected: SFSymbol };
+};
+
+const TAB_DEFS: readonly TabDef[] = [
+  { name: 'feed', title: 'Feed', sf: { default: 'house', selected: 'house.fill' } },
+  { name: 'index', title: 'Wallet', sf: { default: 'wallet.bifold', selected: 'wallet.bifold' } },
+  { name: 'contacts', title: 'Contacts', sf: { default: 'person.2', selected: 'person.2.fill' } },
+  { name: 'ai', title: 'AI', sf: { default: 'brain', selected: 'brain' } },
+];
+
 // Fallback tab bar background for pre-liquid glass devices
 const TabBarBackground = () => (
   <BlurView tint="dark" intensity={75} style={[StyleSheet.absoluteFill, { borderRadius: 8 }]} />
 );
 
 export default function TabLayout() {
-  const pathname = usePathname();
   const hasAndroidLiquidGlass = Platform.OS === 'android' && isLiquidGlassTabBarAvailable();
-
-  useEffect(() => {
-    if (pathname === '/(drawer)/(tabs)' || pathname === '/(drawer)/(tabs)/') {
-      router.replace('/(drawer)/(tabs)/index');
-    }
-  }, [pathname]);
 
   // Use wrapped NativeTabs for iOS liquid-glass devices.
   if (isExpo55NativeTabsSupported()) {
@@ -51,34 +60,12 @@ export default function TabLayout() {
               }),
             })}
             disableTransparentOnScrollEdge>
-            <Expo55NativeTabs.Trigger name="feed">
-              <Expo55NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />
-              <Expo55NativeTabs.Trigger.Label>Feed</Expo55NativeTabs.Trigger.Label>
-            </Expo55NativeTabs.Trigger>
-
-            <Expo55NativeTabs.Trigger name="index">
-              <Expo55NativeTabs.Trigger.Icon
-                sf={{
-                  default: 'wallet.bifold',
-                  selected: 'wallet.bifold',
-                }}
-              />
-              <Expo55NativeTabs.Trigger.Label>Wallet</Expo55NativeTabs.Trigger.Label>
-            </Expo55NativeTabs.Trigger>
-
-            <Expo55NativeTabs.Trigger name="contacts">
-              <Expo55NativeTabs.Trigger.Icon
-                sf={{ default: 'person.2', selected: 'person.2.fill' }}
-              />
-              <Expo55NativeTabs.Trigger.Label>Contacts</Expo55NativeTabs.Trigger.Label>
-            </Expo55NativeTabs.Trigger>
-
-            <Expo55NativeTabs.Trigger name="ai">
-              <Expo55NativeTabs.Trigger.Icon
-                sf={{ default: 'brain', selected: 'brain' }}
-              />
-              <Expo55NativeTabs.Trigger.Label>AI</Expo55NativeTabs.Trigger.Label>
-            </Expo55NativeTabs.Trigger>
+            {TAB_DEFS.map((tab) => (
+              <Expo55NativeTabs.Trigger key={tab.name} name={tab.name}>
+                <Expo55NativeTabs.Trigger.Icon sf={tab.sf} />
+                <Expo55NativeTabs.Trigger.Label>{tab.title}</Expo55NativeTabs.Trigger.Label>
+              </Expo55NativeTabs.Trigger>
+            ))}
           </Expo55NativeTabs>
           <WhitenoiseSetupBanner />
         </View>
@@ -91,7 +78,6 @@ export default function TabLayout() {
     <BackgroundProvider>
       <View style={{ flex: 1 }}>
         <Tabs
-          initialRouteName="index"
           screenOptions={{
             headerShown: false,
             ...(!hasAndroidLiquidGlass && { tabBarBackground: () => <TabBarBackground /> }),
@@ -106,36 +92,18 @@ export default function TabLayout() {
             tabBarActiveTintColor: '#fff',
             tabBarInactiveTintColor: '#ECEDEE',
           }}>
-          <Tabs.Screen
-            name="feed"
-            options={{
-              title: 'Feed',
-              tabBarIcon: ({ color }) => <IconSymbol name="house" color={color} size={24} />,
-            }}
-          />
-          <Tabs.Screen
-            name="index"
-            options={{
-              title: 'Wallet',
-              tabBarIcon: ({ color }) => (
-                <IconSymbol name="wallet.bifold" color={color} size={24} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="contacts"
-            options={{
-              title: 'Contacts',
-              tabBarIcon: ({ color }) => <IconSymbol name="person.2" color={color} size={24} />,
-            }}
-          />
-          <Tabs.Screen
-            name="ai"
-            options={{
-              title: 'AI',
-              tabBarIcon: ({ color }) => <IconSymbol name="brain" color={color} size={24} />,
-            }}
-          />
+          {TAB_DEFS.map((tab) => (
+            <Tabs.Screen
+              key={tab.name}
+              name={tab.name}
+              options={{
+                title: tab.title,
+                tabBarIcon: ({ color }) => (
+                  <IconSymbol name={tab.sf.default} color={color} size={24} />
+                ),
+              }}
+            />
+          ))}
         </Tabs>
         {hasAndroidLiquidGlass ? <GlobalLiquidGlassTabsOverlay /> : null}
         <WhitenoiseSetupBanner />
