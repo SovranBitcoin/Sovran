@@ -115,7 +115,7 @@
       "verification_note": "Re-read lines 509–543. The comment at line 513 is candid about the private-API reach. Counter-argument considered: coco is sovran-upstream and changes are coordinated, so silent drift is unlikely. Rejected — the whole point of the `as unknown as` cast is to defeat type-checking, which means a future refactor won't catch the break at compile time. Flagged High because the failure mode is silent and the cleanup is load-bearing for recovery.",
       "prior_audit_id": null,
       "completion_status": "complete",
-      "completion_note": "Routed through coco-payment-ux/src/api/managerInternals.ts deleteMintOperation(); the inline `as unknown as { mintOperationRepository?: ... }` cast is gone. Cluster: typed coco-manager seam."
+      "completion_note": "Routed through deleteMintOperation() in the typed coco-manager seam; the inline `as unknown as { mintOperationRepository?: ... }` cast is gone. Slice b17f8dcd then hoisted the seam from coco-payment-ux/src/api/managerInternals.ts into sovran-app's shared/lib/cashu/managerInternals.ts so the cast-into-private-coco lives where its sovran-only callers live. Cluster: typed coco-manager seam."
     },
     {
       "id": "F-004",

@@ -242,7 +242,7 @@
       "verification_note": "Phase B: re-ran `bun run type-check` and confirmed all eight private-access errors at the cited lines. The errors localize to the orchestrator inside the audit's blast radius; outside-blast-radius TS errors (33 total project-wide) were noted in audit.tooling_run.type_check but not filed.",
       "prior_audit_id": null,
       "completion_status": "complete",
-      "completion_note": "All 8 TS2341 errors fixed. Routed through coco-payment-ux/src/api/managerInternals.ts getReadyProofs/getWallet helpers (40 → 32 baseline tsc errors). Cluster: typed coco-manager seam."
+      "completion_note": "All 8 TS2341 errors fixed. Routed through getReadyProofs/getWallet helpers in the typed coco-manager seam (40 → 32 baseline tsc errors). Slice b17f8dcd then hoisted the seam from coco-payment-ux/src/api/managerInternals.ts into sovran-app's shared/lib/cashu/managerInternals.ts so the cast-into-private-coco lives where its sovran-only callers live; the package's walletContextTracker keeps a 4-line private inline helper for its one internal use. Cluster: typed coco-manager seam."
     },
     {
       "id": "F-009",
