@@ -136,7 +136,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Confirmed: grepped MintOperation.ts for `expiresAt` (no match) and `expiry` (line 44, MintQuoteSnapshot). Grepped sovran-app for any consumer of `participant.expiresAt` — zero matches. Field is dead on both ends.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Re-read useSplitBillOrchestrator.ts 2026-05-03 — the `(mintOp as any)?.expiresAt` access is gone; `mintOp` is destructured as `{ quoteId, request }` with no expiry fallback chain. Sister fix in commit 27ea51ec spread to splitBill before this slice."
     },
     {
       "id": "F-004",
@@ -157,7 +159,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Re-checked at line 321; confirmed coco type at MintOperation.ts:42 (MintQuoteSnapshot.quoteId) and :21 (MintOperationBase.id). Counter-argument: 'the chain is purely defensive, the first slot always wins' — granted, today; but the cost of a defensive cast is the type system can no longer prevent the failure mode it's defending against.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Fallback chain `(mintOp as any)?.quoteId ?? ?.quote ?? ?.id` is gone; the orchestrator now destructures `quoteId` directly from a typed mintOp."
     },
     {
       "id": "F-005",
@@ -176,7 +180,9 @@
         "ts:TS2551"
       ],
       "verification_note": "Reproduced via `npm run type-check` — exact error quoted in tooling output. Counter-argument: 'maybe the API does return snake_case at runtime, the type is just incomplete' — possible, but if so the fix is to widen the type, not to read a property TS says doesn't exist.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "TS2551 still reproduces in 2026-05-03 baseline at useSplitBillParticipantPicker.ts:460. Out of scope for the popup slice."
     },
     {
       "id": "F-006",
@@ -236,8 +242,8 @@
       ],
       "verification_note": "Re-checked all three sites; confirmed all three are reading documented coco fields (quoteId, request, expiry, history.getPaginatedHistory) that real types exist for upstream. The casts are removing type safety, not earning their keep.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Same coco-typed-payload-laundering pattern, but in features/splitBill — out of scope for this slice. Sister-pattern fixed in shared/hooks/usePaymentStatusListener.ts and coco-payment-ux/src/operations/defaultOperations.ts (commit 27ea51ec)."
+      "completion_status": "stale",
+      "completion_note": "Re-greped 2026-05-03 across sovran-app: zero matches for `(manager as any)`, `(operation as any)`, `(mintOp as any)`, `(h as any).quoteId`. The three cited cast sites in features/splitBill are gone; the sister-pattern fix from commit 27ea51ec spread to splitBill before this slice."
     },
     {
       "id": "F-009",

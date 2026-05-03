@@ -141,7 +141,9 @@
         "skill:typescript-advanced-types"
       ],
       "verification_note": "Ran `npm run type-check 2>&1 | grep theme` — 5 errors confirmed verbatim at the cited line numbers. Counter-argument considered: the failures could be at non-stable feature boundaries (third-party type drift). Checked: Image is OUR primitive, not a third-party type; the AppProps interface is hand-written 7 lines above the file's main function.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "All five TS errors still in 2026-05-03 baseline (UnitPreviewCard.tsx:74, WallpaperThumbnail.tsx:58/72, GalleryScreen.tsx:130, downloadedThemeRegistry.ts:17-18). Out of scope for the popup slice."
     },
     {
       "id": "F-004",
@@ -219,7 +221,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Compared the two implementations: themeDraft.equalRecords (line 102-107) and ThemePreviewScreen.shallowEqual (line 29-37) are byte-for-byte identical except for the function name and parameter naming. The downstream comparison at line 85-88 of the screen uses the same trio (activeAlbumSlug, mode, unitWallpapers) that the action's body does at line 168-172.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Re-read ThemePreviewScreen.tsx 2026-05-03: the screen now reads `const isDirty = useThemeDraft((s) => s.isDirty());` (line 99) and there is no local `shallowEqual` helper or inline-derivation block. Closed in an earlier commit, not this slice."
     },
     {
       "id": "F-008",
