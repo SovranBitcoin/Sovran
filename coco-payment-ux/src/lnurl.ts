@@ -31,6 +31,7 @@ import {
   type LnurlPayParams,
 } from '@sovranbitcoin/schemas';
 
+import { errField, logger } from './logger';
 import { isAbortError, safeFetch, type RequestControls } from './safeFetch';
 
 const LN_ADDRESS_REGEX =
@@ -160,20 +161,21 @@ export async function getLnurlPayParams(
     if (isAbortError(e)) {
       throw new LnurlError('LNURL_TIMEOUT', `LNURL pay-params timed out for ${meltTarget}`);
     }
-    console.warn('[LNURL] Failed to fetch pay-params:', e instanceof Error ? e.message : e);
+    logger.warn('lnurl.payParams.fetchFailed', { error: errField(e) });
     return null;
   }
 
   if (!response.ok) {
-    console.warn('[LNURL] HTTP error fetching pay params:', response.status, response.statusText);
+    logger.warn('lnurl.payParams.httpError', {
+      status: response.status,
+      statusText: response.statusText,
+    });
     return null;
   }
   const raw = await response.json();
   const parsed = parsePayParams(raw);
   if (parsed.isErr()) {
-    console.warn('[LNURL] Invalid pay params shape', {
-      issues: loggableIssues(parsed.error),
-    });
+    logger.warn('lnurl.payParams.invalidShape', { issues: loggableIssues(parsed.error) });
     return null;
   }
   return parsed.value;
@@ -230,7 +232,7 @@ export async function requestInvoiceFromLnurl(
   const raw = await response.json();
   const parsed = parseInvoiceCallback(raw);
   if (parsed.isErr()) {
-    console.warn('[LNURL] Invalid invoice callback shape', {
+    logger.warn('lnurl.invoiceCallback.invalidShape', {
       callback: callbackUrl.host,
       issues: loggableIssues(parsed.error),
     });
@@ -243,7 +245,7 @@ export async function requestInvoiceFromLnurl(
   const invoice = parsed.value.pr;
   const decodedMsats = decodedInvoiceMsats(invoice);
   if (decodedMsats !== amountMsats) {
-    console.warn('[LNURL] Invoice amount mismatch', {
+    logger.warn('lnurl.invoice.amountMismatch', {
       callback: callbackUrl.host,
       requestedMsats: amountMsats,
       decodedMsats,

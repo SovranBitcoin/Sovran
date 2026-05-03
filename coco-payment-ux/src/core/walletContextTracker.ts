@@ -7,6 +7,7 @@
 
 import type { Manager } from '@cashu/coco-core';
 import { getReadyProofs } from '../api/managerInternals';
+import { errField, logger } from '../logger';
 import type { WalletContext } from '../types';
 
 export interface WalletContextTrackerConfig {
@@ -58,7 +59,10 @@ export function createWalletContextTracker(
             .map((p) => p.amount)
             .sort((a, b) => a - b);
         } catch (e) {
-          console.warn('[walletContextTracker] getReadyProofs failed for', (mint as any).mintUrl, e instanceof Error ? e.message : e);
+          logger.warn('walletContextTracker.getReadyProofs.failed', {
+            mintUrl: (mint as any).mintUrl,
+            error: errField(e),
+          });
           amounts[(mint as any).mintUrl] = [];
         }
       }

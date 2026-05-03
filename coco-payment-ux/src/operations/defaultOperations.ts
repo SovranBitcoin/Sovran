@@ -19,6 +19,7 @@ import type { Manager } from '@cashu/coco-core';
 import type { MachineOperations, StepDataMap } from '../machine/types';
 import type { MintCatalogEntry, MintListItem, MintReviewInfo, PaymentRequestInfo } from '../types';
 import { defaultDetectors } from '../detectors';
+import { errField, logger } from '../logger';
 import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from '../lnurl';
 
 // ---------------------------------------------------------------------------
@@ -63,33 +64,28 @@ async function attemptRollback(mgr: Manager, operationId: string): Promise<boole
   try {
     const operation = await mgr.ops.send.get(operationId);
     if (operation && operation.state === 'prepared') {
-      console.info('[attemptRollback] Cancelling prepared operation | operationId:', operationId);
+      logger.info('operations.attemptRollback.cancelPrepared', { operationId });
       await mgr.ops.send.cancel(operationId);
     } else if (operation && ['executing', 'pending'].includes(operation.state)) {
-      console.info(
-        '[attemptRollback] Reclaiming',
-        operation.state,
-        'operation | operationId:',
-        operationId
-      );
+      logger.info('operations.attemptRollback.reclaim', {
+        state: operation.state,
+        operationId,
+      });
       await mgr.ops.send.reclaim(operationId);
     } else {
-      console.warn(
-        '[attemptRollback] Operation in unexpected state:',
-        operation?.state,
-        '| operationId:',
-        operationId
-      );
+      logger.warn('operations.attemptRollback.unexpectedState', {
+        state: operation?.state,
+        operationId,
+      });
       return false;
     }
-    console.info('[attemptRollback] Rollback successful | operationId:', operationId);
+    logger.info('operations.attemptRollback.success', { operationId });
     return true;
   } catch (e) {
-    console.warn(
-      '[attemptRollback] Rollback failed | operationId:',
+    logger.warn('operations.attemptRollback.failed', {
       operationId,
-      e instanceof Error ? e.message : e
-    );
+      error: errField(e),
+    });
     return false;
   }
 }
@@ -120,12 +116,10 @@ function buildRolledBackResult(
       errorMessage,
     },
   };
-  console.info(
-    '[executePaymentRequest] Rolled back | operationId:',
+  logger.info('operations.executePaymentRequest.rolledBack', {
     operationId,
-    '| error:',
-    errorMessage
-  );
+    errorMessage,
+  });
   return { historyEntry: JSON.stringify(entry), rolledBack: true, errorMessage };
 }
 
@@ -181,7 +175,7 @@ export function createDefaultOperations(
   function requireManager(): Manager {
     const mgr = getManager();
     if (!mgr) {
-      console.warn('[requireManager] Wallet manager is not available — getManager() returned null');
+      logger.warn('operations.requireManager.unavailable');
       throw new Error('Wallet manager is not available');
     }
     return mgr;
@@ -190,16 +184,14 @@ export function createDefaultOperations(
   return {
     executeSend: async (mintUrl, amount) => {
       const mgr = requireManager();
-      console.info('[executeSend] Preparing | mintUrl:', mintUrl, '| amount:', amount);
+      logger.info('operations.executeSend.prepare', { mintUrl, amount });
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
-      console.info('[executeSend] Executing | operationId:', prepared.id);
+      logger.info('operations.executeSend.execute', { operationId: prepared.id });
       const { operation, token } = await mgr.ops.send.execute(prepared.id);
-      console.info(
-        '[executeSend] Complete | operationId:',
-        operation.id,
-        '| state:',
-        operation.state
-      );
+      logger.info('operations.executeSend.complete', {
+        operationId: operation.id,
+        state: operation.state,
+      });
 
       // Try history first (should be there after execute), fall back to
       // constructing from the operation result to avoid a race.
@@ -214,10 +206,7 @@ export function createDefaultOperations(
         return { historyEntry };
       }
 
-      console.warn(
-        '[executeSend] History entry not found, building from operation | operationId:',
-        operation.id
-      );
+      logger.warn('operations.executeSend.historyMissing', { operationId: operation.id });
       const entry = {
         id: operation.id,
         type: 'send' as const,
@@ -237,14 +226,11 @@ export function createDefaultOperations(
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
 
       if (prepared.needsSwap) {
-        console.warn(
-          '[executeOfflineSend] Needs swap, cancelling | operationId:',
-          prepared.id,
-          '| mintUrl:',
+        logger.warn('operations.executeOfflineSend.needsSwap', {
+          operationId: prepared.id,
           mintUrl,
-          '| amount:',
-          amount
-        );
+          amount,
+        });
         await mgr.ops.send.cancel(prepared.id);
         throw new Error('Offline send requires exact proof match');
       }
@@ -261,10 +247,7 @@ export function createDefaultOperations(
         return { historyEntry };
       }
 
-      console.warn(
-        '[executeOfflineSend] History entry not found, building from operation | operationId:',
-        operation.id
-      );
+      logger.warn('operations.executeOfflineSend.historyMissing', { operationId: operation.id });
       const entry = {
         id: operation.id,
         type: 'send' as const,
@@ -281,19 +264,12 @@ export function createDefaultOperations(
 
     executeMintQuote: async (mintUrl, amount, _unit) => {
       const mgr = requireManager();
-      console.info(
-        '[executeMintQuote] Preparing mint quote | mintUrl:',
-        mintUrl,
-        '| amount:',
-        amount
-      );
+      logger.info('operations.executeMintQuote.prepare', { mintUrl, amount });
       const mintOp = await mgr.ops.mint.prepare({ mintUrl, amount, method: 'bolt11' });
-      console.info(
-        '[executeMintQuote] Quote created | operationId:',
-        mintOp.id,
-        '| quoteId:',
-        mintOp.quoteId
-      );
+      logger.info('operations.executeMintQuote.created', {
+        operationId: mintOp.id,
+        quoteId: mintOp.quoteId,
+      });
 
       // Build entry directly from the operation result to avoid a race
       // where getPaginatedHistory runs before HistoryService persists the row.
@@ -315,14 +291,11 @@ export function createDefaultOperations(
     buildMintListItems: async (data: StepDataMap['selectMint']): Promise<MintListItem[]> => {
       const mgr = requireManager();
       const t0 = performance.now();
-      console.info(
-        '[buildMintListItems] Building mint list | unit:',
-        data.unit,
-        '| scope:',
-        data.scope,
-        '| destination:',
-        data.destination
-      );
+      logger.info('operations.buildMintListItems.start', {
+        unit: data.unit,
+        scope: data.scope,
+        destination: data.destination,
+      });
       const [allTrustedMints, balancesByMint] = await Promise.all([
         mgr.mint.getAllTrustedMints(),
         mgr.wallet.balances.byMint(),
@@ -341,35 +314,29 @@ export function createDefaultOperations(
             const info = await mgr.mint.getMintInfo(mint.mintUrl);
             if (info) {
               mintInfoMap.set(mint.mintUrl, info);
-              console.info(
-                '[buildMintListItems] getMintInfo OK',
-                mint.mintUrl,
-                '| name:',
-                info.name,
-                '| icon:',
-                !!info.icon_url
-              );
+              logger.info('operations.buildMintListItems.getMintInfo.ok', {
+                mintUrl: mint.mintUrl,
+                name: info.name,
+                hasIcon: !!info.icon_url,
+              });
             } else {
-              console.warn('[buildMintListItems] getMintInfo returned null for', mint.mintUrl);
+              logger.warn('operations.buildMintListItems.getMintInfo.null', {
+                mintUrl: mint.mintUrl,
+              });
             }
           } catch (e) {
-            console.warn(
-              '[buildMintListItems] getMintInfo failed for',
-              mint.mintUrl,
-              e instanceof Error ? e.message : e
-            );
+            logger.warn('operations.buildMintListItems.getMintInfo.failed', {
+              mintUrl: mint.mintUrl,
+              error: errField(e),
+            });
           }
         })
       );
-      console.info(
-        '[buildMintListItems] info resolved:',
-        mintInfoMap.size,
-        '/',
-        allTrustedMints.length,
-        '| duration:',
-        Math.round(performance.now() - t0),
-        'ms'
-      );
+      logger.info('operations.buildMintListItems.info.resolved', {
+        resolved: mintInfoMap.size,
+        total: allTrustedMints.length,
+        durationMs: Math.round(performance.now() - t0),
+      });
 
       // One bulk fetch — the wallet returns audit / KYM / operator-profile
       // data for every trusted mint in a single round-trip. Awaited so items
@@ -380,10 +347,9 @@ export function createDefaultOperations(
         try {
           catalog = await config.fetchMintCatalog(mintUrls);
         } catch (e) {
-          console.warn(
-            '[buildMintListItems] fetchMintCatalog failed, continuing without catalog data:',
-            e instanceof Error ? e.message : e
-          );
+          logger.warn('operations.buildMintListItems.fetchMintCatalog.failed', {
+            error: errField(e),
+          });
         }
       }
 
@@ -450,26 +416,23 @@ export function createDefaultOperations(
 
     trustMint: async (mintUrl) => {
       const mgr = requireManager();
-      console.info('[trustMint] Trusting mint | mintUrl:', mintUrl);
+      logger.info('operations.trustMint', { mintUrl });
       await mgr.mint.addMint(mintUrl, { trusted: true });
     },
 
     executeNfcSend: async (mintUrl, amount) => {
       const mgr = requireManager();
-      console.info('[executeNfcSend] Preparing NFC send | mintUrl:', mintUrl, '| amount:', amount);
+      logger.info('operations.executeNfcSend.prepare', { mintUrl, amount });
       const prepared = await mgr.ops.send.prepare({ mintUrl, amount });
       const { operation, token } = await mgr.ops.send.execute(prepared.id);
-      console.info('[executeNfcSend] NFC token created | operationId:', operation.id);
+      logger.info('operations.executeNfcSend.tokenCreated', { operationId: operation.id });
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
       if (!historyEntry) {
-        console.warn(
-          '[executeNfcSend] History entry not found | operationId:',
-          operation.id,
-          '| mintUrl:',
+        logger.warn('operations.executeNfcSend.historyMissing', {
+          operationId: operation.id,
           mintUrl,
-          '| amount:',
-          amount
-        );
+          amount,
+        });
         throw new Error('Send history entry not found after creation');
       }
       return {
@@ -482,27 +445,24 @@ export function createDefaultOperations(
     rollbackSend: async (operationId) => {
       const mgr = getManager();
       if (!mgr) return;
-      console.info('[rollbackSend] Starting | operationId:', operationId);
+      logger.info('operations.rollbackSend.start', { operationId });
       try {
         const operation = await mgr.ops.send.get(operationId);
         if (operation && operation.state === 'prepared') {
-          console.info('[rollbackSend] Cancelling prepared operation | operationId:', operationId);
+          logger.info('operations.rollbackSend.cancelPrepared', { operationId });
           await mgr.ops.send.cancel(operationId);
         } else if (operation && ['executing', 'pending'].includes(operation.state)) {
-          console.info(
-            '[rollbackSend] Reclaiming',
-            operation.state,
-            'operation | operationId:',
-            operationId
-          );
+          logger.info('operations.rollbackSend.reclaim', {
+            state: operation.state,
+            operationId,
+          });
           await mgr.ops.send.reclaim(operationId);
         }
       } catch (e) {
-        console.warn(
-          '[rollbackSend] Best-effort rollback failed | operationId:',
+        logger.warn('operations.rollbackSend.failed', {
           operationId,
-          e instanceof Error ? e.message : e
-        );
+          error: errField(e),
+        });
       }
     },
 
@@ -524,14 +484,12 @@ export function createDefaultOperations(
 
     executeReceive: async (tokenString, mintUrl, _amount) => {
       const mgr = requireManager();
-      console.info(
-        '[executeReceive] Receiving token | mintUrl:',
+      logger.info('operations.executeReceive.start', {
         mintUrl,
-        '| token:',
-        tokenString.slice(0, 20) + '…'
-      );
+        tokenPreview: tokenString.slice(0, 20) + '…',
+      });
       await mgr.wallet.receive(tokenString);
-      console.info('[executeReceive] Token received');
+      logger.info('operations.executeReceive.received');
 
       let hadP2PK = false;
       let tokenAmount = 0;
@@ -540,7 +498,7 @@ export function createDefaultOperations(
         hadP2PK = hasP2PKProofs(decoded.proofs);
         tokenAmount = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
       } catch (e) {
-        console.warn('[executeReceive] P2PK detection failed:', e instanceof Error ? e.message : e);
+        logger.warn('operations.executeReceive.p2pkDetectionFailed', { error: errField(e) });
       }
 
       // Try history first, fall back to constructing from known data
@@ -548,10 +506,7 @@ export function createDefaultOperations(
       const historyEntry = await findReceiveHistoryEntry(mgr, tokenString, mintUrl);
       if (historyEntry) return { historyEntry, hadP2PKProofs: hadP2PK };
 
-      console.warn(
-        '[executeReceive] History entry not found, building from token data | mintUrl:',
-        mintUrl
-      );
+      logger.warn('operations.executeReceive.historyMissing', { mintUrl });
       const entry = {
         id: `redeemed-${Date.now()}`,
         type: 'receive' as const,
@@ -571,14 +526,11 @@ export function createDefaultOperations(
 
     executeMelt: async (mintUrl, meltTarget, amount, _unit) => {
       const mgr = requireManager();
-      console.info(
-        '[executeMelt] Starting | mintUrl:',
+      logger.info('operations.executeMelt.start', {
         mintUrl,
-        '| amount:',
         amount,
-        '| target:',
-        meltTarget.slice(0, 30) + '…'
-      );
+        targetPreview: meltTarget.slice(0, 30) + '…',
+      });
 
       const bolt11 = isLightningInvoiceBolt11(meltTarget)
         ? meltTarget
@@ -591,9 +543,12 @@ export function createDefaultOperations(
         method: 'bolt11',
         methodData: { invoice: bolt11 },
       });
-      console.info('[executeMelt] Executing | operationId:', operation.id);
+      logger.info('operations.executeMelt.execute', { operationId: operation.id });
       const result = await mgr.ops.melt.execute(operation.id);
-      console.info('[executeMelt] Complete | operationId:', result.id, '| state:', result.state);
+      logger.info('operations.executeMelt.complete', {
+        operationId: result.id,
+        state: result.state,
+      });
 
       const entry = {
         id: result.id,
@@ -611,20 +566,19 @@ export function createDefaultOperations(
 
     rollbackMelt: async (operationId) => {
       const mgr = requireManager();
-      console.info('[rollbackMelt] Cancelling | operationId:', operationId);
+      logger.info('operations.rollbackMelt.start', { operationId });
       await mgr.ops.melt.cancel(operationId, 'User cancelled');
-      console.info('[rollbackMelt] Cancelled | operationId:', operationId);
+      logger.info('operations.rollbackMelt.done', { operationId });
     },
 
     buildMintReviewInfo: async (mintUrl, item): Promise<MintReviewInfo> => {
       const mgr = requireManager();
       const [mintInfo, balancesByMint, isTrusted] = await Promise.all([
         mgr.mint.getMintInfo(mintUrl).catch((e) => {
-          console.warn(
-            '[buildMintReviewInfo] getMintInfo failed for',
+          logger.warn('operations.buildMintReviewInfo.getMintInfo.failed', {
             mintUrl,
-            e instanceof Error ? e.message : e
-          );
+            error: errField(e),
+          });
           return undefined;
         }),
         mgr.wallet.balances.byMint({ mintUrls: [mintUrl] }),
@@ -676,14 +630,13 @@ export function createDefaultOperations(
 
     executePaymentRequest: async (mintUrl, paymentRequest, amount, unit) => {
       const mgr = requireManager();
-      console.info('[executePaymentRequest] Starting | mintUrl:', mintUrl, '| amount:', amount);
+      logger.info('operations.executePaymentRequest.start', { mintUrl, amount });
 
       const info = defaultDetectors.getPaymentRequestInfo(paymentRequest);
       if (!info) {
-        console.warn(
-          '[executePaymentRequest] Failed to parse payment request:',
-          paymentRequest.slice(0, 60)
-        );
+        logger.warn('operations.executePaymentRequest.parseFailed', {
+          paymentRequestPreview: paymentRequest.slice(0, 60),
+        });
         throw new Error('Invalid payment request');
       }
 
@@ -693,19 +646,17 @@ export function createDefaultOperations(
       let operationId: string;
 
       if (nostrTransport && !httpTransport) {
-        console.info('[executePaymentRequest] Using Nostr transport');
+        logger.info('operations.executePaymentRequest.transport', { transport: 'nostr' });
         // Nostr transport: use ops.send directly since PaymentRequestsApi doesn't support Nostr
         const sendNostrDM = config.sendNostrDM;
         if (!sendNostrDM) {
-          console.warn(
-            '[executePaymentRequest] sendNostrDM not configured for Nostr payment request'
-          );
+          logger.warn('operations.executePaymentRequest.nostrDM.unconfigured');
           throw new Error('sendNostrDM operation is required for Nostr payment requests');
         }
 
         const effectiveAmount = info.amount ?? amount;
         if (!effectiveAmount) {
-          console.warn('[executePaymentRequest] No amount provided for Nostr payment request');
+          logger.warn('operations.executePaymentRequest.nostr.missingAmount');
           throw new Error('Amount is required for Nostr payment requests');
         }
 
@@ -724,13 +675,12 @@ export function createDefaultOperations(
             throw new Error('Mock delivery failure (dev)');
           }
           await sendNostrDM(nostrTransport.target, JSON.stringify(payload));
-          console.info('[executePaymentRequest] Nostr DM sent | operationId:', operationId);
+          logger.info('operations.executePaymentRequest.nostr.sent', { operationId });
         } catch (deliveryErr) {
-          console.warn(
-            '[executePaymentRequest] Nostr delivery failed | operationId:',
+          logger.warn('operations.executePaymentRequest.nostr.deliveryFailed', {
             operationId,
-            deliveryErr instanceof Error ? deliveryErr.message : deliveryErr
-          );
+            error: errField(deliveryErr),
+          });
           const rollbackResult = await attemptRollback(mgr, operationId);
           if (rollbackResult) {
             const errorMessage =
@@ -748,7 +698,7 @@ export function createDefaultOperations(
           throw deliveryErr;
         }
       } else {
-        console.info('[executePaymentRequest] Using HTTP transport');
+        logger.info('operations.executePaymentRequest.transport', { transport: 'http' });
         // HTTP or inband transport: use paymentRequests API
         const parsed = await mgr.paymentRequests.parse(paymentRequest);
         const transaction = await mgr.paymentRequests.prepare(parsed, { mintUrl, amount });
@@ -758,16 +708,12 @@ export function createDefaultOperations(
             throw new Error('Mock delivery failure (dev)');
           }
           await mgr.paymentRequests.execute(transaction);
-          console.info(
-            '[executePaymentRequest] HTTP payment request executed | operationId:',
-            operationId
-          );
+          logger.info('operations.executePaymentRequest.http.executed', { operationId });
         } catch (deliveryErr) {
-          console.warn(
-            '[executePaymentRequest] HTTP delivery failed | operationId:',
+          logger.warn('operations.executePaymentRequest.http.deliveryFailed', {
             operationId,
-            deliveryErr instanceof Error ? deliveryErr.message : deliveryErr
-          );
+            error: errField(deliveryErr),
+          });
           const rollbackResult = await attemptRollback(mgr, operationId);
           if (rollbackResult) {
             const errorMessage =
@@ -810,12 +756,10 @@ export function createDefaultOperations(
           : { transportType: 'http' }),
       };
       entry.operationId = entry.operationId ?? operationId;
-      console.info(
-        '[executePaymentRequest] Done | operationId:',
+      logger.info('operations.executePaymentRequest.done', {
         operationId,
-        '| transport:',
-        nostrTransport ? 'nostr' : 'http'
-      );
+        transport: nostrTransport ? 'nostr' : 'http',
+      });
       return { historyEntry: JSON.stringify(entry) };
     },
   };

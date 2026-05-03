@@ -20,6 +20,7 @@ import React, {
 } from 'react';
 
 import { registerLocale } from '../formatting/locales';
+import { errField, logger } from '../logger';
 import { createPaymentMachine } from '../machine/createMachine';
 import { selectMintContext } from '../machine/selectMintContext';
 import type {
@@ -388,7 +389,7 @@ export function CocoPaymentUXProvider({
     if (ignored.has(host)) return;
 
     machineRef.current.scan(host, { source: 'deeplink' }).catch((err) => {
-      console.warn('[DeepLink] scan failed for host:', host, err instanceof Error ? err.message : err);
+      logger.warn('deepLink.scan.failed', { host, error: errField(err) });
       deepLinks.onError?.(err instanceof Error ? err : new Error(String(err)));
     });
   }, [deepLinks?.url]); // eslint-disable-line react-hooks/exhaustive-deps

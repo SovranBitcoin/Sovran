@@ -13,6 +13,8 @@
 import type { UnsignedEvent, VerifiedEvent } from 'nostr-tools';
 import { getPublicKey, getEventHash, nip44, finalizeEvent, generateSecretKey } from 'nostr-tools';
 
+import { errField, logger } from '../logger';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -187,7 +189,7 @@ export function unwrapGiftWrap(
       tags: rumor.tags || [],
     };
   } catch (e) {
-    console.warn('[unwrapGiftWrap] Failed to unwrap DM:', e instanceof Error ? e.message : e);
+    logger.warn('nostr.unwrapGiftWrap.failed', { error: errField(e) });
     return null;
   }
 }

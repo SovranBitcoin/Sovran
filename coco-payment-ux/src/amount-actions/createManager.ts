@@ -9,6 +9,7 @@
 // The manager computes EVERYTHING the UI needs — the component is stateless.
 // ---------------------------------------------------------------------------
 
+import { logger } from '../logger';
 import { resolveAmount, resolutionEqual } from './resolve';
 import { computeQuickSendSuggestions, type QuickSendSuggestion } from './suggestions';
 import type {
@@ -104,14 +105,11 @@ export function createAmountActionManager(
     // actual sum of available proofs. Mismatches indicate the wallet's
     // proofAmounts cache is stale relative to coco's proof state.
     const sendAll = result.find((s) => s.sendAll);
-    console.info(
-      '[amount.suggestion.derive] proofCount:',
-      len,
-      '| spendableTotal:',
-      sum,
-      '| displayedSendAll:',
-      sendAll?.satoshis ?? '(none)'
-    );
+    logger.info('amountActions.suggestion.derive', {
+      proofCount: len,
+      spendableTotal: sum,
+      displayedSendAll: sendAll?.satoshis ?? null,
+    });
     sugCache = { len, sum, price, result };
     return result;
   }

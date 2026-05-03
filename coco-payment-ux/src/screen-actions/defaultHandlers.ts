@@ -14,6 +14,7 @@
 import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
 
 import { isMintOfflineError } from '../errors';
+import { errField, logger } from '../logger';
 import type { Destination, MachineOperations, PaymentMachine } from '../machine/types';
 import type { ScreenActionContext, ScreenActionHandlerMap } from './types';
 
@@ -62,7 +63,7 @@ function encodeToken(entry: EntryLike): string | null {
   try {
     return getEncodedTokenV4(token as Parameters<typeof getEncodedTokenV4>[0]);
   } catch (e) {
-    console.warn('[encodeToken] Failed to encode token:', e instanceof Error ? e.message : e);
+    logger.warn('screenAction.encodeToken.failed', { error: errField(e) });
     return null;
   }
 }
@@ -87,9 +88,12 @@ export function createDefaultScreenActionHandlers(
         const ops = getOperations();
         if (!ops?.checkSendStatus) return;
 
-        console.info('[sendToken.checkStatus] Checking | operationId:', operationId);
+        logger.info('screenAction.sendToken.checkStatus.start', { operationId });
         const result = await ops.checkSendStatus(operationId);
-        console.info('[sendToken.checkStatus] Result | operationId:', operationId, '| state:', result.state);
+        logger.info('screenAction.sendToken.checkStatus.result', {
+          operationId,
+          state: result.state,
+        });
         notify('onSendStatusChecked', {
           operationId,
           state: result.state,
@@ -105,14 +109,18 @@ export function createDefaultScreenActionHandlers(
         const ops = getOperations();
         if (!ops?.rollbackSend) return;
 
-        console.info('[sendToken.cancel] Cancelling | operationId:', operationId);
+        logger.info('screenAction.sendToken.cancel.start', { operationId });
         try {
           await ops.rollbackSend(operationId);
-          console.info('[sendToken.cancel] Cancelled | operationId:', operationId);
+          logger.info('screenAction.sendToken.cancel.done', { operationId });
           notify('onSendCancelled', { operationId });
         } catch (err) {
           const mintUnreachable = isMintOfflineError(err);
-          console.warn('[sendToken.cancel] Failed | operationId:', operationId, mintUnreachable ? '(mint unreachable)' : '', err instanceof Error ? err.message : err);
+          logger.warn('screenAction.sendToken.cancel.failed', {
+            operationId,
+            mintUnreachable,
+            error: errField(err),
+          });
           notify('onSendCancelFailed', {
             operationId,
             message: err instanceof Error ? err.message : String(err),
@@ -153,7 +161,7 @@ export function createDefaultScreenActionHandlers(
             return;
           }
         } catch (e) {
-          console.warn('[receiveToken] Token decode failed for unit check, proceeding:', e instanceof Error ? e.message : e);
+          logger.warn('screenAction.receiveToken.unitDecodeFailed', { error: errField(e) });
         }
 
         // Check mint trust
@@ -170,7 +178,7 @@ export function createDefaultScreenActionHandlers(
         }
 
         // Dispatch processing notification
-        console.info('[receiveToken.redeem] Processing | mintUrl:', mintUrl, '| amount:', amount, '| id:', id);
+        logger.info('screenAction.receiveToken.redeem.processing', { mintUrl, amount, id });
         notify('onReceiveProcessing', { id, mintUrl, amount: amount ?? 0, unit });
 
         // Execute receive
@@ -178,17 +186,24 @@ export function createDefaultScreenActionHandlers(
 
         try {
           const result = await ops.executeReceive(tokenString, mintUrl, amount ?? 0);
-          console.info('[receiveToken.redeem] Received successfully | mintUrl:', mintUrl);
+          logger.info('screenAction.receiveToken.redeem.success', { mintUrl });
 
           // Update screen entry with real history entry
           const setEntry = (ctx as EntryLike).setEntry as
             | ((e: EntryLike) => void)
             | undefined;
-          console.info('[receiveToken.redeem] setEntry available:', !!setEntry, '| historyEntry available:', !!result.historyEntry);
+          logger.info('screenAction.receiveToken.redeem.entryUpdate.eligibility', {
+            hasSetEntry: !!setEntry,
+            hasHistoryEntry: !!result.historyEntry,
+          });
           if (setEntry && result.historyEntry) {
             try {
               const realEntry = JSON.parse(result.historyEntry);
-              console.info('[receiveToken.redeem] Updating screen entry | id:', realEntry.id, '| type:', realEntry.type, '| amount:', realEntry.amount);
+              logger.info('screenAction.receiveToken.redeem.entryUpdate.apply', {
+                id: realEntry.id,
+                type: realEntry.type,
+                amount: realEntry.amount,
+              });
               setEntry(realEntry);
 
               // Link transaction for scan history. Prefer the original raw
@@ -204,10 +219,13 @@ export function createDefaultScreenActionHandlers(
                 ops.linkTransaction(linkInput, realEntry.id);
               }
             } catch (e) {
-              console.warn('[receiveToken] History entry parse failed:', e instanceof Error ? e.message : e);
+              logger.warn('screenAction.receiveToken.historyParseFailed', { error: errField(e) });
             }
           } else {
-            console.warn('[receiveToken.redeem] Cannot update screen entry — setEntry:', !!setEntry, '| historyEntry:', !!result.historyEntry);
+            logger.warn('screenAction.receiveToken.redeem.entryUpdate.skipped', {
+              hasSetEntry: !!setEntry,
+              hasHistoryEntry: !!result.historyEntry,
+            });
           }
 
           notify('onReceiveConfirmed', {
@@ -256,7 +274,7 @@ export function createDefaultScreenActionHandlers(
     // ── meltQuote ────────────────────────────────────────────────────
     meltQuote: {
       pay: async (_ctx: ScreenActionContext) => {
-        console.info('[meltQuote.pay] Confirming melt payment');
+        logger.info('screenAction.meltQuote.pay');
         const machine = getMachine();
         if (machine?.confirmMelt) {
           await machine.confirmMelt();
@@ -276,11 +294,11 @@ export function createDefaultScreenActionHandlers(
         if (!ops?.rollbackMelt) return;
 
         const rollbackId = operationId ?? quoteId!;
-        console.info('[meltQuote.cancel] Cancelling | operationId:', rollbackId);
+        logger.info('screenAction.meltQuote.cancel.start', { operationId: rollbackId });
 
         try {
           await ops.rollbackMelt(rollbackId);
-          console.info('[meltQuote.cancel] Cancelled | operationId:', rollbackId);
+          logger.info('screenAction.meltQuote.cancel.done', { operationId: rollbackId });
           notify('onMeltCancelled', { operationId: rollbackId });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -291,7 +309,7 @@ export function createDefaultScreenActionHandlers(
             msg.includes('not found') ||
             msg.includes('No melt operation')
           ) {
-            console.warn('[meltCancel] Expected rollback error (already finalized/rolled back):', msg);
+            logger.warn('screenAction.meltQuote.cancel.expected', { message: msg });
             return;
           }
           notify('onMeltCancelFailed', { operationId: rollbackId, message: msg, mintUnreachable: isMintOfflineError(err) });
@@ -307,7 +325,12 @@ export function createDefaultScreenActionHandlers(
 
         // Capture the entry before the async call for reference.
         const preEntry = ctx.entry as EntryLike;
-        console.info('[paymentRequest.confirm] Confirming | operationId:', getString(getMetadata(preEntry), 'operationId') ?? getString(preEntry, 'operationId') ?? '-');
+        logger.info('screenAction.paymentRequest.confirm.start', {
+          operationId:
+            getString(getMetadata(preEntry), 'operationId') ??
+            getString(preEntry, 'operationId') ??
+            null,
+        });
 
         const result = await machine.confirmPaymentRequest();
 
@@ -316,7 +339,7 @@ export function createDefaultScreenActionHandlers(
         // If the delivery failed and ecash was rolled back, set the entry
         // to rolledBack state instead of enriching with delivered metadata.
         if (result.rolledBack) {
-          console.info('[paymentRequest.confirm] Rolled back — setting rolledBack entry');
+          logger.info('screenAction.paymentRequest.confirm.rolledBack');
           if (setEntry) {
             const metadata = ((preEntry?.metadata ?? {}) as Record<string, unknown>);
             const operationId = getString(getMetadata(preEntry), 'operationId') ??
@@ -353,7 +376,10 @@ export function createDefaultScreenActionHandlers(
               nostrSent: 'true',
             },
           };
-          console.info('[paymentRequest.confirm] Enriching screen entry | id:', (enriched as any).id, '| operationId:', operationId);
+          logger.info('screenAction.paymentRequest.confirm.enrich', {
+            id: (enriched as any).id,
+            operationId,
+          });
           setEntry(enriched as EntryLike);
         }
       },
@@ -397,9 +423,9 @@ export function createDefaultScreenActionHandlers(
         const ops = getOperations();
         if (!ops?.trustMint) return;
 
-        console.info('[mintInfo.trust] Trusting mint | mintUrl:', mintUrl);
+        logger.info('screenAction.mintInfo.trust.start', { mintUrl });
         await ops.trustMint(mintUrl);
-        console.info('[mintInfo.trust] Mint trusted | mintUrl:', mintUrl);
+        logger.info('screenAction.mintInfo.trust.done', { mintUrl });
         notify('onMintTrustedFromScreen', {
           mintUrl,
           fromAccepter: entry.fromAccepter === true,
@@ -415,7 +441,7 @@ export function createDefaultScreenActionHandlers(
         const entry = ctx.entry as EntryLike;
         const scope = (entry.scope as 'npc' | 'selected') ?? 'selected';
         if (!mintUrl || !machine) return;
-        console.info('[mintSelector.select] Selecting mint | mintUrl:', mintUrl, '| scope:', scope);
+        logger.info('screenAction.mintSelector.select', { mintUrl, scope });
         await machine.changeMint(mintUrl, { scope });
       },
 
@@ -437,7 +463,10 @@ export function createDefaultScreenActionHandlers(
             const info = await ops.buildMintReviewInfo(mintUrl, item);
             infoEntry = { ...(info as unknown as EntryLike) };
           } catch (e) {
-            console.warn('[mintInfo] buildMintReviewInfo failed for', mintUrl, e instanceof Error ? e.message : e);
+            logger.warn('screenAction.mintInfo.buildReviewInfo.failed', {
+              mintUrl,
+              error: errField(e),
+            });
           }
         }
         navigation.mintInfo?.(JSON.stringify(infoEntry));
@@ -481,41 +510,33 @@ export function createDefaultScreenActionHandlers(
             destination = 'meltQuote';
             meltTarget = meltTargetFromEntry;
           } else {
-            console.warn('[amountEntry.next] Lightning variant without meltTarget — aborting');
+            logger.warn('screenAction.amountEntry.next.lightningWithoutMeltTarget');
             return;
           }
         } else if (variantId === 'ecash') {
           if (entryDestination === 'mintQuote') {
-            console.warn('[amountEntry.next] Ecash variant not valid on mintQuote — aborting');
+            logger.warn('screenAction.amountEntry.next.ecashOnMintQuote');
             return;
           }
           // sendEcash / paymentRequest keep their destination; nothing to do.
           destination = entryDestination;
         } else if (variantId === 'onchain') {
-          console.info('[amountEntry.next] Onchain variant not supported yet');
+          logger.info('screenAction.amountEntry.next.onchainNotSupported');
           return;
         }
 
-        console.info(
-          '[amountEntry.next] Amount confirmed | amount:',
-          effectiveSat,
-          '| mintUrl:',
-          mintUrl || '(none)',
-          '| destination:',
+        logger.info('screenAction.amountEntry.next.confirm', {
+          amount: effectiveSat,
+          mintUrl: mintUrl || null,
           destination,
-          '| variantId:',
-          variantId ?? '(none)',
-          '| meltTarget:',
-          meltTarget ? meltTarget.slice(0, 30) + '…' : '(none)'
-        );
+          variantId: variantId ?? null,
+          meltTargetPreview: meltTarget ? meltTarget.slice(0, 30) + '…' : null,
+        });
         try {
           await machine.enterAmount(effectiveSat, mintUrl, { destination, meltTarget });
-          console.info('[amountEntry.next] machine.enterAmount resolved');
+          logger.info('screenAction.amountEntry.next.resolved');
         } catch (err) {
-          console.warn(
-            '[amountEntry.next] machine.enterAmount threw:',
-            err instanceof Error ? err.message : String(err)
-          );
+          logger.warn('screenAction.amountEntry.next.threw', { error: errField(err) });
           throw err;
         }
       },

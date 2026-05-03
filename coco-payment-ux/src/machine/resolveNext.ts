@@ -1,4 +1,5 @@
 import type { LocalizedReason } from '../formatting/locales';
+import { logger } from '../logger';
 import { selectMint } from '../mint-selection';
 import { composeSatoshis } from '../offline';
 import type { ResolvedIntent, WalletContext } from '../types';
@@ -132,7 +133,11 @@ function checkProofComposition(
 // ---------------------------------------------------------------------------
 
 function terminalStep(destination: Destination, ctx: FlowContext): StepResult {
-  console.info('[resolveNext] → terminal | destination:', destination, '| mint:', ctx.mintUrl, '| amount:', ctx.amount);
+  logger.info('resolveNext.terminal', {
+    destination,
+    mintUrl: ctx.mintUrl,
+    amount: ctx.amount,
+  });
   const { mintUrl, amount, unit, meltTarget } = ctx;
 
   switch (destination) {
@@ -207,11 +212,16 @@ export function resolveNext(
   const destination = getDestination(intent, ctx);
   const supportedMintUrls = ctx.supportedMintUrls;
   const unit = ctx.unit;
-  console.info('[resolveNext] Routing | intent:', intent.type, '| destination:', destination, '| amount:', ctx.amount, '| mint:', ctx.mintUrl || '(none)');
+  logger.info('resolveNext.routing', {
+    intentType: intent.type,
+    destination,
+    amount: ctx.amount,
+    mintUrl: ctx.mintUrl || null,
+  });
 
   // 1. Need amount?
   if (needsAmount(destination, ctx)) {
-    console.info('[resolveNext] → enterAmount (amount needed)');
+    logger.info('resolveNext.enterAmount.amountNeeded');
 
     const preselectedMintUrl = ctx.mintUrl ?? walletCtx.preferredMintUrl;
     return {

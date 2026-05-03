@@ -17,6 +17,7 @@ import type { AmountResolution, CreateAmountActionManagerConfig } from '../amoun
 import { defaultDetectors } from '../detectors';
 import { FormattedString } from '../formatting/FormattedString';
 import { FormattedTimestamp } from '../formatting/FormattedTimestamp';
+import { errField, logger } from '../logger';
 import type { PaymentRequestInfo } from '../types';
 import { getAvailableActions } from './availability';
 import type {
@@ -184,14 +185,12 @@ export function createScreenActionManager<S extends ScreenType>(
   const getEntry = (): Record<string, unknown> | null => getEffectiveEntry();
 
   const setEntry = (newEntry: Record<string, unknown>): void => {
-    console.info(
-      `[ScreenActionManager:${screenType}] setEntry | id:`,
-      newEntry?.id,
-      '| type:',
-      newEntry?.type,
-      '| state:',
-      newEntry?.state
-    );
+    logger.info('screenActionManager.setEntry', {
+      screenType,
+      id: newEntry?.id,
+      type: newEntry?.type,
+      state: newEntry?.state,
+    });
     entry = newEntry;
     notify();
   };
@@ -260,7 +259,7 @@ const CONTENT_EXTRACTORS: Partial<Record<ScreenType, ContentExtractor>> = {
         target: 'token',
       };
     } catch (e) {
-      console.warn('[clipboard] Token encode failed:', e instanceof Error ? e.message : e);
+      logger.warn('screenActionManager.clipboard.tokenEncodeFailed', { error: errField(e) });
       return null;
     }
   },
@@ -368,10 +367,7 @@ function getReceiveTokenString(entry: EntryRecord | null | undefined): string | 
     try {
       return getEncodedTokenV4(token as Parameters<typeof getEncodedTokenV4>[0]);
     } catch (e) {
-      console.warn(
-        '[getReceiveTokenString] Token encode failed:',
-        e instanceof Error ? e.message : e
-      );
+      logger.warn('screenActionManager.getReceiveTokenString.failed', { error: errField(e) });
     }
   }
   return getStringField(getMetadata(entry), 'rawToken');
@@ -395,7 +391,7 @@ export function shouldApplyEntryUpdate(
     const cq = getStringField(currentEntry, 'quoteId');
     const uq = getStringField(updatedEntry, 'quoteId');
     if (cq && uq && cq === uq) {
-      console.info('[shouldApplyEntryUpdate] mint: matched by quoteId |', cq);
+      logger.info('shouldApplyEntryUpdate.mint.matchByQuoteId', { quoteId: cq });
       return true;
     }
 
@@ -406,7 +402,7 @@ export function shouldApplyEntryUpdate(
       getStringField(getMetadata(updatedEntry), 'operationId') ??
       getStringField(updatedEntry, 'operationId');
     if (co && uo && co === uo) {
-      console.info('[shouldApplyEntryUpdate] mint: matched by operationId |', co);
+      logger.info('shouldApplyEntryUpdate.mint.matchByOperationId', { operationId: co });
       return true;
     }
   }
@@ -464,12 +460,7 @@ export function shouldApplyEntryUpdate(
 
     const isPreview = currentId?.startsWith('receive-') ?? false;
     if (!isPreview) {
-      console.info(
-        '[shouldApplyEntryUpdate] receive: not a preview entry, skipping | currentId:',
-        currentId,
-        '| updatedId:',
-        updatedId
-      );
+      logger.info('shouldApplyEntryUpdate.receive.notPreview', { currentId, updatedId });
       return false;
     }
 
@@ -478,16 +469,12 @@ export function shouldApplyEntryUpdate(
     const ca = getNumberField(currentEntry, 'amount');
     const ua = getNumberField(updatedEntry, 'amount');
     const matched = !!cm && cm === um && typeof ca === 'number' && ca === ua;
-    console.info(
-      '[shouldApplyEntryUpdate] receive preview match:',
+    logger.info('shouldApplyEntryUpdate.receivePreviewMatch', {
       matched,
-      '| mintUrl:',
-      cm === um,
-      '| amount:',
-      ca,
-      '→',
-      ua
-    );
+      mintUrlMatch: cm === um,
+      amountFrom: ca,
+      amountTo: ua,
+    });
     return matched;
   }
 
@@ -570,7 +557,7 @@ export function decorateEntry(raw: EntryRecord | null, language: string): EntryR
         language
       );
     } catch (e) {
-      console.warn('[buildEntryContent] Token encode failed:', e instanceof Error ? e.message : e);
+      logger.warn('buildEntryContent.tokenEncodeFailed', { error: errField(e) });
     }
   }
 

@@ -16,6 +16,10 @@ export {
 // Re-export Manager type so consumers don't need to import coco-cashu-core
 export type { Manager } from '@cashu/coco-core';
 
+// Logger seam — consumers inject a structured logger via the `logger` option
+// on `createCocoPaymentUX`; tests and standalone consumers get a no-op default.
+export { setLogger, type Logger } from './logger';
+
 // Typed accessors for coco Manager internals — see api/managerInternals.ts
 export {
   getReadyProofs,

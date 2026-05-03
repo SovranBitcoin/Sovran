@@ -1,4 +1,5 @@
 import { resolveIntent } from '../intent';
+import { logger } from '../logger';
 import { composeSatoshis } from '../offline';
 import { parsePaymentInput } from '../parse';
 import { selectMint, getValidMintCandidates } from '../mint-selection';
@@ -34,7 +35,7 @@ function handleExecute(
 ): TransitionResult {
   const parsed = parsePaymentInput(input, detectors);
   const intent = resolveIntent(parsed, detectors, walletCtx);
-  console.info('[transitions.execute] Parsed input | type:', parsed.type, '| intent:', intent.type);
+  logger.info('transitions.execute', { parsedType: parsed.type, intentType: intent.type });
 
   const ctx: FlowContext = { parsed, intent, unit, rawInput: input, offline };
 
@@ -124,7 +125,11 @@ function handleAmountEntered(
   currentCtx: FlowContext,
   walletCtx: WalletContext
 ): TransitionResult {
-  console.info('[transitions.amountEntered] Amount:', event.amount, '| mintUrl:', event.mintUrl || '(none)', '| destination:', event.destination ?? currentCtx.destination);
+  logger.info('transitions.amountEntered', {
+    amount: event.amount,
+    mintUrl: event.mintUrl || null,
+    destination: event.destination ?? currentCtx.destination,
+  });
   const shouldResetContext = !!event.destination && event.destination !== currentCtx.destination;
   const ctx: FlowContext = shouldResetContext
     ? {
@@ -158,7 +163,11 @@ function handleMintSelected(
   currentCtx: FlowContext,
   walletCtx: WalletContext
 ): TransitionResult {
-  console.info('[transitions.mintSelected] Mint:', event.mintUrl, '| amount:', event.amount, '| destination:', event.destination ?? currentCtx.destination);
+  logger.info('transitions.mintSelected', {
+    mintUrl: event.mintUrl,
+    amount: event.amount,
+    destination: event.destination ?? currentCtx.destination,
+  });
   const shouldResetContext = !!event.destination && event.destination !== currentCtx.destination;
   const ctx: FlowContext = shouldResetContext
     ? {
@@ -266,10 +275,13 @@ function handleMintSelectorRequested(
 // ---------------------------------------------------------------------------
 
 function handleStartSendEcash(walletCtx: WalletContext, unit: string, offline?: boolean): TransitionResult {
-  console.info('[transitions] startSendEcash | unit:', unit, '| offline:', offline ?? false);
+  logger.info('transitions.startSendEcash', { unit, offline: offline ?? false });
   const ctx: FlowContext = { unit, destination: 'sendEcash', offline };
   const selection = selectMint(walletCtx);
-  console.info('[transitions] Mint selection result:', selection.type, selection.type === 'selected' ? '| mint:' + selection.mintUrl : '');
+  logger.info('transitions.mintSelection.result', {
+    selectionType: selection.type,
+    mintUrl: selection.type === 'selected' ? selection.mintUrl : null,
+  });
 
   switch (selection.type) {
     case 'selected':
@@ -304,7 +316,7 @@ function handleStartSendEcash(walletCtx: WalletContext, unit: string, offline?: 
 
 function handleStartReceiveLightning(walletCtx: WalletContext, unit: string): TransitionResult {
   const mintUrl = walletCtx.preferredMintUrl ?? walletCtx.trustedMintUrls[0] ?? '';
-  console.info('[transitions] startReceiveLightning | unit:', unit, '| mintUrl:', mintUrl || '(none)');
+  logger.info('transitions.startReceiveLightning', { unit, mintUrl: mintUrl || null });
   const ctx: FlowContext = { unit, destination: 'mintQuote', mintUrl };
 
   return {
@@ -335,7 +347,11 @@ function resolveFromContext(ctx: FlowContext, walletCtx: WalletContext): Transit
   const unit = ctx.unit;
   const amount = ctx.amount;
   const mintUrl = ctx.mintUrl;
-  console.info('[transitions.resolveFromContext] destination:', destination, '| amount:', amount, '| mintUrl:', mintUrl || '(none)');
+  logger.info('transitions.resolveFromContext', {
+    destination,
+    amount,
+    mintUrl: mintUrl || null,
+  });
 
   if (destination === 'mintQuote') {
     if (amount == null || amount <= 0) {

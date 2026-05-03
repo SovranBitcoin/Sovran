@@ -11,6 +11,7 @@
 
 import type { Manager } from '@cashu/coco-core';
 import { createPaymentMachine } from '../machine/createMachine';
+import { setLogger, type Logger } from '../logger';
 import type {
   MachineOperations,
   NfcIOAdapter,
@@ -67,6 +68,14 @@ export interface CocoPaymentUXConfig {
    * the melt flow a faster fail-stop on hostile or stalled providers.
    */
   lightningTimeoutMs?: number;
+
+  /**
+   * Structured logger used by every internal module. Defaults to a no-op
+   * so the package stays runtime-agnostic; sovran-app passes its scoped
+   * `paymentLog` so coco-payment-ux events flow through the same
+   * structured pipeline as the rest of the app.
+   */
+  logger?: Logger;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +105,8 @@ export function createCocoPaymentUX(config: CocoPaymentUXConfig): CocoPaymentUXI
     getLocale,
     enrichMintReviewInfo,
   } = config;
+
+  if (config.logger) setLogger(config.logger);
 
   const tracker = createWalletContextTracker(manager, {
     getPreferredMintUrl: config.getPreferredMintUrl,
