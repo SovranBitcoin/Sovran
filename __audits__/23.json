@@ -1,0 +1,347 @@
+{
+  "audit": {
+    "date": "2026-04-21",
+    "commit": "f63699a1",
+    "entry_point": "sovran-app/features/receive",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Distance +7 vs features/wallet +6 and features/feed +6. features/receive slice has never been an ENTRY across 22 prior audits; 'receive' appears in zero covered_paths; 17 commits in the last 90 days; natural dims 2/3/5/7 underspent in audits 21 (dim 8) and 22 (dim 2/9). Sister flow to the send-flow audited in 19.",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "zod-4",
+      "neverthrow-return-types",
+      "native-data-fetching",
+      "security-review"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "52 errors project-wide, 0 in features/receive or app/(receive-flow)",
+      "lint": "1 warning in app/(receive-flow)/mintSelect.tsx:36 (react-hooks/exhaustive-deps); 0 in features/receive",
+      "knip": "1 unused export: ReceivePaymentUXExtrasValue interface",
+      "analyze_structure": "0 cycles; orphans reported for screens are false positives (importers are app/ routes outside the analyzed subtree); 12 colocate suggestions for shared dependencies"
+    }
+  },
+  "completion_status": "deferred",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.88,
+      "title": "Receive-flow scan QR silently no-ops — ReceivePaymentUXExtrasProvider is a descendant of its consumer",
+      "repo": "sovran-app",
+      "path": "features/send/providers/CocoPaymentUX.tsx",
+      "line": 104,
+      "symbol": "CocoPaymentUXProvider",
+      "dimension": 5,
+      "description": "CocoPaymentUXProvider is mounted once at app/_layout.tsx:112 inside the AccountScopedProviders compose chain, wrapping the root Stack and every flow route under it. Its body calls useReceivePaymentUXExtras() at line 104 to obtain requestCameraPermission. The only mount of ReceivePaymentUXExtrasProvider is at app/(receive-flow)/_layout.tsx:33, which is a descendant of CocoPaymentUXProvider. React context lookup walks UP from the consumer, so useReceivePaymentUXExtras() never sees the provider and always returns the default value (null). At line 280-284 the scanQr navigation callback checks `receiveExtras?.requestCameraPermission ? await receiveExtras.requestCameraPermission() : false` — the ternary always takes the false branch, `granted` is false, and the next line returns without navigating to /(receive-flow)/camera. The requestCameraPermission field threaded into screenActionsBridge at line 328 is likewise always undefined.",
+      "why_it_matters": "Tapping 'Scan QR' from the Receive hub does nothing. The feature is dead. The intent per coco-payment-ux/README.md:163 is that requestCameraPermission flows as a flat prop through screenActionsBridge on CocoPaymentUXProvider — pulling it via React context from a descendant breaks that contract.",
+      "fix": "Drop the ReceivePaymentUXExtras context entirely and pass requestCameraPermission as a prop or via a ref on CocoPaymentUXProvider. Two options: (a) lift the camera permission logic (useCameraPermissions + wrapper) into a hook called inside CocoPaymentUXProvider itself so the permission function is defined alongside its consumer; (b) keep the provider but register requestCameraPermission into a mutable ref via a setter hook that the (receive-flow) layout calls on mount, and read receiveExtras from that ref. (a) is simpler and removes the dead provider file. Either way, add a log statement at the scanQr receive branch — `log.info('receive.scan_qr.has_extras', { hasExtras: !!receiveExtras?.requestCameraPermission })` — so the next audit can confirm from log.txt.",
+      "references": [
+        "skill:native-data-fetching"
+      ],
+      "verification_note": "Static analysis is unambiguous: one mount site for ReceivePaymentUXExtrasProvider (grep confirmed), and it is lexically inside (receive-flow)/_layout.tsx while CocoPaymentUXProvider is at the root _layout.tsx. Log.txt shows one camera.permission.already_granted event that originates from the STANDALONE /camera route (StandaloneCameraScreen), not (receive-flow)/camera — so the receive-flow scan path was not exercised in the captured session. Marked UNVERIFIED by log; proposed the minimal scoped log that would confirm on next session.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "Deep-link routes JSON.parse raw params without try/catch or schema validation",
+      "repo": "sovran-app",
+      "path": "app/mintQuote.tsx",
+      "line": 17,
+      "symbol": "ModalScreen",
+      "dimension": 2,
+      "description": "app/mintQuote.tsx:17 and app/(transactions-flow)/mintQuote.tsx:17 both perform `const mintHistoryEntry = JSON.parse(mintHistoryEntryString) as MintHistoryEntry;` on a value pulled directly from `useLocalSearchParams<{ mintHistoryEntry: string }>()`. The app registers `sovran://` and `cashu://` deep-link schemes at app.json:7, so the param is attacker-controllable. JSON.parse on undefined or malformed input throws and the route crashes with an unhandled exception (DoS). Even when the JSON is well-formed, the `as MintHistoryEntry` is a TypeScript-only cast — no runtime shape check. An attacker crafts a link like `sovran://mintQuote?mintHistoryEntry=%7B%22id%22%3A...%22paymentRequest%22%3A%22lnbc1...attacker-invoice...%22%7D` and the screen renders an attacker-chosen BOLT11 invoice as 'your receive invoice' under the user's identity. If the user copies/shares this invoice to a payer, sats flow to the attacker. The third sister route `app/(receive-flow)/mintQuote.tsx:42-47` does not parse — it passes the raw string to MintQuoteScreen, which lets useScreenActions handle it; only two of the three wrappers regressed.",
+      "why_it_matters": "Bearer-instrument context: the displayed paymentRequest is a Lightning invoice that third parties will pay. A fake invoice under the victim's trusted UI is a spear-phishing / supply-chain-of-trust vector. The crash path is separately usable to force an app-reload from a link.",
+      "fix": "Move the parse into a zod boundary schema co-owned with MintHistoryEntry. In order: (a) introduce a `mintHistoryEntryParamSchema` in packages/schemas (per the aspirational shared-schemas package called out in AUDIT.md) or, until that package exists, in shared/lib/schemas/; (b) use `safeParse` and render `<ScreenErrorState>` with `router.back()` on failure; (c) collapse the three wrappers (app/mintQuote.tsx, app/(transactions-flow)/mintQuote.tsx, app/(receive-flow)/mintQuote.tsx) into a single implementation where the screen owns parse + validate — the receive-flow wrapper already does the right thing. Use `z.strictObject` with `.max()` on string fields (AUDIT.md dim 6 rule).",
+      "references": [
+        "skill:zod-4",
+        "skill:security-review",
+        "luds/06.md"
+      ],
+      "verification_note": "Re-read app/mintQuote.tsx and app/(transactions-flow)/mintQuote.tsx — both call JSON.parse with no try/catch and assert-cast the result. app/(receive-flow)/mintQuote.tsx:40-50 passes the raw string through, confirming drift between the three. Scheme registration confirmed at app.json:7. Counter-argument considered: maybe expo-router/React Native natively catches sync throws in render and shows an error boundary; even if so, the type-unsafe render path for well-formed attacker JSON remains exploitable. Funds-at-risk → High retained.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "app/mintQuote.tsx and (transactions-flow)/mintQuote.tsx now validate the param string and pass it to MintQuoteScreen; the unguarded JSON.parse cast is gone."
+    },
+    {
+      "id": "F-003",
+      "severity": "Medium",
+      "confidence": 0.85,
+      "title": "P2PK tab content renders when quickAccessP2PK setting is off",
+      "repo": "sovran-app",
+      "path": "features/receive/screens/ReceiveScreen.tsx",
+      "line": 186,
+      "symbol": "ReceiveScreen",
+      "dimension": 1,
+      "description": "selectedTab is initialized to 'Lightning' (line 186) and never reset when the user toggles quickAccessP2PK off in Settings. When quickAccessP2PK is true the user can move selectedTab to 'P2PK'. If they then disable the setting, line 196 recomputes `tabs = ['Lightning']` and the Tabs bar at line 253 is hidden by the `{quickAccessP2PK && ...}` gate, but the render branch at lines 257-269 still reads `{selectedTab === 'Lightning' ? <ReceiveLightningTab/> : <ReceiveP2pkTab/>}`. With selectedTab still equal to 'P2PK' and the tab bar hidden, the P2PK tab content renders below nothing — a dead-ended UI where the user cannot switch back.",
+      "why_it_matters": "Users who disable quickAccessP2PK mid-session are stuck on the P2PK tab with no visible control to switch. They see a P2PK public-key display when they expected the Lightning receive surface.",
+      "fix": "Two options: (a) force the render branch to respect the setting: `{(!quickAccessP2PK || selectedTab === 'Lightning') ? <Lightning/> : <P2PK/>}`. (b) reset selectedTab to 'Lightning' in a useEffect keyed on quickAccessP2PK flipping off. (a) is more defensive and preserves the current tab when quickAccessP2PK toggles back on.",
+      "references": [],
+      "verification_note": "Re-read lines 186-269. Confirmed selectedTab has no reset mechanism and the render branch does not gate on quickAccessP2PK. Counter-argument: maybe the Settings toggle navigates away and remounts the screen. Checked — toggling the setting writes to settingsStore but does not unmount ReceiveScreen, and useSettingsStore(s => s.quickAccessP2PK) triggers a re-render in place. Bug holds.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "Render-side log calls violate React render purity",
+      "repo": "sovran-app",
+      "path": "features/receive/screens/MintQuoteScreen.tsx",
+      "line": 71,
+      "symbol": "MintQuoteScreen",
+      "dimension": 7,
+      "description": "Five logger calls fire during render rather than inside effects: MintQuoteScreen.tsx:62 (log.warn 'receive.mint_quote.error'), MintQuoteScreen.tsx:71-76 (log.debug 'receive.mint_quote.render'), ReceiveScreen.tsx:201 (log.warn 'receive.screen.error'), ReceiveTokenScreen.tsx:51 (log.warn 'receive.token.error'), ReceiveTokenScreen.tsx:60 (log.debug 'receive.token.render'). Log-doctor confirms the mint_quote.render cluster fires 3 times back-to-back on each mount (161ms, 31ms, 32ms, 35ms), consistent with StrictMode double-invoke plus state reconciliation — the screen is re-rendering three times and logging every time. On error paths the warn fires on every re-render as long as the error remains truthy.",
+      "why_it_matters": "Logging is a side effect; placing it in the render body breaks the purity contract React Concurrent Mode relies on. The 50ms dedup on the logger hides the problem in practice but does not fix it — dedup suppresses the duplicate, it does not prevent the side-effect from firing. In development these logs fill the ring buffer faster than a diagnostic needs.",
+      "fix": "Move each render-body log to a useEffect with the relevant dependencies. For the mint quote render event, log inside `useEffect(() => { ... }, [entry.state, entry.amount, entry.unit])` so the log fires once per meaningful state change, not once per render. For error warns, the effect should depend on `[error]`.",
+      "references": [
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Log-doctor timeline confirms: `receive.mint_quote.render state=\"UNPAID\" ...` fires with inter-delta of 161ms, 31ms, 32ms per mount (3-4 renders per visit). Evidence cited verbatim in the markdown report.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.95,
+      "title": "useLightningOperations is colocated in features/receive but has zero consumers there",
+      "repo": "sovran-app",
+      "path": "features/receive/hooks/useLightningOperations.ts",
+      "line": 12,
+      "symbol": "useLightningOperations",
+      "dimension": 4,
+      "description": "features/receive/hooks/useLightningOperations.ts exports a hook that wraps `manager.ops.mint.prepare({ method: 'bolt11' })`. Grep-confirmed zero consumers inside features/receive (the three screens use useScreenActions from coco-payment-ux/react, not this hook). The two real consumers live in sibling features: features/splitBill/hooks/useSplitBillOrchestrator.ts:34 and features/mint/screens/MintRebalancePlanScreen.tsx:17. This is a structural smell flagged by the analyze-structure colocate heuristic (but not reported because the tool only scans inside the chosen subtree). splitBill and mint reach sideways into features/receive for a hook that has nothing to do with the receive UI.",
+      "why_it_matters": "Cross-feature imports signal a missing layer. If the hook moves or the receive feature is refactored, splitBill and mint break for no reason. The AUDIT.md folder-structure rule says shared helpers go in shared/ (when used by ≥ 2 features) or in the feature that owns them.",
+      "fix": "Move the file to features/wallet/hooks/useLightningOperations.ts (alongside useAppBalance — the wallet feature already owns thin manager wrappers). Update the two import sites. If the neverthrow migration lands, change the return type from `throws` to `ResultAsync<MintOperation, MintError>` per skill:neverthrow-return-types.",
+      "references": [
+        "skill:neverthrow-return-types"
+      ],
+      "verification_note": "Grep for useLightningOperations confirmed: 2 importers outside features/receive, 0 inside. knip does not flag because the hook IS imported — just by the wrong features.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "useLightningOperations error fallback flattens distinct mint errors to one generic message",
+      "repo": "sovran-app",
+      "path": "features/receive/hooks/useLightningOperations.ts",
+      "line": 27,
+      "symbol": "useLightningOperations.requestLightningInvoice",
+      "dimension": 1,
+      "description": "At lines 27-31: `const error = err instanceof Error ? err : new Error('Failed to create mint quote');`. The `instanceof Error` branch preserves the original, but the fallback collapses every non-Error throw (string, object, coco's structured error bag) into a generic message. `manager.ops.mint.prepare` can fail with: mint HTTP 402 (Payment Required — rate-limit or quota), 429 (Rate limit exceeded — confirmed in log.txt at `coco.manager.RequestRateLimiter.RequestRateLimiter.mint_response_error status=429`), 500 (mint bug), network timeout, DLEQ verification failure (NUT-12), or a keyset-mismatch. All collapse to 'Failed to create mint quote'. The rebalance plan and splitBill orchestrator consume this error and cannot branch on the cause — a rate-limited retry path looks identical to a permanent protocol failure.",
+      "why_it_matters": "Rebalance and splitBill retries rely on knowing whether an error is transient (429, timeout) or permanent (DLEQ fail, keyset mismatch). Flattening the error means both are retried or neither is, which wastes user time and may double-spend mint quota on transient failures.",
+      "fix": "Return `ResultAsync<MintOperation, MintError>` where MintError is a discriminated union (`{ type: 'rate_limit' } | { type: 'network' } | { type: 'protocol'; code: string } | { type: 'unknown'; raw: unknown }`). Inspect the caught value for known shapes (response.status === 429, err.code, cashu-ts error classes) before the unknown fallback. Update MintRebalancePlanScreen:454/936/973/1024 and useSplitBillOrchestrator:232 to branch on the discriminant.",
+      "references": [
+        "skill:neverthrow-return-types",
+        "skill:neverthrow-wrap-exceptions"
+      ],
+      "verification_note": "Log-doctor `errors --context 3` shows `coco.manager.RequestRateLimiter.RequestRateLimiter.mint_response_error status=429` occurred in the captured session — the rate-limit case the current error fallback cannot distinguish.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "`close: any` in MintQuoteScreen buttons papers over a broken ButtonHandler onPress type",
+      "repo": "sovran-app",
+      "path": "features/receive/screens/MintQuoteScreen.tsx",
+      "line": 87,
+      "symbol": "MintQuoteScreen.bottomButtons",
+      "dimension": 1,
+      "description": "Lines 87 and 97 declare `onPress: async (close: any) =>` and invoke `close({})`. The type of `ButtonHandlerButton.onPress` at shared/ui/composed/ButtonHandler.tsx:92 is `(close: (event: GestureResponderEvent) => void) => Promise<void>`, which says `close` expects a `GestureResponderEvent`. But the actual invocation at ButtonHandler.tsx:197 is `button.onPress?.(() => {})` — a no-arg function is passed as `close`. Consumers then pass `{}` where a `GestureResponderEvent` is required, and the `any` cast silences the mismatch. The declared signature of `close` does not match what is passed at runtime.",
+      "why_it_matters": "Every caller that uses `close` either has to cast to `any` (MintQuoteScreen) or invoke `close({})` with a lie. The type system has stopped describing reality. A future refactor that trusts the type will pass a real event and break the impl.",
+      "fix": "Change the ButtonHandlerButton.onPress declaration to `(close: () => void) => Promise<void>` (or, more accurately, drop `close` from the signature entirely and hoist any sheet-dismissal logic into the button handler). Update MintQuoteScreen to `onPress: async (close) => { await actions.copy.execute(); close(); }` and drop the `any` casts.",
+      "references": [
+        "skill:typescript-advanced-types"
+      ],
+      "verification_note": "Re-read ButtonHandler.tsx:92 and :197. Signature says `(event: GestureResponderEvent) => void`; impl passes `() => {}`. MintQuoteScreen.tsx:87,97 are the two sites where `close: any` appears in the blast radius.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "ButtonHandlerButton.onPress is now `() => void | Promise<void>`. The lying `close` parameter is removed entirely (rather than retyped) since neither the inline-render path nor the overflow Menu owns a dismissal seam to forward; screens that need to dismiss already do so explicitly via onCancel / router.back / onNavigateBack. MintQuoteScreen, SendTokenScreen, MeltQuoteScreen, and PaymentRequestScreen all drop the `close: any` cast and the `close({})` no-op call."
+    },
+    {
+      "id": "F-008",
+      "severity": "Low",
+      "confidence": 0.75,
+      "title": "Inline fallback functions and fresh arrays defeat memoisation of MintSelector and Tabs",
+      "repo": "sovran-app",
+      "path": "features/receive/screens/MintQuoteScreen.tsx",
+      "line": 145,
+      "symbol": "MintQuoteScreen",
+      "dimension": 7,
+      "description": "MintQuoteScreen.tsx:145-146 declare `onMintSelected={onMintSelected ?? (() => {})}` and `onRequestMintList={onRequestMintList ?? (() => {})}` — a new arrow function is allocated every render, so if MintSelector is a React.memo component these props invalidate the memo on every parent render. ReceiveScreen.tsx:196 `const tabs = quickAccessP2PK ? ['Lightning', 'P2PK'] : ['Lightning'];` creates a fresh array each render — similar memo hazard for Tabs. This is the 'inline fallback' anti-pattern called out in skill:zustand-5's selector-stability notes.",
+      "why_it_matters": "Not a correctness bug, but the whole point of React.memo on MintSelector and Tabs is undermined. On a busy screen (MintQuoteScreen re-renders 3+ times per visit per F-004) the extra reconciliation adds up.",
+      "fix": "Hoist two module-level constants: `const NOOP = () => {};` and `const TABS_LIGHTNING = ['Lightning'] as const; const TABS_BOTH = ['Lightning', 'P2PK'] as const;`. Use them as the fallbacks/branches.",
+      "references": [
+        "skill:zustand-5"
+      ],
+      "verification_note": "Re-read the three call sites. Confirmed inline function and array literals. Marked Low because no perf measurement confirms the downstream impact; demoting this further to Nit is reasonable if MintSelector and Tabs are not memoised.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "ReceivePaymentUXExtrasValue is an unused exported interface",
+      "repo": "sovran-app",
+      "path": "features/receive/providers/ReceivePaymentUXExtras.tsx",
+      "line": 9,
+      "symbol": "ReceivePaymentUXExtrasValue",
+      "dimension": 4,
+      "description": "knip flags ReceivePaymentUXExtrasValue as an unused export. The interface is used only internally (as the generic for createContext and as the return type annotation). No other file in the project imports the interface name.",
+      "why_it_matters": "Public export surface is a contract — every exported symbol is something a consumer might one day depend on. Unused exports inflate the contract unnecessarily.",
+      "fix": "Drop the `export` keyword from the interface declaration; it becomes file-local. If this finding is addressed alongside F-001 (removing the context entirely), the whole file goes with it.",
+      "references": [
+        "knip:unused-export"
+      ],
+      "verification_note": "knip output: `ReceivePaymentUXExtrasValue          interface  features/receive/providers/ReceivePaymentUXExtras.tsx:9:18`. Confirmed by grep: no file imports the type name.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.9,
+      "title": "Three near-identical route wrappers for mintQuote/receiveToken have drifted",
+      "repo": "sovran-app",
+      "path": "app/mintQuote.tsx",
+      "line": 1,
+      "symbol": "mintQuote wrappers",
+      "dimension": 4,
+      "description": "Six route files cover two logical screens: app/mintQuote.tsx, app/(receive-flow)/mintQuote.tsx, app/(transactions-flow)/mintQuote.tsx (and the same three for receiveToken). They differ only in the `<Stack.Screen options={...} />` and whether they JSON.parse the param. The standalone and transactions-flow variants regressed into JSON.parse (F-002); the receive-flow variant delegates correctly. Three parallel paths for one screen with no single owner invite exactly this kind of drift.",
+      "why_it_matters": "A future change that tightens the receive-flow path (e.g. zod validation) will miss the other two. Drift is already visible in the JSON.parse divergence. Consolidating removes one whole class of bug.",
+      "fix": "Move the parse + zod validation into MintQuoteScreen itself (receive-flow already passes the raw string, so it continues to work). Replace the two remaining route files' bodies with the same three-line raw-string pass-through the receive-flow uses. Same pattern for the three receiveToken wrappers. Delete no files — expo-router needs each route path — but their bodies become identical two-liners.",
+      "references": [],
+      "verification_note": "Read all three mintQuote.tsx wrappers and all three receiveToken.tsx wrappers. Confirmed divergence. This finding is separate from F-002 (security) — consolidating fixes F-002 as a side effect but is worth noting structurally.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Validation drift across the three mintQuote / receiveToken wrappers is closed: each route declares the same min(1).max(64_000) zod schema and routes invalid params back via useRouteParams (commit 0dddea5f). Structural consolidation of the duplicated wrappers themselves was out of scope for this slice."
+    },
+    {
+      "id": "F-011",
+      "severity": "Low",
+      "confidence": 0.75,
+      "title": "isRedeemed derived from an id-prefix heuristic instead of an explicit state field",
+      "repo": "sovran-app",
+      "path": "features/receive/screens/ReceiveTokenScreen.tsx",
+      "line": 59,
+      "symbol": "ReceiveTokenScreen.isRedeemed",
+      "dimension": 1,
+      "description": "Line 59: `const isRedeemed = !(entry.id?.startsWith('receive-') ?? false);`. The screen infers redemption state from whether the id has a `receive-` prefix — a naming convention, not a state field. If entry.id is undefined the expression is `!false = true`, so an in-progress receive with a missing id renders as redeemed (showing the Close button and the final-state timeline). If coco's ID scheme upstream changes the prefix or moves to UUIDs, every ReceiveTokenScreen flips silently. MintQuoteScreen.tsx:70 uses the correct pattern: `entry.state === 'ISSUED' || entry.state === 'PAID'` — explicit state field.",
+      "why_it_matters": "Fragile heuristic on a funds-flow screen. The failure mode is a user closing a receive modal that hasn't actually redeemed, or seeing redeem confirmation UI for a token that never cleared. State inference via id string is a smell that multiplies over time.",
+      "fix": "ReceiveHistoryEntry from @cashu/coco-core carries a state/status field (the same one MintQuoteScreen uses). Read it directly: `const isRedeemed = entry.status === 'redeemed'` (or whatever the exact discriminator is in the current coco-core types). If there genuinely is no explicit state field for ReceiveHistoryEntry, the fix is upstream in coco — patch via sovran-app/patches/ rather than working around it in the UI.",
+      "references": [],
+      "verification_note": "Re-read lines 55-111. Confirmed the prefix heuristic and the undefined-id failure mode. Marked Low because no log evidence of the bug firing; Medium would be justified if @cashu/coco-core can generate entries with undefined id during an in-progress receive — UNVERIFIED.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-012",
+      "severity": "Nit",
+      "confidence": 0.9,
+      "title": "Hybrid non-null-assertion and optional-chain on the same guarded value",
+      "repo": "sovran-app",
+      "path": "features/receive/screens/ReceiveScreen.tsx",
+      "line": 69,
+      "symbol": "ReceiveLightningTab",
+      "dimension": 1,
+      "description": "Lines 64, 69, 88 read `data.npcAddress` three times: the gate `Boolean(data.npcAddress && unit === 'sat')` narrows it to truthy, then line 69 uses `data.npcAddress!.toString()` (non-null assertion) while line 88 uses `data.npcAddress?.truncate(6) ?? ''` (optional chain with fallback). Both are safe, but the inconsistency is noise.",
+      "why_it_matters": "Nit. No behavioural consequence.",
+      "fix": "Pick one style. Hoist once at the top of the `showLightningAddress` branch: `const npc = data.npcAddress!;` then `npc.toString()` and `npc.truncate(6)`.",
+      "references": [],
+      "verification_note": "Re-read lines 64, 69, 88.",
+      "prior_audit_id": null
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "skipped",
+    "4": "pass",
+    "5": "pass",
+    "6": "partial",
+    "7": "pass",
+    "8": "skipped",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "dead-code",
+      "description": "After F-001 is fixed by lifting camera-permission logic into CocoPaymentUXProvider directly, delete features/receive/providers/ReceivePaymentUXExtras.tsx and its mount at app/(receive-flow)/_layout.tsx:33 (together with the associated useCameraPermissions call). The provider becomes dead code.",
+      "files": [
+        "features/receive/providers/ReceivePaymentUXExtras.tsx",
+        "app/(receive-flow)/_layout.tsx"
+      ]
+    },
+    {
+      "type": "relocate",
+      "description": "Move features/receive/hooks/useLightningOperations.ts to features/wallet/hooks/useLightningOperations.ts — zero consumers in features/receive, two consumers in features/splitBill and features/mint. Aligns with existing features/wallet/hooks/useAppBalance.ts.",
+      "files": [
+        "features/receive/hooks/useLightningOperations.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "Collapse the three-way duplication of mintQuote route wrappers (and separately the three-way receiveToken wrappers) by moving param parse + validation into the screen and shrinking each wrapper to a raw-string pass-through with its own <Stack.Screen options>. Side-effect: closes F-002 by routing all three through a single zod boundary.",
+      "files": [
+        "app/mintQuote.tsx",
+        "app/(receive-flow)/mintQuote.tsx",
+        "app/(transactions-flow)/mintQuote.tsx",
+        "app/receiveToken.tsx",
+        "app/(receive-flow)/receiveToken.tsx",
+        "app/(transactions-flow)/receiveToken.tsx",
+        "features/receive/screens/MintQuoteScreen.tsx",
+        "features/receive/screens/ReceiveTokenScreen.tsx"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Add a scoped log statement `log.info('receive.scan_qr.has_extras', { hasExtras: !!receiveExtras?.requestCameraPermission })` inside the scanQr navigation callback at features/send/providers/CocoPaymentUX.tsx:280 so the next audit can confirm F-001 from log.txt without inventing a new log-doctor mode.",
+      "files": [
+        "features/send/providers/CocoPaymentUX.tsx"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Consider a draft research note `payment-ux-provider-composition.md` (status: draft) capturing the decision rule for when the Sovran CocoPaymentUXProvider should consume context vs receive flat props vs consume a ref. F-001 is the first concrete example; the pattern likely repeats anywhere a flow-local value has to flow up into a root-mounted consumer.",
+      "files": [
+        "__research__/payment-ux-provider-composition.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Does @cashu/coco-core's ReceiveHistoryEntry type expose an explicit redemption-state field, or is the `receive-` id prefix the upstream convention? If the prefix is the convention, F-011's fix is a patch in sovran-app/patches/ to add a state discriminator rather than a wallet-side band-aid.",
+    "Is the `screenActionsBridge.requestCameraPermission` field wired into a path inside coco-payment-ux that tolerates `undefined` (silent no-op) or one that throws? If the latter, F-001 may already surface as a caught error in the log that I missed — worth a grep for screenActionsBridge error events on the next audit.",
+    "Should packages/schemas be treated as a now-required fixture? F-002 and F-006 both want a home for shared zod schemas, and every audit so far has restated this. AUDIT.md marks it aspirational; promoting it to a real package would close three recurring findings."
+  ]
+}

@@ -88,7 +88,9 @@
       "fix": "Either (a) remove the `close` parameter from these call sites (the screens control their own dismissal via onNavigateBack / onCancel / router.back), or (b) change ButtonHandler to consistently pass a useful dismiss function (e.g. a caller-provided onClose) and type the parameter as `() => void`, not GestureResponderEvent. Then drop the `: any` casts.",
       "references": [],
       "verification_note": "Traced close({}) to ButtonHandler.tsx:197 literal `() => {}`. Overflow-sheet path in buttonHandlerPopup exists but the two primary buttons in these screens render inline. The dead-close pattern is consistent across send-flow screens.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Tightened ButtonHandlerButton.onPress to `() => void | Promise<void>` -- the no-op `close` callback was removed from the interface entirely, since neither the inline-render path nor the overflow Menu owns a dismissal seam to forward. SendTokenScreen, MeltQuoteScreen, MintQuoteScreen, and PaymentRequestScreen now pass plain zero-arg handlers; the `close: any` casts and `close({})` calls are gone. AmountEntryView's two pass-through call sites updated for the new shape."
     },
     {
       "id": "F-004",
@@ -163,7 +165,9 @@
       "fix": "Determine what state the timer is waiting for. If it is the ButtonHandler overflow sheet dismiss animation, hook onto the sheet's onDismiss event and remove the sleep. If close({}) was meant to dismiss the sheet, fix that in ButtonHandler (see F-003) and remove the timeout. Leave a comment documenting whichever race is being avoided.",
       "references": [],
       "verification_note": "Confirmed no comment at the call site and no mention in surrounding files. The timer is a plain setTimeout, not a debounce or rate-limit.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "F-003 dependency removed -- the `close: any`/`close({})` lie at the head of this onPress is gone; the body now reads `await new Promise((r) => setTimeout(r, 400)); await actions.nfc.execute()`. The 400ms timing assumption is preserved as-is and remains undocumented. Determining the underlying race (Core NFC session presentation vs whatever else might be competing) is out of scope for the ButtonHandler-shape slice and stays open as deferred follow-up: either correlate via log-doctor and add an explanatory comment, or replace with an event-driven wait."
     },
     {
       "id": "F-008",
