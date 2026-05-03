@@ -129,7 +129,9 @@
         "skill:zod-4"
       ],
       "verification_note": "Confirmed TS2345 at the cited line via tsc run. The diagnostic is stable across repeat runs.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Original TS2345 site (CocoPaymentUX.tsx:185) no longer exists — fetchMintAuditData migrated to shared/lib/getMintCatalog.ts in a prior refactor, which now passes `info as unknown as GetInfoResponse`. The audit-store cast risk persists at the new call site but is out of scope for this slice; the original file/line cited here is no longer current."
     },
     {
       "id": "F-006",
@@ -338,7 +340,8 @@
       ],
       "verification_note": "Same line as prior audit 02.json F-005 plus additional occurrences.",
       "prior_audit_id": "F-005@02.json",
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "Three `as any` type-laundering casts (enrichMintReviewInfo wrapper, the two (info as any) duck-types on manager.mint.getMintInfo) have been removed from features/send/providers/CocoPaymentUX.tsx. Surface check: `grep 'as any' features/send/providers/CocoPaymentUX.tsx` now returns zero results. Achieved by typing getMintEnrichment as Partial<MintReviewInfo> and threading coco's typed GetInfoResponse end-to-end through the mint:added subscription and the bare-entry mintInfo fetch path."
     },
     {
       "id": "F-017",
