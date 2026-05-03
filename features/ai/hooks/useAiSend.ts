@@ -12,7 +12,7 @@ import {
   noWalletAvailablePopup,
   sendMessageFailedPopup,
 } from '@/shared/lib/popup';
-import { aiLog, log } from '@/shared/lib/logger';
+import { aiLog } from '@/shared/lib/logger';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
 import {
@@ -170,17 +170,8 @@ export function useAiSend() {
       // Resolve the (provider, tier) pair against the live catalog, then
       // take the affordable head of the same-tier chain across the other
       // providers as runtime fallback for connect-time failures.
-      const primaryModel = resolveSelectedModel(
-        provider.id,
-        tier.id,
-        balanceSats,
-        cachedModels
-      );
-      const allCandidates = resolveCandidateChainForSlot(
-        provider.id,
-        tier.id,
-        cachedModels
-      );
+      const primaryModel = resolveSelectedModel(provider.id, tier.id, balanceSats, cachedModels);
+      const allCandidates = resolveCandidateChainForSlot(provider.id, tier.id, cachedModels);
       const primaryIdx = allCandidates.indexOf(primaryModel);
       const candidateChain =
         primaryIdx >= 0 ? allCandidates.slice(primaryIdx) : [primaryModel, ...allCandidates];
@@ -501,7 +492,7 @@ export function useAiSend() {
             });
           })
           .catch((err) => {
-            log.warn('ai.send.balance_refresh_failed', { flowId, err });
+            aiLog.warn('ai.send.balance_refresh_failed', { flowId, err });
           });
 
         span.end({ outcome: 'ok', chunks: chunkCount, chars: fullContent.length });
@@ -622,7 +613,10 @@ export function useAiSend() {
       // freshly-added messages via the active path because the store has
       // already absorbed them.
       const stateAfter = useRoutstrStore.getState();
-      const apiMessages = deriveActivePath(stateAfter.conversationHistory, stateAfter.activeChildren)
+      const apiMessages = deriveActivePath(
+        stateAfter.conversationHistory,
+        stateAfter.activeChildren
+      )
         .filter((m) => m.id !== assistantMessageId && m.content)
         .map((m) => ({
           role: m.role as 'user' | 'assistant' | 'system',
@@ -662,7 +656,7 @@ export function useAiSend() {
       const stateNow = useRoutstrStore.getState();
       const original = stateNow.conversationHistory.find((m) => m.id === messageId);
       if (!original || original.role !== 'assistant') {
-        log.warn('ai.retry.invalid_target', { messageId, role: original?.role });
+        aiLog.warn('ai.retry.invalid_target', { messageId, role: original?.role });
         return;
       }
       // Build the context that produced `messageId`: every ancestor up to
@@ -676,7 +670,7 @@ export function useAiSend() {
           content: m.content,
         }));
       if (apiMessages.length === 0) {
-        log.warn('ai.retry.no_context', { messageId });
+        aiLog.warn('ai.retry.no_context', { messageId });
         return;
       }
 

@@ -13,6 +13,8 @@
  */
 
 import Supercluster from 'supercluster';
+
+import { mapLog } from '@/shared/lib/logger';
 import { CLUSTER_MARKER_COLOR, getMarkerColor } from './categories';
 
 // ============================================================================
@@ -92,9 +94,10 @@ export class ClusterManager {
     this.loaded = true;
     const duration = Math.round((performance.now() - t0) * 100) / 100;
     if (duration > 100) {
-      console.warn(
-        `[perf] Supercluster.load(${points.length} points) took ${duration}ms — JS thread was blocked`
-      );
+      mapLog.warn('map.cluster.load_slow', {
+        points: points.length,
+        duration_ms: duration,
+      });
     }
   }
 

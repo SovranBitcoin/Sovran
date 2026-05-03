@@ -1,4 +1,6 @@
 import type Supercluster from 'supercluster';
+
+import { mapLog } from '@/shared/lib/logger';
 import { ClusterManager, GeoPoint } from './mapClustering';
 
 type CacheEntry = {
@@ -42,9 +44,11 @@ export function getOrBuildBTCMapClusterManager(
   evictIfNeeded();
   const duration = Math.round((performance.now() - t0) * 100) / 100;
   if (duration > 50) {
-    console.warn(
-      `[perf] cluster.build(${points.length} points) ${duration}ms — cache miss for "${cacheKey}"`
-    );
+    mapLog.warn('map.cluster.build_slow', {
+      points: points.length,
+      duration_ms: duration,
+      cacheKey,
+    });
   }
   return manager;
 }

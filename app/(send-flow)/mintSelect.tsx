@@ -24,7 +24,7 @@ import { MintListScreen } from '@/features/mint';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { ScreenHeaderAction } from '@/shared/ui/composed/ScreenHeaderAction';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
 const ParamsSchema = z.object({
@@ -47,7 +47,7 @@ function MintSelectRoute() {
     const disabled = items.filter((i) => i.status === 'disabled').length;
     const withIcon = items.filter((i) => i.iconUrl).length;
     const withReputation = items.filter((i) => (i.contactReputation ?? 0) > 0).length;
-    log.info('mint.selector.entry', {
+    paymentLog.info('mint.selector.entry', {
       flow: 'send',
       scope: entry?.scope,
       destination: entry?.destination,

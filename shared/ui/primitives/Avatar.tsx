@@ -8,6 +8,7 @@ import Icon from 'assets/icons';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { generateSeededGradient } from '@/shared/lib/avatarGradient';
 import { prefetchImage } from '@/shared/lib/imageCache';
+import { log } from '@/shared/lib/logger';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { Badge } from './Badge';
 
@@ -140,10 +141,7 @@ export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: A
   if (state === 'fallback') {
     return (
       <VStack style={{ position: 'relative', overflow: 'hidden' }}>
-        <View
-          style={containerStyle}
-          accessibilityRole="image"
-          accessibilityLabel={imageAlt}>
+        <View style={containerStyle} accessibilityRole="image" accessibilityLabel={imageAlt}>
           <FallbackContent gradientTheme={gradientTheme} borderRadius={borderRadius} />
         </View>
         {StatusBadgeWrapper}
@@ -154,7 +152,7 @@ export const Avatar = ({ state, picture, size = 48, alt, name, status, seed }: A
   // 3. Image state — dev misuse without picture, fall back safely.
   if (!picture) {
     if (__DEV__) {
-      console.warn('[Avatar] state="image" but picture is missing — falling back to gradient');
+      log.warn('avatar.image_missing_picture');
     }
     return (
       <VStack style={{ position: 'relative', overflow: 'hidden' }}>

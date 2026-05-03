@@ -31,7 +31,7 @@ import {
   type ScreenActionsBridge,
 } from 'coco-payment-ux/react';
 
-import { log, paymentLog } from '@/shared/lib/logger';
+import { paymentLog } from '@/shared/lib/logger';
 import { useReceivePaymentUXExtras } from '@/features/receive/providers/ReceivePaymentUXExtras';
 import {
   createSovranExecuteMintQuote,
@@ -214,14 +214,14 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
     }) => {
       if (payload.state !== 'PAID' && payload.state !== 'ISSUED') return;
       if (!payload.quoteId) {
-        log.warn('payment.mint_quote.displayed_inference.no_quote_id', {
+        paymentLog.warn('payment.mint_quote.displayed_inference.no_quote_id', {
           operationId: payload.operationId,
           state: payload.state,
         });
         return;
       }
       useTransactionDistributionStore.getState().setDistribution(payload.quoteId, 'displayed');
-      log.debug('payment.mint_quote.displayed_inference.applied', {
+      paymentLog.debug('payment.mint_quote.displayed_inference.applied', {
         quoteId: payload.quoteId,
         operationId: payload.operationId,
         state: payload.state,
@@ -319,7 +319,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         if (screenType !== 'mintSelector' && screenType !== 'mintInfo') {
           unsubscribes.push(
             manager.on('history:updated', ({ entry: updated }: { mintUrl: string; entry: any }) => {
-              log.info('send.entry_updated', {
+              paymentLog.info('send.entry_updated', {
                 screenType,
                 type: updated?.type,
                 id: updated?.id,
@@ -365,7 +365,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
                 quoteId: string;
                 state: string;
               }) => {
-                log.info('send.mint_quote_state_changed', {
+                paymentLog.info('send.mint_quote_state_changed', {
                   screenType,
                   operationId,
                   quoteId,
@@ -379,7 +379,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
             manager.on(
               'mint-op:finalized',
               ({ operationId }: { mintUrl: string; operationId: string }) => {
-                log.info('send.mint_op_finalized', { screenType, operationId });
+                paymentLog.info('send.mint_op_finalized', { screenType, operationId });
                 callback({ type: 'mint', operationId, state: 'ISSUED' } as unknown as EntryRecord);
               }
             )
@@ -525,7 +525,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
                   isTrusted,
                 } as EntryRecord);
               } catch (e) {
-                log.warn('send.mint_info_fetch_failed', {
+                paymentLog.warn('send.mint_info_fetch_failed', {
                   mintUrl,
                   error: e instanceof Error ? e : new Error(String(e)),
                 });

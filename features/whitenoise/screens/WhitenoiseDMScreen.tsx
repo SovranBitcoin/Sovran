@@ -4,14 +4,11 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import {
-  KeyboardAvoidingView,
-  useKeyboardState,
-} from 'react-native-keyboard-controller';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
 import { router } from 'expo-router';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { LegendList } from '@legendapp/list';
-import { chatLog, Screen, useLifecycleLogger } from '@/shared/lib/logger';
+import { wnLog, Screen, useLifecycleLogger } from '@/shared/lib/logger';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -26,10 +23,7 @@ import {
   useMessageGrouping,
   type ChatBubbleMessage,
 } from '@/shared/ui/composed/chat';
-import {
-  useWhitenoiseDM,
-  type WhitenoiseDmMessage,
-} from '../hooks/useWhitenoiseDM';
+import { useWhitenoiseDM, type WhitenoiseDmMessage } from '../hooks/useWhitenoiseDM';
 import { MarmotIcon } from '../components/MarmotIcon';
 
 /**
@@ -45,15 +39,8 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
   const headerHeight = useHeaderHeight();
 
   const { metadata } = useNostrProfileMetadata(pubkey);
-  const {
-    isLoading,
-    isCreatingGroup,
-    error,
-    hasGroup,
-    messages,
-    send,
-    isClientReady,
-  } = useWhitenoiseDM(pubkey, accountIndex);
+  const { isLoading, isCreatingGroup, error, hasGroup, messages, send, isClientReady } =
+    useWhitenoiseDM(pubkey, accountIndex);
 
   const [surface, shade400, shade500, danger] = useThemeColor([
     'surface',
@@ -69,19 +56,19 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
     if (!text) return;
     setDraft('');
     const sendStart = performance.now();
-    chatLog.info('chat.send.dispatch', {
+    wnLog.info('chat.send.dispatch', {
       surface: 'whitenoise',
       textLen: text.length,
       historyCount: messages.length,
     });
     try {
       await send(text);
-      chatLog.info('chat.send.complete', {
+      wnLog.info('chat.send.complete', {
         surface: 'whitenoise',
         duration_ms: Math.round((performance.now() - sendStart) * 100) / 100,
       });
     } catch (err) {
-      chatLog.warn('chat.send.failed', {
+      wnLog.warn('chat.send.failed', {
         surface: 'whitenoise',
         duration_ms: Math.round((performance.now() - sendStart) * 100) / 100,
         err,
@@ -101,7 +88,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
   useEffect(() => {
     const prev = kbStateRef.current;
     if (prev.isVisible === kbState.isVisible && prev.height === kbState.height) return;
-    chatLog.info('chat.kav.keyboard_state', {
+    wnLog.info('chat.kav.keyboard_state', {
       surface: perfSurface,
       from: { isVisible: prev.isVisible, height: prev.height },
       to: { isVisible: kbState.isVisible, height: kbState.height },
@@ -121,7 +108,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
       return;
     }
     listLayoutRef.current = { width, height };
-    chatLog.info('chat.list.layout', {
+    wnLog.info('chat.list.layout', {
       surface: perfSurface,
       width: Math.round(width),
       height: Math.round(height),
@@ -135,7 +122,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
       if (last && Math.abs(last.w - w) < 0.5 && Math.abs(last.h - h) < 0.5) return;
       const viewportH = listLayoutRef.current?.height ?? 0;
       listContentSizeRef.current = { w, h };
-      chatLog.debug('chat.list.content_size', {
+      wnLog.debug('chat.list.content_size', {
         surface: perfSurface,
         contentW: Math.round(w),
         contentH: Math.round(h),
@@ -148,25 +135,22 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
   );
 
   const lastScrollLogRef = useRef(0);
-  const handleListScroll = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent> | any) => {
-      const now = Date.now();
-      if (now - lastScrollLogRef.current < 120) return;
-      lastScrollLogRef.current = now;
-      const { contentOffset, contentSize, layoutMeasurement } = (
-        e as NativeSyntheticEvent<NativeScrollEvent>
-      ).nativeEvent;
-      const distFromEnd = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-      chatLog.debug('chat.list.scroll', {
-        surface: perfSurface,
-        offsetY: Math.round(contentOffset.y),
-        contentH: Math.round(contentSize.height),
-        viewportH: Math.round(layoutMeasurement.height),
-        distFromEnd: Math.round(distFromEnd),
-      });
-    },
-    []
-  );
+  const handleListScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent> | any) => {
+    const now = Date.now();
+    if (now - lastScrollLogRef.current < 120) return;
+    lastScrollLogRef.current = now;
+    const { contentOffset, contentSize, layoutMeasurement } = (
+      e as NativeSyntheticEvent<NativeScrollEvent>
+    ).nativeEvent;
+    const distFromEnd = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    wnLog.debug('chat.list.scroll', {
+      surface: perfSurface,
+      offsetY: Math.round(contentOffset.y),
+      contentH: Math.round(contentSize.height),
+      viewportH: Math.round(layoutMeasurement.height),
+      distFromEnd: Math.round(distFromEnd),
+    });
+  }, []);
 
   const prevMsgRef = useRef({ count: 0, lastId: '' });
   useEffect(() => {
@@ -174,7 +158,7 @@ export function WhitenoiseDMScreen({ pubkey }: { pubkey: string }) {
     const last = bubbleMessages[bubbleMessages.length - 1];
     const next = { count: bubbleMessages.length, lastId: last?.id ?? '' };
     if (next.count === prev.count && next.lastId === prev.lastId) return;
-    chatLog.info('chat.list.history_change', {
+    wnLog.info('chat.list.history_change', {
       surface: perfSurface,
       prevCount: prev.count,
       count: next.count,

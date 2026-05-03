@@ -916,6 +916,7 @@ export const chatLog = log.child({ module: 'chat' });
 export const bitchatLog = log.child({ module: 'bitchat' });
 export const wnLog = log.child({ module: 'whitenoise' });
 export const popupLog = log.child({ module: 'popup' });
+export const mapLog = log.child({ module: 'map' });
 
 /**
  * Narrow an unknown caught value to a stable `{ name, message }` shape suitable
