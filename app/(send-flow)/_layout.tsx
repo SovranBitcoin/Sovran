@@ -26,7 +26,10 @@ export default function SendFlowLayout() {
       <Stack.Screen name="mintSelect" options={{ title: 'Select Mint' }} />
       <Stack.Screen name="amount" options={{ title: 'Select Amount' }} />
       <Stack.Screen name="sendToken" options={{ title: 'Send Ecash' }} />
-      <Stack.Screen name="meltQuote" options={{ title: 'Send Lightning' }} />
+      <Stack.Screen
+        name="meltQuote"
+        options={{ title: 'Send Lightning', headerBackButtonMenuEnabled: false }}
+      />
       <Stack.Screen name="paymentRequest" options={{ title: 'Payment Request' }} />
       <Stack.Screen
         name="camera"

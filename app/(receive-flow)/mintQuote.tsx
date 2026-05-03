@@ -1,34 +1,25 @@
 /**
- * @fileoverview Receive flow mintQuote route wrapper
- *
- * Displays a mint quote that was created before navigation.
- * The mintHistoryEntry param contains the full MintHistoryEntry as JSON.
- * Wires up the resolver so MintSelector can trigger changeMint(),
- * which re-runs the createMintQuote handler with the new mint.
- *
- * Validates deep-link params at the route boundary per AUDIT.md dim-5
- * (audit 23#F-002): unguarded `JSON.parse(...)` was the crash +
- * invoice-spoofing surface.
+ * @fileoverview Receive-flow mintQuote route — final screen of an
+ * active Lightning receive. The route body and zod schema live on
+ * `MintQuoteRoute`; this wrapper threads the mint-pill callbacks through
+ * the active payment machine so the user can swap mints mid-flow.
+ * `Stack.Screen` title comes from `(receive-flow)/_layout.tsx`.
  */
 
 import React, { useCallback } from 'react';
-import { Stack } from 'expo-router';
-import { z } from 'zod';
+import { useLocalSearchParams } from 'expo-router';
 
-import { MintQuoteScreen } from '@/features/receive';
+import { MintQuoteRoute } from '@/features/receive';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
-import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
-const ParamsSchema = z.object({
-  mintHistoryEntry: z.string().min(1).max(64_000),
-  unit: z.string().max(16).optional(),
-});
-
-function ModalScreen() {
-  const params = useRouteParams(ParamsSchema, { where: 'receive-flow.mintQuote' });
-
-  const unit = params?.unit ?? 'sat';
+export default function ModalScreen() {
+  // Bind unit to the machine each render so the active flow tracks the
+  // currency the route was opened with. MintQuoteRoute revalidates the
+  // full param shape; pulling `unit` off the raw params here is just for
+  // the always-on machine binding.
+  const rawParams = useLocalSearchParams<{ unit?: string }>();
+  const unit = typeof rawParams.unit === 'string' ? rawParams.unit : 'sat';
 
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext, unit });
@@ -39,24 +30,15 @@ function ModalScreen() {
     },
     [machine]
   );
-
   const handleRequestMintList = useCallback(() => {
     void machine.requestMintSelector();
   }, [machine]);
 
-  if (!params) return null;
-
   return (
-    <>
-      <Stack.Screen options={{ headerTitle: 'Receive' }} />
-      <MintQuoteScreen
-        key={params.mintHistoryEntry}
-        mintHistoryEntry={params.mintHistoryEntry}
-        onMintSelected={handleMintSelected}
-        onRequestMintList={handleRequestMintList}
-      />
-    </>
+    <MintQuoteRoute
+      where="receive-flow.mintQuote"
+      onMintSelected={handleMintSelected}
+      onRequestMintList={handleRequestMintList}
+    />
   );
 }
-
-export default ModalScreen;

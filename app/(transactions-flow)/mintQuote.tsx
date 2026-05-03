@@ -1,33 +1,13 @@
 /**
- * @fileoverview Transactions flow mintQuote route wrapper
- *
- * Part of the (transactions-flow) modal group — displays with back button.
- * Validates the `mintHistoryEntry` param at the route boundary per
- * AUDIT.md dim-5 (audit 23#F-002): unguarded `JSON.parse(...)` was the
- * crash + invoice-spoofing surface. The validated string is passed
- * through to MintQuoteScreen, which decodes it via useScreenActions.
+ * @fileoverview Transactions-flow mintQuote route — re-entry from the
+ * transactions list. The route body and zod schema live on
+ * `MintQuoteRoute`. Mint-pill callbacks stay undefined here: this route
+ * renders the entry read-only. `Stack.Screen` title comes from
+ * `(transactions-flow)/_layout.tsx`.
  */
 
-import React from 'react';
-import { Stack } from 'expo-router';
-import { z } from 'zod';
-import { MintQuoteScreen } from '@/features/receive';
-import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { MintQuoteRoute } from '@/features/receive';
 
-const ParamsSchema = z.object({
-  mintHistoryEntry: z.string().min(1).max(64_000),
-});
-
-function ModalScreen() {
-  const params = useRouteParams(ParamsSchema, { where: 'transactions-flow.mintQuote' });
-  if (!params) return null;
-
-  return (
-    <>
-      <Stack.Screen options={{ headerTitle: 'Receive' }} />
-      <MintQuoteScreen mintHistoryEntry={params.mintHistoryEntry} />
-    </>
-  );
+export default function ModalScreen() {
+  return <MintQuoteRoute where="transactions-flow.mintQuote" />;
 }
-
-export default ModalScreen;

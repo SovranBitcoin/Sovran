@@ -1,32 +1,19 @@
 /**
- * @fileoverview Send flow meltQuote route wrapper
- *
- * Part of the (send-flow) modal group - displays with back button.
- * The navigateToMeltPreview handler navigates here with a serialized
- * meltHistoryEntry; actions are handled by the screen-action system.
- *
- * Validates the `meltHistoryEntry` deep-link param at the route boundary
- * per AUDIT.md dim-5 (audit 23#F-002): the param is JSON-encoded and was
- * previously forwarded raw to a `JSON.parse(...)` cast.
+ * @fileoverview Send-flow meltQuote route — final screen of an active
+ * Lightning send. The route body and zod schema live on
+ * `MeltQuoteRoute`; this wrapper threads the mint-pill callbacks through
+ * the active payment machine so the user can swap mints mid-flow.
+ * `Stack.Screen` title comes from `(send-flow)/_layout.tsx`.
  */
 
 import React, { useCallback } from 'react';
-import { router, Stack } from 'expo-router';
-import { z } from 'zod';
 
-import { MeltQuoteScreen } from '@/features/send';
+import { MeltQuoteRoute } from '@/features/send';
 import { usePaymentFlowMachine } from '@/features/send/providers/CocoPaymentUX';
 import { useWalletContext } from '@/shared/providers/WalletContextProvider';
 import { cashuLog } from '@/shared/lib/logger';
-import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
-const ParamsSchema = z.object({
-  meltHistoryEntry: z.string().min(1).max(64_000).optional(),
-});
-
-function ModalScreen() {
-  const params = useRouteParams(ParamsSchema, { where: 'send-flow.meltQuote' });
-
+export default function ModalScreen() {
   const walletContext = useWalletContext();
   const machine = usePaymentFlowMachine({ walletContext });
 
@@ -40,33 +27,16 @@ function ModalScreen() {
     },
     [machine]
   );
-
   const handleRequestMintList = useCallback(() => {
     cashuLog.info('melt.mint_list.requested', { source: 'pill' });
     void machine.requestMintSelector();
   }, [machine]);
 
-  if (!params) return null;
-
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: 'Send Lightning',
-          headerBackButtonMenuEnabled: false,
-        }}
-      />
-      <MeltQuoteScreen
-        key={params.meltHistoryEntry}
-        meltHistoryEntry={params.meltHistoryEntry}
-        onCancel={() => {
-          router.dismissTo('/');
-        }}
-        onMintSelected={handleMintSelected}
-        onRequestMintList={handleRequestMintList}
-      />
-    </>
+    <MeltQuoteRoute
+      where="send-flow.meltQuote"
+      onMintSelected={handleMintSelected}
+      onRequestMintList={handleRequestMintList}
+    />
   );
 }
-
-export default ModalScreen;

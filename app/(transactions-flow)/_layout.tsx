@@ -36,7 +36,10 @@ function TransactionsFlowContent() {
         }}
       />
       <Stack.Screen name="mintQuote" options={{ title: 'Receive Lightning' }} />
-      <Stack.Screen name="meltQuote" options={{ title: 'Send Lightning' }} />
+      <Stack.Screen
+        name="meltQuote"
+        options={{ title: 'Send Lightning', headerBackButtonMenuEnabled: false }}
+      />
       <Stack.Screen name="sendToken" options={{ title: 'Send Ecash' }} />
       <Stack.Screen name="receiveToken" options={{ title: 'Receive Ecash' }} />
       <Stack.Screen name="swap" options={{ title: 'Swap' }} />
