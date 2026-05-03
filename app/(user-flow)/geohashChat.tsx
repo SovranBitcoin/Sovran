@@ -12,13 +12,13 @@
 import React from 'react';
 import { router } from 'expo-router';
 import { z } from 'zod';
+
 import { GeohashChatScreen } from '@/features/bitchat/screens/GeohashChatScreen';
+import { Geohash } from '@/shared/lib/nav/routeSchemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 
-const GEOHASH = /^[0-9bcdefghjkmnpqrstuvwxyz]{1,12}$/;
-
 const ParamsSchema = z.object({
-  geohash: z.string().regex(GEOHASH, 'invalid geohash'),
+  geohash: Geohash,
   tierLabel: z.string().max(64).optional(),
   transport: z.enum(['nostr', 'ble']).optional(),
 });

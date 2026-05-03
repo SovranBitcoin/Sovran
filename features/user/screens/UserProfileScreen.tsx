@@ -15,7 +15,7 @@ import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Image as ExpoImage } from 'expo-image';
 import { Stack, Link } from 'expo-router';
 import { z } from 'zod';
-import { Hex64 } from '@sovranbitcoin/schemas';
+import { Hex64, HttpsUrl, Npub } from '@/shared/lib/nav/routeSchemas';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
 import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
@@ -73,14 +73,11 @@ const BANNER_HEIGHT = 150;
 const AVATAR_SIZE = 90;
 const AVATAR_OVERLAP = AVATAR_SIZE / 4;
 
-const NPUB = /^npub1[02-9ac-hj-np-z]{58,}$/;
-const HTTPS_URL = /^https:\/\/[^\s]+$/;
-
 const UserProfileParamsSchema = z
   .object({
-    npub: z.string().regex(NPUB, 'invalid npub').optional(),
+    npub: Npub.optional(),
     pubkey: Hex64.optional(),
-    mintUrl: z.string().regex(HTTPS_URL, 'mintUrl must be https').max(2048).optional(),
+    mintUrl: HttpsUrl.optional(),
   })
   .refine((v) => !!(v.npub || v.pubkey), {
     message: 'either npub or pubkey is required',
