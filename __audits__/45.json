@@ -79,7 +79,7 @@
       "analyze_structure": "2 cycles=0; orphans flagged WalletHealthCard.tsx (true) + HealthModalScreen.tsx (false — barrel-imported); 1 colocate suggestion (useWalletHealthData → components, not actioned)"
     }
   },
-  "completion_status": "deferred",
+  "completion_status": "complete",
   "findings": [
     {
       "id": "F-001",
@@ -103,8 +103,8 @@
       ],
       "verification_note": "Grep for 'WalletHealthCard' returns only the definition, the barrel re-export, and a doc-comment in useWalletHealthData; 'startWalletHealth' is called only from WalletHealthCard.tsx:71. Counter-argument considered: maybe re-hosting is imminent — rejected because the audit reports current state, and PR #189's body explicitly retires Explore without re-homing wallet-health.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Wallet-health unreachable from app UI — considered as candidate dead-code slice (cluster C). Excluded in favour of route-boundary param validation. Real, unfixed."
+      "completion_status": "complete",
+      "completion_note": "Resolved by deleting features/health/, /healthModal route, and the walletHealth hero phase (git:5aaa7747). The reach-or-delete decision settled on delete: PR #189 retired the only host (Explore) and no re-host was scheduled."
     },
     {
       "id": "F-002",
@@ -125,8 +125,8 @@
       ],
       "verification_note": "Read both implementations side by side; rules are textually similar but the lib emits an extra Concentrated chip and a CTA-bearing signals array that the modal never produces. Grep confirms computeWalletHealth has only one caller (WalletHealthCard).",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Wallet-health subtree clusters with the canonical-primitive pattern but lives behind an unreachable entry point (45.F-001). Out of scope for the map-subtree slice; revisit alongside the F-001 reach-or-delete decision."
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). lib/walletHealth.ts and WalletHealthModalContent gone, so the lib/modal divergence (Concentrated chip + signal-driven design) collapses to nothing rather than a single source of truth."
     },
     {
       "id": "F-003",
@@ -146,7 +146,9 @@
         "skill:diagnose"
       ],
       "verification_note": "Confirmed default pageSize=100 in coco/packages/react/src/lib/hooks/usePaginatedHistory.ts:14 and that history:updated only re-fetches the current page (lines 49-68). useReservedProofs already exists and is used by PrimaryBalance.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). useWalletHealthData.ts removed; the pending-outgoing pagination undercount has nowhere to surface."
     },
     {
       "id": "F-004",
@@ -166,8 +168,8 @@
       ],
       "verification_note": "Read both files end-to-end; the modal pushes only two row keys ('rebalance', 'split'). The HealthModalScreen handler for openPendingEcash is therefore unreachable through the UI even when the modal is reachable.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Wallet-health subtree dead-branch — distinct seam from map subtree. Bundled with the F-002 reach-or-delete decision."
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). HealthCta enum and the modal that produced its rows both removed; the dead branch is gone."
     },
     {
       "id": "F-005",
@@ -211,8 +213,8 @@
       ],
       "verification_note": "Grep confirms no other file defines a similar helper. Mint type already in lib's import set.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Same canonical-primitive pattern as the map slice (helper-belongs-with-its-pair) but in the wallet-health subtree. Bundled with the F-001 reach-or-delete decision."
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). HealthModalScreen.tsx removed; getCurrenciesFromMints any[] helper went with it. The Mint-type / Unit-type pairing is no longer needed."
     },
     {
       "id": "F-007",
@@ -231,7 +233,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Read top-to-bottom; each concern starts and ends at a clear seam. Counter-argument: React components do tend to be larger when they juggle state + layout + animations — accepted but the four concerns here have natural separation.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). 459-line WalletHealthModalContent.tsx removed wholesale."
     },
     {
       "id": "F-008",
@@ -250,7 +254,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Grep for WalletHealthModalContent usages returns one caller (HealthModalScreen.tsx) which always passes children. No storybook in the repo.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). The render-prop fallback was the dead branch — removing the file removes the branch."
     },
     {
       "id": "F-009",
@@ -267,7 +273,9 @@
       "fix": "Delete the alias, use red directly. Or, if 'gradient accent always tracks the danger token' is the actual invariant, lift it to a useHealthAccent() hook reading from the theme.",
       "references": [],
       "verification_note": "Grep within the file confirms red is only read once (the assignment to gradientAccent).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). The gradientAccent alias is gone."
     },
     {
       "id": "F-010",
@@ -285,8 +293,8 @@
       "references": [],
       "verification_note": "Both literals confirmed; no other 200-bp threshold exists in the feature.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Threshold-constant duplication; tracked alongside the wallet-health rule consolidation (45.F-002). Out of scope for the map-subtree slice."
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). Both REBALANCE_DRIFT_THRESHOLD_BP duplicates removed; threshold-drift risk eliminated."
     },
     {
       "id": "F-011",
@@ -306,7 +314,9 @@
         "skill:vercel-react-native-skills"
       ],
       "verification_note": "Counter-argument: hero.registerRef is stable (useCallback), so the inline closure equality is irrelevant for its consumer; the only cost is allocation. Confidence kept Low.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). WalletHealthCard.onLayout register loop deleted with the file."
     },
     {
       "id": "F-012",
@@ -325,7 +335,9 @@
         "skill:building-native-ui"
       ],
       "verification_note": "UNVERIFIED — depends on heroui-native's accessibilityState propagation. If disabled is purely visual styling there, demote to Nit.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). The disabled-but-tappable list-row a11y mismatch deleted with WalletHealthModalContent."
     },
     {
       "id": "F-013",
@@ -342,7 +354,9 @@
       "fix": "Convert the StyleSheet entries to className where they map to tokens (heroWrap → w-full self-stretch rounded-3xl border p-[18px] overflow-hidden; statPill → flex-1 border rounded-2xl py-2.5 px-3 items-center justify-center). Keep StyleSheet for absoluteFill/absoluteFillObject.",
       "references": [],
       "verification_note": "Both styling systems present at the cited lines; codebase rule is Uniwind for sovran-app.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). StyleSheet/Uniwind drift deleted with WalletHealthModalContent."
     },
     {
       "id": "F-014",
@@ -362,7 +376,9 @@
         "skill:creating-reanimated-animations"
       ],
       "verification_note": "react-native-reanimated 4.2.2 confirmed in package.json:148. Both APIs work; .set() is the v4 idiom.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). Reanimated v4 .set()-vs-.value drift in this feature deleted with the screens."
     },
     {
       "id": "F-015",
@@ -379,7 +395,9 @@
       "fix": "Combined with F-005: parse unit as a lowercase enum once at the boundary, store lowercase in state, present uppercase only at render. Drop the selectedCurrency uppercase mirror — let MintCurrencyTabs handle display casing internally or accept a lowercase token.",
       "references": [],
       "verification_note": "Read the cited lines; three transformations confirmed. Counter-argument: MintCurrencyTabs may require uppercase — accepted as a constraint, but it can uppercase internally instead of forcing the screen to.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). HealthModalScreen.tsx removed; the unit casing round-trip went with it."
     },
     {
       "id": "F-016",
@@ -396,7 +414,9 @@
       "fix": "Subsumed by F-002 (route the modal through computeWalletHealth.signals).",
       "references": [],
       "verification_note": "Lib code confirmed; modal code reviewed end-to-end and there is no Concentrated branch.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Resolved by deletion (git:5aaa7747). lib/walletHealth.ts removed; the dropped Concentrated branch can no longer mislead because no surface consumes the lib."
     }
   ],
   "dimensions": {
