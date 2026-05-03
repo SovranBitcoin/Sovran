@@ -241,7 +241,9 @@
         "log-doctor slow --latest --threshold 200 (Largest gap: 11670ms; 374 perf.js_thread_blocked events)"
       ],
       "verification_note": "Re-read createMachine.ts \u2014 confirmed 8 JSON.parse sites. Log-doctor evidence UNVERIFIED for this specific cause (no perf.js_thread_blocked directly tied to a JSON.parse stack frame in the captured session). Counter-argument considered: V8/Hermes may inline cache the parse \u2014 unlikely to deduplicate three distinct parse calls on the same string across function boundaries.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Considered alongside F-015 in slice d5dcbfaa but kept out of scope. All 8 JSON.parse sites still in createMachine.ts; the parseHistoryEntryOnce extraction is a follow-up perf change that doesn't share the snapshot-discipline seam this slice closed."
     },
     {
       "id": "F-011",
@@ -349,7 +351,8 @@
       ],
       "verification_note": "Re-read createMachine.ts \u2014 confirmed pervasive as-any casts. Counter-argument considered: discriminated-union narrowing is awkward in mutating assignments \u2014 the setStep helper above is the standard resolution and is a lightweight refactor.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "Slice d5dcbfaa adds `setStep<S extends FlowStep>(step, data: StepDataMap[S])` at createMachine.ts:189 and routes every step transition through it \u2014 all 18 `step = '...'; stepData = ... as any;` sites and the `let stepData: StepDataMap[FlowStep] = {} as any` initializer are gone. `navigateToMeltPreview` and `navigateToPaymentRequest` widened in machine/types.ts to declare the optional `historyEntry` field that callers were spread-casting through `as any`. The discriminated union now catches typos at compile time and was the precondition that let F-006@08's in-place-mutation fix type-check."
     },
     {
       "id": "F-016",
@@ -412,7 +415,9 @@
         "coco-payment-ux/src/react/CocoPaymentUXProvider.tsx:372-394"
       ],
       "verification_note": "Re-read CocoPaymentUXProvider.tsx:372-394. Confirmed no length cap. Nit severity.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Considered when surveying coco-payment-ux candidates; lives on the deep-link entry-point seam (CocoPaymentUXProvider.tsx) not the snapshot-discipline seam this slice consolidated. Real and unfixed."
     }
   ],
   "dimensions": {
