@@ -28,7 +28,7 @@
     "submit:ios": "eas submit -p ios",
     "submit:android": "eas submit -p android",
     "log-doctor": "npx tsx scripts/log-doctor.ts",
-    "analyze-structure": "node scripts/analyze-structure.mjs",
+    "analyze-structure": "node scripts/analyze-structure.mjs --history --reach --leakage --vocab-drift",
     "lint": "expo lint",
     "type-check": "tsc --noEmit",
     "pretty": "prettier --write \"./**/*.{js,jsx,mjs,cjs,ts,tsx,json}\"",
