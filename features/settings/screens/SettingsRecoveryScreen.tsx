@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Dimensions, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 import Animated, {
@@ -255,10 +255,8 @@ declare global {
 
 // ─── Slide to recover ──────────────────────────────────────────────────────
 
-const SLIDER_WIDTH = Dimensions.get('window').width - 48;
 const THUMB_SIZE = 40;
 const TRACK_PADDING = 4;
-const MAX_TRANSLATE = SLIDER_WIDTH - THUMB_SIZE - TRACK_PADDING * 2;
 
 const SlideToRecover: React.FC<{
   onComplete: () => void;
@@ -268,6 +266,9 @@ const SlideToRecover: React.FC<{
   iconColor: string;
   label?: string;
 }> = ({ onComplete, trackColor, thumbColor, textColor, iconColor, label }) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const sliderWidth = windowWidth - 48;
+  const maxTranslate = sliderWidth - THUMB_SIZE - TRACK_PADDING * 2;
   const translateX = useSharedValue(0);
   const isComplete = useSharedValue(false);
 
@@ -278,12 +279,12 @@ const SlideToRecover: React.FC<{
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       if (isComplete.value) return;
-      translateX.value = Math.max(0, Math.min(event.translationX, MAX_TRANSLATE));
+      translateX.value = Math.max(0, Math.min(event.translationX, maxTranslate));
     })
     .onEnd(() => {
       if (isComplete.value) return;
-      if (translateX.value > MAX_TRANSLATE * 0.9) {
-        translateX.value = withSpring(MAX_TRANSLATE, { damping: 20, stiffness: 200 });
+      if (translateX.value > maxTranslate * 0.9) {
+        translateX.value = withSpring(maxTranslate, { damping: 20, stiffness: 200 });
         isComplete.value = true;
         runOnJS(handleComplete)();
       } else {
@@ -296,12 +297,12 @@ const SlideToRecover: React.FC<{
   }));
 
   const textAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [0, MAX_TRANSLATE * 0.5], [1, 0], Extrapolation.CLAMP),
+    opacity: interpolate(translateX.value, [0, maxTranslate * 0.5], [1, 0], Extrapolation.CLAMP),
   }));
 
   return (
     <GestureHandlerRootView>
-      <View style={[styles.track, { backgroundColor: trackColor, width: SLIDER_WIDTH }]}>
+      <View style={[styles.track, { backgroundColor: trackColor, width: sliderWidth }]}>
         <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
           <Text size={16} medium style={{ color: textColor }}>
             {label || 'Swipe to recover'}

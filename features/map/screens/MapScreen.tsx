@@ -36,10 +36,10 @@ import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   InteractionManager,
   Platform,
   StyleSheet,
+  useWindowDimensions,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
@@ -73,9 +73,6 @@ const CATEGORY_FILTERS: readonly CategoryFilter[] = [
   ...MERCHANT_CATEGORIES.map((c) => c.id),
 ];
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const ASPECT_RATIO = SCREEN_WIDTH / SCREEN_HEIGHT;
-
 // Default to Europe (most BTC merchants)
 const DEFAULT_LAT = 48;
 const DEFAULT_LON = 10;
@@ -84,8 +81,6 @@ const DEFAULT_ZOOM = 4;
 // Track if we're ready to render the map (after transition completes)
 const DEFER_MAP_RENDER_MS = 50; // Small delay to let modal animation start
 
-// Numeric width for the stats card Host (percentage widths don't work with SwiftUI Host)
-const STATS_CARD_WIDTH = SCREEN_WIDTH - 32; // matches left: 16 + right: 16
 const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 // ============================================================================
@@ -98,6 +93,7 @@ type StatsCardProps = {
   loading: boolean;
   category: CategoryFilter;
   onCategoryChange: (cat: CategoryFilter) => void;
+  cardWidth: number;
 };
 
 const StatsCard = memo(function StatsCard({
@@ -106,6 +102,7 @@ const StatsCard = memo(function StatsCard({
   loading,
   category,
   onCategoryChange,
+  cardWidth,
 }: StatsCardProps) {
   const foreground = useThemeColor('foreground');
 
@@ -116,7 +113,7 @@ const StatsCard = memo(function StatsCard({
 
   return (
     <View style={styles.statsContainer}>
-      <Host style={{ zIndex: 10, height: 60, width: STATS_CARD_WIDTH }} matchContents>
+      <Host style={{ zIndex: 10, height: 60, width: cardWidth }} matchContents>
         <ContextMenu>
           <ContextMenu.Items>
             {CATEGORY_FILTERS.map((cat) => (
@@ -132,7 +129,7 @@ const StatsCard = memo(function StatsCard({
               <SwiftUIButton
                 modifiers={[
                   // buttonStyle('glass'),
-                  frame({ width: STATS_CARD_WIDTH, height: 60, alignment: 'center' }),
+                  frame({ width: cardWidth, height: 60, alignment: 'center' }),
                   ...liquidGlassModifiers(
                     glassEffect({
                       shape: 'capsule',
@@ -216,6 +213,12 @@ export function MapScreen() {
     'accent',
     'background',
   ] as const);
+
+  // Reactive viewport dimensions — bbox math and the stats card both depend on
+  // the live aspect ratio so rotation, foldables, and split-screen reflow.
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+  const aspectRatio = viewportWidth / viewportHeight;
+  const statsCardWidth = viewportWidth - 32; // matches stats container padding
 
   // BTCMap store
   const { placesCache, storeLoading, error, fetchPlaces, setError } = useBTCMapStore(
@@ -314,62 +317,65 @@ export function MapScreen() {
   }, [places, category]);
 
   // Update markers for given camera position
-  const updateMarkersForCamera = useCallback((lat: number, lon: number, z: number) => {
-    const manager = clusterManagerRef.current;
-    if (!manager || !manager.isLoaded()) {
-      setMarkers([]);
-      setVisibleCount(0);
-      lastRenderedMarkersRef.current = [];
-      lastRenderedVisibleCountRef.current = 0;
-      return;
-    }
+  const updateMarkersForCamera = useCallback(
+    (lat: number, lon: number, z: number) => {
+      const manager = clusterManagerRef.current;
+      if (!manager || !manager.isLoaded()) {
+        setMarkers([]);
+        setVisibleCount(0);
+        lastRenderedMarkersRef.current = [];
+        lastRenderedVisibleCountRef.current = 0;
+        return;
+      }
 
-    // Avoid querying a padded bbox that's too large at high zoom (lots of pins)
-    const padding = z >= 14 ? 0.25 : z >= 10 ? 0.5 : 0.75;
-    const bbox = cameraToBbox(lat, lon, z, ASPECT_RATIO, padding);
-    const clustered = manager.getClusters(bbox, z);
-    markersRef.current = clustered;
+      // Avoid querying a padded bbox that's too large at high zoom (lots of pins)
+      const padding = z >= 14 ? 0.25 : z >= 10 ? 0.5 : 0.75;
+      const bbox = cameraToBbox(lat, lon, z, aspectRatio, padding);
+      const clustered = manager.getClusters(bbox, z);
+      markersRef.current = clustered;
 
-    let count = 0;
-    for (const m of clustered) {
-      count += m.count;
-    }
+      let count = 0;
+      for (const m of clustered) {
+        count += m.count;
+      }
 
-    const mapMarkers = clustered.map((m) => ({
-      id: m.id,
-      coordinates: { latitude: m.latitude, longitude: m.longitude },
-      tintColor: m.tintColor,
-      title: m.type === 'cluster' ? `📍 ${m.count} merchants` : m.title,
-    }));
+      const mapMarkers = clustered.map((m) => ({
+        id: m.id,
+        coordinates: { latitude: m.latitude, longitude: m.longitude },
+        tintColor: m.tintColor,
+        title: m.type === 'cluster' ? `📍 ${m.count} merchants` : m.title,
+      }));
 
-    // Avoid re-setting state if markers/count didn't actually change (saves JS + native work)
-    const prevMarkers = lastRenderedMarkersRef.current;
-    const sameCount = lastRenderedVisibleCountRef.current === count;
-    let sameMarkers = prevMarkers.length === mapMarkers.length;
-    if (sameMarkers) {
-      for (let i = 0; i < mapMarkers.length; i++) {
-        const a = prevMarkers[i];
-        const b = mapMarkers[i];
-        if (
-          a.id !== b.id ||
-          a.coordinates.latitude !== b.coordinates.latitude ||
-          a.coordinates.longitude !== b.coordinates.longitude ||
-          a.tintColor !== b.tintColor ||
-          a.title !== b.title
-        ) {
-          sameMarkers = false;
-          break;
+      // Avoid re-setting state if markers/count didn't actually change (saves JS + native work)
+      const prevMarkers = lastRenderedMarkersRef.current;
+      const sameCount = lastRenderedVisibleCountRef.current === count;
+      let sameMarkers = prevMarkers.length === mapMarkers.length;
+      if (sameMarkers) {
+        for (let i = 0; i < mapMarkers.length; i++) {
+          const a = prevMarkers[i];
+          const b = mapMarkers[i];
+          if (
+            a.id !== b.id ||
+            a.coordinates.latitude !== b.coordinates.latitude ||
+            a.coordinates.longitude !== b.coordinates.longitude ||
+            a.tintColor !== b.tintColor ||
+            a.title !== b.title
+          ) {
+            sameMarkers = false;
+            break;
+          }
         }
       }
-    }
 
-    if (sameMarkers && sameCount) return;
+      if (sameMarkers && sameCount) return;
 
-    lastRenderedMarkersRef.current = mapMarkers;
-    lastRenderedVisibleCountRef.current = count;
-    setMarkers(mapMarkers);
-    setVisibleCount(count);
-  }, []);
+      lastRenderedMarkersRef.current = mapMarkers;
+      lastRenderedVisibleCountRef.current = count;
+      setMarkers(mapMarkers);
+      setVisibleCount(count);
+    },
+    [aspectRatio]
+  );
 
   // Defer map rendering until after navigation transition
   useEffect(() => {
@@ -531,7 +537,7 @@ export function MapScreen() {
       const last = lastMarkerQueryRef.current;
       const span = 360 / Math.pow(2, Math.max(newZoom, 0));
       const latThreshold = span * 0.12;
-      const lonThreshold = span * ASPECT_RATIO * 0.12;
+      const lonThreshold = span * aspectRatio * 0.12;
       const shouldSkip =
         last &&
         last.zoomFloor === zoomFloor &&
@@ -553,7 +559,7 @@ export function MapScreen() {
         });
       }, 250);
     },
-    [updateMarkersForCamera]
+    [updateMarkersForCamera, aspectRatio]
   );
 
   const MapComponent = Platform.OS === 'ios' ? AppleMaps : GoogleMaps;
@@ -631,6 +637,7 @@ export function MapScreen() {
         loading={loading}
         category={category}
         onCategoryChange={setCategory}
+        cardWidth={statsCardWidth}
       />
 
       <FloatingActionButtons

@@ -11,9 +11,9 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import {
   ScrollView,
   StatusBar,
-  Dimensions,
   ColorValue,
   InteractionManager,
+  useWindowDimensions,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -413,7 +413,7 @@ interface UserMessagesScreenProps {
 export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) {
   useLifecycleLogger('UserMessagesScreen');
   const headerHeight = useHeaderHeight();
-  const screenWidth = Dimensions.get('window').width;
+  const { width: screenWidth } = useWindowDimensions();
   const listRef = useRef<any>(null);
 
   const [foreground, surfaceSecondary, surface, shade400] = useThemeColor([

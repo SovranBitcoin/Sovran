@@ -1,9 +1,10 @@
 import React from 'react';
+import { useWindowDimensions } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { Text } from '@/shared/ui/primitives/Text';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
-import { scanBoxSize, type CameraScreenShared } from './types';
+import type { CameraScreenShared } from './types';
 import { Log } from '@/shared/lib/logger';
 
 interface CameraLayoutProps extends CameraScreenShared {
@@ -21,6 +22,9 @@ export function CameraLayout({
   handleCameraReady,
   children,
 }: CameraLayoutProps): React.ReactElement {
+  const { width } = useWindowDimensions();
+  const scanBoxSize = width * 0.8;
+
   if (!hasPermission) {
     return <View className="relative flex-1 bg-black" />;
   }

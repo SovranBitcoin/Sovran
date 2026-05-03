@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Dimensions, StyleSheet } from 'react-native';
+import { StyleSheet, useWindowDimensions } from 'react-native';
 import { Easing, LinearTransition } from 'react-native-reanimated';
 
 import { AnimatedLegendList } from '@legendapp/list/reanimated';
@@ -138,6 +138,7 @@ export const Transactions = React.memo(
     onVisiblePendingEcashChange,
   }: Props) => {
     const [muted, foreground] = useThemeColor(['muted', 'foreground'] as const);
+    const { height: screenHeight } = useWindowDimensions();
 
     // Operation ids that are still showing the post-success collapse
     // animation. Keeping them pinned in the Pending bucket gives the
@@ -465,7 +466,7 @@ export const Transactions = React.memo(
           <View
             className="flex items-center"
             style={{
-              minHeight: Dimensions.get('screen').height / 2,
+              minHeight: screenHeight / 2,
             }}>
             <Spacer size={24} />
             <Icon

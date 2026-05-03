@@ -4,7 +4,7 @@ import {
   GestureHandlerRootView,
   Pressable as GesturePressable,
 } from 'react-native-gesture-handler';
-import { StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { router, useSegments } from 'expo-router';
 import { DrawerContentComponentProps } from '@react-navigation/drawer';
 import opacity from 'hex-color-opacity';
@@ -23,9 +23,6 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { DrawerProfileChrome } from '@/shared/blocks/DrawerProfileChrome';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 320);
 
 type MenuRoute =
   | '/(drawer)/(tabs)/feed'
@@ -210,6 +207,8 @@ function DrawerContentInner({
 }
 
 export default function DrawerLayout() {
+  const { width } = useWindowDimensions();
+  const drawerWidth = Math.min(width * 0.82, 320);
   return (
     <GestureHandlerRootView style={styles.container}>
       <Drawer
@@ -217,7 +216,7 @@ export default function DrawerLayout() {
           headerShown: false,
           drawerType: 'slide',
           drawerStyle: {
-            width: DRAWER_WIDTH,
+            width: drawerWidth,
             backgroundColor: 'transparent',
             borderTopRightRadius: 20,
             borderBottomRightRadius: 20,

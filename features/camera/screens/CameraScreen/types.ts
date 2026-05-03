@@ -1,8 +1,3 @@
-import { Dimensions } from 'react-native';
-
-const { width: screenWidth } = Dimensions.get('window');
-export const scanBoxSize = screenWidth * 0.8;
-
 export interface ScanningData {
   data: string;
   type?: string;

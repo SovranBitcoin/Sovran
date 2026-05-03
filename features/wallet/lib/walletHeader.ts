@@ -2,11 +2,10 @@
  * Wallet header layout constants and dimension helpers.
  * Used by the wallet tab layout and screens that need consistent header sizing.
  *
- * In components, prefer useWindowDimensions() + getHeaderTitleWidthFromWidth(width)
- * over getHeaderTitleWidth() so layout reacts to orientation/resize.
+ * Components should pull width from `useWindowDimensions()` and pass it into
+ * `getHeaderTitleWidthFromWidth(windowWidth)` so layout reacts to orientation
+ * and split-view changes.
  */
-
-import { Dimensions } from 'react-native';
 
 /** Shared header layout constants for calculating title dimensions. */
 export const HEADER_LAYOUT = {
@@ -30,17 +29,8 @@ export function getHeaderTitleWidthFromWidth(windowWidth: number): number {
   return windowWidth - SIDE * 2;
 }
 
-/** Use when hook context not available (e.g. outside component). */
-export function getHeaderTitleWidth(): number {
-  return getHeaderTitleWidthFromWidth(Dimensions.get('window').width);
-}
-
 export function getHeaderTitleHeight(): number {
   return HEADER_LAYOUT.BUTTON_HEIGHT;
-}
-
-export function getHeaderContentWidth(): number {
-  return getHeaderTitleWidth() - HEADER_LAYOUT.CONTENT_PADDING_HORIZONTAL;
 }
 
 /** Content dimensions from a known window width (for use with useWindowDimensions). */

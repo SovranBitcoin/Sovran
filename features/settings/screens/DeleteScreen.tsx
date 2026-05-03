@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Dimensions, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
@@ -22,10 +22,8 @@ import Icon from 'assets/icons';
 import { Button, Card } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 
-const SLIDER_WIDTH = Dimensions.get('window').width - 48;
 const THUMB_SIZE = 40;
 const TRACK_PADDING = 4;
-const MAX_TRANSLATE = SLIDER_WIDTH - THUMB_SIZE - TRACK_PADDING * 2;
 
 interface SlideToDeleteProps {
   onComplete: () => void;
@@ -42,6 +40,9 @@ const SlideToDelete: React.FC<SlideToDeleteProps> = ({
   textColor,
   iconColor,
 }) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const sliderWidth = windowWidth - 48;
+  const maxTranslate = sliderWidth - THUMB_SIZE - TRACK_PADDING * 2;
   const translateX = useSharedValue(0);
   const isComplete = useSharedValue(false);
 
@@ -52,13 +53,13 @@ const SlideToDelete: React.FC<SlideToDeleteProps> = ({
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       if (isComplete.value) return;
-      translateX.value = Math.max(0, Math.min(event.translationX, MAX_TRANSLATE));
+      translateX.value = Math.max(0, Math.min(event.translationX, maxTranslate));
     })
     .onEnd(() => {
       if (isComplete.value) return;
 
-      if (translateX.value > MAX_TRANSLATE * 0.9) {
-        translateX.value = withSpring(MAX_TRANSLATE, { damping: 20, stiffness: 200 });
+      if (translateX.value > maxTranslate * 0.9) {
+        translateX.value = withSpring(maxTranslate, { damping: 20, stiffness: 200 });
         isComplete.value = true;
         runOnJS(handleComplete)();
       } else {
@@ -71,7 +72,7 @@ const SlideToDelete: React.FC<SlideToDeleteProps> = ({
   }));
 
   const textAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [0, MAX_TRANSLATE * 0.5], [1, 0], Extrapolation.CLAMP),
+    opacity: interpolate(translateX.value, [0, maxTranslate * 0.5], [1, 0], Extrapolation.CLAMP),
   }));
 
   return (
@@ -81,7 +82,7 @@ const SlideToDelete: React.FC<SlideToDeleteProps> = ({
           styles.track,
           {
             backgroundColor: trackColor,
-            width: SLIDER_WIDTH,
+            width: sliderWidth,
           },
         ]}>
         <Animated.View style={[styles.textContainer, textAnimatedStyle]}>
@@ -142,77 +143,77 @@ export function DeleteScreen() {
 
   return (
     <ScreenWrapper name="DeleteScreen" scroll="custom" safeArea>
-        <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
-          <VStack spacing={24} className="flex-1 px-6 pt-12">
-            <VStack spacing={24} className="flex-1 items-center justify-center">
-              <View
-                className="h-24 w-24 items-center justify-center self-center rounded-full"
-                style={{ backgroundColor: danger }}>
-                <Icon name="mdi:trash-can-outline" size={48} color={red400} />
-              </View>
+      <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
+        <VStack spacing={24} className="flex-1 px-6 pt-12">
+          <VStack spacing={24} className="flex-1 items-center justify-center">
+            <View
+              className="h-24 w-24 items-center justify-center self-center rounded-full"
+              style={{ backgroundColor: danger }}>
+              <Icon name="mdi:trash-can-outline" size={48} color={red400} />
+            </View>
 
-              <VStack spacing={8} className="items-center">
-                <Text size={24} bold className="text-foreground text-center">
-                  Delete Account
-                </Text>
-                <Text
-                  size={16}
-                  className="text-center leading-6"
-                  style={{ color: opacity(foreground, 0.5) }}>
-                  This will permanently erase all wallet data, all profiles, and all keys from this
-                  device. The app will restart as if freshly installed. This action cannot be
-                  reversed.
-                </Text>
-              </VStack>
-
-              <Card variant="secondary" className="w-full">
-                <Card.Body className="gap-2">
-                  <Card.Title>Save your NIP06</Card.Title>
-                  <Card.Description>
-                    Your NIP06 is the recovery phrase for your full Sovran account. Every Cashu
-                    profile in this app is derived from it, so restoring with a different NIP06 will
-                    create different Cashu wallets and will not recover the same ecash. If you were a
-                    TestFlight user, recovery may still not restore all historical funds.
-                  </Card.Description>
-                </Card.Body>
-              </Card>
-
-              <Card variant="secondary" className="w-full">
-                <Card.Body className="gap-2">
-                  <Card.Title>Imported Nostr accounts</Card.Title>
-                  <Card.Description>
-                    Even imported Nostr accounts depend on your current NIP06 for their Cashu profile.
-                    Re-importing the same Nostr key under a different NIP06 will produce a different
-                    Cashu profile, so that ecash will not be recoverable.
-                  </Card.Description>
-                </Card.Body>
-              </Card>
-
-              <Card variant="secondary" className="w-full">
-                <Card.Body className="gap-2">
-                  <Card.Title>Before deleting, make sure you have:</Card.Title>
-                  <Card.Description>
-                    - Backed up your NIP06{'\n'}- Transferred any ecash you do not want to risk
-                    {'\n'}- Exported any important data
-                  </Card.Description>
-                </Card.Body>
-              </Card>
+            <VStack spacing={8} className="items-center">
+              <Text size={24} bold className="text-foreground text-center">
+                Delete Account
+              </Text>
+              <Text
+                size={16}
+                className="text-center leading-6"
+                style={{ color: opacity(foreground, 0.5) }}>
+                This will permanently erase all wallet data, all profiles, and all keys from this
+                device. The app will restart as if freshly installed. This action cannot be
+                reversed.
+              </Text>
             </VStack>
 
-            <VStack spacing={12} className="w-full items-center pb-6">
-              <SlideToDelete
-                onComplete={handleDelete}
-                trackColor={danger}
-                thumbColor={foreground}
-                textColor={foreground}
-                iconColor={danger}
-              />
-              <Button variant="secondary" className="w-full" onPress={() => router.back()}>
-                <Button.Label>Cancel</Button.Label>
-              </Button>
-            </VStack>
+            <Card variant="secondary" className="w-full">
+              <Card.Body className="gap-2">
+                <Card.Title>Save your NIP06</Card.Title>
+                <Card.Description>
+                  Your NIP06 is the recovery phrase for your full Sovran account. Every Cashu
+                  profile in this app is derived from it, so restoring with a different NIP06 will
+                  create different Cashu wallets and will not recover the same ecash. If you were a
+                  TestFlight user, recovery may still not restore all historical funds.
+                </Card.Description>
+              </Card.Body>
+            </Card>
+
+            <Card variant="secondary" className="w-full">
+              <Card.Body className="gap-2">
+                <Card.Title>Imported Nostr accounts</Card.Title>
+                <Card.Description>
+                  Even imported Nostr accounts depend on your current NIP06 for their Cashu profile.
+                  Re-importing the same Nostr key under a different NIP06 will produce a different
+                  Cashu profile, so that ecash will not be recoverable.
+                </Card.Description>
+              </Card.Body>
+            </Card>
+
+            <Card variant="secondary" className="w-full">
+              <Card.Body className="gap-2">
+                <Card.Title>Before deleting, make sure you have:</Card.Title>
+                <Card.Description>
+                  - Backed up your NIP06{'\n'}- Transferred any ecash you do not want to risk
+                  {'\n'}- Exported any important data
+                </Card.Description>
+              </Card.Body>
+            </Card>
           </VStack>
-        </ScrollView>
+
+          <VStack spacing={12} className="w-full items-center pb-6">
+            <SlideToDelete
+              onComplete={handleDelete}
+              trackColor={danger}
+              thumbColor={foreground}
+              textColor={foreground}
+              iconColor={danger}
+            />
+            <Button variant="secondary" className="w-full" onPress={() => router.back()}>
+              <Button.Label>Cancel</Button.Label>
+            </Button>
+          </VStack>
+        </VStack>
+      </ScrollView>
     </ScreenWrapper>
   );
 }

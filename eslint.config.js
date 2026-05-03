@@ -53,6 +53,19 @@ module.exports = defineConfig([
           ],
         },
       ],
+      // `Dimensions.get('window' | 'screen')` snapshots the viewport once and
+      // never updates on rotation, foldable resize, or split-screen — UI that
+      // depends on it goes stale. Use `useWindowDimensions()` from react-native
+      // inside components, which subscribes via change events. Pure helpers
+      // should accept a `windowWidth: number` parameter from the caller's hook.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.object.name='Dimensions'][callee.property.name='get']",
+          message:
+            "Use `useWindowDimensions()` from 'react-native' inside components, or accept a `windowWidth` parameter in helpers. `Dimensions.get(...)` snapshots the viewport once and won't react to rotation, foldables, or split-screen.",
+        },
+      ],
     },
     ignores: [
       'dist/*',
@@ -68,6 +81,23 @@ module.exports = defineConfig([
     files: ['shared/ui/primitives/Pressable.tsx'],
     rules: {
       'no-restricted-imports': 'off',
+    },
+  },
+  // Two known callers legitimately need a frozen snapshot rather than a
+  // rotation-reactive value. Both are tracked as deferred follow-ups in
+  // __audits__/ — when they land, drop these exemptions.
+  //   - app/_layout.tsx: splash overlay measurements are taken once at app
+  //     launch (before any rotation could matter) and used to morph into a
+  //     QR-button anchor. Subscribing to dimension changes here would
+  //     invalidate the morph-source rectangle mid-animation.
+  //   - features/splitBill/components/ParticipantCardDeck.tsx: STEP /
+  //     CARD_W / SIDE_PAD feed `useAnimatedStyle` worklets and the carousel
+  //     snap math; converting these to reactive values needs the worklet
+  //     deps to thread through the SharedValue path, out of scope here.
+  {
+    files: ['app/_layout.tsx', 'features/splitBill/components/ParticipantCardDeck.tsx'],
+    rules: {
+      'no-restricted-syntax': 'off',
     },
   },
 ]);

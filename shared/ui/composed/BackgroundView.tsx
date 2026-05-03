@@ -4,7 +4,7 @@ import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useBackgroundContext } from '@/shared/providers/BackgroundProvider';
 import React, { memo, ReactNode, useMemo } from 'react';
-import { Dimensions, StyleSheet, ViewStyle } from 'react-native';
+import { StyleSheet, useWindowDimensions, ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useTheme } from '@/shared/providers/ThemeProvider';
 import { isBackgroundImageTheme, getGradientColorScale } from '@/config/backgroundImageThemes';
@@ -105,7 +105,7 @@ function ScrollableGradientOverlayComponent({
   const background = useThemeColor('background');
   const primaryColor950 = useMemo(() => background, [background]);
 
-  const viewportHeight = Dimensions.get('window').height;
+  const viewportHeight = useWindowDimensions().height;
 
   // Get gradient colors for background image themes
   const { currentTheme } = useTheme();

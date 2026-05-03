@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Linking, Dimensions, Platform } from 'react-native';
+import { StyleSheet, Linking, Platform } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -85,8 +85,6 @@ export type RelayMessage =
 // ============================================================================
 // Constants
 // ============================================================================
-
-export const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export const EMPTY_QUOTED_EVENTS: Map<string, FeedEvent> = new Map();
 export const DEFAULT_METRICS: NoteMetrics = Object.freeze({
