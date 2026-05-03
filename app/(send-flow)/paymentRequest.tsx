@@ -12,7 +12,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { router, Stack } from 'expo-router';
+import { router } from 'expo-router';
 import { z } from 'zod';
 
 import { PaymentRequestScreen } from '@/features/send';
@@ -44,23 +44,15 @@ function ModalScreen() {
   if (!params) return null;
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: 'Payment Request',
-          headerBackButtonMenuEnabled: false,
-        }}
-      />
-      <PaymentRequestScreen
-        key={params.paymentRequestEntry}
-        paymentRequestEntry={params.paymentRequestEntry}
-        onCancel={() => {
-          router.dismissTo('/');
-        }}
-        onMintSelected={handleMintSelected}
-        onRequestMintList={handleRequestMintList}
-      />
-    </>
+    <PaymentRequestScreen
+      key={params.paymentRequestEntry}
+      paymentRequestEntry={params.paymentRequestEntry}
+      onCancel={() => {
+        router.dismissTo('/');
+      }}
+      onMintSelected={handleMintSelected}
+      onRequestMintList={handleRequestMintList}
+    />
   );
 }
 

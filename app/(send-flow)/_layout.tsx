@@ -30,7 +30,10 @@ export default function SendFlowLayout() {
         name="meltQuote"
         options={{ title: 'Send Lightning', headerBackButtonMenuEnabled: false }}
       />
-      <Stack.Screen name="paymentRequest" options={{ title: 'Payment Request' }} />
+      <Stack.Screen
+        name="paymentRequest"
+        options={{ title: 'Payment Request', headerBackButtonMenuEnabled: false }}
+      />
       <Stack.Screen
         name="camera"
         options={{
