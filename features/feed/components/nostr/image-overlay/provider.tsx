@@ -27,6 +27,7 @@ import {
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 import { useScrollViewOffset } from '@/features/feed/hooks/useScrollViewOffset';
 import type { EngagementViewState } from '@/features/feed/hooks/useNostrEngagement';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import type { NoteMetrics } from '../shared';
 import {
   BOTTOM_PANEL_STIFF_DURATION_MS,
@@ -155,10 +156,9 @@ export function ImageOverlayProvider({
   );
   const [videoFeedLayoutIndex, setVideoFeedLayoutIndexState] = useState(0);
 
-  const onSwipeUpToNextPostRef = useRef<
+  const onSwipeUpToNextPostRef = useLatestRef<
     ((openNext: (layout: ImageOverlayReplaceLayout) => void) => void) | undefined
   >(onSwipeUpToNextPost);
-  onSwipeUpToNextPostRef.current = onSwipeUpToNextPost;
 
   const setActiveIndex = useCallback((index: number) => {
     setActiveIndexState((prev) => (index === prev ? prev : index));

@@ -1,5 +1,6 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 
+import { useLatestRef } from './useLatestRef';
 import { createPaymentMachine } from '../machine/createMachine';
 import type { PaymentMachine, StepHandlerMap } from '../machine/types';
 import type { Detectors, WalletContext } from '../types';
@@ -21,13 +22,9 @@ export function usePaymentMachine({
   walletContext,
   unit = 'sat',
 }: UsePaymentMachineConfig): PaymentMachine {
-  const walletContextRef = useRef(walletContext);
-  const handlersRef = useRef(handlers);
-  const unitRef = useRef(unit);
-
-  walletContextRef.current = walletContext;
-  handlersRef.current = handlers;
-  unitRef.current = unit;
+  const walletContextRef = useLatestRef(walletContext);
+  const handlersRef = useLatestRef(handlers);
+  const unitRef = useLatestRef(unit);
 
   return useMemo(
     () =>

@@ -19,6 +19,7 @@ import React, {
   useSyncExternalStore,
 } from 'react';
 
+import { useLatestRef } from './useLatestRef';
 import { registerLocale } from '../formatting/locales';
 import { errField, logger } from '../logger';
 import { createPaymentMachine } from '../machine/createMachine';
@@ -271,20 +272,13 @@ export function CocoPaymentUXProvider({
   const nfcAdapter = nfcAdapterProp ?? ic?.platform?.nfc;
   const createURDecoder = createURDecoderProp ?? ic?.platform?.createURDecoder;
 
-  const getLocaleRef = useRef(getLocale);
-  getLocaleRef.current = getLocale;
-
-  const notificationsRef = useRef(notifications);
-  notificationsRef.current = notifications;
+  const getLocaleRef = useLatestRef(getLocale);
+  const notificationsRef = useLatestRef(notifications);
   const operations = operationsProp ?? instance?.operations;
-  const operationsRef = useRef<Partial<MachineOperations> | undefined>(operations);
-  operationsRef.current = operations;
-  const navigationRef = useRef<NavigationCallbacks | undefined>(navigation);
-  navigationRef.current = navigation;
-  const writeClipboardRef = useRef(writeClipboard);
-  writeClipboardRef.current = writeClipboard;
-  const shareContentRef = useRef(shareContent);
-  shareContentRef.current = shareContent;
+  const operationsRef = useLatestRef<Partial<MachineOperations> | undefined>(operations);
+  const navigationRef = useLatestRef<NavigationCallbacks | undefined>(navigation);
+  const writeClipboardRef = useLatestRef(writeClipboard);
+  const shareContentRef = useLatestRef(shareContent);
 
   if (translations) {
     for (const [lang, dict] of Object.entries(translations)) {
@@ -292,13 +286,9 @@ export function CocoPaymentUXProvider({
     }
   }
 
-  const getOfflineRef = useRef(getOffline);
-  getOfflineRef.current = getOffline;
-
-  const getBtcPriceRef = useRef(getBtcPrice);
-  getBtcPriceRef.current = getBtcPrice;
-  const getDisplayCurrencyRef = useRef(getDisplayCurrency);
-  getDisplayCurrencyRef.current = getDisplayCurrency;
+  const getOfflineRef = useLatestRef(getOffline);
+  const getBtcPriceRef = useLatestRef(getBtcPrice);
+  const getDisplayCurrencyRef = useLatestRef(getDisplayCurrency);
 
   const walletContextRef = useRef<WalletContext | null>(null);
   const unitRef = useRef('sat');

@@ -12,9 +12,10 @@
  * `usePricelistStore`, so changing either flows through automatically.
  */
 
-import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { createAmountActionManager } from 'coco-payment-ux';
 
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useSettingsStore, type DisplayCurrency } from '@/shared/stores/global/settingsStore';
 import { usePricelistStore } from '@/shared/stores/global/pricelistStore';
 
@@ -54,8 +55,7 @@ export function useLocalAmountEntry(
 
   // Kept in a ref so the manager's getBtcPrice() reads fresh values without
   // forcing a manager rebuild on every price tick.
-  const priceRef = useRef(0);
-  priceRef.current = usePricelistStore((s) => s.getBtcPrice(displayCurrency)) ?? 0;
+  const priceRef = useLatestRef(usePricelistStore((s) => s.getBtcPrice(displayCurrency)) ?? 0);
 
   const manager = useMemo(
     () =>

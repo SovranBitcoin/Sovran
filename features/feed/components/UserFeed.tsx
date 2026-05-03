@@ -27,6 +27,7 @@ import React, { useMemo, useRef, useEffect, useCallback, useState, useTransition
 import { StyleSheet, InteractionManager, ActivityIndicator } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -343,12 +344,9 @@ function UserFeedInner({
   const feedItemIdsRef = useRef(new Set<string>());
 
   // Stable refs for renderItem — avoids re-creating renderItem on every Map update
-  const metricsRef = useRef(metricsMap);
-  metricsRef.current = metricsMap;
-  const quotedRef = useRef(quotedEventsMap);
-  quotedRef.current = quotedEventsMap;
-  const profilesRef = useRef(profilesMap);
-  profilesRef.current = profilesMap;
+  const metricsRef = useLatestRef(metricsMap);
+  const quotedRef = useLatestRef(quotedEventsMap);
+  const profilesRef = useLatestRef(profilesMap);
   const [dataVersion, setDataVersion] = useState(0);
 
   // Track whether initial load has completed — skip fade-in for items after first render

@@ -1,5 +1,6 @@
-import { useRef } from 'react';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
+
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log } from '@/shared/lib/logger';
 
 /**
@@ -20,8 +21,7 @@ export function useBeforeRemoveCleanup(options: {
   cleanup: () => Promise<void>;
 }): void {
   const navigation = useNavigation();
-  const optsRef = useRef(options);
-  optsRef.current = options;
+  const optsRef = useLatestRef(options);
 
   usePreventRemove(options.active, ({ data }) => {
     const { shouldCleanup, cleanup } = optsRef.current;

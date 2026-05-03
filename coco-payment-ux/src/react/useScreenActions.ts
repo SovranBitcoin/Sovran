@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useSyncExternalStore } from 'react';
 
+import { useLatestRef } from './useLatestRef';
 import type { CreateAmountActionManagerConfig } from '../amount-actions/types';
 import {
   createScreenActionManager,
@@ -135,14 +136,10 @@ export function useScreenActionsWithConfig<S extends ScreenType>(
     amountConfig,
   } = config;
 
-  const getExtraContextRef = useRef(getExtraContext);
-  getExtraContextRef.current = getExtraContext;
-  const shouldApplyEntryUpdateRef = useRef(shouldApplyEntryUpdate);
-  shouldApplyEntryUpdateRef.current = shouldApplyEntryUpdate;
-  const mergeEntryUpdateRef = useRef(mergeEntryUpdate);
-  mergeEntryUpdateRef.current = mergeEntryUpdate;
-  const amountConfigRef = useRef(amountConfig);
-  amountConfigRef.current = amountConfig;
+  const getExtraContextRef = useLatestRef(getExtraContext);
+  const shouldApplyEntryUpdateRef = useLatestRef(shouldApplyEntryUpdate);
+  const mergeEntryUpdateRef = useLatestRef(mergeEntryUpdate);
+  const amountConfigRef = useLatestRef(amountConfig);
 
   const { parsed, error } = useMemo(
     () =>
@@ -256,10 +253,8 @@ export function useScreenActions(
   const isAmountEntry = screenType === 'amountEntry';
   const skipDecoration = isAmountEntry || screenType === 'mintSelector';
 
-  const machineRef = useRef(machine);
-  machineRef.current = machine;
-  const bridgeRef = useRef(screenActionsBridge);
-  bridgeRef.current = screenActionsBridge;
+  const machineRef = useLatestRef(machine);
+  const bridgeRef = useLatestRef(screenActionsBridge);
 
   const getExtraContext = useCallback(
     () => ({
@@ -303,9 +298,9 @@ export function useScreenActions(
         notify: (event: string, ...args: unknown[]) => {
           const notifications = notificationsRef.current;
           if (!notifications) return;
-          const handler = (notifications as Record<string, ((...a: unknown[]) => void) | undefined>)[
-            event
-          ];
+          const handler = (
+            notifications as Record<string, ((...a: unknown[]) => void) | undefined>
+          )[event];
           if (typeof handler === 'function') handler(...args);
         },
         navigation: {
@@ -318,7 +313,9 @@ export function useScreenActions(
     [] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const defaultHandlersForScreen = (
-    isAmountEntry ? allDefaults.amountEntry : allDefaults[screenType as Exclude<ScreenType, 'amountEntry'>]
+    isAmountEntry
+      ? allDefaults.amountEntry
+      : allDefaults[screenType as Exclude<ScreenType, 'amountEntry'>]
   ) as ScreenActionHandlerMap[typeof screenType];
 
   const shouldApply = screenActionsBridge?.shouldApplyEntryUpdate ?? defaultShouldApply;

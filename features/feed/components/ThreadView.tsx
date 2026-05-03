@@ -5,7 +5,7 @@
  * replies below). Uses Primal's cache relay thread_view API.
  */
 
-import React, { useMemo, useRef, useEffect, useCallback, useState } from 'react';
+import React, { useMemo, useEffect, useCallback, useState } from 'react';
 import { StyleSheet, ActivityIndicator, InteractionManager } from 'react-native';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
@@ -36,6 +36,7 @@ import { PostCard } from './nostr/PostCard';
 
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
 import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { feedLog, Log } from '@/shared/lib/logger';
 
@@ -169,12 +170,9 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   const [quotedEventsMap, setQuotedEventsMap] = useState<Map<string, FeedEvent>>(new Map());
 
   // Stable refs for renderItem — avoids re-creating renderItem on every Map update
-  const profilesRef = useRef(profilesMap);
-  profilesRef.current = profilesMap;
-  const metricsRef = useRef(metricsMap);
-  metricsRef.current = metricsMap;
-  const quotedRef = useRef(quotedEventsMap);
-  quotedRef.current = quotedEventsMap;
+  const profilesRef = useLatestRef(profilesMap);
+  const metricsRef = useLatestRef(metricsMap);
+  const quotedRef = useLatestRef(quotedEventsMap);
   const [dataVersion, setDataVersion] = useState(0);
 
   const [hiddenReplyCount, setHiddenReplyCount] = useState(0);

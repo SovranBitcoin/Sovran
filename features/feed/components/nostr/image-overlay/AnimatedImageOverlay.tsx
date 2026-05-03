@@ -29,6 +29,7 @@ import { scheduleOnUI } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { guardedRouter as router } from '@/shared/hooks/useGuardedRouter';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { Log } from '@/shared/lib/logger';
 import Icon from 'assets/icons';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -394,8 +395,7 @@ function AnimatedImageOverlayContent({ ctx }: { ctx: ImageOverlayContextValue })
     }
   }, []);
 
-  const closeRef = useRef(close);
-  closeRef.current = close;
+  const closeRef = useLatestRef(close);
   /** Pass current pager index when multiple images so dismiss animates to the visible thumbnail. */
   const triggerClose = useCallback(
     (dismissedPageIndex?: number) => {

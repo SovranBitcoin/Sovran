@@ -30,6 +30,7 @@ import {
   type ScreenActionsBridge,
 } from 'coco-payment-ux/react';
 
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { paymentLog } from '@/shared/lib/logger';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
 import { useReceivePaymentUXExtras } from '@/features/receive/providers/ReceivePaymentUXExtras';
@@ -124,16 +125,12 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
   const { isOffline: contextOffline } = useOfflineStatus();
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || contextOffline;
-  const offlineRef = useRef(isOffline);
-  offlineRef.current = isOffline;
+  const offlineRef = useLatestRef(isOffline);
   const getOffline = useCallback(() => offlineRef.current, []);
 
-  const npubRef = useRef(keys?.npub);
-  npubRef.current = keys?.npub;
-  const pubkeyRef = useRef(keys?.pubkey);
-  pubkeyRef.current = keys?.pubkey;
-  const privateKeyRef = useRef(keys?.privateKey);
-  privateKeyRef.current = keys?.privateKey;
+  const npubRef = useLatestRef(keys?.npub);
+  const pubkeyRef = useLatestRef(keys?.pubkey);
+  const privateKeyRef = useLatestRef(keys?.privateKey);
 
   const [nfcAdapter] = useState(() => createNfcAdapter());
   const p2pkKeyRefreshedRef = useRef<((newKey: string | null) => void) | null>(null);

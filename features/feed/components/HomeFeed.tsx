@@ -14,6 +14,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { log, Log } from '@/shared/lib/logger';
 import { LegendList, type LegendListRenderItemProps, type LegendListRef } from '@legendapp/list';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
@@ -163,12 +164,9 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
   const loadingMoreRef = useRef(false);
   const feedItemIdsRef = useRef(new Set<string>());
 
-  const metricsRef = useRef(metricsMap);
-  metricsRef.current = metricsMap;
-  const quotedRef = useRef(quotedEventsMap);
-  quotedRef.current = quotedEventsMap;
-  const profilesRef = useRef(profilesMap);
-  profilesRef.current = profilesMap;
+  const metricsRef = useLatestRef(metricsMap);
+  const quotedRef = useLatestRef(quotedEventsMap);
+  const profilesRef = useLatestRef(profilesMap);
   const [dataVersion, setDataVersion] = useState(0);
 
   const isFirstRender = useRef(true);

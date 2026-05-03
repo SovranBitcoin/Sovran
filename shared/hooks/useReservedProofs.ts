@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useManager } from '@cashu/coco-react';
 import type { CoreProof } from '@cashu/coco-core';
 import { getReservedProofs } from 'coco-payment-ux';
 
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { walletLog } from '@/shared/lib/logger';
 
 export interface ReservedProofsResult {
@@ -15,8 +16,7 @@ export function useReservedProofs(): ReservedProofsResult {
   const [reservedTotal, setReservedTotal] = useState(0);
   const [reservedProofs, setReservedProofs] = useState<CoreProof[]>([]);
 
-  const managerRef = useRef(manager);
-  managerRef.current = manager;
+  const managerRef = useLatestRef(manager);
 
   useEffect(() => {
     let cancelled = false;

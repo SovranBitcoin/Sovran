@@ -42,6 +42,7 @@ import { supportsLiquidGlass } from '@/shared/lib/version';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 import { HistoryEntryHeader } from '@/features/transactions';
 import Icon from 'assets/icons';
+import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { Log, useLifecycleLogger, useRenderLogger, walletLog } from '@/shared/lib/logger';
 import { resolveIdentityName } from '@/shared/lib/identity';
 import { Text } from '@/shared/ui/primitives/Text';
@@ -121,8 +122,7 @@ export default function SplitBillParticipantsScreen() {
   // every row to reconcile on every tap. `selectedIds` is read through
   // a ref so the log stays accurate without tripping the dep list.
   const togglePressAt = useRef<number | null>(null);
-  const selectedIdsRef = useRef(selectedIds);
-  selectedIdsRef.current = selectedIds;
+  const selectedIdsRef = useLatestRef(selectedIds);
   const instrumentedToggle = useCallback(
     (candidate: PickerCandidate) => {
       togglePressAt.current = performance.now();
