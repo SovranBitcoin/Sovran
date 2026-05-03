@@ -79,8 +79,7 @@ export function AccountPagerViewLayout({
        *   registered monicon set (see .monicon/icons.js).
        *   `mdi:swap-horizontal` → "Swap" → navigates to the mint-flow
        *   `distribution` screen, whose title is "Balance split" (see
-       *   `app/(mint-flow)/_layout.tsx:27`). Same destination
-       *   `HealthModalScreen.handleAction` routes to for `openBalanceSplit`.
+       *   `app/(mint-flow)/_layout.tsx:27`).
        *   `tabler:dots` for the single remaining placeholder.
        */}
       <HStack

@@ -34,7 +34,6 @@
     "features/feed/**": ["exports", "types"],
     "features/auth/**": ["exports"],
     "features/camera/**": ["files", "types"],
-    "features/health/**": ["exports", "types"],
     "features/mint/**": ["exports", "types"],
     "features/settings/**": ["exports"],
     "features/transactions/**": ["exports"],
