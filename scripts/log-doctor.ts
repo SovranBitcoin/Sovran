@@ -19,7 +19,7 @@
  *   analyzed, reducing the number of tokens."
  *
  * USAGE:
- *   npx ts-node scripts/log-doctor.ts <mode> [options] < log.txt
+ *   npx tsx scripts/log-doctor.ts <mode> [options] < log.txt
  *   npm run log-doctor -- <mode> [options]
  *
  * MODES:
@@ -60,21 +60,14 @@ import * as fs from 'fs';
 import * as nodePath from 'path';
 import * as url from 'url';
 import { spawn, spawnSync } from 'child_process';
-// js-yaml ships without types in this workspace; declare a minimal shape so
-// TypeScript doesn't complain about an implicit any on a default import.
-// @ts-ignore — module has no .d.ts in node_modules
-import * as yaml from 'js-yaml';
 
 // Test DSL — parser, executor, discovery, verification metadata writer.
-// These power the `phone test ...` subcommand. The import is renamed to
-// `formatDslTestList` so it doesn't collide with the legacy YAML helper of
-// the same name still living lower in this file (slated for deletion once
-// the migration is complete).
+// These power the `phone test ...` subcommand.
 import {
   discoverTests,
   findMatrix,
   findTest,
-  formatTestList as formatDslTestList,
+  formatTestList,
 } from './test-dsl/discovery';
 import type { RunnerEvent } from './test-dsl/events';
 import { executeMatrix, executeTest } from './test-dsl/executor';
@@ -175,7 +168,6 @@ function parseArgs(argv: string[]): Options {
       opts.tokenBudget = parseInt(args[++i], 10);
     } else {
       // Unknown flag — pass through to subcommand-style modes (phone test ...).
-      // Subcommand parsers (e.g. parseSaveArgs) decide what to do with it.
       opts.restArgs.push(arg);
     }
   }
@@ -2948,152 +2940,8 @@ function buildCoordTapNudge(x: number, y: number): string {
   ].join('\n');
 }
 
-// ─── Test runner (`phone test …`) ──────────────────────────────────────────
-//
-// TESTS.yml at the repo root holds verified end-to-end flows. The runner
-// supports two modes:
-//
-//   phone test <name>          — re-run an existing test
-//   phone test --list          — list registered tests
-//   phone test all             — run every registered test
-//   phone test save <name>     — record a NEW test (executes steps live, only
-//                                writes to TESTS.yml if every step passes)
-//
-// `save` is the only path that mutates TESTS.yml — there is no way to add a
-// test without it actually running first. See TESTS.yml header for the rules.
-
-/**
- * A step is a single-key YAML object whose value is either a primitive
- * (string/number/boolean) for simple step kinds or a nested object for
- * step kinds that take multiple parameters (e.g. `capture-id-suffix`,
- * `assert-starts-with`).
- */
-type TestStep = { [k: string]: unknown };
-
-/** Step kinds that take a primitive arg (string most of the time). */
-const PRIMITIVE_STEP_KINDS = [
-  'tap-id', 'tap-text', 'tap-id-if-present', 'tap-text-if-present',
-  'wait-for', 'wait-for-text', 'wait-for-id-prefix',
-  'assert-id', 'assert-text', 'assert-id-prefix',
-  'type', 'keypad',
-  'home', 'relaunch-app', 'dismiss-dev-menu', 'screenshot',
-  'capture-clipboard',
-  'tap-back', 'dismiss-modal', 'swipe',
-] as const;
-
-/** Step kinds that take a nested object arg with multiple keys. */
-const OBJECT_STEP_KINDS = [
-  'capture-id-suffix',  // { prefix: string, as: string }
-  'capture-id-label',   // { id: string, as: string }
-  'assert-starts-with', // { var: string, prefix: string } | { value: string, prefix: string }
-  'assert-contains',    // { var: string, needle: string } | { value: string, needle: string }
-  'assert-eq',          // { a: string, b: string }
-] as const;
-
-interface TestVerified {
-  date: string;
-  by: string;
-  device?: string;
-  'last-run'?: string;
-}
-
-interface TestEntry {
-  description?: string;
-  steps: TestStep[];
-  verified?: TestVerified;
-}
-
-interface TestsRules {
-  forbidden_step_kinds?: string[];
-  forbidden_target_patterns?: string[];
-}
-
-interface TestsDocument {
-  rules?: TestsRules;
-  tests?: Record<string, TestEntry>;
-}
-
-const TESTS_PATH = nodePath.resolve(process.cwd(), 'TESTS.yml');
 const STEP_TIMEOUT_MS = 90_000;
 
-function loadTestsDoc(): TestsDocument {
-  if (!fs.existsSync(TESTS_PATH)) {
-    throw new Error(
-      `TESTS.yml not found at ${TESTS_PATH}.\n` +
-        'Create it with the rules header (see existing template) or cd to the repo root.'
-    );
-  }
-  const doc = yaml.load(fs.readFileSync(TESTS_PATH, 'utf-8')) as TestsDocument;
-  return doc || { tests: {} };
-}
-
-/**
- * Normalize a YAML list item to a single-key TestStep object. js-yaml parses
- * a bare list item like `- dismiss-dev-menu` as the string "dismiss-dev-menu",
- * not an object — convert those into `{ "dismiss-dev-menu": true }` so the
- * step interpreter handles them uniformly.
- */
-function normalizeStep(raw: unknown): TestStep {
-  if (typeof raw === 'string') {
-    return { [raw]: true } as TestStep;
-  }
-  return raw as TestStep;
-}
-
-function stepKind(step: TestStep): string {
-  const keys = Object.keys(step);
-  if (keys.length !== 1) {
-    throw new Error(`Step must have exactly one key, got: ${JSON.stringify(step)}`);
-  }
-  return keys[0];
-}
-
-function stepArg(step: TestStep): string | undefined {
-  const k = stepKind(step);
-  const v = step[k];
-  if (v === undefined || v === null || typeof v === 'boolean') return undefined;
-  if (typeof v === 'object') return undefined;
-  return String(v);
-}
-
-function stepArgObj(step: TestStep): Record<string, unknown> | undefined {
-  const k = stepKind(step);
-  const v = step[k];
-  if (v && typeof v === 'object' && !Array.isArray(v)) {
-    return v as Record<string, unknown>;
-  }
-  return undefined;
-}
-
-/**
- * Replace `${name}` references in a string with the matching value from
- * `vars`. Throws if a referenced var is undefined. Recurses into nested
- * objects/arrays so step args declared as objects also get interpolated.
- */
-function interpolate(value: unknown, vars: Record<string, string>): unknown {
-  if (typeof value === 'string') {
-    return value.replace(/\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, (_match, name) => {
-      if (!(name in vars)) {
-        throw new Error(`undefined variable '${name}' (defined: ${Object.keys(vars).join(', ') || 'none'})`);
-      }
-      return vars[name];
-    });
-  }
-  if (Array.isArray(value)) return value.map((v) => interpolate(v, vars));
-  if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const k of Object.keys(value)) {
-      out[k] = interpolate((value as Record<string, unknown>)[k], vars);
-    }
-    return out;
-  }
-  return value;
-}
-
-function previewValue(s: string, max = 60): string {
-  if (s.length <= max) return s;
-  return s.slice(0, max - 1) + '…';
-}
 
 /**
  * Read the iOS clipboard via WDA. iOS 14+ blocks pasteboard reads from
@@ -3186,31 +3034,6 @@ export async function writeClipboard(
   });
 }
 
-function validateStep(step: TestStep, rules: TestsRules | undefined): void {
-  const kind = stepKind(step);
-  if (rules?.forbidden_step_kinds?.includes(kind)) {
-    throw new Error(
-      `Step kind '${kind}' is forbidden by TESTS.yml rules. ` +
-        `Add a testID to the target component and use 'tap-id' instead.`
-    );
-  }
-  const arg = stepArg(step);
-  if (arg && rules?.forbidden_target_patterns) {
-    for (const pat of rules.forbidden_target_patterns) {
-      if (new RegExp(pat).test(arg)) {
-        throw new Error(
-          `Step target "${arg}" matches forbidden pattern /${pat}/. ` +
-            `Session-variable data (amounts, dates, IDs) MUST NOT appear in test steps.`
-        );
-      }
-    }
-  }
-  // Step shape sanity
-  const validKinds: readonly string[] = [...PRIMITIVE_STEP_KINDS, ...OBJECT_STEP_KINDS];
-  if (!validKinds.includes(kind)) {
-    throw new Error(`Unknown step kind: '${kind}'. Valid kinds: ${validKinds.join(', ')}`);
-  }
-}
 
 async function pollFor<T>(
   fn: () => Promise<T | null>,
@@ -3998,508 +3821,6 @@ export async function assertIDPrefix(prefix: string): Promise<FlatNode> {
   return node;
 }
 
-async function executeStep(
-  step: TestStep,
-  rules: TestsRules | undefined,
-  vars: Record<string, string>
-): Promise<string> {
-  validateStep(step, rules);
-  const kind = stepKind(step);
-  // Interpolate ${var} in the step's value before dispatching to the handler.
-  const interpolatedStep: TestStep = { [kind]: interpolate((step as Record<string, unknown>)[kind], vars) };
-  const arg = stepArg(interpolatedStep);
-  const obj = stepArgObj(interpolatedStep);
-  switch (kind) {
-    case 'tap-id':
-      await tapByID(arg!);
-      return `tap-id: ${arg}`;
-    case 'tap-text': {
-      const { nudge } = await tapByText(arg!);
-      return nudge
-        ? `tap-text: ${arg}  ⚠ no testID on target — consider adding one`
-        : `tap-text: ${arg}`;
-    }
-    case 'tap-id-if-present': {
-      const tree = await getCurrentTree();
-      const flat = flattenAll(tree);
-      const node = findByTestID(flat, arg!);
-      if (!node || !node.rect) return `tap-id-if-present: ${arg} — not present, skipped`;
-      await tapXY(node.centerX, node.centerY);
-      return `tap-id-if-present: ${arg} — tapped`;
-    }
-    case 'tap-text-if-present': {
-      const tree = await getCurrentTree();
-      const flat = flattenAll(tree);
-      const match = findByText(flat, arg!);
-      if (!match) return `tap-text-if-present: ${arg} — not present, skipped`;
-      await tapXY(match.node.centerX, match.node.centerY);
-      return `tap-text-if-present: ${arg} — tapped`;
-    }
-    case 'wait-for':
-      await waitForID(arg!);
-      return `wait-for: ${arg} ✓`;
-    case 'wait-for-text':
-      await waitForText(arg!);
-      return `wait-for-text: ${arg} ✓`;
-    case 'wait-for-id-prefix': {
-      const node = await waitForIDPrefix(arg!);
-      return `wait-for-id-prefix: ${arg} ✓ (matched ${node.identifier})`;
-    }
-    case 'assert-id':
-      await assertID(arg!);
-      return `assert-id: ${arg} ✓`;
-    case 'assert-text':
-      await assertText(arg!);
-      return `assert-text: ${arg} ✓`;
-    case 'assert-id-prefix': {
-      const node = await assertIDPrefix(arg!);
-      return `assert-id-prefix: ${arg} ✓ (matched ${node.identifier})`;
-    }
-    case 'type':
-      await typeKeys(arg!);
-      return `type: ${arg}`;
-    case 'keypad':
-      await tapKeypadDigit(arg!);
-      return `keypad: ${arg}`;
-    case 'home':
-      await pressHome();
-      return 'home';
-    case 'tap-back': {
-      // Tap the back button on the topmost iOS navigation bar. Walks the
-      // accessibility tree (parent-child preserved) to find the first
-      // XCUIElementTypeButton descendant of the LAST XCUIElementTypeNavigationBar
-      // — that's the iOS native back arrow on a presented modal/Stack screen.
-      // No source changes needed (works without a testID on the back button).
-      const tree = await getCurrentTree();
-      const hit = findTopmostNavBackButton(tree);
-      if (!hit) {
-        // Help the test author diagnose: show what nav bars ARE on the screen.
-        const navBars: string[] = [];
-        const walk = (node: AXNode): void => {
-          if (node.type === 'XCUIElementTypeNavigationBar') {
-            const id = node.rawIdentifier || node.identifier || node.label || node.name || '(unlabeled)';
-            const buttonCount = countDescendantButtons(node);
-            navBars.push(`  - [${id}] (${buttonCount} button${buttonCount === 1 ? '' : 's'})`);
-          }
-          if (node.children) for (const c of node.children) walk(c);
-        };
-        walk(tree);
-        throw new Error(
-          'tap-back: no navigation bar with a tappable back button on the current screen.\n' +
-            (navBars.length === 0
-              ? 'No XCUIElementTypeNavigationBar in the tree at all.'
-              : `Nav bars present:\n${navBars.join('\n')}\n` +
-                '(Are you on the root screen? Stack/modal pushes typically expose a back button.)')
-        );
-      }
-      await tapXY(hit.centerX, hit.centerY);
-      return `tap-back: tapped nav back button at (${hit.centerX},${hit.centerY})`;
-    }
-    case 'relaunch-app':
-      await relaunchApp(arg || 'com.sovranbitcoin.dev');
-      return `relaunch-app: ${arg || 'com.sovranbitcoin.dev'}`;
-    case 'dismiss-modal': {
-      // Native iOS swipe-to-dismiss for the topmost modal sheet. Replaces
-      // `relaunch-app` when a test only needs to return to the root screen
-      // — far faster than a terminate+launch and avoids the dev-menu race.
-      await dismissModal();
-      return 'dismiss-modal: swiped down to dismiss topmost modal';
-    }
-    case 'swipe': {
-      // Generic directional swipe — `swipe: down|up|left|right`. Useful for
-      // dismissing modals (`down`), revealing content, or driving custom
-      // gesture-based UI. Coords are computed from the live window size.
-      const dir = String(arg || '').toLowerCase();
-      if (dir !== 'up' && dir !== 'down' && dir !== 'left' && dir !== 'right') {
-        throw new Error(
-          `swipe: direction must be one of up|down|left|right (got "${arg}")`
-        );
-      }
-      await swipe(dir);
-      return `swipe: ${dir}`;
-    }
-    case 'dismiss-dev-menu': {
-      // Polls for the Expo dev menu's [xmark] close button for up to 3
-      // seconds and dismisses it if found. Soft-fails (returns success even
-      // if the menu never appears) — used after `relaunch-app` to handle
-      // the race where the dev menu sometimes renders 0–2 seconds late.
-      const start = Date.now();
-      while (Date.now() - start < 3000) {
-        const tree = await getCurrentTree();
-        const flat = flattenAll(tree);
-        const node = findByTestID(flat, 'xmark');
-        if (node && node.rect) {
-          await tapXY(node.centerX, node.centerY);
-          // Brief settle so subsequent steps see the dismissed state.
-          await sleep(300);
-          return 'dismiss-dev-menu — dismissed';
-        }
-        await sleep(300);
-      }
-      return 'dismiss-dev-menu — no menu, skipped';
-    }
-    case 'screenshot': {
-      const dir = nodePath.resolve(process.cwd(), SCREENSHOTS_DIR, 'manual');
-      fs.mkdirSync(dir, { recursive: true });
-      const out = await takeScreenshot(
-        nodePath.join(dir, `${sanitizeForFile(arg || String(Date.now()))}.png`)
-      );
-      return `screenshot: ${nodePath.relative(process.cwd(), out)}`;
-    }
-
-    // ─── Variables: capture ─────────────────────────────────────────────
-    case 'capture-clipboard': {
-      // arg is the variable name to bind the clipboard value to.
-      const varName = arg;
-      if (!varName) throw new Error('capture-clipboard requires a variable name as its arg');
-      const text = await readClipboard();
-      vars[varName] = text;
-      return `capture-clipboard: $${varName} = "${previewValue(text)}" (${text.length} chars)`;
-    }
-    case 'capture-id-suffix': {
-      // { prefix: <testid prefix>, as: <var name> }
-      if (!obj) throw new Error('capture-id-suffix requires {prefix, as} object args');
-      const prefix = String(obj.prefix || '');
-      const varName = String(obj.as || '');
-      if (!prefix || !varName) {
-        throw new Error('capture-id-suffix requires both `prefix` and `as` keys');
-      }
-      const tree = await getCurrentTree();
-      const flat = flattenAll(tree);
-      const node = findByTestIDPrefix(flat, prefix);
-      if (!node) {
-        throw new Error(
-          `capture-id-suffix: no testID matching prefix "${prefix}" on the current screen`
-        );
-      }
-      const suffix = node.identifier.slice(prefix.length);
-      vars[varName] = suffix;
-      return `capture-id-suffix: $${varName} = "${suffix}" (full id ${node.identifier})`;
-    }
-    case 'capture-id-label': {
-      // { id: <testID>, as: <var name> }
-      // Reads the accessibility label of the element with the given testID
-      // straight from the AX tree. Use this for surfacing in-app values
-      // (tokens, addresses, invoices) into test variables WITHOUT touching
-      // the iOS pasteboard — no app foregrounding, no visual flicker.
-      // The element should set `accessibilityLabel={value}` in the source.
-      if (!obj) throw new Error('capture-id-label requires {id, as} object args');
-      const id = String(obj.id || '');
-      const varName = String(obj.as || '');
-      if (!id || !varName) {
-        throw new Error('capture-id-label requires both `id` and `as` keys');
-      }
-      const tree = await getCurrentTree();
-      const flat = flattenAll(tree);
-      const node = findByTestID(flat, id);
-      if (!node) {
-        const available = flat
-          .filter((n) => n.hasIdent)
-          .map((n) => `  ${n.identifier}`)
-          .slice(0, 30)
-          .join('\n');
-        throw new Error(
-          `capture-id-label: no element with testID="${id}" on the current screen.\n` +
-            (available
-              ? `Available testIDs:\n${available}`
-              : '(no testIDs are present on this screen)')
-        );
-      }
-      const value = node.label || node.name || '';
-      if (!value) {
-        throw new Error(
-          `capture-id-label: element [${id}] has no accessibility label/name. ` +
-            `Set \`accessibilityLabel={value}\` in the source component.`
-        );
-      }
-      vars[varName] = value;
-      return `capture-id-label: $${varName} = "${previewValue(value)}" (${value.length} chars)`;
-    }
-
-    // ─── Variables: assert ──────────────────────────────────────────────
-    case 'assert-starts-with': {
-      // { var: <name> | value: <literal>, prefix: <expected> }
-      if (!obj) throw new Error('assert-starts-with requires object args');
-      const value =
-        obj.var !== undefined
-          ? vars[String(obj.var)]
-          : obj.value !== undefined
-            ? String(obj.value)
-            : undefined;
-      if (value === undefined) {
-        throw new Error('assert-starts-with requires either `var` or `value`');
-      }
-      const prefix = String(obj.prefix || '');
-      if (!prefix) throw new Error('assert-starts-with requires `prefix`');
-      if (!value.startsWith(prefix)) {
-        throw new Error(
-          `assert-starts-with failed: "${previewValue(value)}" does not start with "${prefix}"`
-        );
-      }
-      return `assert-starts-with: "${previewValue(value, 30)}" startsWith "${prefix}" ✓`;
-    }
-    case 'assert-contains': {
-      // { var: <name> | value: <literal>, needle: <expected substring> }
-      if (!obj) throw new Error('assert-contains requires object args');
-      const value =
-        obj.var !== undefined
-          ? vars[String(obj.var)]
-          : obj.value !== undefined
-            ? String(obj.value)
-            : undefined;
-      if (value === undefined) {
-        throw new Error('assert-contains requires either `var` or `value`');
-      }
-      const needle = String(obj.needle || '');
-      if (!needle) throw new Error('assert-contains requires `needle`');
-      if (!value.includes(needle)) {
-        throw new Error(
-          `assert-contains failed: "${previewValue(value)}" does not contain "${needle}"`
-        );
-      }
-      return `assert-contains: "${previewValue(value, 30)}" contains "${needle}" ✓`;
-    }
-    case 'assert-eq': {
-      // { a: <var or literal>, b: <var or literal> }
-      // Both a and b have already been ${var}-interpolated above.
-      if (!obj) throw new Error('assert-eq requires object args');
-      const a = obj.a !== undefined ? String(obj.a) : '';
-      const b = obj.b !== undefined ? String(obj.b) : '';
-      if (a !== b) {
-        throw new Error(
-          `assert-eq failed: "${previewValue(a)}" !== "${previewValue(b)}"`
-        );
-      }
-      return `assert-eq: "${previewValue(a, 30)}" === "${previewValue(b, 30)}" ✓`;
-    }
-
-    default:
-      throw new Error(`unhandled step kind: ${kind}`);
-  }
-}
-
-/**
- * Sanitize a string for use as a filename component:
- *   "tap-id-if-present"  → "tap-id-if-present"
- *   "tap-text:Receive"   → "tap-text-Receive"
- *   "wait-for: amount-x" → "wait-for-amount-x"
- */
-function sanitizeForFile(s: string): string {
-  return s
-    .replace(/[^a-zA-Z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60);
-}
-
-const SCREENSHOTS_DIR = '.screenshots';
-
-function prepareScreenshotsDir(testName: string): string {
-  const dir = nodePath.resolve(process.cwd(), SCREENSHOTS_DIR, sanitizeForFile(testName));
-  // Clear any prior run for this test so the folder always reflects the
-  // most recent execution.
-  if (fs.existsSync(dir)) {
-    for (const f of fs.readdirSync(dir)) {
-      try {
-        fs.unlinkSync(nodePath.join(dir, f));
-      } catch {
-        /* ignore */
-      }
-    }
-  } else {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
-}
-
-function screenshotPath(dir: string, index: number, label: string, suffix = ''): string {
-  const idx = String(index).padStart(2, '0');
-  return nodePath.join(dir, `${idx}-${sanitizeForFile(label)}${suffix}.png`);
-}
-
-async function runTestSteps(
-  name: string,
-  test: TestEntry,
-  rules: TestsRules | undefined
-): Promise<{ ok: boolean; log: string[] }> {
-  const log: string[] = [`▶ test: ${name}${test.description ? '  — ' + test.description : ''}`];
-  const shotDir = prepareScreenshotsDir(name);
-  log.push(`  screenshots → ${nodePath.relative(process.cwd(), shotDir)}/`);
-
-  // Per-run variables — populated by capture-* steps and consumed via ${name}
-  // interpolation in subsequent string args.
-  const vars: Record<string, string> = {};
-
-  // 00 — capture the starting state before any step runs.
-  try {
-    await takeScreenshot(screenshotPath(shotDir, 0, 'start'));
-  } catch {
-    /* WDA may not be ready before relaunch — best effort */
-  }
-
-  // Normalize bare-string YAML items into single-key objects.
-  const steps = test.steps.map(normalizeStep);
-  for (let i = 0; i < steps.length; i++) {
-    const step = steps[i];
-    const idx = i + 1;
-    try {
-      const result = await executeStep(step, rules, vars);
-      log.push(`  [${idx}/${test.steps.length}] ${result}`);
-      // Capture state AFTER the step has run. Brief settle for nav animations.
-      await sleep(150);
-      try {
-        await takeScreenshot(screenshotPath(shotDir, idx, stepKind(step)));
-      } catch {
-        /* best effort */
-      }
-    } catch (err) {
-      const msg = (err as Error).message;
-      log.push(`  [${idx}/${test.steps.length}] ✗ ${stepKind(step)}: ${msg}`);
-      // Save a failure screenshot in the same folder as the rest of the run.
-      try {
-        const failPath = screenshotPath(shotDir, idx, stepKind(step), '-FAIL');
-        await takeScreenshot(failPath);
-        log.push(`        screenshot: ${nodePath.relative(process.cwd(), failPath)}`);
-      } catch {
-        /* best effort */
-      }
-      return { ok: false, log };
-    }
-  }
-  log.push(`✓ ${name} PASSED (${test.steps.length} steps)`);
-  return { ok: true, log };
-}
-
-function parseSaveArgs(args: string[]): {
-  name: string;
-  description: string;
-  steps: TestStep[];
-} {
-  if (args.length === 0) {
-    throw new Error(
-      'Usage: phone test save <name> [--desc "..."] --step <kind>:<arg> [--step ...]\n' +
-        '\n' +
-        'Example:\n' +
-        '  phone test save create-mint-quote --desc "Open mint quote entry" \\\n' +
-        '    --step tap-text:Receive \\\n' +
-        '    --step wait-for:receive-fixed-amount \\\n' +
-        '    --step tap-id:receive-fixed-amount \\\n' +
-        '    --step wait-for:amount-next'
-    );
-  }
-  const name = args[0];
-  let description = '';
-  let steps: TestStep[] = [];
-  let stepsFile: string | undefined;
-  // Helper: split `--key=value` into `[--key, value]`. npm strips shell quoting,
-  // so callers must either use a single-word value or the `=` form.
-  const norm: string[] = [];
-  for (const a of args.slice(1)) {
-    const eq = a.indexOf('=');
-    if (a.startsWith('--') && eq > 0) {
-      norm.push(a.slice(0, eq), a.slice(eq + 1));
-    } else {
-      norm.push(a);
-    }
-  }
-  for (let i = 0; i < norm.length; i++) {
-    if (norm[i] === '--desc' && norm[i + 1] !== undefined) {
-      description = norm[++i];
-    } else if (norm[i] === '--steps-file' && norm[i + 1] !== undefined) {
-      stepsFile = norm[++i];
-    } else if (norm[i] === '--step' && norm[i + 1] !== undefined) {
-      const raw = norm[++i];
-      const colonIdx = raw.indexOf(':');
-      if (colonIdx === -1) {
-        // boolean step like 'home'
-        steps.push({ [raw]: true } as TestStep);
-      } else {
-        const kind = raw.slice(0, colonIdx);
-        const arg = raw.slice(colonIdx + 1);
-        steps.push({ [kind]: arg } as TestStep);
-      }
-    } else {
-      throw new Error(`unexpected arg: ${norm[i]}`);
-    }
-  }
-
-  // --steps-file takes precedence and is the recommended path: it sidesteps
-  // npm's shell-quote stripping by reading the test definition from a YAML
-  // file. The file may contain `description` and `steps` keys.
-  if (stepsFile) {
-    const filePath = nodePath.resolve(process.cwd(), stepsFile);
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`--steps-file not found: ${filePath}`);
-    }
-    const parsed = yaml.load(fs.readFileSync(filePath, 'utf-8')) as {
-      description?: string;
-      steps?: TestStep[];
-    };
-    if (!parsed || !Array.isArray(parsed.steps) || parsed.steps.length === 0) {
-      throw new Error(`--steps-file must contain a non-empty 'steps' array`);
-    }
-    if (!description && parsed.description) description = parsed.description;
-    steps = parsed.steps;
-  }
-
-  if (steps.length === 0) {
-    throw new Error('at least one --step (or --steps-file) is required');
-  }
-  return { name, description, steps };
-}
-
-function dumpTestsYaml(doc: TestsDocument): string {
-  // Preserve the comment header by re-reading and re-writing only the
-  // tests block. We re-emit the entire doc; the comment header at the top
-  // of the file is preserved by writeTestsDoc().
-  return yaml.dump(doc, { lineWidth: 100, noRefs: true, sortKeys: false });
-}
-
-function writeTestsDoc(doc: TestsDocument): void {
-  // Preserve everything ABOVE the `# tests:  (empty until ...` marker line, then
-  // re-emit `tests:` from the doc. This keeps the rules header + comments intact.
-  const raw = fs.readFileSync(TESTS_PATH, 'utf-8');
-  const marker = '# tests:';
-  const markerIdx = raw.indexOf(marker);
-  let header: string;
-  if (markerIdx === -1) {
-    // First time — keep the whole file as header and append.
-    header = raw.replace(/\ntests:\s*\{\s*\}\s*$/m, '\n').trimEnd() + '\n\n';
-  } else {
-    // Cut at the marker line, keep everything above + the marker line itself.
-    const lineEnd = raw.indexOf('\n', markerIdx);
-    header = raw.slice(0, lineEnd + 1);
-  }
-  const testsBlock = yaml.dump(
-    { tests: doc.tests || {} },
-    { lineWidth: 100, noRefs: true, sortKeys: false }
-  );
-  fs.writeFileSync(TESTS_PATH, header + testsBlock);
-}
-
-function formatTestList(doc: TestsDocument): string {
-  const tests = doc.tests || {};
-  const names = Object.keys(tests);
-  if (names.length === 0) {
-    return '(no tests registered yet — record one with `phone test save <name> --step ...`)';
-  }
-  return names
-    .map((n) => {
-      const t = tests[n];
-      const v = t.verified;
-      const stamp = v ? `verified ${v.date} by ${v.by}` : 'UNVERIFIED';
-      const last = v?.['last-run'] ? `, last run ${v['last-run']}` : '';
-      return `  ${n.padEnd(28)} ${stamp}${last}\n      ${t.description || ''}`;
-    })
-    .join('\n');
-}
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function nowISO(): string {
-  return new Date().toISOString().replace('T', ' ').slice(0, 19);
-}
 
 export async function detectDeviceLabel(): Promise<string> {
   try {
@@ -4655,7 +3976,7 @@ async function modePhoneTest(args: string[]): Promise<string> {
   // ── Discovery / list ──
   if (args.length === 0 || args[0] === '--list' || args[0] === 'list') {
     const result = discoverTests();
-    return formatDslTestList(result);
+    return formatTestList(result);
   }
 
   // ── Help ──
@@ -4815,8 +4136,8 @@ async function modePhoneTest(args: string[]): Promise<string> {
     return '';
   }
 
-  // ── Run single (also handles `save` as a force-run) ──
-  const name = args[0] === 'save' ? args[1] : args[0];
+  // ── Run single ──
+  const name = args[0];
   if (!name) throw new Error('Usage: phone test <name>');
   const result = discoverTests();
   const found = findTest(result, name);
@@ -4861,7 +4182,7 @@ async function modePhoneTest(args: string[]): Promise<string> {
   const foundMatrix = findMatrix(result, name);
   if (!foundMatrix) {
     throw new Error(
-      `no test or matrix named '${name}'.\n\nAvailable:\n${formatDslTestList(result)}`
+      `no test or matrix named '${name}'.\n\nAvailable:\n${formatTestList(result)}`
     );
   }
   await ensureWDAReady();
@@ -4968,7 +4289,7 @@ async function modePhone(args: string[]): Promise<string> {
       '  dismiss-modal       Swipe down to dismiss the topmost iOS modal sheet',
       '                      (use this instead of `relaunch-app` to return to root)',
       '  swipe <direction>   Swipe up|down|left|right across the screen',
-      '  test [...]          Run/record verified end-to-end tests from TESTS.yml',
+      '  test [...]          Run verified end-to-end tests from tests/*.sov',
       '                      (`phone test help` for the test sub-DSL)',
       '',
       'Env:',
