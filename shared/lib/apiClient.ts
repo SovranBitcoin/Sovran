@@ -204,7 +204,9 @@ const parseCatalog = parseWith(CatalogResponse, 'wallpapers/catalog');
  * NUT-06 spine here so a hostile or misconfigured mint returning
  * `{ name: [1,2,3] }` cannot reach `coco`'s blinding helpers. Unknown
  * fields pass through (Postel's Law) so cashu-ts type evolutions don't
- * require a Sovran release.
+ * require a Sovran release. The full `GetInfoResponse` shape is owned by
+ * cashu-ts; we narrow the validated input through a cast so callers get the
+ * cashu-ts type without us re-asserting every NUT block.
  */
 const MintInfoSpine = z
   .object({
@@ -214,6 +216,14 @@ const MintInfoSpine = z
     nuts: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
+
+const parseMintInfo = (input: unknown): Result<GetInfoResponse, ParseError> => {
+  const r = MintInfoSpine.safeParse(input);
+  if (!r.success) {
+    return err({ type: 'schema/zod', where: 'cashu/mint/info', issues: r.error.issues });
+  }
+  return ok(input as GetInfoResponse);
+};
 
 // ---------------------------------------------------------------------------
 // Public API client functions
@@ -327,63 +337,21 @@ export const fetchWallpaperCatalog = (controls: RequestControls = {}) =>
   );
 
 // ---------------------------------------------------------------------------
-// Mint `/v1/info` — upstream Cashu shape, owned by `@cashu/cashu-ts`
+// Mint `/v1/info` — upstream Cashu shape, owned by `@cashu/cashu-ts`.
 //
-// We rely on cashu-ts for the structural type, but apply `MintInfoSpine` at
-// runtime so a hostile or misconfigured mint can't ship a non-string `name`
-// past the boundary. Cancellation and timeout share the same plumbing as
-// `fetchJson`.
+// `MintInfoSpine` runs at the boundary so a hostile or misconfigured mint
+// can't ship a non-string `name` past the validator; the full `GetInfoResponse`
+// type is owned by cashu-ts. Cancellation, timeout, and HTTP error mapping
+// share the canonical `fetchJson` scaffolding.
 // ---------------------------------------------------------------------------
 
-export const fetchMintInfo = async (
-  mintUrl: string,
-  controls: RequestControls = {}
-): Promise<Result<GetInfoResponse, Error>> => {
-  const { signal: callerSignal, timeoutMs = DEFAULT_TIMEOUT_MS } = controls;
+export const fetchMintInfo = (mintUrl: string, controls: RequestControls = {}) => {
   const normalizedUrl = mintUrl.endsWith('/') ? mintUrl : `${mintUrl}/`;
-  const infoUrl = `${normalizedUrl}v1/info`;
-  const signal = combineSignals(callerSignal, timeoutSignal(timeoutMs));
-
-  try {
-    apiLog.debug('api.mint_info', { mintUrl });
-    const res = await fetch(infoUrl, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      signal,
-    });
-
-    if (!res.ok) {
-      apiLog.warn('api.mint_info_error', { mintUrl, status: res.status });
-      return err(
-        new Error(`Mint info fetch error: ${res.status} ${res.statusText} for ${infoUrl}`)
-      );
-    }
-
-    const data = await res.json();
-    const guard = MintInfoSpine.safeParse(data);
-    if (!guard.success) {
-      apiLog.warn('api.mint_info.invalid_shape', {
-        mintUrl,
-        issues: guard.error.issues.length,
-      });
-      return err(new Error(`Mint info from ${mintUrl} has malformed NUT-06 spine`));
-    }
-    apiLog.debug('api.mint_info.ok', { mintUrl, name: guard.data.name, hasIcon: !!data?.icon_url });
-    return ok(data as GetInfoResponse);
-  } catch (e) {
-    if (isAbortError(e)) {
-      apiLog.debug('api.mint_info.aborted', {
-        mintUrl,
-        reason: callerSignal?.aborted ? 'caller' : 'timeout',
-      });
-      return err(e instanceof Error ? e : new Error('Aborted'));
-    }
-    apiLog.error('api.mint_info_failed', { mintUrl, error: e });
-    return err(
-      e instanceof Error ? e : new Error(`Unknown error fetching mint info from ${infoUrl}`)
-    );
-  }
+  return fetchJson(
+    `${normalizedUrl}v1/info`,
+    parseMintInfo,
+    'cashu/mint/info',
+    { headers: { Accept: 'application/json' } },
+    controls
+  );
 };
