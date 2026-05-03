@@ -93,12 +93,21 @@ export interface StepDataMap {
   receiveToken: { token: string };
   confirmSend: { mintUrl: string; amount: number };
   sendComplete: { historyEntry: string; mintWasOffline?: boolean };
-  navigateToMeltPreview: { mintUrl: string; meltTarget: string; unit: string; amount: number };
+  navigateToMeltPreview: {
+    mintUrl: string;
+    meltTarget: string;
+    unit: string;
+    amount: number;
+    /** Populated after a successful melt so the screen can link to the new transaction. */
+    historyEntry?: string;
+  };
   navigateToPaymentRequest: {
     mintUrl: string;
     paymentRequest: string;
     amount: number;
     unit: string;
+    /** Populated after a successful payment request send. */
+    historyEntry?: string;
   };
   createMintQuote: { mintUrl: string; amount: number; unit: string };
   mintQuoteCreated: { historyEntry: string; unit: string };

@@ -167,14 +167,18 @@ export function createScreenActionManager<S extends ScreenType>(
     notify();
 
     try {
-      const ctx = getContext();
+      // Build a fresh ctx per invocation. Mutating the object returned by
+      // `getContext()` would contaminate any caller that memoises the context
+      // (a normal optimisation when notifications/writeClipboard/shareContent
+      // are stable refs). The spread costs nothing and keeps `execute`
+      // reentrant for queued/concurrent action calls.
+      const base = getContext();
       const effectiveEntry = getEffectiveEntry();
-      if (effectiveEntry) {
-        ctx.entry = effectiveEntry;
-      }
-      if (params) {
-        Object.assign(ctx, params);
-      }
+      const ctx: ScreenActionContext = {
+        ...base,
+        ...(effectiveEntry ? { entry: effectiveEntry } : {}),
+        ...(params ?? {}),
+      };
       await effectiveHandler(ctx);
     } finally {
       loadingActions.delete(action as string);

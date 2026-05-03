@@ -172,20 +172,31 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
   let processedRef = false;
   let lastScanSource: string | undefined;
 
+  // `step` and `stepData` are written together via `setStep<S>(s, d)` so the
+  // discriminated `StepDataMap` carries through every transition. Previously
+  // each site cast through `as any`, defeating the union check and letting
+  // typos like `mintListItems = items` silently mutate state behind a stale
+  // `details` reference. The helper is the only legal seam for advancing the
+  // step; readers narrow via `stepData as StepDataMap[S]` at the use site.
   let step: FlowStep = 'idle';
   let flowCtx: FlowContext = { unit: configUnit };
-  let stepData: StepDataMap[FlowStep] = {} as any;
+  const idleData: StepDataMap['idle'] = {};
+  let stepData: StepDataMap[FlowStep] = idleData;
   let handlerExecuting = false;
   let sendLocked = false;
   let lastPaymentRequestResult: { rolledBack: boolean } = { rolledBack: false };
   const listeners = new Set<() => void>();
 
-  let cachedSnapshot: ExecutionState = deriveExecutionState('idle', {} as any);
+  function setStep<S extends FlowStep>(nextStep: S, data: StepDataMap[S]): void {
+    step = nextStep;
+    stepData = data as StepDataMap[FlowStep];
+  }
+
+  let cachedSnapshot: ExecutionState = deriveExecutionState('idle', idleData);
 
   function resetInternal() {
-    step = 'idle';
     flowCtx = { unit: getUnit?.() ?? configUnit };
-    stepData = {} as any;
+    setStep('idle', {});
     handlerExecuting = false;
     processedRef = false;
     if (createURDecoder) {
@@ -253,19 +264,17 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       const hasViable = reAnnotated.some((o) => o.status !== 'disabled');
 
       if (hasViable) {
-        step = 'chooseFallbackOption';
-        stepData = {
+        setStep('chooseFallbackOption', {
           parsed: flowCtx.parsed!,
           options: reAnnotated,
           unit: flowCtx.unit,
           failedOptionValues: failedValues,
           lastFailedMessage: message,
-        } as any;
+        });
         return;
       }
 
-      step = 'error';
-      stepData = { code: 'ALL_OPTIONS_DISABLED', message: 'All payment options have failed' } as any;
+      setStep('error', { code: 'ALL_OPTIONS_DISABLED', message: 'All payment options have failed' });
       return;
     }
 
@@ -297,21 +306,19 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       flowCtx.amount
     ) {
       if (flowCtx.meltTarget) {
-        step = 'navigateToMeltPreview';
-        stepData = {
+        setStep('navigateToMeltPreview', {
           mintUrl: flowCtx.mintUrl,
           meltTarget: flowCtx.meltTarget,
           amount: flowCtx.amount,
           unit: flowCtx.unit,
-        } as any;
+        });
       } else if (flowCtx.paymentRequest) {
-        step = 'navigateToPaymentRequest';
-        stepData = {
+        setStep('navigateToPaymentRequest', {
           mintUrl: flowCtx.mintUrl,
           paymentRequest: flowCtx.paymentRequest,
           amount: flowCtx.amount,
           unit: flowCtx.unit,
-        } as any;
+        });
       }
       notify();
     }
@@ -379,7 +386,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
         }
 
-        stepData = { ...data, historyEntry: result.historyEntry } as any;
+        setStep('navigateToMeltPreview', { ...data, historyEntry: result.historyEntry });
       } catch (err) {
         logger.warn('machine.melt.failed', { error: errField(err) });
         routeOperationFailure(err, 'melt', data.meltTarget, data);
@@ -473,7 +480,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
           }
 
-          stepData = { ...data, historyEntry: result.historyEntry } as any;
+          setStep('navigateToPaymentRequest', { ...data, historyEntry: result.historyEntry });
         }
       } catch (err) {
         logger.warn('machine.paymentRequest.failed', { error: errField(err) });
@@ -528,9 +535,8 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
     const prevStep = step;
     const result = transition(step, flowCtx, eventForTransition, detectors, walletCtx, unit, offline);
 
-    step = result.step;
     flowCtx = result.context;
-    stepData = result.data;
+    setStep(result.step, result.data);
     if (step !== prevStep) {
       logger.info('machine.transition', { from: prevStep, to: step, eventType: event.type });
     }
@@ -605,10 +611,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             const walletCtxInner = getContext();
             const unitInner = getUnit?.() ?? configUnit;
             const r = transition(step, flowCtx, { type: 'OPTION_CHOSEN', option: best.option }, detectors, walletCtxInner, unitInner, offline);
-            step = r.step;
             flowCtx = r.context;
             flowCtx.source = 'nfc';
-            stepData = r.data;
+            setStep(r.step, r.data);
             continue;
           }
           // No viable option
@@ -621,10 +626,9 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             const walletCtxInner = getContext();
             const unitInner = getUnit?.() ?? configUnit;
             const r = transition(step, flowCtx, { type: 'MINT_SELECTED', mintUrl: best.mintUrl }, detectors, walletCtxInner, unitInner, offline);
-            step = r.step;
             flowCtx = r.context;
             flowCtx.source = 'nfc';
-            stepData = r.data;
+            setStep(r.step, r.data);
             continue;
           }
           // No candidates — will be handled by error dispatch below
@@ -632,11 +636,10 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         } else if (step === 'enterAmount') {
           // NFC requires amount in payment request — if we reach enterAmount, the request lacked it
           await nfcAdapter.releaseSession();
-          step = 'error';
-          stepData = {
+          setStep('error', {
             code: 'NFC_READ_FAILED',
             message: 'Payment request must include an amount for NFC payment',
-          } as any;
+          });
           nfcResolved = true;
         } else if (step === 'navigateToPaymentRequest' && operations?.executeNfcSend) {
           // Auto-execute: create token → write back to NFC tag
@@ -689,8 +692,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
               logger.warn('machine.historyEntryParseFailed', { error: errField(e) });
             }
 
-            step = 'sendComplete';
-            stepData = { historyEntry: nfcSendResult.historyEntry } as any;
+            setStep('sendComplete', { historyEntry: nfcSendResult.historyEntry });
           } catch (err) {
             // Write-back or send failed — rollback if token was created
             let rolledBack = false;
@@ -705,8 +707,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
             const message = err instanceof Error ? err.message : 'NFC write failed';
             void notifications?.onNfcWriteFailed?.({ message, rolledBack });
 
-            step = 'error';
-            stepData = { code: 'NFC_WRITE_FAILED', message } as any;
+            setStep('error', { code: 'NFC_WRITE_FAILED', message });
           }
 
           handlerExecuting = false;
@@ -735,8 +736,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         try {
           const result = await operations.executeSend(data.mintUrl, data.amount);
           logger.info('machine.send.success');
-          step = 'sendComplete';
-          stepData = result as any;
+          setStep('sendComplete', { historyEntry: result.historyEntry });
 
           try {
             const parsed = JSON.parse(result.historyEntry);
@@ -771,8 +771,10 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
               try {
                 const result = await operations.executeOfflineSend(data.mintUrl, data.amount);
                 logger.info('machine.send.offlineFallback.success');
-                step = 'sendComplete';
-                stepData = { historyEntry: result.historyEntry, mintWasOffline: true } as any;
+                setStep('sendComplete', {
+                  historyEntry: result.historyEntry,
+                  mintWasOffline: true,
+                });
 
                 try {
                   const parsed = JSON.parse(result.historyEntry);
@@ -806,8 +808,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
               composition.nearestLower != null ||
               composition.nearestUpper != null;
             if (hasOptions) {
-              step = 'chooseProofs';
-              stepData = {
+              setStep('chooseProofs', {
                 mintUrl: data.mintUrl,
                 amount: data.amount,
                 unit: flowCtx.unit,
@@ -824,7 +825,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
                       ? { amount: composition.nearestUpper }
                       : null,
                 },
-              } as any;
+              });
               handled = true;
             }
           }
@@ -832,14 +833,13 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
           // Phase 3: Error
           if (!handled) {
             const mintUnreachable = isMintOfflineError(err);
-            step = 'error';
-            stepData = {
+            setStep('error', {
               code: 'SEND_FAILED',
               message: mintUnreachable
                 ? t('MINT_UNREACHABLE', getLocale?.() ?? 'en')
                 : err instanceof Error ? err.message : t('SEND_FAILED', getLocale?.() ?? 'en'),
               ...(mintUnreachable ? { data: { mintUnreachable: true } } : {}),
-            } as any;
+            });
           }
         }
         handlerExecuting = false;
@@ -855,8 +855,7 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         try {
           const result = await operations.executeMintQuote(data.mintUrl, data.amount, data.unit);
           logger.info('machine.createMintQuote.success');
-          step = 'mintQuoteCreated';
-          stepData = { historyEntry: result.historyEntry, unit: data.unit } as any;
+          setStep('mintQuoteCreated', { historyEntry: result.historyEntry, unit: data.unit });
 
           try {
             const parsed = JSON.parse(result.historyEntry);
@@ -877,14 +876,13 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         } catch (err) {
           logger.warn('machine.createMintQuote.failed', { error: errField(err) });
           const mintUnreachable = isMintOfflineError(err);
-          step = 'error';
-          stepData = {
+          setStep('error', {
             code: 'MINT_QUOTE_FAILED',
             message: mintUnreachable
               ? t('MINT_UNREACHABLE', getLocale?.() ?? 'en')
               : err instanceof Error ? err.message : t('MINT_QUOTE_FAILED', getLocale?.() ?? 'en'),
             ...(mintUnreachable ? { data: { mintUnreachable: true } } : {}),
-          } as any;
+          });
         }
         handlerExecuting = false;
         notify();
@@ -894,14 +892,15 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
         notify();
         try {
           const items = await operations.buildMintListItems(data);
-          (stepData as any).mintListItems = items;
+          // Fresh ref so useSyncExternalStore consumers (and any details-keyed
+          // useMemo) see the enrichment instead of reusing the stale snapshot.
+          setStep('selectMint', { ...data, mintListItems: items });
         } catch (err) {
-          step = 'error';
-          stepData = {
+          setStep('error', {
             code: 'UNSUPPORTED_INPUT',
             message:
               err instanceof Error ? err.message : t('LOAD_MINTS_FAILED', getLocale?.() ?? 'en'),
-          } as any;
+          });
         }
         handlerExecuting = false;
         notify();
@@ -913,22 +912,30 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       (step === 'reviewMint' || step === 'openMint') &&
       operations?.buildMintReviewInfo
     ) {
+      const reviewStep = step;
+      const reviewData =
+        reviewStep === 'reviewMint'
+          ? (stepData as StepDataMap['reviewMint'])
+          : (stepData as StepDataMap['openMint']);
       const mintUrl =
-        step === 'reviewMint'
-          ? (stepData as StepDataMap['reviewMint']).mintUrl
-          : (stepData as StepDataMap['openMint']).url;
+        reviewStep === 'reviewMint'
+          ? (reviewData as StepDataMap['reviewMint']).mintUrl
+          : (reviewData as StepDataMap['openMint']).url;
       handlerExecuting = true;
       notify();
       try {
         const info = await operations.buildMintReviewInfo(mintUrl);
-        (stepData as any).mintInfo = info;
+        if (reviewStep === 'reviewMint') {
+          setStep('reviewMint', { ...(reviewData as StepDataMap['reviewMint']), mintInfo: info });
+        } else {
+          setStep('openMint', { ...(reviewData as StepDataMap['openMint']), mintInfo: info });
+        }
       } catch (err) {
-        step = 'error';
-        stepData = {
+        setStep('error', {
           code: 'UNSUPPORTED_INPUT',
           message:
             err instanceof Error ? err.message : t('LOAD_MINTS_FAILED', getLocale?.() ?? 'en'),
-        } as any;
+        });
       }
       handlerExecuting = false;
       notify();
@@ -942,12 +949,11 @@ export function createPaymentMachine(config: CreateMachineConfig): PaymentMachin
       try {
         await operations.trustMint(reviewMintData.mintUrl);
       } catch (err) {
-        step = 'error';
-        stepData = {
+        setStep('error', {
           code: 'UNSUPPORTED_INPUT',
           message:
             err instanceof Error ? err.message : t('TRUST_MINT_FAILED', getLocale?.() ?? 'en'),
-        } as any;
+        });
       }
       handlerExecuting = false;
       notify();

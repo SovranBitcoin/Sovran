@@ -115,7 +115,10 @@ export function createAmountActionManager(
   }
 
   function notify(): void {
-    prevResolution = null;
+    // Don't invalidate `prevResolution` — `inspect()`'s structural-equal check
+    // already promotes a new ref only when the resolution actually changed,
+    // so notifying here without clearing the cache lets useSyncExternalStore
+    // skip re-renders for setInput calls that produce structurally equal output.
     for (const fn of listeners) fn();
   }
 
