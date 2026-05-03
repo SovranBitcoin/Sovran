@@ -119,7 +119,8 @@
       "references": [
         "skill:zustand-5"
       ],
-      "verification_note": "Confirmed via `npm run analyze-structure -- shared/stores` output: `Cycle 1 (2 files): profile/themeStore.ts → global/wallpaperStore.ts`. Both imports are top-level."
+      "verification_note": "Confirmed via `npm run analyze-structure -- shared/stores` output: `Cycle 1 (2 files): profile/themeStore.ts → global/wallpaperStore.ts`. Both imports are top-level.",
+      "completion_status": "deferred"
     },
     {
       "id": "F-005",
@@ -157,7 +158,8 @@
       "references": [
         "skill:zustand-5"
       ],
-      "verification_note": "Re-checked lines 13-20, 71-75, 97-101, 129-132, 142-150. createProfileScopedStorage already produces key `npc-mint-store:profile:<pubkey>`, and every call site uses `.getActiveMintUrl()`/`.updateServerMint(...)` without an explicit pubkey."
+      "verification_note": "Re-checked lines 13-20, 71-75, 97-101, 129-132, 142-150. createProfileScopedStorage already produces key `npc-mint-store:profile:<pubkey>`, and every call site uses `.getActiveMintUrl()`/`.updateServerMint(...)` without an explicit pubkey.",
+      "completion_status": "deferred"
     },
     {
       "id": "F-007",
@@ -175,7 +177,8 @@
       "references": [
         "docs/SOV-00.md §10"
       ],
-      "verification_note": "Re-read profileScopedStorage.ts lines 100-209. 12 keys in the registry, 11 reset calls (mintStore, mintDistributionStore, routstrStore, scanHistoryStore, searchHistoryStore, swapTransactionsStore, transactionLocationStore, transactionDistributionStore, npcMintStore, nostrSocialStore, themeStore), 11 rehydrate() calls. split-bill-transactions-store has neither."
+      "verification_note": "Re-read profileScopedStorage.ts lines 100-209. 12 keys in the registry, 11 reset calls (mintStore, mintDistributionStore, routstrStore, scanHistoryStore, searchHistoryStore, swapTransactionsStore, transactionLocationStore, transactionDistributionStore, npcMintStore, nostrSocialStore, themeStore), 11 rehydrate() calls. split-bill-transactions-store has neither.",
+      "completion_status": "deferred"
     },
     {
       "id": "F-008",
@@ -193,7 +196,8 @@
       "references": [
         "skill:zustand-5"
       ],
-      "verification_note": "Grep `selectFollowingSet` → only the definition at nostrSocialStore.ts:416. No importers. Re-confirmed the return shape (new Set) on re-read."
+      "verification_note": "Grep `selectFollowingSet` → only the definition at nostrSocialStore.ts:416. No importers. Re-confirmed the return shape (new Set) on re-read.",
+      "completion_status": "deferred"
     },
     {
       "id": "F-009",
@@ -232,7 +236,8 @@
       "references": [
         "skill:zustand-5"
       ],
-      "verification_note": "Re-read mockDataStore.ts lines 214-258 and settingsStore.ts lines 318-329. Confirmed setState on profile-scoped persisted stores triggers the persist middleware."
+      "verification_note": "Re-read mockDataStore.ts lines 214-258 and settingsStore.ts lines 318-329. Confirmed setState on profile-scoped persisted stores triggers the persist middleware.",
+      "completion_status": "deferred"
     },
     {
       "id": "F-011",
@@ -250,7 +255,8 @@
       "references": [
         "skill:zustand-5"
       ],
-      "verification_note": "Re-read wallpaperStore.ts:179-210. setState is synchronous; no propagation wait is needed. The 50 ms magic number is a code smell, not a documented race mitigation."
+      "verification_note": "Re-read wallpaperStore.ts:179-210. setState is synchronous; no propagation wait is needed. The 50 ms magic number is a code smell, not a documented race mitigation.",
+      "completion_status": "deferred"
     },
     {
       "id": "F-012",
@@ -269,7 +275,8 @@
         "docs/SOV-00.md §6",
         "docs/SOV-00.md §11"
       ],
-      "verification_note": "Re-read walletLifecycleStore.ts lines 22-28 (state), 42-49 (setters), 54-58 (partialize). lastRestoreError is present in state, written by setRestoreStatus, and absent from partialize."
+      "verification_note": "Re-read walletLifecycleStore.ts lines 22-28 (state), 42-49 (setters), 54-58 (partialize). lastRestoreError is present in state, written by setRestoreStatus, and absent from partialize.",
+      "completion_status": "deferred"
     },
     {
       "id": "F-013",

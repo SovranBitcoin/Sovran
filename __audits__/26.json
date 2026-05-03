@@ -70,7 +70,8 @@
         "nips/01.md"
       ],
       "verification_note": "Verified: the URL is a module-level string literal at shared.tsx:98; user_pubkey attachment confirmed at HomeFeed.tsx:451, HomeFeed.tsx:605, StoriesRow.tsx:141. Counter-argument considered: this is Primal's documented architecture, which users implicitly accept by using the app. That does not substitute for an explicit consent surface when a wallet pubkey is the leaked identifier.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-002",
@@ -89,7 +90,8 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Traced by code reading: no abort signal exists, no spec-match check guards setQuotedEventsMap/setMetricsMap/setProfilesMap at :489-509 or :691-712. Log-doctor could not confirm dynamically because the captured session only opened the feed once (feed.parse.done fired once with 26 items and no pagination). Structural race is self-evident from source per the <log_doctor_integration> carve-out.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-003",
@@ -109,7 +111,8 @@
         "nips/01.md"
       ],
       "verification_note": "Code path verified. UNVERIFIED dynamically because the captured log.txt session did not exercise pagination and log-doctor ws showed no feed-relay churn. Mark UNVERIFIED. If log-doctor ws is run after a pagination-heavy session, feed.engagement-related CLOSE/REQ pairs would confirm.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-004",
@@ -128,7 +131,8 @@
         "nips/01.md"
       ],
       "verification_note": "Verified by code reading. The `ReDoS` risk is not catastrophic-backtracking (these regexes are linear), but the allocation and cache-retention risk is real. Counter-argument considered: in practice, Primal's moderation filters out such content. That does not remove the need for client-side bounds against relays the app may add later.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-005",
@@ -148,7 +152,8 @@
         "skill:zod-4"
       ],
       "verification_note": "Verified at HomeFeed.tsx:119. CATEGORY_PUBKEYS is currently sourced from a local module (features/feed/components/nostr/categoryNpubs), so no active exploit today. Flagged as trust-boundary hygiene.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-006",
@@ -168,7 +173,8 @@
         "luds/06.md"
       ],
       "verification_note": "Marked UNVERIFIED because the actual CocoPaymentUX melt confirmation behaviour is not in this audit's blast radius (covered partially by audits 19 and 23, but not the exact 'deep-link-from-feed' flow). Severity will stand at Medium until the melt-surface contract is confirmed.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-007",
@@ -187,7 +193,8 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Verified at :157-166 and :343-346. Log-doctor could not directly attribute perf.js_thread_blocked entries to parseContent since no explicit instrumentation exists on parseContent — a follow-up would wrap parseContent with feedLog.measure or add paymentLog-style timing events to quantify.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-008",
@@ -206,7 +213,8 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Verified by code reading. Log-doctor ws shows unmatched_subscribe_response entries on mint subscriptions but no feed-specific WS entries (the captured session did not exercise rapid filter changes).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-009",
@@ -282,7 +290,8 @@
       "fix": "Delete lines 482-483. Consolidate all four handlers (onmessage, onopen, onerror, onclose) into the openPromise constructor, or lift the open handling out of an IIFE and let the constructor own handler assignments.",
       "references": [],
       "verification_note": "Verified by code reading. Low severity, no functional impact.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-013",
@@ -320,7 +329,8 @@
         "skill:zustand-5"
       ],
       "verification_note": "Verified by arithmetic. Downgraded from Medium — impact is theoretical at current scale.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-015",
@@ -358,7 +368,8 @@
       "fix": "Filter before passing: 'prefetchImages(storyUsers.map((u) => u.profile?.picture).filter((u): u is string => !!u))'. Or expand prefetchImages's signature to '(urls: (string | undefined)[])' and filter inside — pick one contract and hold to it.",
       "references": [],
       "verification_note": "Verified call-site. Dependent on prefetchImages implementation in shared/lib/imageCache (not audited in this pass). Marked confidence 0.6 to acknowledge that.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-017",
@@ -377,7 +388,8 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Verified at :513-520 and :717-724.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-018",
@@ -396,7 +408,8 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Unverified whether React Compiler is enabled in babel.config.js. Low severity.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-019",
@@ -415,7 +428,8 @@
         "skill:zustand-5"
       ],
       "verification_note": "Verified at :249-252. Nit-level.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     }
   ],
   "dimensions": {
