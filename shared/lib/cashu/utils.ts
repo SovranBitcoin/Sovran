@@ -20,6 +20,7 @@ import {
 } from '@cashu/coco-core';
 
 import { log } from '../logger';
+import { mintLocalId } from '../id';
 
 /**
  * Validates if a string is a valid ecash token by attempting to decode it
@@ -125,7 +126,7 @@ export function buildReceiveHistoryEntry(
     hasP2pk: !!p2pkPubkey,
   });
   return {
-    id: `receive-${Date.now()}`,
+    id: mintLocalId('receive'),
     type: 'receive',
     amount: sumProofAmounts(decodedToken.proofs),
     unit: unitOverride ?? decodedToken.unit ?? 'sat',

@@ -25,6 +25,7 @@ import {
 } from 'bitchat-module';
 import { useBitchatNickname } from './useBitchatNickname';
 import { bitchatLog } from '@/shared/lib/logger';
+import { mintLocalId } from '@/shared/lib/id';
 
 /**
  * Public channel transports: `'ble'` = BLE mesh public chat,
@@ -322,7 +323,7 @@ export function useBitChat(
         case 'ble': {
           // Public BLE — no own-echo, add locally.
           const ownMsg: ChatMessage = {
-            id: `own-${Date.now()}`,
+            id: mintLocalId('own'),
             content,
             sender: nickname || 'You',
             senderPubkey: '',
@@ -337,6 +338,7 @@ export function useBitChat(
             bitchatLog.error('bitchat.hook.ble_send_failed', {
               error: err instanceof Error ? err.message : String(err),
             });
+            setMessages((prev) => prev.filter((m) => m.id !== ownMsg.id));
           }
           break;
         }
@@ -345,7 +347,7 @@ export function useBitChat(
           if (!dmPeerID) return;
           // Noise-encrypted DM — also no own-echo, add locally.
           const ownMsg: ChatMessage = {
-            id: `own-${Date.now()}`,
+            id: mintLocalId('own'),
             content,
             sender: nickname || 'You',
             senderPubkey: dmPeerID,
@@ -360,6 +362,7 @@ export function useBitChat(
             bitchatLog.error('bitchat.hook.ble_dm_send_failed', {
               error: err instanceof Error ? err.message : String(err),
             });
+            setMessages((prev) => prev.filter((m) => m.id !== ownMsg.id));
           }
           break;
         }
@@ -380,7 +383,7 @@ export function useBitChat(
           // NIP-17 gift-wrap DMs don't echo back to the sender via the
           // subscription, so add locally.
           const ownMsg: ChatMessage = {
-            id: `own-${Date.now()}`,
+            id: mintLocalId('own'),
             content,
             sender: nickname || 'You',
             senderPubkey: dmPeerID,
@@ -395,6 +398,7 @@ export function useBitChat(
             bitchatLog.error('bitchat.hook.nostr_dm_send_failed', {
               error: err instanceof Error ? err.message : String(err),
             });
+            setMessages((prev) => prev.filter((m) => m.id !== ownMsg.id));
           }
           break;
         }

@@ -17,6 +17,7 @@ import { scanFromURLAsync } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { paymentLog } from '@/shared/lib/logger';
+import { mintLocalId } from '@/shared/lib/id';
 
 import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
 import type {
@@ -226,7 +227,7 @@ export function createSovranExecuteReceive(
       /* ignore */
     }
     const fallbackEntry = {
-      id: `redeemed-${Date.now()}`,
+      id: mintLocalId('redeemed'),
       type: 'receive' as const,
       createdAt: Date.now(),
       mintUrl,
@@ -823,7 +824,7 @@ export function createSovranHandlers({
     navigateToPaymentRequest: ({ mintUrl, paymentRequest, amount, unit }) => {
       paymentLog.info('payment.step.navigate_payment_request', { mintUrl, amount, unit });
       const entry = {
-        id: `pr-preview-${Date.now()}`,
+        id: mintLocalId('pr-preview'),
         type: 'send',
         createdAt: Date.now(),
         mintUrl,
@@ -843,7 +844,7 @@ export function createSovranHandlers({
     navigateToMeltPreview: ({ mintUrl, meltTarget, amount, unit }) => {
       paymentLog.info('payment.step.navigate_melt_preview', { mintUrl, amount, unit });
       const entry: MeltHistoryEntry = {
-        id: `melt-preview-${Date.now()}`,
+        id: mintLocalId('melt-preview'),
         type: 'melt',
         createdAt: Date.now(),
         mintUrl,

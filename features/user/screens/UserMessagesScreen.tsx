@@ -54,6 +54,7 @@ import { ChatComposer } from '@/shared/ui/composed/chat/ChatComposer';
 import { Button } from '@/shared/ui/primitives/Button';
 
 import { isValidEcashToken } from '@/shared/lib/cashu/utils';
+import { mintLocalId } from '@/shared/lib/id';
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { getDecodedToken, ReceiveHistoryEntry } from '@cashu/coco-core';
 import { Proof } from '@cashu/cashu-ts';
@@ -178,7 +179,7 @@ function CashuTokenBubble({ token, isMe }: CashuTokenBubbleProps) {
 
     const decodedToken = getDecodedToken(token);
     const receiveHistoryEntry: ReceiveHistoryEntry = {
-      id: `receive-${Date.now()}`,
+      id: mintLocalId('receive'),
       type: 'receive',
       amount,
       unit,
