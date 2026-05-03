@@ -337,8 +337,8 @@
       ],
       "verification_note": "Re-confirmed by grep on logger.ts and direct read of all three feature/user screen files. The alias `Screen = Log` suggests the export was a typed-pass-through rather than a deliberate UI export.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Screen import path inconsistency is a wider repo pattern; out of this slice."
+      "completion_status": "complete",
+      "completion_note": "Deprecated `Screen` alias removed from shared/lib/logger.ts; 23 call sites renamed to canonical `Log`. The name collision with shared/ui/composed/Screen.tsx is gone. Resolved in 6aba6375."
     },
     {
       "id": "F-013",
