@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Manager internals — typed seam
+// Manager internals — typed seam (sovran-app)
 // ---------------------------------------------------------------------------
 //
 // coco-core's `Manager` exposes a curated public API (`mint`, `wallet`,
@@ -9,10 +9,15 @@
 // each caller writes its own `(manager as unknown as { … })` cast, and a
 // future coco rename silently breaks all of them.
 //
-// This module is a deep adapter: every reach-in is collapsed into one place
-// behind a small typed interface. Callers depend on the helper signatures —
-// not on the cast — so a coco internals change trips the type-checker here
-// (one file) instead of breaking N callers at runtime.
+// This module is the deep adapter for those reach-ins. Every cast is
+// collapsed into one place behind a small typed interface. Callers depend on
+// the helper signatures — not on the cast — so a coco internals change trips
+// the type-checker here (one file) instead of breaking N callers at runtime.
+//
+// Lives in sovran-app rather than coco-payment-ux because every caller is
+// sovran-side (cashu-manager bootstrap, recovery screen, rebalance plan,
+// transactions hooks, wallet context provider). coco-payment-ux's own
+// internals stay inside that package.
 //
 // When coco promotes any of these to its public API, delete the corresponding
 // helper and migrate callers to the official accessor. Until then, this file
@@ -25,12 +30,7 @@
 //     migration.ts / useReservedProofs)
 //
 
-import type {
-  CoreProof,
-  Manager,
-  MeltOperation,
-  MeltOperationState,
-} from '@cashu/coco-core';
+import type { CoreProof, Manager, MeltOperation, MeltOperationState } from '@cashu/coco-core';
 import type { Wallet } from '@cashu/cashu-ts';
 
 interface ManagerInternals {
@@ -84,10 +84,7 @@ export function getReservedProofs(manager: Manager): Promise<CoreProof[]> {
  * Inflight proofs (transient state during mint/melt), optionally filtered by mint.
  * Used by the per-mint rebalance recovery to clear leftovers after a melt failure.
  */
-export function getInflightProofs(
-  manager: Manager,
-  mintUrls?: string[]
-): Promise<CoreProof[]> {
+export function getInflightProofs(manager: Manager, mintUrls?: string[]): Promise<CoreProof[]> {
   return internals(manager).proofRepository.getInflightProofs(mintUrls);
 }
 
@@ -107,11 +104,7 @@ export function restoreProofsToReady(
  * Persist proofs in the given mint+state, via the private ProofService.
  * Used by the legacy Redux→Coco migration to seed the proof table.
  */
-export function saveProofs(
-  manager: Manager,
-  mintUrl: string,
-  proofs: CoreProof[]
-): Promise<void> {
+export function saveProofs(manager: Manager, mintUrl: string, proofs: CoreProof[]): Promise<void> {
   return internals(manager).proofService.saveProofs(mintUrl, proofs);
 }
 

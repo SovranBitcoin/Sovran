@@ -15,7 +15,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useMints, useBalanceContext, useManager } from '@cashu/coco-react';
-import { getReadyProofs, getWallet } from 'coco-payment-ux';
+import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { useLightningOperations } from '@/features/receive/hooks/useLightningOperations';
 import { MIN_FEE_RESERVE } from '@/features/mint/components/rebalance';

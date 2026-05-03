@@ -20,19 +20,6 @@ export type { Manager } from '@cashu/coco-core';
 // on `createCocoPaymentUX`; tests and standalone consumers get a no-op default.
 export { setLogger, type Logger } from './logger';
 
-// Typed accessors for coco Manager internals — see api/managerInternals.ts
-export {
-  getReadyProofs,
-  getWallet,
-  getReservedProofs,
-  getInflightProofs,
-  restoreProofsToReady,
-  saveProofs,
-  overwriteCounter,
-  listMeltOperationsByState,
-  deleteMintOperation,
-} from './api/managerInternals';
-
 // Machine (state machine core)
 export { createPaymentMachine } from './machine/createMachine';
 export { resolveNext } from './machine/resolveNext';

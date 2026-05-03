@@ -29,7 +29,7 @@ import { useMintManagement } from '@/features/mint';
 import { useNavigation, router } from 'expo-router';
 import { Mint } from '@cashu/coco-core';
 import { useBalanceContext } from '@cashu/coco-react';
-import { deleteMintOperation } from 'coco-payment-ux';
+import { deleteMintOperation } from '@/shared/lib/cashu/managerInternals';
 import opacity from 'hex-color-opacity';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { PaymentStatusIcon } from '@/shared/lib/popup/PaymentStatusIcon';
@@ -518,7 +518,7 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
         const pendingOps = await manager.ops.mint.listPending();
         if (pendingOps.length > 0) {
           // Coco doesn't expose a public abandon API for pending operations,
-          // so go through the typed seam in coco-payment-ux/api/managerInternals.
+          // so go through the typed seam in shared/lib/cashu/managerInternals.
           for (const op of pendingOps) {
             await deleteMintOperation(manager, op.id).catch((e) =>
               cashuLog.warn('recovery.cleanup.delete_failed', {

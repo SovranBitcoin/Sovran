@@ -16,7 +16,7 @@ import {
   deriveCashuWalletSeedFromRoot,
   deriveCashuWalletSeedForImported,
 } from '@/shared/lib/nostr/keyDerivation';
-import { getInflightProofs, restoreProofsToReady } from 'coco-payment-ux';
+import { getInflightProofs, restoreProofsToReady } from './managerInternals';
 import * as FileSystem from 'expo-file-system/legacy';
 import { EventTemplate, finalizeEvent, VerifiedEvent } from 'nostr-tools';
 import * as Sharing from 'expo-sharing';

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useManager } from '@cashu/coco-react';
 import type { CoreProof } from '@cashu/coco-core';
-import { getReservedProofs } from 'coco-payment-ux';
+import { getReservedProofs } from '@/shared/lib/cashu/managerInternals';
 
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { walletLog } from '@/shared/lib/logger';

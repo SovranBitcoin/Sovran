@@ -6,7 +6,7 @@ import type {
   MeltOperation,
   MeltOperationState,
 } from '@cashu/coco-core';
-import { listMeltOperationsByState } from 'coco-payment-ux';
+import { listMeltOperationsByState } from '@/shared/lib/cashu/managerInternals';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { useMockDataStore } from '@/shared/stores/runtime/mockDataStore';
 import { log } from '@/shared/lib/logger';

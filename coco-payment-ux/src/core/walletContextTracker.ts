@@ -5,10 +5,23 @@
 // WalletContext. Framework-agnostic — no React dependency.
 // ---------------------------------------------------------------------------
 
-import type { Manager } from '@cashu/coco-core';
-import { getReadyProofs } from '../api/managerInternals';
+import type { CoreProof, Manager } from '@cashu/coco-core';
 import { errField, logger } from '../logger';
 import type { WalletContext } from '../types';
+
+// Reach past coco's `private` ProofService to get the ready (UNSPENT,
+// unreserved) proofs for one mint. The public surface only exposes balance
+// totals; the tracker needs the per-proof amount distribution to drive
+// offline-amount composition. Cast lives here because the tracker is the
+// only intra-package consumer; sovran-side reach-ins live in
+// sovran-app/shared/lib/cashu/managerInternals.ts.
+function getReadyProofs(manager: Manager, mintUrl: string): Promise<CoreProof[]> {
+  return (
+    manager as unknown as {
+      proofService: { getReadyProofs(mintUrl: string): Promise<CoreProof[]> };
+    }
+  ).proofService.getReadyProofs(mintUrl);
+}
 
 export interface WalletContextTrackerConfig {
   getPreferredMintUrl?: () => string | undefined;
@@ -55,9 +68,7 @@ export function createWalletContextTracker(
       for (const mint of trustedMints) {
         try {
           const proofs = await getReadyProofs(manager, (mint as any).mintUrl);
-          amounts[(mint as any).mintUrl] = proofs
-            .map((p) => p.amount)
-            .sort((a, b) => a - b);
+          amounts[(mint as any).mintUrl] = proofs.map((p) => p.amount).sort((a, b) => a - b);
         } catch (e) {
           logger.warn('walletContextTracker.getReadyProofs.failed', {
             mintUrl: (mint as any).mintUrl,

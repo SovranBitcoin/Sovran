@@ -1,6 +1,6 @@
 import { Manager } from '@cashu/coco-core';
 import { CheckStateEnum } from '@cashu/cashu-ts';
-import { getWallet, saveProofs, overwriteCounter } from 'coco-payment-ux';
+import { getWallet, saveProofs, overwriteCounter } from './managerInternals';
 import { store } from '@/redux/store/store.deprecated';
 import { RootState } from '@/redux/store/reducer.deprecated';
 import { CashuProfile } from '@/redux/cashu/types.deprecated';

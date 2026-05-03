@@ -3,7 +3,7 @@
  *
  * Provides a pre-built WalletContext (trustedMintUrls, mintBalances, proofAmounts,
  * preferredMintUrl) so call sites don't need to construct it or fetch proofs.
- * Proof amounts are fetched via coco-payment-ux's getReadyProofs seam when
+ * Proof amounts are fetched via the shared/lib/cashu/managerInternals seam when
  * balance changes.
  *
  * Must be a descendant of CocoProvider (CocoCashuProvider).
@@ -20,7 +20,8 @@ import React, {
 } from 'react';
 
 import { useBalanceContext, useManager, useMints } from '@cashu/coco-react';
-import { getReadyProofs, type WalletContext } from 'coco-payment-ux';
+import { type WalletContext } from 'coco-payment-ux';
+import { getReadyProofs } from '@/shared/lib/cashu/managerInternals';
 
 import { useMintStore } from '@/shared/stores/profile/mintStore';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
