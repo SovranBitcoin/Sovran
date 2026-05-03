@@ -179,8 +179,8 @@
       ],
       "verification_note": "Re-read shared/ui/primitives/Image.tsx end-to-end. Confirmed line 53 hardcodes contentFit='cover', AppProps at lines 8-13 does NOT declare contentFit, the default export at line 19 is named `App` not `Image`. Confirmed TS2322 from `npm run type-check` at features/theme/components/UnitPreviewCard.tsx:74 and WallpaperThumbnail.tsx:72 and features/theme/screens/GalleryScreen.tsx:136 — each says `Property 'contentFit' does not exist on type 'IntrinsicAttributes & AppProps'`. Counter-argument considered: 'these callers might be importing expo-image directly not the primitive'. Rejected — the TS error identifies the receiving type as `AppProps`, which is the primitive's type, proving they hit the primitive. Confidence 0.95 — the mechanism and impact are both confirmed from source + type-check. The only uncertainty is whether the 3 external callers actually render mis-aspected images in product; that needs a visual check, but the type-check alone is sufficient to file.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered during shared/ui pattern survey; outside the stack-primitives gap-consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "Image primitive interface widened to forward all expo-image props (commit ccd09dbd). The contentFit shadow is gone — callers in features/theme now pass through to expo-image."
     },
     {
       "id": "F-007",
@@ -351,8 +351,8 @@
       ],
       "verification_note": "Re-read Image.tsx:1-59. Confirmed BLUR_HASH='000000' at line 6 and its use at line 52. Did NOT test with a live expo-image build to observe the actual placeholder behaviour — the spec ambiguity is the structural finding, the runtime effect is UNVERIFIED. Confidence 0.70 (Medium threshold) reflecting the unverified runtime. Severity Medium, not Low, because the primitive is general-purpose and callers trust the placeholder prop to do something useful.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered during shared/ui pattern survey; outside the stack-primitives gap-consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "Invalid '000000' base83 placeholder removed (commit ccd09dbd). The wrapper no longer hardcodes a placeholder; callers may opt in via expo-image's own placeholder prop."
     },
     {
       "id": "F-015",
