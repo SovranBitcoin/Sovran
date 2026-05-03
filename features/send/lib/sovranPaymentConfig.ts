@@ -21,6 +21,7 @@ import { mintLocalId } from '@/shared/lib/id';
 
 import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
 import type {
+  HistoryEntry,
   Manager,
   SendHistoryEntry,
   MeltHistoryEntry,
@@ -281,12 +282,9 @@ export function createSovranExecuteMintQuote(
     // newly-persisted row by set difference if quoteId matching fails.
     let beforeIds: Set<string>;
     try {
-      const beforeHistory = await manager.history.getPaginatedHistory(0, 100);
+      const beforeHistory: HistoryEntry[] = await manager.history.getPaginatedHistory(0, 100);
       beforeIds = new Set(
-        (beforeHistory as ReadonlyArray<Record<string, unknown>>)
-          .filter((h) => h.type === 'mint' && h.mintUrl === mintUrl)
-          .map((h) => (typeof h.id === 'string' ? h.id : ''))
-          .filter((id) => id.length > 0)
+        beforeHistory.filter((h) => h.type === 'mint' && h.mintUrl === mintUrl).map((h) => h.id)
       );
     } catch (e) {
       paymentLog.warn('payment.execute_mint_quote.snapshot_failed', {
@@ -303,18 +301,17 @@ export function createSovranExecuteMintQuote(
     });
 
     // Constructed entry — used as a fallback (same shape as coco's default
-    // executeMintQuote) and as the source of `paymentRequest` if coco's
-    // persisted row doesn't carry it.
-    const constructedEntry = {
+    // executeMintQuote) when polling can't find coco's persisted row in time.
+    const constructedEntry: MintHistoryEntry = {
       id: mintOp.id,
-      type: 'mint' as const,
-      createdAt: (mintOp as Record<string, unknown>).createdAt ?? Date.now(),
-      mintUrl: ((mintOp as Record<string, unknown>).mintUrl as string) ?? mintUrl,
-      unit: ((mintOp as Record<string, unknown>).unit as string) ?? 'sat',
+      type: 'mint',
+      createdAt: mintOp.createdAt,
+      mintUrl: mintOp.mintUrl,
+      unit: mintOp.unit,
       quoteId: mintOp.quoteId,
-      state: 'UNPAID' as const,
-      amount: ((mintOp as Record<string, unknown>).amount as number) ?? amount,
-      paymentRequest: (mintOp as Record<string, unknown>).request as string | undefined,
+      state: 'UNPAID',
+      amount: mintOp.amount,
+      paymentRequest: mintOp.request,
       metadata: { operationId: mintOp.id },
     };
 
@@ -324,16 +321,13 @@ export function createSovranExecuteMintQuote(
     const DELAY_MS = 200;
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
-        const after = await manager.history.getPaginatedHistory(0, 100);
-        const persisted = (after as ReadonlyArray<Record<string, unknown>>).find((h) => {
+        const after: HistoryEntry[] = await manager.history.getPaginatedHistory(0, 100);
+        const persisted = after.find((h): h is MintHistoryEntry => {
           if (h.type !== 'mint' || h.mintUrl !== mintUrl) return false;
           // Preferred: deterministic quoteId match
-          if (mintOp.quoteId && typeof h.quoteId === 'string' && h.quoteId === mintOp.quoteId) {
-            return true;
-          }
+          if (mintOp.quoteId && h.quoteId === mintOp.quoteId) return true;
           // Fallback: set difference on ids
-          const id = typeof h.id === 'string' ? h.id : '';
-          return id.length > 0 && !beforeIds.has(id);
+          return !beforeIds.has(h.id);
         });
         if (persisted) {
           paymentLog.info('payment.execute_mint_quote.found', {
@@ -343,16 +337,9 @@ export function createSovranExecuteMintQuote(
             matchedById: persisted.id === mintOp.id,
             attempts: attempt + 1,
           });
-          // Use coco's persisted row as authoritative (so its real id flows
-          // downstream), but preserve `paymentRequest` from the operation
-          // result if coco's row doesn't carry it.
-          const merged = {
-            ...persisted,
-            paymentRequest:
-              (persisted as Record<string, unknown>).paymentRequest ??
-              constructedEntry.paymentRequest,
-          };
-          return { historyEntry: JSON.stringify(merged) };
+          // Coco's persisted row is authoritative — its `id` is what flows
+          // downstream to onTransactionCreated and the scan-history link.
+          return { historyEntry: JSON.stringify(persisted) };
         }
       } catch (e) {
         paymentLog.warn('payment.execute_mint_quote.poll_failed', {
@@ -1080,10 +1067,10 @@ export function createSovranScreenActionHandlers(): ScreenActionHandlerMap {
       copy: async (rawCtx) => {
         const { entry } = sendCtx(rawCtx);
         if (!entry.token) return;
-        const variantId =
-          typeof (rawCtx as unknown as { variantId?: unknown }).variantId === 'string'
-            ? (rawCtx as unknown as { variantId: string }).variantId
-            : 'text';
+        // `ScreenActionContext` carries action params via the `[key: string]: unknown`
+        // index signature, so `rawCtx.variantId` is already typed as `unknown` —
+        // narrow it directly without a cast.
+        const variantId = typeof rawCtx.variantId === 'string' ? rawCtx.variantId : 'text';
         if (variantId === 'emoji') {
           emojiPickerPopup({ token: getEncodedTokenV4(entry.token) });
           return;

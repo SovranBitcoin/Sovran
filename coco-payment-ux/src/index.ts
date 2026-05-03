@@ -160,6 +160,20 @@ export {
   type UnwrappedDM,
 } from './nostr';
 
+// Cancellable-fetch primitives (timeout + AbortSignal). Hermes lacks
+// `DOMException`, so callers must duck-type aborts via `isAbortError`
+// rather than `instanceof DOMException`. The same primitives back the
+// app's `apiClient` so there's one canonical implementation.
+export {
+  combineSignals,
+  isAbortError,
+  safeFetch,
+  timeoutSignal,
+  withTimeout,
+  DEFAULT_TIMEOUT_MS,
+  type RequestControls,
+} from './safeFetch';
+
 // Domain types
 export type {
   Detectors,

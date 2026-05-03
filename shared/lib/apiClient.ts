@@ -1,4 +1,5 @@
 import { GetInfoResponse } from '@cashu/cashu-ts';
+import { combineSignals, isAbortError, timeoutSignal, type RequestControls } from 'coco-payment-ux';
 import { ok, err, Result } from 'neverthrow';
 import { z } from 'zod';
 import { apiLog } from './logger';
@@ -41,7 +42,9 @@ export const PRICELIST_URL = `wss://ws.sovran.money`;
  * Default per-request budget. React Native's `fetch` has no native timeout;
  * a request that never settles wedges the screen's loading state until the
  * OS reaps the socket — minutes on cellular. Every helper enforces this
- * unless the caller passes a tighter signal.
+ * unless the caller passes a tighter signal. The wallet endpoints sit
+ * behind sovran.money so use a tighter budget than coco-payment-ux's
+ * `DEFAULT_TIMEOUT_MS` (15s, tuned for arbitrary LNURL endpoints).
  */
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -56,6 +59,11 @@ export type {
   TopFollower,
 };
 
+// Re-export coco-payment-ux's cancellable-fetch primitives so existing
+// `@/shared/lib/apiClient` consumers don't have to learn the new import
+// path. `coco-payment-ux/safeFetch` is the canonical implementation.
+export { isAbortError, type RequestControls };
+
 type FetchOrParseError = Error | ParseError;
 
 function toError(e: FetchOrParseError): Error {
@@ -65,68 +73,6 @@ function toError(e: FetchOrParseError): Error {
     return new Error(`${(e as ParseError).where}: ${issues} schema issue(s)`);
   }
   return new Error('unknown error');
-}
-
-/**
- * `true` when the rejection came from an `AbortController.abort()` — caller
- * cancellation or the per-request timeout. Spec impls raise `DOMException`
- * here, but Hermes doesn't ship `DOMException`, so duck-type on `.name`
- * instead of using `instanceof`.
- */
-export function isAbortError(e: unknown): boolean {
-  if (typeof e !== 'object' || e === null) return false;
-  const name = (e as { name?: unknown }).name;
-  return name === 'AbortError' || name === 'TimeoutError';
-}
-
-/**
- * Combine an arbitrary number of signals into one. The result aborts when
- * any input aborts. Hand-rolled because `AbortSignal.any` is only widely
- * available on Hermes from RN 0.81+; the listener pattern works everywhere
- * `AbortController` does, which is Sovran's whole runtime range.
- */
-function combineSignals(...signals: (AbortSignal | undefined)[]): AbortSignal {
-  const controller = new AbortController();
-  const onAbort = (reason: unknown) => controller.abort(reason);
-  for (const s of signals) {
-    if (!s) continue;
-    if (s.aborted) {
-      controller.abort(s.reason);
-      return controller.signal;
-    }
-    s.addEventListener('abort', () => onAbort(s.reason), { once: true });
-  }
-  return controller.signal;
-}
-
-/**
- * Build a signal that fires after `ms` ms. Falls back to a manual timer when
- * `AbortSignal.timeout` isn't on the runtime — kept to one call site so the
- * compatibility check is centralized. The fallback uses a plain `Error`
- * tagged with `name = 'TimeoutError'` because Hermes lacks `DOMException`;
- * `isAbortError` duck-types on the name either way.
- */
-function timeoutSignal(ms: number): AbortSignal {
-  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
-    return AbortSignal.timeout(ms);
-  }
-  const c = new AbortController();
-  setTimeout(() => {
-    const err = new Error('Timed out');
-    err.name = 'TimeoutError';
-    c.abort(err);
-  }, ms);
-  return c.signal;
-}
-
-/**
- * Caller-supplied request controls. Every helper accepts these so a screen
- * can cancel an in-flight request when the user navigates away or types
- * another keystroke. The default `timeoutMs` is `DEFAULT_TIMEOUT_MS`.
- */
-export interface RequestControls {
-  signal?: AbortSignal;
-  timeoutMs?: number;
 }
 
 /**
