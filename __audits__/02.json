@@ -180,7 +180,8 @@
         "sovran-app/coco-payment-ux/src/screen-actions/createManager.ts:380-410"
       ],
       "verification_note": "Verified the no-filter dispatch at lines 334-345 and confirmed defaultShouldApply filters downstream.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-009",
