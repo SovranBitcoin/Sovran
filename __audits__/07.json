@@ -110,7 +110,7 @@
       "verification_note": "Re-read nip17.ts:158-193 \u2014 confirmed no verifyEvent call and no rumor.id check. Counter-argument considered: NIP-44's HMAC provides sender auth since the conversation key is keyed on the sender's pubkey \u2014 correct for the forgery case, but does not replace the spec-mandated signature check for defence-in-depth or id integrity.",
       "prior_audit_id": null,
       "completion_status": "deferred",
-      "completion_note": "NIP-59 seal verify + rumor.id check is its own slice (touches nip17.ts shared/coco copies; F-013 must be resolved first)."
+      "completion_note": "Pattern preserved on the canonical impl: shared/lib/nostr/nip17.ts:392 still skips verifyEvent(seal) and getEventHash(rumor). Slice 6df46a86 unblocks the seal-verify fix by deleting the duplicate coco-payment-ux copy \u2014 only one file needs the change now. Original call site coco-payment-ux/src/nostr/nip17.ts:158 no longer exists."
     },
     {
       "id": "F-005",
@@ -304,7 +304,9 @@
         "features/splitBill/hooks/useSplitBillOrchestrator.ts:37"
       ],
       "verification_note": "Diff confirmed files differ. Grep confirmed app imports only from shared/. Counter-argument considered: maybe some tests or the package's own sendDirectMessageToRelays use the package version \u2014 true for sendDirectMessageToRelays, but the Sovran app does not call sendDirectMessageToRelays; it wires its own sendNostrDM via CocoPaymentUX.tsx. So the package's nip17.ts is effectively dead from the app's perspective.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Slice 6df46a86 deletes coco-payment-ux/src/nostr/ (nip17.ts, sendDirectMessage.ts, index.ts) and drops the nostr crypto exports from coco-payment-ux/src/index.ts. shared/lib/nostr/nip17.ts is now the only NIP-17/NIP-59 implementation. sendDirectMessageToRelays moves to shared/lib/nostr/sendDirectMessage.ts and is wired into features/send/providers/CocoPaymentUX.tsx via the existing sendNostrDM config callback, so the package itself ships no Nostr crypto. Net 290 LOC deleted; the package is now UI-agnostic on the Nostr seam."
     },
     {
       "id": "F-014",
