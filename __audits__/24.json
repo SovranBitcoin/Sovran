@@ -172,7 +172,8 @@
       "fix": "Delete IOS_SECURE_OPTIONS and STORAGE_KEYS from useSecureStore.ts; re-export the typed retrieveMnemonic / storeMnemonic from shared/lib/nostr/secureStorage.ts and wire useMnemonic through those. Separately, fix requireAuthentication to a runtime-gated value (production: true; dev: false via __DEV__) per audit 11 F-002. Not a duplicate — flagging the CARRY-OVER means the secureStorage.ts fix landing without the hook fix leaves the settings surface vulnerable.",
       "references": ["docs/SOV-00.md §4", "skill:security-review"],
       "verification_note": "Still present since __audits__/11.json F-009. Re-checked useSecureStore.ts:7–16. Confidence 0.9 — the dup is literal.",
-      "prior_audit_id": "F-009@11.json"
+      "prior_audit_id": "F-009@11.json",
+      "completion_status": "stale"
     },
     {
       "id": "F-010",
@@ -397,7 +398,8 @@
       "fix": "`import { hexToBytes } from '@noble/hashes/utils'`, delete the hand-rolled version, replace the single call site at line 298.",
       "references": ["skill:wycheproof"],
       "verification_note": "Verified file.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale"
     },
     {
       "id": "F-023",

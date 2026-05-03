@@ -76,7 +76,8 @@
         "skill:security-review"
       ],
       "verification_note": "Still present since 04.json and 10.json. Re-read L29-33 on HEAD; identical. No change since prior audits.",
-      "prior_audit_id": "F-002@10.json"
+      "prior_audit_id": "F-002@10.json",
+      "completion_status": "stale"
     },
     {
       "id": "F-003",
@@ -219,7 +220,8 @@
         "sovran-app/shared/providers/NostrKeysProvider.tsx:102-116"
       ],
       "verification_note": "Still present since 10.json. Re-read useSecureStore.ts L1-132 on HEAD and confirmed duplicate constants (L7-16) and direct SecureStore.getItemAsync/setItemAsync/deleteItemAsync calls at L50, L73, L92.",
-      "prior_audit_id": "F-009@10.json"
+      "prior_audit_id": "F-009@10.json",
+      "completion_status": "stale"
     },
     {
       "id": "F-010",

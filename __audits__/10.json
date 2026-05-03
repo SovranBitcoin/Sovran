@@ -74,7 +74,8 @@
         "skill:security-review"
       ],
       "verification_note": "Still present since 04.json. Re-read L29-33 and every options= spread; all call sites thread this same object. No change since prior audit.",
-      "prior_audit_id": "F-001@04.json"
+      "prior_audit_id": "F-001@04.json",
+      "completion_status": "stale"
     },
     {
       "id": "F-003",
@@ -217,7 +218,8 @@
         "sovran-app/shared/providers/NostrKeysProvider.tsx:102-116"
       ],
       "verification_note": "Still present since 04.json. Re-read useSecureStore.ts L1-132 and confirmed duplicate constants and direct SecureStore calls.",
-      "prior_audit_id": "F-008@04.json"
+      "prior_audit_id": "F-008@04.json",
+      "completion_status": "stale"
     },
     {
       "id": "F-010",

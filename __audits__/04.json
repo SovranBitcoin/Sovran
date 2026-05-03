@@ -32,7 +32,8 @@
         "AUDIT.md (Sovran audit system prompt, dim 2, 'Device-local secrets')"
       ],
       "verification_note": "Re-read L29-33 and every call site: every options= spread threads this same object. Counter-argument considered: 'enabling requireAuthentication bricks users without biometrics' — real concern, but the mitigation is a runtime capability probe with a settings toggle, not hardcoded false. The keychainAccessible omission has no such mitigation argument.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale"
     },
     {
       "id": "F-002",
@@ -177,7 +178,8 @@
         "sovran-app/shared/providers/NostrKeysProvider.tsx:102-116"
       ],
       "verification_note": "Re-read both files. STORAGE_KEYS.USER_MNEMONIC = 'user_mnemonic' in both. IOS_SECURE_OPTIONS identical. Counter-argument considered: 'useSecureStore is generic, the hook wants to cover other keys.' But only USER_MNEMONIC is ever passed; useCashuMnemonic at L140 goes through NostrKeysContext, not SecureStore. The abstraction is vestigial.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale"
     },
     {
       "id": "F-009",

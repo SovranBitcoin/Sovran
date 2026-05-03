@@ -246,7 +246,8 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-checked LOC (`wc -l`) and structure. Counter-argument: the four branches share the listener-add / setMessages / cleanup pattern, which is exactly what the merge helper would consolidate. The refactor concentrates complexity (locality) and trims the interface to one merge function — passes the deletion test from skill:improve-codebase-architecture/DEEPENING.md.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-009",
@@ -266,7 +267,8 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-checked LOC and the per-block structure at GeohashChatScreen.tsx:116-204. Counter-argument: keeping the instrumentation inline lets each surface tweak the logged fields. Partly true, but the actual divergence is just the 'surface' string and the dep arrays — both parameterisable.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred"
     },
     {
       "id": "F-010",
