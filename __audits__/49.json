@@ -346,7 +346,8 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-checked grep for `surface` literals across features/bitchat/. Counter-argument: maybe BitChatScreen+MessageList intentionally use a separate tag because they're a different KAV strategy. Refuted — the perf-instrumentation question is orthogonal to the KAV implementation; the tag should describe the screen, not the KAV.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale"
     },
     {
       "id": "F-014",
@@ -471,7 +472,8 @@
         "skill:neverthrow-wrap-exceptions"
       ],
       "verification_note": "Re-checked at GeohashChatScreen.tsx:232-237 and the redacted pattern at useBitChat.ts:96-99. Counter-argument: bitchatLog might already redact non-enumerable Error fields. UNVERIFIED — depends on shared/lib/logger internals; consult shared/lib/logger.ts to confirm. Confidence 0.7.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete"
     },
     {
       "id": "F-020",
@@ -545,7 +547,8 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Re-checked grep for chatLog vs bitchatLog inside features/bitchat. Counter-argument: chatLog is the canonical 'chat surface' scope across UserMessages/Whitenoise/Ai too. Partly true — then the convention should be chatLog everywhere, including bitchatLog migrating to chatLog. Either way, mixed usage is the wrong answer.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete"
     },
     {
       "id": "F-024",
