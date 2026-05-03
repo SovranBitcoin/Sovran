@@ -31,7 +31,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { npubToPubkey } from '@/shared/lib/nostr/client';
 import { Card } from '@/shared/ui/composed/Card';
-import { Section } from '@/features/settings';
+import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { truncateMiddle } from '@/shared/lib/strings';

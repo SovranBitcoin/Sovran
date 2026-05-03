@@ -7,7 +7,7 @@ import {
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
 import { Text } from '@/shared/ui/primitives/Text';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
-import { Section } from '@/features/settings';
+import { Section } from '@/shared/ui/composed/Section';
 import Icon from 'assets/icons';
 import {
   Card,

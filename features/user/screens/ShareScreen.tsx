@@ -7,7 +7,7 @@
 
 import React, { useCallback, useState } from 'react';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
-import { Section } from '@/features/settings';
+import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { View } from '@/shared/ui/primitives/View/View';
 import * as Clipboard from 'expo-clipboard';

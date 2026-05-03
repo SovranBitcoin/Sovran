@@ -6,6 +6,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Link, router, type Href } from 'expo-router';
 import { truncateMiddle } from '@/shared/lib/strings';
 import { Screen as ScreenWrapper } from '@/shared/ui/composed/Screen';
+import { Section } from '@/shared/ui/composed/Section';
 import * as Application from 'expo-application';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
@@ -26,27 +27,6 @@ import { log, useLifecycleLogger } from '@/shared/lib/logger';
 export const name = Application.applicationName;
 export const version = Application.nativeApplicationVersion;
 export const buildNumber = Application.nativeBuildVersion;
-
-export const Section: React.FC<{
-  title: string;
-  children: React.ReactNode;
-  isDanger?: boolean;
-}> = ({ title, children, isDanger }) => {
-  const danger = useThemeColor('danger');
-
-  return (
-    <View className="py-3">
-      <Text
-        className="text-foreground/50 my-2 ml-3 uppercase tracking-wide"
-        size={13}
-        medium
-        style={isDanger ? { color: danger } : undefined}>
-        {title}
-      </Text>
-      <View className="overflow-hidden rounded-xl">{children}</View>
-    </View>
-  );
-};
 
 const ProfileButton = () => {
   const { keys: nostrKeys } = useNostrKeysContext();

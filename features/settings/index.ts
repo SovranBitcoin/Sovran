@@ -2,7 +2,6 @@
 
 export {
   SettingsScreen,
-  Section,
   ROW_ICON_SIZE,
   name,
   version,

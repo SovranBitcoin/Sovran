@@ -12,7 +12,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import { Card } from '@/shared/ui/composed/Card';
-import { Section } from '@/features/settings/screens/SettingsScreen';
+import { Section } from '@/shared/ui/composed/Section';
 import Icon, { CurrencyIcon } from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { Badge } from '@/shared/ui/primitives/Badge';

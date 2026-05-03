@@ -5,7 +5,7 @@ import { Log } from '@/shared/lib/logger';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
-import { Section } from '@/shared/ui/composed/Section';
+import { DetailsList } from '@/shared/ui/composed/DetailsList';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import opacity from 'hex-color-opacity';
 import Icon from 'assets/icons';
@@ -62,7 +62,7 @@ export function DetailsSection({
           </HStack>
         </Pressable>
         {expanded ? (
-          <Section items={items} camera={camera} gradient style={{ marginHorizontal: 0 }} />
+          <DetailsList items={items} camera={camera} gradient style={{ marginHorizontal: 0 }} />
         ) : null}
       </View>
     </Log>

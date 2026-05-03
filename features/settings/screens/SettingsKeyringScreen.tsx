@@ -26,7 +26,7 @@ import {
   copyPopup,
 } from '@/shared/lib/popup';
 import { truncateMiddle } from '@/shared/lib/strings';
-import { Section } from '@/features/settings';
+import { Section } from '@/shared/ui/composed/Section';
 import type { Keypair } from '@cashu/coco-core';
 import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Screen } from '@/shared/ui/composed/Screen';

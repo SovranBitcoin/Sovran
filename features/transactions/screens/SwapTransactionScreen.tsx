@@ -35,7 +35,7 @@ import {
   type SwapLeg,
 } from '@/shared/stores/profile/swapTransactionsStore';
 import opacity from 'hex-color-opacity';
-import { Section } from '@/shared/ui/composed/Section';
+import { DetailsList } from '@/shared/ui/composed/DetailsList';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { AmountFormatter } from '@/shared/ui/composed/AmountFormatter';
 import {
@@ -554,7 +554,7 @@ export function SwapTransactionScreen({ groupId }: Props) {
           </Animated.View>
 
           {/* ── Section: metadata (below the cards, matching other screens) ── */}
-          <Section
+          <DetailsList
             items={[
               {
                 title: 'Status',

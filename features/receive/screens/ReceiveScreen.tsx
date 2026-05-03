@@ -18,7 +18,7 @@ import { useScreenActions, type UseScreenActionsResult } from 'coco-payment-ux/r
 import { log, useLifecycleLogger } from '@/shared/lib/logger';
 
 import type { FormattedString } from 'coco-payment-ux';
-import { Section } from '@/features/settings';
+import { Section } from '@/shared/ui/composed/Section';
 import { GradientCard } from '@/shared/ui/composed/GradientCard';
 import { PaymentInfo } from '@/shared/blocks/PaymentInfo';
 import { HistoryEntryRefresh } from '@/features/transactions';

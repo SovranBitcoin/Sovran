@@ -12,7 +12,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { z } from 'zod';
 
 import Icon from 'assets/icons';
-import { Section } from '@/features/settings';
+import { Section } from '@/shared/ui/composed/Section';
 import { Badge } from '@/shared/ui/primitives/Badge';
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
