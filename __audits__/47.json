@@ -210,8 +210,8 @@
       ],
       "verification_note": "Re-read line 46-47 and DrawerLayout's drawerStyle (line 418-424). Confirmed DRAWER_WIDTH is module-static. Counter-argument: drawer width is rarely visible on rotation since most users don't rotate during use. Severity stays Low.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Real and unfixed at app/(drawer)/_layout.tsx:46. Same module-load Dimensions pattern as 17.json#F-018; deferred along with that cluster (13 call sites total)."
+      "completion_status": "complete",
+      "completion_note": "Resolved in dee4cf6f. SCREEN_WIDTH and DRAWER_WIDTH moved into DrawerLayout; drawerStyle.width now derives from useWindowDimensions() so the drawer rescales on rotation, foldable, and split-screen."
     },
     {
       "id": "F-009",
