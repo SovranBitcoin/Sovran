@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { redactError, storeLog } from '@/shared/lib/logger';
 import {
+  type BtcMapPlace,
+  type BtcMapPlaceDetails as BtcMapPlaceDetailsBase,
   BtcMapPlaceDetails as BtcMapPlaceDetailsSchema,
   BtcMapPlacesResponse,
   parseWith,
@@ -11,60 +13,38 @@ import {
 import { fetchJson, type RequestControls } from '@/shared/lib/apiClient';
 import { createMergeWithSchema } from '@/shared/lib/persist/createMergeWithSchema';
 
-interface BTCMapPlace {
-  id: number;
-  lat: number;
-  lon: number;
-  icon: string;
-  comments?: number;
-  boosted_until?: string;
-  deleted_at?: string | null;
-  updated_at: string;
-}
+// Upstream BTCMap exposes colon-keyed `osm:*` properties under the schema's
+// `passthrough()` envelope; surface the ones the detail screen actually
+// reads as a typed extension so consumers don't need ad-hoc casts.
+type OsmContactField =
+  | 'osm:contact:instagram'
+  | 'osm:contact:twitter'
+  | 'osm:contact:facebook'
+  | 'osm:contact:phone'
+  | 'osm:contact:website'
+  | 'osm:contact:email';
 
-export interface BTCMapPlaceDetails {
-  id: number;
-  lat: number;
-  lon: number;
-  icon: string;
-  updated_at: string;
-  name?: string;
-  address?: string;
-  description?: string;
-  phone?: string;
-  website?: string;
-  twitter?: string;
-  facebook?: string;
-  instagram?: string;
-  email?: string;
-  opening_hours?: string;
-  created_at?: string;
-  verified_at?: string;
-  osm_id?: string;
-  osm_url?: string;
-  'osm:contact:instagram'?: string;
-  'osm:contact:twitter'?: string;
-  'osm:contact:facebook'?: string;
-  'osm:contact:phone'?: string;
-  'osm:contact:website'?: string;
-  'osm:contact:email'?: string;
-  required_app_url?: string;
-  'osm:payment:onchain'?: string;
-  'osm:payment:lightning'?: string;
-  'osm:payment:lightning_contactless'?: string;
-  'osm:payment:bitcoin'?: string;
-  'osm:payment:uri'?: string;
-  'osm:payment:coinos'?: string;
-  'osm:payment:pouch'?: string;
-  'osm:amenity'?: string;
-  'osm:category'?: string;
-  'osm:survey:date'?: string;
-  'osm:check_date'?: string;
-  'osm:check_date:currency:XBT'?: string;
-}
+type OsmPaymentField =
+  | 'osm:payment:onchain'
+  | 'osm:payment:lightning'
+  | 'osm:payment:lightning_contactless'
+  | 'osm:payment:bitcoin'
+  | 'osm:payment:uri'
+  | 'osm:payment:coinos'
+  | 'osm:payment:pouch';
+
+type OsmMetaField =
+  | 'osm:amenity'
+  | 'osm:category'
+  | 'osm:survey:date'
+  | 'osm:check_date'
+  | 'osm:check_date:currency:XBT';
+
+export type BTCMapPlaceDetails = BtcMapPlaceDetailsBase &
+  Partial<Record<OsmContactField | OsmPaymentField | OsmMetaField, string>>;
 
 interface PlacesCache {
-  data: BTCMapPlace[];
+  data: BtcMapPlace[];
   timestamp: number;
 }
 
@@ -100,8 +80,8 @@ interface BTCMapState {
 }
 
 interface BTCMapActions {
-  getCachedPlaces: () => BTCMapPlace[] | null;
-  fetchPlaces: (forceRefresh?: boolean, controls?: RequestControls) => Promise<BTCMapPlace[]>;
+  getCachedPlaces: () => BtcMapPlace[] | null;
+  fetchPlaces: (forceRefresh?: boolean, controls?: RequestControls) => Promise<BtcMapPlace[]>;
   fetchPlaceDetails: (
     id: number,
     forceRefresh?: boolean,
@@ -118,7 +98,7 @@ type BTCMapStore = BTCMapState & BTCMapActions;
 // and the explore tab's MapTeaserCard, which both mount on boot via native
 // tabs) used to each kick off their own fetch + parse. Sharing the in-flight
 // promise eliminates duplicate work and the second 3s blocker.
-let inflightPlacesFetch: Promise<BTCMapPlace[]> | null = null;
+let inflightPlacesFetch: Promise<BtcMapPlace[]> | null = null;
 
 // Persisted-shape schema. Envelope-only validation on `placesCache.data` —
 // per-item parse against `BtcMapPlace` is a 2–3s JS-thread block on a 40k
@@ -175,7 +155,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
         const startTime = performance.now();
         set({ isLoading: true, error: null });
 
-        const run = async (): Promise<BTCMapPlace[]> => {
+        const run = async (): Promise<BtcMapPlace[]> => {
           const result = await fetchJson(
             `${SOVRAN_API_BASE}/places`,
             parsePlaces,
@@ -198,7 +178,7 @@ export const useBTCMapStore = create<BTCMapStore>()(
             throw result.error;
           }
 
-          const data = result.value as BTCMapPlace[];
+          const data = result.value as BtcMapPlace[];
           storeLog.info('store.btc_map.fetch_places.success', {
             count: data.length,
             duration_ms: Math.round((performance.now() - startTime) * 100) / 100,

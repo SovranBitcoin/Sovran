@@ -28,14 +28,7 @@ import {
   Image as SwiftUIImage,
   Text as SwiftUIText,
 } from '@expo/ui/swift-ui';
-import {
-  buttonStyle,
-  font,
-  foregroundStyle,
-  frame,
-  glassEffect,
-  padding,
-} from '@expo/ui/swift-ui/modifiers';
+import { font, foregroundStyle, frame, glassEffect, padding } from '@expo/ui/swift-ui/modifiers';
 import { liquidGlassModifiers } from '@/shared/lib/version';
 import { router } from 'expo-router';
 import opacity from 'hex-color-opacity';
@@ -51,6 +44,12 @@ import {
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useBTCMapStore } from '@/shared/stores/global/btcMapStore';
 import { ClusterManager, cameraToBbox, MapMarker, GeoPoint } from '@/shared/lib/map/mapClustering';
+import {
+  MERCHANT_CATEGORIES,
+  type MerchantCategoryId,
+  getIconsForCategory,
+} from '@/shared/lib/map/categories';
+import { CircleActionButton } from '@/shared/ui/composed/CircleActionButton';
 import { useShallow } from 'zustand/react/shallow';
 import { getOrBuildBTCMapClusterManager } from '@/shared/lib/map/btcMapClusterCache';
 import { applySafetyOffset } from '@/shared/lib/map/locationPrivacy';
@@ -60,38 +59,19 @@ import { Screen, log, deferWork, useLifecycleLogger } from '@/shared/lib/logger'
 // Types & Constants
 // ============================================================================
 
-type CategoryFilter = 'all' | 'food' | 'retail' | 'atm' | 'accommodation' | 'services';
+type CategoryFilter = 'all' | MerchantCategoryId;
 
-const CATEGORIES: Record<CategoryFilter, { label: string; icons: string[] }> = {
-  all: { label: 'All Merchants', icons: [] },
-  food: {
-    label: 'Food & Drink',
-    icons: ['local_cafe', 'lunch_dining', 'restaurant', 'bakery_dining'],
-  },
-  retail: {
-    label: 'Retail & Shopping',
-    icons: ['storefront', 'local_grocery_store', 'computer', 'diamond'],
-  },
-  atm: {
-    label: 'ATMs & Exchange',
-    icons: ['local_atm', 'currency_exchange'],
-  },
-  accommodation: {
-    label: 'Accommodation',
-    icons: ['hotel', 'spa'],
-  },
-  services: {
-    label: 'Services',
-    icons: [
-      'medical_services',
-      'local_pharmacy',
-      'content_cut',
-      'car_repair',
-      'fitness_center',
-      'business',
-    ],
-  },
-};
+const ALL_CATEGORY_LABEL = 'All Merchants';
+
+function categoryLabel(filter: CategoryFilter): string {
+  if (filter === 'all') return ALL_CATEGORY_LABEL;
+  return MERCHANT_CATEGORIES.find((c) => c.id === filter)?.label ?? filter;
+}
+
+const CATEGORY_FILTERS: readonly CategoryFilter[] = [
+  'all',
+  ...MERCHANT_CATEGORIES.map((c) => c.id),
+];
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const ASPECT_RATIO = SCREEN_WIDTH / SCREEN_HEIGHT;
@@ -132,17 +112,17 @@ const StatsCard = memo(function StatsCard({
   const visibleText = loading ? '...' : `${visibleCount.toLocaleString()} visible`;
   const totalText = loading
     ? 'Loading...'
-    : `${totalCount.toLocaleString()} total • ${CATEGORIES[category].label}`;
+    : `${totalCount.toLocaleString()} total • ${categoryLabel(category)}`;
 
   return (
     <View style={styles.statsContainer}>
       <Host style={{ zIndex: 10, height: 60, width: STATS_CARD_WIDTH }} matchContents>
         <ContextMenu>
           <ContextMenu.Items>
-            {(Object.keys(CATEGORIES) as CategoryFilter[]).map((cat) => (
+            {CATEGORY_FILTERS.map((cat) => (
               <SwiftUIButton
                 key={cat}
-                label={`${CATEGORIES[cat].label}${cat === category ? ' ✓' : ''}`}
+                label={`${categoryLabel(cat)}${cat === category ? ' ✓' : ''}`}
                 onPress={() => onCategoryChange(cat)}
               />
             ))}
@@ -201,92 +181,26 @@ const FloatingActionButtons = memo(function FloatingActionButtons({
   onZoomIn,
   onZoomOut,
 }: FloatingActionButtonsProps) {
-  const foreground = useThemeColor('foreground');
-
-  if (Platform.OS === 'ios') {
-    return (
-      <VStack style={styles.floatingButtons} spacing={8}>
-        {/* Location Button */}
-        <Host style={{ height: 48, width: 48 }} matchContents={false}>
-          <SwiftUIButton
-            modifiers={[
-              ...liquidGlassModifiers(buttonStyle('glass')),
-              frame({ height: 48, width: 48 }),
-              ...liquidGlassModifiers(
-                glassEffect({
-                  shape: 'circle',
-                  glass: { variant: 'regular', interactive: true },
-                })
-              ),
-            ]}
-            onPress={onMyLocation}>
-            <SwiftUIHStack
-              alignment="center"
-              modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
-              <SwiftUIImage systemName="location.fill" size={20} color={foreground} />
-            </SwiftUIHStack>
-          </SwiftUIButton>
-        </Host>
-
-        {/* Zoom In Button */}
-        <Host style={{ height: 48, width: 48 }} matchContents={false}>
-          <SwiftUIButton
-            modifiers={[
-              ...liquidGlassModifiers(buttonStyle('glass')),
-              frame({ height: 48, width: 48 }),
-              ...liquidGlassModifiers(
-                glassEffect({
-                  shape: 'circle',
-                  glass: { variant: 'regular', interactive: true },
-                })
-              ),
-            ]}
-            onPress={onZoomIn}>
-            <SwiftUIHStack
-              alignment="center"
-              modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
-              <SwiftUIImage systemName="plus" size={20} color={foreground} />
-            </SwiftUIHStack>
-          </SwiftUIButton>
-        </Host>
-
-        {/* Zoom Out Button */}
-        <Host style={{ height: 48, width: 48 }} matchContents={false}>
-          <SwiftUIButton
-            modifiers={[
-              ...liquidGlassModifiers(buttonStyle('glass')),
-              frame({ height: 48, width: 48 }),
-              ...liquidGlassModifiers(
-                glassEffect({
-                  shape: 'circle',
-                  glass: { variant: 'regular', interactive: true },
-                })
-              ),
-            ]}
-            onPress={onZoomOut}>
-            <SwiftUIHStack
-              alignment="center"
-              modifiers={[frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'center' })]}>
-              <SwiftUIImage systemName="minus" size={20} color={foreground} />
-            </SwiftUIHStack>
-          </SwiftUIButton>
-        </Host>
-      </VStack>
-    );
-  }
-
-  // Android fallback
   return (
     <VStack style={styles.floatingButtons} spacing={8}>
-      <Pressable onPress={onMyLocation} style={styles.androidCircleButton}>
-        <Icon name="mdi:crosshairs-gps" size={22} color={foreground} />
-      </Pressable>
-      <Pressable onPress={onZoomIn} style={styles.androidCircleButton}>
-        <Icon name="mdi:plus" size={22} color={foreground} />
-      </Pressable>
-      <Pressable onPress={onZoomOut} style={styles.androidCircleButton}>
-        <Icon name="mdi:minus" size={22} color={foreground} />
-      </Pressable>
+      <CircleActionButton
+        icon="mdi:crosshairs-gps"
+        systemIcon="location.fill"
+        onPress={onMyLocation}
+        testID="map-locate"
+      />
+      <CircleActionButton
+        icon="mdi:plus"
+        systemIcon="plus"
+        onPress={onZoomIn}
+        testID="map-zoom-in"
+      />
+      <CircleActionButton
+        icon="mdi:minus"
+        systemIcon="minus"
+        onPress={onZoomOut}
+        testID="map-zoom-out"
+      />
     </VStack>
   );
 });
@@ -393,7 +307,7 @@ export function MapScreen() {
     if (category === 'all') {
       return places.map((p) => ({ id: p.id, lat: p.lat, lon: p.lon, icon: p.icon }));
     }
-    const icons = CATEGORIES[category].icons;
+    const icons = getIconsForCategory(category);
     return places
       .filter((p) => icons.includes(p.icon))
       .map((p) => ({ id: p.id, lat: p.lat, lon: p.lon, icon: p.icon }));
@@ -775,19 +689,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 16,
     bottom: 110,
-  },
-  circleButtonContent: {
-    width: 24,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  androidCircleButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

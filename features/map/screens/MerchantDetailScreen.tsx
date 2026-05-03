@@ -24,36 +24,11 @@ import { ListGroup, PressableFeedback } from 'heroui-native';
 import opacity from 'hex-color-opacity';
 import { Screen, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
+import { getMarkerColor } from '@/shared/lib/map/categories';
 
 const ParamsSchema = z.object({
   placeId: z.string().regex(/^\d{1,15}$/, 'placeId must be a positive integer'),
 });
-
-const CATEGORIES: Record<string, { icons: string[] }> = {
-  food: { icons: ['local_cafe', 'lunch_dining', 'restaurant', 'bakery_dining'] },
-  retail: { icons: ['storefront', 'local_grocery_store', 'computer', 'diamond'] },
-  atm: { icons: ['local_atm', 'currency_exchange'] },
-  accommodation: { icons: ['hotel', 'spa'] },
-  services: {
-    icons: [
-      'medical_services',
-      'local_pharmacy',
-      'content_cut',
-      'car_repair',
-      'fitness_center',
-      'business',
-    ],
-  },
-};
-
-function getMarkerColor(icon: string): string {
-  if (CATEGORIES.food.icons.includes(icon)) return '#FF6B6B';
-  if (CATEGORIES.retail.icons.includes(icon)) return '#4ECDC4';
-  if (CATEGORIES.atm.icons.includes(icon)) return '#F7931A';
-  if (CATEGORIES.accommodation.icons.includes(icon)) return '#9B59B6';
-  if (CATEGORIES.services.icons.includes(icon)) return '#3498DB';
-  return '#6366f1';
-}
 
 export function MerchantDetailScreen() {
   useLifecycleLogger('MerchantDetailScreen');

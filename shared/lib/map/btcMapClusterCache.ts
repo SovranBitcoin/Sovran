@@ -25,12 +25,10 @@ function evictIfNeeded() {
   if (oldestKey) CACHE.delete(oldestKey);
 }
 
-export type ClusterBuildOptions = Supercluster.Options<any, any>;
-
 export function getOrBuildBTCMapClusterManager(
   cacheKey: string,
   points: GeoPoint[],
-  options?: ClusterBuildOptions
+  options?: Supercluster.Options<any, any>
 ): ClusterManager {
   const existing = CACHE.get(cacheKey);
   if (existing && existing.pointsCount === points.length && existing.manager.isLoaded()) {

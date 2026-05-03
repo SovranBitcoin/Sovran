@@ -46,7 +46,10 @@ const GOOGLE_MAPS_NO_LABELS_STYLE = JSON.stringify([
 ]);
 const HAS_ANDROID_GOOGLE_MAPS_KEY = !!process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-interface MapMarker {
+// Local type matching the AppleMaps / GoogleMaps `markers` prop shape
+// (coordinates as a nested object). Distinct from the clustering-library
+// MapMarker in shared/lib/map/mapClustering.ts which uses flat lat/lon.
+interface NearbyMapMarker {
   id: string;
   coordinates: { latitude: number; longitude: number };
   tintColor: string;
@@ -60,7 +63,7 @@ function MapPreview({
 }: {
   latitude: number;
   longitude: number;
-  markers: MapMarker[];
+  markers: NearbyMapMarker[];
 }) {
   const surfaceSecondary = useThemeColor('surface-secondary');
 
@@ -205,12 +208,12 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
     };
   }, [mockMode]);
 
-  const nearbyMarkers = useMemo((): MapMarker[] => {
+  const nearbyMarkers = useMemo((): NearbyMapMarker[] => {
     const places = placesCache?.data;
     if (!places?.length) return [];
 
     const { latitude, longitude } = coords;
-    const nearby: MapMarker[] = [];
+    const nearby: NearbyMapMarker[] = [];
 
     for (const place of places) {
       if (nearby.length >= MAX_MARKERS) break;
