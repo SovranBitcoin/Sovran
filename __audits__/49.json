@@ -206,7 +206,9 @@
         "skill:vercel-react-native-skills"
       ],
       "verification_note": "Re-checked useBitChat.ts:80-142 and grep for `transport: 'ble'` (no internal call sites pass it). log.txt grep for bitchat.hook.ble_diag: 0 hits. Counter-argument: maybe the 10s poll is load-bearing for some BLE state machine. Refuted — the diag fields are read-only and the interval body is a single log call.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "10s setInterval(getBLEDiagnostics) lifecycle is a separate pattern from logger-scope drift; the prior bitchat slice (audit 49) tracks it."
     },
     {
       "id": "F-007",

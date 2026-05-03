@@ -5,18 +5,64 @@
     "entry_point": "sovran-app/features/ai/screens/AiChatScreen.tsx",
     "entry_point_autoselected": true,
     "entry_point_selection_rationale": "Score 7: never-audited slice (+3), feature name absent from all 33 prior covered_paths (+2), dim overlap < 50% with audits 32-33 (+1), 11 commits in 90d plus current-branch bug-fix commit 38797b50 touched this file (+1). Top runners-up disqualified: api.sovran.money/src/lnurl.ts (score 6, no recent churn) and features/payments (score 6, contacts substring overlap with audit 32 covering features/contacts).",
-    "repos_touched": ["sovran-app"],
-    "prior_audits_consulted": [
-      "01.json", "02.json", "03.json", "04.json", "05.json", "06.json", "07.json",
-      "08.json", "09.json", "10.json", "11.json", "12.json", "13.json", "14.json",
-      "15.json", "16.json", "17.json", "18.json", "19.json", "20.json", "21.json",
-      "22.json", "23.json", "24.json", "25.json", "26.json", "27.json", "28.json",
-      "29.json", "30.json", "31.json", "32.json", "33.json"
+    "repos_touched": [
+      "sovran-app"
     ],
-    "sov_specs_consulted": ["docs/SOV-00.md"],
-    "skills_consulted": ["zustand-5", "zod-4", "neverthrow-return-types", "react-native-best-practices", "native-data-fetching", "vercel-react-native-skills"],
-    "process_skills_consulted": ["zoom-out", "improve-codebase-architecture", "diagnose"],
-    "research_consulted": ["neverthrow-boundary-playbook", "zustand-zod-playbook"],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json",
+      "28.json",
+      "29.json",
+      "30.json",
+      "31.json",
+      "32.json",
+      "33.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "zod-4",
+      "neverthrow-return-types",
+      "react-native-best-practices",
+      "native-data-fetching",
+      "vercel-react-native-skills"
+    ],
+    "process_skills_consulted": [
+      "zoom-out",
+      "improve-codebase-architecture",
+      "diagnose"
+    ],
+    "research_consulted": [
+      "neverthrow-boundary-playbook",
+      "zustand-zod-playbook"
+    ],
     "tooling_run": {
       "type_check": "1 critical AI-feature-related error: TS2724 in features/user/screens/UserMessagesScreen.tsx:92 (setStreaming missing). Other unrelated TS errors in features/theme, navigation, scripts/log-doctor, shared/lib/cashu/manager (private member access), shared/lib/downloadedThemeRegistry — out of scope for this audit but flagged in Open questions.",
       "lint": "41 prettier/prettier errors in features/ai (AiChatScreen.tsx, format.ts) + 2 warnings (1 unused eslint-disable directive at AiChatScreen.tsx:206)",
@@ -39,7 +85,10 @@
       "description": "UserMessagesScreen.tsx:92 imports `setStreaming` from `@/features/ai/lib/streamingBuffer` and calls it at lines 1672 and 1785 (`setStreaming(assistantMessageId, '')` and `setStreaming(assistantMessageId, fullContent)`). The streamingBuffer module exports `startStreaming`, `setStreamingText`, `setStreamingReasoning`, `clearStreaming`, `useStreamingContent`, `useStreamingReasoning`, and `useStreamingStartedAt` — there is no `setStreaming`. `npm run type-check` reports `TS2724: '\"@/features/ai/lib/streamingBuffer\"' has no exported member named 'setStreaming'. Did you mean 'startStreaming'?`. Metro/Babel does not fail the bundle on missing named imports at compile time — the symbol resolves to `undefined` at runtime, and `setStreaming(assistantMessageId, '')` becomes `undefined(...)` which throws `TypeError: undefined is not a function`. The legacy AI message screen (the user-facing chat with ROUTSTR_PUBKEY, still used per the comment in routstrStore.ts:9-12) crashes the moment the user taps Send.",
       "why_it_matters": "Production crash on a paid AI flow. The user types a message, taps send, and the screen throws. The PR that added this should have been blocked at type-check.",
       "fix": "Either rename the call sites at UserMessagesScreen.tsx:1672, 1785 to `setStreamingText`, OR re-export a `setStreaming` alias from streamingBuffer.ts that forwards to `setStreamingText`. The former is preferable — keep one canonical name. After the rename, run `npm run type-check` and confirm TS2724 is gone. Investigate why the type-check error did not block the PR (likely CI gate gap on type-check).",
-      "references": ["ts:TS2724", "skill:diagnose"],
+      "references": [
+        "ts:TS2724",
+        "skill:diagnose"
+      ],
       "verification_note": "Re-checked: streamingBuffer.ts:34-105 exports the four named setters and three hooks; none is named `setStreaming`. UserMessagesScreen.tsx:1672 and 1785 both call `setStreaming(...)`. Confirmed via type-check output and direct read.",
       "prior_audit_id": null,
       "completion_status": "complete",
@@ -58,7 +107,10 @@
       "description": "AiChatScreen.tsx:108-120 wires the composer's `onSend` to `handleSend`, which calls `void send(trimmed)`. The composer's gating (`disabled={isSending}`) reads from `useAiSend`'s React state set by `setStatus({ isSending: true })` at useAiSend.ts:187 — inside `streamIntoPlaceholder`, after the synchronous `addMessage` user + assistant placeholder writes at L605-618. React state updates are scheduled (not synchronous), so the disabled prop only flips after the next React commit. A second tap landing inside that window (the typical 100-200ms human double-tap interval is FAR longer than React's commit) re-enters `handleSend` with stale `text` (which is also a state read), calls `send` again, appends another user + assistant placeholder, and starts a parallel SSE stream. The streamingBuffer's id-guard at lines 60-72 ensures only the LATER stream renders live; the earlier stream's bubble shows nothing. Both Routstr API calls bill the user, and both `finalizeAssistantMessage` writes persist in the tree. AUDIT.md dim-7 names this exact pattern: \"Double-tap on Pay/Melt/Mint/Send must be blocked with a ref guard + try/finally; the guard lives in state (async-flushed) instead of a useRef\".",
       "why_it_matters": "Direct sat loss for paying users. Conversation tree gets two siblings under the same user message that the user did not request, and the active-path derivation flips to the second sibling (the streamingMessageId) so the first response's content is invisible until the user navigates branches.",
       "fix": "Add a `useRef<boolean>(false)` guard inside `useAiSend`. Wrap the entry of both `send` and `retry` with: `if (sendingRef.current) return; sendingRef.current = true; try { ... } finally { sendingRef.current = false; }`. Set + clear synchronously around the entire async chain. Keep the existing `setStatus` for UI gating (visible disabled state) but rely on the ref for race-safety. Optionally also disable the Pressable in ChatComposer before navigating to its onPress callback.",
-      "references": ["skill:react-native-best-practices", "skill:diagnose"],
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:diagnose"
+      ],
       "verification_note": "Re-checked the synchronous chain: handleSend → setText('') → void send(...) → send (sync addMessage ×2) → streamIntoPlaceholder (sync until L252 first await). The setStatus call at L187 schedules a React update; React commits and re-renders ChatComposer asynchronously. There is no synchronous gate between handleSend and the first await, so a tap landing within 100-200ms reaches send() unimpeded.",
       "prior_audit_id": null,
       "completion_status": "complete",
@@ -77,7 +129,10 @@
       "description": "The `for await (const chunk of stream)` loop at useAiSend.ts:308-390 has no AbortController. The fetch in shared/lib/routstr/api.ts:459-486 is dispatched without a `signal`. `parseSSEStream` at L329-422 has no abort handling either. If the user navigates away from the AI tab, backgrounds the app, or unmounts the screen mid-stream, the SSE response stays open: the JS thread keeps consuming chunks, `setStreamingText` keeps notifying listeners (now stale fibers from an unmounted component tree), and `finalizeAssistantMessage` writes a message after unmount. Routstr keeps producing tokens until the model completes, and the user is billed for the full response they did not see.",
       "why_it_matters": "User-paid sat leak on every premature navigation. Compounds the F-002 race when retry fires while the prior stream is still draining — the prior stream remains uncancelled and continues to bill while the user thinks they replaced it. AUDIT.md dim-7: \"useEffect network calls pass an AbortController and clean it up. Promise.race without loser cancellation is a finding.\"",
       "fix": "Add a `useRef<AbortController | null>(null)` in `useAiSend`. At the top of `streamIntoPlaceholder`: `controllerRef.current?.abort('superseded'); const controller = new AbortController(); controllerRef.current = controller;`. Pass `controller.signal` to `sendMessage`'s options object and forward it to fetch's init. Catch `AbortError` in the for-await loop and skip the failure popup branch — abort is a normal lifecycle event. In a useEffect cleanup at the AiChatScreen level, abort the in-flight controller on unmount. Also pass `signal` into `parseSSEStream`'s reader so it stops mid-decode.",
-      "references": ["skill:native-data-fetching", "skill:react-native-best-practices"],
+      "references": [
+        "skill:native-data-fetching",
+        "skill:react-native-best-practices"
+      ],
       "verification_note": "Re-read api.ts:459-486 (fetch call), 329-422 (parseSSEStream), and useAiSend.ts:247-282 (candidate-chain loop), 308-390 (chunk consumer). Confirmed: no AbortController, no signal, no cleanup. The retry path has the same shape.",
       "prior_audit_id": null
     },
@@ -94,7 +149,9 @@
       "description": "L442-500 fires `void checkBalance(apiKey).then(...)` as fire-and-forget after stream completion. The `.then` body computes `const costMsats = balanceBeforeMsats - data.balance` where `balanceBeforeMsats` was captured at L164 at flow start. If the user taps Retry on the just-finalised message before this checkBalance resolves (typical Routstr GET /wallet/info latency ~100-150ms), the retry's `streamIntoPlaceholder` runs with its own `balanceBeforeMsats` snapshot — reading the same stale store balance because the first call's setBalance hasn't fired yet. Both checkBalance promises eventually resolve. The first stamps the original message with `costSats = (orig_balance - balance_after_retry)`, which is the SUM of both costs. The second stamps the retry message with `costSats = (stale_orig_balance - balance_after_retry)` which is also the sum minus the retry-only delta. Cost UI is wrong on both messages.",
       "why_it_matters": "Cost attribution is the user-facing confirmation that the AI feature is honest about spend. A small UX bug, not a fund-loss bug — the actual sats spent are correct, only the per-message attribution is misleading.",
       "fix": "Make checkBalance single-flight: dedupe in-flight calls by maintaining a `Promise<BalanceResponse> | null` ref in useAiSend. Each finalize awaits the SAME pending call. Or compute costSats inside the synchronous part of the response by having the server return it on the chat completion (Routstr's `usage` field if it exposes one). Or skip per-message costSats stamping and surface a session-level total elsewhere.",
-      "references": ["skill:diagnose"],
+      "references": [
+        "skill:diagnose"
+      ],
       "verification_note": "Re-read L164 (balanceBeforeMsats snapshot), L447-500 (fire-and-forget then). Confirmed both flows snapshot independently from the same store value. Race window is narrow (~150ms) but reachable on retry-immediately scenarios. Confidence intentionally below 0.7 because the impact is UX, not funds.",
       "prior_audit_id": null
     },
@@ -111,7 +168,9 @@
       "description": "Logger's `startSpan` at logger.ts:789-808 implements automatic level escalation by elapsed duration: `duration_ms > 5000 → 'error'`, `> 1000 → 'warn'`, else `debug`. AI sends regularly run 6-14 seconds (TTFB alone is 6.7-8.4s in log.txt evidence: `ai.stream.connection ttfb_ms=6694.09` and `ttfb_ms=8411.82`). Every `span.end({ outcome: 'ok' })` at useAiSend.ts:506 therefore emits at ERROR level. log-doctor `errors --grep '^ai\\.'` shows multiple `ERROR ai.send.end flowId=...` lines sandwiched between `INFO ai.send.assistant_finalized` and `INFO ai.send.actual_cost` — both happy-path-only events. Same problem applies to any other long-lived flow that uses startSpan (mint quote polling, NDK initial connect, etc.).",
       "why_it_matters": "Pollutes the error stream with noise. A real AI failure now sits next to dozens of false-positive successes; on-call diagnostics have to filter aggressively. Sentry / Crashlytics counts get inflated; alert thresholds tuned against this noise become useless.",
       "fix": "Add an `expectedDurationMs` option to `startSpan(event, params, opts?)` and skip auto-escalation when the actual duration is within expectations. Default 5s threshold for unspecified flows. AI send: `aiLog.startSpan('ai.send', params, { expectedDurationMs: 30_000 })`. Alternative: emit at the level requested by the caller's `span.end({ level })` and drop the auto-escalation entirely — callers know whether their flow is expected to take 5s.",
-      "references": ["skill:diagnose"],
+      "references": [
+        "skill:diagnose"
+      ],
       "verification_note": "Confirmed by direct read of logger.ts:799-805 (auto-escalation logic) and useAiSend.ts:197 (startSpan call) and 506 (span.end on success). Log evidence quoted verbatim from log-doctor timeline output. Severity Medium because it doesn't change behaviour, only observability quality.",
       "prior_audit_id": null
     },
@@ -128,7 +187,12 @@
       "description": "L552-569 configures `persist({ name: 'routstr-store', storage: createJSONStorage(...), partialize: ..., onRehydrateStorage: ... })` with NO `version` field, NO `migrate` function, and an `onRehydrateStorage` that only logs errors. AUDIT.md dim-3 mandates: \"Every persist-wrapped store sets name, an explicit version, and a migrate function; persisted Zustand state has a zod schema per version.\" The AI feature added new fields to RoutstrMessage (`parentId`, `thinkingDurationSec`, `reasoningContent`, `costSats`) and a new top-level `activeChildren` map; all are optional, so old persisted data round-trips. But the next breaking change (e.g. dropping a field, renaming, changing a type) needs a migrator that this config cannot support without a version bump first. Audit __audits__/14.json already filed F-006 for the absence of schema validation — still present. The AI feature's additions are backwards-compatible by accident, not by design.",
       "why_it_matters": "Future-you will need to ship a new RoutstrMessage shape and the store will silently corrupt or crash. Persisted shape evolution is the single most common cause of post-launch wallet bugs in this category of app.",
       "fix": "Bump partialize-shape with a `version: 1` and write a `migrate(persisted, version)` function that no-ops at v1 (current shape). Add a zod schema per version (ideally in a future packages/schemas) and validate the rehydrated blob in `onRehydrateStorage` — fall back to defaults on parse failure. Keep `isAnonymousMode` excluded from partialize per audit 14 F-001's still-open finding.",
-      "references": ["__audits__/14.json#F-006", "research:zustand-zod-playbook", "skill:zustand-5", "skill:zod-4"],
+      "references": [
+        "__audits__/14.json#F-006",
+        "research:zustand-zod-playbook",
+        "skill:zustand-5",
+        "skill:zod-4"
+      ],
       "verification_note": "Re-read L552-569. Confirmed missing version/migrate. The new partialize fields (`activeChildren`) are correctly merged on rehydrate via Zustand's shallow-merge default, which is why they round-trip safely as long as fields are only ADDED.",
       "prior_audit_id": "F-006@14.json",
       "completion_status": "stale",
@@ -147,7 +211,10 @@
       "description": "L235: `const data: ModelsResponse = await response.json();` — type cast, no validation. Same at L267 (`checkBalance`), L309 (`topUpBalance`), L355 (`JSON.parse(data) as OpenAI.Chat.Completions.ChatCompletionChunk`). The `RoutstrModel` interface (L161-206) is hand-written and assumes `pricing.max_cost`, `sats_pricing.max_cost`, `enabled` etc. exist as numbers/booleans. format.ts then reads `model.sats_pricing.max_cost` (line 356-357) at trust-the-type face value. If Routstr changes the response shape — a renamed field, a typed-as-string number, a missing pricing object — the affordability gate produces silent garbage (NaN comparisons, undefined dereferences). AUDIT.md dim-6 mandates `z.strictObject` at every API boundary; AUDIT.md dim-2 names \"Treat relays (Nostr), mints (Cashu), and any user-generated content as untrusted input\" — a third-party API endpoint serving a paid feature qualifies.",
       "why_it_matters": "Affordability indicator is the gate between user balance and burning sats. Bad pricing data → picker shows an unaffordable tier as affordable → send 402s → user surfaces an error popup, but the bigger risk is the inverse: a tier marked unaffordable that the user could actually afford locks them out of using their own credits. Both cost trust.",
       "fix": "Add zod schemas in shared/lib/routstr/schemas.ts (or in a future packages/schemas): `RoutstrModelSchema`, `BalanceResponseSchema`, `ChatChunkSchema`. Replace each `await response.json()` with `RoutstrModelsResponseSchema.parse(await response.json())` (throw on bad shape, mapping to a typed RoutstrError). Use `safeParseAsync` for the SSE chunk parser — throwing on a single bad chunk should not kill the whole stream; emit a warn and skip.",
-      "references": ["research:neverthrow-boundary-playbook", "skill:zod-4"],
+      "references": [
+        "research:neverthrow-boundary-playbook",
+        "skill:zod-4"
+      ],
       "verification_note": "Confirmed by reading api.ts:235, 267, 309, 355 — all four boundaries. format.ts:356-357 reads `m?.sats_pricing?.max_cost` with optional chaining and a `typeof === 'number'` guard, which IS partial defensive coding, but does nothing about the input not being a number where expected (e.g. a string).",
       "prior_audit_id": null
     },
@@ -164,9 +231,13 @@
       "description": "L503: `log.warn('ai.send.balance_refresh_failed', { flowId, err })` — drops to the generic `log` import while every other emit in the file uses `aiLog`. L657: same pattern with `log.warn('ai.retry.invalid_target', { messageId, role: original?.role })`. Both events live in the `ai.*` namespace per their event names but are routed through the generic logger, which means log-doctor's `aiLog`-scoped queries (and any future per-domain log routing) miss them. Audit __audits__/14.json#F-005 filed the identical pattern in routstrStore.ts (`log.warn('store.routstr.session_not_found', ...)` etc.) for the same reason.",
       "why_it_matters": "Observability drift is recurring across the AI surface. The fix landed in the store before but the new feature reintroduced it. A useful log-doctor invariant: every `<domain>.<event>` log should fire through `<domain>Log`, not the root `log`.",
       "fix": "Replace the two `log.warn` sites at useAiSend.ts:503 and 657 with `aiLog.warn`. Drop the now-unused `log` import (line 15 imports both `aiLog` and `log` — only aiLog is needed). Consider an ESLint rule that flags `log.<level>` calls inside files that already import a domain logger.",
-      "references": ["__audits__/14.json#F-005"],
+      "references": [
+        "__audits__/14.json#F-005"
+      ],
       "verification_note": "Re-read L15 imports and L503, L657 emit sites. Confirmed both use generic `log`. Confidence high.",
-      "prior_audit_id": "F-005@14.json"
+      "prior_audit_id": "F-005@14.json",
+      "completion_status": "complete",
+      "completion_note": "useAiSend.ts no longer imports the generic log; the three ai.* events route through aiLog.warn."
     },
     {
       "id": "F-009",
@@ -181,7 +252,9 @@
       "description": "Four interactive Pressables in this file lack accessibility props: BranchNavView prev/next at L231 and L245 (only have `testID` + `hitSlop`), Copy at L380, Retry at L392, and the ThinkingHeader Pressable at L183. AUDIT.md dim-8 mandates: \"Every Pressable / TouchableOpacity has accessibilityLabel and accessibilityRole; touch targets ≥ 44pt; accessibilityState reflects disabled / selected / checked.\" VoiceOver users have no way to identify these controls; the BranchNav chevrons announce as 'image' at best. The hitSlop=14 + size=20 chevron does meet the 44pt minimum, but a11y labelling is independent of touch-target size.",
       "why_it_matters": "Direct WCAG 2.2 violation. The AI tab is a primary product surface; releasing without screen-reader support on its action buttons is an accessibility regression compared to the rest of the wallet (see ContactsScreen, etc., which were audited recently for these props in __audits__/32.json).",
       "fix": "Add to BranchNav prev: `accessibilityRole=\"button\" accessibilityLabel=\"Previous response\" accessibilityState={{ disabled: !onPrev }}`. Mirror for next. Copy: `accessibilityRole=\"button\" accessibilityLabel=\"Copy message text\"`. Retry: `accessibilityRole=\"button\" accessibilityLabel=\"Regenerate response\" accessibilityState={{ disabled: isStreaming }}`. ThinkingHeader: `accessibilityRole=\"button\" accessibilityLabel={expanded ? \"Hide reasoning\" : \"Show reasoning\"} accessibilityState={{ expanded }}`. Optionally announce the live counter with `accessibilityLiveRegion=\"polite\"`.",
-      "references": ["skill:building-native-ui"],
+      "references": [
+        "skill:building-native-ui"
+      ],
       "verification_note": "Re-read L183, 231, 245, 380, 392. None carry accessibility* props. Confidence high.",
       "prior_audit_id": null
     },
@@ -198,7 +271,9 @@
       "description": "L1 imports `import OpenAI from 'openai'`. The streaming branch (L459-486) uses `fetch` + the hand-rolled `parseSSEStream`. The OpenAI SDK is used only in the non-streaming branch at L489-496 (`createRoutstrClient(apiKey).chat.completions.create({ stream: false })`). Both consumers of `sendMessage` — features/user/screens/UserMessagesScreen.tsx:1712 and features/ai/hooks/useAiSend.ts:252 — always pass `stream: true`. The non-streaming branch has zero callers; the OpenAI SDK is imported solely to keep that dead branch compiling. The SDK and its dependency tree (openai-types, form-data, etc.) ship to every device.",
       "why_it_matters": "Bundle weight on a wallet app where startup time is on the critical path (SOV-00 §8). Cold-start cost is a recurring concern.",
       "fix": "Drop the OpenAI SDK dependency and rewrite the non-streaming branch using fetch + JSON.parse, mirroring what `parseSSEStream` already does for the streaming case. Or delete the non-streaming branch entirely if there are truly no callers — the function signature already encodes the discriminated return shape (`{ response?, stream? }`), so dropping the response branch is mechanical. Update `package.json` to remove `openai` from dependencies.",
-      "references": ["knip:unused-export"],
+      "references": [
+        "knip:unused-export"
+      ],
       "verification_note": "Verified by grep of all `sendMessage(` call sites: 2 internal call sites, both pass `stream: true`. The bitchat module's sendMessage is a separate Swift function unrelated to this hook.",
       "prior_audit_id": null
     },
@@ -215,7 +290,9 @@
       "description": "knip reports 11 unused exports across the AI feature surface: `TIER_MATRIX` (format.ts:79), `DEFAULT_PROVIDER_ID` (97), `DEFAULT_TIER_ID` (101), `buildCandidateChain` (294), `extractModelName` (423), `BranchInfo` (branching.ts:27), `RoutstrTierId` / `RoutstrProviderId` / `RoutstrSession` (routstrStore.ts:17/21/53), `TopUpResult` / `TopUpFailure` (topUp.ts:5/11). All have internal callers within their declaring file but no external consumers — the `export` keyword is overscoped. `extractModelName` (L423) is the most egregious: it's a 3-line wrapper that calls `getModelDisplayName(modelId, availableModels)` with the same arguments. Pure dead code.",
       "why_it_matters": "Legitimate dead code (extractModelName) and over-exported internals (everything else). Each exported symbol is a tree-shaking hint that this is part of a public surface; downstream readers waste time inferring intent.",
       "fix": "Remove `export` from the 10 type/const/function declarations whose only consumers are inside their own file. Delete `extractModelName` outright; if any external caller exists later, they can use `getModelDisplayName` directly. Re-run `npm run knip` after the change.",
-      "references": ["knip:unused-export"],
+      "references": [
+        "knip:unused-export"
+      ],
       "verification_note": "Verified by direct read of each declaration site. extractModelName at L423-425 is literally `return getModelDisplayName(modelId, availableModels)`.",
       "prior_audit_id": null,
       "completion_status": "partial",
@@ -268,7 +345,9 @@
       "description": "`npm run lint -- features/ai` reports 41 errors and 2 warnings. All errors are `prettier/prettier` formatting violations (line wrapping, indentation). One warning at AiChatScreen.tsx:206 is an unused `// eslint-disable-next-line react-hooks/exhaustive-deps` directive — the rule no longer fires there.",
       "why_it_matters": "Lint is a CI gate; this PR landed with lint failing. Either lint isn't gating in CI, or it was bypassed. Either way, CI hygiene gap.",
       "fix": "Run `npm run lint -- --fix features/ai/`. Remove the now-unused `eslint-disable-next-line` directive at AiChatScreen.tsx:206 explicitly. Investigate why the lint failure didn't block the merge of commit 90f1326a / 38797b50.",
-      "references": ["lint:prettier/prettier"],
+      "references": [
+        "lint:prettier/prettier"
+      ],
       "verification_note": "Confirmed by direct lint run.",
       "prior_audit_id": null
     },
@@ -285,7 +364,10 @@
       "description": "L72-88 builds `const branchNavById = useMemo(() => new Map(...), [activeMessages, conversationHistory, setActiveBranch])`. `setActiveBranch` is a stable Zustand action ref; the effective deps are `activeMessages` (re-derived from conversationHistory + activeChildren via `deriveActivePath`) and `conversationHistory` (changes on addMessage and finalizeAssistantMessage). On each conversationHistory mutation — user send (×2 addMessage), stream finalize (×1), checkBalance.then (×1), retry (×1) — `branchNavById` allocates a new Map. The `renderItem` callback at L130-142 closes over `branchNavById`, so its identity changes too. LegendList with `recycleItems={false}` (L341) re-mounts items when `renderItem` reference changes; each AssistantBubble (no React.memo wrap) re-renders. Not a per-chunk storm — the streaming buffer correctly bypasses Zustand — but it is a per-message-finalisation spike.",
       "why_it_matters": "Long conversations (50+ messages) get a measurable jank on every send/retry/finalize. Acceptable for now, but the more long-running threading the AI tab gains, the more this matters.",
       "fix": "Extract a `BubbleHost` component memoised on `messageId` that subscribes to its own siblings via a fine-grained `useRoutstrStore` selector + useShallow, and computes its own `BranchNav` in-place. The screen no longer needs `branchNavById`. Alternatively, wrap AssistantBubble in `React.memo` with a custom comparator that checks `branchNav.index/total/onPrev/onNext` shallowly.",
-      "references": ["skill:zustand-5", "skill:react-native-best-practices"],
+      "references": [
+        "skill:zustand-5",
+        "skill:react-native-best-practices"
+      ],
       "verification_note": "Re-read L72-88, 130-142, 341. The trigger frequency is lower than I initially feared (not per-chunk, only per-message-finalisation). Confidence dropped to 0.55. Keeping as Low because the pattern is real and worth flagging for the next perf pass.",
       "prior_audit_id": null
     }
@@ -306,32 +388,52 @@
     {
       "type": "consolidate",
       "description": "Single-flight the Routstr balance refresh: hold a `Promise<BalanceResponse> | null` ref in useAiSend so concurrent send + retry share the same in-flight call. Removes the F-004 cost-attribution race and reduces redundant /wallet/info calls.",
-      "files": ["features/ai/hooks/useAiSend.ts", "shared/lib/routstr/api.ts"]
+      "files": [
+        "features/ai/hooks/useAiSend.ts",
+        "shared/lib/routstr/api.ts"
+      ]
     },
     {
       "type": "dead-code",
       "description": "Drop the OpenAI SDK dependency and the never-called non-streaming branch in shared/lib/routstr/api.ts:489-496. Rewrite the non-streaming hook (if a future caller needs it) using fetch. Reduces bundle weight and removes one supply-chain dependency from a wallet bundle. Also delete the dead extractModelName wrapper at format.ts:423.",
-      "files": ["shared/lib/routstr/api.ts", "features/ai/lib/format.ts", "package.json"]
+      "files": [
+        "shared/lib/routstr/api.ts",
+        "features/ai/lib/format.ts",
+        "package.json"
+      ]
     },
     {
       "type": "dead-code",
       "description": "Remove `export` from 10 internally-used declarations in features/ai/lib/{format,branching}.ts, shared/stores/profile/routstrStore.ts, shared/lib/routstr/topUp.ts (knip-confirmed). See F-011 for the symbol list.",
-      "files": ["features/ai/lib/format.ts", "features/ai/lib/branching.ts", "shared/stores/profile/routstrStore.ts", "shared/lib/routstr/topUp.ts"]
+      "files": [
+        "features/ai/lib/format.ts",
+        "features/ai/lib/branching.ts",
+        "shared/stores/profile/routstrStore.ts",
+        "shared/lib/routstr/topUp.ts"
+      ]
     },
     {
       "type": "consolidate",
       "description": "Add zod schemas for the Routstr API surface (RoutstrModelSchema, BalanceResponseSchema, ChatChunkSchema) and parse responses at the boundary in shared/lib/routstr/api.ts. When packages/schemas materialises (currently aspirational per AUDIT.md), promote these into it. Use safeParseAsync on per-chunk SSE so a single malformed chunk doesn't kill the stream.",
-      "files": ["shared/lib/routstr/api.ts", "shared/lib/routstr/schemas.ts"]
+      "files": [
+        "shared/lib/routstr/api.ts",
+        "shared/lib/routstr/schemas.ts"
+      ]
     },
     {
       "type": "log-helper",
       "description": "Propose an `expectedDurationMs` option on logger.startSpan to suppress the auto-escalation for known-slow flows (AI streams, mint quote polling, NDK initial connect). Without this, log-doctor's error stream is polluted by every successful AI response. The helper extension goes in shared/lib/logger.ts; AI's call site at useAiSend.ts:197 should pass `expectedDurationMs: 30_000`.",
-      "files": ["shared/lib/logger.ts", "features/ai/hooks/useAiSend.ts"]
+      "files": [
+        "shared/lib/logger.ts",
+        "features/ai/hooks/useAiSend.ts"
+      ]
     },
     {
       "type": "research-note",
       "description": "Open `__research__/ai-tab-billing-and-streaming.md` as `status: draft` capturing: (a) the user-paid SSE lifecycle (when does a chunk == billable token vs reasoning token vs control frame), (b) the AbortController + retry-cancellation strategy proposed in F-003, (c) the cost-attribution model proposed in F-004 (single-flight checkBalance vs server-side usage in chat.completion response). Establishes the ground rules before the next AI-tab feature lands.",
-      "files": ["__research__/ai-tab-billing-and-streaming.md"]
+      "files": [
+        "__research__/ai-tab-billing-and-streaming.md"
+      ]
     }
   ],
   "open_questions": [

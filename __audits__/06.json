@@ -23,20 +23,20 @@
       "id": "F-001",
       "severity": "Critical",
       "confidence": 0.98,
-      "title": "zod installed in sovran-app but imported nowhere \u2014 no runtime validation at any input boundary",
+      "title": "zod installed in sovran-app but imported nowhere — no runtime validation at any input boundary",
       "repo": "sovran-app",
       "path": "package.json",
       "line": 1,
       "symbol": "dependencies.zod",
       "dimension": 6,
       "description": "sovran-app declares `zod: ^4.3.6` but recursive grep for `from 'zod'` across application source returns zero hits (only two markdown docs in .agents/skills/). apiClient.ts still blind-casts every response with `data as T` at lines 61, 83, 220. fetchMintInfo dials arbitrary user-supplied mints. Nostr event bodies, wallet catalog responses, and per-mint /v1/info payloads all flow into stores as `any`.",
-      "why_it_matters": "Review_dimensions \u00a76 requires every API boundary to parse inputs with z.strictObject; the repo's own convention is not followed anywhere. A hostile or misconfigured mint returning any JSON shape flows straight into state. A server-side rename lands as undefined at the use site with no runtime signal. This is the underlying cause of several downstream findings in this audit (F-003, F-005, F-011).",
+      "why_it_matters": "Review_dimensions §6 requires every API boundary to parse inputs with z.strictObject; the repo's own convention is not followed anywhere. A hostile or misconfigured mint returning any JSON shape flows straight into state. A server-side rename lands as undefined at the use site with no runtime signal. This is the underlying cause of several downstream findings in this audit (F-003, F-005, F-011).",
       "fix": "Introduce zod at every apiClient.ts boundary. Declare z.strictObject per endpoint in the aspirational packages/schemas workspace (F-006). Each helper returns Result<z.infer<typeof Schema>, ApiError | SchemaError>. Replace `data as T` with `Schema.safeParse(data)`. Apply .max() caps on strings/arrays.",
       "references": [
         "sovran-app/__audits__/01.json (F-003)",
-        "review_dimensions \u00a76"
+        "review_dimensions §6"
       ],
-      "verification_note": "Grepped `from ['\\\"]zod['\\\"]` across sovran-app \u2014 zero matches in source; only matches in .agents/skills/*.md. Confirmed package.json declares zod. Counter-argument considered: TS interfaces provide compile-time safety \u2014 no, the interfaces contain `any` / `any[]` escape hatches and are not enforced at runtime.",
+      "verification_note": "Grepped `from ['\\\"]zod['\\\"]` across sovran-app — zero matches in source; only matches in .agents/skills/*.md. Confirmed package.json declares zod. Counter-argument considered: TS interfaces provide compile-time safety — no, the interfaces contain `any` / `any[]` escape hatches and are not enforced at runtime.",
       "prior_audit_id": "F-003@01.json",
       "completion_status": "stale",
       "completion_note": "apiClient.ts already declares zod schemas + parseWith for every helper."
@@ -51,115 +51,115 @@
       "line": 13,
       "symbol": "dependencies",
       "dimension": 6,
-      "description": "Package manifest contains hono, @cashu/cashu-ts, @nostr-dev-kit/ndk \u2014 no zod, no @hono/zod-validator. Route handlers do inline `typeof queryParam === 'string'` at best (nostr.ts:480-495) and raw `let mints: any = {}; mints[mint.url] = mint` elsewhere (cashu.ts:66-72). `any` occurrence count per file: nostr.ts 23, cashu.ts 25, wallpapers.ts 12, mintReviews.ts 7.",
-      "why_it_matters": "The server is the trust boundary between upstream mints/relays and every Sovran client. Untyped `any` flows mean a corrupt auditor response, a hostile relay event, or a malformed mint info payload can reshape downstream client state with no server-side rejection. Ad-hoc typeof checks also miss the array case (Hono parses `?q=a&q=b` as the first element), DoS bounds (nostr.ts:484 bounds query low at 3 but not high \u2014 a 100 KB query reaches NDK), and shape consistency between client interface and server response.",
+      "description": "Package manifest contains hono, @cashu/cashu-ts, @nostr-dev-kit/ndk — no zod, no @hono/zod-validator. Route handlers do inline `typeof queryParam === 'string'` at best (nostr.ts:480-495) and raw `let mints: any = {}; mints[mint.url] = mint` elsewhere (cashu.ts:66-72). `any` occurrence count per file: nostr.ts 23, cashu.ts 25, wallpapers.ts 12, mintReviews.ts 7.",
+      "why_it_matters": "The server is the trust boundary between upstream mints/relays and every Sovran client. Untyped `any` flows mean a corrupt auditor response, a hostile relay event, or a malformed mint info payload can reshape downstream client state with no server-side rejection. Ad-hoc typeof checks also miss the array case (Hono parses `?q=a&q=b` as the first element), DoS bounds (nostr.ts:484 bounds query low at 3 but not high — a 100 KB query reaches NDK), and shape consistency between client interface and server response.",
       "fix": "Add zod@^4 and @hono/zod-validator to api.sovran.money. Every route declares zValidator('query', QuerySchema) / zValidator('json', BodySchema) from shared packages/schemas. Responses built via z.infer and asserted in a single middleware before c.json. The same schemas are imported by sovran-app's apiClient.ts.",
       "references": [
         "api.sovran.money/src/nostr.ts:476-495",
         "api.sovran.money/src/cashu.ts:66-72",
-        "review_dimensions \u00a76"
+        "review_dimensions §6"
       ],
-      "verification_note": "Re-read api.sovran.money/package.json \u2014 confirmed no zod. Grepped c.req.json/query/param in nostr.ts \u2014 only inline typeof checks, no schema parse. Counter-argument considered: the server is internal \u2014 but it reads from upstream mints and relays, which are explicitly untrusted per review_dimensions \u00a72.",
+      "verification_note": "Re-read api.sovran.money/package.json — confirmed no zod. Grepped c.req.json/query/param in nostr.ts — only inline typeof checks, no schema parse. Counter-argument considered: the server is internal — but it reads from upstream mints and relays, which are explicitly untrusted per review_dimensions §2.",
       "prior_audit_id": null
     },
     {
       "id": "F-003",
       "severity": "Critical",
       "confidence": 0.99,
-      "title": "/api/app/latest-version ignores the client body and returns a hardcoded version \u2014 the only forward-compat channel is inert",
+      "title": "/api/app/latest-version ignores the client body and returns a hardcoded version — the only forward-compat channel is inert",
       "repo": "api.sovran.money",
       "path": "src/app.ts",
       "line": 6,
       "symbol": "appRoutes",
       "dimension": 1,
       "description": "Handler at lines 6-14: `const body = await c.req.json(); console.log(body); return c.json({ version: '0.0.32' })`. The client POSTs `{ version: currentVersion }` from sovran-app/shared/hooks/useVersionCheck.ts:24; server's sole response-shape guarantee is a hardcoded semver literal. No platform branching (iOS/Android), no staged rollout, no minSupportedVersion, no deprecatedFields, no schema-evolution notices.",
-      "why_it_matters": "The question the user asked \u2014 how do we ensure API changes never break previous versions of the app \u2014 rides on exactly this endpoint, and it currently cannot tell a client to upgrade, downgrade a feature, or refuse a deprecated API shape. The hook (useVersionCheck.ts:34-47) assumes a richer contract than the server implements. A genuine forward-compat channel needs server-side knowledge of client version + platform + build.",
+      "why_it_matters": "The question the user asked — how do we ensure API changes never break previous versions of the app — rides on exactly this endpoint, and it currently cannot tell a client to upgrade, downgrade a feature, or refuse a deprecated API shape. The hook (useVersionCheck.ts:34-47) assumes a richer contract than the server implements. A genuine forward-compat channel needs server-side knowledge of client version + platform + build.",
       "fix": "Rewrite as: const { version, platform } = SchemaAppVersionRequest.parse(body); return c.json(SchemaAppVersionResponse.parse({ latest, minSupported, deprecatedFields })). Platform comes from body or a custom `X-Sovran-Client: ios/1.2.3` header. On the client, treat currentVersion < minSupported as a hard upgrade-required state. Schema lives in packages/schemas so sovran-app and api.sovran.money agree by construction.",
       "references": [
         "sovran-app/shared/hooks/useVersionCheck.ts:13-52",
         "sovran-app/shared/lib/apiClient.ts:183-189"
       ],
-      "verification_note": "Re-read api.sovran.money/src/app.ts:6-14 \u2014 confirmed hardcoded response, client body ignored. Counter-argument considered: maybe there's version-aware logic elsewhere \u2014 grepped `latest-version` and `/app/` across api.sovran.money/src \u2014 only this one handler.",
+      "verification_note": "Re-read api.sovran.money/src/app.ts:6-14 — confirmed hardcoded response, client body ignored. Counter-argument considered: maybe there's version-aware logic elsewhere — grepped `latest-version` and `/app/` across api.sovran.money/src — only this one handler.",
       "prior_audit_id": null
     },
     {
       "id": "F-004",
       "severity": "Critical",
       "confidence": 0.93,
-      "title": "useVersionCheck calls semver.gt without validating payload.version is a valid semver string \u2014 a malformed server response crashes as an unhandled rejection on cold start",
+      "title": "useVersionCheck calls semver.gt without validating payload.version is a valid semver string — a malformed server response crashes as an unhandled rejection on cold start",
       "repo": "sovran-app",
       "path": "shared/hooks/useVersionCheck.ts",
       "line": 38,
       "symbol": "useVersionCheck",
       "dimension": 1,
-      "description": "Lines 34-38 narrow via `'version' in payload` but never `typeof payload.version === 'string'`. semver v7 `gt()` uses `new SemVer()` internally and throws `TypeError('Invalid Version')` on non-semver input unless `{ loose: true }` is passed (it is not). The call lives inside an async function in useEffect with no outer try/catch \u2014 it surfaces as an unhandled promise rejection. A server regression returning `{ version: null }`, `{ version: 0 }`, `{ version: '' }`, or any string semver cannot parse crashes the hook on every cold start until the server rolls back.",
-      "why_it_matters": "This is the exact forward-compat regression pattern the user asked about. Today the server response is hardcoded, so the symptom is latent \u2014 but one typo in api.sovran.money/src/app.ts away from a production outage that affects every app version that ever shipped this hook. The hook is invoked from the root layout, so the rejection fires on startup and is easy for crash reporters to capture but hard for users to recover from.",
+      "description": "Lines 34-38 narrow via `'version' in payload` but never `typeof payload.version === 'string'`. semver v7 `gt()` uses `new SemVer()` internally and throws `TypeError('Invalid Version')` on non-semver input unless `{ loose: true }` is passed (it is not). The call lives inside an async function in useEffect with no outer try/catch — it surfaces as an unhandled promise rejection. A server regression returning `{ version: null }`, `{ version: 0 }`, `{ version: '' }`, or any string semver cannot parse crashes the hook on every cold start until the server rolls back.",
+      "why_it_matters": "This is the exact forward-compat regression pattern the user asked about. Today the server response is hardcoded, so the symptom is latent — but one typo in api.sovran.money/src/app.ts away from a production outage that affects every app version that ever shipped this hook. The hook is invoked from the root layout, so the rejection fires on startup and is easy for crash reporters to capture but hard for users to recover from.",
       "fix": "Parse payload via a zod schema: `const parsed = AppVersionResponseSchema.safeParse(payload); if (!parsed.success) { log.warn('hook.version_check.malformed_payload'); return; }`. Wrap the semver call in try/catch as defence-in-depth. Log the raw payload hash (not the body) so production observability can attribute future regressions.",
       "references": [
         "sovran-app/shared/hooks/useVersionCheck.ts:24-47",
         "https://github.com/npm/node-semver (gt throws on invalid input without loose flag)"
       ],
-      "verification_note": "Re-read useVersionCheck.ts:13-52 \u2014 confirmed no typeof check on payload.version, no try/catch around semver.gt. semver@7 docs confirm gt() throws TypeError on invalid input. Counter-argument considered: maybe the server always returns a valid string \u2014 today yes, but forward-compat is explicitly the question being asked.",
+      "verification_note": "Re-read useVersionCheck.ts:13-52 — confirmed no typeof check on payload.version, no try/catch around semver.gt. semver@7 docs confirm gt() throws TypeError on invalid input. Counter-argument considered: maybe the server always returns a valid string — today yes, but forward-compat is explicitly the question being asked.",
       "prior_audit_id": null
     },
     {
       "id": "F-005",
       "severity": "High",
       "confidence": 0.9,
-      "title": "Response types in apiClient.ts are TypeScript interfaces with any / any[] escape hatches \u2014 client and server schemas cannot be kept in sync",
+      "title": "Response types in apiClient.ts are TypeScript interfaces with any / any[] escape hatches — client and server schemas cannot be kept in sync",
       "repo": "sovran-app",
       "path": "shared/lib/apiClient.ts",
       "line": 159,
       "symbol": "MintSearchResult|WallpaperCatalogResponse",
       "dimension": 6,
       "description": "MintSearchResult.info: any (line 159). WallpaperCatalogResponse.wallpapers: any[] / albums: any[] (lines 266-268). These interfaces are the closest thing the repo has to an API contract, yet the server-side declared shape is pure `any` (api.sovran.money/src/cashu.ts:66-72 builds responses ad-hoc). Cross-repo schema coherence is a hand-maintained invariant today.",
-      "why_it_matters": "A server-side rename is a silent client regression \u2014 no compile error, no runtime error, just `undefined` at the use site. The interfaces propagate into stores (wallpaperStore.catalog, auditMintStore.cache), so drift surfaces far from the cause. Combined with F-001 and F-002, there is no mechanism anywhere in the codebase that would detect a schema mismatch between client and server.",
+      "why_it_matters": "A server-side rename is a silent client regression — no compile error, no runtime error, just `undefined` at the use site. The interfaces propagate into stores (wallpaperStore.catalog, auditMintStore.cache), so drift surfaces far from the cause. Combined with F-001 and F-002, there is no mechanism anywhere in the codebase that would detect a schema mismatch between client and server.",
       "fix": "Declare each endpoint's request and response shape as z.strictObject in packages/schemas. `type AuditMintResponse = z.infer<typeof AuditMintResponseSchema>`. Both repos import the inferred type. Delete every any/any[] from the interface. Add .max() to every string and array for DoS mitigation.",
       "references": [
         "sovran-app/__audits__/01.json (F-008)",
         "sovran-app/shared/lib/apiClient.ts:95-160,265-272"
       ],
-      "verification_note": "Re-read apiClient.ts \u2014 any/any[] still present at lines 52, 68, 159, 266-268 (matches prior 01.json F-007 and F-008). Counter-argument considered: maybe info field shape is genuinely variable \u2014 even so, narrow to Record<string, unknown> with a zod parser downstream; any is never the right type for a boundary.",
+      "verification_note": "Re-read apiClient.ts — any/any[] still present at lines 52, 68, 159, 266-268 (matches prior 01.json F-007 and F-008). Counter-argument considered: maybe info field shape is genuinely variable — even so, narrow to Record<string, unknown> with a zod parser downstream; any is never the right type for a boundary.",
       "prior_audit_id": "F-008@01.json"
     },
     {
       "id": "F-006",
       "severity": "High",
       "confidence": 0.95,
-      "title": "packages/schemas workspace still aspirational after multiple audits \u2014 the single most useful refactor for cross-repo schema consistency is unshipped",
+      "title": "packages/schemas workspace still aspirational after multiple audits — the single most useful refactor for cross-repo schema consistency is unshipped",
       "repo": "sovran-app",
       "path": "packages",
       "line": 1,
       "symbol": "packages.schemas",
       "dimension": 6,
       "description": "sovran-app/packages/ contains `nutpatch` only (a Nitro-modules native package). The audit system prompt itself names packages/schemas as aspirational; prior audits 01.json F-003 and 02.json F-006 both recommended it; every schema-related finding in this audit reduces to its absence.",
-      "why_it_matters": "Without a shared schema package, the four repos (sovran-app, api.sovran.money, sovran.money, sovran-admin-panel) each re-declare (or don't declare) the same shapes. Schema drift is guaranteed at the rate of one rename per month per repo. The user's explicit ask \u2014 keep zod schemas consistent across all four repos \u2014 cannot be answered without this package.",
-      "fix": "Create packages/schemas as a yarn/pnpm workspace package. Zod v4 schemas only; z.infer re-exports for types; each repo's package.json lists it as a workspace (or file:) dep. Note: the four repos are separate git repositories today \u2014 either publish the package to npm, or colocate via file: deps during development. Start with the 3-4 most-drifted endpoints: AuditMintResponse, MintSearchResponse, NostrProfileResponse, WallpaperCatalogResponse, AppVersionRequest/Response.",
+      "why_it_matters": "Without a shared schema package, the four repos (sovran-app, api.sovran.money, sovran.money, sovran-admin-panel) each re-declare (or don't declare) the same shapes. Schema drift is guaranteed at the rate of one rename per month per repo. The user's explicit ask — keep zod schemas consistent across all four repos — cannot be answered without this package.",
+      "fix": "Create packages/schemas as a yarn/pnpm workspace package. Zod v4 schemas only; z.infer re-exports for types; each repo's package.json lists it as a workspace (or file:) dep. Note: the four repos are separate git repositories today — either publish the package to npm, or colocate via file: deps during development. Start with the 3-4 most-drifted endpoints: AuditMintResponse, MintSearchResponse, NostrProfileResponse, WallpaperCatalogResponse, AppVersionRequest/Response.",
       "references": [
         "sovran-app/__audits__/01.json (F-003, refactor_plan)",
         "AUDIT.md shared_package declaration"
       ],
-      "verification_note": "Listed sovran-app/packages/ \u2014 only nutpatch/ present. Confirmed schemas package has been named as aspirational in at least two prior audits.",
+      "verification_note": "Listed sovran-app/packages/ — only nutpatch/ present. Confirmed schemas package has been named as aspirational in at least two prior audits.",
       "prior_audit_id": "F-003@01.json"
     },
     {
       "id": "F-007",
       "severity": "High",
       "confidence": 0.88,
-      "title": "Nested persisted objects silently drop new field defaults under shallow merge \u2014 settingsStore.middlemanRouting has no runtime fallback",
+      "title": "Nested persisted objects silently drop new field defaults under shallow merge — settingsStore.middlemanRouting has no runtime fallback",
       "repo": "sovran-app",
       "path": "shared/stores/global/settingsStore.ts",
       "line": 53,
       "symbol": "SettingsState.middlemanRouting",
       "dimension": 3,
-      "description": "SettingsState.middlemanRouting: MiddlemanRoutingSettings is a nested persisted object (declared line 53, defaulted in DEFAULT_MIDDLEMAN_ROUTING at line 56-62, persisted via partialize at line 329). Zustand persist uses shallow merge \u2014 the initial-state default for middlemanRouting is only applied if the whole key is missing in persisted data. Once any user has ever written the key, adding `MiddlemanRoutingSettings.newFlag: true` does NOT reach them on upgrade. The repo's own .claude/rules/zustand-persistence-review.md \u00a78 documents this exact hazard.",
-      "why_it_matters": "Today the settings shape is fine. The first PR that adds a field to MiddlemanRoutingSettings ships a silent bug to every existing user. Wallet routing behaviour reads these settings (maxHops, maxFee, trustMode) \u2014 a missing field that defaults to undefined corrupts routing logic. The hazard is strictly a forward-compat one and it compounds with the user's stated concern about never breaking old app versions.",
-      "fix": "Pick one of: (a) read every nested field with a runtime ?? fallback \u2014 `state.middlemanRouting.maxHops ?? DEFAULT_MIDDLEMAN_ROUTING.maxHops` at every consumer; (b) add `merge: (persisted, initial) => deepMerge(initial, persisted)` to the persist config \u2014 lowest ceremony, works for all future additions; (c) add a global migration in shared/lib/migrations/globalMigrations.ts that merges the new default into every persisted blob. Option (b) is the recommended default.",
+      "description": "SettingsState.middlemanRouting: MiddlemanRoutingSettings is a nested persisted object (declared line 53, defaulted in DEFAULT_MIDDLEMAN_ROUTING at line 56-62, persisted via partialize at line 329). Zustand persist uses shallow merge — the initial-state default for middlemanRouting is only applied if the whole key is missing in persisted data. Once any user has ever written the key, adding `MiddlemanRoutingSettings.newFlag: true` does NOT reach them on upgrade. The repo's own .claude/rules/zustand-persistence-review.md §8 documents this exact hazard.",
+      "why_it_matters": "Today the settings shape is fine. The first PR that adds a field to MiddlemanRoutingSettings ships a silent bug to every existing user. Wallet routing behaviour reads these settings (maxHops, maxFee, trustMode) — a missing field that defaults to undefined corrupts routing logic. The hazard is strictly a forward-compat one and it compounds with the user's stated concern about never breaking old app versions.",
+      "fix": "Pick one of: (a) read every nested field with a runtime ?? fallback — `state.middlemanRouting.maxHops ?? DEFAULT_MIDDLEMAN_ROUTING.maxHops` at every consumer; (b) add `merge: (persisted, initial) => deepMerge(initial, persisted)` to the persist config — lowest ceremony, works for all future additions; (c) add a global migration in shared/lib/migrations/globalMigrations.ts that merges the new default into every persisted blob. Option (b) is the recommended default.",
       "references": [
-        "sovran-app/.claude/rules/zustand-persistence-review.md \u00a78",
+        "sovran-app/.claude/rules/zustand-persistence-review.md §8",
         "sovran-app/shared/stores/global/settingsStore.ts:311-330"
       ],
-      "verification_note": "Re-read settingsStore.ts:53,56-62,311-330 \u2014 confirmed partialize persists middlemanRouting as-is; no merge strategy, no rehydrate-time defaults. The rule doc at zustand-persistence-review.md \u00a78 explicitly calls out middlemanRouting as the canonical example of this hazard. Counter-argument considered: the rule doc is documentation, not a fix \u2014 true, which is why the hazard still ships.",
+      "verification_note": "Re-read settingsStore.ts:53,56-62,311-330 — confirmed partialize persists middlemanRouting as-is; no merge strategy, no rehydrate-time defaults. The rule doc at zustand-persistence-review.md §8 explicitly calls out middlemanRouting as the canonical example of this hazard. Counter-argument considered: the rule doc is documentation, not a fix — true, which is why the hazard still ships.",
       "prior_audit_id": null,
       "completion_status": "stale",
       "completion_note": "settingsStore now uses createMergeWithSchema with a zod-validated PersistedSettings shape; nested defaults are filled via the schema, not shallow merge. Ratified by commits 95c14ea3 and 520c57a1."
@@ -168,7 +168,7 @@
       "id": "F-008",
       "severity": "High",
       "confidence": 0.85,
-      "title": "Three repos point at three different API hosts \u2014 sovran-admin-panel hardcodes sovran-api.up.railway.app, neither api.sovran.money nor a shared helper",
+      "title": "Three repos point at three different API hosts — sovran-admin-panel hardcodes sovran-api.up.railway.app, neither api.sovran.money nor a shared helper",
       "repo": "sovran-admin-panel",
       "path": "src/components/PurchaseModal.tsx",
       "line": 35,
@@ -183,14 +183,14 @@
         "sovran-admin-panel/src/components/Orders.tsx:275",
         "sovran.money/src/lib/api.ts:1-2"
       ],
-      "verification_note": "Grepped for api.sovran.money / BASE_URL / fetch( in sovran-admin-panel/src \u2014 confirmed two distinct hosts. Counter-argument considered: the two URLs may be the same service behind a CNAME \u2014 possible, but the audit cannot verify without infra access, and the hardcoded URLs are still a maintainability hazard.",
+      "verification_note": "Grepped for api.sovran.money / BASE_URL / fetch( in sovran-admin-panel/src — confirmed two distinct hosts. Counter-argument considered: the two URLs may be the same service behind a CNAME — possible, but the audit cannot verify without infra access, and the hardcoded URLs are still a maintainability hazard.",
       "prior_audit_id": null
     },
     {
       "id": "F-009",
       "severity": "Medium",
       "confidence": 0.8,
-      "title": "splitBillTransactionsStore.groups is a deeply-nested persisted shape with no runtime field-fallbacks \u2014 same shallow-merge hazard",
+      "title": "splitBillTransactionsStore.groups is a deeply-nested persisted shape with no runtime field-fallbacks — same shallow-merge hazard",
       "repo": "sovran-app",
       "path": "shared/stores/profile/splitBillTransactionsStore.ts",
       "line": 411,
@@ -201,9 +201,9 @@
       "fix": "Add `merge: deepMerge` to the persist config (same approach as F-007). Deep-merges initial state (including new fields on participants) into persisted state on rehydrate. Zero-churn for future shape additions.",
       "references": [
         "sovran-app/shared/stores/profile/splitBillTransactionsStore.ts:55-80,408-420",
-        "sovran-app/.claude/rules/zustand-persistence-review.md \u00a78"
+        "sovran-app/.claude/rules/zustand-persistence-review.md §8"
       ],
-      "verification_note": "Re-read splitBillTransactionsStore.ts:55-80 (participant/group types) and 408-420 (persist config). Confirmed no merge strategy. Counter-argument considered: existing users won't have split-bill groups yet \u2014 true today, but the feature is live on the feat branch and any persisted data from here forward is exposed to the hazard.",
+      "verification_note": "Re-read splitBillTransactionsStore.ts:55-80 (participant/group types) and 408-420 (persist config). Confirmed no merge strategy. Counter-argument considered: existing users won't have split-bill groups yet — true today, but the feature is live on the feat branch and any persisted data from here forward is exposed to the hazard.",
       "prior_audit_id": null,
       "completion_status": "deferred"
     },
@@ -217,15 +217,15 @@
       "line": 255,
       "symbol": "persist.partialize|onRehydrateStorage",
       "dimension": 3,
-      "description": "These three stores persist raw API payloads (pricelist, placesCache, catalog). partialize forwards the whole sub-object to AsyncStorage; on rehydrate, Zustand hands the decoded JSON back and no schema check runs. onRehydrateStorage blocks log-on-error only \u2014 no reshape, no schema validation.",
-      "why_it_matters": "If the server renames a nested field (e.g. WallpaperCatalogEntry.fileSize \u2192 .byteSize), every existing user's persisted blob still has the old shape and DownloadedWallpaper.fileSize becomes undefined at the renderer. The client's local cache pins old-shape data in front of the new-shape server response. Compounds with F-005 (no schema at the wire) to make this invisible.",
+      "description": "These three stores persist raw API payloads (pricelist, placesCache, catalog). partialize forwards the whole sub-object to AsyncStorage; on rehydrate, Zustand hands the decoded JSON back and no schema check runs. onRehydrateStorage blocks log-on-error only — no reshape, no schema validation.",
+      "why_it_matters": "If the server renames a nested field (e.g. WallpaperCatalogEntry.fileSize → .byteSize), every existing user's persisted blob still has the old shape and DownloadedWallpaper.fileSize becomes undefined at the renderer. The client's local cache pins old-shape data in front of the new-shape server response. Compounds with F-005 (no schema at the wire) to make this invisible.",
       "fix": "In each store's onRehydrateStorage, run the persisted payload through the shared zod schema; on parse failure, drop the cache (it refetches on next use). Schemas come from packages/schemas (F-006).",
       "references": [
         "sovran-app/shared/stores/global/pricelistStore.ts:139-145",
         "sovran-app/shared/stores/global/btcMapStore.ts:250-253",
         "sovran-app/shared/stores/global/wallpaperStore.ts:255-260"
       ],
-      "verification_note": "Re-read three store persist configs. None of them runs schema validation on rehydrate. Counter-argument considered: server never changes these shapes \u2014 not a guarantee, and the whole point is forward compatibility.",
+      "verification_note": "Re-read three store persist configs. None of them runs schema validation on rehydrate. Counter-argument considered: server never changes these shapes — not a guarantee, and the whole point is forward compatibility.",
       "prior_audit_id": null,
       "completion_status": "stale"
     },
@@ -239,14 +239,14 @@
       "line": 476,
       "symbol": "app.get('/search')",
       "dimension": 2,
-      "description": "Handler at lines 476-495. `queryParam.trim()` and `query.length < 3` set a lower bound; no upper bound. `typeof queryParam === 'string'` narrows but doesn't cap length. limitParam coerces to number and clamps to [1,100] \u2014 correct. sortParam has no enum check. Why the query is `any` to start with: c.req.query() returns an untyped lookup.",
-      "why_it_matters": "DoS surface \u2014 review_dimensions \u00a76 requires every string to have a .max(). A 100 KB query reaches NDK and the Vertex relay. A stray sort value is passed through to the cache key with no enumeration, enlarging the cache-key space unboundedly.",
+      "description": "Handler at lines 476-495. `queryParam.trim()` and `query.length < 3` set a lower bound; no upper bound. `typeof queryParam === 'string'` narrows but doesn't cap length. limitParam coerces to number and clamps to [1,100] — correct. sortParam has no enum check. Why the query is `any` to start with: c.req.query() returns an untyped lookup.",
+      "why_it_matters": "DoS surface — review_dimensions §6 requires every string to have a .max(). A 100 KB query reaches NDK and the Vertex relay. A stray sort value is passed through to the cache key with no enumeration, enlarging the cache-key space unboundedly.",
       "fix": "zValidator('query', z.strictObject({ query: z.string().trim().min(3).max(128), limit: z.coerce.number().int().min(1).max(100).default(5), sort: z.enum(['globalPagerank','follows']).optional() })). Applies to every other handler in nostr.ts and across all route modules.",
       "references": [
         "api.sovran.money/src/nostr.ts:476-495",
-        "review_dimensions \u00a76"
+        "review_dimensions §6"
       ],
-      "verification_note": "Re-read nostr.ts:476-495 \u2014 confirmed string max missing; enum check on sort missing. Counter-argument considered: NodeCache has a max key count \u2014 true, but the per-key allocation is unbounded and the DoS concern is memory, not key count.",
+      "verification_note": "Re-read nostr.ts:476-495 — confirmed string max missing; enum check on sort missing. Counter-argument considered: NodeCache has a max key count — true, but the per-key allocation is unbounded and the DoS concern is memory, not key count.",
       "prior_audit_id": null
     },
     {
@@ -260,32 +260,32 @@
       "symbol": "cors",
       "dimension": 2,
       "description": "app.use('*', cors({ origin: '*', allowMethods: [...] })) at lines 18-21. credentials not set (defaults false, good today). No auth cookies per auth.ts. Why this matters for forward compat: the next route that sets credentials: true inadvertently inherits origin: '*' unless the CORS policy is per-route.",
-      "why_it_matters": "Review_dimensions \u00a72 forbids origin: '*' with credentials: true. One future `app.route('/api/admin', adminRoutes)` with credentials: true opens every origin to the admin API. Pinning CORS per-route-group is the defence-in-depth fix.",
+      "why_it_matters": "Review_dimensions §2 forbids origin: '*' with credentials: true. One future `app.route('/api/admin', adminRoutes)` with credentials: true opens every origin to the admin API. Pinning CORS per-route-group is the defence-in-depth fix.",
       "fix": "Split CORS into per-route groups: public read-only endpoints stay origin: '*'; anything that uses adminOnly or plans to use cookies gets origin: ALLOWED_ORIGINS with credentials: true. Centralise allowed-origins in src/config.ts.",
       "references": [
         "api.sovran.money/src/index.ts:17-21",
         "api.sovran.money/src/auth.ts"
       ],
-      "verification_note": "Re-read index.ts:17-21. Confirmed global wildcard, no per-route override. Counter-argument: no cookies today \u2014 correct, which is why this is Medium not High.",
+      "verification_note": "Re-read index.ts:17-21. Confirmed global wildcard, no per-route override. Counter-argument: no cookies today — correct, which is why this is Medium not High.",
       "prior_audit_id": null
     },
     {
       "id": "F-013",
       "severity": "Low",
       "confidence": 0.95,
-      "title": "apiClient.ts still has <T = any> defaults and body: any \u2014 prior finding not yet fixed",
+      "title": "apiClient.ts still has <T = any> defaults and body: any — prior finding not yet fixed",
       "repo": "sovran-app",
       "path": "shared/lib/apiClient.ts",
       "line": 52,
       "symbol": "safeFetch|safePost",
       "dimension": 1,
       "description": "safeFetch<T = any>, safePost<T = any> with body: any at lines 52, 68. Callers can omit the type and lose all type-safety. The any defaults also block the migration to a zod-parsed return path proposed in F-001.",
-      "why_it_matters": "Degrades TypeScript strictness at the core API layer; the repo otherwise forbids any. Prior audit 01.json F-007 flagged this exact issue \u2014 still present at commit f797ae15.",
+      "why_it_matters": "Degrades TypeScript strictness at the core API layer; the repo otherwise forbids any. Prior audit 01.json F-007 flagged this exact issue — still present at commit f797ae15.",
       "fix": "<T> without a default; body: unknown (or <T, B = unknown>). Do this in the same PR as F-001's zod wiring.",
       "references": [
         "sovran-app/__audits__/01.json (F-007)"
       ],
-      "verification_note": "Re-read apiClient.ts:52,68 \u2014 confirmed still present.",
+      "verification_note": "Re-read apiClient.ts:52,68 — confirmed still present.",
       "prior_audit_id": "F-007@01.json"
     },
     {
@@ -312,7 +312,7 @@
       "id": "F-015",
       "severity": "Low",
       "confidence": 0.7,
-      "title": "No $schemaVersion discriminator on any API response \u2014 clients cannot detect when they've been compiled against an older contract",
+      "title": "No $schemaVersion discriminator on any API response — clients cannot detect when they've been compiled against an older contract",
       "repo": "api.sovran.money",
       "path": "src/app.ts",
       "line": 11,
@@ -325,14 +325,14 @@
         "api.sovran.money/src/*.ts",
         "sovran-app/shared/lib/apiClient.ts"
       ],
-      "verification_note": "Re-read a sample of api.sovran.money route handlers (app.ts, cashu.ts, nostr.ts search) \u2014 no discriminator on any response. Counter-argument considered: schemas in packages/schemas with z.infer would catch compile-time drift \u2014 true, but they don't catch a runtime deploy where the app is already in users' hands.",
+      "verification_note": "Re-read a sample of api.sovran.money route handlers (app.ts, cashu.ts, nostr.ts search) — no discriminator on any response. Counter-argument considered: schemas in packages/schemas with z.infer would catch compile-time drift — true, but they don't catch a runtime deploy where the app is already in users' hands.",
       "prior_audit_id": null
     },
     {
       "id": "F-016",
       "severity": "Low",
       "confidence": 0.75,
-      "title": "api.sovran.money uses raw console.log throughout \u2014 no structured logger, server-side log-doctor equivalent is impossible",
+      "title": "api.sovran.money uses raw console.log throughout — no structured logger, server-side log-doctor equivalent is impossible",
       "repo": "api.sovran.money",
       "path": "src/cashu.ts",
       "line": 190,
@@ -345,8 +345,10 @@
         "api.sovran.money/src/cashu.ts:190",
         "sovran-app/shared/lib/logger.ts (mirror pattern)"
       ],
-      "verification_note": "Re-read cashu.ts:186-200 \u2014 confirmed raw console.log. Pattern verified across modules by sample grep.",
-      "prior_audit_id": null
+      "verification_note": "Re-read cashu.ts:186-200 — confirmed raw console.log. Pattern verified across modules by sample grep.",
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Lives in api.sovran.money, not sovran-app — out of scope of this slice."
     },
     {
       "id": "F-017",
@@ -358,12 +360,12 @@
       "line": 14,
       "symbol": "MiddlemanTrustMode",
       "dimension": 6,
-      "description": "export type MiddlemanTrustMode = 'trusted_only' | 'allow_untrusted'. A future addition (e.g. 'auditor_only') is an enum change per review_dimensions \u00a76. Persisted values remain typed as the old union at compile time; new code that handles the old values safely is a judgement call.",
+      "description": "export type MiddlemanTrustMode = 'trusted_only' | 'allow_untrusted'. A future addition (e.g. 'auditor_only') is an enum change per review_dimensions §6. Persisted values remain typed as the old union at compile time; new code that handles the old values safely is a judgement call.",
       "why_it_matters": "Low today, but combined with F-007 the shape evolution story around settingsStore is incomplete. A removed variant could flow into a switch that doesn't handle it.",
       "fix": "When the set grows, add an onRehydrateStorage that coerces unknown values to the default. Better: define MiddlemanTrustMode as a zod enum in packages/schemas and use z.infer.",
       "references": [
         "sovran-app/shared/stores/global/settingsStore.ts:14",
-        "sovran-app/.claude/rules/zustand-persistence-review.md \u00a75"
+        "sovran-app/.claude/rules/zustand-persistence-review.md §5"
       ],
       "verification_note": "Re-read settingsStore.ts:14,56-62. Counter-argument: today the set is frozen. Kept Nit.",
       "prior_audit_id": null,
@@ -385,7 +387,7 @@
   "refactor_plan": [
     {
       "type": "consolidate",
-      "description": "Create packages/schemas as a yarn/pnpm workspace package at the monorepo root. Zod v4 schemas only; z.infer re-exports for types. Every API request and response shape lives here as z.strictObject. Each of the four repos consumes it as a workspace dep (or file: dep, since they are independent git repositories). Start with AuditMintResponse, MintSearchResponse, NostrProfileResponse, WallpaperCatalogResponse, AppVersionRequest, AppVersionResponse \u2014 the five boundaries that show up in the most repos.",
+      "description": "Create packages/schemas as a yarn/pnpm workspace package at the monorepo root. Zod v4 schemas only; z.infer re-exports for types. Every API request and response shape lives here as z.strictObject. Each of the four repos consumes it as a workspace dep (or file: dep, since they are independent git repositories). Start with AuditMintResponse, MintSearchResponse, NostrProfileResponse, WallpaperCatalogResponse, AppVersionRequest, AppVersionResponse — the five boundaries that show up in the most repos.",
       "files": [
         "sovran-app/packages/schemas/package.json",
         "sovran-app/packages/schemas/src/index.ts",
@@ -429,7 +431,7 @@
     },
     {
       "type": "consolidate",
-      "description": "Add `merge: deepMerge` to every persist config whose partialized shape contains nested objects. Closes the shallow-merge-drops-defaults hazard documented in .claude/rules/zustand-persistence-review.md \u00a78. Minimum-viable set: settingsStore (middlemanRouting), splitBillTransactionsStore (groups + participants), nostrSocialStore (followingPubkeys, likesByEventId, etc). This is a store-config change, not a persist-shape change, so per the repo's no-version-bump policy it ships without a migrator. Provide a shared deepMerge helper in shared/lib/mergeState.ts.",
+      "description": "Add `merge: deepMerge` to every persist config whose partialized shape contains nested objects. Closes the shallow-merge-drops-defaults hazard documented in .claude/rules/zustand-persistence-review.md §8. Minimum-viable set: settingsStore (middlemanRouting), splitBillTransactionsStore (groups + participants), nostrSocialStore (followingPubkeys, likesByEventId, etc). This is a store-config change, not a persist-shape change, so per the repo's no-version-bump policy it ships without a migrator. Provide a shared deepMerge helper in shared/lib/mergeState.ts.",
       "files": [
         "sovran-app/shared/lib/mergeState.ts",
         "sovran-app/shared/stores/global/settingsStore.ts",
@@ -439,7 +441,7 @@
     },
     {
       "type": "consolidate",
-      "description": "Add onRehydrateStorage schema validation to pricelistStore, btcMapStore, and wallpaperStore \u2014 stores that cache raw server payloads. On parse failure against the packages/schemas definition, drop the cache and let the next fetch repopulate. Closes F-010 and gives forward-compat a server-driven escape hatch: a deployed schema change that doesn't match the client invalidates the client's stale cache automatically.",
+      "description": "Add onRehydrateStorage schema validation to pricelistStore, btcMapStore, and wallpaperStore — stores that cache raw server payloads. On parse failure against the packages/schemas definition, drop the cache and let the next fetch repopulate. Closes F-010 and gives forward-compat a server-driven escape hatch: a deployed schema change that doesn't match the client invalidates the client's stale cache automatically.",
       "files": [
         "sovran-app/shared/stores/global/pricelistStore.ts",
         "sovran-app/shared/stores/global/btcMapStore.ts",
@@ -468,7 +470,7 @@
     },
     {
       "type": "log-helper",
-      "description": "Add a log-doctor `schema` mode that groups api.fetch_failed and api.post_failed events by response-body hash and flags new hashes appearing after a deploy \u2014 production schema-drift detection. Document in .claude/rules/log-doctor.md. Useful only after F-001/F-005 land so parse failures emit structured events. Also add a parallel `/debug/schema-health` endpoint on api.sovran.money that returns counts of zValidator parse failures per route over the last hour.",
+      "description": "Add a log-doctor `schema` mode that groups api.fetch_failed and api.post_failed events by response-body hash and flags new hashes appearing after a deploy — production schema-drift detection. Document in .claude/rules/log-doctor.md. Useful only after F-001/F-005 land so parse failures emit structured events. Also add a parallel `/debug/schema-health` endpoint on api.sovran.money that returns counts of zValidator parse failures per route over the last hour.",
       "files": [
         "sovran-app/scripts/log-doctor/",
         "sovran-app/.claude/rules/log-doctor.md",

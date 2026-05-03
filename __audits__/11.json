@@ -336,7 +336,9 @@
         "sovran-app/shared/lib/logger.ts"
       ],
       "verification_note": "Still present since 10.json. Log-doctor stats --latest confirms no secure-storage events in the session ring buffer.",
-      "prior_audit_id": "F-015@10.json"
+      "prior_audit_id": "F-015@10.json",
+      "completion_status": "stale",
+      "completion_note": "Already addressed: shared/lib/nostr/secureStorage.ts now imports nostrLog (not generic log)."
     },
     {
       "id": "F-016",

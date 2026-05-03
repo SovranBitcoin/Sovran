@@ -203,7 +203,9 @@
       "fix": "Import paymentLog in both files and swap log.info for paymentLog.info.",
       "references": [],
       "verification_note": "Re-read the imports and emit calls. Same pattern as prior audit 02.json F-004 but in a different file, so filed separately rather than as a carry-forward.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "app/(send-flow)/mintSelect.tsx now imports paymentLog and the mint.selector.entry event emits through it."
     },
     {
       "id": "F-010",
@@ -311,7 +313,9 @@
       "fix": "Import paymentLog and replace log.info / log.warn / log.debug where the event describes send/melt/mint behaviour. Leave log only for truly cross-cutting provider events.",
       "references": [],
       "verification_note": "Still present at the cited line with identical call sites.",
-      "prior_audit_id": "F-004@02.json"
+      "prior_audit_id": "F-004@02.json",
+      "completion_status": "complete",
+      "completion_note": "Same fix as 02/F-004 — CocoPaymentUX.tsx routes payment-flow logs through paymentLog."
     },
     {
       "id": "F-016",
