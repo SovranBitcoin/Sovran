@@ -10,7 +10,7 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import { PressableFeedback } from 'heroui-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Image from '@/shared/ui/primitives/Image';
+import { Image } from '@/shared/ui/primitives/Image';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
 import Icon from 'assets/icons';
@@ -55,7 +55,7 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
   return (
     <PressableFeedback
       onPress={onPress}
-      disabled={!onPress || inProgress}
+      isDisabled={!onPress || inProgress}
       animation={false}
       style={{ width, height }}>
       <PressableFeedback.Scale>

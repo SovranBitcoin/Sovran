@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { DeviceMotion } from 'expo-sensors';
 import { View } from '@/shared/ui/primitives/View/View';
-import Image from '@/shared/ui/primitives/Image';
+import { Image } from '@/shared/ui/primitives/Image';
 import { backgroundImageThemes } from 'config/backgroundImageThemes';
 import { useTheme } from '@/shared/providers/ThemeProvider';
 import { Log, log } from '@/shared/lib/logger';

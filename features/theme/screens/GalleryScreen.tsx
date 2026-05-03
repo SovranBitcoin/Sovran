@@ -16,7 +16,7 @@ import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Text } from '@/shared/ui/primitives/Text';
-import Image from '@/shared/ui/primitives/Image';
+import { Image } from '@/shared/ui/primitives/Image';
 import Icon from 'assets/icons';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
