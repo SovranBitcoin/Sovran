@@ -66,7 +66,7 @@
       ],
       "verification_note": "Re-read lines 60-61, 82-83, 218-220; no schema call anywhere in the file. Counter-argument considered (trusted api.sovran.money) \u2014 doesn't hold for fetchMintInfo which dials arbitrary hosts.",
       "completion_status": "stale",
-      "completion_note": "apiClient blind-cast already replaced with parseWith(@sovranbitcoin/schemas) before this session."
+      "completion_note": "apiClient blind-cast already replaced with parseWith(@sovranbitcoin/schemas) before this session. The residual fetchMintInfo callsite still ran a bespoke MintInfoSpine.safeParse + `data as GetInfoResponse` branch alongside the parseWith pattern; that structural divergence was closed in this session by hoisting parseMintInfo and routing fetchMintInfo through fetchJson."
     },
     {
       "id": "F-004",
@@ -120,7 +120,7 @@
       "references": [],
       "verification_note": "Verified at lines 197-209 \u2014 no clearTimeout on the success path, no signal passed to fetch.",
       "completion_status": "stale",
-      "completion_note": "fetchMintInfo now uses combineSignals; the buggy Promise.race timeout has been replaced."
+      "completion_note": "fetchMintInfo's bespoke Promise.race + setTimeout was replaced earlier by combineSignals + timeoutSignal; this session removes that scaffolding entirely by delegating fetchMintInfo to fetchJson, which owns the abort/timeout plumbing."
     },
     {
       "id": "F-007",
