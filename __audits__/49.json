@@ -507,8 +507,8 @@
       "references": [],
       "verification_note": "Re-checked the three Date.now() sites and the dedup logic. Counter-argument: the dedup is keyed on the real message id when the listener echoes; own-* IDs only collide with each other. Confirmed \u2014 but the collision-with-self case still drops a real send.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the duplicate-helper slice (mint/lib/auditInfo + colorUtils consolidation); features/bitchat is a separate cluster."
+      "completion_status": "complete",
+      "completion_note": "All three own-${Date.now()} sites now mint ids through the canonical mintLocalId('own') helper (shared/lib/id.ts), which appends a process-local counter so same-millisecond sends no longer collide. Same slice also adds the missing rollback path: when the underlying send throws, the optimistic ChatMessage is filtered out of state instead of stranding a phantom-sent message in the UI \u2014 matches the pattern useWhitenoiseDM.send already established. Commit 3f9a0557."
     },
     {
       "id": "F-021",
