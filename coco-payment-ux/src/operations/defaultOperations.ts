@@ -14,13 +14,24 @@
 //                           injected via enrichMintReviewInfo
 // ---------------------------------------------------------------------------
 
-import { getDecodedToken, getEncodedTokenV4 } from '@cashu/cashu-ts';
-import type { Manager } from '@cashu/coco-core';
+import { getDecodedToken, getEncodedTokenV4, type Token } from '@cashu/cashu-ts';
+import type {
+  Manager,
+  Mint,
+  ReceiveHistoryEntry,
+  SendHistoryEntry,
+} from '@cashu/coco-core';
 import type { MachineOperations, StepDataMap } from '../machine/types';
-import type { MintCatalogEntry, MintListItem, MintReviewInfo, PaymentRequestInfo } from '../types';
+import type { MintCatalogEntry, MintListItem, MintReviewInfo } from '../types';
 import { defaultDetectors } from '../detectors';
 import { errField, logger } from '../logger';
 import { requestInvoiceFromLnurl, isLightningInvoiceBolt11 } from '../lnurl';
+import { parseHistoryEntryOnce } from './historyEntry';
+
+// MintInfo is the cashu-ts GetInfoResponse — coco-core re-derives but does
+// not export it as a named type, so we infer it from the manager API to
+// stay aligned with whatever shape mgr.mint.getMintInfo actually returns.
+type MintInfo = Awaited<ReturnType<Manager['mint']['getMintInfo']>>;
 
 // ---------------------------------------------------------------------------
 // History lookup helpers
@@ -32,7 +43,7 @@ async function findSendHistoryEntryByOperationId(
 ): Promise<string | null> {
   const history = await mgr.history.getPaginatedHistory(0, 50);
   const entry = history.find(
-    (h: any) =>
+    (h): h is SendHistoryEntry =>
       h.type === 'send' &&
       (h.operationId === operationId || h.metadata?.operationId === operationId)
   );
@@ -43,6 +54,45 @@ function mapMeltOperationState(state: string): string {
   if (state === 'finalized') return 'PAID';
   if (state === 'pending' || state === 'executing') return 'PENDING';
   return 'UNPAID';
+}
+
+// ---------------------------------------------------------------------------
+// Synthetic history-entry builders — used when coco's history row hasn't
+// been persisted yet (race) or when we need to thread token data through
+// the entry. Shapes mirror coco-core's SendHistoryEntry / MintHistoryEntry
+// so consumers downstream see the same field set as a DB-backed row.
+// ---------------------------------------------------------------------------
+
+interface SendOperationLike {
+  id: string;
+  createdAt: number;
+  mintUrl: string;
+  amount: number;
+}
+
+function buildSyntheticSendEntry(operation: SendOperationLike, token: Token): SendHistoryEntry {
+  return {
+    id: operation.id,
+    type: 'send',
+    createdAt: operation.createdAt,
+    mintUrl: operation.mintUrl,
+    unit: 'sat',
+    state: 'pending',
+    amount: operation.amount,
+    operationId: operation.id,
+    token,
+    metadata: { operationId: operation.id },
+  };
+}
+
+function ensureSendEntryToken(historyEntry: string, token: Token): string {
+  // The DB row may not have the token yet due to a race between execute
+  // resolving and HistoryService persisting; inject it before returning so
+  // the caller never sees a tokenless send entry.
+  const parsed = parseHistoryEntryOnce(historyEntry);
+  if (!parsed || parsed.type !== 'send') return historyEntry;
+  if (parsed.token) return historyEntry;
+  return JSON.stringify({ ...parsed, token });
 }
 
 function hasP2PKProofs(proofs: readonly { secret: string }[]): boolean {
@@ -216,28 +266,11 @@ export function createDefaultOperations(
       // constructing from the operation result to avoid a race.
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
       if (historyEntry) {
-        // Ensure the token is present — the DB row may not have it yet due to a race.
-        const parsed = JSON.parse(historyEntry);
-        if (!parsed.token && token) {
-          parsed.token = token;
-          return { historyEntry: JSON.stringify(parsed) };
-        }
-        return { historyEntry };
+        return { historyEntry: ensureSendEntryToken(historyEntry, token) };
       }
 
       logger.warn('operations.executeSend.historyMissing', { operationId: operation.id });
-      const entry = {
-        id: operation.id,
-        type: 'send' as const,
-        createdAt: operation.createdAt,
-        mintUrl: operation.mintUrl,
-        unit: 'sat',
-        state: 'pending',
-        amount: operation.amount,
-        token,
-        metadata: { operationId: operation.id },
-      };
-      return { historyEntry: JSON.stringify(entry) };
+      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, token)) };
     },
 
     executeOfflineSend: async (mintUrl, amount) => {
@@ -258,27 +291,11 @@ export function createDefaultOperations(
 
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operation.id);
       if (historyEntry) {
-        const parsed = JSON.parse(historyEntry);
-        if (!parsed.token && token) {
-          parsed.token = token;
-          return { historyEntry: JSON.stringify(parsed) };
-        }
-        return { historyEntry };
+        return { historyEntry: ensureSendEntryToken(historyEntry, token) };
       }
 
       logger.warn('operations.executeOfflineSend.historyMissing', { operationId: operation.id });
-      const entry = {
-        id: operation.id,
-        type: 'send' as const,
-        createdAt: operation.createdAt,
-        mintUrl: operation.mintUrl,
-        unit: 'sat',
-        state: 'pending',
-        amount: operation.amount,
-        token,
-        metadata: { operationId: operation.id },
-      };
-      return { historyEntry: JSON.stringify(entry) };
+      return { historyEntry: JSON.stringify(buildSyntheticSendEntry(operation, token)) };
     },
 
     executeMintQuote: async (mintUrl, amount, _unit) => {
@@ -326,9 +343,9 @@ export function createDefaultOperations(
       // Fetch NUT-06 mint info for each mint in parallel.
       // getAllTrustedMints() returns stored records without display metadata;
       // getMintInfo() returns the NUT-06 info with name/icon_url.
-      const mintInfoMap = new Map<string, any>();
+      const mintInfoMap = new Map<string, MintInfo>();
       await Promise.all(
-        allTrustedMints.map(async (mint: any) => {
+        allTrustedMints.map(async (mint) => {
           try {
             const info = await mgr.mint.getMintInfo(mint.mintUrl);
             if (info) {
@@ -360,7 +377,7 @@ export function createDefaultOperations(
       // One bulk fetch — the wallet returns audit / KYM / operator-profile
       // data for every trusted mint in a single round-trip. Awaited so items
       // ship to the screen with catalog fields already populated.
-      const mintUrls = allTrustedMints.map((m: any): string => m.mintUrl);
+      const mintUrls = allTrustedMints.map((m) => m.mintUrl);
       let catalog: Record<string, MintCatalogEntry> = {};
       if (config.fetchMintCatalog) {
         try {
@@ -376,9 +393,9 @@ export function createDefaultOperations(
 
       const proofAmounts = getProofAmounts?.() ?? {};
 
-      const items = allTrustedMints.map((mint: any): MintListItem => {
+      const items = allTrustedMints.map((mint: Mint): MintListItem => {
         const mintUrl = mint.mintUrl;
-        const info: any = mintInfoMap.get(mintUrl) ?? {};
+        const info = mintInfoMap.get(mintUrl);
         const balance = balances[mintUrl] ?? 0;
         const isInCandidate = data.candidates.some((c) => c.mintUrl === mintUrl);
 
@@ -408,8 +425,8 @@ export function createDefaultOperations(
         const entry = catalog[mintUrl] ?? {};
         return {
           mintUrl,
-          displayName: info.name ?? mintUrl,
-          iconUrl: info.icon_url ?? undefined,
+          displayName: info?.name ?? mintUrl,
+          iconUrl: info?.icon_url ?? undefined,
           balance,
           unit: data.unit,
           status,
@@ -782,61 +799,56 @@ export function createDefaultOperations(
       }
 
       const historyEntry = await findSendHistoryEntryByOperationId(mgr, operationId);
-      const entry = historyEntry
-        ? JSON.parse(historyEntry)
-        : {
-            id: operationId,
-            type: 'send' as const,
-            createdAt: Date.now(),
-            mintUrl,
-            amount,
-            unit,
-            operationId,
-            state: 'pending',
-          };
+      const baseEntry: SendHistoryEntry = historyEntry
+        ? // findSendHistoryEntryByOperationId only returns 'send' rows, so the
+          // narrow is safe; the cast is a pragmatic alternative to re-running
+          // the type guard inside parseHistoryEntryOnce's loose return.
+          ((parseHistoryEntryOnce(historyEntry) as SendHistoryEntry | null) ??
+          buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount))
+        : buildSyntheticPaymentRequestEntry(operationId, mintUrl, amount);
       // Enrich with transport metadata so the screen can show progress
-      entry.metadata = {
-        ...(entry.metadata ?? {}),
-        paymentRequest,
-        phase: 'delivered',
-        tokenCreated: 'true',
-        ...(nostrTransport
-          ? { nostrSent: 'true', transportType: 'nostr' }
-          : { transportType: 'http' }),
+      const enriched: SendHistoryEntry = {
+        ...baseEntry,
+        operationId: baseEntry.operationId ?? operationId,
+        metadata: {
+          ...(baseEntry.metadata ?? {}),
+          paymentRequest,
+          phase: 'delivered',
+          tokenCreated: 'true',
+          ...(nostrTransport
+            ? { nostrSent: 'true', transportType: 'nostr' }
+            : { transportType: 'http' }),
+        },
       };
-      entry.operationId = entry.operationId ?? operationId;
       logger.info('operations.executePaymentRequest.done', {
         operationId,
         transport: nostrTransport ? 'nostr' : 'http',
       });
-      return { historyEntry: JSON.stringify(entry) };
+      return { historyEntry: JSON.stringify(enriched) };
     },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Payment request helpers
-// ---------------------------------------------------------------------------
-
-function buildInbandParsed(encodedRequest: string, info: PaymentRequestInfo, mintUrl: string): any {
-  const requiredMints = info.mints ?? [];
-  const matchingMints =
-    requiredMints.length > 0
-      ? requiredMints.filter((candidate) => candidate === mintUrl)
-      : [mintUrl];
-
-  return {
-    paymentRequest: encodedRequest,
-    matchingMints,
-    requiredMints,
-    amount: info.amount,
-    transport: { type: 'inband' as const },
   };
 }
 
 // ---------------------------------------------------------------------------
 // Receive history lookup helper
 // ---------------------------------------------------------------------------
+
+function buildSyntheticPaymentRequestEntry(
+  operationId: string,
+  mintUrl: string,
+  amount: number
+): SendHistoryEntry {
+  return {
+    id: operationId,
+    type: 'send',
+    createdAt: Date.now(),
+    mintUrl,
+    unit: 'sat',
+    amount,
+    operationId,
+    state: 'pending',
+  };
+}
 
 async function findReceiveHistoryEntry(
   mgr: Manager,
@@ -845,10 +857,10 @@ async function findReceiveHistoryEntry(
 ): Promise<string | null> {
   const history = await mgr.history.getPaginatedHistory(0, 50);
   const entry = history.find(
-    (h: any) =>
+    (h): h is ReceiveHistoryEntry =>
       h.type === 'receive' &&
       h.mintUrl === mintUrl &&
-      (h.metadata?.rawToken === tokenString || h.token === tokenString)
+      h.metadata?.rawToken === tokenString
   );
   return entry ? JSON.stringify(entry) : null;
 }
