@@ -52,7 +52,7 @@ import {
   topUpDeficitSats,
 } from '@/features/ai/lib/format';
 
-import { showActionSheet } from '../bridge';
+import { showActionSheet } from './bridge';
 import { modelSwitchedPopup } from './messages';
 import type { ActionSheetPayloads } from '../actionSheetTypes';
 import type { CustomSheetSharedProps } from '../sheets/types';

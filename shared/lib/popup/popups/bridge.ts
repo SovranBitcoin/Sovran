@@ -1,15 +1,15 @@
 import React from 'react';
 import type { ReactNode } from 'react';
-import { popupLog } from '../logger';
-import type { PopupIcon } from './icons';
-import type { PopupTextSegment } from './format';
+import { popupLog } from '../../logger';
+import type { PopupIcon } from '../icons';
+import type { PopupTextSegment } from '../format';
 import { isCustomSheetPayload, usePopupStore } from '@/shared/stores/runtime/popupStore';
 import type { SheetCloseEvent } from '@/shared/stores/runtime/popupStore';
-import type { ActionSheetPayloads } from './actionSheetTypes';
-import { CompactToast } from './CompactToast';
-import type { LiveSheetConfig } from './liveSheetTypes';
+import type { ActionSheetPayloads } from '../actionSheetTypes';
+import { CompactToast } from '../CompactToast';
+import type { LiveSheetConfig } from '../liveSheetTypes';
 
-export type { ActionSheetPayloads } from './actionSheetTypes';
+export type { ActionSheetPayloads } from '../actionSheetTypes';
 
 /** Best-effort first stack frame outside the popup module — gives "where did this come from" without a full trace. */
 function getCallerFrame(): string | undefined {

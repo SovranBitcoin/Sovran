@@ -37,7 +37,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { SectionAnchorList, type AnchorSection } from '@/shared/ui/composed/SectionAnchorList';
 
-import { showActionSheet } from '../bridge';
+import { showActionSheet } from './bridge';
 import { copyPopup } from './copy';
 import {
   CATEGORIES,

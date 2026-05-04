@@ -8,9 +8,9 @@
  * - registerToast: called once by PopupHost to connect the HeroUI toast manager
  */
 
-export { popup } from './engine';
-export { registerToast, setPopupDuration, showActionSheet, showCustomToast } from './bridge';
-export type { ActionSheetPayloads } from './bridge';
+export { popup } from './popups/engine';
+export { registerToast, setPopupDuration, showActionSheet, showCustomToast } from './popups/bridge';
+export type { ActionSheetPayloads } from './popups/bridge';
 export { fmt, isAmountSegment } from './format';
 export { parsePaymentError } from './parsePaymentError';
 export type { PopupTextSegment } from './format';

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { popup } from '../engine';
+import { popup } from './engine';
 import type { PopupIcon } from '../icons';
 import type { PopupTextSegment } from '../format';
 import type { BaseOverrides, TextOverrides } from './types';

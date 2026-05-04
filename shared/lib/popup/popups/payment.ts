@@ -1,5 +1,5 @@
 import React from 'react';
-import { showCustomToast } from '../bridge';
+import { showCustomToast } from './bridge';
 import { PaymentStatusToast } from '../PaymentStatusToast';
 import { SwapStatusToast } from '../SwapStatusToast';
 import { usePaymentStatusStore } from '@/shared/stores/runtime/paymentStatusStore';
