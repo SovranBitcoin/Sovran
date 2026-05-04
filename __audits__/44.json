@@ -212,8 +212,8 @@
       ],
       "verification_note": "Cross-checked via grep across features/, shared/, app/, sheets/, navigation/. Only btcMapStore.ts itself references these symbols.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "Dead actions deleted: setSelectedPlace, clearCache, clearAllData. Dead state fields (selectedPlace, isLoadingDetails) left in place — internal writes inside fetchPlaceDetails still set them, so removing the fields requires touching that body and was kept out of the dead-action slice."
+      "completion_status": "complete",
+      "completion_note": "Dead state fields (selectedPlace, isLoadingDetails) and their fetchPlaceDetails writes removed; partialize already excluded both so persist contract is unchanged. BTCMapState now reads { placesCache, placeDetailsCache, isLoading, error }; the dead actions were trimmed in the prior partial."
     },
     {
       "id": "F-007",
