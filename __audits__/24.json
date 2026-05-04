@@ -314,7 +314,9 @@
         "docs/SOV-00.md §15 (D-6 patch-package policy)"
       ],
       "verification_note": "Verified lines 429–430 and 563–564. Low because the impact is observability, not correctness.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "globalThis.__CASHU_PERF / __CASHU_RECOVERY_CONFIG are load-bearing for cashu-ts + coco-core patches per the file comment; out of scope for hygiene cluster."
     },
     {
       "id": "F-014",
@@ -334,7 +336,9 @@
         "lint:unused-imports/no-unused-vars"
       ],
       "verification_note": "Verified by `npx expo lint features/settings/screens` (14 warnings, see tooling section).",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Dropped 7 unused destructured/computed names (restoreMint, discoveryLoading, totalMintCount, knownMintUrlSet, green400, red400, isComplete)."
     },
     {
       "id": "F-015",
@@ -394,7 +398,9 @@
         "skill:neverthrow-wrap-exceptions"
       ],
       "verification_note": "Verified lines 285–303.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Replaced empty catches in tryImportKey with scoped log.warn breadcrumbs (no PII)."
     },
     {
       "id": "F-018",
@@ -411,7 +417,9 @@
       "fix": "Normalize with URL-parsing: `const canon = (u: string) => { try { const url = new URL(u); return (url.protocol + '//' + url.host.toLowerCase() + url.pathname.replace(/\\/$/, '')); } catch { return u; } }`. Apply to both `knownUrls` and the fetched list before the Set comparison.",
       "references": [],
       "verification_note": "Verified line 46–54. Latent because F-001 currently masks the consequence.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "fetchDiscoveredMintUrls now lower-cases URLs into the dedup set after stripping the trailing slash."
     },
     {
       "id": "F-019",
@@ -450,7 +458,9 @@
         "knip:unused-export"
       ],
       "verification_note": "knip-confirmed.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Removed export from SettingsRecoveryScreenProps; only the file itself uses it."
     },
     {
       "id": "F-021",
@@ -467,7 +477,9 @@
       "fix": "Round the store value to the nearest step on write: `update({ minSuccessRate: Math.round(asNumber(value) / 5) * 5 / 100 })` — or round on read before the label.",
       "references": [],
       "verification_note": "Verified lines 131–138.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Display + slider value snap to step={5} via snapSuccessRate so a non-multiple-of-5 stored rate cannot drift the thumb position."
     },
     {
       "id": "F-022",
@@ -506,7 +518,9 @@
         "lint:prettier/prettier"
       ],
       "verification_note": "Verified by running expo lint.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Stale on DeleteScreen + SettingsRecoveryScreen (already prettier-clean). Remaining drift across SettingsRoutingScreen, SettingsKeyringScreen, SettingsProfileScreen, SettingsStorageScreen swept with prettier --write."
     }
   ],
   "dimensions": {
