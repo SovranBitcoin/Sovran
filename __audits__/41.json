@@ -96,8 +96,8 @@
       ],
       "verification_note": "Re-grepped `applyAlbum`, `setMode`, `resetToDefault`, `getAllUnitWallpapers` in sovran-app/ with --include='*.ts' --include='*.tsx' — no callers outside the defining file. Counter-argument considered: actions could be reached via a debug menu or external integration. Checked modules/, scripts/, tests/, app/(drawer)/ — no hits. Counter-argument fails.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "themeStore side cleared: setMode, resetToDefault, clearAllData, getAllUnitWallpapers all deleted. applyAlbum and themeDraft.resolveUnitTheme remain — applyAlbum has a real semantic question (the docstring/code mismatch the audit flagged) that is bigger than the dead-action slice; deferred as a separate slice."
+      "completion_status": "complete",
+      "completion_note": "Dead applyAlbum + supporting helpers (distributeWallpapers, seededShuffle, getActiveProfilePubkey) deleted along with the rest of the dead-shuffle path; themeStore is now 105 LOC (was 184). The applyAlbum docstring/code mismatch noted in the prior partial closes with the deletion."
     },
     {
       "id": "F-002",
@@ -244,7 +244,9 @@
         "skill:improve-codebase-architecture"
       ],
       "verification_note": "Read both algorithms in full. The seeded-shuffle would produce different assignments per profile (since the seed includes the pubkey). The newest-first picks the same first N items for everyone. Confirmed `applyAlbum` is unreferenced (see F-001). Counter-argument considered: maybe `applyAlbum` is invoked via store middleware. Checked persist middleware setup at themeStore.ts:209-233 — no action interception.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Dead applyAlbum/seededShuffle path deleted. themeDraft.distributeFromAlbum (newest-first) is now the sole album-distribution algorithm; pickFirstThemeForAlbum was inlined as a pool[0] read in getUnitWallpaper for consistency with that path."
     },
     {
       "id": "F-009",
@@ -343,7 +345,9 @@
         "docs/SOV-00.md §3"
       ],
       "verification_note": "Re-checked. Counter-argument considered: SOV-00 §3 G7-G8 ordering prevents this. Verdict: yes, the gates make it unreachable today, but the defensive fail-loud is still warranted because future refactors could rearrange the gate order.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "getActiveProfilePubkey deleted with the rest of the seeded-shuffle path; the ':<albumSlug>' bootstrap-seed bug is structurally impossible now."
     },
     {
       "id": "F-014",
