@@ -246,12 +246,6 @@ export function useNostrEngagement(
       }))
     );
 
-  // Actions are stable references — read once from the store, no selector needed
-  const actions = useRef(useNostrSocialStore.getState());
-  useEffect(() => {
-    actions.current = useNostrSocialStore.getState();
-  });
-
   const lastStaleWarningRef = useRef(0);
 
   // ---- derived event lookup ----
@@ -314,7 +308,7 @@ export function useNostrEngagement(
 
   useEffect(() => {
     if (eventIds.length === 0) return;
-    const { syncLikesFromRelay, syncRepostsFromRelay } = actions.current;
+    const { syncLikesFromRelay, syncRepostsFromRelay } = useNostrSocialStore.getState();
 
     const likesPayload = relayLikes.map((l) => ({
       targetEventId: l.targetEventId,
@@ -334,7 +328,7 @@ export function useNostrEngagement(
   // ---- settle optimistic entries when relay catches up ----
 
   useEffect(() => {
-    const { clearLikeOptimistic, clearRepostOptimistic } = actions.current;
+    const { clearLikeOptimistic, clearRepostOptimistic } = useNostrSocialStore.getState();
 
     for (const eventId of eventIds) {
       settleOptimistic(
@@ -380,19 +374,11 @@ export function useNostrEngagement(
 
   // ---- engagement revision (for consumer cache-busting) ----
 
+  const engagementRevisionRef = useRef(0);
   const engagementRevision = useMemo(() => {
-    let revision = 0;
-    for (const eventId of eventIds) {
-      for (const entry of [
-        likesByEventId[eventId],
-        repostsByEventId[eventId],
-        optimisticLikesByEventId[eventId],
-        optimisticRepostsByEventId[eventId],
-      ]) {
-        if (entry) revision += (entry as { updatedAt?: number }).updatedAt || 1;
-      }
-    }
-    return revision;
+    engagementRevisionRef.current += 1;
+    return engagementRevisionRef.current;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     eventIds,
     likesByEventId,
@@ -453,6 +439,7 @@ export function useNostrEngagement(
         return;
       }
       const state = getEngagementState(target.id);
+      const { setLikeOptimistic, clearLikeOptimistic } = useNostrSocialStore.getState();
       await toggleEngagement({
         target,
         ndk,
@@ -463,8 +450,8 @@ export function useNostrEngagement(
         relatedEventIdFromStore: likesByEventId[target.id]?.reactionEventId,
         displayedCount: getDisplayMetrics(target.id).likeCount,
         baseCount: getBaseMetrics(target.id).likeCount,
-        setOptimistic: actions.current.setLikeOptimistic,
-        clearOptimistic: actions.current.clearLikeOptimistic,
+        setOptimistic: setLikeOptimistic,
+        clearOptimistic: clearLikeOptimistic,
         buildContent: () => '+',
         label: 'like',
       });
@@ -487,6 +474,8 @@ export function useNostrEngagement(
         return;
       }
       const state = getEngagementState(target.id);
+      const { setRepostOptimistic, clearRepostOptimistic, unmarkRepostDeleted, markRepostDeleted } =
+        useNostrSocialStore.getState();
       await toggleEngagement({
         target,
         ndk,
@@ -497,11 +486,11 @@ export function useNostrEngagement(
         relatedEventIdFromStore: repostsByEventId[target.id]?.repostEventId,
         displayedCount: getDisplayMetrics(target.id).repostCount,
         baseCount: getBaseMetrics(target.id).repostCount,
-        setOptimistic: actions.current.setRepostOptimistic,
-        clearOptimistic: actions.current.clearRepostOptimistic,
+        setOptimistic: setRepostOptimistic,
+        clearOptimistic: clearRepostOptimistic,
         buildContent: (t) => JSON.stringify(t),
-        onActivated: () => actions.current.unmarkRepostDeleted(target.id),
-        onDeactivated: () => actions.current.markRepostDeleted(target.id),
+        onActivated: () => unmarkRepostDeleted(target.id),
+        onDeactivated: () => markRepostDeleted(target.id),
         label: 'repost',
       });
     },

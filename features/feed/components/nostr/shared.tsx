@@ -114,7 +114,7 @@ const NOSTR_URI_REGEX = /nostr:(npub1|nprofile1|nevent1|note1|naddr1)[a-z0-9]+/g
 // Utility functions
 // ============================================================================
 
-export function getVideoUrlsFromContent(content: string): string[] {
+function getVideoUrlsFromContent(content: string): string[] {
   const urls: string[] = [];
   for (const m of content.matchAll(URL_REGEX)) {
     if (VIDEO_EXT.test(m[0])) {
@@ -351,7 +351,7 @@ export function tryNpubEncode(hex: string): string {
   }
 }
 
-export function prettifyUrl(raw: string): string {
+function prettifyUrl(raw: string): string {
   try {
     const u = new URL(raw);
     const host = u.hostname.replace(/^www\./, '');
@@ -387,7 +387,7 @@ export function normalizeFeedEvent(value: unknown): FeedEvent | null {
   };
 }
 
-export function normalizeRawPrimalEvent(value: unknown): RawPrimalEvent | null {
+function normalizeRawPrimalEvent(value: unknown): RawPrimalEvent | null {
   if (!value || typeof value !== 'object') return null;
   const input = value as Record<string, unknown>;
   if (typeof input.kind !== 'number' || typeof input.content !== 'string') {
@@ -411,7 +411,7 @@ export function parseJson<T>(raw: string): T | null {
   }
 }
 
-export function getFirstTagValue(event: FeedEvent, tagName: string): string | undefined {
+function getFirstTagValue(event: FeedEvent, tagName: string): string | undefined {
   const tag = event.tags.find((t) => t[0] === tagName);
   return tag?.[1];
 }
@@ -481,14 +481,24 @@ export function createPrimalRelayClient(url: string) {
     }
   };
 
-  ws.onerror = failAll;
-  ws.onclose = failAll;
+  let openTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const openPromise = new Promise<boolean>((resolve) => {
     const settle = (value: boolean) => {
       if (openSettled) return;
       openSettled = true;
+      if (openTimeoutId !== undefined) clearTimeout(openTimeoutId);
       resolve(value);
+    };
+
+    ws.onopen = () => settle(true);
+    ws.onerror = () => {
+      failAll();
+      settle(false);
+    };
+    ws.onclose = () => {
+      failAll();
+      settle(false);
     };
 
     if (ws.readyState === WebSocket.OPEN) {
@@ -496,21 +506,7 @@ export function createPrimalRelayClient(url: string) {
       return;
     }
 
-    const timeoutId = setTimeout(() => settle(false), OPEN_TIMEOUT_MS);
-    ws.onopen = () => {
-      clearTimeout(timeoutId);
-      settle(true);
-    };
-    ws.onerror = () => {
-      clearTimeout(timeoutId);
-      failAll();
-      settle(false);
-    };
-    ws.onclose = () => {
-      clearTimeout(timeoutId);
-      failAll();
-      settle(false);
-    };
+    openTimeoutId = setTimeout(() => settle(false), OPEN_TIMEOUT_MS);
   });
 
   const request = async (subId: string, filter: Record<string, unknown>) => {
