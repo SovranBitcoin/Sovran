@@ -174,7 +174,9 @@
       "references": [
         "sovran-app/shared/lib/logger.ts"
       ],
-      "verification_note": "Downgraded from Medium in Phase B: debug level is gated by __DEV__ in the logger, so production builds don't emit. Kept as Low because dumpForLLM still captures dev-session PII."
+      "verification_note": "Downgraded from Medium in Phase B: debug level is gated by __DEV__ in the logger, so production builds don't emit. Kept as Low because dumpForLLM still captures dev-session PII.",
+      "completion_status": "complete",
+      "completion_note": "fetchJson now projects URLs through describeRoute (host + path only) before logging; query string with user-entered names/NIP-05/mint URLs no longer reaches the ring buffer that dumpForLLM exports."
     },
     {
       "id": "F-010",
@@ -190,7 +192,9 @@
       "why_it_matters": "This is the boundary that dials arbitrary user-supplied hosts. Defence in depth: refuse non-https explicitly.",
       "fix": "Inside fetchMintInfo, assert `new URL(normalizedUrl).protocol === 'https:'` and return err('SchemeNotAllowed') otherwise.",
       "references": [],
-      "verification_note": "Verified at lines 191-207; no scheme assertion in the helper itself."
+      "verification_note": "Verified at lines 191-207; no scheme assertion in the helper itself.",
+      "completion_status": "complete",
+      "completion_note": "fetchMintInfo now parses mintUrl with `new URL(...)` and rejects anything where protocol !== 'https:' (returns err with logger event api.mint_info_scheme_rejected). Defence-in-depth even though normalizeUrlForApi prepends https:// — caller paths that skip normalization still hit the boundary."
     },
     {
       "id": "F-011",
@@ -222,7 +226,9 @@
       "why_it_matters": "Transport-layer concern unrelated to the HTTP client. Tidy-up only.",
       "fix": "Move to shared/lib/websockets.ts or colocate with PricelistProvider.",
       "references": [],
-      "verification_note": "Verified PRICELIST_URL has exactly one import site."
+      "verification_note": "Verified PRICELIST_URL has exactly one import site.",
+      "completion_status": "complete",
+      "completion_note": "PRICELIST_URL constant inlined into PricelistProvider.tsx (its sole consumer) and removed from apiClient.ts; the HTTP-client module no longer carries a transport-layer concern."
     }
   ],
   "dimensions": {

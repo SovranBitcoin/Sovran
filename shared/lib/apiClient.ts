@@ -36,8 +36,6 @@ type AuditMintResponseType = z.infer<typeof AuditMintResponse>;
 
 const BASE_URL = 'https://api.sovran.money/api';
 
-export const PRICELIST_URL = `wss://ws.sovran.money`;
-
 /**
  * Default per-request budget. React Native's `fetch` has no native timeout;
  * a request that never settles wedges the screen's loading state until the
@@ -104,12 +102,13 @@ export async function fetchJson<T>(
 ): Promise<Result<T, Error>> {
   const { signal: callerSignal, timeoutMs = DEFAULT_TIMEOUT_MS } = controls;
   const signal = combineSignals(callerSignal, timeoutSignal(timeoutMs));
+  const route = describeRoute(url);
 
   try {
-    apiLog.debug('api.fetch', { url });
+    apiLog.debug('api.fetch', route);
     const res = await fetch(url, { ...init, signal });
     if (!res.ok) {
-      apiLog.warn('api.fetch_error', { url, status: res.status });
+      apiLog.warn('api.fetch_error', { ...route, status: res.status });
       return err(new Error(`Fetch error: ${res.status} ${res.statusText}`));
     }
     const raw = await res.json();
@@ -122,13 +121,29 @@ export async function fetchJson<T>(
   } catch (e) {
     if (isAbortError(e)) {
       apiLog.debug('api.fetch_aborted', {
-        url,
+        ...route,
         reason: callerSignal?.aborted ? 'caller' : 'timeout',
       });
       return err(e instanceof Error ? e : new Error('Aborted'));
     }
-    apiLog.error('api.fetch_failed', { url, error: e });
+    apiLog.error('api.fetch_failed', { ...route, error: e });
     return err(e instanceof Error ? e : new Error('Unknown error'));
+  }
+}
+
+/**
+ * Logger-safe URL projection. Query strings carry user-entered PII for
+ * `nostr/search` (names, NIP-05 addresses) and arbitrary mint URLs for
+ * `cashu/mint/*`; the ring buffer can be exported via `dumpForLLM`, so we
+ * never let the raw query reach a log line. Host + path is enough to
+ * disambiguate routes during triage.
+ */
+function describeRoute(url: string): { host: string; path: string } {
+  try {
+    const parsed = new URL(url);
+    return { host: parsed.host, path: parsed.pathname };
+  } catch {
+    return { host: 'invalid', path: url };
   }
 }
 
@@ -291,7 +306,29 @@ export const fetchWallpaperCatalog = (controls: RequestControls = {}) =>
 // share the canonical `fetchJson` scaffolding.
 // ---------------------------------------------------------------------------
 
-export const fetchMintInfo = (mintUrl: string, controls: RequestControls = {}) => {
+export const fetchMintInfo = (
+  mintUrl: string,
+  controls: RequestControls = {}
+): Promise<Result<GetInfoResponse, Error>> => {
+  // Defence-in-depth: this is the one helper that dials arbitrary
+  // user-supplied hosts. Callers normalize the URL, but a stray `http://`
+  // or `file://` would otherwise sail through to `fetch`. Reject anything
+  // that isn't `https:` here so the policy is enforced at the boundary
+  // regardless of which call site forgot to validate.
+  let parsed: URL;
+  try {
+    parsed = new URL(mintUrl);
+  } catch {
+    return Promise.resolve(err(new Error('Invalid mint URL')));
+  }
+  if (parsed.protocol !== 'https:') {
+    apiLog.warn('api.mint_info_scheme_rejected', {
+      host: parsed.host,
+      protocol: parsed.protocol,
+    });
+    return Promise.resolve(err(new Error(`Mint URL must use https: (got ${parsed.protocol})`)));
+  }
+
   const normalizedUrl = mintUrl.endsWith('/') ? mintUrl : `${mintUrl}/`;
   return fetchJson(
     `${normalizedUrl}v1/info`,

@@ -1,8 +1,9 @@
 import React, { useEffect, createContext, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { usePricelistStore, BitcoinPrices } from '@/shared/stores/global/pricelistStore';
-import { PRICELIST_URL } from '@/shared/lib/apiClient';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
+
+const PRICELIST_URL = 'wss://ws.sovran.money';
 
 initLog('Module', 'PricelistProvider loaded');
 import { PricelistWsMessage, loggableIssues, parseWith } from '@sovranbitcoin/schemas';
