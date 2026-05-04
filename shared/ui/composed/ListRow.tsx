@@ -89,6 +89,12 @@ export interface ListRowProps {
   padding?: 'default' | 'compact';
 
   style?: StyleProp<ViewStyle>;
+
+  /** VoiceOver/TalkBack label for the row. Defaults to `title` when `title`
+   *  is a string. Required for rows whose title is a ReactNode. */
+  accessibilityLabel?: string;
+  /** Optional VoiceOver hint describing the row's tap outcome. */
+  accessibilityHint?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +125,8 @@ export function ListRow({
   testID,
   padding = 'default',
   style,
+  accessibilityLabel,
+  accessibilityHint,
 }: ListRowProps) {
   const [foreground, surfaceSecondary] = useThemeColor([
     'foreground',
@@ -183,21 +191,19 @@ export function ListRow({
 
   const subtitleIsNode = typeof subtitle !== 'string' && subtitle != null;
   const subtitleEl =
-    subtitle == null && subtitleFallback == null && !loading
-      ? null
-      : subtitleIsNode
-        ? subtitle
-        : (
-          <Text
-            size={14}
-            numberOfLines={1}
-            color={opacity(foreground, 0.5)}
-            loading={loading}
-            placeholder={subtitlePlaceholder}
-            fallback={subtitleFallback}>
-            {subtitle as string | undefined}
-          </Text>
-        );
+    subtitle == null && subtitleFallback == null && !loading ? null : subtitleIsNode ? (
+      subtitle
+    ) : (
+      <Text
+        size={14}
+        numberOfLines={1}
+        color={opacity(foreground, 0.5)}
+        loading={loading}
+        placeholder={subtitlePlaceholder}
+        fallback={subtitleFallback}>
+        {subtitle as string | undefined}
+      </Text>
+    );
 
   // ----- Row content -----
 
@@ -223,11 +229,17 @@ export function ListRow({
     );
   }
 
+  const a11yLabel = accessibilityLabel ?? (typeof title === 'string' ? title : undefined);
+
   return (
     <Pressable
       testID={testID}
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={a11yLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => [
         pressed && { backgroundColor: surfaceSecondary },
         disabled && styles.disabled,

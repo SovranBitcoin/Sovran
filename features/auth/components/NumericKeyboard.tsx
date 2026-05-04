@@ -30,9 +30,15 @@ const KeyButton: React.FC<KeyButtonProps> = ({ value, onPress }) => {
     return <View className="flex-1" style={{ marginHorizontal: 0.5 }} />;
   }
 
+  // The visible glyph for backspace is `⌫` which screen readers either
+  // misread ("eraser") or skip — explicit label is required for the
+  // passcode flow.
+  const a11yLabel = value === '<' ? 'Delete' : `Digit ${value}`;
+
   return (
     <Button
       onPress={() => onPress(value)}
+      accessibilityLabel={a11yLabel}
       ripple={{
         color: 'rgba(255,255,255,1)',
         opacity: 0.3,

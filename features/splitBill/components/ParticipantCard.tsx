@@ -138,6 +138,8 @@ export function ParticipantCard({
   const retryCTA = (
     <Pressable
       onPress={onRetry ? () => onRetry(participant.id) : undefined}
+      accessibilityRole="button"
+      accessibilityLabel={`Retry delivery to ${title}`}
       style={({ pressed }) => [
         styles.retryCTA,
         { backgroundColor: opacity('#FFFFFF', pressed ? 0.35 : 0.2) },
@@ -237,6 +239,9 @@ export function ParticipantCard({
           <Pressable
             onPress={canView ? () => onView(participant.id) : undefined}
             disabled={!canView}
+            accessibilityRole="button"
+            accessibilityLabel={`${viewLabel} for ${title}`}
+            accessibilityState={{ disabled: !canView }}
             style={({ pressed }) => [
               styles.viewButton,
               {

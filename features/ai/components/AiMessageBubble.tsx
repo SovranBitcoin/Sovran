@@ -166,11 +166,7 @@ function ThinkingHeader({
         </>
       ) : null}
       {hasReasoning ? (
-        <Icon
-          name={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-          size={14}
-          color={color}
-        />
+        <Icon name={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'} size={14} color={color} />
       ) : null}
     </HStack>
   );
@@ -181,7 +177,12 @@ function ThinkingHeader({
   if (!hasReasoning) return headerRow;
 
   return (
-    <Pressable onPress={onToggleExpanded} testID={testID}>
+    <Pressable
+      onPress={onToggleExpanded}
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={expanded ? 'Hide reasoning' : 'Show reasoning'}
+      accessibilityState={{ expanded }}>
       {headerRow}
       {expanded ? (
         <Text size={13} style={{ color, lineHeight: 18, marginTop: 4 }}>
@@ -233,12 +234,11 @@ function BranchNavView({ index, total, onPrev, onNext, color, testIdPrefix }: Br
         onPress={onPrev}
         disabled={!onPrev}
         hitSlop={14}
+        accessibilityRole="button"
+        accessibilityLabel="Previous response"
+        accessibilityState={{ disabled: !onPrev }}
         testID={`${testIdPrefix}-branch-prev`}>
-        <Icon
-          name="mdi:chevron-left"
-          size={20}
-          color={onPrev ? color : opacity(color, 0.35)}
-        />
+        <Icon name="mdi:chevron-left" size={20} color={onPrev ? color : opacity(color, 0.35)} />
       </Pressable>
       <Text size={12} style={{ color, fontVariant: ['tabular-nums'] }}>
         {index} / {total}
@@ -247,12 +247,11 @@ function BranchNavView({ index, total, onPrev, onNext, color, testIdPrefix }: Br
         onPress={onNext}
         disabled={!onNext}
         hitSlop={14}
+        accessibilityRole="button"
+        accessibilityLabel="Next response"
+        accessibilityState={{ disabled: !onNext }}
         testID={`${testIdPrefix}-branch-next`}>
-        <Icon
-          name="mdi:chevron-right"
-          size={20}
-          color={onNext ? color : opacity(color, 0.35)}
-        />
+        <Icon name="mdi:chevron-right" size={20} color={onNext ? color : opacity(color, 0.35)} />
       </Pressable>
     </HStack>
   );
@@ -281,9 +280,7 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
   // Persisted reasoning is the source of truth once the stream ends. Mid-
   // stream we prefer the live channel so reasoning tokens render as they
   // arrive instead of appearing all at once on completion.
-  const displayedReasoning = isLive
-    ? liveReasoning ?? ''
-    : message.reasoningContent ?? '';
+  const displayedReasoning = isLive ? (liveReasoning ?? '') : (message.reasoningContent ?? '');
 
   const hasContent = displayedContent.length > 0;
   const hasReasoning = displayedReasoning.length > 0;
@@ -292,8 +289,7 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
   //   • we're actively streaming this bubble (live counter + spinner),
   //   • OR the persisted message accumulated thinking duration / reasoning.
   // Otherwise we'd flash an empty bubble with no header.
-  const showHeader =
-    isLive || message.thinkingDurationSec != null || hasReasoning;
+  const showHeader = isLive || message.thinkingDurationSec != null || hasReasoning;
 
   // Persist-side seconds when the stream is no longer live, live-tick seconds
   // while it is. The user wanted "exactly how long it's thinking for" — this
@@ -381,6 +377,8 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
               <Pressable
                 onPress={handleCopy}
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Copy response"
                 testID={`ai-message-copy-${message.id}`}>
                 <HStack align="center" spacing={4}>
                   <Icon name="lets-icons:copy" size={16} color={opacity(foreground, 0.6)} />
@@ -394,6 +392,8 @@ function AssistantBubble({ message, isStreaming, onRetry, branchNav }: AiMessage
                 <Pressable
                   onPress={handleRetry}
                   hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Regenerate response"
                   testID={`ai-message-retry-${message.id}`}>
                   <HStack align="center" spacing={4}>
                     <Icon name="mdi:refresh" size={16} color={opacity(foreground, 0.6)} />

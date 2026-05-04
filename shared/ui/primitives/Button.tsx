@@ -268,6 +268,11 @@ interface ButtonProps {
   blur?: boolean | BlurConfig;
   /** Haptic feedback configuration (boolean or config object) */
   haptics?: boolean | HapticConfig;
+  /** VoiceOver/TalkBack label. Defaults to `text` when `text` is a string;
+   *  required for icon-only buttons since the glyph carries no name. */
+  accessibilityLabel?: string;
+  /** Optional VoiceOver hint describing the action's outcome. */
+  accessibilityHint?: string;
 }
 
 /**
@@ -313,7 +318,20 @@ export const Button = ({
   ripple = false,
   blur = false,
   haptics = false,
+  accessibilityLabel,
+  accessibilityHint,
 }: ButtonProps) => {
+  // Derive a sensible default label from `text` when it's a string so the
+  // common case ("primary CTA with visible copy") needs no extra prop.
+  // Icon-only and ReactNode-text callers must supply `accessibilityLabel`
+  // explicitly — we cannot read text out of a node tree.
+  const a11yLabel = accessibilityLabel ?? (typeof text === 'string' ? text : undefined);
+  const a11yProps = {
+    accessibilityRole: 'button' as const,
+    accessibilityLabel: a11yLabel,
+    accessibilityHint,
+    accessibilityState: { disabled: disabled || loading, busy: loading },
+  };
   const [foreground, surfaceForeground, foregroundSecondary, surfaceTertiary, background, danger] =
     useThemeColor([
       'foreground',
@@ -457,6 +475,7 @@ export const Button = ({
         onPressIn={handleRipplePressIn}
         haptics={haptics}
         hitSlop={BUTTON_HIT_SLOP}
+        {...a11yProps}
         style={[getButtonStyles(), style]}>
         {/* Ripple effect overlay */}
         {shouldShowRipple && <Animated.View pointerEvents="none" style={getRippleStyle()} />}
@@ -487,7 +506,8 @@ export const Button = ({
         onLayout={handleRippleLayout}
         onPressIn={handleRipplePressIn}
         haptics={haptics}
-        hitSlop={BUTTON_HIT_SLOP}>
+        hitSlop={BUTTON_HIT_SLOP}
+        {...a11yProps}>
         <View
           style={[getButtonStyles(), { width: 52, height: 52, position: 'relative' }, style]}
           blur={shouldUseBlur}
@@ -524,7 +544,8 @@ export const Button = ({
       onLayout={handleRippleLayout}
       onPressIn={handleRipplePressIn}
       haptics={haptics}
-      hitSlop={BUTTON_HIT_SLOP}>
+      hitSlop={BUTTON_HIT_SLOP}
+      {...a11yProps}>
       <View
         style={[getButtonStyles(), { position: 'relative', minHeight: 48 }, style]}
         blur={shouldUseBlur}
