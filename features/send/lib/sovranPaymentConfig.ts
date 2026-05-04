@@ -526,7 +526,7 @@ export function createSovranNotifications(
       const scanSource = sourceMap[source ?? ''] ?? 'qr';
       useScanHistoryStore
         .getState()
-        .addScan(rawInput, rawInput, scanType, scanSource, parsedType, container, optionKinds);
+        .addScan(rawInput, scanType, scanSource, parsedType, container, optionKinds);
     },
     onNfcWriteFailed: ({ message, rolledBack }) => {
       const errorMsg = rolledBack ? `${message} Your funds have been returned.` : message;

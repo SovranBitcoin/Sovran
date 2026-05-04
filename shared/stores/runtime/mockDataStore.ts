@@ -64,7 +64,6 @@ const TIME_OFFSETS_MS = [
 interface ScanEntry {
   id: string;
   raw: string;
-  processed: string;
   type: 'lightning' | 'ecash';
   source: ScanSource;
   scannedAt: number;
@@ -138,7 +137,6 @@ function buildMockData() {
       scanEntries.push({
         id: `demo-scan-${i}`,
         raw: `demo-raw-${i}`,
-        processed: `demo-raw-${i}`,
         type: scanType,
         source: row.badge,
         scannedAt: createdAt,

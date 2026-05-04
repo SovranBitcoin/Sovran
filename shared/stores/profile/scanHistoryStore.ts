@@ -2,9 +2,8 @@
  * @fileoverview Scan History Store
  *
  * Keeps track of all QR codes/strings that have been scanned via QR or NFC.
- * Stores both raw and processed versions for different use cases.
  *
- * This can be used for:
+ * Used for:
  * - Recently scanned items
  * - Scan analytics
  * - Quick re-access to previously scanned data
@@ -20,6 +19,9 @@ import { persistConfig } from '@/shared/lib/persist/persistConfig';
 
 const profileStorage = createProfileScopedStorage();
 
+/** Cap matches `searchHistoryStore`'s MAX_RECENT_SEARCHES convention; tail-evicts oldest. */
+const MAX_SCAN_HISTORY = 500;
+
 /** What type of data was scanned */
 type ScanType = 'npub' | 'ecash' | 'lightning' | 'mint' | 'paymentRequest' | 'unknown';
 
@@ -31,8 +33,6 @@ interface ScanHistoryEntry {
   id: string;
   /** The raw string as scanned */
   raw: string;
-  /** The processed/normalized string (e.g., npub without nostr: prefix) */
-  processed: string;
   /** Type of the scanned data (what was scanned) */
   type: ScanType;
   /** Source of the scan (how it was scanned) */
@@ -54,26 +54,37 @@ interface ScanHistoryState {
 }
 
 interface ScanHistoryActions {
-  /** Add a scan to history */
+  /** Add a scan to history. Dedupes on the normalised raw (see `normaliseForDedupe`). */
   addScan: (
     raw: string,
-    processed: string,
     type: ScanType,
     source: ScanSource,
     inputType?: string,
     container?: string,
     optionKinds?: string[]
   ) => void;
-  /** Link a scan entry to a transaction by matching the processed string */
-  linkTransaction: (processed: string, transactionId: string) => void;
+  /** Link a scan entry to a transaction by matching the raw string. */
+  linkTransaction: (raw: string, transactionId: string) => void;
 }
 
 type ScanHistoryStore = ScanHistoryState & ScanHistoryActions;
 
+/**
+ * Lookup key for dedupe — never persisted. Strips a leading payment-URI scheme
+ * (`nostr:`, `cashu:`, `bitcoin:`, `lightning:`), trims, and lower-cases so
+ * trivially-different surface forms collapse onto the same prior entry.
+ */
+export function normaliseForDedupe(raw: string): string {
+  const trimmed = raw.trim().toLowerCase();
+  return trimmed.replace(/^(nostr|cashu|bitcoin|lightning):/, '');
+}
+
+// `processed` was an in-memory mirror of `raw` (the sole call site passed raw
+// twice). Removed from the schema; older persisted blobs that still carry
+// `processed` validate via `looseObject` and the value ages out via the cap.
 const PersistedScanEntry = z.looseObject({
   id: z.string().max(128),
   raw: z.string().max(16_384),
-  processed: z.string().max(16_384),
   type: z.enum(['npub', 'ecash', 'lightning', 'mint', 'paymentRequest', 'unknown']),
   source: z.enum(['qr', 'nfc', 'paste', 'deeplink']),
   inputType: z.string().max(64).optional(),
@@ -84,7 +95,7 @@ const PersistedScanEntry = z.looseObject({
 });
 
 const PersistedScanHistoryStore = z.object({
-  entries: z.array(PersistedScanEntry).max(10_000).default([]),
+  entries: z.array(PersistedScanEntry).max(MAX_SCAN_HISTORY).default([]),
 });
 
 export const useScanHistoryStore = create<ScanHistoryStore>()(
@@ -95,7 +106,6 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
 
         addScan: (
           raw: string,
-          processed: string,
           type: ScanType,
           source: ScanSource,
           inputType?: string,
@@ -104,9 +114,12 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
         ) => {
           storeLog.info('store.scan_history.add', { type, source, inputType, container });
           const now = Date.now();
+          const key = normaliseForDedupe(raw);
 
           set((state) => {
-            const existingIndex = state.entries.findIndex((entry) => entry.raw === raw);
+            const existingIndex = state.entries.findIndex(
+              (entry) => normaliseForDedupe(entry.raw) === key
+            );
             if (existingIndex !== -1) {
               const updated = [...state.entries];
               updated[existingIndex] = {
@@ -122,7 +135,6 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
             const newEntry: ScanHistoryEntry = {
               id: mintLocalId('scan'),
               raw,
-              processed,
               type,
               source,
               ...(inputType != null && { inputType }),
@@ -130,16 +142,22 @@ export const useScanHistoryStore = create<ScanHistoryStore>()(
               ...(optionKinds != null && { optionKinds }),
               scannedAt: now,
             };
-            return { entries: [...state.entries, newEntry] };
+            const appended = [...state.entries, newEntry];
+            // Tail-evict oldest by scannedAt once the cap is breached. Stable when under cap.
+            const capped =
+              appended.length > MAX_SCAN_HISTORY
+                ? [...appended].sort((a, b) => b.scannedAt - a.scannedAt).slice(0, MAX_SCAN_HISTORY)
+                : appended;
+            return { entries: capped };
           });
         },
 
-        linkTransaction: (processed: string, transactionId: string) => {
-          if (!processed || !transactionId) return;
+        linkTransaction: (raw: string, transactionId: string) => {
+          if (!raw || !transactionId) return;
           storeLog.debug('store.scan_history.link_transaction', { transactionId });
 
           set((state) => {
-            const index = state.entries.findIndex((entry) => entry.processed === processed);
+            const index = state.entries.findIndex((entry) => entry.raw === raw);
             if (index === -1) return state;
             const updated = [...state.entries];
             updated[index] = { ...updated[index], transactionId };
