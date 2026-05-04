@@ -342,8 +342,8 @@
       ],
       "verification_note": "Confirmed at lines 329 and 337–344. Lint did not flag because expo lint runs without --max-warnings strict; the `any` is technically allowed but violates the codebase's own dim-1 invariant.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Typing hygiene; distinct from canonical-primitive consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "mapRef typed as a structural { setCameraPosition } shape backed by CameraPosition (& duration on Android); JSX branched per Platform so each map's ref typechecks against its concrete view type. Two any casts removed."
     },
     {
       "id": "F-013",
@@ -553,8 +553,8 @@
       "references": [],
       "verification_note": "Cosmetic.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Nit comment-add; not part of the canonical-primitive consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "Added comment explaining the +1 overshoot — Supercluster getClusterExpansionZoom returns the zoom at which children separate; +1 ensures they actually break apart in the viewport instead of re-clustering at the threshold. Cap at 18 stays within Supercluster maxZoom + 1."
     }
   ],
   "dimensions": {
