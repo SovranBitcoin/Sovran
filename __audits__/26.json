@@ -91,7 +91,8 @@
       ],
       "verification_note": "Traced by code reading: no abort signal exists, no spec-match check guards setQuotedEventsMap/setMetricsMap/setProfilesMap at :489-509 or :691-712. Log-doctor could not confirm dynamically because the captured session only opened the feed once (feed.parse.done fired once with 26 items and no pagination). Structural race is self-evident from source per the <log_doctor_integration> carve-out.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "loadFeed and loadMoreItems now record their requestPrefix into activeLoadIdRef on entry; the enrichFeedPage onUpdate callbacks bail out when activeLoadIdRef.current no longer matches the captured prefix, preventing stale writes after a filter switch. Same shape applied in-passing to UserFeed.loadMoreItems (loadFeedFromPrimal already had the canonical cancelled flag)."
     },
     {
       "id": "F-003",

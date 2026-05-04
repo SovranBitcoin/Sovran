@@ -98,7 +98,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-checked at line 511. Verified upstream hook returns fresh Map (shared/hooks/useNostrProfileMetadata.ts:129-137 useMemo deps include `byPubkey`). Counter-argument: `data` reference IS fresh through `currentListData → filteredDisplayContacts → profilesMap` deps chain, so LegendList sees a new array. But the array CONTAINS the same item refs (only the predicate changed which items survive, not the items' identities), and LegendList memoises rendered rows by item identity + extraData. Finding holds.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "extraData={profilesMap.size} → extraData={profilesMap}; the upstream useNostrProfileMetadataMany hook returns a fresh Map ref on each kind-0 cache write, so reference compare picks up content updates without a perf regression."
     },
     {
       "id": "F-003",
