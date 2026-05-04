@@ -63,11 +63,8 @@ export function useMintSelector({
 
   const mintInfo = useMemo(() => {
     if (!mintData) return null;
-    const info = mintData.mintInfo as any;
-    return { name: info?.name || mintData.name, icon_url: info?.icon_url } as {
-      name?: string;
-      icon_url?: string;
-    };
+    const info = mintData.mintInfo;
+    return { name: info?.name || mintData.name, icon_url: info?.icon_url };
   }, [mintData]);
 
   const mintName = mintUrl ? getMintDisplayName(mintUrl, { name: mintInfo?.name }) : undefined;

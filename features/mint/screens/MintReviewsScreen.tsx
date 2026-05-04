@@ -12,6 +12,7 @@ import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { reviewMint } from '@/shared/lib/apiClient';
+import type { MintRecommendation } from '@sovranbitcoin/schemas';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { useIdentityName } from '@/shared/hooks/useIdentityName';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
@@ -57,7 +58,7 @@ const ReviewItem = React.memo(function ReviewItem({
   review,
   isLast,
 }: {
-  review: any;
+  review: MintRecommendation;
   isLast: boolean;
 }) {
   const [foreground, surfaceSecondary] = useThemeColor([
@@ -333,20 +334,21 @@ export function MintReviewsScreen() {
     const all = kymRecommendations || [];
     const withContent = all.filter((r) => r.comment?.trim());
     const withoutContent = all.filter((r) => !r.comment?.trim());
-    const byDate = (a: any, b: any) => (b.created_at ?? 0) - (a.created_at ?? 0);
+    const byDate = (a: MintRecommendation, b: MintRecommendation) =>
+      (b.created_at ?? 0) - (a.created_at ?? 0);
     return [...withContent.sort(byDate), ...withoutContent.sort(byDate)];
   }, [kymRecommendations]);
   const totalReviews = reviews.length;
 
   const renderItem = useCallback(
-    ({ item, index }: { item: any; index: number }) => (
+    ({ item, index }: { item: MintRecommendation; index: number }) => (
       <ReviewItem review={item} isLast={!isLoading && index === reviews.length - 1} />
     ),
     [reviews.length, isLoading]
   );
 
   const keyExtractor = useCallback(
-    (item: any, index: number) => item.pubkey || `review-${index}`,
+    (item: MintRecommendation, index: number) => item.pubkey || `review-${index}`,
     []
   );
 

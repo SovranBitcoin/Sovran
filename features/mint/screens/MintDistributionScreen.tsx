@@ -76,7 +76,7 @@ export function MintDistributionScreen() {
     const units: string[] = [];
     trustedMints.forEach((mint) => {
       if (mint.mintInfo?.nuts?.['4']?.methods) {
-        mint.mintInfo.nuts['4'].methods.forEach((method: any) => {
+        mint.mintInfo.nuts['4'].methods.forEach((method) => {
           if (method.unit) {
             units.push(method.unit.toUpperCase());
           }
@@ -104,12 +104,12 @@ export function MintDistributionScreen() {
         // Default to SAT if no nuts data
         if (!mint.mintInfo?.nuts?.['4']?.methods) return true;
         return mint.mintInfo.nuts['4'].methods.some(
-          (method: any) => method.unit?.toUpperCase() === 'SAT'
+          (method) => method.unit?.toUpperCase() === 'SAT'
         );
       }
       if (!mint.mintInfo?.nuts?.['4']?.methods) return false;
       return mint.mintInfo.nuts['4'].methods.some(
-        (method: any) => method.unit?.toUpperCase() === selectedCurrency
+        (method) => method.unit?.toUpperCase() === selectedCurrency
       );
     });
   }, [trustedMints, selectedCurrency]);

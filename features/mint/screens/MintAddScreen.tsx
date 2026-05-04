@@ -1,10 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, memo } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  TextInput,
-  useWindowDimensions,
-} from 'react-native';
+import { ActivityIndicator, Platform, TextInput, useWindowDimensions } from 'react-native';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { useSharedValue } from 'react-native-reanimated';
 import { Stack, router } from 'expo-router';
@@ -45,6 +40,7 @@ import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import opacity from 'hex-color-opacity';
 import { log, cashuLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { getHeaderTitleWidthFromWidth } from '@/features/wallet/lib/walletHeader';
+import type { GetInfoResponse } from '@cashu/cashu-ts';
 
 // Height constant for currency tabs (same as MintListScreen)
 const CURRENCY_TABS_HEIGHT = 48;
@@ -54,7 +50,7 @@ const CURRENCY_TABS_HEIGHT = 48;
 interface PseudoMint {
   url: string;
   isPseudoMint: true;
-  mintInfo?: any;
+  mintInfo?: GetInfoResponse | null;
   name?: string;
 }
 

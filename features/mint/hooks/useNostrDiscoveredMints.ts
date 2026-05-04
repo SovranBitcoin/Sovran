@@ -89,7 +89,7 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
         { fullUrl: string; recs: MintRecommendation[] }
       >();
 
-      events.forEach((event: any) => {
+      events.forEach((event) => {
         if (!isCashuRecommendationEvent(event as NostrEvent)) return;
         const mintUrl = extractMintUrlFromEvent(event as NostrEvent);
         if (!mintUrl) return;
@@ -99,6 +99,11 @@ export const useNostrDiscoveredMints = (): UseNostrDiscoveredMintsResult => {
 
         const recommendation = parseRecommendation(event.content);
         if (!recommendation) return;
+
+        // NDKEvent.created_at is optional; MintRecommendation requires it.
+        // Drop events without one rather than coerce to 0/Date.now() —
+        // they'd misorder downstream sort-by-recency.
+        if (typeof event.created_at !== 'number') return;
 
         const entry = recommendationsByKey.get(key) ?? {
           fullUrl: normalizeUrlForApi(mintUrl),

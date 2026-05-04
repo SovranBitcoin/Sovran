@@ -15,6 +15,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useMints, useBalanceContext, useManager } from '@cashu/coco-react';
+import type { GetInfoResponse } from '@cashu/cashu-ts';
 import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { useLightningOperations } from '@/features/receive/hooks/useLightningOperations';
@@ -81,7 +82,7 @@ export function MintRebalancePlanScreen() {
   const { requestLightningInvoice } = useLightningOperations();
   const middlemanRouting = useSettingsStore((state) => state.middlemanRouting);
   const minTransferThreshold = useSettingsStore((state) => state.minTransferThreshold);
-  const [mintInfoMap, setMintInfoMap] = useState<Record<string, any>>({});
+  const [mintInfoMap, setMintInfoMap] = useState<Record<string, GetInfoResponse | null>>({});
 
   const distributions = useMintDistributionStore((state) => state.distributions);
   const distribution = useMemo(() => distributions[unit] || {}, [distributions, unit]);
@@ -91,13 +92,11 @@ export function MintRebalancePlanScreen() {
       if (unit === 'sat') {
         if (!mint.mintInfo?.nuts?.['4']?.methods) return true;
         return mint.mintInfo.nuts['4'].methods.some(
-          (method: any) => method.unit?.toLowerCase() === 'sat'
+          (method) => method.unit?.toLowerCase() === 'sat'
         );
       }
       if (!mint.mintInfo?.nuts?.['4']?.methods) return false;
-      return mint.mintInfo.nuts['4'].methods.some(
-        (method: any) => method.unit?.toLowerCase() === unit
-      );
+      return mint.mintInfo.nuts['4'].methods.some((method) => method.unit?.toLowerCase() === unit);
     });
   }, [trustedMints, unit]);
 
@@ -105,7 +104,7 @@ export function MintRebalancePlanScreen() {
 
   useEffect(() => {
     const loadMintInfo = async () => {
-      const infoMap: Record<string, any> = {};
+      const infoMap: Record<string, GetInfoResponse | null> = {};
       for (const mint of trustedMints) {
         try {
           const info = await getMintInfo(mint.mintUrl);

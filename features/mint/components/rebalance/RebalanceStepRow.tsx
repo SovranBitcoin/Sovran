@@ -27,6 +27,7 @@ import {
   TransferStepChain,
   TransferErrorBanner,
 } from '@/shared/blocks/transfer';
+import type { GetInfoResponse } from '@cashu/cashu-ts';
 import Icon from 'assets/icons';
 import { extractDomain, getMintDisplayName } from '@/shared/lib/url';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
@@ -43,11 +44,6 @@ export type StepStatus =
   | 'failed'
   | 'skipped';
 
-interface MintInfo {
-  name?: string;
-  icon_url?: string;
-}
-
 interface ChainInfo {
   chainId: string;
   /** Full ordered path of mint URLs: [source, via1, …, destination]. */
@@ -55,7 +51,7 @@ interface ChainInfo {
   /** 0-based index of the current hop within the chain. */
   chainHopIndex: number;
   /** Mint info for each URL in chainPath (parallel array). */
-  pathMintInfos: (MintInfo | null)[];
+  pathMintInfos: (GetInfoResponse | null)[];
 }
 
 interface RebalanceStepRowProps {
@@ -64,11 +60,11 @@ interface RebalanceStepRowProps {
   /** Source mint URL */
   fromMintUrl: string;
   /** Source mint info */
-  fromMintInfo?: MintInfo | null;
+  fromMintInfo?: GetInfoResponse | null;
   /** Destination mint URL */
   toMintUrl: string;
   /** Destination mint info */
-  toMintInfo?: MintInfo | null;
+  toMintInfo?: GetInfoResponse | null;
   /** Amount to transfer */
   amount: number;
   /** Unit for display */
