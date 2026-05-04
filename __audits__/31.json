@@ -160,7 +160,9 @@
         "ts:TS2459"
       ],
       "verification_note": "None of the 11 error paths intersect the branch change set (git diff --stat main...HEAD + git diff HEAD). Severity Low because root-cause is pre-existing and the refactor is not the author of the drift.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "partial",
+      "completion_note": "Closed 5 of the audit-cited TS errors (CapsuleButton.android.tsx:35 TS2322; nativeTabs.tsx:157,215 TS2322; downloadedThemeRegistry.ts:17,18 TS2459). Remaining baseline errors at app/_layout.tsx (Reanimated v4 transitionTimingFunction × 3), codereview/log-doctor, features/ai/components/ModelChip, features/mint/hooks/useMintSearch, features/splitBill/hooks/useSplitBillParticipantPicker — different seams, separate slices."
     },
     {
       "id": "F-006",

@@ -142,8 +142,8 @@
       ],
       "verification_note": "Ran `npm run type-check 2>&1 | grep theme` — 5 errors confirmed verbatim at the cited line numbers. Counter-argument considered: the failures could be at non-stable feature boundaries (third-party type drift). Checked: Image is OUR primitive, not a third-party type; the AppProps interface is hand-written 7 lines above the file's main function.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "3 of 5 TS2322 errors (UnitPreviewCard.tsx:74, WallpaperThumbnail.tsx:72, GalleryScreen.tsx:130) cleared by widening the Image primitive (commit ccd09dbd). WallpaperThumbnail.tsx:58 PressableFeedback prop also fixed (disabled → isDisabled). The downloadedThemeRegistry.ts:17-18 export gap remains deferred — separate seam."
+      "completion_status": "complete",
+      "completion_note": "Final 2 TS2459 errors cleared by adding 'export' to DominantColor / HSB / GradientColor in config/backgroundImageThemes.ts (matches the build-background-themes.js template at lines 341/351/360 — file had drifted from the generator)."
     },
     {
       "id": "F-004",
