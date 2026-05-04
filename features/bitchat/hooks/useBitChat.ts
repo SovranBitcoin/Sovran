@@ -9,7 +9,6 @@ import {
   addBLEPeerListener,
   addBLEStateListener,
   getBLEState,
-  getBLEDiagnostics,
   startNostr,
   joinGeohash,
   leaveGeohash,
@@ -26,6 +25,16 @@ import {
 import { useBitchatNickname } from './useBitchatNickname';
 import { bitchatLog } from '@/shared/lib/logger';
 import { mintLocalId } from '@/shared/lib/id';
+
+const MESSAGE_BUFFER_CAP = 500;
+
+function appendChatMessage(prev: ChatMessage[], msg: ChatMessage): ChatMessage[] {
+  if (prev.some((m) => m.id === msg.id)) return prev;
+  const last = prev[prev.length - 1];
+  const inOrder = !last || msg.timestamp >= last.timestamp;
+  const next = inOrder ? [...prev, msg] : [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
+  return next.length > MESSAGE_BUFFER_CAP ? next.slice(next.length - MESSAGE_BUFFER_CAP) : next;
+}
 
 /**
  * Public channel transports: `'ble'` = BLE mesh public chat,
@@ -100,10 +109,6 @@ export function useBitChat(
     const peerSub = addBLEPeerListener((event) => {
       bitchatLog.info('bitchat.hook.ble_peer', event);
     });
-    const peerPoll = setInterval(() => {
-      const diag = getBLEDiagnostics();
-      bitchatLog.info('bitchat.hook.ble_diag', { ...diag });
-    }, 10_000);
 
     const sub = addBLEMessageListener((event: BLEMessageEvent) => {
       const msg: ChatMessage = {
@@ -115,15 +120,10 @@ export function useBitChat(
         isPrivate: event.isPrivate,
         isOwn: false,
       };
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        const next = [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
-        return next.length > 500 ? next.slice(next.length - 500) : next;
-      });
+      setMessages((prev) => appendChatMessage(prev, msg));
     });
 
     return () => {
-      clearInterval(peerPoll);
       sub.remove();
       stateSub.remove();
       peerSub.remove();
@@ -180,11 +180,7 @@ export function useBitChat(
         isPrivate: true,
         isOwn: event.isOwn,
       };
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        const next = [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
-        return next.length > 500 ? next.slice(next.length - 500) : next;
-      });
+      setMessages((prev) => appendChatMessage(prev, msg));
     });
 
     return () => {
@@ -219,11 +215,7 @@ export function useBitChat(
         isPrivate: false,
         isOwn: event.isOwn,
       };
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        const next = [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
-        return next.length > 500 ? next.slice(next.length - 500) : next;
-      });
+      setMessages((prev) => appendChatMessage(prev, msg));
     });
 
     (async () => {
@@ -281,11 +273,7 @@ export function useBitChat(
         isPrivate: true,
         isOwn: event.isOwn,
       };
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        const next = [...prev, msg].sort((a, b) => a.timestamp - b.timestamp);
-        return next.length > 500 ? next.slice(next.length - 500) : next;
-      });
+      setMessages((prev) => appendChatMessage(prev, msg));
     });
 
     (async () => {
