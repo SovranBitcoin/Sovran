@@ -30,7 +30,7 @@ import { Screen } from '@/shared/ui/composed/Screen';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import Icon from 'assets/icons';
 import opacity from 'hex-color-opacity';
-import { log, useLifecycleLogger } from '@/shared/lib/logger';
+import { log, redactError, useLifecycleLogger } from '@/shared/lib/logger';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { finalizeEvent } from 'nostr-tools';
 import { useHeroTransition } from '@/shared/providers/hero-transition/HeroTransitionProvider';
@@ -42,6 +42,7 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
+import { z } from 'zod';
 
 // Available domains for Lightning addresses
 const DOMAINS = [
@@ -58,17 +59,48 @@ interface AvailabilityResult {
   error?: string;
 }
 
+// Username schema mirrors the input sanitiser (lowercase a-z, digits, underscore)
+// and caps the local-part well under NIP-05 / Lightning-Address conventions so
+// pathological input is rejected before reaching the (eventual) backend.
+const usernameSchema = z
+  .string()
+  .min(3, 'Too short')
+  .max(32, 'Too long')
+  .regex(/^[a-z0-9_]+$/, 'Invalid characters');
+
+// Hash the username to an 8-char prefix so log entries don't carry plaintext
+// candidate identifiers — consistent within a session for correlating retries,
+// but opaque to log consumers.
+function hashUsername(username: string): string {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < username.length; i++) {
+    h = Math.imul(h ^ username.charCodeAt(i), 16777619) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
 // Mock availability check - replace with actual API call
 async function checkUsernameAvailability(
   username: string,
-  _domain: string
+  _domain: string,
+  signal?: AbortSignal
 ): Promise<{ available: boolean; error?: string }> {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 600 + Math.random() * 400));
+  // Simulate API delay; abort if the caller has moved on
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(resolve, 600 + Math.random() * 400);
+    if (signal) {
+      const onAbort = () => {
+        clearTimeout(timer);
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
 
-  // Mock logic: usernames less than 3 chars are invalid, some common names are taken
-  if (username.length < 3) {
-    return { available: false, error: 'Too short' };
+  const parsed = usernameSchema.safeParse(username);
+  if (!parsed.success) {
+    return { available: false, error: parsed.error.issues[0]?.message ?? 'Invalid' };
   }
 
   const takenUsernames = ['satoshi', 'admin', 'bitcoin', 'test', 'user'];
@@ -270,7 +302,7 @@ export function ClaimUsernameScreen() {
   const hero = useHeroTransition();
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
-  const heroRef = useRef<any>(null);
+  const heroRef = useRef<RNView>(null);
   const [username, setUsername] = useState('');
   const [selectedDomain, setSelectedDomain] = useState<DomainId>('npubx');
   const [availabilityResults, setAvailabilityResults] = useState<AvailabilityResult[]>([]);
@@ -320,8 +352,9 @@ export function ClaimUsernameScreen() {
   const topOffset = insets.top;
   const accentColor = accent;
 
-  // Check availability for all domains
-  const checkAvailability = useCallback(async (name: string) => {
+  // Check availability for all domains; abortable so a stale in-flight check
+  // cannot overwrite the latest user input.
+  const checkAvailability = useCallback(async (name: string, signal: AbortSignal) => {
     if (name.length < 1) {
       setAvailabilityResults([]);
       return;
@@ -338,18 +371,30 @@ export function ClaimUsernameScreen() {
     setAvailabilityResults(initialResults);
 
     // Check all domains in parallel
-    log.info('onboarding.claim.check_availability', { username: name });
+    const usernameHash = hashUsername(name);
+    log.info('onboarding.claim.check_availability', { usernameHash });
     const results = await Promise.all(
       DOMAINS.map(async (domain) => {
         try {
-          const result = await checkUsernameAvailability(name, domain.value);
+          const result = await checkUsernameAvailability(name, domain.value, signal);
           return {
             domain: domain.value,
             available: result.available,
             loading: false,
             error: result.error,
           };
-        } catch {
+        } catch (e) {
+          if ((e as { name?: string })?.name === 'AbortError') {
+            return {
+              domain: domain.value,
+              available: null,
+              loading: false,
+            };
+          }
+          log.warn('onboarding.claim.availability_failed', {
+            domain: domain.value,
+            error: redactError(e),
+          });
           return {
             domain: domain.value,
             available: null,
@@ -360,25 +405,34 @@ export function ClaimUsernameScreen() {
       })
     );
 
+    if (signal.aborted) return;
+
     log.info('onboarding.claim.availability_results', {
-      username: name,
+      usernameHash,
       available: results.filter((r) => r.available).map((r) => r.domain),
     });
     setAvailabilityResults(results);
     setIsChecking(false);
   }, []);
 
-  // Trigger availability check when username changes
+  // Trigger availability check when username changes; abort the previous
+  // in-flight check on every change so the latest input wins regardless of
+  // network jitter (mocked or real).
   useEffect(() => {
+    if (username.length < 1) {
+      setAvailabilityResults([]);
+      setIsChecking(false);
+      return;
+    }
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      if (username.length >= 1) {
-        checkAvailability(username);
-      } else {
-        setAvailabilityResults([]);
-      }
+      checkAvailability(username, controller.signal);
     }, 400);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [username, checkAvailability]);
 
   // Get availability result for a domain
@@ -399,7 +453,10 @@ export function ClaimUsernameScreen() {
   // Generate NIP-98 auth for npub.cash and navigate to local server with auth
   const handleContinue = useCallback(() => {
     Keyboard.dismiss();
-    log.info('onboarding.claim.continue', { username, domain: selectedDomain });
+    log.info('onboarding.claim.continue', {
+      usernameHash: hashUsername(username),
+      domain: selectedDomain,
+    });
 
     if (!nostrKeys?.privateKey) {
       log.error('onboarding.claim.no_private_key');
@@ -419,9 +476,9 @@ export function ClaimUsernameScreen() {
     const localUrl = `http://localhost:8080/api/npubcash-server/username?nostr:authorization=${encodedAuth}`;
 
     Linking.openURL(localUrl);
-  }, [nostrKeys?.privateKey]);
+  }, [nostrKeys?.privateKey, username, selectedDomain]);
 
-  const selectedDomainLabel = DOMAINS.find((d) => d.id === selectedDomain)?.value || '';
+  const selectedDomainLabel = DOMAINS.find((d) => d.id === selectedDomain)!.value;
 
   // Bottom buttons component
   const bottomButtons = useMemo(
@@ -466,143 +523,138 @@ export function ClaimUsernameScreen() {
         scroll="animated"
         scrollY={scrollY}
         disableHeaderSpacer>
-          <VStack style={{ paddingBottom: 24 }}>
-            <RNView
-              ref={heroRef}
-              onLayout={handleHeroLayout}
-              collapsable={false}
-              shouldRasterizeIOS
-              renderToHardwareTextureAndroid
-              style={[
-                styles.heroCard,
-                {
-                  borderColor: opacity(accentColor, 0.3),
-                  opacity: hero.isHidden('claimUsername', 'destination') ? 0 : 1,
-                  marginTop: -topOffset,
-                  paddingTop: 52 + topOffset * 2,
-                },
-              ]}>
-              <ClaimUsernameCardFrame
-                accentColor={accentColor}
-                backgroundColor={background}
-                highlightColor={surfaceForeground}>
-                <VStack style={{ paddingHorizontal: 20, paddingBottom: 20, zIndex: 1 }}>
-                  <HStack align="center" style={{ marginBottom: 14 }}>
-                    <View
-                      style={[
-                        styles.heroSmallIcon,
-                        { backgroundColor: opacity(accentColor, 0.15) },
-                      ]}>
-                      <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
-                    </View>
-                    <VStack style={{ flex: 1, marginLeft: 12 }}>
-                      <Text size={18} heavy style={{ color: opacity(foreground, 0.9) }}>
-                        Claim Your Address
-                      </Text>
-                      <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
-                        Get a memorable Lightning URL
-                      </Text>
-                    </VStack>
-                  </HStack>
+        <VStack style={{ paddingBottom: 24 }}>
+          <RNView
+            ref={heroRef}
+            onLayout={handleHeroLayout}
+            collapsable={false}
+            shouldRasterizeIOS={isHeroTransitioning}
+            renderToHardwareTextureAndroid={isHeroTransitioning}
+            style={[
+              styles.heroCard,
+              {
+                borderColor: opacity(accentColor, 0.3),
+                opacity: hero.isHidden('claimUsername', 'destination') ? 0 : 1,
+                marginTop: -topOffset,
+                paddingTop: 52 + topOffset * 2,
+              },
+            ]}>
+            <ClaimUsernameCardFrame
+              accentColor={accentColor}
+              backgroundColor={background}
+              highlightColor={surfaceForeground}>
+              <VStack style={{ paddingHorizontal: 20, paddingBottom: 20, zIndex: 1 }}>
+                <HStack align="center" style={{ marginBottom: 14 }}>
+                  <View
+                    style={[styles.heroSmallIcon, { backgroundColor: opacity(accentColor, 0.15) }]}>
+                    <Icon name="mingcute:lightning-fill" size={20} color={accentColor} />
+                  </View>
+                  <VStack style={{ flex: 1, marginLeft: 12 }}>
+                    <Text size={18} heavy style={{ color: opacity(foreground, 0.9) }}>
+                      Claim Your Address
+                    </Text>
+                    <Text size={12} style={{ color: opacity(accentColor, 0.7) }}>
+                      Get a memorable Lightning URL
+                    </Text>
+                  </VStack>
+                </HStack>
 
-                  <Text size={14} style={{ color: opacity(foreground, 0.5), marginBottom: 14 }}>
-                    Choose a memorable username for receiving Bitcoin.
-                  </Text>
+                <Text size={14} style={{ color: opacity(foreground, 0.5), marginBottom: 14 }}>
+                  Choose a memorable username for receiving Bitcoin.
+                </Text>
 
-                  <UsernameInput
-                    value={username}
-                    onChangeText={setUsername}
-                    selectedDomain={selectedDomainLabel}
-                    isChecking={isChecking}
-                    accentColor={accentColor}
+                <UsernameInput
+                  value={username}
+                  onChangeText={setUsername}
+                  selectedDomain={selectedDomainLabel}
+                  isChecking={isChecking}
+                  accentColor={accentColor}
+                />
+              </VStack>
+            </ClaimUsernameCardFrame>
+          </RNView>
+
+          <Animated.View style={contentAnimStyle}>
+            <View style={{ paddingHorizontal: 16 }}>
+              <VStack style={{ gap: 8, marginTop: 18 }}>
+                <Text
+                  size={12}
+                  heavy
+                  style={{
+                    color: opacity(foreground, 0.33),
+                    marginLeft: 4,
+                    marginBottom: 4,
+                  }}>
+                  SELECT DOMAIN
+                </Text>
+                {DOMAINS.map((domain) => (
+                  <DomainOption
+                    key={domain.id}
+                    domain={domain}
+                    isSelected={selectedDomain === domain.id}
+                    onSelect={() => setSelectedDomain(domain.id)}
+                    availabilityResult={
+                      username.length >= 1 ? getAvailabilityForDomain(domain.value) : undefined
+                    }
                   />
-                </VStack>
-              </ClaimUsernameCardFrame>
-            </RNView>
+                ))}
+              </VStack>
 
-            <Animated.View style={contentAnimStyle}>
-              <View style={{ paddingHorizontal: 16 }}>
-                <VStack style={{ gap: 8, marginTop: 18 }}>
+              {username.length === 0 && (
+                <View style={[styles.guidelinesBox, { backgroundColor: surface }]}>
                   <Text
-                    size={12}
+                    size={13}
+                    heavy
+                    style={{ color: opacity(foreground, 0.5), marginBottom: 12 }}>
+                    Username Guidelines
+                  </Text>
+                  <VStack style={{ gap: 10 }}>
+                    {[
+                      { text: 'At least 3 characters', icon: 'mdi:check' },
+                      { text: 'Lowercase letters, numbers, underscores', icon: 'mdi:check' },
+                      { text: 'No spaces or special characters', icon: 'mdi:check' },
+                    ].map((item, index) => (
+                      <HStack key={index} align="center">
+                        <Icon name={item.icon} size={16} color={opacity(foreground, 0.33)} />
+                        <Text size={13} style={{ color: opacity(foreground, 0.4), marginLeft: 10 }}>
+                          {item.text}
+                        </Text>
+                      </HStack>
+                    ))}
+                  </VStack>
+                </View>
+              )}
+
+              {/* Preview - show when valid username */}
+              {username.length >= 3 && selectedDomainAvailable && (
+                <View
+                  style={[
+                    styles.previewBox,
+                    {
+                      backgroundColor: opacity(accent, 0.08),
+                      borderColor: opacity(accent, 0.2),
+                    },
+                  ]}>
+                  <Text
+                    size={11}
                     heavy
                     style={{
                       color: opacity(foreground, 0.33),
-                      marginLeft: 4,
-                      marginBottom: 4,
+                      marginBottom: 8,
+                      letterSpacing: 1,
                     }}>
-                    SELECT DOMAIN
+                    YOUR NEW ADDRESS
                   </Text>
-                  {DOMAINS.map((domain) => (
-                    <DomainOption
-                      key={domain.id}
-                      domain={domain}
-                      isSelected={selectedDomain === domain.id}
-                      onSelect={() => setSelectedDomain(domain.id)}
-                      availabilityResult={
-                        username.length >= 1 ? getAvailabilityForDomain(domain.value) : undefined
-                      }
-                    />
-                  ))}
-                </VStack>
-
-                {username.length === 0 && (
-                  <View style={[styles.guidelinesBox, { backgroundColor: surface }]}>
-                    <Text
-                      size={13}
-                      heavy
-                      style={{ color: opacity(foreground, 0.5), marginBottom: 12 }}>
-                      Username Guidelines
-                    </Text>
-                    <VStack style={{ gap: 10 }}>
-                      {[
-                        { text: 'At least 3 characters', icon: 'mdi:check' },
-                        { text: 'Lowercase letters, numbers, underscores', icon: 'mdi:check' },
-                        { text: 'No spaces or special characters', icon: 'mdi:check' },
-                      ].map((item, index) => (
-                        <HStack key={index} align="center">
-                          <Icon name={item.icon} size={16} color={opacity(foreground, 0.33)} />
-                          <Text
-                            size={13}
-                            style={{ color: opacity(foreground, 0.4), marginLeft: 10 }}>
-                            {item.text}
-                          </Text>
-                        </HStack>
-                      ))}
-                    </VStack>
-                  </View>
-                )}
-
-                {/* Preview - show when valid username */}
-                {username.length >= 3 && selectedDomainAvailable && (
-                  <View
-                    style={[
-                      styles.previewBox,
-                      {
-                        backgroundColor: opacity(accent, 0.08),
-                        borderColor: opacity(accent, 0.2),
-                      },
-                    ]}>
-                    <Text
-                      size={11}
-                      heavy
-                      style={{
-                        color: opacity(foreground, 0.33),
-                        marginBottom: 8,
-                        letterSpacing: 1,
-                      }}>
-                      YOUR NEW ADDRESS
-                    </Text>
-                    <Text
-                      size={18}
-                      heavy
-                      style={{ color: opacity(foreground, 0.9), fontFamily: 'monospace' }}>
-                      {username}@{selectedDomainLabel}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </Animated.View>
+                  <Text
+                    size={18}
+                    heavy
+                    style={{ color: opacity(foreground, 0.9), fontFamily: 'monospace' }}>
+                    {username}@{selectedDomainLabel}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </Animated.View>
         </VStack>
       </Screen>
     </>
@@ -670,14 +722,6 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-  },
-  heroIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
   },
   guidelinesBox: {
     borderRadius: 14,
