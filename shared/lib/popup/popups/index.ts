@@ -13,6 +13,7 @@ export { actionMenuPopup, dismissActionMenuPopup } from './actionMenu';
 export {
   paymentStatusPopup,
   swapStatusPopup,
+  isSwapStatusToastMounted,
   sendSuccessPopup,
   receiveSuccessPopup,
   nostrPaymentSentPopup,

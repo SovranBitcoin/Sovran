@@ -52,6 +52,7 @@ import { CocoPaymentUXProvider } from '@/features/send/providers/CocoPaymentUX';
 import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useAppBalance } from '@/features/wallet';
 import { usePaymentStatusListener } from '@/shared/hooks/usePaymentStatusListener';
+import { useSwapStatusListener } from '@/shared/hooks/useSwapStatusListener';
 import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
@@ -198,6 +199,12 @@ function PaymentStatusListener() {
   return null;
 }
 
+/** Re-pops the unified Swap toast on running→terminal transitions when the user dismissed mid-flight. */
+function SwapStatusListener() {
+  useSwapStatusListener();
+  return null;
+}
+
 /** Invisible component that syncs the live balance to the profile store for the active profile */
 function ProfileBalanceSync() {
   const balance = useAppBalance();
@@ -317,6 +324,7 @@ function RootLayoutContent() {
     <NavigationThemeProvider value={DarkTheme}>
       <KeyDerivationRegistrar />
       <PaymentStatusListener />
+      <SwapStatusListener />
       <ProfileBalanceSync />
       <ProfileMetadataSync />
       <StatusBar

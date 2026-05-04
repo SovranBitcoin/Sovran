@@ -40,17 +40,37 @@ export function paymentStatusPopup(payload: {
  * `useSwapStatusStore.start({ legs })` before this; the toast subscribes to
  * the store and re-renders as legs flip pending → active → done. On
  * `complete()` / `fail()` it animates to the green/red terminal state and
- * auto-dismisses 3s later. Also clears `useSwapStatusStore.active` on hide.
+ * auto-dismisses 3s later.
+ *
+ * The store is only cleared on a terminal-state dismissal. A swipe while
+ * `state === 'running'` leaves `active` in place so AccountPagerViewLayout's
+ * payment-button gate stays load-bearing — clearing mid-flight would let the
+ * user kick off a Send/Receive into coco's serialised mint/melt mutex.
+ *
+ * Idempotent: if a swap toast is already mounted, this is a no-op so
+ * `useSwapStatusListener` can call it on running→terminal transitions
+ * without racing the runner's own initial pop in MintRebalancePlanScreen.
  */
+let swapToastMounted = false;
+
+export function isSwapStatusToastMounted(): boolean {
+  return swapToastMounted;
+}
+
 export function swapStatusPopup(): void {
+  if (swapToastMounted) return;
+  swapToastMounted = true;
   showCustomToast({
     component: (toastProps) => React.createElement(SwapStatusToast, toastProps),
     duration: 'persistent',
     onHide: () => {
-      // Defensive — the toast clears too, but a manual dismiss path
-      // (e.g. user swipes) needs the store reset to avoid stale state on
-      // the next swap.
-      useSwapStatusStore.getState().clear();
+      swapToastMounted = false;
+      const cur = useSwapStatusStore.getState().active;
+      // Mid-flight swipe leaves the gate engaged; clear only after the
+      // toast unmounts in a terminal state (or the store is already empty).
+      if (!cur || cur.state !== 'running') {
+        useSwapStatusStore.getState().clear();
+      }
     },
   });
 }
