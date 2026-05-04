@@ -94,6 +94,34 @@ CWD is `sovran-app/`. All paths below are relative to it unless noted.
    substantially the same thing, two schemas validating the same shape,
    two helpers with overlapping APIs, and dead exports flagged by `knip`
    are first-class findings even when no other dimension flags them.
+9. **Cross-cite structural overlaps on every finding, with the Matt
+   Pocock lens named.** For each finding's `path`, check the §4
+   `analyze-structure` hotspot lists (complexity, type-safety,
+   components, hub-spoke, shallow, pass-through, unused-export) and
+   the `lookalikes` collisions for the surrounding subtree. Whenever
+   the cited file appears in any of those rows, append a reference
+   token of the form
+   `analyze-structure:<dim-or-list> <score-or-rank>` or
+   `lookalikes:<count> in <subtree>` to the finding's `references`,
+   **plus a `skill:<lens-name>` token naming whichever Matt Pocock
+   process skill best owns the structural shape** —
+   `skill:zoom-out` (dim 11 — frame coherence: name/job mismatch,
+   vocabulary leaks, file doing two jobs);
+   `skill:improve-codebase-architecture` (dim 12 — depth/seam:
+   shallow module, pass-through, hub-spoke, hypothetical seam,
+   `any[]`/`unknown` escape hatch);
+   `skill:diagnose` (dim 13 — diagnosability: silent fallback,
+   missing instrumentation, hidden coupling);
+   `skill:prompt-engineering-patterns` (dim 14 — API legibility:
+   throws-across-seam, lossy `T | null`, lossy error envelope, schema
+   missing `.strictObject` / `.max()`). These tokens are the
+   pre-computed signal that arms `fix.md`'s touched-file boy-scout
+   rule (`fix.md` §1b principle 6 + Phase 5): when the fixer ships an
+   unrelated dimension fix on the same file, the cross-cite tells it
+   the file's score is in the tail *and which architecture skill's
+   lens to apply when picking the one-small improvement*. This is
+   recording existing signal, not a separate finding; no Pass 0 work
+   is required because the Matt Pocock skills are already loaded.
 
 ## 4. Pre-flight cheatsheet — paste verbatim, never re-derive
 
@@ -677,7 +705,12 @@ those later when work lands.
 classify):
 `nuts/NN.md[:L]`, `nips/NN.md[:L]`, `luds/NN.md[:L]`, `docs/SOV-XX.md §N`,
 `skill:<name>`, `lint:<rule-id>`, `ts:<error-code>`, `knip:<category>`,
-`git:<sha>`, `gh:<pr>`, `research:<slug>[#section]`, plain `path:line`.
+`git:<sha>`, `gh:<pr>`, `research:<slug>[#section]`, plain `path:line`,
+`analyze-structure:<dim-or-list> <score-or-rank>` (e.g.
+`analyze-structure:complexity rank3`, `analyze-structure:Module-Design 49/100`),
+`lookalikes:<count> in <subtree>` (e.g. `lookalikes:6 collisions in features/payments`).
+The last two are the cross-cite tokens that arm `fix.md`'s boy-scout
+rule on touched files (see §3 ground rule 9 and §10 item 13).
 
 ## 10. Self-check (run before emitting)
 
@@ -706,3 +739,17 @@ classify):
     elsewhere.
 12. Schemas in sovran-app or coco-payment-ux duplicating
     `../sovran-schemas` are flagged.
+13. **Structural overlap cross-cited with Matt Pocock lens (§3 ground
+    rule 9).** For every finding, the auditor checked the finding's
+    `path` against `analyze-structure` hotspot lists and `lookalikes`
+    collisions for the surrounding subtree. If the file is in any
+    tail row, the finding's `references` carries both (a) the
+    structural token (`analyze-structure:<dim-or-list> <…>` or
+    `lookalikes:<count> in <subtree>`) and (b) a `skill:<lens-name>`
+    token from the Matt Pocock set (`zoom-out`,
+    `improve-codebase-architecture`, `diagnose`,
+    `prompt-engineering-patterns`) naming whichever skill best owns
+    the structural shape per §3 ground rule 9. A finding whose path
+    is a known structural hotspot but lacks either token blocks the
+    audit until both are added — without the lens, the fixer's
+    boy-scout rule can't pick the right architecture skill to apply.

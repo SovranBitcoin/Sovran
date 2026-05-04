@@ -107,6 +107,44 @@ from "fix the audit findings" alone.
    can't perceive, merge them. When the difference is intentional and
    load-bearing, leave them. Use judgment; context usually makes the
    call obvious.
+6. **Boy-scout rule on touched files.** Every file the slice opens for
+   edit — for any reason, including unrelated dimension fixes — gets a
+   fast structural check before the slice closes. If the file appears
+   in `analyze-structure`'s complexity/type-safety/component/hub-spoke/
+   shallow/pass-through/unused-export hotspot lists, in a `lookalikes`
+   collision the file participates in, or in the lowest-scoring
+   sub-dimension's hotspot rows for either package, fold a *small*
+   structural improvement into the slice. **The bar is "the file's
+   score moves because we were here," not "the file's score is
+   fixed."** One small fix per touched file is enough; bundling more
+   risks overflowing the slice budget. Skip a file only when its
+   structural cost genuinely doesn't fit in the remaining budget — and
+   record why in the Phase 4 plan so the deferred work is visible. This
+   is the standing rule that turns unrelated edits into compounding
+   structural-score gains; it complements the Phase 1 cross-link rule
+   (which picks the slice from the score) by acting on files the slice
+   already pulled in.
+
+   **The improvement choice is driven by the Matt Pocock process
+   skills already loaded at Phase 0 — they're the architecture lens
+   for this rule, not an ad-hoc list of fix shapes.** Pick the lens
+   from the file's tail signal:
+
+   | Tail signal on the touched file | Lens skill (already in context) | Shape of the one-small improvement |
+   | ------------------------------- | ------------------------------- | ---------------------------------- |
+   | File-name / symbol-name doesn't match the file's job; vocabulary leaks across layers; one file doing two jobs | `skill:zoom-out` (dim 11 — Frame coherence) | Apply the rename test — rename the symbol/file to what it really does, fix the imports the rename forces, *or* split the second job out. |
+   | Shallow module, pass-through, hub-spoke, hypothetical seam, interface that reveals implementation, `any[]`/`unknown` on a public type | `skill:improve-codebase-architecture` (dim 12 — Module depth & seam) | Apply the deletion test — if removing the module would collapse complexity, inline it; if interface ≈ implementation, collapse the wrapper; replace the escape-hatch type with a precise one. |
+   | Silent no-op fallback (context default swallowing missing provider, `try/catch` returning `null` without logging, `as any` cast hiding a type error), missing instrumentation a `log-doctor` mode would need, hidden coupling that prevents bisection | `skill:diagnose` (dim 13 — Diagnosability) | Restore the feedback loop — turn the silent fallback into a typed `Result.err` with a scoped logger line, or pin the random/time seam, or add the instrumentation the next debugger needs. |
+   | Function signature hides failure modes (throws across a seam, returns `T \| null` for ≥2 distinct failure cases), error envelope loses the cause, raw `string` where a brand or `z.enum` belongs, schema missing `.strictObject` / `.max()` | `skill:prompt-engineering-patterns` (dim 14 — API legibility) | Tighten the surface — return `Result<T, E>` per `neverthrow-return-types`, brand the type, narrow the union, add the missing zod constraint. |
+
+   When more than one lens fits a file, pick the one whose skill best
+   names the *root cause* (zoom-out for naming/frame, architecture for
+   shape/seam, diagnose for observability, prompt-engineering for
+   surface/types) and record the chosen skill on the snapshot row.
+   `skill:tdd` doesn't pick the fix here, but if the chosen
+   improvement changes runtime behaviour in a testable way, the
+   regression test follows the same `tdd` rule that already governs
+   Phase 5.
 
 ## 2. Inheritance from audit.md
 
@@ -336,6 +374,19 @@ into an audit fix is the canonical "net-negative diff" outcome §1b
 calls for. The Phase 4 plan must name the structural signal that was
 folded in (or note its absence).
 
+**Touched-file health snapshot (mandatory, for the §1b principle 6
+boy-scout rule).** Once the candidate file list is stable, run
+`analyze-structure --llm` once for each package the slice touches and
+`lookalikes --focus <file>` for each candidate file (cap by skipping
+files clearly outside the structural-hotspot tail). For every
+candidate file that appears in any hotspot / lookalikes / lowest-dim
+row, record the matched signal — the Phase 4 plan's
+"Touched-file health snapshot" line lists `<file> :: <signal>` for
+each, plus the *one* small structural improvement that file will
+receive in this slice (or `defer — <reason>`). This snapshot is the
+input to the Phase 5 boy-scout pass; an empty snapshot is allowed
+only when none of the candidate files are in the tail.
+
 ### Phase 2 — Pick a slice
 
 Apply `skill:improve-codebase-architecture` here — the slice must be
@@ -436,6 +487,14 @@ Write a short brief inline (markdown). Structure:
 - <path 2>
 - ...
 
+## Touched-file health snapshot (boy-scout rule, §1b principle 6)
+- <path 1> :: <analyze-structure signal | lookalikes signal | "clean">
+  · lens: <skill:zoom-out | skill:improve-codebase-architecture |
+           skill:diagnose | skill:prompt-engineering-patterns | "n/a — clean">
+  → <one small structural improvement to land in this slice | "defer — <reason>">
+- <path 2> :: <signal> · lens: <skill> → <improvement | defer reason>
+- ...
+
 ## Fix approach
 <2–4 sentences. Reference the controlling skill + protocol spec by path.>
 
@@ -497,6 +556,32 @@ Apply §1b principles in passing:
   `nuts/`, `nips/`, `luds/`, `../sovran-schemas/`). Inside
   `coco-payment-ux/`, rename sovran-borrowed names to UI-agnostic
   vocabulary.
+- **Boy-scout the touched files (§1b principle 6).** Walk the
+  Phase 4 "Touched-file health snapshot" and land the recorded
+  one-small-improvement on every entry that wasn't deferred. The
+  *kind* of improvement is determined by the snapshot's `lens` —
+  one of the four Matt Pocock process skills already loaded at
+  Phase 0 — not by an ad-hoc list:
+    - `skill:zoom-out` lens → apply the rename test (rename file/symbol
+      to what it really does; or split a file doing two jobs).
+    - `skill:improve-codebase-architecture` lens → apply the deletion
+      test (collapse pass-throughs / shallow modules; replace `any[]`
+      / `unknown` on public types with precise types).
+    - `skill:diagnose` lens → restore the feedback loop (turn silent
+      no-op fallbacks into typed `Result.err` + scoped log; add the
+      instrumentation a debugger would need; pin time/random seams).
+    - `skill:prompt-engineering-patterns` lens → tighten the API
+      surface (`Result<T, E>` per `neverthrow-return-types`; brand a
+      raw `string`; add `.strictObject` / `.max()`).
+  Each improvement must (a) be small enough to add ≈≤30 lines / ≈0
+  net additions and (b) move at least one `analyze-structure` or
+  `lookalikes` row off the next snapshot for that file. Note each
+  boy-scout fix in the commit body with
+  `Boy-scout (<lens-skill>): <file> — <one line>` so reviewers see
+  both the change and the architecture rule that made it. If a
+  candidate file's bad-score signal genuinely cannot be addressed in
+  budget, the Phase 4 snapshot's `defer — <reason>` carries forward;
+  do not silently skip.
 
 Stop and ask the user when:
 
@@ -676,6 +761,22 @@ out-of-scope | dim mismatch`).
     `lookalikes` collision count from the slice's subtree, OR it
     explicitly says "none — slice is purely audit-driven, no structural
     overlap" with the §4.9 + §4.9a outputs proving the absence.
+    10c. **Touched-file boy-scout pass** (§1b principle 6). The
+    Phase 4 "Touched-file health snapshot" was completed for every
+    candidate file with a §4.8/§4.9/§4.9a hit, every non-deferred row
+    names one of the four Matt Pocock lens skills (`skill:zoom-out`,
+    `skill:improve-codebase-architecture`, `skill:diagnose`,
+    `skill:prompt-engineering-patterns`) as the architecture rule
+    driving its fix, and Phase 5 landed the recorded
+    one-small-improvement for each non-deferred entry (each with a
+    `Boy-scout (<lens-skill>): <file> — <one line>` note in the commit
+    body that names the same lens skill). Deferrals carry an explicit
+    `defer — <reason>`. An empty snapshot is acceptable only when none
+    of the candidate files appeared in any structural-tail row; this
+    must be stated explicitly with the §4.8 / §4.9 / §4.9a outputs
+    proving the absence. A blank snapshot without that proof, any
+    non-deferred row missing its lens skill, or any non-deferred row
+    that didn't land its boy-scout fix, blocks the slice.
 11. Schemas added or changed live in `../sovran-schemas/src` unless
     app-only was explicitly justified in the plan.
 12. Final summary cites both commit SHAs.
