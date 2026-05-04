@@ -40,6 +40,8 @@ import {
   pickIntermediaryPath,
   addLocalHistoryEdges,
   getLocalCandidatesForDestination,
+  releaseTrustWindow,
+  formatStrandedRoutingDetail,
   type TransferStep,
   type RebalancePlan,
   type StepStatus,
@@ -114,19 +116,30 @@ export function MintRebalancePlanScreen() {
   const mintUrls = useMemo(() => mintsForUnit.map((m) => m.mintUrl), [mintsForUnit]);
 
   useEffect(() => {
+    let cancelled = false;
     const loadMintInfo = async () => {
+      const results = await Promise.allSettled(
+        trustedMints.map((mint) =>
+          getMintInfo(mint.mintUrl).then(
+            (info) => [mint.mintUrl, info] as const,
+            () => [mint.mintUrl, mint.mintInfo || null] as const
+          )
+        )
+      );
+      if (cancelled) return;
       const infoMap: Record<string, GetInfoResponse | null> = {};
-      for (const mint of trustedMints) {
-        try {
-          const info = await getMintInfo(mint.mintUrl);
-          infoMap[mint.mintUrl] = info;
-        } catch {
-          infoMap[mint.mintUrl] = mint.mintInfo || null;
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          const [url, info] = r.value;
+          infoMap[url] = info;
         }
       }
       setMintInfoMap(infoMap);
     };
     loadMintInfo();
+    return () => {
+      cancelled = true;
+    };
   }, [trustedMints, getMintInfo]);
 
   const computedPlan = useMemo(() => {
@@ -286,7 +299,11 @@ export function MintRebalancePlanScreen() {
       const getBalances = async () => {
         try {
           return await manager.wallet.balances.byMint();
-        } catch {
+        } catch (error) {
+          // Don't swallow silently — a transient balance-fetch failure looks
+          // identical to a real "balance didn't increase" timeout downstream,
+          // and that ambiguity hides operator-actionable network issues.
+          cashuLog.warn('mint.rebalance.balance_fetch_failed', { mintUrl, error });
           return {};
         }
       };
@@ -326,6 +343,26 @@ export function MintRebalancePlanScreen() {
     }
     return true;
   }, []);
+
+  const releaseTemporaryTrust = useCallback(
+    async (temporarilyTrusted: string[], warnStepId: string | undefined) => {
+      const { stranded, untrustErrors } = await releaseTrustWindow(manager, temporarilyTrusted);
+      for (const { url, error } of untrustErrors) {
+        cashuLog.warn('mint.rebalance.untrust_failed', { url, error });
+      }
+      if (stranded.length > 0) {
+        // Louder than the previous silent log.warn — this is a recovery_required
+        // signal: funds remain on an intermediary the user did not pre-trust.
+        cashuLog.warn('mint.rebalance.middleman_recovery_required', { stranded });
+        if (warnStepId) {
+          updateStepState(warnStepId, {
+            routingDetail: formatStrandedRoutingDetail(stranded),
+          });
+        }
+      }
+    },
+    [manager, updateStepState]
+  );
 
   const executeStep = useCallback(
     async (step: TransferStep, runId: number): Promise<boolean> => {
@@ -471,8 +508,21 @@ export function MintRebalancePlanScreen() {
           transferAmount = capped;
         }
 
-        // Helper: create invoice + tag the leg
-        const createInvoiceForAmount = async (amt: number) => {
+        // Helper: create invoice + tag the leg. When called with a previous
+        // quote, log it as orphaned — the previous mint quote on the
+        // destination mint is now unreachable but the mint will hold it open
+        // until expiry. Surfacing the id makes the leak observable to
+        // log-doctor's coco view.
+        const createInvoiceForAmount = async (amt: number, previous?: { quoteId?: string }) => {
+          if (previous?.quoteId) {
+            appendDebug({
+              event: 'mint_quote_orphaned',
+              stepId: id,
+              orphanedQuoteId: previous.quoteId,
+              toMintUrl,
+              reason: 'amount_changed',
+            });
+          }
           const mq = await requestLightningInvoice(toMintUrl, amt);
           const legId = ensureLegId();
           if (groupId && legId && mq.quoteId) {
@@ -519,7 +569,7 @@ export function MintRebalancePlanScreen() {
                   feeHeadroom,
                 });
                 transferAmount = capped;
-                mintQuote = await createInvoiceForAmount(transferAmount);
+                mintQuote = await createInvoiceForAmount(transferAmount, mintQuote);
                 invoice = mintQuote.request;
               }
             }
@@ -580,7 +630,7 @@ export function MintRebalancePlanScreen() {
                 reducedAmount: transferAmount,
                 reason: msg,
               });
-              mintQuote = await createInvoiceForAmount(transferAmount);
+              mintQuote = await createInvoiceForAmount(transferAmount, mintQuote);
               invoice = mintQuote.request;
               updateStepState(id, { status: 'invoiceReady', invoice });
               continue;
@@ -681,7 +731,7 @@ export function MintRebalancePlanScreen() {
 
                 // Restore proofs from the failed attempt, then start fresh
                 await CocoManager.restoreInflightProofsForMint(fromMintUrl);
-                mintQuote = await createInvoiceForAmount(transferAmount);
+                mintQuote = await createInvoiceForAmount(transferAmount, mintQuote);
                 invoice = mintQuote.request;
                 preparedMeltOp = null;
                 updateStepState(id, { status: 'invoiceReady', invoice });
@@ -1124,22 +1174,11 @@ export function MintRebalancePlanScreen() {
               lastCandidateError = hopErr;
             }
 
-            // Untrust temporary intermediaries (if no funds remain)
-            const finalBals = await manager.wallet.balances
-              .byMint()
-              .catch(() => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>);
-            for (const url of temporarilyTrusted) {
-              const bal = finalBals[url]?.total ?? 0;
-              if (bal > 0) {
-                cashuLog.warn('mint.rebalance.middleman_kept', { url, balance: bal });
-                continue;
-              }
-              try {
-                await manager.mint.untrustMint(url);
-              } catch {
-                /* ignore */
-              }
-            }
+            // Always untrust intermediaries we trusted for this attempt —
+            // the trust window must not outlive the operation. Remaining
+            // balance is surfaced (not used to retain trust); user can
+            // manually re-trust to recover any stranded funds.
+            await releaseTemporaryTrust(temporarilyTrusted, finalAutoRouteStepId ?? id);
 
             if (chainSuccess) {
               meltSucceeded = true;
@@ -1286,6 +1325,7 @@ export function MintRebalancePlanScreen() {
       appendDebug,
       trustedMints,
       mintInfoMap,
+      releaseTemporaryTrust,
     ]
   );
 
@@ -1577,28 +1617,16 @@ export function MintRebalancePlanScreen() {
       try {
         await runStepsSequentially(nextSteps, runId);
       } finally {
-        // ── Revoke temporary trust ──
-        // Only untrust intermediary mints whose balance is zero. If a chain
-        // failed mid-way, the user may have ecash stranded on the intermediary;
-        // keeping it trusted lets them recover those funds.
-        const balances = await manager.wallet.balances
-          .byMint()
-          .catch(() => ({}) as Awaited<ReturnType<typeof manager.wallet.balances.byMint>>);
-        for (const url of temporarilyTrusted) {
-          const bal = balances[url]?.total ?? 0;
-          if (bal > 0) {
-            cashuLog.warn('mint.rebalance.middleman_kept', { url, balance: bal });
-            continue;
-          }
-          try {
-            await manager.mint.untrustMint(url);
-          } catch (err) {
-            cashuLog.warn('mint.rebalance.untrust_failed', { url, error: err });
-          }
-        }
+        // Always revoke temporary trust we acquired for intermediaries — the
+        // trust window must not outlive the operation. If funds remain on an
+        // intermediary after a mid-chain failure, surface that to the user via
+        // the step's routingDetail and a louder log; the mint URL stays in the
+        // wallet (untrust does not delete proofs), and the user can re-trust
+        // manually to recover.
+        await releaseTemporaryTrust(temporarilyTrusted, rerouteSteps[rerouteSteps.length - 1]?.id);
       }
     },
-    [runPlan, runStatus, runStepsSequentially, trustedMints, manager]
+    [runPlan, runStatus, runStepsSequentially, trustedMints, manager, releaseTemporaryTrust]
   );
 
   const handleCancelRun = useCallback(() => {
