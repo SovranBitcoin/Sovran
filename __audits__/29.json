@@ -76,7 +76,9 @@
         "skill:security-review"
       ],
       "verification_note": "Re-checked: Transactions.tsx:127-139 is unchanged from audit 03; scanHistoryStore.ts:29 still declares raw as the raw scanned string; sovranPaymentConfig.ts:548 still passes rawInput as both args of addScan. Counter-argument considered: the scanEntries array was observed empty in the latest log session — does that make the path benign? No: emptiness is session-state, not code-state. Any user who has ever scanned a token to receive ecash has a populated entries array and the next mount of Transactions writes those tokens to the ring buffer.",
-      "prior_audit_id": "F-001@03.json"
+      "prior_audit_id": "F-001@03.json",
+      "completion_status": "stale",
+      "completion_note": "Diagnostic dump of scanHistoryStore.entries / locations was already removed from Transactions.tsx before this slice — no scanHistoryStore reference remains in the file."
     },
     {
       "id": "F-002",
@@ -96,7 +98,9 @@
         "skill:vercel-react-native-skills"
       ],
       "verification_note": "Re-verified by running type-check; the error is emitted against the exact line in my ENTRY file. Counter-argument: the project ships with this error, so the product works despite it. True — but the prop isn't doing what the code expects, and type errors mask future regressions.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "waitForInitialLayout prop is no longer present in Transactions.tsx (file uses AnimatedLegendList from '@legendapp/list/reanimated' with no waitForInitialLayout); UserMessagesScreen.tsx imports from '@legendapp/list' and does not set the prop. The TS2322 surface flagged by the auditor is gone."
     },
     {
       "id": "F-003",
@@ -138,7 +142,8 @@
       ],
       "verification_note": "Re-checked file; behaviour is as described. Counter-argument: entries may always have an id in practice — true for most types, but the fallback exists specifically because some paths don't, and the fix is so cheap that removing the risk is the right call.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "getTimelineKey now returns a deterministic composite '${entry.type}-${entry.createdAt}-${entry.amount}' as the fallback. Math.random() and the raw-token branch were removed — bearer tokens can never become React keys."
     },
     {
       "id": "F-005",
@@ -199,7 +204,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Downgraded from initial Medium — React Compiler is enabled so the perf impact is likely marginal. Kept as Low because the header wrapper is genuinely redundant even ignoring memoization.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "renderItem hoisted to a useCallback (renderSection) keyed on foreground/muted/borderColor/renderTimelineItem; ListHeaderComponent resolved through useMemo (resolvedHeader)."
     },
     {
       "id": "F-008",
@@ -218,7 +225,9 @@
         "skill:vercel-react-native-skills"
       ],
       "verification_note": "Straightforward reading of the code. Counter-argument: a constant estimate is fine if sections are uniform-ish — true for the Confirmed tab; not true for the All tab when pending + expired + confirmed sections differ wildly.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Switched from a single estimatedItemSize (first section only) to LegendList's getEstimatedItemSize callback so each section's estimate uses its own row count."
     },
     {
       "id": "F-009",
@@ -256,7 +265,9 @@
         "skill:native-data-fetching"
       ],
       "verification_note": "UNVERIFIED — requires reading coco/packages/coco-react/src/hooks/usePaginatedHistory.ts (out of audit scope here) or enabling a perf.js_thread_blocked scope on this event pair. Proposed probe: cashuLog.debug('tx.history.refresh', { source: 'history:updated' }) inside the handler + stats --event 'tx.history.refresh' over a long session; counts > 2 per real update are the diagnostic signal.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "UNVERIFIED loop suspicion: needs coco-react usePaginatedHistory.refresh source to confirm whether refresh() re-emits 'history:updated'. Out of scope for this slice; revisit when refactoring the melt/history bridge."
     },
     {
       "id": "F-011",
@@ -273,7 +284,9 @@
       "fix": "Either (a) pass `filteredByTypeHistory` down as the data source so both MonthSelector and Transactions operate on the same pre-filtered array and Transactions drops the matching branches of its internal filter; or (b) delete `filteredByTypeHistory` and derive MonthSelector's month list from whatever Transactions actually rendered. Option (a) is the cleaner separation.",
       "references": [],
       "verification_note": "Confirmed via reading both files. Counter-argument: keeping Transactions self-filtering makes it reusable from WalletScreen and other contexts without a pre-filter step — valid. In that case, push the filter logic into a shared helper (`filterHistory(history, opts)`) that both TransactionsScreen and Transactions can call.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "TransactionsScreen now feeds filteredByTypeHistory to <Transactions> instead of raw history; MonthSelector and the list operate on the same pre-filtered source. Transactions's internal filter is idempotent for the type/direction props that already filtered upstream."
     },
     {
       "id": "F-012",
