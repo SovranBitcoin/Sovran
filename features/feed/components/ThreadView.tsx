@@ -2,60 +2,32 @@
  * @fileoverview Thread View Component
  *
  * Displays a Nostr post in detail with its reply chain (parents above,
- * replies below). Uses Primal's cache relay thread_view API.
+ * replies below). Pure renderer — data acquisition lives in `useThread`.
  */
 
-import React, { useMemo, useEffect, useCallback, useState } from 'react';
-import { StyleSheet, ActivityIndicator, InteractionManager } from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { ActivityIndicator, StyleSheet } from 'react-native';
+import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
+import { useHeaderHeight } from '@react-navigation/elements';
+import opacity from 'hex-color-opacity';
+
 import { Text } from '@/shared/ui/primitives/Text';
 import { View } from '@/shared/ui/primitives/View/View';
 import { Spacer } from '@/shared/ui/primitives/View/Spacer';
 import Icon from 'assets/icons';
-import opacity from 'hex-color-opacity';
-import { ShortTextNote, Metadata } from 'nostr-tools/kinds';
-import { LegendList, type LegendListRenderItemProps } from '@legendapp/list';
-import { useHeaderHeight } from '@react-navigation/elements';
 
-import {
-  type FeedEvent,
-  type NoteMetrics,
-  type ProfileInfo,
-  DEFAULT_METRICS,
-  PRIMAL_CACHE_RELAY_URL,
-  PRIMAL_KIND_NOTE_STATS,
-  PRIMAL_KIND_MENTIONS,
-  createPrimalRelayClient,
-  collectReferencedIds,
-  normalizeFeedEvent,
-  parseJson,
-  parseProfileFromRaw,
-  parseNoteMetrics,
-} from './nostr/shared';
-
+import { type NoteMetrics, DEFAULT_METRICS } from './nostr/shared';
 import { PostCard } from './nostr/PostCard';
-
 import { ImageOverlayProvider, useImageOverlay, AnimatedImageOverlay } from './nostr/image-overlay';
-import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
-import { useLatestRef } from '@/shared/hooks/useLatestRef';
-import { useThemeColor } from '@/shared/hooks/useThemeColor';
-import { feedLog, Log } from '@/shared/lib/logger';
 
-// ============================================================================
-// Types
-// ============================================================================
+import { useThread, type ThreadItem } from '@/features/feed/hooks/useThread';
+import { useNostrEngagement } from '@/features/feed/hooks/useNostrEngagement';
+import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { Log } from '@/shared/lib/logger';
 
 interface ThreadViewProps {
   eventId: string;
 }
-
-type ThreadItem =
-  | { type: 'parent'; event: FeedEvent }
-  | { type: 'target'; event: FeedEvent }
-  | { type: 'reply'; event: FeedEvent };
-
-// ============================================================================
-// Stable list helpers (module-level — no closures needed)
-// ============================================================================
 
 function threadKeyExtractor(item: ThreadItem): string {
   switch (item.type) {
@@ -72,86 +44,6 @@ function threadItemType(item: ThreadItem): string {
   return item.type;
 }
 
-// ============================================================================
-// Thread data fetching helpers
-// ============================================================================
-
-/**
- * Given the target eventId and all events from thread_view, build:
- * - parents: chain of ancestor posts above the target
- * - target: the focused event
- * - replies: direct replies to the target
- */
-function buildThreadStructure(
-  eventId: string,
-  allEvents: Map<string, FeedEvent>
-): { parents: FeedEvent[]; target: FeedEvent | null; replies: FeedEvent[] } {
-  const target = allEvents.get(eventId) || null;
-  if (!target) return { parents: [], target: null, replies: [] };
-
-  // Build parent chain by walking e-tags upward
-  const parents: FeedEvent[] = [];
-  let current = target;
-  const visited = new Set<string>([eventId]);
-
-  while (true) {
-    const eTags = (current.tags || []).filter((t) => t[0] === 'e');
-    const replyTag = eTags.find((t) => t[3] === 'reply');
-    const rootTag = eTags.find((t) => t[3] === 'root');
-    const parentTag = replyTag || rootTag || (eTags.length > 0 ? eTags[eTags.length - 1] : null);
-
-    if (!parentTag) break;
-    const parentId = parentTag[1];
-    if (visited.has(parentId)) break;
-    visited.add(parentId);
-
-    const parentEvent = allEvents.get(parentId);
-    if (!parentEvent) break;
-
-    parents.unshift(parentEvent);
-    current = parentEvent;
-  }
-
-  // Find direct replies: Kind 1 events with an e-tag pointing to our eventId
-  const replies: FeedEvent[] = [];
-  for (const ev of allEvents.values()) {
-    if (ev.id === eventId) continue;
-    if (ev.kind !== ShortTextNote) continue;
-    if (parents.some((p) => p.id === ev.id)) continue;
-
-    const eTags = (ev.tags || []).filter((t) => t[0] === 'e');
-    const replyTag = eTags.find((t) => t[3] === 'reply');
-    if (replyTag && replyTag[1] === eventId) {
-      replies.push(ev);
-      continue;
-    }
-    // NIP-10: if only root is present, it's a direct reply
-    if (!replyTag) {
-      const rootTag = eTags.find((t) => t[3] === 'root');
-      if (rootTag && rootTag[1] === eventId) {
-        replies.push(ev);
-        continue;
-      }
-    }
-    // NIP-10 positional: last e-tag points to our event
-    if (!replyTag && eTags.length > 0) {
-      const lastETag = eTags[eTags.length - 1];
-      if (lastETag[1] === eventId && lastETag[3] !== 'root' && lastETag[3] !== 'mention') {
-        replies.push(ev);
-        continue;
-      }
-    }
-  }
-
-  replies.sort((a, b) => a.created_at - b.created_at);
-
-  return { parents, target, replies };
-}
-
-// ============================================================================
-// Main ThreadView Component
-// ============================================================================
-
 function ThreadViewInner({ eventId }: ThreadViewProps) {
   const [foreground, background, mutedColor, defaultColor] = useThemeColor([
     'foreground',
@@ -161,271 +53,29 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
   ] as const);
   const headerHeight = useHeaderHeight();
   const imageOverlay = useImageOverlay();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const [threadItems, setThreadItems] = useState<ThreadItem[]>([]);
-  const [profilesMap, setProfilesMap] = useState<Map<string, ProfileInfo>>(new Map());
-  const [metricsMap, setMetricsMap] = useState<Map<string, NoteMetrics>>(new Map());
-  const [quotedEventsMap, setQuotedEventsMap] = useState<Map<string, FeedEvent>>(new Map());
+  const {
+    items,
+    hiddenReplyCount,
+    isLoading,
+    error,
+    dataVersion,
+    profilesRef,
+    metricsRef,
+    quotedEventsRef,
+  } = useThread(eventId);
 
-  // Stable refs for renderItem — avoids re-creating renderItem on every Map update
-  const profilesRef = useLatestRef(profilesMap);
-  const metricsRef = useLatestRef(metricsMap);
-  const quotedRef = useLatestRef(quotedEventsMap);
-  const [dataVersion, setDataVersion] = useState(0);
-
-  const [hiddenReplyCount, setHiddenReplyCount] = useState(0);
-
-  const targetIndex = useMemo(() => {
-    return threadItems.findIndex((item) => item.type === 'target');
-  }, [threadItems]);
+  const targetIndex = useMemo(() => items.findIndex((item) => item.type === 'target'), [items]);
+  const hasParents = useMemo(() => items.some((i) => i.type === 'parent'), [items]);
 
   const getMetrics = useCallback(
     (id: string): NoteMetrics => metricsRef.current.get(id) || DEFAULT_METRICS,
-    []
+    [metricsRef]
   );
 
-  const actionableEvents = useMemo(() => threadItems.map((item) => item.event), [threadItems]);
+  const actionableEvents = useMemo(() => items.map((item) => item.event), [items]);
   const { getDisplayMetrics, getEngagementState, toggleLike, toggleRepost, engagementRevision } =
     useNostrEngagement(actionableEvents, getMetrics);
-
-  // Fetch thread data
-  useEffect(() => {
-    if (!eventId) return;
-
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-
-    feedLog.info('thread.load.start', { eventId });
-
-    const fetchThread = async () => {
-      const client = createPrimalRelayClient(PRIMAL_CACHE_RELAY_URL);
-
-      try {
-        const prefix = Date.now().toString(36);
-
-        // Phase 1: thread_view
-        const rawEvents = await client.request(`${prefix}_thread`, {
-          cache: [
-            'thread_view',
-            {
-              event_id: eventId,
-              limit: 200,
-            },
-          ],
-        });
-
-        if (cancelled) return;
-
-        // Parse raw events
-        const allEvents = new Map<string, FeedEvent>();
-        const profiles = new Map<string, ProfileInfo>();
-        const metrics = new Map<string, NoteMetrics>();
-        const embeddedMentions = new Map<string, FeedEvent>();
-
-        for (const raw of rawEvents) {
-          if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-            const parsed = parseJson<Record<string, unknown>>(raw.content);
-            const eid = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-            if (!eid || !parsed) continue;
-            metrics.set(eid, parseNoteMetrics(parsed));
-            continue;
-          }
-
-          if (raw.kind === PRIMAL_KIND_MENTIONS) {
-            const mentionEvent = normalizeFeedEvent(parseJson<unknown>(raw.content));
-            if (!mentionEvent) continue;
-            embeddedMentions.set(mentionEvent.id, mentionEvent);
-            allEvents.set(mentionEvent.id, mentionEvent);
-            continue;
-          }
-
-          if (raw.kind === Metadata) {
-            const result = parseProfileFromRaw(raw);
-            if (result) profiles.set(result[0], result[1]);
-            continue;
-          }
-
-          const ev = normalizeFeedEvent(raw);
-          if (!ev) continue;
-          if (ev.kind === ShortTextNote) {
-            allEvents.set(ev.id, ev);
-          }
-        }
-
-        if (cancelled) return;
-
-        // Build thread structure
-        let { parents, target, replies } = buildThreadStructure(eventId, allEvents);
-
-        if (!target) {
-          setError('Post not found');
-          setIsLoading(false);
-          return;
-        }
-
-        // Supplementary reply fetch: if metrics indicate more replies exist than
-        // thread_view returned, try a dedicated reply endpoint for additional coverage
-        const suppExpected = metrics.get(eventId)?.replyCount ?? 0;
-        if (suppExpected > replies.length && !cancelled) {
-          try {
-            const suppRaw = await client.request(`${prefix}_supp`, {
-              cache: ['event_replies', { event_id: eventId, limit: 50 }],
-            });
-            let foundNew = false;
-            for (const raw of suppRaw) {
-              if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-                const parsed = parseJson<Record<string, unknown>>(raw.content);
-                const eid = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-                if (!eid || !parsed) continue;
-                metrics.set(eid, parseNoteMetrics(parsed));
-                continue;
-              }
-              if (raw.kind === PRIMAL_KIND_MENTIONS) {
-                const mentionEvent = normalizeFeedEvent(parseJson<unknown>(raw.content));
-                if (mentionEvent) {
-                  embeddedMentions.set(mentionEvent.id, mentionEvent);
-                  allEvents.set(mentionEvent.id, mentionEvent);
-                }
-                continue;
-              }
-              if (raw.kind === Metadata) {
-                const result = parseProfileFromRaw(raw);
-                if (result) profiles.set(result[0], result[1]);
-                continue;
-              }
-              const ev = normalizeFeedEvent(raw);
-              if (ev && ev.kind === ShortTextNote && !allEvents.has(ev.id)) {
-                allEvents.set(ev.id, ev);
-                foundNew = true;
-              }
-            }
-            if (foundNew && !cancelled) {
-              const rebuilt = buildThreadStructure(eventId, allEvents);
-              if (rebuilt.target) {
-                parents = rebuilt.parents;
-                target = rebuilt.target;
-                replies = rebuilt.replies;
-              }
-            }
-          } catch {
-            // event_replies not available on this Primal cache version
-          }
-        }
-
-        if (cancelled) return;
-
-        // Phase 2: Fetch missing quoted events
-        const contentSources = [target, ...parents, ...replies];
-        const { eventIds: referencedEventIds, pubkeys: inlineMentionPubkeys } =
-          collectReferencedIds(contentSources);
-        const quotedEvents = new Map<string, FeedEvent>(embeddedMentions);
-        const missingQuotedIds = referencedEventIds.filter((id) => !quotedEvents.has(id));
-
-        if (missingQuotedIds.length > 0) {
-          const quotedRawEvents = await client.request(`${prefix}_quoted`, {
-            cache: ['events', { event_ids: missingQuotedIds }],
-          });
-          if (!cancelled) {
-            for (const raw of quotedRawEvents) {
-              if (raw.kind === PRIMAL_KIND_NOTE_STATS) {
-                const parsed = parseJson<Record<string, unknown>>(raw.content);
-                const eid = typeof parsed?.event_id === 'string' ? parsed.event_id : undefined;
-                if (!eid || !parsed) continue;
-                metrics.set(eid, parseNoteMetrics(parsed));
-                continue;
-              }
-              const ev = normalizeFeedEvent(raw);
-              if (ev) quotedEvents.set(ev.id, ev);
-              if (raw.kind === Metadata) {
-                const result = parseProfileFromRaw(raw);
-                if (result) profiles.set(result[0], result[1]);
-              }
-            }
-          }
-        }
-
-        // Phase 3: Fetch missing profiles
-        const neededPubkeys = new Set(inlineMentionPubkeys);
-        for (const ev of contentSources) neededPubkeys.add(ev.pubkey);
-        for (const ev of quotedEvents.values()) neededPubkeys.add(ev.pubkey);
-        const missingProfilePubkeys = Array.from(neededPubkeys).filter((pk) => !profiles.has(pk));
-
-        if (missingProfilePubkeys.length > 0) {
-          const profileRawEvents = await client.request(`${prefix}_profiles`, {
-            cache: ['user_infos', { pubkeys: missingProfilePubkeys }],
-          });
-          if (!cancelled) {
-            for (const raw of profileRawEvents) {
-              if (raw.kind === Metadata) {
-                const result = parseProfileFromRaw(raw);
-                if (result) profiles.set(result[0], result[1]);
-              }
-            }
-          }
-        }
-
-        if (cancelled) return;
-
-        // Build thread items list
-        const items: ThreadItem[] = [];
-
-        for (let i = 0; i < parents.length; i++) {
-          items.push({ type: 'parent', event: parents[i] });
-        }
-
-        items.push({ type: 'target', event: target });
-
-        for (const reply of replies) {
-          items.push({ type: 'reply', event: reply });
-        }
-
-        // Compute hidden reply count from metrics vs loaded replies
-        const targetMetrics = metrics.get(eventId);
-        const expectedReplies = targetMetrics?.replyCount ?? 0;
-        setHiddenReplyCount(Math.max(0, expectedReplies - replies.length));
-
-        feedLog.info('thread.load.done', {
-          eventId,
-          parents: parents.length,
-          replies: replies.length,
-          profiles: profiles.size,
-          hiddenReplies: Math.max(0, expectedReplies - replies.length),
-        });
-
-        setThreadItems(items);
-        setProfilesMap(profiles);
-        setMetricsMap(metrics);
-        setQuotedEventsMap(quotedEvents);
-        setDataVersion((v) => v + 1);
-        setIsLoading(false);
-      } catch (err) {
-        if (!cancelled) {
-          feedLog.error('thread.load.error', {
-            eventId,
-            error: err instanceof Error ? err : new Error(String(err)),
-          });
-          setError('Failed to load thread');
-          setIsLoading(false);
-        }
-      } finally {
-        client.close();
-      }
-    };
-
-    const task = InteractionManager.runAfterInteractions(() => {
-      fetchThread();
-    });
-
-    return () => {
-      cancelled = true;
-      task.cancel();
-    };
-  }, [eventId]);
-
-  const hasParents = useMemo(() => threadItems.some((i) => i.type === 'parent'), [threadItems]);
 
   const renderItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<ThreadItem, string | undefined>) => {
@@ -440,7 +90,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
           variant={isTarget ? 'thread-target' : 'thread-reply'}
           event={item.event}
           metrics={metrics}
-          quotedEvents={quotedRef.current}
+          quotedEvents={quotedEventsRef.current}
           profiles={profilesRef.current}
           getMetrics={getMetrics}
           showLineAbove={isParent ? index > 0 : isTarget ? hasParents : false}
@@ -456,7 +106,16 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         />
       );
     },
-    [getDisplayMetrics, getEngagementState, getMetrics, hasParents, toggleLike, toggleRepost]
+    [
+      getDisplayMetrics,
+      getEngagementState,
+      getMetrics,
+      hasParents,
+      profilesRef,
+      quotedEventsRef,
+      toggleLike,
+      toggleRepost,
+    ]
   );
 
   if (isLoading) {
@@ -496,7 +155,7 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
         getEngagementState={getEngagementState}>
         <View style={[styles.container, { backgroundColor: background }]}>
           <LegendList
-            data={threadItems}
+            data={items}
             keyExtractor={threadKeyExtractor}
             getItemType={threadItemType}
             estimatedItemSize={200}
@@ -535,10 +194,6 @@ function ThreadViewInner({ eventId }: ThreadViewProps) {
 }
 
 export const ThreadView = React.memo(ThreadViewInner);
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {
