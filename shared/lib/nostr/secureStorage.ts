@@ -2,7 +2,8 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 import { useCallback, useEffect, useState } from 'react';
 
 import { nostrLog, redactError } from '../logger';
@@ -17,6 +18,12 @@ const STORAGE_KEYS = {
   CASHU_MNEMONIC_PREFIX: 'cashu_mnemonic_',
   CASHU_SEED_PREFIX: 'cashu_seed_',
   IMPORTED_NSEC_PREFIX: 'imported_nsec_',
+  // Bookkeeping index of every key written via secureSet. Lets clearAllSecureData
+  // delete keys the caller cannot enumerate (orphans from migrations, partial
+  // imported-profile writes, pre-release builds). Filled lazily on each write —
+  // installs that predate this index are still wiped via the caller-supplied
+  // list so behaviour only improves, never regresses.
+  KEY_INDEX: 'secure_key_index',
 } as const;
 
 export interface CachedDerivedKeys {
@@ -65,11 +72,18 @@ async function secureGet(key: string, op: string): Promise<string | null> {
 async function secureSet(key: string, value: string, op: string): Promise<boolean> {
   try {
     await SecureStore.setItemAsync(key, value, secureOptions());
-    return true;
   } catch (error) {
     nostrLog.error(`nostr.secure.${op}_failed`, { error: redactError(error) });
     return false;
   }
+  if (key !== STORAGE_KEYS.KEY_INDEX) {
+    // Bookkeeping is best-effort; a failure to update the index does not roll
+    // back the actual write. clearAllSecureData treats the index as a hint.
+    rememberKey(key).catch((error) =>
+      nostrLog.warn('nostr.secure.index_remember_failed', { error: redactError(error) })
+    );
+  }
+  return true;
 }
 
 async function secureDelete(key: string, op: string): Promise<boolean> {
@@ -80,6 +94,45 @@ async function secureDelete(key: string, op: string): Promise<boolean> {
     nostrLog.error(`nostr.secure.${op}_failed`, { error: redactError(error) });
     return false;
   }
+}
+
+// ── secure_key_index ────────────────────────────────────────────
+// Serialised RMW chain: concurrent rememberKey calls would otherwise read the
+// same baseline and lose entries on the round-trip through SecureStore.
+let keyIndexQueue: Promise<void> = Promise.resolve();
+
+async function readKeyIndex(): Promise<string[]> {
+  const raw = await secureGet(STORAGE_KEYS.KEY_INDEX, 'index_read');
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((k): k is string => typeof k === 'string');
+    }
+  } catch {
+    // Corrupt index — start fresh. Callers still supply their own key list,
+    // so the worst case is one cycle of stale residuals.
+  }
+  return [];
+}
+
+async function rememberKey(key: string): Promise<void> {
+  const next = keyIndexQueue.then(async () => {
+    const existing = await readKeyIndex();
+    if (existing.includes(key)) return;
+    existing.push(key);
+    try {
+      await SecureStore.setItemAsync(
+        STORAGE_KEYS.KEY_INDEX,
+        JSON.stringify(existing),
+        secureOptions()
+      );
+    } catch (error) {
+      nostrLog.warn('nostr.secure.index_write_failed', { error: redactError(error) });
+    }
+  });
+  keyIndexQueue = next.catch(() => {});
+  return next;
 }
 
 /**
@@ -158,11 +211,22 @@ export async function storeMnemonic(mnemonic: string): Promise<boolean> {
 }
 
 /**
- * Retrieves the user's mnemonic phrase from secure storage
- * @returns Promise<string | null> The mnemonic phrase or null if not found/error
+ * Retrieves the user's mnemonic phrase from secure storage. The same BIP-39
+ * gate that storeMnemonic enforces on the write side is re-checked here:
+ * historical bad writes from prior app versions and rare SecureStore
+ * corruption both produce a 12-word string with a bad checksum, and a silent
+ * wrong-identity derivation is worse than a loud null. Bad reads are NOT
+ * auto-deleted — the user is the only holder of the seed, so a corrupt blob
+ * is surfaced to the recovery path instead of being destroyed.
  */
-export function retrieveMnemonic(): Promise<string | null> {
-  return secureGet(STORAGE_KEYS.USER_MNEMONIC, 'retrieve_mnemonic');
+export async function retrieveMnemonic(): Promise<string | null> {
+  const value = await secureGet(STORAGE_KEYS.USER_MNEMONIC, 'retrieve_mnemonic');
+  if (value == null) return null;
+  if (!bip39.validateMnemonic(value, wordlist)) {
+    nostrLog.warn('nostr.secure.mnemonic_corrupt');
+    return null;
+  }
+  return value;
 }
 
 /**
@@ -272,6 +336,15 @@ async function ensureMnemonicExistsInner(): Promise<string | null> {
 
 /**
  * Clears all data from secure storage including per-account keys.
+ *
+ * The caller supplies the indexes/pubkeys it knows about, but expo-secure-store
+ * has no listKeys API and profileStore can drift from SecureStore (migrations
+ * dropping indexes, partially-written imported_nsec_{pubkey} from a crashed
+ * addProfile, pre-release builds with retired indexes). The persistent
+ * secure_key_index built up by every prior secureSet call closes that gap so
+ * a 'Delete All' actually deletes everything we ever wrote, not just what the
+ * current profileStore happens to remember.
+ *
  * @param accountIndexes Explicit list of account indexes to clear.
  * @param importedPubkeys Hex pubkeys of imported profiles whose nsec records should be deleted.
  * @returns Promise<boolean> True if cleared successfully, false otherwise
@@ -280,25 +353,41 @@ export async function clearAllSecureData(
   accountIndexes: number[],
   importedPubkeys: string[] = []
 ): Promise<boolean> {
-  const keysToDelete: string[] = [
+  const callerKeys: string[] = [
     STORAGE_KEYS.USER_MNEMONIC,
     STORAGE_KEYS.MIGRATIONS_COMPLETE_LEGACY,
   ];
 
   for (const i of accountIndexes) {
-    keysToDelete.push(migrationsCompleteKey(i), derivedKeysKey(i), cashuMnemonicKey(i));
+    callerKeys.push(
+      migrationsCompleteKey(i),
+      derivedKeysKey(i),
+      cashuMnemonicKey(i),
+      cashuSeedKey(i)
+    );
   }
 
   for (const pubkey of importedPubkeys) {
-    keysToDelete.push(importedNsecKey(pubkey));
+    callerKeys.push(importedNsecKey(pubkey));
   }
 
-  const results = await Promise.all(keysToDelete.map((key) => secureDelete(key, 'clear_key')));
+  // Union with the bookkeeping index so orphaned keys (drift between
+  // profileStore and SecureStore) get deleted alongside the caller-supplied
+  // list. Belt-and-braces: if the index is empty (older install) the caller
+  // list still wipes the well-known keys.
+  const indexed = await readKeyIndex();
+  const allKeys = Array.from(new Set([...callerKeys, ...indexed]));
+
+  const results = await Promise.all(allKeys.map((key) => secureDelete(key, 'clear_key')));
+  // Drop the index itself last so a partial wipe followed by a retry still
+  // sees the un-wiped keys on the second pass.
+  await secureDelete(STORAGE_KEYS.KEY_INDEX, 'clear_index');
+
   const allOk = results.every(Boolean);
   if (allOk) {
-    nostrLog.info('nostr.secure.all_data_cleared');
+    nostrLog.info('nostr.secure.all_data_cleared', { count: allKeys.length });
   } else {
-    nostrLog.warn('nostr.secure.all_data_cleared_with_errors');
+    nostrLog.warn('nostr.secure.all_data_cleared_with_errors', { count: allKeys.length });
   }
   return allOk;
 }
@@ -316,15 +405,21 @@ function cashuMnemonicKey(accountIndex: number): string {
 }
 
 /**
- * Simple hash of a mnemonic string used to detect if the mnemonic changed.
- * Not cryptographic — just a fast fingerprint for cache invalidation.
+ * 64-bit truncated SHA-256 of the mnemonic, hex-encoded. Used to bind cached
+ * derived-keys / cashu-mnemonic / cashu-seed blobs to a specific mnemonic so a
+ * fresh restore (different mnemonic, same SecureStore residue) cannot
+ * accidentally serve the prior install's identity from cache.
+ *
+ * Birthday-bound collisions on the previous 32-bit djb2 fingerprint were
+ * ~65K mnemonics — small enough that an Apple family-share install chain
+ * could see real wrong-identity cache hits. 64 bits puts the bound at ~4B
+ * which is comfortably outside any realistic single-device population. The
+ * value is only ever compared for equality, so a mismatch on existing
+ * stored blobs triggers a one-shot cache miss + re-derivation on the next
+ * cold start — no schema bump or migration is needed.
  */
 export function hashMnemonic(mnemonic: string): string {
-  let hash = 0;
-  for (let i = 0; i < mnemonic.length; i++) {
-    hash = (hash * 31 + mnemonic.charCodeAt(i)) | 0;
-  }
-  return hash.toString(36);
+  return bytesToHex(sha256(utf8ToBytes(mnemonic))).slice(0, 16);
 }
 
 export function storeDerivedKeys(accountIndex: number, keys: CachedDerivedKeys): Promise<boolean> {
