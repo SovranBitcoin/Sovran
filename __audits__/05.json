@@ -34,7 +34,9 @@
         "sovran-app/shared/lib/cashu/profileScopedStorage.ts:73-98"
       ],
       "verification_note": "Re-read mintStore.ts:9-22 and every one of the 8 call sites. Counter-argument considered: 'the pattern is documented in the secure-storage rule.' True, but documentation does not imply optimality — the rule text describes behaviour, not rationale. The profile-scoped storage layer supersedes the need for an inner pubkey index. Kept Medium because the fix requires a persist-version bump and a migrator, and must not ship without both.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Collapsed selectedMints Record<pubkey,url> to scalar selectedMint; persist v1->v2 migrator picks first defined value. Commit b2f688c8."
     },
     {
       "id": "F-002",
@@ -143,7 +145,9 @@
         "sovran-app/tsconfig.json:1-30"
       ],
       "verification_note": "Re-read L10 and L14, L37-43. Confirmed no write path produces a literal undefined. tsconfig.json confirmed not to enable noUncheckedIndexedAccess. Kept as Nit at 0.5 — purely a stylistic/correctness nuance.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Resolved automatically — selectedMints field removed in favour of scalar selectedMint. Commit b2f688c8."
     }
   ],
   "dimensions": {

@@ -159,7 +159,8 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-checked lines 13-20, 71-75, 97-101, 129-132, 142-150. createProfileScopedStorage already produces key `npc-mint-store:profile:<pubkey>`, and every call site uses `.getActiveMintUrl()`/`.updateServerMint(...)` without an explicit pubkey.",
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "Collapsed mintUrls + lastSyncedAt Record<pubkey,...> to scalar mintUrl (lastSyncedAt dropped — write-only). Persist v1->v2 with migrator. getActiveProfilePubkey indirection removed. Commit b2f688c8."
     },
     {
       "id": "F-007",
