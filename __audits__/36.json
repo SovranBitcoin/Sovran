@@ -90,8 +90,8 @@
       ],
       "verification_note": "Phase B: re-read MintRebalancePlanScreen.tsx:1283-1368 and the useEffect at 142-144. Counter-argument: maybe the runner reads the ref before the React commit cycle by design (so terminal flips are deferred to the next render). Rejected — the runner explicitly relies on `finalStatus` to fire setLegDone/Failed/Skipped, and the orchestrator at 1345-1350 calls complete() unconditionally when anyFailed=false, so a missed setLegDone == silent success report. log.txt confirms two distinct swap IDs hit the bug across one session.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the popup-tree slice — lives inside the manual swap orchestrator (MintRebalancePlanScreen), not the toast/engine seam."
+      "completion_status": "complete",
+      "completion_note": "executeStep now drives setLegDone/Skipped/Failed at its terminal sites (lines 437/1218/1278), so the runner no longer reads stepStatesRef across the await boundary; runStepsSequentially tracks anyFailed via executeStep's boolean return."
     },
     {
       "id": "F-002",
@@ -135,8 +135,8 @@
       ],
       "verification_note": "Phase B: confirmed by reading the cancel branch at MintRebalancePlanScreen.tsx:1612-1623 and grepping for `useSwapStatusStore.getState().cancel` (zero hits). The 'cancelled' enum value at swapStatusStore.ts:21 has no setter — confirmed via grep for `state: 'cancelled'`.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Swap orchestration / state machine concern -- handleCancelRun should write a 'cancelled' SwapState that StatusToast's terminal-state branch picks up. Outside the toast-shell consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "swapStatusStore now has a cancel() action that flips state to 'cancelled' with a swap.status.cancel info log; SwapStatusToast treats 'cancelled' as terminal (failed visual + 'Swap cancelled' title) so StatusToast's isTerminal check fires the auto-dismiss; handleCancelRun calls cancel() after finalizing the SwapTransactions group."
     },
     {
       "id": "F-004",
@@ -179,8 +179,8 @@
       ],
       "verification_note": "Phase B: confirmed swapStatusStore.ts:115 and 126 both early-return when get().active is null, so the no-op behavior is real. The finding is about clarity/maintainability, not a current bug.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the popup-tree slice — same orchestrator file/closure as F-001."
+      "completion_status": "complete",
+      "completion_note": "Captured swapStatus = useSwapStatusStore.getState() snapshot dropped from runStepsSequentially; the two terminal-flip branches now read useSwapStatusStore.getState().active fresh."
     },
     {
       "id": "F-006",
