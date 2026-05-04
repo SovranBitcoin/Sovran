@@ -329,13 +329,13 @@ export function useScreenActions(
   }, [subscribeGlobal]);
 
   // Auto-derive amountConfig from provider context when not explicitly provided.
-  // Uses getter closures so values stay fresh on each inspect().
+  // Every reactive field is a getter so the manager — created once and held
+  // in managerRef across the screen's lifetime — re-reads destination, unit,
+  // and display currency on every inspect(). Without this, opening amountEntry
+  // a second time from a different destination (sendEcash → meltQuote) or
+  // after a settings currency change keeps the first-render snapshot.
   const derivedAmountConfig = useMemo((): CreateAmountActionManagerConfig | undefined => {
     if (!isAmountEntry || options?.amountConfig) return undefined;
-    const flowCtx = machine.getContext();
-    const isSend = flowCtx.destination !== 'mintQuote';
-    const isEcashSend = flowCtx.destination === 'sendEcash';
-    const dc = getDisplayCurrencyRef.current?.();
     return {
       getMintUrl: () => machineRef.current.getContext().mintUrl,
       getProofAmounts: () => {
@@ -343,12 +343,15 @@ export function useScreenActions(
         return mint ? (walletContextRef.current?.proofAmounts[mint] ?? []) : [];
       },
       getBtcPrice: () => getBtcPriceRef.current?.() ?? 0,
-      offlineOptimization: isEcashSend,
-      unit: flowCtx.unit,
-      fiatCurrency: dc?.code,
-      fiatSymbol: dc?.symbol,
+      offlineOptimization: () => machineRef.current.getContext().destination === 'sendEcash',
+      unit: () => machineRef.current.getContext().unit,
+      fiatCurrency: () => getDisplayCurrencyRef.current?.()?.code,
+      fiatSymbol: () => getDisplayCurrencyRef.current?.()?.symbol,
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Refs are stable across renders; getter closures read .current on each
+    // inspect() so the manager always sees the latest values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAmountEntry, options?.amountConfig]);
 
   const effectiveAmountConfig = isAmountEntry
     ? (options?.amountConfig ?? derivedAmountConfig)

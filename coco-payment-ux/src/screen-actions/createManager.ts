@@ -80,7 +80,14 @@ export function createScreenActionManager<S extends ScreenType>(
       unit: resolution.unit,
       keyboardUnit: resolution.keyboardUnit,
       secondaryDisplay: resolution.secondaryDisplay,
+      // fiatCurrency + btcPrice flow from the AmountActionManager so the
+      // amountEntry availability rule (`hasFiatToggle`) checks fields the
+      // package itself controls — not entrySeed fields the wallet has to
+      // remember to populate. Closes the contract gap where availability
+      // could read stale or missing values.
+      fiatCurrency: resolution.fiatCurrency,
       fiatSymbol: resolution.fiatSymbol,
+      btcPrice: resolution.btcPrice,
       suggestions: resolution.suggestions,
     };
   }

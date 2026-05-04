@@ -172,7 +172,9 @@ export function resolutionEqual(a: AmountResolution, b: AmountResolution): boole
     a.unit === b.unit &&
     a.keyboardUnit === b.keyboardUnit &&
     a.secondaryDisplay === b.secondaryDisplay &&
+    a.fiatCurrency === b.fiatCurrency &&
     a.fiatSymbol === b.fiatSymbol &&
+    a.btcPrice === b.btcPrice &&
     a.suggestions === b.suggestions
   );
 }
