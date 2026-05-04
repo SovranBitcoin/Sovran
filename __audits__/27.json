@@ -5,16 +5,46 @@
     "entry_point": "sovran-app/features/wallet",
     "entry_point_autoselected": true,
     "entry_point_selection_rationale": "Score 7 — farthest uncovered feature slice. features/wallet had 125 commits in the last 90 days (highest among uncovered features), last non-merge touch 14h ago, 1730 LOC, and a high cross-feature fan-in (imported by app/(drawer)/(tabs), send, mint, receive). Top disqualified: features/send (audited in 02 & 19, −3 penalty), features/mint (audited in 25, −3), features/feed (audited in 26, −3). features/onboarding and features/health tied at 7 on distance but lost tiebreaker (a) last-commit-recency to features/wallet (14h vs 13d).",
-    "repos_touched": ["sovran-app"],
-    "prior_audits_consulted": [
-      "01.json", "02.json", "03.json", "04.json", "05.json", "06.json",
-      "07.json", "08.json", "09.json", "10.json", "11.json", "12.json",
-      "13.json", "14.json", "15.json", "16.json", "17.json", "18.json",
-      "19.json", "20.json", "21.json", "22.json", "23.json", "24.json",
-      "25.json", "26.json"
+    "repos_touched": [
+      "sovran-app"
     ],
-    "sov_specs_consulted": ["docs/SOV-00.md"],
-    "skills_consulted": ["zustand-5", "react-native-best-practices", "animating-react-native-expo", "typescript-advanced-types"],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "react-native-best-practices",
+      "animating-react-native-expo",
+      "typescript-advanced-types"
+    ],
     "research_consulted": [],
     "tooling_run": {
       "type_check": "clean for features/wallet/** (external TS errors in shared/lib/cashu/manager.ts, shared/providers/WalletContextProvider.tsx, CapsuleButton.android.tsx, navigation/nativeTabs.tsx, features/theme/screens/GalleryScreen.tsx, features/transactions/components/Transactions.tsx — out of scope for this ENTRY, flagged in Open questions)",
@@ -38,7 +68,10 @@
       "description": "features/wallet/components/MintSelector/ contains only MintSelector.ios.tsx and MintSelector.liquid.tsx. There is no MintSelector.android.tsx, MintSelector.native.tsx, or MintSelector.tsx. The barrel at index.ts:1 does `export { default as MintSelector, default } from './MintSelector'`. Metro's platform-extension resolver for Android tries foo.android.*, foo.native.*, then foo.* — none exist. Any Android bundle will fail to resolve ./MintSelector. FiatCurrencyPill/ in the same directory correctly provides .android.tsx, .ios.tsx, and .liquid.tsx variants, so the gap is asymmetric. Consumers import unconditionally: app/(drawer)/(tabs)/index/_layout.tsx:7, features/send/screens/PaymentRequestScreen.tsx:17, features/send/screens/MeltQuoteScreen.tsx:18, features/send/screens/AmountFlowScreen.tsx:15, features/receive/screens/MintQuoteScreen.tsx:16. The file was created in a1716f39 and has never had an Android variant (git log --follow history clean).",
       "why_it_matters": "app.json declares an Android target (`android.versionCode: 2`, `android.userInterfaceStyle`) and android/build.gradle exists, so the repo still claims Android support. Even if EAS submits iOS-only today (eas.json has only `submit.production.ios`), a dev running `expo start --android` or `eas build --platform android` now fails at bundle time instead of surfacing a controlled degraded-UX. Both code branches inside MintSelector.ios.tsx use iOS-only primitives (@expo/ui/swift-ui, heroui-native PressableFeedback) so simply renaming the file would not fix Android — a real .android.tsx variant or an explicit platform fallback is required.",
       "fix": "Two options. (A) Ship iOS-only explicitly: rename MintSelector.ios.tsx to MintSelector.tsx and gate the body with Platform.OS === 'ios' (returning a thin Pressable fallback or null on Android), and remove `android` from app.json until the wallet is actually built for Android. (B) Add MintSelector.android.tsx that renders the MintBalanceDisplay inside an HeroUI PressableFeedback or a plain TouchableOpacity (FiatCurrencyPill.android.tsx is the template). Option B is consistent with FiatCurrencyPill and CapsuleButton, which are already cross-platform.",
-      "references": ["skill:react-native-best-practices", "git:a1716f39"],
+      "references": [
+        "skill:react-native-best-practices",
+        "git:a1716f39"
+      ],
       "verification_note": "Confirmed by `find features/wallet/components/MintSelector -type f` (returns only .ios.tsx, .liquid.tsx, index.ts, useMintSelector.ts) and Metro's default resolver order. Counter-argument considered: EAS production-submit is iOS-only per eas.json:23 — but the repo still ships Android config, meaning any Android build (including dev) breaks.",
       "prior_audit_id": null
     },
@@ -55,7 +88,10 @@
       "description": "handleReservedPress (PrimaryBalance.tsx:218-247) opens an Alert.alert with a 'Recover Pending Operations' button. On confirm it awaits `manager.ops.send.recovery.run()` then `manager.ops.melt.recovery.run()`. Coco's SendOperationService.recoverPendingOperations() at coco/packages/core/operations/send/SendOperationService.ts:497-500 guards with a recovery lock and throws 'Recovery is already in progress' on reentry. There is no UI-level single-flight guard — tapping the pill again while the first recovery is running opens a second Alert; confirming it fires a fresh send.recovery.run() that throws synchronously. The outer try/catch at line 233-240 catches and shows reservedProofsFailedPopup with message 'Recovery is already in progress'. The user sees a FAILURE popup while a SUCCESS is still running in the background, then (potentially seconds later) the success popup from the first call lands on top.",
       "why_it_matters": "Not a funds-at-risk race — coco's internal lock prevents counter corruption. But the UX is confusing: the user has no in-progress feedback while recovery runs (Alert dismisses immediately after tap), so they tap again, and the error popup looks like the feature is broken. A naive bug-report pattern would follow. Ships wallet-trust debt.",
       "fix": "Add a useRef<boolean> or component-level 'running' flag set before calling `manager.ops.send.recovery.run()` and cleared in finally. When the flag is set, either disable the pill (pass an undefined onPress or grey out via tintColor), or swap the label for 'Recovering…'. Reading `manager.ops.send.recovery.inProgress()` from coco (SendOpsApi.ts:51) is a second-best option — it lets multiple components sync but still needs UI feedback. Either way, do not show an Alert while a recovery is running.",
-      "references": ["skill:react-native-best-practices", "docs/SOV-00.md §6.2"],
+      "references": [
+        "skill:react-native-best-practices",
+        "docs/SOV-00.md §6.2"
+      ],
       "verification_note": "Verified coco's lock at SendOperationService.ts:497-500 throws on reentry. Counter-argument considered: Alert auto-dismisses after button tap so a user cannot double-fire the SAME alert — correct, but they can open a second Alert because the pill remains tappable. Downgraded from initial High (counter-corruption) to Medium (UX only) after reading coco.",
       "prior_audit_id": null,
       "completion_status": "complete",
@@ -74,7 +110,10 @@
       "description": "useAppBalance.ts:39-53 computes `total` inside useMemo and, before returning, writes `prevBalance.current = total` (line 51) and calls `walletLog.info('wallet.balance.changed', ...)` (line 44) when the previous balance differs. React's useMemo factory is required to be pure — it can be called more than once per render under Strict Mode (dev), Suspense retries, and concurrent features (useTransition, useDeferredValue). Metro bundle URL in log.txt confirms `transform.reactCompiler=true`, so React Compiler 1.0 is active; the Compiler itself does not re-run user useMemos but also does not disable StrictMode-double-invoke. A discarded render would still mutate the ref and fire the log, producing phantom wallet.balance.changed events that never corresponded to a user-visible balance change.",
       "why_it_matters": "Analytics / observability correctness: wallet.balance.changed is the signal an auditor or future incident response will use to reconstruct balance movement. Phantom events from double-invoke mask real transitions and break the `log-doctor timeline --event 'wallet\\.balance'` diagnostic. Under Suspense retries the same event fires on every attempt. Not funds-at-risk, but observability is load-bearing for a wallet.",
       "fix": "Compute `total` in useMemo (pure). Move the previous-balance comparison and the walletLog.info call into a useEffect that depends on `total`. This is the canonical 'derive in render, notify in effect' pattern. Keep `prevBalance` as a ref inside the effect, not inside the memo.",
-      "references": ["skill:react-native-best-practices", "skill:zustand-5"],
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:zustand-5"
+      ],
       "verification_note": "Confirmed React Compiler is on (Metro transform URL `transform.reactCompiler=true` in log.txt). Counter-argument: in pure production renders with no Strict Mode and no Suspense boundary around this hook, useMemo is called once and the bug is invisible — but the app ships Strict Mode (Expo 55 default) and uses Suspense in multiple surfaces per coco-react. Keep.",
       "prior_audit_id": null,
       "completion_status": "complete",
@@ -93,7 +132,9 @@
       "description": "AccountPagerViewLayout.tsx:81 `router.push('/(user-flow)/splitBill/amount' as any)` and :104 `router.push('/(settings-flow)/theme/preview' as any)` cast the pathname to `any`. app.json declares `experiments.typedRoutes: true` — the whole app is opted into compile-time route validation. Both target files exist today (app/(user-flow)/splitBill/amount.tsx, app/(settings-flow)/theme/preview.tsx), but the cast means renaming or deleting either file will not surface as a TS error at this call site. Compare the sibling call at line 91-95 which uses `router.navigate({ pathname: '/(mint-flow)/distribution', params: { unit: account.unit } })` with no cast — typed-routes handles it correctly.",
       "why_it_matters": "typedRoutes is the codebase's explicit regression surface for navigation. Every `as any` on a pathname is a silent escape hatch. If Split Bill or Theme Preview gets renamed in a refactor, these two call sites will compile, pass lint, ship, and crash the wallet screen's Split Bill / Theme buttons at runtime. The PaymentTiers audit history shows these routes have been reshuffled before (audit 21 on split bill).",
       "fix": "Replace with the object form `router.push({ pathname: '/(user-flow)/splitBill/amount' })` (or whatever the canonical typed shape is) and remove the cast. If the typed signature legitimately does not accept the group path, check expo-router docs for the current typed form — relative hrefs under typed routes are unsupported, and useSegments() is the documented escape. Do not ship another cast.",
-      "references": ["skill:react-native-best-practices"],
+      "references": [
+        "skill:react-native-best-practices"
+      ],
       "verification_note": "Confirmed via `grep typedRoutes app.json` (line contains `\"typedRoutes\": true`) and `ls app/(user-flow)/splitBill/amount.tsx app/(settings-flow)/theme/preview.tsx` (both exist). Counter-argument: the cast is a legitimate workaround if typed-routes has a known quirk with nested groups — but the sibling navigate() call uses no cast, so the pattern is inconsistent rather than necessary.",
       "prior_audit_id": null,
       "completion_status": "complete",
@@ -112,7 +153,9 @@
       "description": "PrimaryBalance.tsx:218-247 declares `const handleReservedPress = useCallback(() => { ... walletLog.info('wallet.reserved.recovery_start', { reservedTotal }); ... }, []);`. Dependency array is `[]` (line 247) but the closure reads `reservedTotal` from the enclosing scope on line 220. Because useCallback memoises by deps, the first render's handler is reused forever — the logged `reservedTotal` is always the value at first render (typically 0, since useReservedProofs debounces its initial load by 150ms per shared/hooks/useReservedProofs.ts:59). By the time the user taps, reservedTotal is correct in the UI but stale in the log.",
       "why_it_matters": "Funds-irrelevant — the logged value is only for diagnostics. But log.txt is an active evidence source for this audit agent and future incident response; stale values in wallet.reserved.recovery_start reduce the signal of that event to zero. Low severity because nothing user-visible breaks.",
       "fix": "Add `reservedTotal` to the useCallback dependency array. React's exhaustive-deps rule would flag this — the eslint config appears not to enforce it globally; enabling it for features/wallet/** would catch the whole class.",
-      "references": ["skill:react-native-best-practices"],
+      "references": [
+        "skill:react-native-best-practices"
+      ],
       "verification_note": "Verified closure scope at PrimaryBalance.tsx:218 (`useCallback`) and line 220 (`reservedTotal` read). ESLint did not flag this in `npm run lint` output — react-hooks/exhaustive-deps is either disabled or absent from the config.",
       "prior_audit_id": null
     },
@@ -129,9 +172,14 @@
       "description": "NonGestureView.tsx:12 documents 'Prevents gesture propagation by consuming gestures without handling them.' Line 13 creates `PanResponder.create({})` — with no handlers. PanResponder handlers default to `() => false` for onStartShouldSetPanResponder and friends, meaning the responder never claims a gesture. The component is a no-op wrapper. Its only effect is React-element overhead and an extra Log boundary. Account.tsx:44 wraps the balance region inside NonGestureView inside a Swiper; if the intent was to prevent inner taps from stealing horizontal drags from the Swiper, the actual mechanism that makes the app work is Swiper's own responder precedence, not this component.",
       "why_it_matters": "Dead wrapping + misleading name. A future maintainer sees NonGestureView and assumes gesture-blocking is handled here; they miss real gesture conflicts elsewhere. Not funds-at-risk. Also every Account render incurs one extra VirtualNode + Log for no benefit.",
       "fix": "Either (A) delete NonGestureView and inline the `<View style={...}>`, or (B) if real gesture blocking is needed, add the missing handlers: `{ onStartShouldSetPanResponder: () => true, onMoveShouldSetPanResponder: () => true, onPanResponderTerminationRequest: () => false }` — this genuinely blocks parent responders. Pick one, update the name and comment to match.",
-      "references": ["skill:animating-react-native-expo", "skill:react-native-best-practices"],
+      "references": [
+        "skill:animating-react-native-expo",
+        "skill:react-native-best-practices"
+      ],
       "verification_note": "Confirmed by reading PanResponder docs default handler return values. Counter-argument: perhaps the wrapping exists for a specific historical gesture conflict that has since been fixed elsewhere, and removing it now regresses — mark Low and defer to the author's judgement rather than prescribing deletion.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "NonGestureView deleted; Account renders View directly"
     },
     {
       "id": "F-007",
@@ -146,7 +194,10 @@
       "description": "PrimaryBalance.tsx:205-216 calls `router.navigate({ pathname: '/transactions', params: { account: JSON.stringify(account), ... } })`. The consumer at app/(transactions-flow)/transactions.tsx:101 does `const initialAccount = account ? JSON.parse(account) : undefined;` with no schema validation. The account shape today is trivial (`{ unit: 'sat' }`) but the pattern defeats typedRoutes' param validation and opens a small prompt-injection surface if `account` is ever user-influenced (it isn't today, but deep-link params share the same screen). mintQuote.tsx:17 has the same pattern with a `MintHistoryEntry`. The adjacent finding F-004 already notes typedRoutes is opted in.",
       "why_it_matters": "Low today because `account` is not user-provided. Becomes a Medium the moment a deep-link form (`/transactions?account=...`) is exposed, because JSON.parse on an attacker-controlled string can throw unhandled, and the downstream screen treats the parsed object as a trusted shape. Also hides API evolution: adding a required field to `account` silently ships with no TS error at call sites.",
       "fix": "Break out the fields as typed params: `params: { unit: account.unit, filterCurrency: account.unit, ... }`. Remove the `account` JSON blob. If the account object grows, add a zod schema in packages/schemas (or its aspirational location per AUDIT.md operating_context) and `safeParse` it at the consumer before use.",
-      "references": ["skill:zod-4", "skill:react-native-best-practices"],
+      "references": [
+        "skill:zod-4",
+        "skill:react-native-best-practices"
+      ],
       "verification_note": "Verified consumer at app/(transactions-flow)/transactions.tsx:101 (JSON.parse with no validation). Account today is `{ unit: 'sat' }` from WalletScreen.tsx:22 — low blast radius. Keep Low.",
       "prior_audit_id": null,
       "completion_status": "partial",
@@ -165,7 +216,9 @@
       "description": "PrimaryBalance.tsx:243 uses `Alert.alert('Reserved Proofs', 'Choose a recovery action.', ...)` for the recovery confirmation, then on lines 227 and 237 correctly calls the imported `reservedProofsFreedPopup` / `reservedProofsFailedPopup` from @/shared/lib/popup for the outcomes. The same component thus mixes the system Alert with the shared popup convention. .cursor/rules/popup-toast-sheet-guidelines.mdc mandates popup helpers for wallet UX (prior audits 07, 12, 17 flagged comparable inconsistencies in sibling features).",
       "why_it_matters": "Platform Alert on iOS is an action-sheet-like modal that is not theme-aware; it ignores dark-mode tinting and the wallet's liquid-glass surface language. Functional but jarring. Low severity — it works.",
       "fix": "Build or reuse a popup helper — e.g., `reservedProofsConfirmPopup({ onConfirm })` — and replace the Alert.alert call. The existing popup pair at lines 227 and 237 is the template.",
-      "references": ["skill:react-native-best-practices"],
+      "references": [
+        "skill:react-native-best-practices"
+      ],
       "verification_note": "Confirmed imports at line 28 (reservedProofsFreedPopup, reservedProofsFailedPopup used) and line 2 (Alert, Platform from react-native). Pattern is inconsistent within the same function.",
       "prior_audit_id": null
     },
@@ -201,7 +254,9 @@
       "description": "useAccountPagerView.ts:27 declares `swiperRef: React.RefObject<any>` in the shared interface and line 49 creates `const swiperRef = useRef<any>(null)`. The consumer on line 61 calls `swiperRef.current?.goTo(idx)`. react-native-web-infinite-swiper exposes an imperative handle — its type should be imported. The `any` silences any future API change (method renamed, signature changed) at compile time. AGENTS.md and the TypeScript skill both mark `any` on library handles as a high-value cleanup target.",
       "why_it_matters": "Small. If Swiper's API changes (goTo renamed to scrollToIndex, etc.), the call site compiles and crashes at runtime on every account switch. No funds impact.",
       "fix": "Check the library's exported types (likely something like `SwiperHandle` or `SwiperRef`) and replace `any` with the specific type. If no handle type is exported, define a local interface `{ goTo(index: number): void }` and cast the ref to it at creation.",
-      "references": ["skill:typescript-advanced-types"],
+      "references": [
+        "skill:typescript-advanced-types"
+      ],
       "verification_note": "Lint run showed no @typescript-eslint/no-explicit-any violations here, suggesting the rule is disabled or the `any` is warn-not-error. Confirming with the rule enabled would make this a mechanical fix.",
       "prior_audit_id": null
     },
@@ -218,7 +273,10 @@
       "description": "useMintSelector.ts:69-73 does `const info = mintData.mintInfo as any;` then accesses `info?.name` and `info?.icon_url`. The cast suggests the coco-react MintInfo type either does not expose `icon_url` or does not match the runtime shape the mint returns. Silencing this with `any` hides any future schema drift on the mint-info RPC (NUT-06 GET /v1/info) — e.g., if coco renames the field, the UI silently falls back to the URL-derived name.",
       "why_it_matters": "UX-degrading if the mint rebrands icons or the field is renamed upstream. Not funds-at-risk.",
       "fix": "Define a local Zod schema `MintInfoUX = z.object({ name: z.string().max(200).optional(), icon_url: z.url().max(500).optional() }).passthrough()` and `safeParse` mintData.mintInfo. Return `null` on parse failure and log via cashuLog. This pattern is already encouraged in other sovran stores for coco-returned data.",
-      "references": ["skill:zod-4", "nuts/06.md"],
+      "references": [
+        "skill:zod-4",
+        "nuts/06.md"
+      ],
       "verification_note": "Mint-info surface returns a NUT-06 GetInfoResponse; `icon_url` is a known de-facto field but not part of the current coco-react public type (not verified against the installed coco-react typedefs — leaving UNVERIFIED on the exact cause).",
       "prior_audit_id": null,
       "completion_status": "deferred",
@@ -256,7 +314,9 @@
       "fix": "Either (A) add a one-line comment on WalletScreen.tsx:22 citing the tracking issue / SOV spec for multi-unit (e.g., 'single-unit for now; see docs/SOV-XX.md'), or (B) simplify: drop the Swiper wrapping, remove the dots, and inline a single `<Account>` until multi-unit actually ships. Option A preserves the scaffolding, Option B removes complexity.",
       "references": [],
       "verification_note": "Verified ACCOUNTS has one entry by reading WalletScreen.tsx:22. No SOV-XX spec for multi-unit exists in docs/ (only SOV-00 is ratified). Decision deferred to the author.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "AccountPagerView/Swiper machinery removed; WalletScreen renders single Account directly"
     }
   ],
   "dimensions": {
@@ -284,17 +344,24 @@
     {
       "type": "dead-code",
       "description": "NonGestureView.tsx wraps children in a no-op PanResponder and a Log boundary. If no gesture conflict exists today, delete the component and inline the styled View inside Account.tsx. If one does exist, add real responder handlers and rename the comment. See F-006.",
-      "files": ["features/wallet/components/NonGestureView.tsx"]
+      "files": [
+        "features/wallet/components/NonGestureView.tsx"
+      ]
     },
     {
       "type": "log-helper",
       "description": "Add a log-doctor mode `wallet` (analogous to the existing `coco` mode) that scopes to the wallet-action event regex `^wallet\\.(action|balance|reserved|split_bill|swap|theme|tap)` and summarises action frequency, balance-change cadence, and recovery pill events. During this audit the wallet feature never emitted a wallet.* event in the captured session (Pass 5 probe), so a dedicated mode would make 'was the wallet exercised?' a one-command check for future auditors.",
-      "files": ["scripts/log-doctor.ts", ".claude/rules/log-doctor.md"]
+      "files": [
+        "scripts/log-doctor.ts",
+        ".claude/rules/log-doctor.md"
+      ]
     },
     {
       "type": "research-note",
       "description": "Write a `decided`-status research note at `__research__/platform-split-convention.md` documenting the chosen rule from the consolidate item above (MintSelector/FiatCurrencyPill/CapsuleButton asymmetry today). Include the iOS-first posture (eas.json submits iOS only) and whether Android support is deferred, planned, or dropped. That note plus the consolidation PR are the regression-grade artefact.",
-      "files": ["sovran-app/__research__/"]
+      "files": [
+        "sovran-app/__research__/"
+      ]
     }
   ],
   "open_questions": [

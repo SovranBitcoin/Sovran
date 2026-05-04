@@ -275,7 +275,9 @@
         "shared/stores/global/settingsStore.ts:182-186"
       ],
       "verification_note": "Grep confirms zero external callers for both. Stands.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "removed getPasscode and clearPasscode from settingsStore"
     },
     {
       "id": "F-011",

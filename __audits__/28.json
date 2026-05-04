@@ -1,0 +1,334 @@
+{
+  "audit": {
+    "date": "2026-04-21",
+    "commit": "1c2fb9b0",
+    "entry_point": "sovran-app/shared/providers/CocoProvider.tsx",
+    "entry_point_autoselected": true,
+    "entry_point_selection_rationale": "Scored +7 (slice shared/providers absent from 27 prior audits' covered_slices, never appears in any covered_paths, dim-1/2/7 funds-risk rarely hit recently, SOV-00 explicitly cites this file for G9 phase 1, §7 steps 1–5, §6.2 wallet-machinery gate, D9/D10/D11). Top disqualified: shared/blocks/AppGate.tsx (+6, narrower pure-routing scope), shared/lib/profile/profileSessionOrchestrator.ts (+6, narrower §10 scope). Farthest from covered slices for SOV-00 blast radius.",
+    "repos_touched": [
+      "sovran-app"
+    ],
+    "prior_audits_consulted": [
+      "01.json",
+      "02.json",
+      "03.json",
+      "04.json",
+      "05.json",
+      "06.json",
+      "07.json",
+      "08.json",
+      "09.json",
+      "10.json",
+      "11.json",
+      "12.json",
+      "13.json",
+      "14.json",
+      "15.json",
+      "16.json",
+      "17.json",
+      "18.json",
+      "19.json",
+      "20.json",
+      "21.json",
+      "22.json",
+      "23.json",
+      "24.json",
+      "25.json",
+      "26.json",
+      "27.json"
+    ],
+    "sov_specs_consulted": [
+      "docs/SOV-00.md",
+      "docs/README.md"
+    ],
+    "skills_consulted": [
+      "zustand-5",
+      "react-native-best-practices",
+      "native-data-fetching"
+    ],
+    "research_consulted": [],
+    "tooling_run": {
+      "type_check": "fails (pre-existing TS2341/TS7006 in blast radius: manager.ts:701,702,742,884,885,892; WalletContextProvider.tsx:84,89)",
+      "lint": "21 problems (12 errors, 9 warnings) — none in CocoProvider blast radius",
+      "knip": "1 unused export confirmed in blast radius (needsRestore)",
+      "analyze_structure": "no cycles in shared/providers; 5 colocate suggestions toward (root); knip orphan list for this subtree is a scope artefact (importers live in _layout.tsx outside the subtree) — not filed as findings"
+    }
+  },
+  "completion_status": "deferred",
+  "findings": [
+    {
+      "id": "F-001",
+      "severity": "High",
+      "confidence": 0.85,
+      "title": "SQLite \"Access to closed resource\" race between cleanup and in-flight ProofService queries",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 421,
+      "symbol": "cleanup",
+      "dimension": 1,
+      "description": "log-doctor errors captures 'coco.manager.ProofService.failed_to_check_inflight_proofs_for_mint' with stack 'Error: Calling the prepareAsync function has failed → Caused by: Access to closed resource'. cleanup() disables watchers then calls db.closeAsync() at manager.ts:421. In-flight ProofService queries already holding a DB reference fail with this error. CocoProvider.tsx:164 fires cleanup() fire-and-forget on keys?.pubkey change or unmount; pendingCleanup serialises subsequent initialize() but NOT subsequent ProofService calls. Masked in production by SOV-00 D12 native restart; reproduces in dev hot reload and during the 2s coco.phase2 window.",
+      "why_it_matters": "Error is currently swallowed as WARN. A future refactor that removes the native-restart invariant would expose inflight-proof-state corruption on every profile switch. dim-1 concurrency bug with funds-adjacent blast radius (proofs).",
+      "fix": "Hold cleanup() until in-flight ProofService queries drain. Options: (a) inflightQueriesPending counter on CocoManager, await zero before db.closeAsync; (b) wrap ProofService dispatch in try/catch that survives mid-flight DB close; (c) stop the operation processor first (already done), await one microtask tick, then close DB. Cite nuts/07.md for TOCTOU on proof state.",
+      "references": [
+        "nuts/07.md",
+        "docs/SOV-00.md §6.2",
+        "docs/SOV-00.md §10 D12",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Re-read manager.ts:384-452 (cleanup) and CocoProvider.tsx:163-167 (effect cleanup). Counter-argument considered: race only reproducible in dev. Kept because evidence is live log-doctor trace and the race is self-evident from code.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-002",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "JS thread blocked 3–6s multiple times during boot; coco.phase2 deferWork drift 5.2s",
+      "repo": "sovran-app",
+      "path": "shared/providers/CocoProvider.tsx",
+      "line": 227,
+      "symbol": "deferWork",
+      "dimension": 7,
+      "description": "log-doctor slow --threshold 200 and errors --latest capture: perf.js_thread_blocked blocked_ms=5698.39, 3753.62, 4973.47; perf.defer.drift label=\"coco.phase2\" intended_ms=2000 drift_ms=5244.06. The 5.2s drift proves the JS thread was blocked for ~5s when Phase 2 was meant to fire, pushing it from T+2s to ~T+7s. Candidates for the blocker: PBKDF2 cashu seed derivation (manager.ts:177 deriveCashuWalletSeed — SecureStore cache fast path saves this usually but first run pays ~5s); synchronous JSON.parse of large coco blobs; synchronous SubscriptionManager.received_ws_message handlers.",
+      "why_it_matters": "dim-7 rules require measured evidence; we have it. User-visible: wallet is interactive but unresponsive during the blocked window. Log-doctor gaps of 19.6s, 10.4s, 8.0s, 7.8s, 4.8s in an 80s session indicate blocks are not one-off.",
+      "fix": "Run PBKDF2 on a worklet or native module (nutpatch already offers native crypto — confirm deriveCashuWalletSeed uses it on cold path). Move feed-parse (687 raw events observed) off JS thread via InteractionManager.runAfterInteractions or a worklet. Audit SubscriptionManager.received_ws_message handlers for synchronous coco-core chains.",
+      "references": [
+        "skill:react-native-best-practices",
+        "skill:native-data-fetching",
+        "docs/SOV-00.md §7",
+        "docs/SOV-00.md §8"
+      ],
+      "verification_note": "Re-read CocoProvider.tsx:172-230. deferWork's 2s delay was meant to yield to the interactive window — the drift itself is the evidence the window was NOT interactive.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-003",
+      "severity": "High",
+      "confidence": 0.9,
+      "title": "enableNpcSyncAndProcessor duration 10.8s — wallet interactive without operation processor for ≥10s",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 289,
+      "symbol": "enableNpcSyncAndProcessor",
+      "dimension": 7,
+      "description": "log-doctor timeline captures cashu.manager.npc_sync_and_processor.done duration_ms=10791.6. The function serialises npcPlugin.sync() (network to npubx.cash), enableMintOperationWatcher({ watchExistingPendingOnStart: true }) (WS setup for 2 mints), and enableMintOperationProcessor(...). Per SOV-00 §7 step 4 these must wait for restore-ready, which they correctly do. But Phase 1 completes in ~17ms of actual work, so the user has an interactive wallet for 10–18 seconds with NPC sync and the mint-operation processor NOT running.",
+      "why_it_matters": "Operations the user triggers during this window rely on watchExistingPendingOnStart picking them up when the watcher enables. UNVERIFIED whether operations CREATED during Phase 2 (after manager ready but before processor starts) are correctly picked up. SOV-00 §13 OQ-6 already flags this gap: 'A failure in step 4 (NPC sync) or step 5 (op recovery) is currently non-fatal and silent. Should it raise a banner or degrade specific UI affordances (disable Send)?'",
+      "fix": "Parallelise the three enable-calls via Promise.all where internal invariants allow (npcPlugin.sync, enableMintOperationWatcher, enableMintOperationProcessor look independent at this call site). Pre-warm WS connections during Phase 1 (safe — connections don't touch the counter). Surface a degraded-mode signal in UI until Phase 2 completes (resolves OQ-6).",
+      "references": [
+        "docs/SOV-00.md §6.2",
+        "docs/SOV-00.md §7 step 4",
+        "docs/SOV-00.md §13 OQ-6",
+        "skill:react-native-best-practices"
+      ],
+      "verification_note": "Verified against manager.ts:289-331. The function serialises the three enables with a single await npcPromise then sequential watcher/processor enables. Network-bound but still a long time without a processor.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-004",
+      "severity": "Medium",
+      "confidence": 0.7,
+      "title": "awaitRestoreReady() reads restoreStatus pre-hydration; does not use useWalletLifecycleHydrated",
+      "repo": "sovran-app",
+      "path": "shared/providers/CocoProvider.tsx",
+      "line": 19,
+      "symbol": "awaitRestoreReady",
+      "dimension": 3,
+      "description": "SOV-00 §11: 'Persisted stores rehydrate before any gate reads them. Pre-hydration reads return initial values and trigger false-positive redirects.' walletLifecycleStore.ts:85 ships useWalletLifecycleHydrated() for this, and AppGate.tsx:138 correctly uses it in RestoreGate. CocoProvider.tsx:19-31 does not: it reads useWalletLifecycleStore.getState().restoreStatus at Phase-2-start time then subscribes. If the persisted value equals the in-memory initial 'unknown', the subscribe's state !== prev guard is false and the function hangs until RestoreGate transitions the value.",
+      "why_it_matters": "Currently works because RestoreGate (a descendant of CocoProvider) runs in parallel and sets restoreStatus before the 2s deferWork fires — the gap is covered by a sibling's side-effect, not an explicit hydration wait. Brittle; a refactor that changes the mount tree would break Phase 2.",
+      "fix": "Await useWalletLifecycleStore.persist.onFinishHydration() at the top of awaitRestoreReady, or gate Phase 2's useEffect on useWalletLifecycleHydrated() so it doesn't fire until the store is hydrated. Pattern already exists in the same file's sibling AppGate.",
+      "references": [
+        "docs/SOV-00.md §11",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Confirmed useWalletLifecycleHydrated exists at walletLifecycleStore.ts:85 and is used in AppGate but not here.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-005",
+      "severity": "Medium",
+      "confidence": 0.5,
+      "title": "stampSeedCreatedForExistingUsers overwrites existing wallet-lifecycle blob when seedCreatedAt is null",
+      "repo": "sovran-app",
+      "path": "shared/lib/migrations/globalMigrations.ts",
+      "line": 185,
+      "symbol": "stampSeedCreatedForExistingUsers",
+      "dimension": 1,
+      "description": "Idempotence guard is 'if (parsed?.state?.seedCreatedAt != null) return'. If a prior app version persisted wallet-lifecycle state with seedCreatedAt=null but non-null restoreStatus (e.g. restoreStatus='pending' from a mid-recovery crash), this migration clobbers the entire blob with { seedCreatedAt: Date.now(), restoreStatus: 'not-needed', lastRestoreAt: null }. Net effect: a user who was mid-recovery loses the in-progress flag and the wallet loads as if restore is not needed.",
+      "why_it_matters": "§6.2 wallet-machinery gate keys on restoreStatus; if this clobbers 'pending' → 'not-needed', minting proceeds on a counter the mint may have already signed. Funds-adjacent. Reachability UNVERIFIED (depends on release history that put wallet-lifecycle into storage without seedCreatedAt while hasSeenOnboarding=true).",
+      "fix": "Preserve restoreStatus and lastRestoreAt when merging: write only seedCreatedAt if the blob exists, OR gate the write on restoreStatus === 'unknown' as well. Add a test fixture for the pre-condition.",
+      "references": [
+        "docs/SOV-00.md §6",
+        "docs/SOV-00.md §9",
+        "docs/SOV-00.md §11",
+        "nuts/13.md"
+      ],
+      "verification_note": "Precondition reachability UNVERIFIED. Kept at Medium 0.5 because if reachable, impact is funds-risk.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-006",
+      "severity": "Medium",
+      "confidence": 0.75,
+      "title": "Phase 1 useEffect cleanup fires on keys.pubkey change but hasStarted.current blocks re-init",
+      "repo": "sovran-app",
+      "path": "shared/providers/CocoProvider.tsx",
+      "line": 129,
+      "symbol": "Phase 1 useEffect",
+      "dimension": 1,
+      "description": "useEffect deps [stage.canStart, keys?.pubkey]; cleanup returns CocoManager.cleanup().catch(...). If keys?.pubkey changes (profile switch without native restart), cleanup tears down the manager. The next effect invocation early-returns on hasStarted.current === true so no re-init happens. The manager state variable is not reset to null; <CocoCashuProvider manager={manager}> keeps rendering with a stale/cleaned-up manager until the component unmounts entirely.",
+      "why_it_matters": "In production D12 enforces native restart for profile switches so this path doesn't fire; in dev Fast Refresh it does. Fragile — the next refactor that loosens D12 exposes it.",
+      "fix": "(a) remove keys?.pubkey from the dep array — re-init is prevented anyway, so the dep change only causes spurious cleanup. (b) If re-init on pubkey IS desired, reset hasStarted.current=false, setManager(null), setIsReady(false) in cleanup. Either way, state and ref must stay in sync; document the why against D12.",
+      "references": [
+        "docs/SOV-00.md §10 D12",
+        "skill:zustand-5"
+      ],
+      "verification_note": "Confirmed behaviour by reading the effect and cleanup. Counter-argument: D12 holds in production. Kept Medium because fragility is real and the cleanup fire still runs spuriously.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-007",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "flushProfileStoreToDisk hand-writes persist blob shape; drift-trap with profileStore.partialize",
+      "repo": "sovran-app",
+      "path": "shared/lib/profile/profileSessionOrchestrator.ts",
+      "line": 86,
+      "symbol": "flushProfileStoreToDisk",
+      "dimension": 3,
+      "description": "The function writes AsyncStorage.setItem('profile-store', { state: { activeAccountIndex, profiles, cocoMigrationComplete }, version: 0 }). profileStore.ts:206-210 partialize returns exactly these three fields — currently correct. But the two sources of truth are duplicated; a future PR that adds a field to partialize must remember to add it here. .claude/rules/zustand-persistence-review.md §7 explicitly flags drift-trap as a recognised risk.",
+      "why_it_matters": "No live bug today. Forward-looking: any persisted field added to profileStore that doesn't flush on profile switch is silently dropped from the guaranteed-persisted-before-restart set.",
+      "fix": "Replace body with await useProfileStore.persist.flush() (Zustand v5), or delegate to a shared serializer that reads from the store's own partialize function.",
+      "references": [
+        "skill:zustand-5",
+        ".claude/rules/zustand-persistence-review.md §7",
+        "docs/SOV-00.md §10 D12"
+      ],
+      "verification_note": "Confirmed current parity by reading profileStore.ts:206-210 (partialize) and profileSessionOrchestrator.ts:86-95 (flush). Finding is forward-looking, no current breakage.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-008",
+      "severity": "Medium",
+      "confidence": 0.55,
+      "title": "Provider ordering: NostrKeysProvider + CocoProvider side-effects run before Terms/Onboarding/Passcode gates",
+      "repo": "sovran-app",
+      "path": "app/_layout.tsx",
+      "line": 105,
+      "symbol": "AccountScopedProviders composition",
+      "dimension": 5,
+      "description": "SOV-00 §3 expected order: G1 → G2 → G3 → G4 terms → G5 reinstall → G6 onboarding → G7 passcode → G8 keys → G9 coco phase 1 → G10 restore. Actual tree order in _layout.tsx:105-123 is MigrationGate → ProfileWallpaperProvider → NostrKeysProvider (G8) → NostrNDKProvider → CocoProvider (G9) → ... → BitchatBLEProvider → PasscodeGate (G7) → AppGate (G4/G5/G6/G10). NostrKeysProvider + CocoProvider useEffects fire as soon as their canStart flips, regardless of Terms/Onboarding/Passcode state. On a fresh install that has never accepted Terms, ensureMnemonicExists() has written the mnemonic to SecureStore by the time the user sees the Terms screen; CocoManager has opened the SQLite DB; default-mint seeding fires 2–7s later and writes mint URLs to the DB before T&C acceptance.",
+      "why_it_matters": "SOV-00 §4 explicitly allows silent seed generation (argues ordering is fine). §3 says 'Order is load-bearing' (argues ordering is wrong). The VISIBLE flow matches §3 (splash held, Terms shown first, wallet UI not rendered until gates pass), so a reviewer could interpret §3 as visible-ordering-only. Spec ambiguity, not a crisp code regression.",
+      "fix": "Ratify SOV-50 (Onboarding & Terms) with an explicit decision: either (a) the current ordering is intentional — state it; or (b) seed generation + DB opening + mint seeding must wait for Terms acceptance.",
+      "references": [
+        "docs/SOV-00.md §3",
+        "docs/SOV-00.md §4",
+        "docs/SOV-00.md §8",
+        "docs/README.md SOV-50"
+      ],
+      "verification_note": "Confirmed tree order by reading _layout.tsx. Ambiguity is spec-level. Filed Medium to force a decision, not as a High regression.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-009",
+      "severity": "Medium",
+      "confidence": 0.8,
+      "title": "WebSocket subscription health: 3 unmatched responses, 2 queued messages on closed sockets",
+      "repo": "sovran-app",
+      "path": "shared/lib/cashu/manager.ts",
+      "line": 289,
+      "symbol": "SubscriptionManager lifecycle (via enableMintOperationWatcher)",
+      "dimension": 7,
+      "description": "log-doctor ws --latest: Requests=14, Accepted=6, Unmatched=3, Queued=2 (socket not open at time of send). One concrete trace from errors mode: coco.manager.SubscriptionManager.unmatched_subscribe_response mintUrl=mint.sovran.money id=1 respId=1 hasPendingMap=true pendingMapSize=0. A subscribe response arrived for an empty pending map — the subscription was torn down before the response arrived, OR the bookkeeping has a send-vs-pending-insert race.",
+      "why_it_matters": "Sub responses that never match a listener are silently dropped — proof-state transitions could be missed. Queued messages on closed sockets suggest reconnect logic is discarding send attempts. dim-2 (relays/mints untrusted) + dim-7 (concurrency).",
+      "fix": "Patch SubscriptionManager in sovran-app/patches/ (coco-core is upstream read-only per <ground_rules>). Insert into pending map BEFORE dispatching WS send; refuse to remove pending entries until response-or-timeout. Add a metric on queued-on-closed-socket to surface rates.",
+      "references": [
+        "nips/01.md",
+        "docs/SOV-00.md §7 step 6",
+        "nuts/07.md"
+      ],
+      "verification_note": "WS evidence confirmed via log-doctor. Attributing to SubscriptionManager is UNVERIFIED — could also be how CocoManager triggers disable/enable cycles. Kept at Medium.",
+      "prior_audit_id": null
+    },
+    {
+      "id": "F-010",
+      "severity": "Low",
+      "confidence": 0.95,
+      "title": "isSovranTrusted variable actually checks minibits, not sovran",
+      "repo": "sovran-app",
+      "path": "shared/providers/CocoProvider.tsx",
+      "line": 83,
+      "symbol": "initializeDefaultMints",
+      "dimension": 4,
+      "description": "Line 60 declares selectedMint = 'https://mint.minibits.cash/Bitcoin'. Line 83 declares isSovranTrusted = await manager.mint.isTrustedMint(selectedMint). The local name reads as though checking mint.sovran.money; behaviour is correct but the name is misleading.",
+      "why_it_matters": "Naming-only. No behaviour change. But if a future edit intends 'fall back to Sovran if minibits untrusted', the current name suggests that's already the logic — it isn't.",
+      "fix": "Rename to isSelectedMintTrusted. If a Sovran fallback IS desired, add explicit logic and rename accordingly.",
+      "references": [],
+      "verification_note": "Confirmed lines 59-88.",
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "renamed isSovranTrusted -> isDefaultTrusted with selectedMint -> defaultSelectedMint"
+    }
+  ],
+  "dimensions": {
+    "1": "pass",
+    "2": "pass",
+    "3": "pass",
+    "4": "skipped",
+    "5": "partial",
+    "6": "skipped",
+    "7": "pass",
+    "8": "skipped",
+    "9": "skipped",
+    "10": "partial"
+  },
+  "refactor_plan": [
+    {
+      "type": "dead-code",
+      "description": "needsRestore(mnemonicExists, seedCreatedAt) helper at walletLifecycleStore.ts:71 is exported and unused (knip confirmed). AppGate.tsx:171 inlines the same logic. Either call the helper at that site or delete the helper.",
+      "files": [
+        "shared/stores/global/walletLifecycleStore.ts"
+      ]
+    },
+    {
+      "type": "consolidate",
+      "description": "flushProfileStoreToDisk in profileSessionOrchestrator.ts:86-95 duplicates profileStore.partialize at profileStore.ts:206-210. Replace body with useProfileStore.persist.flush() (Zustand v5) or a shared serializer reading from the store's own partialize. Fixes drift-trap (F-007).",
+      "files": [
+        "shared/lib/profile/profileSessionOrchestrator.ts"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Propose a new log-doctor 'boot' mode that stitches registerStage → updateStage(complete) → deferWork drift → perf.js_thread_blocked into a single waterfall scoped to stage.canStart transitions. Current startup mode is a base but doesn't correlate thread-blocks with specific stages. Would cut 'which stage owns this block?' from 3 greps to 1. Document in .claude/rules/log-doctor.md.",
+      "files": [
+        "scripts/log-doctor.ts",
+        ".claude/rules/log-doctor.md"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Wire logHermesStats() and startThreadMonitor() into app bootstrap (likely app/_layout.tsx top level). log-doctor gc --latest currently returns 'No Hermes/GC entries found' — blocks future heap-leak audits.",
+      "files": [
+        "app/_layout.tsx"
+      ]
+    },
+    {
+      "type": "log-helper",
+      "description": "Wrap CocoProvider's runBackground in startFlow('coco.phase2', cashuLog). Gives future audits a causal chain per boot via log-doctor flows, cutting multi-event traces to one query. Non-fatal even on errors (the existing catch already completes the stage).",
+      "files": [
+        "shared/providers/CocoProvider.tsx"
+      ]
+    },
+    {
+      "type": "research-note",
+      "description": "Propose __research__/boot-side-effects-before-consent.md capturing SOV-00 §3 'Order is load-bearing' vs §4 'Silent seed' tradeoff for Terms-acceptance ordering (grounds F-008). Status: draft; tags: boot, consent, dim-2, dim-5. Feeds ratification of SOV-50.",
+      "files": [
+        "__research__/boot-side-effects-before-consent.md"
+      ]
+    }
+  ],
+  "open_questions": [
+    "Is any ProofService query path outside the CocoManager singleton? Would widen F-001's fix. Grep manager.proofService / manager.proofRepository across app (manager.ts:701-892 already accesses these as private, suggesting other call sites may too).",
+    "Does useMintStore.setSelectedMint during the 2–7s deferWork window write to a store that hasn't hydrated? initializeDefaultMints at CocoProvider.tsx:77-91 reads useMintStore.getState().getSelectedMint and calls setSelectedMint; if mint store hasn't rehydrated, we could set into a shape that gets overwritten on hydration completion.",
+    "Operations created DURING Phase 2 (between manager-ready and processor-start) — are they picked up by watchExistingPendingOnStart on enableMintOperationWatcher? UNVERIFIED; would require a log probe on a session that mints during this window.",
+    "SOV-50 (Onboarding & Terms) slot — the spec should ratify whether side-effects (seed generation, SQLite init, mint seeding) are allowed before T&C acceptance, per F-008."
+  ]
+}

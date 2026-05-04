@@ -290,8 +290,8 @@
       ],
       "verification_note": "Re-checked the file; only one call site for BottomTabs. Per skill:improve-codebase-architecture deletion test: collapsing BottomTabs into the parent does not concentrate complexity — confirms it's a shallow module today.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "LiquidGlassTabBar slop is in shared/blocks but unrelated to the gate consolidation pattern."
+      "completion_status": "complete",
+      "completion_note": "BottomTabs collapsed to controlled-only; tabsCount default removed"
     },
     {
       "id": "F-011",
@@ -353,8 +353,8 @@
       ],
       "verification_note": "Confirmed via npm run lint output: 'TransferStepChain.tsx 150:7 warning DOT_TIMING is assigned a value but never used'.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Trivial unused-const cleanup in a different file. Picks up naturally with a janitorial sweep, not the gate slice."
+      "completion_status": "complete",
+      "completion_note": "DOT_TIMING constant removed from TransferStepChain"
     },
     {
       "id": "F-014",

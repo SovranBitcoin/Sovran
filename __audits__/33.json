@@ -287,7 +287,9 @@
         "features/whitenoise/hooks/useWhitenoiseInbox.ts:50"
       ],
       "verification_note": "Grep confirmed zero reads. Trivial.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "removed unused subscribedFor ref from useWhitenoiseInbox"
     },
     {
       "id": "F-011",
