@@ -56,14 +56,26 @@ export function SwapStatusToast({ hide, ...toastProps }: SwapStatusToastProps) {
 
   const isDone = view.state === 'done';
   const isFailed = view.state === 'failed';
-  const status: StatusToastStatus = isFailed ? 'failed' : isDone ? 'confirmed' : 'pending';
-  const title = isFailed ? 'Swap failed' : isDone ? 'Swap complete' : 'Swapping';
+  const isCancelled = view.state === 'cancelled';
+  // 'cancelled' shares the failed visual + auto-dismiss path so StatusToast's
+  // isTerminal check (status === 'confirmed' || status === 'failed') flips and
+  // the toast doesn't sit on 'Swapping' forever after the user presses Stop.
+  const status: StatusToastStatus =
+    isFailed || isCancelled ? 'failed' : isDone ? 'confirmed' : 'pending';
+  const title = isCancelled
+    ? 'Swap cancelled'
+    : isFailed
+      ? 'Swap failed'
+      : isDone
+        ? 'Swap complete'
+        : 'Swapping';
   const total = view.total;
   // Always render "X of Y swaps" so the toast shows progress from the first
   // frame ("0 of 2 swaps") instead of waiting for the first leg to resolve.
-  const subtitle = isFailed
-    ? (view.errorMessage ?? `${view.doneCount} of ${total} swaps`)
-    : `${isDone ? total : view.doneCount} of ${total} swaps`;
+  const subtitle =
+    isFailed || isCancelled
+      ? (view.errorMessage ?? `${view.doneCount} of ${total} swaps`)
+      : `${isDone ? total : view.doneCount} of ${total} swaps`;
 
   return (
     <StatusToast

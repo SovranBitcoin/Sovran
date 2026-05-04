@@ -435,6 +435,7 @@ export function MintRebalancePlanScreen() {
             minRequired: minTransferThreshold + feeHeadroom,
           });
           updateStepState(id, { status: 'skipped' });
+          useSwapStatusStore.getState().setLegSkipped(id);
           return true; // not a failure — funds already transferred
         }
 
@@ -1213,6 +1214,10 @@ export function MintRebalancePlanScreen() {
           });
           setLegLocalStatus('done');
         }
+        // Drive the swap-status store from the same control point that writes
+        // updateStepState, so the runner doesn't have to read stepStatesRef
+        // across an await (the ref lags one render+commit cycle).
+        useSwapStatusStore.getState().setLegDone(id);
 
         appendDebug({
           event: 'step_done',
@@ -1268,6 +1273,7 @@ export function MintRebalancePlanScreen() {
           routingDetail: undefined,
         });
         setLegLocalStatus('failed', errorMessage);
+        useSwapStatusStore.getState().setLegFailed(id, errorMessage);
         return false;
       } finally {
         // Always release the lock
@@ -1303,7 +1309,6 @@ export function MintRebalancePlanScreen() {
         totalSteps: steps.length,
         runId,
       });
-      const swapStatus = useSwapStatusStore.getState();
       let anyFailed = false;
       try {
         for (const step of steps) {
@@ -1321,24 +1326,16 @@ export function MintRebalancePlanScreen() {
           // executeStep is sync about its UI state but async about coco RPCs.
           useSwapStatusStore.getState().setActiveLeg(step.id);
           const stepT0 = performance.now();
-          // Execute; if it fails, we keep going to the next step (error tolerant)
-          await executeStep(step, runId);
-          const finalStatus = stepStatesRef.current[step.id]?.status;
+          // executeStep drives setLegDone/Skipped/Failed itself at its terminal
+          // sites — see the updateStepState pairs in executeStep — so we don't
+          // re-read the React-managed stepStatesRef across this await.
+          const ok = await executeStep(step, runId);
+          if (!ok) anyFailed = true;
           cashuLog.info('swap.leg.complete', {
             stepId: step.id,
             duration_ms: Math.round(performance.now() - stepT0),
-            status: finalStatus,
+            status: stepStatesRef.current[step.id]?.status,
           });
-          if (finalStatus === 'done') {
-            useSwapStatusStore.getState().setLegDone(step.id);
-          } else if (finalStatus === 'skipped') {
-            useSwapStatusStore.getState().setLegSkipped(step.id);
-          } else if (finalStatus === 'failed') {
-            anyFailed = true;
-            useSwapStatusStore
-              .getState()
-              .setLegFailed(step.id, stepStatesRef.current[step.id]?.errorMessage);
-          }
         }
 
         if (abortRef.current || runIdRef.current !== runId) return;
@@ -1347,10 +1344,10 @@ export function MintRebalancePlanScreen() {
         if (swapGroupIdRef.current) {
           useSwapTransactionsStore.getState().finalizeGroup(swapGroupIdRef.current, 'finished');
         }
-        // Only flip the toast to its terminal state if the orchestrator owns
-        // an active swap (the popup was shown). The check guards retry runs
-        // that didn't trigger handleStart's start() call.
-        if (swapStatus.active) {
+        // Read the store fresh — guards retry runs where handleStart's start()
+        // wasn't called (no active swap to flip terminal). The store-side
+        // actions also early-return on `!active`, so this is double-defence.
+        if (useSwapStatusStore.getState().active) {
           if (anyFailed) {
             useSwapStatusStore.getState().fail();
           } else {
@@ -1358,7 +1355,7 @@ export function MintRebalancePlanScreen() {
           }
         }
       } catch (err) {
-        if (swapStatus.active) {
+        if (useSwapStatusStore.getState().active) {
           useSwapStatusStore.getState().fail(err instanceof Error ? err.message : String(err));
         }
         throw err;
@@ -1627,6 +1624,11 @@ export function MintRebalancePlanScreen() {
     if (swapGroupIdRef.current) {
       useSwapTransactionsStore.getState().finalizeGroup(swapGroupIdRef.current, 'cancelled');
     }
+    // Flip the SwapStatusToast to its terminal 'cancelled' state. Without this
+    // the toast sits on 'Swapping' until the in-flight melt resolves on its
+    // own — the runner's tail at runStepsSequentially returns early on
+    // abortRef so its complete()/fail() never fires either.
+    useSwapStatusStore.getState().cancel();
   }, []);
 
   const bottomButtons = useMemo(() => {

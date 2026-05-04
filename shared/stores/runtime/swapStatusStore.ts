@@ -59,6 +59,7 @@ export interface SwapStatusStore {
   setLegFailed: (legId: string, errorMessage?: string) => void;
   complete: () => void;
   fail: (errorMessage?: string) => void;
+  cancel: (errorMessage?: string) => void;
   /** Clear without firing terminal logs — used when the toast auto-dismisses. */
   clear: () => void;
 }
@@ -131,6 +132,17 @@ export const useSwapStatusStore = create<SwapStatusStore>((set, get) => ({
       errorMessage,
     });
     set({ active: { ...cur, state: 'failed', errorMessage } });
+  },
+  cancel: (errorMessage) => {
+    const cur = get().active;
+    if (!cur) return;
+    paymentLog.info('swap.status.cancel', {
+      id: cur.id,
+      durationMs: Date.now() - cur.startedAt,
+      doneLegs: cur.legs.filter((l) => l.status === 'done').length,
+      totalLegs: cur.legs.length,
+    });
+    set({ active: { ...cur, state: 'cancelled', errorMessage } });
   },
   clear: () => {
     if (get().active) paymentLog.debug('swap.status.clear');
