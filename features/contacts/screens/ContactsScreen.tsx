@@ -16,7 +16,7 @@ import { prefetchImages } from '@/shared/lib/imageCache';
 import { useNostrProfileMetadataMany } from '@/shared/hooks/useNostrProfileMetadata';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
 import { useSearchContext } from '@/shared/ui/composed/SearchLayout';
-import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
+import { Log, log, paymentLog, useLifecycleLogger } from '@/shared/lib/logger';
 import { SearchResultsList } from '@/shared/ui/composed/SearchResultsList';
 import {
   ContactRow,
@@ -26,8 +26,8 @@ import {
   type Identity,
 } from '@/shared/ui/composed/ContactRow';
 import { ScreenContainer } from '../components/ScreenContainer';
-import { navigateToContact } from '../lib/navigateToProfile';
-import { SearchFilters } from '../components/search/SearchFilters';
+import { navigateToProfile } from '../lib/navigateToProfile';
+import { SearchFilters, type ContactsFilter } from '../components/search/SearchFilters';
 import {
   useWhitenoiseRequests,
   type WhitenoiseRequest,
@@ -36,22 +36,11 @@ import { useWhitenoiseDmContacts } from '@/features/whitenoise/hooks/useWhitenoi
 import { RequestActions } from '@/features/whitenoise/components/RequestActions';
 import { SEARCH_FILTERS_HEIGHT } from '../lib/constants/styles';
 import { useLocationTiers, type TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
-import { isValidGeohash } from 'bitchat-module';
+import { parseGeohashQuery } from '../lib/parseGeohashQuery';
+import { matchTiers } from '../lib/matchTiers';
+import type { NostrProfileMetadata } from '@/shared/stores/global/nostrMetadataCache';
 
 type TopTab = 'contacts' | 'groups';
-
-/**
- * Bare geohash detection for the Groups pill header.
- * (All pill's geohash handling lives in `useAllSearchResults` + `SearchResultsList`.)
- */
-function parseGeohashQuery(trimmed: string): string | null {
-  if (!trimmed) return null;
-  const hash = trimmed.startsWith('#') ? trimmed.slice(1).toLowerCase() : trimmed.toLowerCase();
-  if (hash.length < 2) return null;
-  if (!isValidGeohash(hash)) return null;
-  if (!trimmed.startsWith('#') && /\s/.test(trimmed)) return null;
-  return hash;
-}
 
 function GeohashJumpRow({ geohash }: { geohash: string }) {
   const router = useGuardedRouter();
@@ -65,6 +54,7 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
       subtitle="Open geohash chat channel"
       trailingVariant="chevron"
       onPress={() => {
+        paymentLog.info('contact.geohash.press', { geohash, source: 'contacts' });
         router.push({
           pathname: '/(user-flow)/geohashChat',
           params: { geohash },
@@ -87,6 +77,11 @@ function GroupsTierRow({ tier }: { tier: TierEntry }) {
       })}
       trailingVariant="chevron"
       onPress={() => {
+        paymentLog.info('contact.tier.press', {
+          tier: tier.key,
+          transport: tier.transport,
+          source: 'contacts',
+        });
         router.push({
           pathname: '/(user-flow)/geohashChat',
           params: {
@@ -105,8 +100,8 @@ export const ContactsScreen = () => {
   useLifecycleLogger('ContactsScreen');
   const { isSearching, searchQuery } = useSearchContext();
   const [activeTab, setActiveTab] = useState<TopTab>('contacts');
-  const [activeFilter, setActiveFilter] = useState('All');
-  const lastSearchFilterRef = useRef<string>('All');
+  const [activeFilter, setActiveFilter] = useState<ContactsFilter>('All');
+  const lastSearchFilterRef = useRef<ContactsFilter>('All');
   const [foreground, surface, separator, accent] = useThemeColor([
     'foreground',
     'surface',
@@ -196,7 +191,7 @@ export const ContactsScreen = () => {
   // excludes the raw hex pubkey — those are 64-char hex and would false-match
   // any short alphanumeric query ("abc", "face", "123", …).
   const matchesProfileQuery = useCallback(
-    (profile: any): boolean => {
+    (profile: NostrProfileMetadata | undefined): boolean => {
       if (!lowerQuery) return true;
       if (!profile) return false;
       const candidates = [profile.name, profile.displayName, profile.nip05];
@@ -207,7 +202,7 @@ export const ContactsScreen = () => {
 
   const filteredDisplayContacts = useMemo(() => {
     if (!lowerQuery) return displayContacts;
-    return displayContacts.filter((c: any) => {
+    return displayContacts.filter((c) => {
       const profile = c.pubkey ? profilesMap.get(c.pubkey) : undefined;
       return matchesProfileQuery(profile);
     });
@@ -230,13 +225,13 @@ export const ContactsScreen = () => {
   // the user. The row reappears automatically when the kind-0 event arrives
   // (this memo depends on `profilesMap`).
   const mintsWithProfile = useMemo(
-    () => displayMints.filter((m: any) => m.pubkey && profilesMap.has(m.pubkey)),
+    () => displayMints.filter((m) => !!m.pubkey && profilesMap.has(m.pubkey)),
     [displayMints, profilesMap]
   );
 
   const filteredDisplayMints = useMemo(() => {
     if (!lowerQuery) return mintsWithProfile;
-    return mintsWithProfile.filter((m: any) => {
+    return mintsWithProfile.filter((m) => {
       const name = m.mintInfo?.name;
       if (typeof name === 'string' && name.toLowerCase().includes(lowerQuery)) return true;
       if (mintHost(m.mint?.mintUrl).includes(lowerQuery)) return true;
@@ -319,7 +314,7 @@ export const ContactsScreen = () => {
     requestRows,
   ]);
 
-  const handleFilterChange = useCallback((filter: string) => {
+  const handleFilterChange = useCallback((filter: ContactsFilter) => {
     log.debug('contacts.filter_changed', { filter });
     setActiveFilter(filter);
     lastSearchFilterRef.current = filter;
@@ -347,8 +342,14 @@ export const ContactsScreen = () => {
             trailing={
               <RequestActions
                 isBusy={whitenoiseBusyId === req.id}
-                onAccept={() => void acceptWhitenoiseRequest(req)}
-                onDecline={() => void declineWhitenoiseRequest(req)}
+                onAccept={() => {
+                  paymentLog.info('contact.whitenoise.accept', { pubkey: req.fromPubkey });
+                  void acceptWhitenoiseRequest(req);
+                }}
+                onDecline={() => {
+                  paymentLog.info('contact.whitenoise.decline', { pubkey: req.fromPubkey });
+                  void declineWhitenoiseRequest(req);
+                }}
               />
             }
             testID={`request-row:${req.fromPubkey}`}
@@ -393,7 +394,7 @@ export const ContactsScreen = () => {
           identity={identity}
           subtitle={lastMessage}
           hideMetadata={!!lastMessage}
-          onPress={() => navigateToContact(item.pubkey, mintUrl)}
+          onPress={() => navigateToProfile(item.pubkey, mintUrl)}
           testID={`contact-row:nostr:${item.pubkey}`}
         />
       );
@@ -426,20 +427,12 @@ export const ContactsScreen = () => {
   }, [foreground, activeFilter, mintInfoLoading]);
 
   // Groups pill: filter tiers by label (e.g. "Province") or reverse-geocoded
-  // displayName (e.g. "United Kingdom"). Case-insensitive prefix/substring.
-  // (Mirrors the matching in `useAllSearchResults` so Groups pill and All pill
-  // stay consistent for tier hits.)
-  const matchingTiers = useMemo(() => {
-    if (!lowerQuery) return [];
-    return locationTiers.filter((tier: TierEntry) => {
-      if (tier.transport === 'ble') {
-        return tier.label.toLowerCase().startsWith(lowerQuery) && lowerQuery.length >= 3;
-      }
-      if (tier.label.toLowerCase().startsWith(lowerQuery)) return true;
-      if (tier.displayName?.toLowerCase().includes(lowerQuery)) return true;
-      return false;
-    });
-  }, [lowerQuery, locationTiers]);
+  // displayName (e.g. "United Kingdom"). Shared with `useAllSearchResults`
+  // so Groups pill and All pill stay consistent for tier hits.
+  const matchingTiers = useMemo(
+    () => matchTiers(locationTiers, lowerQuery),
+    [lowerQuery, locationTiers]
+  );
 
   // Groups pill still surfaces the geohash jump row as a list header.
   const groupsGeohashQuery = useMemo(() => parseGeohashQuery(trimmedQuery), [trimmedQuery]);
@@ -448,10 +441,10 @@ export const ContactsScreen = () => {
   //   • No active search → base pills (Groups lives in the outer tab bar).
   //   • Search open, empty query → all pills so the user can pick a scope.
   //   • Search open with a query → only pills that have at least one match.
-  const visibleFilters = useMemo<readonly string[]>(() => {
+  const visibleFilters = useMemo<readonly ContactsFilter[]>(() => {
     if (!isSearching) return ['All', 'Recent', 'Requests', 'Mints'];
     if (!lowerQuery) return ['All', 'Recent', 'Requests', 'Mints', 'Groups'];
-    const list: string[] = ['All'];
+    const list: ContactsFilter[] = ['All'];
     if (filteredDisplayContacts.length > 0) list.push('Recent');
     if (whitenoiseRequests.length > 0) list.push('Requests');
     if (filteredDisplayMints.length > 0) list.push('Mints');

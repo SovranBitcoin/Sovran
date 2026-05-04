@@ -1,14 +1,25 @@
 import { Image } from 'expo-image';
 import { log } from '@/shared/lib/logger';
-import {
-  getBootMorphCompleted,
-  subscribeBootMorphCompleted,
-} from '@/shared/lib/qrButtonAnchor';
+import { getBootMorphCompleted, subscribeBootMorphCompleted } from '@/shared/lib/qrButtonAnchor';
 
 const prefetchedUrls = new Set<string>();
 
 function normalizeUrl(url: string): string {
   return url.trim();
+}
+
+// Most prefetch callers feed URLs from untrusted nostr kind-0 metadata
+// (`picture`, `icon_url`). Restrict to https/http so a relay-supplied
+// `javascript:` / `data:` / `file:` / `chrome:` URL never reaches the
+// image loader. http is permitted (some self-hosted mints publish
+// http-only logos) but logged so it's visible in log-doctor.
+function isSafeImageUrl(url: string): boolean {
+  try {
+    const proto = new URL(url).protocol;
+    return proto === 'https:' || proto === 'http:';
+  } catch {
+    return false;
+  }
 }
 
 // Block all image prefetching until the boot splash → QR-button morph has
@@ -36,6 +47,10 @@ export async function prefetchImage(url?: string | null): Promise<void> {
   if (!url) return;
   const normalized = normalizeUrl(url);
   if (!normalized || prefetchedUrls.has(normalized)) return;
+  if (!isSafeImageUrl(normalized)) {
+    log.warn('image.prefetch.rejected_scheme', { url: normalized.slice(0, 40) });
+    return;
+  }
 
   prefetchedUrls.add(normalized);
   try {

@@ -140,7 +140,7 @@ export const PostCard = React.memo(function PostCard({
   }, [event.id]);
 
   const navigateToProfile = useCallback(() => {
-    // push so each profile pushes a new stack entry — see navigateToContact.
+    // push so each profile pushes a new stack entry — see navigateToProfile.
     router.push({
       pathname: '/(user-flow)/profile',
       params: { pubkey: event.pubkey },

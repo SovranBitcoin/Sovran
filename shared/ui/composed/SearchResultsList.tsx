@@ -22,7 +22,8 @@ import {
   type AllSearchResult,
 } from '@/features/contacts/hooks/useAllSearchResults';
 import { ContactRow, geohashIdentity, nostrIdentity } from '@/shared/ui/composed/ContactRow';
-import { navigateToContact } from '@/features/contacts/lib/navigateToProfile';
+import { navigateToProfile } from '@/features/contacts/lib/navigateToProfile';
+import { paymentLog } from '@/shared/lib/logger';
 import { NoResultsFound } from '@/features/payments/components/NoResultsFound';
 import { CONTACT_SEARCH_MIN_LENGTH } from '@/features/payments/hooks/useContactSearch';
 import type { TierEntry } from '@/features/bitchat/hooks/useLocationTiers';
@@ -45,6 +46,7 @@ function GeohashJumpRow({ geohash }: { geohash: string }) {
       subtitle="Open geohash chat channel"
       trailingVariant="chevron"
       onPress={() => {
+        paymentLog.info('contact.geohash.press', { geohash, source: 'search' });
         router.push({
           pathname: '/(user-flow)/geohashChat',
           params: { geohash },
@@ -66,6 +68,11 @@ function TierRow({ tier }: { tier: TierEntry }) {
       })}
       trailingVariant="chevron"
       onPress={() => {
+        paymentLog.info('contact.tier.press', {
+          tier: tier.key,
+          transport: tier.transport,
+          source: 'search',
+        });
         router.push({
           pathname: '/(user-flow)/geohashChat',
           params: {
@@ -108,7 +115,7 @@ export function SearchResultsList({
             identity={nostrIdentity(item.pubkey, item.profile, {
               isLoadingProfile: item.isLoadingProfile,
             })}
-            onPress={() => navigateToContact(item.pubkey)}
+            onPress={() => navigateToProfile(item.pubkey)}
             testID={`contact-row:nostr:${item.pubkey}`}
           />
         );

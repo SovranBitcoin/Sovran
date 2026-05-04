@@ -105,6 +105,30 @@ interface NostrMetadataCacheState {
   clear: () => void;
 }
 
+/**
+ * Wire shape of a Nostr kind-0 metadata event's `content` after
+ * `JSON.parse`. Same fields as `NostrProfileMetadata` plus the snake_case
+ * `display_name` alias the spec permits. `looseObject` ignores unknown
+ * keys (relays serve all sorts of vendor extensions on kind-0). Field
+ * caps come from the persisted-cache schema below — keep the two in sync.
+ *
+ * Exported so the runtime parse path in `useNostrProfileMetadata` shares
+ * one definition with the persisted-cache validator instead of casting
+ * `JSON.parse` output as a TS type.
+ */
+export const Kind0MetadataSchema = z.looseObject({
+  display_name: z.string().max(512).optional(),
+  displayName: z.string().max(512).optional(),
+  name: z.string().max(512).optional(),
+  picture: z.string().max(2048).optional(),
+  banner: z.string().max(2048).optional(),
+  nip05: z.string().max(512).optional(),
+  lud16: z.string().max(512).optional(),
+  website: z.string().max(2048).optional(),
+  about: z.string().max(4096).optional(),
+});
+export type Kind0Metadata = z.infer<typeof Kind0MetadataSchema>;
+
 const PersistedNostrMetadataEntry = z.looseObject({
   displayName: z.string().max(512).optional(),
   name: z.string().max(512).optional(),
