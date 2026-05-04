@@ -5,23 +5,13 @@ import { VStack } from '@/shared/ui/primitives/View/VStack';
 import { HStack } from '@/shared/ui/primitives/View/HStack';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import { useThemeColor } from '@/shared/hooks/useThemeColor';
+import { formatChatTimestamp } from './formatChatTimestamp';
 import type { ChatBubbleMessage } from './types';
 
 interface ChatMessageBubbleProps {
   message: ChatBubbleMessage;
   isFirstInGroup: boolean;
   isLastInGroup: boolean;
-}
-
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-  if (diffInHours < 24) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-  if (diffInHours < 48) return 'Yesterday';
-  return date.toLocaleDateString();
 }
 
 /**
@@ -130,7 +120,7 @@ export function ChatMessageBubble({
                 alignSelf: message.isOwn ? 'flex-end' : 'flex-start',
                 marginTop: 2,
               }}>
-              {message.isPending ? 'sending…' : formatTimestamp(message.timestamp)}
+              {message.isPending ? 'sending…' : formatChatTimestamp(message.timestamp)}
             </Text>
           ) : null}
         </VStack>

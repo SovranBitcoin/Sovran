@@ -51,6 +51,7 @@ import { Text } from '@/shared/ui/primitives/Text';
 import { Avatar } from '@/shared/ui/primitives/Avatar';
 import Icon from 'assets/icons';
 import { ChatComposer } from '@/shared/ui/composed/chat/ChatComposer';
+import { formatChatTimestamp } from '@/shared/ui/composed/chat/formatChatTimestamp';
 import { Button } from '@/shared/ui/primitives/Button';
 
 import { isValidEcashToken } from '@/shared/lib/cashu/utils';
@@ -81,20 +82,6 @@ interface DmMessage {
   isSending?: boolean;
   created_at: number;
   pubkey: string;
-}
-
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp * 1000);
-  const now = new Date();
-  const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-
-  if (diffInHours < 24) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } else if (diffInHours < 48) {
-    return 'Yesterday';
-  } else {
-    return date.toLocaleDateString();
-  }
 }
 
 function extractCashuToken(content: string): string | null {
@@ -654,7 +641,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
                 id: event.id,
                 content: event.content,
                 sender: (isMe ? 'me' : 'other') as 'me' | 'other',
-                timestamp: formatTimestamp(event.created_at || 0),
+                timestamp: formatChatTimestamp((event.created_at || 0) * 1000),
                 isRead: true,
                 created_at: event.created_at || 0,
                 pubkey: senderPubkey,
@@ -717,7 +704,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
         id: dm.wrapId,
         content: dm.content,
         sender: isMe ? 'me' : 'other',
-        timestamp: formatTimestamp(dm.created_at),
+        timestamp: formatChatTimestamp(dm.created_at * 1000),
         isRead: true,
         created_at: dm.created_at,
         pubkey: dm.senderPubkey,
@@ -787,7 +774,7 @@ export function UserMessagesScreen({ pubkey, onBack }: UserMessagesScreenProps) 
       id: tempMessageId,
       content: text,
       sender: 'me',
-      timestamp: formatTimestamp(timestamp),
+      timestamp: formatChatTimestamp(timestamp * 1000),
       isRead: false,
       isSending: true,
       created_at: timestamp,
