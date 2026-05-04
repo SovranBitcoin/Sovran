@@ -53,7 +53,9 @@
         "skill:security-review"
       ],
       "verification_note": "Re-read AppGate.tsx:28-51 and SOV-00 §5 table. Counter-argument considered: 'cashu_seed_0 is a stronger signal than user_mnemonic because it confirms Coco derivation succeeded on the prior install'. Rejected — the spec unambiguously defines the signal, and the import-nsec-first + debug-mnemonic paths are real regressions the current code misses. RestoreGate recovers safety but not the carousel-avoidance intent.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useReinstallDetection now probes retrieveMnemonic() (the master mnemonic at user_mnemonic) per SOV-00 §5, not retrieveCashuSeed(0). Closes the import-nsec-only and debug-mnemonic regressions."
     },
     {
       "id": "F-002",
@@ -96,7 +98,9 @@
         "docs/SOV-00.md §12 D5"
       ],
       "verification_note": "Still present since 04.json. Source-tracking branch added (L103, L163-176) addresses the seedCreatedAt regression per SOV-00 §4.1 D5 but not the constant-in-bundle exposure.",
-      "prior_audit_id": "F-002@04.json"
+      "prior_audit_id": "F-002@04.json",
+      "completion_status": "complete",
+      "completion_note": "DEBUG_MNEMONIC now flows via app.config.js extra.debugMnemonic gated to EAS_BUILD_PROFILE=development; the EXPO_PUBLIC_* var is no longer read. Bundle inlining is structurally prevented; secureStorage.getDebugMnemonicOverride reads Constants.expoConfig.extra.debugMnemonic. Pinned by __tests__/appConfigDebugMnemonic.test.ts."
     },
     {
       "id": "F-004",

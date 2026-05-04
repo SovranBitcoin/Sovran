@@ -53,7 +53,9 @@
         "https://docs.expo.dev/guides/environment-variables/#using-expo_public_ in-client"
       ],
       "verification_note": "Verified secureStorage.ts:35-51 + generateMnemonic branch. Verified dev.sh:48 sets the env in-process. Expo's inlining behaviour is documented and has shipped real-world constant leaks (see Expo EAS docs). Counter-argument considered: __DEV__ minification strips both branch and string in release mode if the minifier follows the closure — but this is build-tool dependent, not guaranteed, and does not help the staging/__DEV__=true case. Kept Critical; confidence 0.7 because the exposure depends on build-time env hygiene rather than source code alone.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "DEBUG_MNEMONIC now flows via app.config.js extra.debugMnemonic gated to EAS_BUILD_PROFILE=development; the EXPO_PUBLIC_* var is no longer read. Bundle inlining is structurally prevented; secureStorage.getDebugMnemonicOverride reads Constants.expoConfig.extra.debugMnemonic. Pinned by __tests__/appConfigDebugMnemonic.test.ts."
     },
     {
       "id": "F-003",
