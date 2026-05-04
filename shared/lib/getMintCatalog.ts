@@ -24,33 +24,13 @@ import type { GetInfoResponse } from '@cashu/cashu-ts';
 import type { MintCatalogEntry } from 'coco-payment-ux';
 
 import { auditMint, fetchNostrProfile, reviewMint } from '@/shared/lib/apiClient';
+import {
+  extractMintNostrPubkey,
+  type MintInfoForNostr,
+} from '@/shared/lib/nostr/extractMintNostrPubkey';
 import { useAuditMintStore } from '@/shared/stores/global/auditMintStore';
 import { useKYMMintStore } from '@/shared/stores/global/kymMintStore';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
-
-interface ContactEntry {
-  method: string;
-  info: string;
-}
-
-// NUT-06 `contact[].info` for a `nostr` method is supposed to be a 64-char
-// hex pubkey. A hostile or careless mint can ship anything in that slot
-// (npub, lightning address, attacker-controlled pubkey, arbitrary URL); we
-// fetch and display the resolved profile under the mint operator's identity,
-// so an unvalidated value lets a mint impersonate someone else's reputation.
-const NOSTR_HEX_PUBKEY_REGEX = /^[0-9a-f]{64}$/i;
-
-function extractNostrPubkey(info: unknown): string | undefined {
-  const contacts = (info as { contact?: ContactEntry[] } | null | undefined)?.contact;
-  if (!Array.isArray(contacts)) return undefined;
-  for (const c of contacts) {
-    if (c?.method !== 'nostr') continue;
-    if (typeof c.info !== 'string') continue;
-    if (!NOSTR_HEX_PUBKEY_REGEX.test(c.info)) continue;
-    return c.info.toLowerCase();
-  }
-  return undefined;
-}
 
 function isMintInfoObject(value: unknown): value is Record<string, unknown> {
   return (
@@ -142,7 +122,7 @@ async function fetchEntry(
     entry.reviewCount = review.recommendations.length;
   }
 
-  const pubkey = extractNostrPubkey(info);
+  const pubkey = extractMintNostrPubkey(info as MintInfoForNostr);
   if (pubkey) {
     const profile = await resolveNostrProfile(mintUrl, pubkey, signal);
     if (profile) {

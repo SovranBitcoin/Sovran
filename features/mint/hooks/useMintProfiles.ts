@@ -9,35 +9,17 @@
 
 import { useEffect, useRef } from 'react';
 import { fetchNostrProfile } from '@/shared/lib/apiClient';
+import {
+  extractMintNostrPubkey,
+  type MintInfoForNostr,
+} from '@/shared/lib/nostr/extractMintNostrPubkey';
 import { useMintProfileStore } from '@/shared/stores/global/mintProfileStore';
 import { normalizeMintUrlKey } from '@/shared/lib/url';
 import { cashuLog } from '@/shared/lib/logger';
 
-// Structural minimum of NUT-06 GetInfoResponse needed here — only the
-// contact array is read. Keeps the input compatible with both the full
-// upstream `GetInfoResponse` and the looser DisplayMint shape used by
-// MintAddScreen (which omits / nulls fields this hook never touches).
-type MintContactList = readonly { method: string; info: string }[];
-type MintInfoForProfile = { contact?: MintContactList } | null | undefined;
-
-/**
- * Extract a Nostr pubkey from NUT-06 mint info contact array.
- * Returns the hex pubkey or npub if found, undefined otherwise.
- */
-function extractNostrPubkey(mintInfo: MintInfoForProfile): string | undefined {
-  const contacts = mintInfo?.contact;
-  if (!Array.isArray(contacts)) return undefined;
-  for (const c of contacts) {
-    if (c.method === 'nostr' && typeof c.info === 'string' && c.info.length > 0) {
-      return c.info;
-    }
-  }
-  return undefined;
-}
-
 interface MintWithInfo {
   url: string;
-  mintInfo?: MintInfoForProfile;
+  mintInfo?: MintInfoForNostr;
 }
 
 /**
@@ -52,7 +34,7 @@ export function useMintProfiles(mints: MintWithInfo[]): void {
     const { isStale } = useMintProfileStore.getState();
     const controller = new AbortController();
     for (const mint of mints) {
-      const pubkey = extractNostrPubkey(mint.mintInfo);
+      const pubkey = extractMintNostrPubkey(mint.mintInfo);
       if (!pubkey) continue;
 
       const key = normalizeMintUrlKey(mint.url);
