@@ -12,6 +12,7 @@ import { Share } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
+import { useCameraPermissions } from 'expo-camera';
 
 import { URDecoder } from '@gandlaf21/bc-ur';
 
@@ -39,7 +40,6 @@ import {
 import { useLatestRef } from '@/shared/hooks/useLatestRef';
 import { paymentLog } from '@/shared/lib/logger';
 import { sendDirectMessageToRelays } from '@/shared/lib/nostr/sendDirectMessage';
-import { useReceivePaymentUXExtras } from '@/features/receive/providers/ReceivePaymentUXExtras';
 import {
   createSovranExecuteMintQuote,
   createSovranExecuteReceive,
@@ -140,13 +140,24 @@ function getMintEnrichment(mintUrl: string): Partial<MintReviewInfo> {
 
 export function CocoPaymentUXProvider({ children }: { children: React.ReactNode }) {
   const manager = useManager();
-  const receiveExtras = useReceivePaymentUXExtras();
   const { keys } = useNostrKeysContext();
   const { isOffline: contextOffline } = useOfflineStatus();
   const mockOffline = useSettingsStore((state) => state.mockOffline);
   const isOffline = mockOffline || contextOffline;
   const offlineRef = useLatestRef(isOffline);
   const getOffline = useCallback(() => offlineRef.current, []);
+
+  // Camera permission lives here rather than behind a (receive-flow)-scoped
+  // context provider so it's reachable from this provider's navigation /
+  // screen-action bridges. A descendant context would resolve to undefined
+  // here and silently no-op the Receive scan-QR button.
+  const [cameraPermission, requestCameraPermissionRaw] = useCameraPermissions();
+  const cameraGrantedRef = useLatestRef(cameraPermission?.granted ?? false);
+  const requestCameraPermission = useCallback(async (): Promise<boolean> => {
+    if (cameraGrantedRef.current) return true;
+    const result = await requestCameraPermissionRaw();
+    return result.granted;
+  }, [requestCameraPermissionRaw]);
 
   const npubRef = useLatestRef(keys?.npub);
   const pubkeyRef = useLatestRef(keys?.pubkey);
@@ -278,17 +289,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
     () => ({
       scanQr: async ({ unit, context }) => {
         if (context === 'receive') {
-          if (!receiveExtras?.requestCameraPermission) {
-            // The Receive screen mounts inside `ReceivePaymentUXExtrasProvider`,
-            // which supplies `requestCameraPermission`. If we got here without
-            // it the provider isn't wrapping the route — log loudly so we can
-            // investigate, and fall through to the generic camera path so the
-            // user isn't stuck with a dead button.
-            paymentLog.warn('receive.scan.no_permission_provider');
-            router.navigate({ pathname: '/(receive-flow)/camera', params: { unit } });
-            return;
-          }
-          const granted = await receiveExtras.requestCameraPermission();
+          const granted = await requestCameraPermission();
           paymentLog.info('receive.scan.permission', { granted });
           if (!granted) return;
           router.navigate({
@@ -312,7 +313,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         router.back();
       },
     }),
-    [receiveExtras?.requestCameraPermission]
+    [requestCameraPermission]
   );
 
   const deepLinkUrl = Linking.useURL();
@@ -334,7 +335,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
     return {
       getExtraContext: () => ({
         manager,
-        requestCameraPermission: receiveExtras?.requestCameraPermission,
+        requestCameraPermission,
       }),
       onEntryUpdate: (screenType, callback) => {
         const unsubscribes: (() => void)[] = [];
@@ -641,7 +642,7 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
         return labels[source] ?? null;
       },
     };
-  }, [manager, receiveExtras?.requestCameraPermission]);
+  }, [manager, requestCameraPermission]);
 
   return (
     <PaymentUXProviderBase

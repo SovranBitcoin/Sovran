@@ -58,7 +58,7 @@ import { useSubscribe } from '@nostr-dev-kit/ndk-mobile';
 import { Metadata } from 'nostr-tools/kinds';
 import PopupHost from '@/shared/blocks/popup/PopupHost';
 import { ActionMenuHost } from '@/shared/blocks/popup/ActionMenuHost';
-import { OfflineProvider } from '@/shared/providers/OfflineProvider';
+import { OfflineShell, OfflineStatusProvider } from '@/shared/providers/OfflineProvider';
 import {
   clearTransitionGuardOnStartup,
   registerTransitionControls,
@@ -112,6 +112,11 @@ const PROFILE_SWITCH_SPLASH_BOX_SIZE =
 // Outer providers — stable across profile switches, never remount.
 // InitializationProvider is first so the splash screen renders immediately
 // while PersistGate waits for Redux rehydration (avoids blank screen gap).
+// OfflineStatusProvider lives here (not inside RootLayoutContent) so the
+// downstream CocoPaymentUXProvider — which consumes useOfflineStatus() to
+// drive the machine's offline send branch — actually sees real network state
+// instead of the default { isOffline: false }. The visual <OfflineShell>
+// stays inside RootLayoutContent and reads the same context.
 const OuterProviders = compose([
   KeyboardProvider,
   InitializationProvider,
@@ -120,6 +125,7 @@ const OuterProviders = compose([
   ThemeProvider,
   HeroUINativeProvider,
   HeroTransitionProvider,
+  OfflineStatusProvider,
 ]);
 
 // Inner providers — remounted on profile switch via React key change
@@ -321,7 +327,7 @@ function RootLayoutContent() {
         backgroundColor={background}
         style={currentTheme.includes('light') ? 'dark' : 'light'}
       />
-      <OfflineProvider>
+      <OfflineShell>
         <Stack
           key={currentTheme}
           screenOptions={{
@@ -339,7 +345,7 @@ function RootLayoutContent() {
             <Stack.Screen key={screen.name} name={screen.name} options={getScreenOptions(screen)} />
           ))}
         </Stack>
-      </OfflineProvider>
+      </OfflineShell>
     </NavigationThemeProvider>
   );
 }
