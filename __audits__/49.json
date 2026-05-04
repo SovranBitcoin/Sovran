@@ -145,8 +145,8 @@
       ],
       "verification_note": "Re-checked at useBitChat.ts:208-256 and 266-317. Counter-argument: maybe joinGeohash is idempotent and the DM's startNostr/joinGeohash chain re-establishes whenever needed. Refuted — joinGeohash is only called inside the per-effect IIFE, which only fires on mount/dep-change, not on subscription loss. Confidence 0.7 because the bug requires a specific nav order and bitchat-module's native refcount semantics are not opened in this audit (UNVERIFIED).",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the duplicate-helper slice (mint/lib/auditInfo + colorUtils consolidation); features/bitchat is a separate cluster."
+      "completion_status": "complete",
+      "completion_note": "Removed the unconditional leaveGeohash().catch(() => {}) from the nostr public cleanup. Native side keeps a single active geohash that fans out to BOTH the public sub (geo-{g}) AND the gift-wrap DM sub (geo-dm-{g}), so the prior cleanup yanked any concurrent nostr-dm thread on the same geohash. Now matches the nostr-dm cleanup which already documented this contract."
     },
     {
       "id": "F-004",

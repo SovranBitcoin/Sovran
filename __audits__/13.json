@@ -99,7 +99,9 @@
         "docs/README.md (SOV-23 TODO)"
       ],
       "verification_note": "Re-read useBitChat.ts:130-142 (ble), 195-202 (ble-dm), 248-255 (nostr), 310-317 (nostr-dm). Confirmed every cleanup path calls `setMessages([])`. Confirmed no persistence layer via grep across features/bitchat and shared/stores — the hook is the only owner. Confirmed nostr-dm replay exists via BitChatNostrBridge.swift:135 (dmSince = -nostrDMSubscribeLookbackSeconds). Confirmed ble-dm has no replay — BLE Noise payloads are not queued server-side. Counter-argument considered: 'clearing on unmount is a privacy feature — if someone grabs the phone, the thread is empty.' Weak — messages in memory live for the duration of the mount anyway, and a real privacy posture would tie thread access to auth re-prompt per SOV-40 (TODO). Also considered: 'ble-dm users should not expect persistence in a mesh-only protocol.' Partially defensible but the screen UI gives zero signal that messages are ephemeral; it looks identical to the nostr-dm variant. If ephemerality is intentional, it must be visible.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useBitChat now resets the message buffer in a single identity-keyed effect (transport/dmPeerID/geohash) instead of clearing on every per-transport cleanup. Dep churn — most importantly nickname resolving from useBitchatNickname — no longer wipes history; ble-dm threads (which have no replay path) survive transient remount and nickname changes."
     },
     {
       "id": "F-004",
@@ -139,7 +141,9 @@
         "skill:zod-4"
       ],
       "verification_note": "Re-read bitchatDM.tsx:32-39 and useBitChat.ts:267-317. Confirmed 'mesh' is the BLUETOOTH_TIER sentinel via features/bitchat/lib/constants.ts:3. Confirmed geohash alphabet includes m, e, s, h by inspection of the bitchat module's geohash.ts / native implementation. Counter-argument considered: 'the route is only linked from NetworkSheet.tsx:54-62 which always passes the correct transport + peerID + no geohash for ble-dm, so the fallback is safe in practice.' True for the intended call site, but deep-link reachability is the issue — any app that can construct a URL to `/(user-flow)/bitchatDM?transport=nostr-dm&peerID=<hex>` without a geohash triggers the bug. Severity Medium; demotes to Low only if F-002 is fixed first.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Dropped the 'mesh' fallback in bitchatDM.tsx and widened useBitChat / GeohashChatScreen geohash to string | undefined. The hook's existing !geohash short-circuit now handles missing geohash cleanly; bitchatDM only handles DM transports (zod refine forces nostr-dm to carry geohash) so the path that would have subscribed to a 'mesh' pseudo-channel is gone."
     },
     {
       "id": "F-006",
@@ -160,7 +164,8 @@
       ],
       "verification_note": "Re-read sendMessage at lines 323-410. Confirmed the three catches are swallowed with only a log call. Counter-argument considered: 'the inbound subscription will reconcile via id dedup (message.some(m => m.id === msg.id) at :124, :188, :228, :289).' Partly true for nostr public — but the own-message id pattern `own-${Date.now()}` never matches the native-emitted id, so dedup can't reconcile. Also considered: 'failure is rare.' AUDIT.md's dim-1 rule explicitly requires every Result/catch branch to be handled, and the user-visible impact of a silent failure dominates the frequency argument.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "stale",
+      "completion_note": "Rollback for failed sends is already in place — useBitChat lines 329/357/394 (ble, ble-dm, nostr-dm cases) filter the optimistic ownMsg out of state on send error. The 'nostr' (public) case has no optimistic add at all (relies on subscription echo), so there is no phantom message to roll back. Pattern resolved before this slice."
     },
     {
       "id": "F-007",
