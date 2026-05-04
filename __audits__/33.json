@@ -87,7 +87,9 @@
         "skill:security-review"
       ],
       "verification_note": "Re-read saveMessage and AsyncStorageKVBackend.setItem. Counter-argument: 'maybe marmot serialises ingest through a queue and never overlaps with sendChatMessage'. Falsified by reading marmot-group.js — ingest (line 813) runs inside an async iterator from group.ingest(), which our useWhitenoiseDM.ts:272-276 spawns fire-and-forget from a subscription handler. sendChatMessage (line 408) is awaited from useWhitenoiseDM.ts:247. These are concurrent on the JS event loop. AsyncStorage operations interleave at every await boundary. Race confirmed. Still present at HEAD 38797b50.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "writeChain serialization landed in commit 515b558b (refactor(nostr): collapse whitenoise lifecycle escape hatches); saveMessage now serialised through per-instance promise chain"
     },
     {
       "id": "F-002",
@@ -132,7 +134,9 @@
         "node_modules/@internet-privacy/marmot-ts/dist/client/group/marmot-group.js:813-820"
       ],
       "verification_note": "Traced the data flow: optimisticId on line 235 ≠ rumor.id used by rumorToMessage (line 45). upsertMessage dedup (line 77) is id-only; no content-match fallback. Counter-argument: 'maybe ChatMessageBubble renders by content and dedups visually'. Read shared/ui/composed/chat — bubbles render per id; no dedup. The bug is real and would be reproduced by any send + screenshot test. Marked High not Critical because it is fully recoverable on restart and does not lose data — but it is unmistakably a shipped UX bug.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "marmot-ts 0.4.0 ingest skips self-echo at marmot-group.js:773 via #sentEventIds, so applicationMessage never re-emits for own sends — no duplicate render path exists"
     },
     {
       "id": "F-004",

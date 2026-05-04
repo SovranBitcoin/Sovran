@@ -118,7 +118,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Re-read useBitChat.ts:330-339 (ble own-echo — senderPubkey:''), 353-362 (ble-dm own-echo — senderPubkey: dmPeerID), 388-397 (nostr-dm own-echo — senderPubkey: dmPeerID). Re-read GeohashChatScreen.tsx:250-261 (groupingMap logic). Walked through a 4-message sequence by hand and confirmed the described misgrouping. Counter-argument considered: 'maybe this is intentional so own+peer messages form a continuous visual thread.' Rejected — the bubble rendering at :90-98 explicitly aligns own/peer on opposite sides, so visual continuity is already broken at the side-switch; grouping should match. Also considered: 'maybe the nickname branch at :122-125 masks the missing-avatar.' Only fires when `isFirst` is true for a non-own message, which is exactly the case broken here. Verified via log-doctor: `bitchat.hook.send` fires at :325, no DM-specific flow in the latest session (only public ble/nostr), so runtime evidence is absent — the finding rests on structural reading of the source.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "fixed: own-message senderPubkey set to '' for ble-dm and nostr-dm; matches ble public path; preserves useMessageGrouping side-switch boundary"
     },
     {
       "id": "F-005",
