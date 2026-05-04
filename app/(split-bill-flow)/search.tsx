@@ -75,11 +75,7 @@ export default function SplitBillSearchScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: PickerCandidate }) => (
-      <ParticipantRow
-        candidate={item}
-        selected={selectedIds.has(item.id)}
-        onToggle={toggle}
-      />
+      <ParticipantRow candidate={item} selected={selectedIds.has(item.id)} onToggle={toggle} />
     ),
     [selectedIds, toggle]
   );

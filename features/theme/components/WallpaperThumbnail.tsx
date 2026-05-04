@@ -18,7 +18,7 @@ import { THEMES } from '@/shared/providers/ThemeProvider';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import type { WallpaperCatalogEntry } from '@/shared/stores/global/wallpaperStore';
 
-export interface WallpaperThumbnailProps {
+interface WallpaperThumbnailProps {
   themeName: string;
   entry?: WallpaperCatalogEntry;
   selected?: boolean;
@@ -46,11 +46,10 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
   const imageSource = downloaded
     ? { uri: downloaded.localUri }
     : entry?.thumbUrl
-    ? { uri: entry.thumbUrl }
-    : null;
+      ? { uri: entry.thumbUrl }
+      : null;
 
-  const inProgress =
-    activeDownloadProgress !== undefined && activeDownloadProgress < 1;
+  const inProgress = activeDownloadProgress !== undefined && activeDownloadProgress < 1;
 
   return (
     <PressableFeedback
@@ -59,18 +58,9 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
       animation={false}
       style={{ width, height }}>
       <PressableFeedback.Scale>
-        <View
-          style={[
-            styles.card,
-            { width, height },
-            selected && styles.cardSelected,
-          ]}>
+        <View style={[styles.card, { width, height }, selected && styles.cardSelected]}>
           {imageSource ? (
-            <Image
-              source={imageSource}
-              style={StyleSheet.absoluteFillObject}
-              contentFit="cover"
-            />
+            <Image source={imageSource} style={StyleSheet.absoluteFillObject} contentFit="cover" />
           ) : paletteColors ? (
             <LinearGradient
               colors={[
@@ -83,9 +73,7 @@ export const WallpaperThumbnail = React.memo(function WallpaperThumbnail({
               end={{ x: 1, y: 1 }}
             />
           ) : (
-            <View
-              style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1a1a1a' }]}
-            />
+            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1a1a1a' }]} />
           )}
 
           {inProgress && (

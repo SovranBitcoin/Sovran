@@ -2,13 +2,13 @@ import { apiLog } from '../logger';
 import { checkBalance, topUpBalance } from './api';
 import { useRoutstrStore } from '@/shared/stores/profile/routstrStore';
 
-export interface TopUpResult {
+interface TopUpResult {
   success: true;
   balance: number;
   isNewWallet: boolean;
 }
 
-export interface TopUpFailure {
+interface TopUpFailure {
   success: false;
   error: string;
 }

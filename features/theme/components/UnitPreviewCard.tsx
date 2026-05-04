@@ -16,7 +16,7 @@ import { backgroundImageThemes } from 'config/backgroundImageThemes';
 import { THEMES } from '@/shared/providers/ThemeProvider';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 
-export interface UnitPreviewCardProps {
+interface UnitPreviewCardProps {
   themeName: string;
   label?: string;
   sublabel?: string;
@@ -43,36 +43,24 @@ export const UnitPreviewCard = React.memo(function UnitPreviewCard({
   // Falls back to the remote catalog thumb so un-downloaded picks still
   // show an image immediately after the user selects them; the full
   // download kicks off later at Apply time.
-  const catalogEntry = useWallpaperStore((s) =>
-    s.catalog.find((w) => w.themeName === themeName),
-  );
+  const catalogEntry = useWallpaperStore((s) => s.catalog.find((w) => w.themeName === themeName));
   const bundledImage = backgroundImageThemes[themeName];
-  const palette = THEMES[themeName as keyof typeof THEMES] as
-    | Record<string, string>
-    | undefined;
+  const palette = THEMES[themeName as keyof typeof THEMES] as Record<string, string> | undefined;
 
   const imageSource = bundledImage
     ? bundledImage
     : downloaded
-    ? { uri: downloaded.localUri }
-    : catalogEntry?.thumbUrl
-    ? { uri: catalogEntry.thumbUrl }
-    : null;
+      ? { uri: downloaded.localUri }
+      : catalogEntry?.thumbUrl
+        ? { uri: catalogEntry.thumbUrl }
+        : null;
 
   const card = (
     <View
       testID={testID}
-      style={[
-        styles.frame,
-        { width, height },
-        selected && styles.frameSelected,
-      ]}>
+      style={[styles.frame, { width, height }, selected && styles.frameSelected]}>
       {imageSource ? (
-        <Image
-          source={imageSource}
-          style={StyleSheet.absoluteFillObject}
-          contentFit="cover"
-        />
+        <Image source={imageSource} style={StyleSheet.absoluteFillObject} contentFit="cover" />
       ) : palette ? (
         <LinearGradient
           colors={[

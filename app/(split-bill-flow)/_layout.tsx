@@ -57,10 +57,7 @@ const PICKER_ROUTES = new Set(['participants', 'search']);
 export default function SplitBillLayout() {
   const [foreground, background] = useThemeColor(['foreground', 'background'] as const);
   const segments = useSegments();
-  const needsPickerNow = useMemo(
-    () => segments.some((s) => PICKER_ROUTES.has(s)),
-    [segments]
-  );
+  const needsPickerNow = useMemo(() => segments.some((s) => PICKER_ROUTES.has(s)), [segments]);
   // Sticky activation. Once the user first visits a picker-consuming
   // route, the subscriptions stay live for the rest of the flow's
   // lifetime — going back to `amount` and forward again doesn't tear

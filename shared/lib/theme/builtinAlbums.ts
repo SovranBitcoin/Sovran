@@ -9,17 +9,17 @@
  */
 
 export const BUILTIN_COLORS_ALBUM_SLUG = 'colors';
-export const BUILTIN_BASICS_TOPIC = 'Basics';
+const BUILTIN_BASICS_TOPIC = 'Basics';
 
 /** The wallet's primary unit ID — matches WalletScreen.ACCOUNTS[0].unit. */
 export const PROFILE_PRIMARY_UNIT_ID = 'sat';
 
-export interface BuiltinColorTheme {
+interface BuiltinColorTheme {
   name: string;
   displayName: string;
 }
 
-export const BUILTIN_COLOR_THEMES: readonly BuiltinColorTheme[] = [
+const BUILTIN_COLOR_THEMES: readonly BuiltinColorTheme[] = [
   { name: 'dark', displayName: 'Dark' },
   { name: 'navy', displayName: 'Navy' },
   { name: 'sunset', displayName: 'Sunset' },
@@ -35,7 +35,7 @@ export function isBuiltinColorTheme(themeName: string): boolean {
   return BUILTIN_COLOR_THEME_NAMES.includes(themeName);
 }
 
-export interface SyntheticAlbumMeta {
+interface SyntheticAlbumMeta {
   slug: string;
   displayName: string;
   description: string;

@@ -67,7 +67,6 @@ function getTimelineKey(item: TimelineItem): string {
 
 interface Account {
   unit: string;
-  type?: string;
 }
 
 interface Section {

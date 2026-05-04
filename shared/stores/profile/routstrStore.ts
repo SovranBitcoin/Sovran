@@ -15,11 +15,11 @@ const FALLBACK_MODEL = 'gpt-4o-mini';
 // AI tab tier + provider ids — duplicated as literal types to avoid a
 // feature → store → feature import cycle. Kept in lockstep with the
 // matching declarations in `features/ai/lib/format.ts`.
-export type RoutstrTierId = 'auto' | 'pro' | 'max';
+type RoutstrTierId = 'auto' | 'pro' | 'max';
 const TIER_IDS: readonly RoutstrTierId[] = ['auto', 'pro', 'max'] as const;
 const DEFAULT_TIER: RoutstrTierId = 'auto';
 
-export type RoutstrProviderId = 'openai' | 'claude' | 'grok';
+type RoutstrProviderId = 'openai' | 'claude' | 'grok';
 const PROVIDER_IDS: readonly RoutstrProviderId[] = ['openai', 'claude', 'grok'] as const;
 const DEFAULT_PROVIDER: RoutstrProviderId = 'openai';
 
@@ -51,7 +51,7 @@ export interface RoutstrMessage {
   costSats?: number;
 }
 
-export interface RoutstrSession {
+interface RoutstrSession {
   id: string;
   title: string;
   createdAt: number;

@@ -89,7 +89,7 @@ type SemanticToken =
   | 'background-tertiary'
   | 'background-inverse';
 
-export type ColorToken = SemanticToken | StaticScale | WallpaperToken;
+type ColorToken = SemanticToken | StaticScale | WallpaperToken;
 
 type StringTuple<N extends number, A extends string[] = []> = A['length'] extends N
   ? A
