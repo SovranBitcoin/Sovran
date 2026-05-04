@@ -301,7 +301,9 @@
       "fix": "Remove both imports after confirming app/_layout.tsx or shared/ndk.ts already imports the polyfill once. Search with `grep -rn \"react-native-get-random-values\" app/ shared/` to find the canonical import.",
       "references": [],
       "verification_note": "Neither Account.tsx nor AccountPagerViewLayout.tsx references crypto/getRandomValues/randomBytes in their body (grep clean). Imports are unused-but-side-effect — safe to remove pending confirmation that a higher-up entry imports the polyfill.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Polyfill drop: removed redundant 'react-native-get-random-values' imports from features/wallet/components/Account.tsx and shared/ui/composed/QRCode.tsx. Entry-shim load (index.js -> shim.js) is canonical."
     },
     {
       "id": "F-013",

@@ -281,7 +281,9 @@
         "knip:unused-export"
       ],
       "verification_note": "Verified by grep of all `sendMessage(` call sites: 2 internal call sites, both pass `stream: true`. The bitchat module's sendMessage is a separate Swift function unrelated to this hook.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "OpenAI SDK removed: dropped dead 'stream: false' branch + createRoutstrClient in shared/lib/routstr/api.ts; replaced OpenAI.Chat.Completions.ChatCompletionChunk with a minimal local interface; removed openai dependency from package.json. Streaming path unchanged."
     },
     {
       "id": "F-011",
@@ -357,7 +359,9 @@
         "lint:prettier/prettier"
       ],
       "verification_note": "Confirmed by direct lint run.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "ESLint --fix applied to features/ai/screens/AiChatScreen.tsx (27 prettier errors -> 0); features/ai/lib/format.ts already clean. Now-unused exhaustive-deps disable directive resolved by autofix."
     },
     {
       "id": "F-015",
