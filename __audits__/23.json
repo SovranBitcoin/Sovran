@@ -50,7 +50,7 @@
       "analyze_structure": "0 cycles; orphans reported for screens are false positives (importers are app/ routes outside the analyzed subtree); 12 colocate suggestions for shared dependencies"
     }
   },
-  "completion_status": "deferred",
+  "completion_status": "partial",
   "findings": [
     {
       "id": "F-001",
@@ -69,7 +69,9 @@
         "skill:native-data-fetching"
       ],
       "verification_note": "Static analysis is unambiguous: one mount site for ReceivePaymentUXExtrasProvider (grep confirmed), and it is lexically inside (receive-flow)/_layout.tsx while CocoPaymentUXProvider is at the root _layout.tsx. Log.txt shows one camera.permission.already_granted event that originates from the STANDALONE /camera route (StandaloneCameraScreen), not (receive-flow)/camera — so the receive-flow scan path was not exercised in the captured session. Marked UNVERIFIED by log; proposed the minimal scoped log that would confirm on next session.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Slice 31fde611 takes option (a) from the audit: lifts useCameraPermissions into CocoPaymentUXProvider directly so requestCameraPermission is defined alongside its consumer. The descendant ReceivePaymentUXExtras context is dropped entirely — provider file deleted, layout-level wrapper removed. navigation.scanQr now calls the inlined permission helper unconditionally; the dead-code ternary fallback is gone."
     },
     {
       "id": "F-002",
@@ -109,7 +111,9 @@
       "fix": "Two options: (a) force the render branch to respect the setting: `{(!quickAccessP2PK || selectedTab === 'Lightning') ? <Lightning/> : <P2PK/>}`. (b) reset selectedTab to 'Lightning' in a useEffect keyed on quickAccessP2PK flipping off. (a) is more defensive and preserves the current tab when quickAccessP2PK toggles back on.",
       "references": [],
       "verification_note": "Re-read lines 186-269. Confirmed selectedTab has no reset mechanism and the render branch does not gate on quickAccessP2PK. Counter-argument: maybe the Settings toggle navigates away and remounts the screen. Checked — toggling the setting writes to settingsStore but does not unmount ReceiveScreen, and useSettingsStore(s => s.quickAccessP2PK) triggers a re-render in place. Bug holds.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Out of scope for the provider-tree slice."
     },
     {
       "id": "F-004",
@@ -128,7 +132,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Log-doctor timeline confirms: `receive.mint_quote.render state=\"UNPAID\" ...` fires with inter-delta of 161ms, 31ms, 32ms per mount (3-4 renders per visit). Evidence cited verbatim in the markdown report.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Render-body logging is its own pattern (also in 19#F-004) — not addressed by the provider-tree slice."
     },
     {
       "id": "F-005",
@@ -147,7 +153,9 @@
         "skill:neverthrow-return-types"
       ],
       "verification_note": "Grep for useLightningOperations confirmed: 2 importers outside features/receive, 0 inside. knip does not flag because the hook IS imported — just by the wrong features.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Cross-feature relocation is structurally unrelated to the provider-tree fix."
     },
     {
       "id": "F-006",
@@ -167,7 +175,9 @@
         "skill:neverthrow-wrap-exceptions"
       ],
       "verification_note": "Log-doctor `errors --context 3` shows `coco.manager.RequestRateLimiter.RequestRateLimiter.mint_response_error status=429` occurred in the captured session — the rate-limit case the current error fallback cannot distinguish.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Discriminated-union error shape is its own slice (neverthrow boundary work)."
     },
     {
       "id": "F-007",
@@ -207,7 +217,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-read the three call sites. Confirmed inline function and array literals. Marked Low because no perf measurement confirms the downstream impact; demoting this further to Nit is reasonable if MintSelector and Tabs are not memoised.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Memoization hygiene is unrelated to the provider-tree slice."
     },
     {
       "id": "F-009",
@@ -226,7 +238,9 @@
         "knip:unused-export"
       ],
       "verification_note": "knip output: `ReceivePaymentUXExtrasValue          interface  features/receive/providers/ReceivePaymentUXExtras.tsx:9:18`. Confirmed by grep: no file imports the type name.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "Closed transitively by slice 31fde611 — the entire ReceivePaymentUXExtras provider file is deleted as part of fixing F-001, so the unused interface goes with it."
     },
     {
       "id": "F-010",
@@ -262,7 +276,9 @@
       "fix": "ReceiveHistoryEntry from @cashu/coco-core carries a state/status field (the same one MintQuoteScreen uses). Read it directly: `const isRedeemed = entry.status === 'redeemed'` (or whatever the exact discriminator is in the current coco-core types). If there genuinely is no explicit state field for ReceiveHistoryEntry, the fix is upstream in coco — patch via sovran-app/patches/ rather than working around it in the UI.",
       "references": [],
       "verification_note": "Re-read lines 55-111. Confirmed the prefix heuristic and the undefined-id failure mode. Marked Low because no log evidence of the bug firing; Medium would be justified if @cashu/coco-core can generate entries with undefined id during an in-progress receive — UNVERIFIED.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Out of scope for the provider-tree slice; requires a coco-core type investigation first."
     },
     {
       "id": "F-012",
@@ -279,7 +295,9 @@
       "fix": "Pick one style. Hoist once at the top of the `showLightningAddress` branch: `const npc = data.npcAddress!;` then `npc.toString()` and `npc.truncate(6)`.",
       "references": [],
       "verification_note": "Re-read lines 64, 69, 88.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Style-only nit; not in this slice."
     }
   ],
   "dimensions": {

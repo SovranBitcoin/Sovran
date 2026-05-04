@@ -109,7 +109,9 @@
         "skill:react-native-best-practices"
       ],
       "verification_note": "Confirmed direct render-body calls. Counter-argument: log.debug is cheap and dedup collapses duplicates. Rejected — the allocation cost and stats skew remain, and React's render-phase-purity rule is a hard rule regardless of the work's cost.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Render-body logging is its own pattern (also flagged in 23#F-004) — not addressed by the provider-tree slice."
     },
     {
       "id": "F-005",
@@ -150,7 +152,9 @@
         "lint:react-hooks/exhaustive-deps"
       ],
       "verification_note": "Ran expo lint; warning reproduces at app/(send-flow)/mintSelect.tsx:36:9 and is the only send-flow-scoped lint hit.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Memoization fix for mintSelect items is unrelated to the provider-tree slice."
     },
     {
       "id": "F-007",
@@ -225,7 +229,9 @@
       "fix": "Switch to `import { View } from '@/shared/ui/primitives/View/View';`.",
       "references": [],
       "verification_note": "Confirmed the sibling screens use the primitive. Safe rename; no runtime divergence expected.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "deferred",
+      "completion_note": "Style nit; not in this slice."
     },
     {
       "id": "F-011",
@@ -244,7 +250,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-verified at path:line pair. The prior audit's finding is unchanged; no patch landed. Counter-argument: maybe mockOffline is enough. Rejected — mockOffline is a dev setting and only activates real-offline behaviour when the user toggles it; production depends on expo-network detection flowing through OfflineProvider.",
-      "prior_audit_id": "F-001@02.json"
+      "prior_audit_id": "F-001@02.json",
+      "completion_status": "complete",
+      "completion_note": "Closed by the same slice that resolved 02#F-001 (commit 31fde611) — OfflineStatusProvider now lives in OuterProviders so the live network state reaches CocoPaymentUXProvider's useOfflineStatus() call."
     },
     {
       "id": "F-012",
@@ -282,7 +290,9 @@
       "fix": "Replace the single ref with a Map<string, callback> keyed by screen instance id, or register a set of callbacks and fan out the notification.",
       "references": [],
       "verification_note": "Same line numbers and pattern as prior audit 02.json F-002.",
-      "prior_audit_id": "F-002@02.json"
+      "prior_audit_id": "F-002@02.json",
+      "completion_status": "stale",
+      "completion_note": "Already closed by 02#F-002 — p2pkKeyRefreshedRef is now a Set; the single-slot clobber window is gone."
     },
     {
       "id": "F-014",
@@ -301,7 +311,9 @@
         "skill:zustand-5"
       ],
       "verification_note": "Re-read the subscription block; identical to prior audit 02.json F-003.",
-      "prior_audit_id": "F-003@02.json"
+      "prior_audit_id": "F-003@02.json",
+      "completion_status": "deferred",
+      "completion_note": "Same as 02#F-003 (Zustand subscribeWithSelector slice); not in the provider-tree slice."
     },
     {
       "id": "F-015",
@@ -362,7 +374,9 @@
         "skill:security-review"
       ],
       "verification_note": "Same line as prior audit 02.json F-006.",
-      "prior_audit_id": "F-006@02.json"
+      "prior_audit_id": "F-006@02.json",
+      "completion_status": "stale",
+      "completion_note": "Already addressed by 02#F-006 (extractNostrPubkey requires 64-char hex). The npub validation gate is now in place upstream of fetchNostrProfile."
     },
     {
       "id": "F-018",
@@ -379,7 +393,9 @@
       "fix": "Wrap each fetch with AbortController tied to instance lifetime; log errors at warn level with a scoped event name (e.g. payment.mint.audit.fetch_failed) so log-doctor errors mode surfaces them.",
       "references": [],
       "verification_note": "Identical to prior audit 02.json F-007.",
-      "prior_audit_id": "F-007@02.json"
+      "prior_audit_id": "F-007@02.json",
+      "completion_status": "stale",
+      "completion_note": "Mirrors 02#F-007 — fetchMintProfiles / fetchMintAuditData / fetchMintReviewData no longer exist in CocoPaymentUX.tsx (delegated to getMintCatalog), so the fire-and-forget surface flagged here is gone."
     },
     {
       "id": "F-019",
@@ -396,7 +412,9 @@
       "fix": "Pre-filter in the subscription: compare updated?.id to the screen's current entry.id (accessible via the managerRef closure) before invoking callback.",
       "references": [],
       "verification_note": "Identical to prior audit 02.json F-008.",
-      "prior_audit_id": "F-008@02.json"
+      "prior_audit_id": "F-008@02.json",
+      "completion_status": "stale",
+      "completion_note": "Closed by 02#F-008 — HISTORY_TYPE_BY_SCREEN narrows the history:updated subscription to the screen's expected entry type."
     },
     {
       "id": "F-020",

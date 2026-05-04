@@ -33,8 +33,8 @@
       ],
       "verification_note": "Re-read CocoPaymentUX.tsx:102-111, OfflineProvider.tsx:15 (default context), and _layout.tsx:110/289 — tree ordering and default confirmed. Counter-argument considered: could useOfflineStatus resolve via a higher-level provider? Grep shows the only OfflineProvider mount is RootLayoutContent.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Re-verified 2026-05-03 — OfflineProvider still mounted inside RootLayoutContent (app/_layout.tsx:324) below CocoPaymentUXProvider in AccountScopedProviders, so getOffline still always returns false. Considered as an alternative slice but kept separate from the render-time ref-mirror consolidation; provider tree-ordering is a different architectural seam."
+      "completion_status": "complete",
+      "completion_note": "Slice 31fde611 splits the old OfflineProvider into OfflineStatusProvider (context + network polling, mounted in OuterProviders above AccountScopedProviders) and OfflineShell (the visual banner + screen-border wrapper, still inside RootLayoutContent). useOfflineStatus() inside CocoPaymentUXProvider now resolves to the live network state, so getOffline() drives the machine's offline send branch correctly. Closes the regression refile at 19#F-011 too."
     },
     {
       "id": "F-002",
