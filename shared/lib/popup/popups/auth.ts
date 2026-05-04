@@ -38,10 +38,3 @@ export const invalidKeyFormatPopup = makeStaticPopup({
   icon: KEY_ICON,
   type: 'error',
 });
-
-export const passcodeNotMatchPopup = makeStaticPopup({
-  message: 'Passcode Not Match',
-  text: 'The passcode does not match. Please try again.',
-  icon: 'icon:mdi:shield',
-  type: 'error',
-});

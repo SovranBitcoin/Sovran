@@ -18,7 +18,6 @@ export default function SettingsFlowLayout() {
       <Stack.Screen name="index" options={{ title: 'Settings' }} />
       <Stack.Screen name="about" options={{ title: 'About' }} />
       <Stack.Screen name="terms" options={{ title: 'Terms & Conditions' }} />
-      <Stack.Screen name="passcode" options={{ title: 'Passcode' }} />
       <Stack.Screen name="profile" options={{ title: 'Profile' }} />
       <Stack.Screen name="routing" options={{ title: 'Swap Routing' }} />
       <Stack.Screen name="keyring" options={{ title: 'P2PK Keys' }} />

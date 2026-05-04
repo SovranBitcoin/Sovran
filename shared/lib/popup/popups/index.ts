@@ -53,7 +53,6 @@ export {
   keyImportedPopup,
   keyImportFailedPopup,
   invalidKeyFormatPopup,
-  passcodeNotMatchPopup,
 } from './auth';
 export {
   mintsAddedPopup,

@@ -30,7 +30,6 @@ import {
   useInitializationReset,
 } from '@/shared/providers/InitializationProvider';
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
-import { PasscodeGate } from '@/features/auth';
 import { compose } from '@/shared/lib/utils';
 import { NostrKeysProvider, useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { NostrNDKProvider } from '@/shared/providers/NostrNDKProvider';
@@ -157,7 +156,6 @@ function AccountScopedProviders({
         // running. Mounted after keys/NDK so the advertised nickname is
         // derived from the active profile.
         BitchatBLEProvider,
-        PasscodeGate,
         AppGate,
       ]),
     [accountIndex]

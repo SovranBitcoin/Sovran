@@ -37,7 +37,6 @@ interface SettingsState {
   language: string;
   displayBtc: number;
   displayCurrency: DisplayCurrency;
-  passcode: string;
   experimental: boolean;
   mockMode: boolean;
   mockOffline: boolean;
@@ -113,8 +112,8 @@ const PersistedSettings = z.object({
   }),
 });
 
-/** Default settings used for initialization and reset. Passcode excluded (never persisted). */
-const DEFAULT_SETTINGS: Omit<SettingsState, 'passcode'> = {
+/** Default settings used for initialization and reset. */
+const DEFAULT_SETTINGS: SettingsState = {
   language: 'en',
   displayBtc: 3,
   displayCurrency: 'usd',
@@ -144,9 +143,6 @@ interface SettingsActions {
   getDisplayBtc: () => number;
   setDisplayCurrency: (currency: DisplayCurrency) => void;
   getDisplayCurrency: () => DisplayCurrency;
-
-  // Passcode management
-  setPasscode: (passcode: string) => void;
 
   // Experimental features
   setExperimental: (experimental: boolean) => void;
@@ -202,7 +198,6 @@ export const useSettingsStore = create<SettingsStore>()(
     persist(
       (set, get) => ({
         ...DEFAULT_SETTINGS,
-        passcode: '',
 
         // Language
         setLanguage: (language: string) => {
@@ -222,12 +217,6 @@ export const useSettingsStore = create<SettingsStore>()(
           set({ displayCurrency: currency });
         },
         getDisplayCurrency: () => get().displayCurrency,
-
-        // Passcode (never persisted)
-        setPasscode: (passcode: string) => {
-          storeLog.info('store.settings.set_passcode');
-          set({ passcode });
-        },
 
         // Experimental
         setExperimental: (experimental: boolean) => {
