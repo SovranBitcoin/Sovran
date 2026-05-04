@@ -10,13 +10,22 @@
  *            https://github.com/nostr-protocol/nips/blob/master/17.md
  */
 
-import type { UnsignedEvent, VerifiedEvent } from 'nostr-tools';
-import { getPublicKey, getEventHash, nip44, finalizeEvent, generateSecretKey } from 'nostr-tools';
+import type { UnsignedEvent, VerifiedEvent, Event as NostrToolsEvent } from 'nostr-tools';
+import {
+  getPublicKey,
+  getEventHash,
+  nip44,
+  finalizeEvent,
+  generateSecretKey,
+  verifyEvent,
+} from 'nostr-tools';
 import { extract as hkdfExtract } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import { equalBytes } from '@noble/ciphers/utils.js';
 import { base64 } from '@scure/base';
+import { z } from 'zod';
+import { Hex64, Hex128 } from '@sovranbitcoin/schemas';
 
 import { nostrLog } from '../logger';
 
@@ -50,7 +59,7 @@ type NativeChacha20Fn = (
   key: Uint8Array,
   nonce: Uint8Array,
   counter: number,
-  data: Uint8Array,
+  data: Uint8Array
 ) => Uint8Array;
 type NativeHmacFn = (key: Uint8Array, data: Uint8Array) => Uint8Array;
 
@@ -74,10 +83,7 @@ function probeNative(): void {
     if (typeof nutpatch.nip44Ecdh === 'function') {
       _nativeEcdh = nutpatch.nip44Ecdh;
     }
-    if (
-      typeof nutpatch.chacha20Ietf === 'function' &&
-      typeof nutpatch.hmacSha256 === 'function'
-    ) {
+    if (typeof nutpatch.chacha20Ietf === 'function' && typeof nutpatch.hmacSha256 === 'function') {
       _nativeChacha20 = nutpatch.chacha20Ietf;
       _nativeHmac = nutpatch.hmacSha256;
     }
@@ -111,7 +117,7 @@ function hkdfExpandNative(
   hmac: NativeHmacFn,
   prk: Uint8Array,
   info: Uint8Array,
-  length: number,
+  length: number
 ): Uint8Array {
   const blocks = Math.ceil(length / 32);
   const out = new Uint8Array(blocks * 32);
@@ -149,7 +155,7 @@ function nip44DecryptNative(
   payloadB64: string,
   conversationKey: Uint8Array,
   chacha20: NativeChacha20Fn,
-  hmac: NativeHmacFn,
+  hmac: NativeHmacFn
 ): string {
   const data = base64.decode(payloadB64);
   if (data.length < 99 || data.length > 65603) {
@@ -177,7 +183,11 @@ function nip44DecryptNative(
   return unpadNip44(chacha20(chachaKey, chachaNonce, 0, ciphertext));
 }
 
-const nip44Decrypt = (ciphertext: string, privateKey: Uint8Array, peerPublicKey: string): unknown => {
+const nip44Decrypt = (
+  ciphertext: string,
+  privateKey: Uint8Array,
+  peerPublicKey: string
+): unknown => {
   probeNative();
   if (_nativeChacha20 && _nativeHmac) {
     try {
@@ -380,6 +390,38 @@ export interface UnwrappedDM {
   tags: string[][];
 }
 
+// NIP-59 envelope shapes. Tag arrays at this layer can be empty (kind 13
+// seals MUST carry zero tags per spec), so we don't reuse `Tag` from
+// @sovranbitcoin/schemas which enforces .min(1). Bounds match the
+// outer wrap caps already enforced by `nip44DecryptNative`.
+const TagElement = z.string().max(4096);
+const LooseTags = z.array(z.array(TagElement).max(64)).max(2048);
+// `created_at` is intentionally unrefined: NIP-59 randomises seal/wrap
+// timestamps within the past two days for metadata privacy, and incoming
+// rumors carry the sender's clock. Future-skew bounds belong on the
+// public wrap event, which is verified by the relay layer — not here.
+const Timestamp = z.number().int().nonnegative();
+const ContentString = z.string().max(100_000);
+
+const SealEventSchema = z.object({
+  id: Hex64,
+  pubkey: Hex64,
+  created_at: Timestamp,
+  kind: z.literal(13),
+  tags: LooseTags,
+  content: ContentString,
+  sig: Hex128,
+});
+
+const RumorEventSchema = z.object({
+  id: Hex64,
+  pubkey: Hex64,
+  created_at: Timestamp,
+  kind: z.number().int().min(0).max(65535),
+  tags: LooseTags,
+  content: ContentString,
+});
+
 /**
  * Unwrap a kind 1059 gift-wrapped event to reveal the inner DM.
  *
@@ -387,7 +429,10 @@ export interface UnwrappedDM {
  *   1. Gift wrap content → kind 13 seal  (using recipient's key + wrap pubkey)
  *   2. Seal content      → kind 14 rumor (using recipient's key + seal pubkey)
  *
- * Returns `null` if decryption fails at any layer.
+ * Each decrypted JSON is validated against a zod schema before further
+ * processing; the seal's Schnorr signature is checked via `verifyEvent`,
+ * and the rumor's `id` is recomputed via `getEventHash` to detect tampering
+ * after the sender originally hashed it. Returns `null` on any failure.
  */
 export function unwrapGiftWrap(
   wrapEvent: { content: string; pubkey: string },
@@ -399,25 +444,46 @@ export function unwrapGiftWrap(
   });
   try {
     // Layer 1: decrypt the gift wrap → seal
-    const seal = nip44Decrypt(wrapEvent.content, recipientPrivateKey, wrapEvent.pubkey) as {
-      pubkey: string;
-      content: string;
-      kind: number;
-    };
+    const sealRaw = nip44Decrypt(wrapEvent.content, recipientPrivateKey, wrapEvent.pubkey);
+    const sealParsed = SealEventSchema.safeParse(sealRaw);
+    if (!sealParsed.success) {
+      nostrLog.warn('nostr.nip17.unwrap_gift_wrap.invalid_seal_shape', {
+        issues: sealParsed.error.issues.length,
+      });
+      return null;
+    }
+    const seal = sealParsed.data;
 
-    if (seal.kind !== 13) {
-      nostrLog.warn('nostr.nip17.unwrap_gift_wrap.invalid_seal_kind', { kind: seal.kind });
+    // NIP-59: the seal MUST be signed by the sender. Without this check the
+    // unwrap relies solely on NIP-44 ECDH binding for sender authentication;
+    // the spec requires the schnorr sig as a defence-in-depth integrity gate.
+    if (!verifyEvent(seal as NostrToolsEvent)) {
+      nostrLog.warn('nostr.nip17.unwrap_gift_wrap.seal_sig_invalid', {
+        sealPrefix: seal.pubkey.slice(0, 8),
+      });
       return null;
     }
 
     // Layer 2: decrypt the seal → rumor
-    const rumor = nip44Decrypt(seal.content, recipientPrivateKey, seal.pubkey) as {
-      pubkey: string;
-      content: string;
-      created_at: number;
-      kind: number;
-      tags: string[][];
-    };
+    const rumorRaw = nip44Decrypt(seal.content, recipientPrivateKey, seal.pubkey);
+    const rumorParsed = RumorEventSchema.safeParse(rumorRaw);
+    if (!rumorParsed.success) {
+      nostrLog.warn('nostr.nip17.unwrap_gift_wrap.invalid_rumor_shape', {
+        issues: rumorParsed.error.issues.length,
+      });
+      return null;
+    }
+    const rumor = rumorParsed.data;
+
+    // NIP-59: the rumor is unsigned, so we use `id == getEventHash(rumor)`
+    // as the integrity gate — a tampered rumor lands with a stale id and
+    // we drop it before any consumer sees the payload.
+    if (getEventHash(rumor as UnsignedEvent) !== rumor.id) {
+      nostrLog.warn('nostr.nip17.unwrap_gift_wrap.rumor_id_mismatch', {
+        senderPrefix: rumor.pubkey.slice(0, 8),
+      });
+      return null;
+    }
 
     // NIP-17: verify that the seal's pubkey matches the rumor's pubkey
     if (seal.pubkey !== rumor.pubkey) {
@@ -435,11 +501,11 @@ export function unwrapGiftWrap(
     });
     return {
       senderPubkey: seal.pubkey,
-      recipientPubkeys: (rumor.tags || []).filter((t) => t[0] === 'p').map((t) => t[1]),
+      recipientPubkeys: rumor.tags.filter((t) => t[0] === 'p').map((t) => t[1]),
       content: rumor.content,
       created_at: rumor.created_at,
       kind: rumor.kind,
-      tags: rumor.tags || [],
+      tags: rumor.tags,
     };
   } catch {
     nostrLog.error('nostr.nip17.unwrap_gift_wrap.decryption_failed', {
