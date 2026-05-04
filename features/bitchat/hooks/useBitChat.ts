@@ -11,7 +11,6 @@ import {
   getBLEState,
   startNostr,
   joinGeohash,
-  leaveGeohash,
   sendGeohashMessage,
   sendGeohashPrivateMessage,
   addNostrMessageListener,
@@ -67,7 +66,7 @@ interface UseBitChatResult {
 }
 
 export function useBitChat(
-  geohash: string,
+  geohash: string | undefined,
   transport: BitChatTransport = 'nostr',
   options: UseBitChatOptions = {}
 ): UseBitChatResult {
@@ -76,6 +75,17 @@ export function useBitChat(
   const [isConnected, setIsConnected] = useState(false);
 
   const dmPeerID = options.dm?.peerID;
+
+  // Reset the buffer only when the *subscription identity* changes — i.e.
+  // we're now watching a different transport / peer / geohash and the old
+  // messages no longer apply. Keying state-reset off the per-transport
+  // cleanups (the prior shape) wiped messages on any dep churn — e.g.
+  // `nickname` resolving from useBitchatNickname after first render — and,
+  // for ble-dm in particular, that loss is permanent because BLE has no
+  // replay path.
+  useEffect(() => {
+    setMessages([]);
+  }, [transport, dmPeerID, geohash]);
 
   // ===========================================================
   //  BLE public chat — transport === 'ble'
@@ -131,7 +141,9 @@ export function useBitChat(
       // owns the mesh lifecycle — stopping it when a chat screen unmounts
       // would yank peers out from under the Split Bill picker and any
       // other concurrent consumer. Matches the 'ble-dm' transport below.
-      setMessages([]);
+      // Buffer reset is handled by the identity-change effect above, not
+      // here, so a transient remount or a `nickname` dep change preserves
+      // history.
       setIsConnected(false);
     };
   }, [transport, nickname]);
@@ -185,9 +197,10 @@ export function useBitChat(
 
     return () => {
       sub.remove();
-      setMessages([]);
       // Deliberately DON'T stopBLE — other screens (public mesh chat,
-      // NetworkSheet) may still be using it.
+      // NetworkSheet) may still be using it. Buffer reset is handled by
+      // the identity-change effect above; ble-dm in particular has no
+      // replay path, so wiping on every dep churn would lose history.
       setIsConnected(false);
     };
   }, [transport, dmPeerID, nickname]);
@@ -235,8 +248,14 @@ export function useBitChat(
     return () => {
       cancelled = true;
       sub.remove();
-      leaveGeohash().catch(() => {});
-      setMessages([]);
+      // Don't leave the geohash here — the native side keeps a single
+      // active geohash that fans out to BOTH the public chat sub
+      // (`geo-{g}`) AND the gift-wrap DM sub (`geo-dm-{g}`), so calling
+      // leaveGeohash on public-screen unmount tears down any concurrent
+      // nostr-dm thread on the same geohash. Matches the nostr-dm
+      // cleanup below. The next joinGeohash(other) replaces the active
+      // channel; full-app stop in BitChatNostrBridge.swift calls
+      // leaveGeohash() during teardown.
       setIsConnected(false);
     };
   }, [geohash, transport, nickname]);
@@ -294,7 +313,6 @@ export function useBitChat(
       cancelled = true;
       sub.remove();
       // Don't leave the geohash — other screens may be using it.
-      setMessages([]);
       setIsConnected(false);
     };
   }, [transport, dmPeerID, geohash, nickname]);

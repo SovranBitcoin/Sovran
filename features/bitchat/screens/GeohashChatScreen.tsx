@@ -44,7 +44,12 @@ import type { ChatMessage } from 'bitchat-module';
 // ===========================
 
 interface GeohashChatScreenProps {
-  geohash: string;
+  /**
+   * Geohash channel identifier. Required for `'nostr'` (public) and
+   * `'nostr-dm'` transports — the hook short-circuits when missing.
+   * Optional for `'ble'` / `'ble-dm'` transports, which ignore it.
+   */
+  geohash?: string;
   tierLabel?: string;
   /**
    * Transport mode:

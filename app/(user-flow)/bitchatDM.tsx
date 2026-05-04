@@ -50,7 +50,7 @@ function BitchatDMRoute() {
 
   return (
     <GeohashChatScreen
-      geohash={params.geohash ?? 'mesh'}
+      geohash={params.geohash}
       transport={params.transport}
       dmPeerID={params.peerID}
       dmNickname={params.nickname}
