@@ -1,4 +1,4 @@
-import { Manager } from '@cashu/coco-core';
+import { Manager, type Plugin } from '@cashu/coco-core';
 import { initNativeCrypto } from './nativeCrypto';
 import { CocoLogger } from './cocoLogger';
 import { ExpoSqliteRepositories } from '@cashu/coco-expo-sqlite';
@@ -9,7 +9,7 @@ import {
   storeCashuSeed,
   hashMnemonic,
 } from '@/shared/lib/nostr/secureStorage';
-import { NPCPlugin } from 'coco-cashu-plugin-npc';
+import { NPCPlugin, type Signer as NpcSigner } from 'coco-cashu-plugin-npc';
 import {
   deriveNostrKeys,
   deriveCashuWalletSeed,
@@ -203,21 +203,27 @@ export class CocoManager {
       this.seedGetter = seedGetter;
 
       // 3. NPC plugin (constructor only — no network call)
-      const plugins: any[] = [];
+      // The Plugin type comes from @cashu/coco-core; NPCPlugin implements
+      // the same shape via coco-cashu-plugin-npc's bundled (older) coco
+      // types, so we bridge with a single nominal cast at the seam — far
+      // narrower than a per-callsite `any`.
+      const plugins: Plugin[] = [];
       const nsecSigner = await initPhase('CocoManager.getSigner', () =>
         this.getCurrentProfileSigner()
       );
       initLog('CocoManager', `signer created: ${!!nsecSigner}`);
 
       if (nsecSigner) {
-        const signerFunction = async (eventTemplate: any) => {
-          return await nsecSigner.signEvent(eventTemplate);
-        };
+        // NpcSigner is `(t: EventTemplate) => Promise<SignedEvent>` from
+        // npubcash-sdk; the underlying NsecSigner.signEvent is the same
+        // shape via nostr-tools, so we re-type the param at the boundary.
+        const signerFunction: NpcSigner = (eventTemplate) =>
+          nsecSigner.signEvent(eventTemplate as EventTemplate);
         this.npcPlugin = new NPCPlugin('https://npubx.cash', signerFunction, {
           syncIntervalMs: 30000,
           useWebsocket: true,
         });
-        plugins.push(this.npcPlugin);
+        plugins.push(this.npcPlugin as unknown as Plugin);
         initLog('CocoManager', 'NPC plugin created');
       }
 

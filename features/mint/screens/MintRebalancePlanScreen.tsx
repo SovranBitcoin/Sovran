@@ -15,7 +15,7 @@ import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { Pressable } from '@/shared/ui/primitives/Pressable';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { useMints, useBalanceContext, useManager } from '@cashu/coco-react';
-import type { GetInfoResponse } from '@cashu/cashu-ts';
+import type { GetInfoResponse, Proof } from '@cashu/cashu-ts';
 import { getReadyProofs, getWallet } from '@/shared/lib/cashu/managerInternals';
 import { useMintManagement } from '@/features/mint/hooks/useMintManagement';
 import { useLightningOperations } from '@/features/receive/hooks/useLightningOperations';
@@ -398,7 +398,7 @@ export function MintRebalancePlanScreen() {
         try {
           const proofs = await getReadyProofs(manager, fromMintUrl);
           const wallet = await getWallet(manager, fromMintUrl);
-          worstCaseInputFee = wallet.getFeesForProofs(proofs as any);
+          worstCaseInputFee = wallet.getFeesForProofs(proofs as unknown as Proof[]);
           // fee_reserve (conservative floor) + worst-case input fee (all proofs selected)
           feeHeadroom = Math.max(STATIC_FEE_HEADROOM, MIN_FEE_RESERVE + worstCaseInputFee);
           appendDebug({
@@ -479,7 +479,7 @@ export function MintRebalancePlanScreen() {
         // re-cap the transfer amount if needed — avoiding blind retry loops.
         try {
           const probeWallet = await getWallet(manager, fromMintUrl);
-          const probeQuote = await (probeWallet as any).createMeltQuoteBolt11(invoice);
+          const probeQuote = await probeWallet.createMeltQuoteBolt11(invoice);
           const actualFeeReserve = Number(probeQuote.fee_reserve ?? 0);
 
           if (actualFeeReserve > 0) {
@@ -531,21 +531,14 @@ export function MintRebalancePlanScreen() {
           updateStepState(id, { operationId: prepared.id });
           {
             const legId = ensureLegId();
-            const quoteId =
-              (prepared as any)?.quoteId ?? (prepared as any)?.quote ?? (prepared as any)?.id;
-            if (groupId && legId && quoteId) {
+            if (groupId && legId && prepared.quoteId) {
               useSwapTransactionsStore.getState().tagMelt(groupId, legId, {
-                quoteId: String(quoteId),
-                operationId: String(prepared.id),
+                quoteId: prepared.quoteId,
+                operationId: prepared.id,
               });
             }
           }
-          return prepared as unknown as {
-            id: string;
-            amount?: number | string;
-            fee_reserve?: number | string;
-            swap_fee?: number | string;
-          };
+          return prepared;
         };
 
         // ── Prepare with automatic retry on "Not enough proofs" ──
@@ -903,7 +896,7 @@ export function MintRebalancePlanScreen() {
                 try {
                   const hopProofs = await getReadyProofs(manager, hopFrom);
                   const hopWallet = await getWallet(manager, hopFrom);
-                  const hopInputFee = hopWallet.getFeesForProofs(hopProofs as any);
+                  const hopInputFee = hopWallet.getFeesForProofs(hopProofs as unknown as Proof[]);
                   hopFeeHeadroom = Math.max(STATIC_FEE_HEADROOM, MIN_FEE_RESERVE + hopInputFee);
                 } catch {
                   // Fallback to static headroom if proof query fails
@@ -948,9 +941,7 @@ export function MintRebalancePlanScreen() {
                 // ── Probe melt quote for this hop's actual fee_reserve ──
                 try {
                   const hopProbeWallet = await getWallet(manager, hopFrom);
-                  const hopProbeQuote = await (hopProbeWallet as any).createMeltQuoteBolt11(
-                    hopInvoice
-                  );
+                  const hopProbeQuote = await hopProbeWallet.createMeltQuoteBolt11(hopInvoice);
                   const hopActualFeeReserve = Number(hopProbeQuote.fee_reserve ?? 0);
 
                   if (hopActualFeeReserve > 0) {
@@ -959,7 +950,7 @@ export function MintRebalancePlanScreen() {
                     try {
                       const hpProofs = await getReadyProofs(manager, hopFrom);
                       const hpWallet = await getWallet(manager, hopFrom);
-                      hopProbeInputFee = hpWallet.getFeesForProofs(hpProofs as any);
+                      hopProbeInputFee = hpWallet.getFeesForProofs(hpProofs as unknown as Proof[]);
                     } catch {
                       /* use 0 */
                     }
@@ -1012,7 +1003,7 @@ export function MintRebalancePlanScreen() {
                 }
 
                 // Prepare melt with retry for "Not enough proofs"
-                let hopPrepared: any = null;
+                let hopPrepared: Awaited<ReturnType<typeof manager.ops.melt.prepare>> | null = null;
                 let hopTransferAmt = hopAmount;
                 for (let att = 0; att <= MAX_PREPARE_RETRIES; att++) {
                   try {
@@ -1036,6 +1027,10 @@ export function MintRebalancePlanScreen() {
                   }
                 }
 
+                if (!hopPrepared) {
+                  throw new Error('Failed to prepare hop melt after retries');
+                }
+
                 // Execute melt
                 updateStepState(hopStepId, { status: 'melting' });
                 const hopResult = (await manager.ops.melt.execute(hopPrepared.id)) as unknown as
@@ -1057,10 +1052,9 @@ export function MintRebalancePlanScreen() {
 
                 // Tag melt in swap store
                 if (groupId && hopLegId) {
-                  const qId = (hopPrepared as any)?.quoteId ?? hopPrepared.id;
                   useSwapTransactionsStore.getState().tagMelt(groupId, hopLegId, {
-                    quoteId: String(qId),
-                    operationId: String(hopPrepared.id),
+                    quoteId: hopPrepared.quoteId,
+                    operationId: hopPrepared.id,
                   });
                   useSwapTransactionsStore.getState().setLegStatus(groupId, hopLegId, {
                     localStatus: 'verifying',
@@ -1068,7 +1062,7 @@ export function MintRebalancePlanScreen() {
                 }
                 updateStepState(hopStepId, {
                   status: 'verifying',
-                  operationId: String(hopPrepared.id),
+                  operationId: hopPrepared.id,
                 });
 
                 appendDebug({
