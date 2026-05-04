@@ -132,7 +132,8 @@
       ],
       "verification_note": "Re-read MintRebalancePlanScreen.tsx:63-76 (unit + distributions + distribution memo) and mintDistributionStore.ts:23-26 + all write paths (271-274 etc). Confirmed every write constructs a fresh outer object. Counter-argument considered: 'the memo at line 76 short-circuits downstream deps, so the extra render only costs one React diff.' Technically true — but the SELECTOR subscription itself fires the re-render; subsequent memo-equality saves work below that point. The finding is about the selector subscription, not the downstream work.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "MintRebalancePlanScreen + MintDistributionScreen now select state.distributions[normalizedUnit] ?? EMPTY_DISTRIBUTION (a module-level frozen empty constant exported from mintDistributionStore). Cross-unit writes no longer re-render either screen. Store also wrapped in subscribeWithSelector for callers who want narrower .subscribe."
     },
     {
       "id": "F-006",

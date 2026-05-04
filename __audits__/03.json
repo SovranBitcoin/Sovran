@@ -77,8 +77,8 @@
       ],
       "verification_note": "Re-read scanHistoryStore.ts:96 (no subscribeWithSelector middleware wrap) and CocoPaymentUX.tsx:577-584 (raw .subscribe). Confirmed 02.json F-003 refactor still pending. Counter-argument considered: scan frequency is low — but listener cost is non-trivial (screen-actions recomputation) and the idiomatic fix is a one-line middleware add.",
       "prior_audit_id": "F-003@02.json",
-      "completion_status": "deferred",
-      "completion_note": "Raw .subscribe in CocoPaymentUX consumers — Slice C."
+      "completion_status": "stale",
+      "completion_note": "scanHistoryStore already has subscribeWithSelector middleware (line 13) and CocoPaymentUX subscribeGlobalScreenActions narrows to (s) => s.entries (line 599). Verified during the zustand-selector-hygiene slice."
     },
     {
       "id": "F-004",
