@@ -177,6 +177,12 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
     });
   }, [morphCompleted, fetchPlaces]);
 
+  // Privacy: TRUE device coordinates never live in component state. The
+  // location effect applies the session-stable safety offset before storing,
+  // so both the camera and the marker bounding-box filter read the same
+  // offset coords. Earlier this state held TRUE coords with a separate
+  // `offsetCoords` derivation feeding only the camera — the markers were
+  // filtered around the user's actual position, leaking it on screen.
   const [coords, setCoords] = useState({
     latitude: mockMode ? MOCK_LAT : DEFAULT_LAT,
     longitude: mockMode ? MOCK_LON : DEFAULT_LON,
@@ -196,7 +202,8 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
         if (status !== 'granted') return;
         const loc = await Location.getLastKnownPositionAsync();
         if (loc && !cancelled) {
-          setCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+          const safe = applySafetyOffset(loc.coords.latitude, loc.coords.longitude);
+          setCoords(safe);
         }
       } catch {
         // keep default
@@ -241,11 +248,6 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
         ? `${totalCount.toLocaleString()} worldwide`
         : '30,000+ locations';
 
-  const offsetCoords = useMemo(
-    () => applySafetyOffset(coords.latitude, coords.longitude),
-    [coords]
-  );
-
   const titleColor = opacity(foreground, 0.66);
 
   return (
@@ -258,8 +260,8 @@ export const BitcoinNearYou = React.memo(function BitcoinNearYou() {
             <BlurCardFrame accentColor={muted}>
               <RNView className="relative z-[1]">
                 <MapPreview
-                  latitude={offsetCoords.latitude}
-                  longitude={offsetCoords.longitude}
+                  latitude={coords.latitude}
+                  longitude={coords.longitude}
                   markers={nearbyMarkers}
                 />
 
