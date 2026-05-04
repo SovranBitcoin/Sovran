@@ -112,8 +112,8 @@
       "references": [],
       "verification_note": "Re-read lines 186-269. Confirmed selectedTab has no reset mechanism and the render branch does not gate on quickAccessP2PK. Counter-argument: maybe the Settings toggle navigates away and remounts the screen. Checked — toggling the setting writes to settingsStore but does not unmount ReceiveScreen, and useSettingsStore(s => s.quickAccessP2PK) triggers a re-render in place. Bug holds.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the provider-tree slice."
+      "completion_status": "complete",
+      "completion_note": "ReceiveScreen now resets selectedTab to Lightning when quickAccessP2PK toggles off (effect at ReceiveScreen.tsx) and gates the P2PK render path behind the setting (defense-in-depth on the same render)."
     },
     {
       "id": "F-004",
@@ -154,8 +154,8 @@
       ],
       "verification_note": "Grep for useLightningOperations confirmed: 2 importers outside features/receive, 0 inside. knip does not flag because the hook IS imported — just by the wrong features.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Cross-feature relocation is structurally unrelated to the provider-tree fix."
+      "completion_status": "complete",
+      "completion_note": "useLightningOperations deleted; replaced by an inline useCallback wrapper over manager.ops.mint.prepare in MintRebalancePlanScreen and useSplitBillOrchestrator (the only two callers, neither of which used the hook's state). Deletion test passes — interface ≈ implementation."
     },
     {
       "id": "F-006",
@@ -176,8 +176,8 @@
       ],
       "verification_note": "Log-doctor `errors --context 3` shows `coco.manager.RequestRateLimiter.RequestRateLimiter.mint_response_error status=429` occurred in the captured session — the rate-limit case the current error fallback cannot distinguish.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Discriminated-union error shape is its own slice (neverthrow boundary work)."
+      "completion_status": "stale",
+      "completion_note": "useLightningOperations.ts:28 already used 'err instanceof Error ? err : new Error(...)', preserving real Error instances; the flatten claim only fires for non-Error throws (rare). Made moot by F-005's deletion of the file."
     },
     {
       "id": "F-007",
@@ -218,8 +218,8 @@
       ],
       "verification_note": "Re-read the three call sites. Confirmed inline function and array literals. Marked Low because no perf measurement confirms the downstream impact; demoting this further to Nit is reasonable if MintSelector and Tabs are not memoised.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Memoization hygiene is unrelated to the provider-tree slice."
+      "completion_status": "complete",
+      "completion_note": "Removed dead onMintSelected prop from MintSelector (declared, never read in the component) and made onRequestMintList optional. The 3× '?? (() => {})' fallbacks at MintQuoteScreen, MeltQuoteScreen, PaymentRequestScreen are gone, restoring memo stability."
     },
     {
       "id": "F-009",
@@ -277,8 +277,8 @@
       "references": [],
       "verification_note": "Re-read lines 55-111. Confirmed the prefix heuristic and the undefined-id failure mode. Marked Low because no log evidence of the bug firing; Medium would be justified if @cashu/coco-core can generate entries with undefined id during an in-progress receive — UNVERIFIED.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Out of scope for the provider-tree slice; requires a coco-core type investigation first."
+      "completion_status": "complete",
+      "completion_note": "isRedeemed now derives from entry.state === 'finalized' per ReceiveHistoryEntry's typed state field (coco/packages/core/models/History.ts:43); also dropped the redundant 'as ReceiveHistoryEntry' state-override cast on HistoryEntryTimeline."
     },
     {
       "id": "F-012",
@@ -296,8 +296,8 @@
       "references": [],
       "verification_note": "Re-read lines 64, 69, 88.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Style-only nit; not in this slice."
+      "completion_status": "complete",
+      "completion_note": "Refactored ReceiveLightningTab to early-return when npcAddress is missing, then narrows once at the top — eliminates the hybrid !.toString() / ?.truncate(6) ?? '' inconsistency."
     }
   ],
   "dimensions": {
