@@ -43,7 +43,8 @@ interface NpcMintActions {
 
 type NpcMintStore = NpcMintState & NpcMintActions;
 
-type PersistedNpcShape = { mintUrl?: string };
+type V1Persisted = { mintUrls?: Record<string, string | undefined> };
+type V2Persisted = { mintUrl?: string };
 
 function createNpcClient(privateKey: Uint8Array): NPCClient {
   const signer = async (eventTemplate: EventTemplate): Promise<VerifiedEvent> =>
@@ -56,22 +57,25 @@ const PersistedNpcMintStore = z.object({
   mintUrl: z.string().max(2048).optional(),
 });
 
-// v1 -> v2: legacy shape was `mintUrls: Record<pubkey, url>` keyed by the
-// active profile's pubkey inside a store already scoped by that pubkey via
-// createProfileScopedStorage. Collapse to a scalar; the record holds at most
-// one meaningful entry per profile.
-function migrateNpcMintStore(state: unknown, version: number): PersistedNpcShape {
-  if (version >= 2 && state && typeof state === 'object' && 'mintUrl' in state) {
-    return { mintUrl: (state as PersistedNpcShape).mintUrl };
+// v1 -> v2: legacy `mintUrls: Record<pubkey, url>` was double-scoped inside
+// a store already partitioned by createProfileScopedStorage. Collapse to a
+// scalar.
+function v1ToV2(state: unknown): V2Persisted {
+  if (!state || typeof state !== 'object' || !('mintUrls' in state)) {
+    return { mintUrl: undefined };
   }
-  if (state && typeof state === 'object' && 'mintUrls' in state) {
-    const map = (state as { mintUrls?: Record<string, string | undefined> }).mintUrls;
-    const first = map
-      ? Object.values(map).find((v): v is string => typeof v === 'string' && v.length > 0)
-      : undefined;
-    return { mintUrl: first };
-  }
-  return { mintUrl: undefined };
+  const map = (state as V1Persisted).mintUrls;
+  const first = map
+    ? Object.values(map).find((v): v is string => typeof v === 'string' && v.length > 0)
+    : undefined;
+  return { mintUrl: first };
+}
+
+// Append-only migration chain. Zustand only calls migrate on version mismatch.
+function migrateNpcMintStore(state: unknown, version: number): V2Persisted {
+  let s: unknown = state;
+  if (version < 2) s = v1ToV2(s);
+  return s as V2Persisted;
 }
 
 export const useNpcMintStore = create<NpcMintStore>()(

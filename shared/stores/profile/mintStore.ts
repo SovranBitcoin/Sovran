@@ -18,27 +18,34 @@ interface MintActions {
 
 type MintStore = MintState & MintActions;
 
-type PersistedMintShape = { selectedMint?: string };
+type V1Persisted = { selectedMints?: Record<string, string | undefined> };
+type V2Persisted = { selectedMint?: string };
 
 const PersistedMintStore = z.object({
   selectedMint: z.string().max(2048).optional(),
 });
 
-// v1 -> v2: the legacy `selectedMints: Record<pubkey, url>` was double-scoped
-// inside an already-profile-scoped storage key, so the record holds at most
-// one meaningful entry — the active profile's. Pick the first defined value.
-function migrateMintStore(state: unknown, version: number): PersistedMintShape {
-  if (version >= 2 && state && typeof state === 'object' && 'selectedMint' in state) {
-    return { selectedMint: (state as PersistedMintShape).selectedMint };
+// v1 -> v2: the storage seam (createProfileScopedStorage) already partitions
+// by profile pubkey, so the inner `selectedMints` record held at most one
+// meaningful entry per profile. Collapse to a scalar.
+function v1ToV2(state: unknown): V2Persisted {
+  if (!state || typeof state !== 'object' || !('selectedMints' in state)) {
+    return { selectedMint: undefined };
   }
-  if (state && typeof state === 'object' && 'selectedMints' in state) {
-    const map = (state as { selectedMints?: Record<string, string | undefined> }).selectedMints;
-    const first = map
-      ? Object.values(map).find((v): v is string => typeof v === 'string' && v.length > 0)
-      : undefined;
-    return { selectedMint: first };
-  }
-  return { selectedMint: undefined };
+  const map = (state as V1Persisted).selectedMints;
+  const first = map
+    ? Object.values(map).find((v): v is string => typeof v === 'string' && v.length > 0)
+    : undefined;
+  return { selectedMint: first };
+}
+
+// Append-only migration chain. Each guard fires when the persisted blob is
+// older than the step it gates. Zustand only calls migrate on a version
+// mismatch, so an "already current" branch would be unreachable.
+function migrateMintStore(state: unknown, version: number): V2Persisted {
+  let s: unknown = state;
+  if (version < 2) s = v1ToV2(s);
+  return s as V2Persisted;
 }
 
 export const useMintStore = create<MintStore>()(
