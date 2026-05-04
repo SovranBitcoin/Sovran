@@ -79,8 +79,8 @@
       ],
       "verification_note": "Verified by reading the file end-to-end. Counter-argument: file size alone is not a finding; co-location of related components in one route file is acceptable when they're never reused. Counter-counter: ProfileSelector's call into profileSessionOrchestrator and profileStore IS shared concern — the next audit that touches profile switching (likely soon — multi-profile is in active development per audit 09's findings) will need to find this code. Keeping at Medium.",
       "prior_audit_id": null,
-      "completion_status": "partial",
-      "completion_note": "ProfileSelector + ProfileHeader extracted to shared/blocks/DrawerProfileChrome.tsx (~175 LOC of profile-domain wiring + waitForDrawerClose + the drawer-mounted header card now live next to the rest of profile-domain code). MenuButton kept inline in the drawer route file because it depends on the drawer's active-state semantics and has no other consumer; CustomDrawerContent / DrawerContentInner pair preserved (BackgroundProvider must wrap useBackgroundContext)."
+      "completion_status": "complete",
+      "completion_note": "Drawer file is now 273 LOC with 4 components (MenuButton, CustomDrawerContent, DrawerContentInner, DrawerLayout) and a 5-key StyleSheet — down from 505 LOC, 6 components, 60-key StyleSheet. ProfileSelector + ProfileHeader extracted to shared/blocks/DrawerProfileChrome.tsx in a prior slice (per F-002's earlier completion_note); the structural drift the finding cited is gone. Remaining: MenuButton kept inline because it is drawer-internal and has no other consumer; CustomDrawerContent / DrawerContentInner pair is load-bearing (BackgroundProvider must wrap useBackgroundContext)."
     },
     {
       "id": "F-003",
@@ -272,8 +272,8 @@
       ],
       "verification_note": "Re-read app/(drawer)/(tabs)/index/index.tsx. Counter-argument: memo here was likely added defensively when a parent re-rendered too often; if so the right fix is upstream. Confidence at 0.85 because the wrapper is harmless but uninformative.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "memo(WalletRoute) sits in the per-tab route file (index/index.tsx), not the drawer chrome. Outside the drawer-cleanup slice; mechanical follow-up."
+      "completion_status": "complete",
+      "completion_note": "memo(WalletRoute) dropped; route file collapsed to a one-line re-export of WalletScreen. React Compiler (app.json:118 reactCompiler:true) subsumes the manual memoisation surface for this no-prop wrapper."
     },
     {
       "id": "F-012",
