@@ -27,7 +27,7 @@ export async function executeRoutstrTopUp(
   encodedToken: string
 ): Promise<TopUpResult | TopUpFailure> {
   const store = useRoutstrStore.getState();
-  const currentApiKey = store.getApiKey();
+  const currentApiKey = store.apiKey;
   let apiKey = currentApiKey;
   let isNewWallet = false;
   const start = performance.now();

@@ -6,11 +6,7 @@ import { mintLocalId } from '@/shared/lib/id';
 import { storeLog } from '@/shared/lib/logger';
 import { RoutstrModel } from '@/shared/lib/routstr/api';
 import { persistConfig } from '@/shared/lib/persist/persistConfig';
-
-// Last-resort model id used by the legacy `UserMessagesScreen` flow when no
-// `selectedModel` has been set. The AI tab does NOT consume this — it
-// resolves models via tier candidates in `features/ai/lib/format.ts`.
-const FALLBACK_MODEL = 'gpt-4o-mini';
+import { restoreActiveSessionView } from '@/shared/stores/profile/restoreActiveSessionView';
 
 // AI tab tier + provider ids — duplicated as literal types to avoid a
 // feature → store → feature import cycle. Kept in lockstep with the
@@ -80,16 +76,17 @@ interface RoutstrState {
   /** Balance in msats */
   balance: number | null;
   /**
-   * Working copy of the active session's messages.
-   * Synced bidirectionally with sessions[currentSessionId].messages.
-   * In anonymous mode, this is the only copy (no session).
+   * Working copy of the active session's messages. The canonical home is
+   * `sessions[currentSessionId].messages`; this field is rehydrated from
+   * the active session in `afterHydrate` and is *not* persisted on its
+   * own. In anonymous mode this is the only copy (no session row exists)
+   * and resets to empty across cold starts.
    */
   conversationHistory: RoutstrMessage[];
   /**
-   * Working copy of the active session's `activeChildren` map. Mirrors
-   * `sessions[currentSessionId].activeChildren` the same way
-   * `conversationHistory` mirrors `messages`. In anonymous mode this is
-   * the only copy (no session row to write through to).
+   * Working copy of the active session's `activeChildren` map. Same
+   * persistence story as `conversationHistory` — rehydrated from the
+   * active session, never persisted standalone.
    */
   activeChildren: Record<string, string>;
   /**
@@ -119,15 +116,12 @@ interface RoutstrState {
 
 interface RoutstrActions {
   setApiKey: (apiKey: string) => void;
-  getApiKey: () => string | null;
   clearApiKey: () => void;
 
   setBalance: (balance: number) => void;
-  getBalance: () => number | null;
   clearBalance: () => void;
 
   addMessage: (message: RoutstrMessage) => void;
-  getConversationHistory: () => RoutstrMessage[];
   clearConversation: () => void;
   updateMessage: (id: string, content: string) => void;
   /** Persist the final assistant payload (content + reasoning + thinking
@@ -148,36 +142,28 @@ interface RoutstrActions {
    *  the current session's `activeChildren` so the choice survives across
    *  app restarts. */
   setActiveBranch: (parentId: string, childId: string) => void;
-  getActiveChildren: () => Record<string, string>;
 
   setSelectedModel: (modelId: string) => void;
-  getSelectedModel: () => string;
   clearSelectedModel: () => void;
 
   setSelectedTier: (tier: RoutstrTierId) => void;
-  getSelectedTier: () => RoutstrTierId;
 
   setSelectedProvider: (provider: RoutstrProviderId) => void;
-  getSelectedProvider: () => RoutstrProviderId;
   /** Atomic write of the (provider, tier) pair — used by the tabbed
    *  picker so flipping a row doesn't briefly leave the store in a
    *  half-updated state between two `set()` calls. */
   setSelectedSlot: (slot: { provider: RoutstrProviderId; tier: RoutstrTierId }) => void;
 
-  getCachedModels: () => RoutstrModel[] | null;
   setCachedModels: (models: RoutstrModel[]) => void;
   isCacheStale: () => boolean;
   clearModelsCache: () => void;
 
   createSession: () => string;
   switchSession: (sessionId: string) => void;
-  getAllSessions: () => RoutstrSession[];
-  getCurrentSessionId: () => string | null;
   updateCurrentSessionTitle: () => void;
   deleteSession: (sessionId: string) => void;
 
   setAnonymousMode: (isAnonymous: boolean) => void;
-  getAnonymousMode: () => boolean;
 }
 
 type RoutstrStore = RoutstrState & RoutstrActions;
@@ -204,8 +190,6 @@ const PersistedRoutstrSession = z.looseObject({
 const PersistedRoutstrStore = z.object({
   apiKey: z.string().max(8192).nullable().default(null),
   balance: z.number().nullable().default(null),
-  conversationHistory: z.array(PersistedRoutstrMessage).max(10_000).default([]),
-  activeChildren: z.record(z.string().max(128), z.string().max(128)).default({}),
   selectedModel: z.string().max(256).nullable().default(null),
   sessions: z.array(PersistedRoutstrSession).max(1024).default([]),
   currentSessionId: z.string().max(128).nullable().default(null),
@@ -231,8 +215,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
         set({ apiKey });
       },
 
-      getApiKey: () => get().apiKey,
-
       clearApiKey: () => {
         storeLog.info('store.routstr.clear_api_key');
         set({ apiKey: null });
@@ -242,8 +224,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
         storeLog.debug('store.routstr.set_balance', { balance });
         set({ balance });
       },
-
-      getBalance: () => get().balance,
 
       clearBalance: () => {
         storeLog.info('store.routstr.clear_balance');
@@ -271,8 +251,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
           return { conversationHistory: newHistory };
         });
       },
-
-      getConversationHistory: () => get().conversationHistory,
 
       clearConversation: () => {
         storeLog.info('store.routstr.clear_conversation');
@@ -372,14 +350,10 @@ export const useRoutstrStore = create<RoutstrStore>()(
         });
       },
 
-      getActiveChildren: () => get().activeChildren,
-
       setSelectedModel: (modelId: string) => {
         storeLog.info('store.routstr.set_model', { modelId });
         set({ selectedModel: modelId });
       },
-
-      getSelectedModel: () => get().selectedModel || FALLBACK_MODEL,
 
       clearSelectedModel: () => {
         storeLog.info('store.routstr.clear_model');
@@ -392,20 +366,10 @@ export const useRoutstrStore = create<RoutstrStore>()(
         set({ selectedTier: safe });
       },
 
-      getSelectedTier: () => {
-        const t = get().selectedTier;
-        return TIER_IDS.includes(t) ? t : DEFAULT_TIER;
-      },
-
       setSelectedProvider: (provider: RoutstrProviderId) => {
         const safe = PROVIDER_IDS.includes(provider) ? provider : DEFAULT_PROVIDER;
         storeLog.info('store.routstr.set_provider', { provider: safe });
         set({ selectedProvider: safe });
-      },
-
-      getSelectedProvider: () => {
-        const p = get().selectedProvider;
-        return PROVIDER_IDS.includes(p) ? p : DEFAULT_PROVIDER;
       },
 
       setSelectedSlot: (slot) => {
@@ -418,13 +382,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
           tier: safeTier,
         });
         set({ selectedProvider: safeProvider, selectedTier: safeTier });
-      },
-
-      getCachedModels: () => {
-        const cache = get().modelsCache;
-        if (!cache) return null;
-        if (Date.now() - cache.timestamp > MODELS_CACHE_TTL) return null;
-        return cache.data;
       },
 
       setCachedModels: (models: RoutstrModel[]) => {
@@ -475,16 +432,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
         } else {
           storeLog.warn('store.routstr.session_not_found', { sessionId });
         }
-      },
-
-      getAllSessions: () => {
-        const sessions = get().sessions;
-        // Sort by createdAt, newest first
-        return [...sessions].sort((a, b) => b.createdAt - a.createdAt);
-      },
-
-      getCurrentSessionId: () => {
-        return get().currentSessionId;
       },
 
       updateCurrentSessionTitle: () => {
@@ -550,8 +497,6 @@ export const useRoutstrStore = create<RoutstrStore>()(
           set({ conversationHistory: [], activeChildren: {} });
         }
       },
-
-      getAnonymousMode: () => get().isAnonymousMode,
     }),
     persistConfig({
       name: 'routstr-store',
@@ -560,12 +505,13 @@ export const useRoutstrStore = create<RoutstrStore>()(
       partialize: (state) => ({
         apiKey: state.apiKey,
         balance: state.balance,
-        conversationHistory: state.conversationHistory,
-        activeChildren: state.activeChildren,
         selectedModel: state.selectedModel,
         sessions: state.sessions,
         currentSessionId: state.currentSessionId,
       }),
+      afterHydrate: (state) => {
+        if (state) restoreActiveSessionView(state);
+      },
     })
   )
 );
