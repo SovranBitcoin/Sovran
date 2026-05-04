@@ -2,7 +2,7 @@
  * @fileoverview Sovran Test DSL — executor.
  *
  * Walks a parsed Suite/Test AST and dispatches each Step to the existing
- * helpers in scripts/log-doctor.ts. The executor is the only place that
+ * helpers in codereview/log-doctor/index.ts. The executor is the only place that
  * knows about both the AST shape AND the device-driving helpers — every
  * other module is intentionally narrow (parser knows AST only, wallet
  * knows cocod only, snapshot knows tree shapes only).

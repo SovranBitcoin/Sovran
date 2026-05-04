@@ -1,39 +1,38 @@
 #!/usr/bin/env node
 
 /**
- * analyze-structure.mjs
+ * codereview/analyze-structure
  *
- * Walks the project tree and produces:
- *   - Annotated tree of files with their exports and imports.
- *   - Structural reports: fan-in, coupling, cycles, orphans, colocate, boundary.
- *   - Module-depth reports: shallow modules, pass-through suspects, hub-spoke
- *     coordinators, instability, re-export depth, importer reach.
- *   - Code-quality reports: cognitive-complexity hotspots, type-safety smells
- *     (any/!/as/@ts-*), React-component smells (large components, hook count,
- *     boolean-state soup, inline subcomponents, useEffect dependency density,
- *     StyleSheet size).
- *   - Symbol-level reports: duplicate export names, unused exports,
- *     default+named clashes, test colocation.
- *   - Conceptual reports: information-leakage clusters, concept locality
- *     (CONTEXT.md), vocabulary drift.
- *   - Architecture-rule violations (when .architecture.json is present).
- *   - History-based reports (opt-in `--history`): churn × complexity, temporal
- *     coupling, stale files.
- *   - LLM-friendly compact summary (`--llm`).
+ * Two modes share one entry:
  *
- * Default reports run unless suppressed with `--no-<name>`.
+ *   1. (default) Structural analysis. Walks the project tree and produces
+ *      structural / depth / quality / symbol / concept reports plus an
+ *      LLM-friendly compact summary (`--llm`).
+ *
+ *   2. `lookalikes` subcommand. Cross-file declaration similarity reports:
+ *      name collisions, value collisions, color near-matches, name
+ *      similarities, focus / by-name / by-value / inventory lookups.
+ *      Implementation lives in `lookalikes-mode.mjs` and is dispatched
+ *      to from this file.
+ *
+ * Common usage:
+ *   node codereview/analyze-structure/index.mjs                       # default reports
+ *   node codereview/analyze-structure/index.mjs app                   # subtree
+ *   node codereview/analyze-structure/index.mjs --json                # machine-readable
+ *   node codereview/analyze-structure/index.mjs --llm                 # compact LLM summary
+ *   node codereview/analyze-structure/index.mjs --history --since 6   # last 6 months of git
+ *   node codereview/analyze-structure/index.mjs --architecture        # use .architecture.json
+ *
+ *   node codereview/analyze-structure/index.mjs lookalikes            # default lookalikes
+ *   node codereview/analyze-structure/index.mjs lookalikes features/x # subtree
+ *   node codereview/analyze-structure/index.mjs lookalikes --by-name red
+ *   node codereview/analyze-structure/index.mjs lookalikes --focus shared/theme.ts
+ *
+ * Default structural reports run unless suppressed with `--no-<name>`.
  * Opt-in (off by default): --history, --reach, --leakage, --concept,
  *   --vocab-drift, --architecture, --boundary, --llm.
  *
- * Common usage:
- *   node scripts/analyze-structure.mjs                  # full default report
- *   node scripts/analyze-structure.mjs app              # subtree
- *   node scripts/analyze-structure.mjs --json           # machine-readable
- *   node scripts/analyze-structure.mjs --llm            # compact LLM-friendly summary
- *   node scripts/analyze-structure.mjs --history --since 6   # last 6 months of git
- *   node scripts/analyze-structure.mjs --architecture        # use .architecture.json
- *
- * Tuning flags (with defaults):
+ * Tuning flags (structural mode, with defaults):
  *   --fanin-min 1
  *   --coupling-depth 1
  *   --colocate-threshold 0.7
@@ -72,6 +71,20 @@ const RESOLVE_EXTS = [
   '/index.js',
   '/index.jsx',
 ];
+
+// ─── Subcommand dispatch ─────────────────────────────────────────────────────
+// Routes `analyze-structure lookalikes [...]` to lookalikes-mode.mjs and exits.
+// process.argv is mutated to drop the subcommand word so the delegated module's
+// own arg parser sees a clean argv (it predates the subcommand convention and
+// uses positional path / flag pattern as before).
+{
+  const sub = process.argv[2];
+  if (sub === 'lookalikes') {
+    process.argv = [process.argv[0], process.argv[1], ...process.argv.slice(3)];
+    await import('./lookalikes-mode.mjs');
+    process.exit(0);
+  }
+}
 
 // ─── CLI args ─────────────────────────────────────────────────────────────────
 
@@ -2930,11 +2943,20 @@ function computeScores(allFiles, dep, totals) {
 
     if (archV !== null) {
       const aD = clampDed(archV.length * 3, 50);
-      breakdown.push({ metric: 'architecture rule violations', value: archV.length, deduction: aD });
+      breakdown.push({
+        metric: 'architecture rule violations',
+        value: archV.length,
+        deduction: aD,
+      });
       d += aD;
     }
 
-    cats.push({ name: 'Architecture', weight: 20, score: Math.round(clampDed(100 - d, 100)), breakdown });
+    cats.push({
+      name: 'Architecture',
+      weight: 20,
+      score: Math.round(clampDed(100 - d, 100)),
+      breakdown,
+    });
   }
 
   // ─── Module Design ─────────────────────────────────────────────────────
@@ -2954,10 +2976,19 @@ function computeScores(allFiles, dep, totals) {
     d += ptD;
 
     const rxD = clampDed(per100(rxDeep.length) * 5, 30);
-    breakdown.push({ metric: 're-export depth ≥2 (barrel hops)', value: rxDeep.length, deduction: rxD });
+    breakdown.push({
+      metric: 're-export depth ≥2 (barrel hops)',
+      value: rxDeep.length,
+      deduction: rxD,
+    });
     d += rxD;
 
-    cats.push({ name: 'Module Design', weight: 15, score: Math.round(clampDed(100 - d, 100)), breakdown });
+    cats.push({
+      name: 'Module Design',
+      weight: 15,
+      score: Math.round(clampDed(100 - d, 100)),
+      breakdown,
+    });
   }
 
   // ─── Code Complexity ───────────────────────────────────────────────────
@@ -2973,12 +3004,14 @@ function computeScores(allFiles, dep, totals) {
       name: 'Code Complexity',
       weight: 15,
       score: Math.round(clampDed(100 - d, 100)),
-      breakdown: [{
-        metric: `complexity hotspots (cognitive ≥ ${complexityThreshold})`,
-        value: cx.length,
-        deduction: d,
-        detail: `weighted severity: ${severity}`,
-      }],
+      breakdown: [
+        {
+          metric: `complexity hotspots (cognitive ≥ ${complexityThreshold})`,
+          value: cx.length,
+          deduction: d,
+          detail: `weighted severity: ${severity}`,
+        },
+      ],
     });
   }
 
@@ -2992,12 +3025,14 @@ function computeScores(allFiles, dep, totals) {
       name: 'Type Safety',
       weight: 10,
       score: Math.round(clampDed(100 - d, 100)),
-      breakdown: [{
-        metric: 'type-safety smells (any / ! / as / @ts-*)',
-        value: total,
-        deduction: d,
-        detail: `${perKLoc.toFixed(1)} weighted smells per kLOC`,
-      }],
+      breakdown: [
+        {
+          metric: 'type-safety smells (any / ! / as / @ts-*)',
+          value: total,
+          deduction: d,
+          detail: `${perKLoc.toFixed(1)} weighted smells per kLOC`,
+        },
+      ],
     });
   }
 
@@ -3012,12 +3047,14 @@ function computeScores(allFiles, dep, totals) {
       name: 'Component Health',
       weight: 10,
       score: Math.round(clampDed(100 - d, 100)),
-      breakdown: [{
-        metric: 'flagged components',
-        value: smells.length,
-        deduction: d,
-        detail: `${rate.toFixed(1)}% of ${totalComps} components`,
-      }],
+      breakdown: [
+        {
+          metric: 'flagged components',
+          value: smells.length,
+          deduction: d,
+          detail: `${rate.toFixed(1)}% of ${totalComps} components`,
+        },
+      ],
     });
   }
 
@@ -3050,10 +3087,19 @@ function computeScores(allFiles, dep, totals) {
     d += dpD;
 
     const cD = clampDed(dup.defaultPlusNamed.length * 5, 20);
-    breakdown.push({ metric: 'default+named clashes', value: dup.defaultPlusNamed.length, deduction: cD });
+    breakdown.push({
+      metric: 'default+named clashes',
+      value: dup.defaultPlusNamed.length,
+      deduction: cD,
+    });
     d += cD;
 
-    cats.push({ name: 'Hygiene', weight: 15, score: Math.round(clampDed(100 - d, 100)), breakdown });
+    cats.push({
+      name: 'Hygiene',
+      weight: 15,
+      score: Math.round(clampDed(100 - d, 100)),
+      breakdown,
+    });
   }
 
   // ─── Testability ───────────────────────────────────────────────────────
@@ -3074,12 +3120,14 @@ function computeScores(allFiles, dep, totals) {
       name: 'Testability',
       weight: 10,
       score: Math.round(clampDed(coverage, 100)),
-      breakdown: [{
-        metric: 'colocated test coverage',
-        value: covered,
-        deduction: Math.round(100 - coverage),
-        detail: `${covered}/${testable} testable files have a colocated test`,
-      }],
+      breakdown: [
+        {
+          metric: 'colocated test coverage',
+          value: covered,
+          deduction: Math.round(100 - coverage),
+          detail: `${covered}/${testable} testable files have a colocated test`,
+        },
+      ],
     });
   }
 
@@ -3107,7 +3155,12 @@ function computeScores(allFiles, dep, totals) {
       d += sD;
     }
     if (breakdown.length > 0) {
-      cats.push({ name: 'Conceptual Cohesion', weight: 5, score: Math.round(clampDed(100 - d, 100)), breakdown });
+      cats.push({
+        name: 'Conceptual Cohesion',
+        weight: 5,
+        score: Math.round(clampDed(100 - d, 100)),
+        breakdown,
+      });
     }
   }
 
@@ -3119,7 +3172,7 @@ function computeScores(allFiles, dep, totals) {
 function scoreColor(score) {
   if (score >= 90) return '\x1b[32m'; // green
   if (score >= 50) return '\x1b[33m'; // yellow
-  return '\x1b[31m';                  // red
+  return '\x1b[31m'; // red
 }
 
 function scoreBar(score, width = 30) {

@@ -224,12 +224,13 @@ bun run codereview/analyze-structure/index.mjs --llm | sed -n '/^Overall:/,/^# R
 bun run codereview/analyze-structure/index.mjs coco-payment-ux --llm | sed -n '/^Overall:/,/^# Repo/p'
 
 # 4.9a Lookalikes — duplicate names / values / colors / near-matches.
-#      Run after picking a candidate slice; collisions in that subtree
-#      should be folded into the slice (consolidate-shaped fix).
-bun run codereview/lookalikes/index.mjs <subtree>                  # default reports
-bun run codereview/lookalikes/index.mjs --focus <hub-spoke-file>   # full reports filtered to one file
-bun run codereview/lookalikes/index.mjs --by-name <ident>          # every definition of an ident, <500 tokens
-bun run codereview/lookalikes/index.mjs --by-value '<literal>'     # every binding to a value, <500 tokens
+#      Subcommand of analyze-structure. Run after picking a candidate
+#      slice; collisions in that subtree should be folded into the
+#      slice (consolidate-shaped fix).
+bun run codereview/analyze-structure/index.mjs lookalikes <subtree>                # default reports
+bun run codereview/analyze-structure/index.mjs lookalikes --focus <hub-spoke-file> # filter to one file
+bun run codereview/analyze-structure/index.mjs lookalikes --by-name <ident>        # every definition, <500 tokens
+bun run codereview/analyze-structure/index.mjs lookalikes --by-value '<literal>'   # every binding, <500 tokens
 
 # 4.10 Skill index + topic search
 for d in .agents/skills/*/; do n=$(basename "$d"); desc=$(awk -F': ' '/^description:/{sub(/^[[:space:]]+/,"",$2); print $2; exit}' "$d/SKILL.md" 2>/dev/null); echo "$n :: $desc"; done
@@ -264,11 +265,9 @@ git stash -u && npm run type-check 2>&1 | tee /tmp/baseline.txt; git stash pop; 
 If a command's output is too large to think with, pipe through `head` and
 narrow with grep. Never paste raw 100k-line output into the plan.
 
-`scripts/analyze-structure.mjs`, `scripts/lookalikes.mjs`, and
-`scripts/log-doctor.ts` are thin shims over `codereview/<name>/index.*`
-— `npm run analyze-structure` / `npm run log-doctor` keep working. The
-cheatsheet uses the canonical paths. See `codereview/README.md` for the
-full param surface and per-mode token estimates.
+All three tools live under `codereview/<name>/index.*` — there are no
+`scripts/` shims. See `codereview/README.md` for the full param surface
+and per-mode token estimates.
 
 ## 5. Workflow
 

@@ -19,7 +19,7 @@
  *   analyzed, reducing the number of tokens."
  *
  * USAGE:
- *   npx tsx scripts/log-doctor.ts <mode> [options] < log.txt
+ *   npx tsx codereview/log-doctor/index.ts <mode> [options] < log.txt
  *   npm run log-doctor -- <mode> [options]
  *
  * MODES:
@@ -4584,14 +4584,11 @@ async function main() {
   console.log(output);
 }
 
-// Only run main() when invoked directly as a CLI — not when imported as a
-// module by the test-dsl executor (or any other consumer). The entry can
-// be the real index, or the back-compat shim at scripts/log-doctor.ts that
-// just imports this file.
+// Only run main() when invoked directly as a CLI — not when imported as
+// a module by the test-dsl executor (or any other consumer). ESM-equivalent
+// of `require.main === module`.
 const __thisFile = url.fileURLToPath(import.meta.url);
-const __entryFile = process.argv[1] ? nodePath.resolve(process.argv[1]) : '';
-const __isShimEntry = __entryFile.endsWith(`${nodePath.sep}scripts${nodePath.sep}log-doctor.ts`);
-if (__entryFile === __thisFile || __isShimEntry) {
+if (process.argv[1] === __thisFile) {
   // Best-effort cleanup of the cached WDA session on exit.
   process.on('exit', () => {
     invalidateCachedSession();

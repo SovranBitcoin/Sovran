@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * find-lookalikes.mjs
+ * lookalikes-mode.mjs
  *
- * Companion to analyze-structure.mjs. Walks the project tree and extracts
- * EVERY declaration regardless of nesting:
+ * Subcommand of analyze-structure. Dispatched to from index.mjs when
+ * argv[2] === 'lookalikes'. Walks the project tree and extracts EVERY
+ * declaration regardless of nesting:
  *
  *   - const / let / var bindings (incl. destructured names)
  *   - function declarations
@@ -22,16 +23,16 @@
  *   4. Name similarities  — Levenshtein-close identifiers, bucketed by length
  *
  * Usage:
- *   node scripts/find-lookalikes.mjs                    # default reports
- *   node scripts/find-lookalikes.mjs features/payments  # subtree
- *   node scripts/find-lookalikes.mjs --json
- *   node scripts/find-lookalikes.mjs --focus shared/theme.ts
- *                                                       # scan whole repo,
- *                                                       # only show look-alikes
- *                                                       # involving theme.ts
- *   node scripts/find-lookalikes.mjs --by-name red      # show every `red` definition
- *   node scripts/find-lookalikes.mjs --by-value '#FF0000'
- *   node scripts/find-lookalikes.mjs --dump variables   # alphabetised name list
+ *   analyze-structure lookalikes                       # default reports
+ *   analyze-structure lookalikes features/payments     # subtree
+ *   analyze-structure lookalikes --json
+ *   analyze-structure lookalikes --focus shared/theme.ts
+ *                                                      # scan whole repo,
+ *                                                      # only show look-alikes
+ *                                                      # involving theme.ts
+ *   analyze-structure lookalikes --by-name red         # every `red` definition
+ *   analyze-structure lookalikes --by-value '#FF0000'
+ *   analyze-structure lookalikes --dump variables      # alphabetised name list
  *
  * Tuning:
  *   --color-distance 30        # max RGB distance for color near-matches

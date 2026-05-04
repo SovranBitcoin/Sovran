@@ -14,10 +14,9 @@ codereview/
 ```
 
 The three scripts share `shared/` for ignore lists, `stripCodeNoise`,
-the file walker, ANSI colors, and CLI helpers. `scripts/analyze-structure.mjs`,
-`scripts/lookalikes.mjs`, and `scripts/log-doctor.ts` are thin shims that
-import these — existing commands and `npm run analyze-structure` /
-`npm run log-doctor` keep working.
+the file walker, ANSI colors, and CLI helpers. `npm run
+analyze-structure` and `npm run log-doctor` invoke them by their
+canonical paths under `codereview/`.
 
 ## When to reach for which
 

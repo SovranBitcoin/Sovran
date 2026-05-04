@@ -130,17 +130,18 @@ bun run codereview/analyze-structure/index.mjs coco-payment-ux --llm       # pay
 bun run codereview/analyze-structure/index.mjs --llm | head -180
 
 # ── Lookalikes (duplicate names / values / colors / near-matches) ────
-# Default reports — run when the slice picks a duplication-prone area.
-bun run codereview/lookalikes/index.mjs                                    # whole repo
-bun run codereview/lookalikes/index.mjs features/payments                  # subtree
+# Subcommand of analyze-structure. Default reports — run when the slice
+# picks a duplication-prone area.
+bun run codereview/analyze-structure/index.mjs lookalikes                   # whole repo
+bun run codereview/analyze-structure/index.mjs lookalikes features/payments # subtree
 
 # Targeted lookups (each <500 tokens). Use when an existing finding cites
 # a literal value or identifier and you want to know where else it lives.
-bun run codereview/lookalikes/index.mjs --by-name red
-bun run codereview/lookalikes/index.mjs --by-value '#FF0000'
+bun run codereview/analyze-structure/index.mjs lookalikes --by-name red
+bun run codereview/analyze-structure/index.mjs lookalikes --by-value '#FF0000'
 
 # Focus mode — full reports filtered to pairs involving one file.
-bun run codereview/lookalikes/index.mjs --focus shared/theme.ts
+bun run codereview/analyze-structure/index.mjs lookalikes --focus shared/theme.ts
 
 # Find files inside coco-payment-ux that import from sovran-app/* (leak hunt)
 grep -RnE "from ['\"](@/|features/|shared/|navigation/|app/)" coco-payment-ux/src 2>/dev/null
@@ -180,10 +181,9 @@ npx tsx codereview/log-doctor/index.ts errors --token-budget 8000     # auto-pru
 If a command's output is too large to think with, pipe through `head -200`
 and narrow with grep — never paste raw 100k-line output into a finding.
 
-`scripts/analyze-structure.mjs`, `scripts/lookalikes.mjs`, and
-`scripts/log-doctor.ts` are thin shims over `codereview/<name>/index.*`,
-so existing habits (`npm run analyze-structure`, `npm run log-doctor`)
-keep working. The cheatsheet uses the canonical paths.
+All three tools live under `codereview/<name>/index.*` — there are no
+`scripts/` shims. `npm run analyze-structure` and `npm run log-doctor`
+invoke them by their canonical paths.
 
 ## 5. Workflow
 
