@@ -44,11 +44,27 @@ import { MintListResponse, parseWith } from '@sovranbitcoin/schemas';
 // ─── Deep probe: discover mints from audit API ─────────────────────────────
 
 const SOVRAN_MINTS_API = 'https://api.sovran.money/api/cashu/mints';
+const MAX_DISCOVERED_MINTS = 100;
 
 const parseMintList = parseWith(MintListResponse, 'cashu/mints');
 
 function normalizeMintUrl(url: string): string {
   return url.replace(/\/$/, '').toLowerCase();
+}
+
+// Hostname allowlist for backend-supplied mint URLs. Every admitted host
+// will be probed by `wallet.restore`, which sends the user's IP and derived
+// blinded messages — a compromised api.sovran.money response (or CDN MITM)
+// must not aim the wallet at LAN, loopback, link-local, or `.onion` hosts.
+function isAllowedMintHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === 'localhost') return false;
+  if (h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.onion')) return false;
+  // Block bare IPs entirely — public mints are reached by hostname.
+  // `URL.hostname` strips brackets from IPv6 literals, leaving colons.
+  if (h.includes(':')) return false;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return false;
+  return true;
 }
 
 async function fetchDiscoveredMintUrls(
@@ -60,10 +76,39 @@ async function fetchDiscoveredMintUrls(
     signal,
   });
   if (result.isErr()) return [];
-  return result.value
-    .filter((u) => u.startsWith('https://'))
-    .map((u) => u.replace(/\/$/, ''))
-    .filter((u) => !known.has(u.toLowerCase()));
+  const admitted: string[] = [];
+  let rejectedHost = 0;
+  let rejectedScheme = 0;
+  let rejectedMalformed = 0;
+  for (const raw of result.value) {
+    if (admitted.length >= MAX_DISCOVERED_MINTS) break;
+    if (!raw.startsWith('https://')) {
+      rejectedScheme++;
+      continue;
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(raw);
+    } catch {
+      rejectedMalformed++;
+      continue;
+    }
+    if (!isAllowedMintHost(parsed.hostname)) {
+      rejectedHost++;
+      continue;
+    }
+    const normalized = raw.replace(/\/$/, '');
+    if (known.has(normalized.toLowerCase())) continue;
+    admitted.push(normalized);
+  }
+  cashuLog.info('recovery.discover.admitted', {
+    admittedCount: admitted.length,
+    rejectedHost,
+    rejectedScheme,
+    rejectedMalformed,
+    totalReturned: result.value.length,
+  });
+  return admitted;
 }
 
 type RecoveryState = 'idle' | 'recovering' | 'complete' | 'error';
@@ -506,6 +551,28 @@ export const SettingsRecoveryScreen: React.FC<SettingsRecoveryScreenProps> = ({
 
       setCurrentMintIndex(-1);
       await Promise.allSettled(allMintUrls.map((url, i) => restoreOneUrl(url, i)));
+
+      // Untrust discovered mints that returned no funds. `wallet.restore`
+      // calls `mintService.addMintByUrl(url, { trusted: true })` for every
+      // probed URL (see ../coco/packages/core/api/WalletApi.ts), which would
+      // otherwise leave attacker-supplied URLs from the audit API permanently
+      // in the trusted-mints set used by the routing surface.
+      const discoveredEmpty = recoveryResults.filter((r) => r.isDiscovered && !r.fundsFound);
+      if (discoveredEmpty.length > 0) {
+        await Promise.allSettled(
+          discoveredEmpty.map(async (r) => {
+            try {
+              await manager.mint.untrustMint(r.mint);
+              cashuLog.info('recovery.cleanup.discovered_mint_untrusted', { mintUrl: r.mint });
+            } catch (e) {
+              cashuLog.warn('recovery.cleanup.untrust_failed', {
+                mintUrl: r.mint,
+                error: (e as Error)?.message,
+              });
+            }
+          })
+        );
+      }
 
       // Clean up stuck pending mint operations from before the restore.
       // These were queued (typically by NPC sync) when the wallet's
