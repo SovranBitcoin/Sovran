@@ -88,8 +88,8 @@
       ],
       "verification_note": "Re-read CocoPaymentUXProvider.tsx:261-370. Confirmed 15 ref writes + registerLocale loop + propsRef assignment + machine-creation block all inside function body before any useEffect. Counter-argument considered: ref writes are cheap; useEffect is overkill — but the correctness issue (read-during-same-commit from another consumer) is real in concurrent React and the perf hit is not measurable either way.",
       "prior_audit_id": "F-011@07.json",
-      "completion_status": "partial",
-      "completion_note": "Ref writes resolved in commit c2932a64 — every `xxxRef.current = xxx` in CocoPaymentUXProvider is now `useLatestRef(xxx)`, which mirrors through `useInsertionEffect` (after commit, before any user-space useLayoutEffect/useEffect) and matches the canonical fix prescribed here. The `registerLocale` loop at :288-292 and the `propsRef.current = { ... }` write at :308-329 still run during render — those are out of scope for the ref-mirror slice and remain deferred."
+      "completion_status": "complete",
+      "completion_note": "Ref writes resolved in commit c2932a64 — every `xxxRef.current = xxx` is now `useLatestRef(xxx)` mirrored through `useInsertionEffect`. The two remaining render-time mutations are now also fixed in commit 7e064c9f: the `registerLocale` translations loop moved into `useEffect([translations])`, and the `propsRef.current = { ... }` write was deleted entirely (it was dead — only read inside the once-only `if (!machineRef.current)` guard whose closure already had the values in scope). The handlers-factory rebind moved into `useLayoutEffect([handlersFactory])` so a changed factory is no longer silently dropped after first render."
     },
     {
       "id": "F-004",
@@ -246,8 +246,8 @@
       ],
       "verification_note": "Re-read walletContextTracker.ts end-to-end. Confirmed sequential loop, no init error path, unconditional retry. Counter-argument considered: coco's event bus may only emit events when underlying data is ready — correct for normal startup but does not cover DB reset / manager disposal / migration cases.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Sequential getReadyProofs / repeated history JSON.parse — distinct perf slice."
+      "completion_status": "complete",
+      "completion_note": "All three issues fixed in commit 7e064c9f. (1) getReadyProofs is now Promise.all over trustedMints.map. (2) The whole refresh body is wrapped in try/catch — top-level rejections (DB locked, manager mid-rehydrate) increment a consecutiveFailures counter and log instead of leaving the tracker silently empty. (3) After MAX_CONSECUTIVE_REFRESH_FAILURES (5) the queued retry stops scheduling itself; the tracker stays alive and a fresh Manager event resets the counter so it can recover. Also added a `disposed` flag so a teardown observed mid-refresh cancels the next scheduled run."
     },
     {
       "id": "F-011",

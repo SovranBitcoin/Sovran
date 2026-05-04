@@ -416,8 +416,8 @@
       ],
       "verification_note": "Re-read CocoPaymentUXProvider.tsx:372-394. Confirmed no length cap. Nit severity.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered when surveying coco-payment-ux candidates; lives on the deep-link entry-point seam (CocoPaymentUXProvider.tsx) not the snapshot-discipline seam this slice consolidated. Real and unfixed."
+      "completion_status": "complete",
+      "completion_note": "Fixed in commit 7e064c9f. Deep-link host length is now capped at DEEP_LINK_HOST_MAX_LENGTH (16384 chars) before machine.scan; over-length URLs are reported through deepLinks.onError as `DEEP_LINK_TOO_LONG` and logged via logger.warn('deepLink.host.too_long')."
     }
   ],
   "dimensions": {
