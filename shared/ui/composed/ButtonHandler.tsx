@@ -157,7 +157,7 @@ export function ButtonHandler({
   style,
   className,
 }: ButtonHandlerProps) {
-  const [loading, setLoading] = useState(false);
+  const [loadingIdx, setLoadingIdx] = useState<number | null>(null);
   const danger = useThemeColor('danger');
 
   // Filter buttons based on condition
@@ -195,16 +195,17 @@ export function ButtonHandler({
 
   // The inner shared `Button` already routes its onPress through
   // `useSingleFlight`, so a rapid second tap is dropped before reaching
-  // this wrapper. We only own the spinner-coordination boolean here.
-  const handleButtonPress = async (button: ButtonHandlerActionButton) => {
+  // this wrapper. We track the in-flight button by its visible-array index
+  // so siblings keep their own visual state while one action runs.
+  const handleButtonPress = async (button: ButtonHandlerActionButton, idx: number) => {
     if (button.disabled) return;
     const result = button.onPress?.();
     if (!(result instanceof Promise)) return;
-    setLoading(true);
+    setLoadingIdx(idx);
     try {
       await result;
     } finally {
-      setLoading(false);
+      setLoadingIdx((current) => (current === idx ? null : current));
     }
   };
 
@@ -221,10 +222,10 @@ export function ButtonHandler({
             className="flex-1">
             <Button
               testID={button.testID}
-              onPress={() => handleButtonPress(button)}
+              onPress={() => handleButtonPress(button, index)}
               text={button.text}
               variant={button.variant}
-              loading={loading || button.loading}
+              loading={loadingIdx === index || button.loading}
               disabled={button.disabled}
             />
           </View>
@@ -242,9 +243,9 @@ export function ButtonHandler({
                   <Icon name="tabler:dots" />
                 )
               }
-              onPress={() => handleButtonPress(visibleButtons[2])}
+              onPress={() => handleButtonPress(visibleButtons[2], 2)}
               variant="secondary"
-              loading={loading}
+              loading={loadingIdx === 2 || visibleButtons[2].loading}
               disabled={visibleButtons[2].disabled}
             />
           </View>
@@ -305,7 +306,6 @@ export function ButtonHandler({
                 icon={<Icon name="tabler:dots" />}
                 onPress={openMoreMenu}
                 variant="secondary"
-                loading={loading}
               />
             </View>
           </>
