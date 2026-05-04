@@ -165,15 +165,6 @@ export function TransactionsScreen({
 
   const { history, isFetching } = useHistoryWithMelts();
 
-  log.debug('tx.list.render', {
-    totalHistory: history.length,
-    isFetching,
-    currency: selectedCurrency,
-    paymentType,
-    direction,
-    tab,
-  });
-
   const listKey = `${paymentType}-${direction}-${tab}-${selectedCurrency}-${filterMintUrl}-${selectedMonth}`;
 
   const filteredByTypeHistory = useMemo(() => {

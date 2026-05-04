@@ -423,8 +423,6 @@ export function MintInfoScreen() {
   const mintUrl = (entry?.mintUrl as string) ?? '';
   const displayName = (entry?.displayName as string) ?? mintUrl;
 
-  log.debug('mint.info.display', { mintUrl, displayName, hasEntry: !!entry });
-
   const handleContactPress = useCallback(async (method: string, info: string) => {
     log.info('mint.info.contact.press', { method });
     try {

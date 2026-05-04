@@ -62,7 +62,6 @@ interface UnitPreviewSlotProps {
 // specific unit's resolved theme actually changes.
 function UnitPreviewSlot({ unit, width, height, onPress }: UnitPreviewSlotProps) {
   const theme = useThemeDraft((s) => s.resolveUnitTheme(unit.id));
-  log.debug('theme.preview.card.resolve', { unitId: unit.id, theme });
   return (
     <UnitPreviewCard
       themeName={theme}

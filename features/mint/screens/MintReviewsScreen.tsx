@@ -19,7 +19,7 @@ import { BottomButtons } from '@/shared/ui/composed/BottomButtons';
 import { ButtonHandler } from '@/shared/ui/composed/ButtonHandler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import opacity from 'hex-color-opacity';
-import { log, useLifecycleLogger, Log } from '@/shared/lib/logger';
+import { useLifecycleLogger, Log } from '@/shared/lib/logger';
 
 const ParamsSchema = z.object({
   mintUrl: z
@@ -327,8 +327,6 @@ export function MintReviewsScreen() {
       });
     return () => controller.abort();
   }, [mintUrl]);
-
-  log.debug('mint.reviews.load', { mintUrl, kymLoading, score: kymScore });
 
   const isLoading = kymLoading;
   const reviews = useMemo(() => {

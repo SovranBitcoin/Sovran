@@ -80,8 +80,6 @@ export function ShareScreen({ type, data, npub, lud16, onTitleChange }: ShareScr
 
   const foreground = useThemeColor('foreground');
 
-  nostrLog.info('share.screen.open', { type });
-
   // Determine if we should show tabs
   const showP2pkTabs = type === 'p2pk' && npub;
   const showNpubTabs = type === 'npub' && lud16;
