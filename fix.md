@@ -133,7 +133,25 @@ narrow with grep. Never paste raw 100k-line output into the plan.
 
 ## 5. Workflow
 
+### Phase 0 — Mandatory skill load (non-negotiable)
+
+Before Phase 1, read every Matt Pocock process skill listed in §6.1 from
+disk. If any required-phase skill is missing, **stop** and tell the user
+to run `npx skills add mattpocock/skills --all -y` — do not proceed
+without them. Record every skill actually loaded under
+`Process skills consulted` in the Phase 4 plan. The self-check (§8 item
+13) blocks the slice if this list is empty.
+
+This phase is the fixer's analogue of `audit.process_skills_consulted`
+in `audit.md` §10 item 9. The Matt Pocock set governs *how* the fixer
+reasons, not *which dimension* it covers — load them every run regardless
+of slice.
+
 ### Phase 1 — Cluster open findings
+
+Apply `skill:zoom-out` first — the open-findings list is the broadest
+frame; the slice must come from clustering, not from latching onto the
+first finding read.
 
 Run §4.1, §4.2, §4.3, §4.5, §4.9. Build a flat list of open findings
 (untagged / partial / deferred). Group by:
@@ -147,6 +165,11 @@ Run §4.1, §4.2, §4.3, §4.5, §4.9. Build a flat list of open findings
   `analyze-structure` sub-dimension toward 100
 
 ### Phase 2 — Pick a slice
+
+Apply `skill:improve-codebase-architecture` here — the slice must be
+named in its **depth/seam/leverage** vocabulary, not in ad-hoc terms.
+"Consolidate the duplicate `Y` adapter at the storage seam" is right;
+"clean up storage" is not.
 
 A slice is a related cluster that:
 
@@ -173,6 +196,12 @@ before any edit.
 
 ### Phase 3 — Re-verify each candidate finding
 
+Apply `skill:diagnose` for any Critical/High in the slice — narrate the
+re-verification using its reproduce → minimise → hypothesise →
+instrument → fix → regression-test loop. The fixer is write-capable, so
+unlike the auditor it carries the loop through to "fix" and adds a
+regression test where the slice supports it.
+
 For every finding in the slice, the fixer applies the **four-lens**
 evaluation. Each rejection is recorded in the plan with a one-line reason.
 
@@ -193,10 +222,25 @@ Critical fix first.
 
 ### Phase 4 — Plan
 
+Apply `skill:prompt-engineering-patterns` to keep the plan specific,
+terse, and structured — it's a prompt for downstream review.
+
 Write a short brief inline (markdown). Structure:
 
 ```
 # Slice — <one-line description>
+
+## Process skills consulted (Matt Pocock set — required)
+- skill:zoom-out — <one line on what it shifted in the slice choice>
+- skill:improve-codebase-architecture — <seam named, leverage estimate>
+- skill:diagnose — <which Critical/High the loop was applied to, or
+  "no Critical/High in slice — loop deferred">
+- skill:tdd — <whether the slice writes/changes logic and a regression
+  test follows, or "non-logic refactor — tdd not engaged">
+- skill:prompt-engineering-patterns — applied to plan and commit body
+
+## Domain skills consulted
+- skill:<name> — <one-line reason; one bullet per relevant dim>
 
 ## Cluster
 - Pattern: <one sentence — the underlying issue>
@@ -296,19 +340,27 @@ scopes per `commitlint.config.cjs`. **No `Co-Authored-By:`.**
 
 ## 6. Skills to consult
 
-### 6.1 Process skills (Matt Pocock set — always loaded)
+### 6.1 Process skills (Matt Pocock set — MANDATORY load every run)
 
-Cite in the slice plan when used.
+These govern *how* the fixer reasons, not *which* dimension it covers.
+Loaded at Phase 0 from `.agents/skills/` — every run, regardless of
+slice. A required skill missing from disk halts the fixer (Phase 0).
+Every skill here MUST appear under "Process skills consulted" in the
+Phase 4 plan with a one-line note on what it shaped, even if its note
+is "non-logic refactor — tdd not engaged" or similar. The §8 self-check
+blocks the slice if any required skill is absent from the plan.
 
-- `skill:zoom-out` — broaden frame before declaring slice scope.
-- `skill:improve-codebase-architecture` — depth/seam/leverage vocabulary
-  for refactor descriptions.
-- `skill:diagnose` — bug-investigation loop for any Critical/High in the
-  slice.
-- `skill:tdd` — when the slice introduces or modifies non-trivial logic.
-  *(audit.md skips this; the fixer writes code so it's allowed here.)*
-- `skill:prompt-engineering-patterns` — keep the slice plan and commit
-  body specific, terse, structured.
+| Skill | Phase that requires it | What it shapes |
+|---|---|---|
+| `skill:zoom-out` | Phase 1 | Broaden frame; the slice comes from clustering, not the first finding read. |
+| `skill:improve-codebase-architecture` | Phase 2 | Slice must be named in depth/seam/leverage vocabulary. |
+| `skill:diagnose` | Phase 3 (Critical/High only) | Reproduce → minimise → hypothesise → instrument → fix → regression-test loop. |
+| `skill:tdd` | Phase 5 (when slice writes/changes logic) | Test-first for non-trivial logic; regression test before fix lands. |
+| `skill:prompt-engineering-patterns` | Phase 4 + Phase 6 commit body | Plan and commit body stay specific, terse, structured. |
+
+(The fixer differs from `audit.md` here on `tdd`: `audit.md` excludes it
+because the auditor is read-only; the fixer writes code so `tdd` is
+in-set.)
 
 ### 6.2 Domain skills (load when relevant)
 
@@ -380,3 +432,8 @@ SHAs: <feature-sha>, <audit-status-sha>.
 11. Schemas added or changed live in `../sovran-schemas/src` unless
     app-only was explicitly justified in the plan.
 12. Final summary cites both commit SHAs.
+13. **Process skills consulted (Matt Pocock set)** — Phase 0 ran. Every
+    skill in §6.1's table appears under "Process skills consulted" in the
+    Phase 4 plan with a non-empty note. An empty list, or any required
+    skill missing without an explicit "not engaged because <reason>"
+    note, blocks the slice and triggers a re-run from Phase 0.
