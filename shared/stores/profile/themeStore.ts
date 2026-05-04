@@ -5,15 +5,13 @@
  * for the current profile. The wallet screen's units each get their own
  * wallpaper within the active album; any unit can be individually overridden.
  *
- * Applying an album WIPES all per-unit overrides and eagerly re-randomises
- * from the new album's wallpapers (Revolut pattern). The randomisation is
- * deterministic — seeded by profile pubkey + album slug — so the same
- * profile on two devices agrees on assignments.
+ * Album commits land here via `themeDraft.commit()` — the draft owns the
+ * unit-to-wallpaper distribution (newest-first from the album catalog).
  *
  * Resolution for `getUnitWallpaper(unitId?)`:
  *   1. explicit `unitWallpapers[unitId]` override
  *   2. first-unit's wallpaper (for chrome surfaces that just want "a wallpaper")
- *   3. deterministic pick from the active album
+ *   3. newest theme in the active album
  *   4. `'dark'` built-in fallback
  */
 
@@ -21,7 +19,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { storeLog } from '@/shared/lib/logger';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
-import { useProfileStore } from '@/shared/stores/global/profileStore';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import {
   BUILTIN_COLORS_ALBUM_SLUG,
@@ -47,8 +44,6 @@ interface ThemeState {
 }
 
 interface ThemeActions {
-  /** Wipe existing overrides and assign a fresh wallpaper from `albumSlug` to each unit. */
-  applyAlbum: (albumSlug: string, unitIds: UnitId[]) => void;
   /** Set a single unit's wallpaper override (any theme from any album). */
   setUnitWallpaper: (unitId: UnitId, theme: ThemeName) => void;
   /** Resolve a unit's wallpaper, walking the fallback chain. */
@@ -68,62 +63,6 @@ function getCatalogThemesForAlbum(albumSlug: string): ThemeName[] {
     .map((w) => w.themeName);
 }
 
-function getActiveProfilePubkey(): string {
-  const state = useProfileStore.getState();
-  return state.profiles.find((p) => p.accountIndex === state.activeAccountIndex)?.pubkey ?? '';
-}
-
-/**
- * Deterministic shuffle seeded by a string. Uses a simple xorshift so the
- * same (seed, input) pair always produces the same order without pulling in
- * a crypto dependency.
- */
-function seededShuffle<T>(items: T[], seed: string): T[] {
-  if (items.length <= 1) return items.slice();
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  const rand = () => {
-    h ^= h << 13;
-    h ^= h >>> 17;
-    h ^= h << 5;
-    return ((h >>> 0) % 1_000_000) / 1_000_000;
-  };
-  const out = items.slice();
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
-
-/**
- * Assign wallpapers from `pool` to `unitIds`:
- *  - pool smaller than unitIds → cycle through pool
- *  - pool larger → pick without immediate repeats in the first pool.length slots
- */
-function distributeWallpapers(
-  pool: ThemeName[],
-  unitIds: UnitId[],
-  seed: string
-): Record<UnitId, ThemeName> {
-  if (pool.length === 0 || unitIds.length === 0) return {};
-  const shuffled = seededShuffle(pool, seed);
-  const assigned: Record<UnitId, ThemeName> = {};
-  for (let i = 0; i < unitIds.length; i++) {
-    assigned[unitIds[i]] = shuffled[i % shuffled.length];
-  }
-  return assigned;
-}
-
-function pickFirstThemeForAlbum(albumSlug: string, seed: string): ThemeName | null {
-  const pool = getCatalogThemesForAlbum(albumSlug);
-  if (pool.length === 0) return null;
-  return seededShuffle(pool, seed)[0];
-}
-
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set, get) => ({
@@ -131,22 +70,6 @@ export const useThemeStore = create<ThemeStore>()(
       activeAlbumSlug: null,
       unitWallpapers: {},
       mode: DEFAULT_MODE,
-
-      applyAlbum: (albumSlug, unitIds) => {
-        const pool = getCatalogThemesForAlbum(albumSlug);
-        if (pool.length === 0) {
-          storeLog.warn('theme.apply_album.empty_pool', { albumSlug });
-          return;
-        }
-        const seed = `${getActiveProfilePubkey()}:${albumSlug}`;
-        const unitWallpapers = distributeWallpapers(pool, unitIds, seed);
-        storeLog.info('store.theme.apply_album', {
-          albumSlug,
-          unitCount: unitIds.length,
-          poolSize: pool.length,
-        });
-        set({ activeAlbumSlug: albumSlug, unitWallpapers });
-      },
 
       setUnitWallpaper: (unitId, theme) => {
         storeLog.info('store.theme.set_unit_wallpaper', { unitId, theme });
@@ -161,9 +84,8 @@ export const useThemeStore = create<ThemeStore>()(
         const firstOverride = Object.values(unitWallpapers)[0];
         if (firstOverride) return firstOverride;
         if (activeAlbumSlug) {
-          const seed = `${getActiveProfilePubkey()}:${activeAlbumSlug}`;
-          const fallback = pickFirstThemeForAlbum(activeAlbumSlug, seed);
-          if (fallback) return fallback;
+          const pool = getCatalogThemesForAlbum(activeAlbumSlug);
+          if (pool.length > 0) return pool[0];
         }
         return FALLBACK_THEME;
       },
