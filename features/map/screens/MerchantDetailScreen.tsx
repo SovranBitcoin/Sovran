@@ -24,6 +24,7 @@ import opacity from 'hex-color-opacity';
 import { Log, log, useLifecycleLogger } from '@/shared/lib/logger';
 import { useRouteParams } from '@/shared/lib/nav/useRouteParams';
 import { getMarkerColor } from '@/shared/lib/map/categories';
+import { isAbortError } from '@/shared/lib/apiClient';
 import { openExternalUrl } from '@/shared/lib/url';
 import { openLinkFailedPopup } from '@/shared/lib/popup/popups/general';
 
@@ -54,6 +55,8 @@ export function MerchantDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const loadDetails = async () => {
       if (!placeId) {
         setIsLoading(false);
@@ -74,16 +77,19 @@ export function MerchantDetailScreen() {
       }
 
       try {
-        const details = await fetchPlaceDetails(id);
+        const details = await fetchPlaceDetails(id, false, { signal: controller.signal });
+        if (controller.signal.aborted) return;
         setPlace(details);
       } catch (err) {
+        if (isAbortError(err)) return;
         log.error('map.merchant.fetch_failed', { error: err });
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
 
     loadDetails();
+    return () => controller.abort();
   }, [placeId, fetchPlaceDetails, getCachedPlaceDetails]);
 
   useEffect(() => {

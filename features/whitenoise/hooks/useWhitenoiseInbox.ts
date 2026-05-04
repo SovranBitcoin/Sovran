@@ -79,6 +79,7 @@ export function useWhitenoiseInbox() {
       // Stage 1: ingest into the `received` store. Returns false if we've
       // seen this event before (deduped via the InviteReader's `seen` map).
       const fresh = await reader.ingestEvent(event as Parameters<typeof reader.ingestEvent>[0]);
+      if (cancelled) return;
       if (!fresh) return;
 
       // Stage 2: decrypt now. Our signer is local (no hardware prompt), so
@@ -87,6 +88,7 @@ export function useWhitenoiseInbox() {
       // `kind !== WELCOME_EVENT_KIND` and emit an `error` event we ignore.
       try {
         const rumor = await reader.decryptGiftWrap(ev.id);
+        if (cancelled) return;
         if (rumor) {
           wnLog.info('whitenoise.inbox.invite_received', {
             eventId: ev.id.slice(0, 8),
@@ -94,6 +96,7 @@ export function useWhitenoiseInbox() {
           });
         }
       } catch (err) {
+        if (cancelled) return;
         wnLog.debug('whitenoise.inbox.decrypt_skipped', {
           eventId: ev.id.slice(0, 8),
           error: err instanceof Error ? err.message : String(err),

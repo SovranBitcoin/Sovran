@@ -28,6 +28,12 @@ export const GlassSearchBar = memo(function GlassSearchBar({
     onChangeTextRef.current = onChangeText;
   }, [onChangeText]);
 
+  // Cancel pending debounce when clearKey changes (user pressed X)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    latestTextRef.current = '';
+  }, [clearKey]);
+
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);

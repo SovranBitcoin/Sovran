@@ -53,7 +53,9 @@ export function GalleryScreen() {
   // The wallpaperStore subscription wired into useAlbumList updates the
   // grouped sections automatically when new albums arrive.
   useEffect(() => {
-    refreshCatalog();
+    const controller = new AbortController();
+    refreshCatalog(controller.signal);
+    return () => controller.abort();
   }, []);
 
   const cardWidth = Math.round(screenWidth * 0.44);
