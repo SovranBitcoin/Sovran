@@ -53,9 +53,17 @@ function assertAccountIndex(accountIndex: number): void {
 
 const HEX_RE = /^[0-9a-f]+$/i;
 
+// 32-byte schnorr/secp256k1 x-only pubkey serialised as 64 hex chars.
+// Use this at any trust boundary that takes a `pubkey` string from
+// untrusted input (relay payloads, deep-link params, feed-spec JSON) —
+// `value.length === 64` alone passes UTF-8 mojibake and arbitrary
+// 64-char strings into NDK/Primal filters (audit 26#F-005).
+export function isNostrPubkeyHex(value: unknown): value is string {
+  return typeof value === 'string' && value.length === 64 && HEX_RE.test(value);
+}
+
 function assertPubkeyHex(pubkeyHex: string): void {
-  // 32-byte schnorr/secp256k1 x-only pubkey serialised as 64 lowercase hex chars
-  if (typeof pubkeyHex !== 'string' || pubkeyHex.length !== 64 || !HEX_RE.test(pubkeyHex)) {
+  if (!isNostrPubkeyHex(pubkeyHex)) {
     throw new Error('Invalid pubkeyHex: expected 64 hex chars');
   }
 }

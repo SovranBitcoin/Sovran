@@ -28,6 +28,7 @@ import { useSettingsStore } from '@/shared/stores/global/settingsStore';
 import { Screen } from '@/shared/ui/composed/Screen';
 import { nip19 } from 'nostr-tools';
 import { hexToBytes } from '@noble/hashes/utils.js';
+import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 import QRCode from 'react-native-qrcode-svg';
 import { Tabs } from '@/shared/ui/composed/Tabs';
 import opacity from 'hex-color-opacity';
@@ -283,7 +284,7 @@ export const SettingsKeyringScreen: React.FC = () => {
     }
 
     // Strategy 2: Try as raw 64-char hex (32-byte private key)
-    if (input.length === 64 && /^[0-9a-fA-F]+$/.test(input)) {
+    if (isNostrPubkeyHex(input)) {
       try {
         await manager.keyring.addKeyPair(hexToBytes(input));
         return true;

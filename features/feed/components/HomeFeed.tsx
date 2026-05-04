@@ -19,6 +19,7 @@ import { log, Log } from '@/shared/lib/logger';
 import { LegendList, type LegendListRenderItemProps, type LegendListRef } from '@legendapp/list';
 import { useNostrKeysContext } from '@/shared/providers/NostrKeysProvider';
 import { useBackgroundConfig } from '@/shared/providers/BackgroundProvider';
+import { isNostrPubkeyHex } from '@/shared/lib/nostr/secureStorage';
 
 import {
   type FeedEvent,
@@ -104,7 +105,7 @@ function getCategoryPubkeysFromSpec(spec: string): string[] {
   const seen = new Set<string>();
   const pubkeys: string[] = [];
   for (const value of parsed.pubkeys) {
-    if (typeof value !== 'string' || value.length !== 64) continue;
+    if (!isNostrPubkeyHex(value)) continue;
     if (seen.has(value)) continue;
     seen.add(value);
     pubkeys.push(value);
