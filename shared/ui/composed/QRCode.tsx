@@ -121,7 +121,6 @@ export const AnimatedQRCode = memo(function AnimatedQRCode({
     log.info('ui.qrcode.address_set', {
       length: address.length,
       needsAnimation,
-      preview: address.slice(0, 30),
       isUR: address.toLowerCase().startsWith('ur:'),
     });
 

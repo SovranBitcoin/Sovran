@@ -16,7 +16,7 @@ import { View } from '@/shared/ui/primitives/View/View';
 import { Skeleton } from '@/shared/ui/primitives/Skeleton';
 import { copyPopup, type CopyTarget } from '@/shared/lib/popup';
 import { EnhancedHaptics } from '@/shared/ui/primitives/Haptics';
-import { log, Log } from '@/shared/lib/logger';
+import { Log, paymentLog } from '@/shared/lib/logger';
 
 // Threshold matches AnimatedQRCode's ANIMATE_THRESHOLD
 const ANIMATE_THRESHOLD = 500;
@@ -68,7 +68,7 @@ export function PaymentInfo({
   const cycleSpeed = useCallback(() => {
     setSpeedIndex((prev) => {
       const next = (prev + 1) % SPEED_PRESETS.length;
-      log.info('ui.qrcode.speed_changed', {
+      paymentLog.info('ui.qrcode.speed_changed', {
         from: SPEED_PRESETS[prev].label,
         to: SPEED_PRESETS[next].label,
         intervalMs: SPEED_PRESETS[next].intervalMs,
@@ -80,7 +80,7 @@ export function PaymentInfo({
   const cycleDensity = useCallback(() => {
     setDensityIndex((prev) => {
       const next = (prev + 1) % DENSITY_PRESETS.length;
-      log.info('ui.qrcode.density_changed', {
+      paymentLog.info('ui.qrcode.density_changed', {
         from: DENSITY_PRESETS[prev].label,
         to: DENSITY_PRESETS[next].label,
         fragmentSize: DENSITY_PRESETS[next].fragmentSize,
@@ -90,7 +90,7 @@ export function PaymentInfo({
   }, []);
 
   const handleCopyPress = useCallback(async () => {
-    log.info('ui.payment_info.copy', {
+    paymentLog.info('ui.payment_info.copy', {
       copyTarget,
       hasLink: Boolean(link),
       valueLength: selectedValue.length,
@@ -101,7 +101,10 @@ export function PaymentInfo({
   }, [link, selectedValue, copyTarget]);
 
   if (!selectedValue) {
-    log.debug('ui.payment_info.empty', { dataType: typeof data, isArray: Array.isArray(data) });
+    paymentLog.debug('ui.payment_info.empty', {
+      dataType: typeof data,
+      isArray: Array.isArray(data),
+    });
     return (
       <HStack align="center" justify="center">
         <Skeleton className="bg-surface-secondary h-64 w-64" />
@@ -109,13 +112,12 @@ export function PaymentInfo({
     );
   }
 
-  log.debug('ui.payment_info.render', {
+  paymentLog.debug('ui.payment_info.render', {
     unit,
     copyTarget,
     animated: willAnimate,
     variant,
     dataLength: selectedValue.length,
-    preview: selectedValue.slice(0, 30),
   });
 
   return (

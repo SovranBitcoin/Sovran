@@ -318,7 +318,9 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
           }
         );
       } catch (error) {
-        log.error('feed.home.load_failed', { error });
+        log.error('feed.home.load_failed', {
+          message: error instanceof Error ? error.message : String(error),
+        });
         setFeedItems([]);
         setMetricsMap(new Map());
         setQuotedEventsMap(new Map());
@@ -524,7 +526,9 @@ function HomeFeedInner({ activeFilter }: HomeFeedProps) {
       );
       return newItems;
     } catch (error) {
-      log.error('feed.home.load_more_failed', { error });
+      log.error('feed.home.load_more_failed', {
+        message: error instanceof Error ? error.message : String(error),
+      });
       return [];
     } finally {
       client.close();
