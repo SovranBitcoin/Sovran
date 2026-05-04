@@ -85,20 +85,48 @@ jq -r --arg p "$TARGET" '.findings[] | select(.path == $p) | "\(input_filename|g
 SKILL="zustand-5"
 jq -r --arg s "skill:$SKILL" '.findings[] | select(.references | index($s)) | "\(input_filename|gsub(".*/"; ""))\t\(.id)\t[\(.severity)]\t\(.completion_status // "untagged")\t\(.path):\(.line)\t\(.title)"' __audits__/*.json | column -t -s $'\t'
 
-# 4.6  Update one finding's completion status + note (jq is not in-place)
+# 4.6  Update one finding's completion status + note (jq is not in-place).
+#      Also records the touched audit path to a slice-local manifest so
+#      Phase 6 can `git add -f` exactly those files (see §4.7a / §5 Phase 6).
+#      Note: `status` is read-only in zsh, so use `fstatus` etc. as locals.
+SOVRAN_FIXER_AUDIT_MANIFEST=${SOVRAN_FIXER_AUDIT_MANIFEST:-/tmp/sovran-fixer-touched-audits.txt}
+: > "$SOVRAN_FIXER_AUDIT_MANIFEST"  # truncate at start of slice
 update_audit() {
   # Usage: update_audit 52.json F-006 complete "fix landed in commit 1a2b3c4"
-  local file=__audits__/$1 id=$2 status=$3 note=${4:-}
+  local file=__audits__/$1 fid=$2 fstatus=$3 fnote=${4:-}
   if [ ! -f "$file" ]; then echo "no such audit: $file" >&2; return 1; fi
   local tmp; tmp=$(mktemp)
-  jq --arg id "$id" --arg s "$status" --arg n "$note" \
+  jq --arg id "$fid" --arg s "$fstatus" --arg n "$fnote" \
     '.findings |= map(if .id == $id then (.completion_status = $s | (if $n != "" then .completion_note = $n else . end)) else . end)' \
     "$file" > "$tmp" && mv "$tmp" "$file"
-  echo "updated $file $id -> $status"
+  echo "$file" >> "$SOVRAN_FIXER_AUDIT_MANIFEST"
+  echo "updated $file $fid -> $fstatus"
 }
 
 # 4.7  Confirm all enums round-trip (catch typos before committing audit edits)
 jq -r '.findings[] | "\(input_filename|gsub(".*/"; ""))\t\(.id)\t\(.completion_status // "untagged")"' __audits__/*.json | awk -F'\t' '$3 != "complete" && $3 != "partial" && $3 != "stale" && $3 != "deferred" && $3 != "untagged" {print}'
+
+# 4.7a Replay the slice-local audit-touched manifest. The §4.6 helper
+#      writes to it on every update_audit; this command consumes it to
+#      drive the Phase 6 `git add -f`.
+#
+#      Why -f? `__audits__/` is in .gitignore (added 2026-04-21);
+#      ~39 of 52 audits were created before that and stay tracked, but
+#      newer audits are gitignored. A bare `git add __audits__` silently
+#      drops the ignored ones, leaving completion annotations on disk
+#      only. Project convention is to force-add — that's how every
+#      tracked audit got there. The audit JSONs are review notes, not
+#      secrets; they belong in git.
+audit_files_to_commit() {
+  # Dedup, drop blanks, prove every path still exists on disk.
+  if [ ! -s "${SOVRAN_FIXER_AUDIT_MANIFEST:-/tmp/sovran-fixer-touched-audits.txt}" ]; then
+    return 0
+  fi
+  sort -u "${SOVRAN_FIXER_AUDIT_MANIFEST:-/tmp/sovran-fixer-touched-audits.txt}" \
+    | awk 'NF' \
+    | while read -r p; do [ -f "$p" ] && echo "$p"; done
+}
+audit_files_to_commit
 
 # 4.8  Compact structural-health (the score we want to drive to 100)
 bun run scripts/analyze-structure.mjs --llm | head -180
@@ -311,8 +339,18 @@ For every finding considered in this slice, set `completion_status`:
 - `stale` — already fixed before this session.
 - `deferred` — real and unfixed, not in this slice.
 
-Use §4.6 `update_audit` helper one finding at a time. Run §4.7 to confirm
-no typos slipped through.
+Use §4.6 `update_audit` helper one finding at a time — it auto-records
+the touched audit path to the slice-local manifest. Run §4.7 to confirm
+no typos slipped through. Run §4.7a to replay the manifest — that list
+is what feeds the Phase 6 `git add -f`.
+
+**About the audits gitignore.** `__audits__/` is in `.gitignore` but
+~39 of 52 audit files are tracked anyway (they predate the ignore line).
+Newer audits are ignored, so a bare `git add __audits__` skips them and
+the completion annotations vanish on the next fresh checkout. Default
+to `git add -f` in the audit-status commit — that matches how every
+tracked audit got there. The audit JSONs are review notes, not secrets;
+they belong in git.
 
 Commit in **two** commits, in order:
 
@@ -328,10 +366,26 @@ Refs: __audits__/NN.json#F-XXX, __audits__/MM.json#F-YYY
 EOF
 )"
 
-# 2. Audit-status commit (touches __audits__/*.json only)
-git add __audits__
+# 2. Audit-status commit. Force-add every annotated audit file so
+#    gitignored ones don't get silently dropped (see §4.7a).
+audit_files_to_commit | xargs -t -r git add -f --
 git commit -m "chore(audits): annotate completion status"
+
+# 3. Verify every annotated file landed in the commit. The diff MUST
+#    be empty. Any missing file means the chore commit is wrong —
+#    `git add -f` it and amend before declaring the slice done.
+diff <(audit_files_to_commit | sort -u) \
+     <(git show --name-only --format= HEAD | grep '^__audits__/' | sort -u)
 ```
+
+Hard stops:
+
+- `audit_files_to_commit` is empty after Phase 6 annotations → either
+  `update_audit` was never called or the manifest path was clobbered.
+  Re-run Phase 3 — the slice considered findings but didn't annotate them.
+- The step-3 diff is non-empty → an annotated audit didn't land in the
+  commit. Most often this is a gitignored file that was added without
+  `-f`. `git add -f <file>` and `git commit --amend --no-edit` to fix.
 
 Conventional Commits per `__research__/contribution-conventions.md`. Allowed
 scopes per `commitlint.config.cjs`. **No `Co-Authored-By:`.**
@@ -425,7 +479,11 @@ SHAs: <feature-sha>, <audit-status-sha>.
 8. Every finding considered in Phase 1–3 has its `completion_status`
    updated; §4.7 returned no rows.
 9. Two commits exist: feature + `chore(audits): annotate completion status`.
-   No `Co-Authored-By:` lines. No push.
+   No `Co-Authored-By:` lines. No push. The audit-status commit was created
+   with `git add -f` so gitignored audit files are not silently dropped
+   (see §5 Phase 6 + §4.7a). Run the §5 Phase 6 step-3 diff: every file
+   in `audit_files_to_commit` must appear in `git show --name-only HEAD`.
+   A non-empty diff between those two lists blocks the slice.
 10. The two named cross-cutting patterns ("bypasses `coco-payment-ux/`",
     "leaks sovran-app assumptions") were considered when choosing the
     slice — even if not picked, the plan says why.
