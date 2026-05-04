@@ -269,8 +269,8 @@
       "references": [],
       "verification_note": "Re-checked PopupHost.tsx:384-414. lastPayloadRef is updated unconditionally inside the render body (an anti-pattern in itself — refs should be set in effects). It is never cleared.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Different file (PopupHost), unrelated to the gate consolidation."
+      "completion_status": "complete",
+      "completion_note": "shared/blocks/popup/PopupHost.tsx now schedules lastPayloadRef.current = null ~400ms after isOpen flips false (cleared if a re-open arrives mid-window). Re-opens no longer fall back to a previous payload during the same render tick."
     },
     {
       "id": "F-010",
@@ -393,8 +393,8 @@
       "references": [],
       "verification_note": "Re-checked the file: data is typed as string | { name: string; value: string }[] (line 39). The boxed-String branch is impossible per the type signature.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Trivial dead-branch deletion in PaymentInfo; not in the gate-consolidation footprint."
+      "completion_status": "complete",
+      "completion_note": "shared/blocks/PaymentInfo.tsx selectedValue branch removed — the data prop is typed string | {name,value}[] so instanceof String could never match."
     },
     {
       "id": "F-016",
@@ -412,8 +412,8 @@
       "references": [],
       "verification_note": "Re-read handleItemPress (lines 293-302) and handleOpenChange (lines 272-291). The race is real but the right contract isn't obvious.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "ActionMenuHost contract clarification — separate concern."
+      "completion_status": "partial",
+      "completion_note": "Documented the race in ActionMenuButton.onPress JSDoc (shared/lib/popup/popups/actionMenu.ts) — overlay-tap during in-flight onPress skips onDismiss because selectedRef commits synchronously. Picked the audit's first listed option (JSDoc) since changing the dismiss-during-onPress race semantics needs UX reasoning beyond a hygiene slice."
     }
   ],
   "dimensions": {

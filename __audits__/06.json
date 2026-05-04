@@ -289,7 +289,8 @@
       ],
       "verification_note": "Re-read apiClient.ts:52,68 — confirmed still present.",
       "prior_audit_id": "F-007@01.json",
-      "completion_status": "deferred"
+      "completion_status": "stale",
+      "completion_note": "shared/lib/apiClient.ts no longer carries <T = any> defaults; fetchJson<T> uses parser-based generic and body is RequestInit['body']. The any escape hatch the prior finding tracked is gone."
     },
     {
       "id": "F-014",
