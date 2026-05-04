@@ -819,12 +819,7 @@ export function MintRebalancePlanScreen() {
             for (const url of intermediaries) {
               if (!trustedUrls.has(url)) {
                 try {
-                  try {
-                    await manager.mint.addMint(url);
-                  } catch {
-                    /* already added */
-                  }
-                  await manager.mint.trustMint(url);
+                  await manager.mint.addMint(url, { trusted: true });
                   temporarilyTrusted.push(url);
                 } catch (trustErr) {
                   cashuLog.warn('mint.rebalance.trust_failed', { url, error: trustErr });
@@ -1525,14 +1520,7 @@ export function MintRebalancePlanScreen() {
       for (const url of intermediaries) {
         if (!trustedUrls.has(url)) {
           try {
-            // addMint may throw if the mint is already added; that's fine,
-            // we just need it to exist before calling trustMint.
-            try {
-              await manager.mint.addMint(url);
-            } catch {
-              // already added — ignore
-            }
-            await manager.mint.trustMint(url);
+            await manager.mint.addMint(url, { trusted: true });
             temporarilyTrusted.push(url);
           } catch (err) {
             cashuLog.warn('mint.rebalance.trust_failed', { url, error: err });

@@ -485,10 +485,10 @@ export function MintAddScreen() {
       const results: string[] = [];
       const errors: { mintUrl: string; error: string }[] = [];
 
-      // Normalize all URLs to ensure https:// prefix before adding
-      const mintUrlsToAdd = Array.from(selectedMints).map((u) =>
-        u.startsWith('https://') || u.startsWith('http://') ? u : normalizeUrlForApi(u)
-      );
+      // Normalize all URLs to ensure https:// prefix before adding.
+      // normalizeUrlForApi strips any http(s)?:// prefix and re-prepends https://,
+      // so plaintext-http URLs from the search backend can't bypass the upgrade.
+      const mintUrlsToAdd = Array.from(selectedMints).map(normalizeUrlForApi);
 
       for (let i = 0; i < mintUrlsToAdd.length; i++) {
         const mintUrl = mintUrlsToAdd[i];
