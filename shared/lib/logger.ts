@@ -75,9 +75,10 @@ interface LoggerOptions {
   ringBufferSize?: number;
   /**
    * Dedup window in ms. When the same event name fires multiple times within
-   * this window, subsequent entries are collapsed into the first one with a
-   * `_dedup` count instead of emitting separate entries. Set to 0 to disable.
-   * Default: 50
+   * this window, subsequent debug/info entries are suppressed; once the window
+   * closes (a different event fires or the same event fires past the window)
+   * a synthetic `{ event, params: { _suppressed: N } }` summary entry is
+   * emitted. Set to 0 to disable. Default: 50
    */
   dedupWindowMs?: number;
 }
@@ -242,12 +243,31 @@ function getExpoDeviceInfo(): Record<string, unknown> {
 //   { _kind: "jwt", len: 512, preview: "eyJhbGciOi…" }
 // An LLM sees that and knows exactly what it is without wading through noise.
 
-const VERBOSE_STRING_PATTERNS: { name: string; test: (s: string) => boolean }[] = [
+// Secret patterns: a previewed prefix of these strings is itself sensitive.
+// nsec1 + bech32 prefix narrows entropy; the first 32 chars of a cashu token
+// reveal mint + denomination; PEM headers identify the key type; the JWT
+// header decodes to the algorithm + key id. summarizeString MUST NOT emit a
+// `preview` for any of these — only `{ _kind, len }`. Order: secret patterns
+// run before LONG_STRING_PATTERNS so a string that matches both (e.g. a
+// base64-shaped JWT) is classified as the secret it actually is.
+const SECRET_STRING_PATTERNS: { name: string; test: (s: string) => boolean }[] = [
+  { name: 'pem_key', test: (s) => s.includes('-----BEGIN') },
   { name: 'jwt', test: (s) => /^eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(s) },
+  { name: 'data_uri', test: (s) => /^data:[^;]+;base64,/.test(s) },
+  { name: 'connection_str', test: (s) => /^(postgres|mysql|mongodb|redis|wss?):\/\//.test(s) },
+  { name: 'nsec', test: (s) => /^nsec1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(s) },
+  { name: 'cashu_token', test: (s) => s.startsWith('cashuA') || s.startsWith('cashuB') },
+  { name: 'lightning_invoice', test: (s) => /^ln(bc|tb|tbs)[0-9a-z]{50,}/i.test(s) },
+];
+
+// Long-string patterns: previewable. These are diagnostic identifiers or
+// generic blob shapes whose first 32 chars are not themselves sensitive.
+// `npub` is split out from `nsec` here — both are bech32-encoded, but only
+// nsec is a secret. A downstream redaction policy can now distinguish them.
+const LONG_STRING_PATTERNS: { name: string; test: (s: string) => boolean }[] = [
+  { name: 'npub', test: (s) => /^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(s) },
   { name: 'base64', test: (s) => /^[A-Za-z0-9+/]{60,}={0,2}$/.test(s) },
   { name: 'hex', test: (s) => /^(0x)?[0-9a-fA-F]{40,}$/.test(s) },
-  { name: 'pem_key', test: (s) => s.includes('-----BEGIN') },
-  { name: 'data_uri', test: (s) => /^data:[^;]+;base64,/.test(s) },
   {
     name: 'uuid',
     test: (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s),
@@ -255,28 +275,27 @@ const VERBOSE_STRING_PATTERNS: { name: string; test: (s: string) => boolean }[] 
   { name: 'url', test: (s) => /^https?:\/\/.{80,}/.test(s) },
   { name: 'json_blob', test: (s) => s.length > 200 && (s[0] === '{' || s[0] === '[') },
   { name: 'xml_blob', test: (s) => s.length > 200 && s.trimStart().startsWith('<') },
-  { name: 'connection_str', test: (s) => /^(postgres|mysql|mongodb|redis|wss?):\/\//.test(s) },
-  {
-    name: 'npub_or_nsec',
-    test: (s) => /^(npub|nsec)1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(s),
-  },
-  { name: 'cashu_token', test: (s) => s.startsWith('cashuA') || s.startsWith('cashuB') },
-  { name: 'lightning_invoice', test: (s) => /^ln(bc|tb|tbs)[0-9a-z]{50,}/i.test(s) },
   { name: 'solana_pubkey', test: (s) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s) && s.length >= 32 },
 ];
 
-function detectStringType(s: string): string | null {
-  for (const pattern of VERBOSE_STRING_PATTERNS) {
-    if (pattern.test(s)) return pattern.name;
-  }
-  return null;
+type StringClass =
+  | { kind: 'secret'; name: string }
+  | { kind: 'long'; name: string }
+  | { kind: 'long'; name: 'long_string' };
+
+function classifyString(s: string): StringClass {
+  for (const p of SECRET_STRING_PATTERNS) if (p.test(s)) return { kind: 'secret', name: p.name };
+  for (const p of LONG_STRING_PATTERNS) if (p.test(s)) return { kind: 'long', name: p.name };
+  return { kind: 'long', name: 'long_string' };
 }
 
-function summarizeString(s: string, maxLen: number): unknown {
+type Compact = string | { _kind: string; len: number; preview?: string };
+
+function summarizeString(s: string, maxLen: number): Compact {
   if (s.length <= maxLen) return s;
-  const detectedType = detectStringType(s);
-  const preview = s.slice(0, 32);
-  return { _kind: detectedType ?? 'long_string', len: s.length, preview: preview + '…' };
+  const c = classifyString(s);
+  if (c.kind === 'secret') return { _kind: c.name, len: s.length };
+  return { _kind: c.name, len: s.length, preview: s.slice(0, 32) + '…' };
 }
 
 function compactValue(
@@ -500,6 +519,41 @@ interface LoggerCore {
   dedupCount: number;
 }
 
+// Push a synthetic "the previous event was suppressed N times" entry. Called
+// when the dedup window closes (a different event arrives or the same event
+// arrives past the window). Replaces the prior post-emit mutation pattern;
+// the synthetic entry is a fresh object that goes through the normal push +
+// transport path, so transports never see two distinct payloads for one
+// emitted entry.
+function flushSuppressedDedup(core: LoggerCore): void {
+  if (core.dedupCount === 0 || !core.lastEntry) return;
+  const summary: LogEntry = {
+    ts: new Date().toISOString(),
+    _t: now(),
+    level: core.lastEntry.level,
+    event: core.lastEvent,
+    src: core.lastEntry.src,
+    params: { _suppressed: core.dedupCount },
+  };
+  core.buffer.push(summary);
+  for (const transport of core.transports) {
+    try {
+      transport(summary);
+    } catch (transportError) {
+      try {
+        const reason =
+          transportError instanceof Error
+            ? `${transportError.name}: ${transportError.message}`
+            : String(transportError);
+        console.error('[logger.transport-error]', summary.event, reason);
+      } catch {
+        /* console itself failed — give up rather than crash */
+      }
+    }
+  }
+  core.dedupCount = 0;
+}
+
 export function createLogger(options: LoggerOptions = {}): Logger {
   const {
     level = IS_DEV ? 'debug' : 'warn',
@@ -538,8 +592,13 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
     if (!SHOW_LOGS || !core.enabled) return;
     if (LEVEL_SEVERITY[logLevel] < core.minSeverity) return;
 
-    // Collapse rapid-fire identical event names into a single entry with _dedup count.
-    // Warnings/errors are never deduped — you always want to see those.
+    // Collapse rapid-fire identical event names. Warnings/errors are never
+    // deduped — you always want to see those. Suppression count is tracked on
+    // the core and flushed as a synthetic summary entry when the window
+    // closes. Earlier versions mutated `core.lastEntry.params._dedup` after
+    // the entry had already been pushed to the ring buffer (and potentially
+    // serialized by transports). Mutating an emitted entry violates the
+    // "frozen once pushed" invariant — see audit 56 F-008.
     if (
       core.dedupWindowMs > 0 &&
       logLevel !== 'warn' &&
@@ -553,13 +612,13 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
         core.lastEntry
       ) {
         core.dedupCount++;
-        (core.lastEntry.params ??= {})._dedup = core.dedupCount;
         core.lastEventTime = t;
         return;
       }
+      flushSuppressedDedup(core);
       core.lastEvent = event;
       core.lastEventTime = t;
-      core.dedupCount = 1;
+      core.dedupCount = 0;
     }
 
     // Stack walk is expensive (throws+parses Error.stack). Skip outside dev
@@ -678,6 +737,8 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
       };
 
       // Key-value params as compact "k=v k2=v2" string
+      const hasKind = (v: unknown): v is { _kind: string } =>
+        typeof v === 'object' && v !== null && '_kind' in v && typeof v._kind === 'string';
       const kvParams = (params?: Record<string, unknown>, max = 6): string => {
         if (!params) return '';
         const keys = Object.keys(params);
@@ -687,7 +748,7 @@ function makeLogger(core: LoggerCore, context: Record<string, unknown>): Logger 
             .map((k) => {
               const v = params[k];
               if (v === null || v === undefined) return `${k}=null`;
-              if (typeof v === 'object' && (v as any)._kind) return `${k}=[${(v as any)._kind}]`;
+              if (hasKind(v)) return `${k}=[${v._kind}]`;
               if (typeof v === 'string' && v.length > 40) return `${k}="${v.slice(0, 37)}…"`;
               if (typeof v === 'object') return `${k}={…}`;
               return `${k}=${JSON.stringify(v)}`;

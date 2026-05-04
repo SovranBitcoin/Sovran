@@ -121,3 +121,111 @@ describe('logger production-safety hygiene (audit 56.json F-002 / F-007 / F-016 
     expect(() => stopJSThreadMonitor()).not.toThrow();
   });
 });
+
+describe('logger redaction safety (audit 56.json F-001 / F-008 / F-012)', () => {
+  function captureLog() {
+    const captured: { event: string; params?: Record<string, unknown> }[] = [];
+    const log = createLogger({
+      level: 'debug',
+      async: false,
+      transports: [(e) => captured.push({ event: e.event, params: e.params })],
+      pretty: false,
+      // Force string summarization on inputs over 8 chars so the regression
+      // test stays small. Default 120 would require artificially long inputs.
+      maxStringLength: 8,
+      dedupWindowMs: 0,
+    });
+    return { log, captured };
+  }
+
+  it('summarizeString does not preview nsec bytes (F-001)', () => {
+    const { log, captured } = captureLog();
+    const nsec = 'nsec1' + 'a'.repeat(58);
+    log.warn('keys.import', { secret: nsec });
+    const dump = JSON.stringify(captured);
+    expect(dump).not.toContain(nsec);
+    // No prefix of the secret is allowed in the dump.
+    expect(dump).not.toContain('nsec1aaaaaaaa');
+    // Classification is preserved so the dev sees what kind of value was redacted.
+    const params = captured[0].params!.secret as { _kind: string; preview?: string; len: number };
+    expect(params._kind).toBe('nsec');
+    expect(params.preview).toBeUndefined();
+    expect(params.len).toBe(nsec.length);
+  });
+
+  it('summarizeString does not preview cashu_token bytes (F-001)', () => {
+    const { log, captured } = captureLog();
+    const token = 'cashuA' + 'B'.repeat(80);
+    log.warn('cashu.receive', { token });
+    const dump = JSON.stringify(captured);
+    expect(dump).not.toContain(token);
+    expect(dump).not.toContain('cashuABBBB');
+    const p = captured[0].params!.token as { _kind: string; preview?: string };
+    expect(p._kind).toBe('cashu_token');
+    expect(p.preview).toBeUndefined();
+  });
+
+  it('summarizeString does not preview lightning_invoice bytes (F-001)', () => {
+    const { log, captured } = captureLog();
+    const invoice = 'lnbc' + '1'.repeat(120);
+    log.warn('ln.melt', { invoice });
+    const p = captured[0].params!.invoice as { _kind: string; preview?: string };
+    expect(p._kind).toBe('lightning_invoice');
+    expect(p.preview).toBeUndefined();
+  });
+
+  it('summarizeString does not preview pem_key bytes (F-001)', () => {
+    const { log, captured } = captureLog();
+    const pem = '-----BEGIN PRIVATE KEY-----\n' + 'A'.repeat(200);
+    log.warn('keys.derive', { pem });
+    const p = captured[0].params!.pem as { _kind: string; preview?: string };
+    expect(p._kind).toBe('pem_key');
+    expect(p.preview).toBeUndefined();
+  });
+
+  it('summarizeString classifies npub separately from nsec and keeps its preview (F-012)', () => {
+    const { log, captured } = captureLog();
+    const npub = 'npub1' + 'a'.repeat(58);
+    log.warn('user.show', { who: npub });
+    const p = captured[0].params!.who as { _kind: string; preview?: string };
+    expect(p._kind).toBe('npub');
+    // Public identifier — preview is fine.
+    expect(typeof p.preview).toBe('string');
+  });
+
+  it('long generic strings retain their preview (non-secret kinds)', () => {
+    const { log, captured } = captureLog();
+    const url = 'https://example.com/' + 'x'.repeat(120);
+    log.warn('http.fetch', { url });
+    const p = captured[0].params!.url as { _kind: string; preview?: string };
+    expect(p._kind).toBe('url');
+    expect(typeof p.preview).toBe('string');
+  });
+
+  it('dedup never mutates an entry already pushed to the ring buffer (F-008)', () => {
+    const log = createLogger({
+      level: 'debug',
+      async: false,
+      transports: [],
+      pretty: false,
+      dedupWindowMs: 1000,
+    });
+    log.debug('evt');
+    const firstSnapshot = JSON.parse(JSON.stringify(log.getRecentLogs()));
+    log.debug('evt');
+    log.debug('evt');
+    log.debug('evt');
+    // The originally-pushed entry must be byte-for-byte identical: dedup
+    // increments are tracked on the core, not by mutating the prior entry.
+    const after = log.getRecentLogs();
+    expect(after[0]).toEqual(firstSnapshot[0]);
+    // Suppression count is flushed when the window closes.
+    log.debug('different.event');
+    const final = log.getRecentLogs();
+    const summary = final.find(
+      (e) => e.event === 'evt' && (e.params?._suppressed as number | undefined) !== undefined
+    );
+    expect(summary).toBeDefined();
+    expect(summary?.params?._suppressed).toBe(3);
+  });
+});
