@@ -163,7 +163,9 @@
         "skill:security-review"
       ],
       "verification_note": "Still present since 10.json. Re-read L279-285 and three consumers (NostrKeysProvider cache check, CocoManager seedGetter at manager.ts, cashuMnemonic cache write).",
-      "prior_audit_id": "F-006@10.json"
+      "prior_audit_id": "F-006@10.json",
+      "completion_status": "complete",
+      "completion_note": "hashMnemonic upgraded to bytesToHex(sha256(utf8ToBytes(mnemonic))).slice(0,16); cache miss self-heals on next cold start"
     },
     {
       "id": "F-007",
@@ -206,7 +208,9 @@
         "sovran-app/shared/blocks/AppGate.tsx:28-51"
       ],
       "verification_note": "Still present since 10.json. Re-read clearAllSecureData and the caller in profileSessionOrchestrator (deleteAllProfiles). expo-secure-store still lacks listKeys.",
-      "prior_audit_id": "F-008@10.json"
+      "prior_audit_id": "F-008@10.json",
+      "completion_status": "complete",
+      "completion_note": "clearAllSecureData now unions caller-supplied keys with a persistent secure_key_index populated by every secureSet; cashuSeedKey was also missing from the caller list and was added"
     },
     {
       "id": "F-009",
@@ -246,7 +250,9 @@
         "sovran-app/shared/lib/nostr/secureStorage.ts:3"
       ],
       "verification_note": "Still present since 10.json. Re-read L85-96; no validation.",
-      "prior_audit_id": "F-010@10.json"
+      "prior_audit_id": "F-010@10.json",
+      "completion_status": "complete",
+      "completion_note": "retrieveMnemonic now calls bip39.validateMnemonic on read; corrupt blob logs nostr.secure.mnemonic_corrupt and returns null without auto-deleting"
     },
     {
       "id": "F-011",

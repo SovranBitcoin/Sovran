@@ -118,8 +118,8 @@
       ],
       "verification_note": "Re-read hashMnemonic and its three consumers (NostrKeysProvider cache check, CocoManager seedGetter cache check, cashuMnemonic cache write). Counter-argument considered: 'the cache is per-device and a collision requires restoring to a device that happens to have a stale prior install's cached blob with matching hash.' True — but app-reinstall on iOS leaves SecureStore intact (AppGate.tsx:20-49 is built on this), so the stale-blob precondition is the normal case for returning users.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Real and unfixed at hashMnemonic:240 (32-bit djb2 still in place). Considered as an alternative slice and held back along with F-003: switching to truncated SHA-256 invalidates every existing cached derived-keys entry and forces re-derivation on the next cold start (~5s PBKDF2). The audit notes the cache miss is self-healing, but it interacts with AppGate's reinstall-detect probe (10.json#F-001) and benefits from a paired pass that warms the cache before the gate runs."
+      "completion_status": "complete",
+      "completion_note": "hashMnemonic upgraded to bytesToHex(sha256(utf8ToBytes(mnemonic))).slice(0,16); cache miss self-heals on next cold start"
     },
     {
       "id": "F-006",
@@ -162,7 +162,9 @@
         "sovran-app/shared/blocks/AppGate.tsx:20-49"
       ],
       "verification_note": "Re-read clearAllSecureData and the caller in profileSessionOrchestrator. expo-secure-store docs confirm no listKeys API. Counter-argument considered: 'profileStore never drifts from SecureStore.' Migrations to the new profile shape (legacyReduxMigrations) and imported-profile failure modes (drawer/_layout.tsx:131 can storeImportedNsec then fail the addProfile step) both create drift.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "clearAllSecureData now unions caller-supplied keys with a persistent secure_key_index populated by every secureSet; cashuSeedKey was also missing from the caller list and was added"
     },
     {
       "id": "F-008",
@@ -202,7 +204,9 @@
         "sovran-app/shared/lib/nostr/secureStorage.ts:3"
       ],
       "verification_note": "Re-read L85-96. Counter-argument: 'write path validation (F-004) makes this redundant.' Not quite — historical bad writes from prior app versions still exist in SecureStore; and SecureStore itself can corrupt entries. Keep as separate finding at the read boundary.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "retrieveMnemonic now calls bip39.validateMnemonic on read; corrupt blob logs nostr.secure.mnemonic_corrupt and returns null without auto-deleting"
     },
     {
       "id": "F-010",
