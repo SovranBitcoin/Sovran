@@ -597,9 +597,17 @@ export function CocoPaymentUXProvider({ children }: { children: React.ReactNode 
       },
       getLocale: () => useSettingsStore.getState().language || 'en',
       subscribeGlobalScreenActions: (listener) => {
-        const unScan = useScanHistoryStore.subscribe(listener);
-        const unDistribution = useTransactionDistributionStore.subscribe(listener);
-        const unSettings = useSettingsStore.subscribe(listener);
+        // Only subscribe to the slices the screen-actions bridge actually
+        // reads (scan entries, distribution map, locale). Subscribing to the
+        // whole settings store re-fired the listener on every unrelated
+        // toggle (mock flags, currency, dev settings) and forced every
+        // mounted screen-action manager to re-derive availability.
+        const unScan = useScanHistoryStore.subscribe((s) => s.entries, listener);
+        const unDistribution = useTransactionDistributionStore.subscribe(
+          (s) => s.distributions,
+          listener
+        );
+        const unSettings = useSettingsStore.subscribe((s) => s.language, listener);
         return () => {
           unScan();
           unDistribution();

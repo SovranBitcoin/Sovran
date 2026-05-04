@@ -7,7 +7,7 @@
  * Melt: toast shown on confirm button → melt-op:finalized updates to confirmed.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 import { useManagerContext } from '@cashu/coco-react';
 
@@ -42,7 +42,6 @@ function shouldShowNpcReceivePopup(
 
 export function usePaymentStatusListener(): void {
   const { manager } = useManagerContext();
-  const cancelledRef = useRef(false);
 
   useEffect(() => {
     if (!manager) {
@@ -50,11 +49,10 @@ export function usePaymentStatusListener(): void {
       return;
     }
     paymentLog.info('hook.payment_status.subscribing');
-    cancelledRef.current = false;
 
     const offStateChanged = manager.on(
       'mint-op:quote-state-changed',
-      async ({ mintUrl, quoteId, state }) => {
+      ({ mintUrl, quoteId, state, operation }) => {
         paymentLog.debug('hook.payment_status.mint_quote_state_changed', {
           quoteId,
           state,
@@ -73,16 +71,11 @@ export function usePaymentStatusListener(): void {
           return;
         }
 
-        const history = await manager.history.getPaginatedHistory(0, 100);
-        if (cancelledRef.current) return;
-        const entry = history.find(
-          (h) =>
-            h.type === 'mint' && 'quoteId' in h && h.quoteId === quoteId && h.mintUrl === mintUrl
-        );
-        if (!entry || !('amount' in entry)) return;
-
-        const amount = entry.amount ?? 0;
-        const unit = entry.unit ?? 'sat';
+        // The event payload's MintOperation already carries amount/unit
+        // (MintIntentData on every state). The previous getPaginatedHistory
+        // scan blocked coco's sequential EventBus on every PAID transition.
+        const amount = operation.amount;
+        const unit = operation.unit;
 
         const existingActive = usePaymentStatusStore.getState().active;
         const isDuplicate = existingActive?.variant === 'receive' && existingActive.id === quoteId;
@@ -200,31 +193,49 @@ export function usePaymentStatusListener(): void {
       usePaymentStatusStore.getState().setConfirmed(quoteId);
     });
 
-    const offReceiveCreated = manager.on('receive-op:finalized', async ({ mintUrl, operation }) => {
-      const amount = operation.amount;
+    // The receiveEntryId enrichment used to race a 50ms setTimeout against
+    // HistoryService.handleReceiveOperationUpdated. Subscribe to the event
+    // instead — `history:updated` fires once the entry is persisted, and
+    // we narrow to `state: 'finalized'` so a prepared-state update doesn't
+    // confirm the toast prematurely.
+    const offHistoryUpdated = manager.on('history:updated', ({ mintUrl, entry }) => {
+      if (entry.type !== 'receive' || entry.state !== 'finalized') return;
+      const store = usePaymentStatusStore.getState();
+      const active = store.active;
+      if (
+        !active ||
+        active.variant !== 'receive-ecash' ||
+        active.mintUrl !== mintUrl ||
+        active.amount !== entry.amount ||
+        active.receiveEntryId ||
+        !entry.id
+      ) {
+        return;
+      }
+      paymentLog.info('hook.payment_status.receive_entry_linked', {
+        mintUrl,
+        amount: entry.amount,
+        entryId: entry.id,
+      });
+      store.setConfirmed(active.id, { receiveEntryId: entry.id });
+    });
+
+    const offReceiveCreated = manager.on('receive-op:finalized', ({ mintUrl, operation }) => {
       paymentLog.info('hook.payment_status.receive_created', {
         mintUrl,
-        amount,
+        amount: operation.amount,
         operationId: operation.id,
       });
+      // Transition the toast to 'confirmed' even if history:updated
+      // hasn't fired yet — receiveEntryId may arrive a tick later.
       const store = usePaymentStatusStore.getState();
-      const hadPending =
-        store.active?.variant === 'receive-ecash' &&
-        store.active?.amount === amount &&
-        store.active?.mintUrl === mintUrl;
-
-      if (hadPending && store.active) {
-        // Brief delay so HistoryService.handleReceiveOperationUpdated can persist the entry
-        await new Promise((r) => setTimeout(r, 50));
-        if (cancelledRef.current) return;
-        const history = await manager.history.getPaginatedHistory(0, 20);
-        if (cancelledRef.current) return;
-        const realEntry = history.find(
-          (h) => h.type === 'receive' && h.amount === amount && h.mintUrl === mintUrl
-        );
-        if (realEntry?.id) {
-          store.setConfirmed(store.active.id, { receiveEntryId: realEntry.id });
-        }
+      const active = store.active;
+      if (
+        active?.variant === 'receive-ecash' &&
+        active.mintUrl === mintUrl &&
+        active.amount === operation.amount
+      ) {
+        store.setConfirmed(active.id);
       }
     });
 
@@ -332,10 +343,10 @@ export function usePaymentStatusListener(): void {
 
     return () => {
       paymentLog.debug('hook.payment_status.unsubscribing');
-      cancelledRef.current = true;
       offStateChanged();
       offAdded();
       offRedeemed();
+      offHistoryUpdated();
       offReceiveCreated();
       offSendFinalized();
       offMeltRolledBack();

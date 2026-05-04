@@ -38,7 +38,7 @@
  */
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
@@ -91,48 +91,50 @@ const PersistedTransactionDistributionStore = z.object({
 });
 
 export const useTransactionDistributionStore = create<TransactionDistributionStore>()(
-  persist(
-    (set, get) => ({
-      // Initial state
-      distributions: {},
+  subscribeWithSelector(
+    persist(
+      (set, get) => ({
+        // Initial state
+        distributions: {},
 
-      // Actions
-      setDistribution: (key: string, source: DistributionSource) => {
-        const existing = get().distributions[key];
-        if (existing) {
-          // First-write-wins: do not overwrite a real action with a later
-          // inference (or with a duplicate of the same action).
-          storeLog.debug('store.tx_distribution.set.skipped', {
-            key,
-            source,
-            existingSource: existing.source,
-          });
-          return;
-        }
-        storeLog.debug('store.tx_distribution.set', { key, source });
-        set((state) => ({
-          distributions: {
-            ...state.distributions,
-            [key]: {
+        // Actions
+        setDistribution: (key: string, source: DistributionSource) => {
+          const existing = get().distributions[key];
+          if (existing) {
+            // First-write-wins: do not overwrite a real action with a later
+            // inference (or with a duplicate of the same action).
+            storeLog.debug('store.tx_distribution.set.skipped', {
+              key,
               source,
-              recordedAt: Date.now(),
+              existingSource: existing.source,
+            });
+            return;
+          }
+          storeLog.debug('store.tx_distribution.set', { key, source });
+          set((state) => ({
+            distributions: {
+              ...state.distributions,
+              [key]: {
+                source,
+                recordedAt: Date.now(),
+              },
             },
-          },
-        }));
-      },
+          }));
+        },
 
-      getDistribution: (key: string) => {
-        return get().distributions[key] ?? null;
-      },
-    }),
-    persistConfig({
-      name: 'transaction-distribution-store',
-      storage: createProfileScopedStorage(),
-      schema: PersistedTransactionDistributionStore,
-      logKey: 'tx_distribution',
-      partialize: (state) => ({
-        distributions: state.distributions,
+        getDistribution: (key: string) => {
+          return get().distributions[key] ?? null;
+        },
       }),
-    })
+      persistConfig({
+        name: 'transaction-distribution-store',
+        storage: createProfileScopedStorage(),
+        schema: PersistedTransactionDistributionStore,
+        logKey: 'tx_distribution',
+        partialize: (state) => ({
+          distributions: state.distributions,
+        }),
+      })
+    )
   )
 );

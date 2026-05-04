@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { z } from 'zod';
 import { isBackgroundImageTheme } from 'config/backgroundImageThemes';
@@ -200,170 +200,172 @@ interface SettingsActions {
 type SettingsStore = SettingsState & SettingsActions;
 
 export const useSettingsStore = create<SettingsStore>()(
-  persist(
-    (set, get) => ({
-      ...DEFAULT_SETTINGS,
-      passcode: '',
+  subscribeWithSelector(
+    persist(
+      (set, get) => ({
+        ...DEFAULT_SETTINGS,
+        passcode: '',
 
-      // Language
-      setLanguage: (language: string) => {
-        storeLog.info('store.settings.set_language', { language });
-        set({ language });
-      },
-      getLanguage: () => get().language,
+        // Language
+        setLanguage: (language: string) => {
+          storeLog.info('store.settings.set_language', { language });
+          set({ language });
+        },
+        getLanguage: () => get().language,
 
-      // Display
-      setDisplayBtc: (display: number) => {
-        storeLog.info('store.settings.set_display_btc', { display });
-        set({ displayBtc: display });
-      },
-      getDisplayBtc: () => get().displayBtc,
-      setDisplayCurrency: (currency: DisplayCurrency) => {
-        storeLog.info('store.settings.set_display_currency', { currency });
-        set({ displayCurrency: currency });
-      },
-      getDisplayCurrency: () => get().displayCurrency,
+        // Display
+        setDisplayBtc: (display: number) => {
+          storeLog.info('store.settings.set_display_btc', { display });
+          set({ displayBtc: display });
+        },
+        getDisplayBtc: () => get().displayBtc,
+        setDisplayCurrency: (currency: DisplayCurrency) => {
+          storeLog.info('store.settings.set_display_currency', { currency });
+          set({ displayCurrency: currency });
+        },
+        getDisplayCurrency: () => get().displayCurrency,
 
-      // Passcode (never persisted)
-      setPasscode: (passcode: string) => {
-        storeLog.info('store.settings.set_passcode');
-        set({ passcode });
-      },
-      getPasscode: () => get().passcode,
-      clearPasscode: () => {
-        storeLog.info('store.settings.clear_passcode');
-        set({ passcode: '' });
-      },
+        // Passcode (never persisted)
+        setPasscode: (passcode: string) => {
+          storeLog.info('store.settings.set_passcode');
+          set({ passcode });
+        },
+        getPasscode: () => get().passcode,
+        clearPasscode: () => {
+          storeLog.info('store.settings.clear_passcode');
+          set({ passcode: '' });
+        },
 
-      // Experimental
-      setExperimental: (experimental: boolean) => {
-        storeLog.info('store.settings.set_experimental', { experimental });
-        set({ experimental });
-      },
-      getExperimental: () => get().experimental,
+        // Experimental
+        setExperimental: (experimental: boolean) => {
+          storeLog.info('store.settings.set_experimental', { experimental });
+          set({ experimental });
+        },
+        getExperimental: () => get().experimental,
 
-      // Mock mode — lazy-import to avoid circular dependency at module load time
-      setMockMode: (enabled: boolean) => {
-        storeLog.info('store.settings.set_mock_mode', { enabled });
-        const { useMockDataStore } = require('../runtime/mockDataStore') as {
-          useMockDataStore: { getState: () => { activate: () => void; deactivate: () => void } };
-        };
-        if (enabled) {
-          useMockDataStore.getState().activate();
-        } else {
-          useMockDataStore.getState().deactivate();
-        }
-        set({ mockMode: enabled });
-      },
-      getMockMode: () => get().mockMode,
-      setMockOffline: (enabled: boolean) => {
-        storeLog.info('store.settings.set_mock_offline', { enabled });
-        set({ mockOffline: enabled });
-      },
-      getMockOffline: () => get().mockOffline,
-      setMockFailSend: (enabled: boolean) => {
-        storeLog.info('store.settings.set_mock_fail_send', { enabled });
-        set({ mockFailSend: enabled });
-      },
-      getMockFailSend: () => get().mockFailSend,
-      setMockFailMelt: (enabled: boolean) => {
-        storeLog.info('store.settings.set_mock_fail_melt', { enabled });
-        set({ mockFailMelt: enabled });
-      },
-      getMockFailMelt: () => get().mockFailMelt,
-      setMockFailPaymentRequest: (enabled: boolean) => {
-        storeLog.info('store.settings.set_mock_fail_payment_request', { enabled });
-        set({ mockFailPaymentRequest: enabled });
-      },
-      getMockFailPaymentRequest: () => get().mockFailPaymentRequest,
-      setMockNoGlass: (enabled: boolean) => {
-        storeLog.info('store.settings.set_mock_no_glass', { enabled });
-        set({ mockNoGlass: enabled });
-      },
-      getMockNoGlass: () => get().mockNoGlass,
-
-      // Terms
-      acceptTerms: (date: string) => {
-        storeLog.info('store.settings.accept_terms', { date });
-        set({ termsAccepted: { termsAccepted: true, date } });
-      },
-      getTermsAccepted: () => get().termsAccepted,
-      isTermsAccepted: () => get().termsAccepted?.termsAccepted === true,
-
-      // Onboarding
-      completeOnboarding: () => {
-        storeLog.info('store.settings.complete_onboarding');
-        set({ hasSeenOnboarding: true });
-      },
-
-      // P2PK
-      setQuickAccessP2PK: (enabled: boolean) => {
-        storeLog.info('store.settings.set_quick_access_p2pk', { enabled });
-        set({ quickAccessP2PK: enabled });
-      },
-      getQuickAccessP2PK: () => get().quickAccessP2PK,
-      setRegenerateP2PKOnReceive: (enabled: boolean) => {
-        storeLog.info('store.settings.set_regenerate_p2pk', { enabled });
-        set({ regenerateP2PKOnReceive: enabled });
-      },
-      getRegenerateP2PKOnReceive: () => get().regenerateP2PKOnReceive,
-
-      // Location stamping
-      setSendLocationEnabled: (enabled: boolean) => {
-        storeLog.info('store.settings.set_send_location', { enabled });
-        set({ sendLocationEnabled: enabled });
-      },
-      getSendLocationEnabled: () => get().sendLocationEnabled,
-
-      // Rebalancing
-      setMinTransferThreshold: (sats: number) => {
-        storeLog.info('store.settings.set_min_transfer_threshold', { sats });
-        set({ minTransferThreshold: sats });
-      },
-      getMinTransferThreshold: () => get().minTransferThreshold,
-
-      // Middleman routing
-      setMiddlemanRouting: (settings) => {
-        storeLog.info('store.settings.set_middleman_routing', { settings });
-        set((state) => ({
-          middlemanRouting: { ...state.middlemanRouting, ...settings },
-        }));
-      },
-      getMiddlemanRouting: () => get().middlemanRouting,
-    }),
-    persistConfig({
-      name: 'settings-store',
-      storage: AsyncStorage,
-      schema: PersistedSettings,
-      partialize: (state) => ({
-        language: state.language,
-        displayBtc: state.displayBtc,
-        displayCurrency: state.displayCurrency,
-        experimental: state.experimental,
-        mockMode: state.mockMode,
-        mockOffline: state.mockOffline,
-        mockFailSend: state.mockFailSend,
-        mockFailMelt: state.mockFailMelt,
-        mockFailPaymentRequest: state.mockFailPaymentRequest,
-        mockNoGlass: state.mockNoGlass,
-        termsAccepted: state.termsAccepted,
-        hasSeenOnboarding: state.hasSeenOnboarding,
-        quickAccessP2PK: state.quickAccessP2PK,
-        regenerateP2PKOnReceive: state.regenerateP2PKOnReceive,
-        sendLocationEnabled: state.sendLocationEnabled,
-        minTransferThreshold: state.minTransferThreshold,
-        middlemanRouting: state.middlemanRouting,
-      }),
-      afterHydrate: (state, error) => {
-        if (error) return;
-        if (state?.mockMode) {
+        // Mock mode — lazy-import to avoid circular dependency at module load time
+        setMockMode: (enabled: boolean) => {
+          storeLog.info('store.settings.set_mock_mode', { enabled });
           const { useMockDataStore } = require('../runtime/mockDataStore') as {
-            useMockDataStore: { getState: () => { activate: () => void } };
+            useMockDataStore: { getState: () => { activate: () => void; deactivate: () => void } };
           };
-          useMockDataStore.getState().activate();
-        }
-      },
-    })
+          if (enabled) {
+            useMockDataStore.getState().activate();
+          } else {
+            useMockDataStore.getState().deactivate();
+          }
+          set({ mockMode: enabled });
+        },
+        getMockMode: () => get().mockMode,
+        setMockOffline: (enabled: boolean) => {
+          storeLog.info('store.settings.set_mock_offline', { enabled });
+          set({ mockOffline: enabled });
+        },
+        getMockOffline: () => get().mockOffline,
+        setMockFailSend: (enabled: boolean) => {
+          storeLog.info('store.settings.set_mock_fail_send', { enabled });
+          set({ mockFailSend: enabled });
+        },
+        getMockFailSend: () => get().mockFailSend,
+        setMockFailMelt: (enabled: boolean) => {
+          storeLog.info('store.settings.set_mock_fail_melt', { enabled });
+          set({ mockFailMelt: enabled });
+        },
+        getMockFailMelt: () => get().mockFailMelt,
+        setMockFailPaymentRequest: (enabled: boolean) => {
+          storeLog.info('store.settings.set_mock_fail_payment_request', { enabled });
+          set({ mockFailPaymentRequest: enabled });
+        },
+        getMockFailPaymentRequest: () => get().mockFailPaymentRequest,
+        setMockNoGlass: (enabled: boolean) => {
+          storeLog.info('store.settings.set_mock_no_glass', { enabled });
+          set({ mockNoGlass: enabled });
+        },
+        getMockNoGlass: () => get().mockNoGlass,
+
+        // Terms
+        acceptTerms: (date: string) => {
+          storeLog.info('store.settings.accept_terms', { date });
+          set({ termsAccepted: { termsAccepted: true, date } });
+        },
+        getTermsAccepted: () => get().termsAccepted,
+        isTermsAccepted: () => get().termsAccepted?.termsAccepted === true,
+
+        // Onboarding
+        completeOnboarding: () => {
+          storeLog.info('store.settings.complete_onboarding');
+          set({ hasSeenOnboarding: true });
+        },
+
+        // P2PK
+        setQuickAccessP2PK: (enabled: boolean) => {
+          storeLog.info('store.settings.set_quick_access_p2pk', { enabled });
+          set({ quickAccessP2PK: enabled });
+        },
+        getQuickAccessP2PK: () => get().quickAccessP2PK,
+        setRegenerateP2PKOnReceive: (enabled: boolean) => {
+          storeLog.info('store.settings.set_regenerate_p2pk', { enabled });
+          set({ regenerateP2PKOnReceive: enabled });
+        },
+        getRegenerateP2PKOnReceive: () => get().regenerateP2PKOnReceive,
+
+        // Location stamping
+        setSendLocationEnabled: (enabled: boolean) => {
+          storeLog.info('store.settings.set_send_location', { enabled });
+          set({ sendLocationEnabled: enabled });
+        },
+        getSendLocationEnabled: () => get().sendLocationEnabled,
+
+        // Rebalancing
+        setMinTransferThreshold: (sats: number) => {
+          storeLog.info('store.settings.set_min_transfer_threshold', { sats });
+          set({ minTransferThreshold: sats });
+        },
+        getMinTransferThreshold: () => get().minTransferThreshold,
+
+        // Middleman routing
+        setMiddlemanRouting: (settings) => {
+          storeLog.info('store.settings.set_middleman_routing', { settings });
+          set((state) => ({
+            middlemanRouting: { ...state.middlemanRouting, ...settings },
+          }));
+        },
+        getMiddlemanRouting: () => get().middlemanRouting,
+      }),
+      persistConfig({
+        name: 'settings-store',
+        storage: AsyncStorage,
+        schema: PersistedSettings,
+        partialize: (state) => ({
+          language: state.language,
+          displayBtc: state.displayBtc,
+          displayCurrency: state.displayCurrency,
+          experimental: state.experimental,
+          mockMode: state.mockMode,
+          mockOffline: state.mockOffline,
+          mockFailSend: state.mockFailSend,
+          mockFailMelt: state.mockFailMelt,
+          mockFailPaymentRequest: state.mockFailPaymentRequest,
+          mockNoGlass: state.mockNoGlass,
+          termsAccepted: state.termsAccepted,
+          hasSeenOnboarding: state.hasSeenOnboarding,
+          quickAccessP2PK: state.quickAccessP2PK,
+          regenerateP2PKOnReceive: state.regenerateP2PKOnReceive,
+          sendLocationEnabled: state.sendLocationEnabled,
+          minTransferThreshold: state.minTransferThreshold,
+          middlemanRouting: state.middlemanRouting,
+        }),
+        afterHydrate: (state, error) => {
+          if (error) return;
+          if (state?.mockMode) {
+            const { useMockDataStore } = require('../runtime/mockDataStore') as {
+              useMockDataStore: { getState: () => { activate: () => void } };
+            };
+            useMockDataStore.getState().activate();
+          }
+        },
+      })
+    )
   )
 );
 

@@ -11,7 +11,7 @@
  */
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, subscribeWithSelector } from 'zustand/middleware';
 import { z } from 'zod';
 import { createProfileScopedStorage } from '@/shared/lib/cashu/profileScopedStorage';
 import { storeLog } from '@/shared/lib/logger';
@@ -89,69 +89,71 @@ const PersistedScanHistoryStore = z.object({
 const generateId = () => `scan-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
 export const useScanHistoryStore = create<ScanHistoryStore>()(
-  persist(
-    (set) => ({
-      entries: [],
+  subscribeWithSelector(
+    persist(
+      (set) => ({
+        entries: [],
 
-      addScan: (
-        raw: string,
-        processed: string,
-        type: ScanType,
-        source: ScanSource,
-        inputType?: string,
-        container?: string,
-        optionKinds?: string[]
-      ) => {
-        storeLog.info('store.scan_history.add', { type, source, inputType, container });
-        const now = Date.now();
+        addScan: (
+          raw: string,
+          processed: string,
+          type: ScanType,
+          source: ScanSource,
+          inputType?: string,
+          container?: string,
+          optionKinds?: string[]
+        ) => {
+          storeLog.info('store.scan_history.add', { type, source, inputType, container });
+          const now = Date.now();
 
-        set((state) => {
-          const existingIndex = state.entries.findIndex((entry) => entry.raw === raw);
-          if (existingIndex !== -1) {
-            const updated = [...state.entries];
-            updated[existingIndex] = {
-              ...updated[existingIndex],
+          set((state) => {
+            const existingIndex = state.entries.findIndex((entry) => entry.raw === raw);
+            if (existingIndex !== -1) {
+              const updated = [...state.entries];
+              updated[existingIndex] = {
+                ...updated[existingIndex],
+                source,
+                scannedAt: now,
+                ...(inputType != null && { inputType }),
+                ...(container != null && { container }),
+                ...(optionKinds != null && { optionKinds }),
+              };
+              return { entries: updated };
+            }
+            const newEntry: ScanHistoryEntry = {
+              id: generateId(),
+              raw,
+              processed,
+              type,
               source,
-              scannedAt: now,
               ...(inputType != null && { inputType }),
               ...(container != null && { container }),
               ...(optionKinds != null && { optionKinds }),
+              scannedAt: now,
             };
+            return { entries: [...state.entries, newEntry] };
+          });
+        },
+
+        linkTransaction: (processed: string, transactionId: string) => {
+          if (!processed || !transactionId) return;
+          storeLog.debug('store.scan_history.link_transaction', { transactionId });
+
+          set((state) => {
+            const index = state.entries.findIndex((entry) => entry.processed === processed);
+            if (index === -1) return state;
+            const updated = [...state.entries];
+            updated[index] = { ...updated[index], transactionId };
             return { entries: updated };
-          }
-          const newEntry: ScanHistoryEntry = {
-            id: generateId(),
-            raw,
-            processed,
-            type,
-            source,
-            ...(inputType != null && { inputType }),
-            ...(container != null && { container }),
-            ...(optionKinds != null && { optionKinds }),
-            scannedAt: now,
-          };
-          return { entries: [...state.entries, newEntry] };
-        });
-      },
-
-      linkTransaction: (processed: string, transactionId: string) => {
-        if (!processed || !transactionId) return;
-        storeLog.debug('store.scan_history.link_transaction', { transactionId });
-
-        set((state) => {
-          const index = state.entries.findIndex((entry) => entry.processed === processed);
-          if (index === -1) return state;
-          const updated = [...state.entries];
-          updated[index] = { ...updated[index], transactionId };
-          return { entries: updated };
-        });
-      },
-    }),
-    persistConfig({
-      name: 'scan-history-store',
-      storage: profileStorage,
-      schema: PersistedScanHistoryStore,
-      partialize: (state) => ({ entries: state.entries }),
-    })
+          });
+        },
+      }),
+      persistConfig({
+        name: 'scan-history-store',
+        storage: profileStorage,
+        schema: PersistedScanHistoryStore,
+        partialize: (state) => ({ entries: state.entries }),
+      })
+    )
   )
 );
