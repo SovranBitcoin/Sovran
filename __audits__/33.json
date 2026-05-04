@@ -183,7 +183,9 @@
         "skill:nostr"
       ],
       "verification_note": "Re-read the subscription filter. No `since`. Counter-argument: 'maybe NDK adds a default since automatically'. Read NDK source — fetchEvents and subscribe pass filters through verbatim; no implicit since. Confirmed.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useWhitenoiseInbox now persists a per-account InboxCursor (Math.max-ratcheted lastSeenAt) and passes since: cursor - 60s on subsequent cold starts. First cold start keeps the full-backfill behaviour so existing users don't drop pre-cursor invites; subsequent starts bound the kind-1059 download. Namespace WhitenoiseNamespace.InboxCursor added; AsyncStorageKVBackend<number> handles the persisted shape via the existing envelope."
     },
     {
       "id": "F-006",
@@ -365,7 +367,9 @@
         "features/whitenoise/hooks/useWhitenoiseSetup.ts:47-58"
       ],
       "verification_note": "Re-read. The flicker is real, the impact is small.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "useWhitenoiseSetup listener handlers (keyPackageAdded/Removed) now apply functional setKeyPackageCount deltas instead of calling refresh(). isLoading no longer flashes on every key-package event; the action button stays enabled mid-bootstrap. The mount-time refresh() and any future explicit refresh() retain the loud loading path."
     },
     {
       "id": "F-014",

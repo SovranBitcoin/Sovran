@@ -227,7 +227,9 @@
         "nips/60.md"
       ],
       "verification_note": "Re-read accept/decline (lines 74-133). UNVERIFIED for the specific MLS-state outcome of double-joinGroupFromWelcome — depends on @internet-privacy/marmot-ts internals (upstream). Confidence 0.7 reflects this. The structural race is self-evident from source per <log_doctor_integration> rules so the finding is kept rather than dropped.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "stale",
+      "completion_note": "Re-verified at useWhitenoiseRequests.ts:138-139 — useSingleFlight(acceptInner) and useSingleFlight(declineInner) are wired (commit 4249c89b). The structural race the audit flagged is closed by the cross-render single-flight guard the audit suggested as the better fix."
     },
     {
       "id": "F-009",

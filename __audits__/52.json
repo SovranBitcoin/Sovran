@@ -325,7 +325,8 @@
       ],
       "verification_note": "Re-checked at lines 50-58 (listeners) and 80-82 (loop). TARGET_KEY_PACKAGE_COUNT=2 confirmed at line 8. Worst-case 3 count() calls per bootstrap.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "complete",
+      "completion_note": "Closed by the same useWhitenoiseSetup change that resolved 33.json#F-013. The bootstrap loop's create() calls now drive listener-side count deltas locally instead of firing one count() RPC per create(); a clean 2-create bootstrap drops from 3 count() reads to 1 (mount). N+1 read storm gone."
     },
     {
       "id": "F-016",
@@ -365,7 +366,8 @@
       ],
       "verification_note": "Re-checked: useWhitenoiseInbox.ts:42-47 (try/catch fallback) vs useWhitenoiseDM.ts:199-200 (no catch on inboxRelays line). Verified divergence.",
       "prior_audit_id": null,
-      "completion_status": "deferred"
+      "completion_status": "stale",
+      "completion_note": "Re-verified at features/whitenoise/client/network.ts:168-179 — resolveInboxRelays helper exists with try/catch fallback, and both useWhitenoiseInbox.ts:38 and useWhitenoiseDM.ts:204 call it. Divergence is closed."
     },
     {
       "id": "F-019",
