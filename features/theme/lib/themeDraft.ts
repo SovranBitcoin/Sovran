@@ -11,11 +11,11 @@
 import { create } from 'zustand';
 import type { UnitId, ThemeName, ThemeMode } from '@/shared/stores/profile/themeStore';
 import { useThemeStore } from '@/shared/stores/profile/themeStore';
+import { PROFILE_PRIMARY_UNIT_ID } from '@/shared/lib/theme/builtinAlbums';
 import {
-  BUILTIN_COLORS_ALBUM_SLUG,
-  BUILTIN_COLOR_THEME_NAMES,
-  PROFILE_PRIMARY_UNIT_ID,
-} from '@/shared/lib/theme/builtinAlbums';
+  getCatalogThemesForAlbum,
+  resolveUnitWallpaper,
+} from '@/shared/lib/theme/resolveUnitWallpaper';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { log } from '@/shared/lib/logger';
 
@@ -65,18 +65,9 @@ function snapshotFromStore(): Pick<ThemeDraftState, 'activeAlbumSlug' | 'unitWal
   };
 }
 
-function distributeFromAlbum(
-  albumSlug: string,
-  unitIds: UnitId[],
-): Record<UnitId, ThemeName> {
+function distributeFromAlbum(albumSlug: string, unitIds: UnitId[]): Record<UnitId, ThemeName> {
   const catalog = useWallpaperStore.getState().catalog;
-  const pool =
-    albumSlug === BUILTIN_COLORS_ALBUM_SLUG
-      ? [...BUILTIN_COLOR_THEME_NAMES]
-      : catalog
-          .filter((w) => w.albumSlug === albumSlug)
-          .sort((a, b) => b.createdAt - a.createdAt)
-          .map((w) => w.themeName);
+  const pool = getCatalogThemesForAlbum(catalog, albumSlug);
 
   if (pool.length === 0 || unitIds.length === 0) {
     log.warn('theme.draft.album_empty', { albumSlug, poolSize: pool.length });
@@ -148,7 +139,9 @@ export const useThemeDraft = create<ThemeDraftStore>((set, get) => ({
   resolveUnitTheme: (unitId) => {
     const { unitWallpapers } = get();
     if (unitWallpapers[unitId]) return unitWallpapers[unitId];
-    return useThemeStore.getState().getUnitWallpaper(unitId);
+    const themeState = useThemeStore.getState();
+    const catalog = useWallpaperStore.getState().catalog;
+    return resolveUnitWallpaper(unitId, themeState, catalog);
   },
 
   resetDraft: () => {

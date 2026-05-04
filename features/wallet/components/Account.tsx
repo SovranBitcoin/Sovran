@@ -7,7 +7,7 @@ import { BitcoinMaskIcon, DollarMaskIcon, EuroMaskIcon, PoundMaskIcon } from 'as
 import { PrimaryBalance } from '@/features/wallet/components/PrimaryBalance';
 
 import { isBackgroundImageTheme } from '@/shared/stores/global/settingsStore';
-import { useUnitWallpaper } from '@/shared/providers/ProfileWallpaperProvider';
+import { useUnitWallpaper } from '@/shared/lib/theme/useUnitWallpaper';
 import { Log } from '@/shared/lib/logger';
 
 interface AccountData {

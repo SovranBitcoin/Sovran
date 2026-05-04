@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { useWallpaperStore } from '@/shared/stores/global/wallpaperStore';
 import { useThemeStore, type ThemeMode } from '@/shared/stores/profile/themeStore';
+import { useUnitWallpaper } from '@/shared/lib/theme/useUnitWallpaper';
 import { THEMES, THEME_NAMES, type ThemeName } from '@/themes';
 import { log, initLog, useInitMount } from '@/shared/lib/logger';
 
@@ -36,12 +37,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // lower in the tree. Gating ThemeProvider on themeStore._hasHydrated
   // here would deadlock the splash screen.
   const wallpaperHydrated = useWallpaperStore((s) => s._hasHydrated);
-  // Run the resolver inside the selector so the chrome theme is derived
-  // straight from store state. The selector re-runs on every themeStore
-  // change, but Zustand only triggers a render when the resolved primitive
-  // (a ThemeName string) actually changes — flipping a unit other than the
-  // first override no longer re-renders the whole provider subtree.
-  const currentTheme = useThemeStore((s) => s.getUnitWallpaper());
+  // Resolve the chrome theme via the shared resolver hook, which subscribes
+  // to themeStore (unitWallpapers + activeAlbumSlug) and wallpaperStore
+  // (catalog) and walks the fallback chain. Re-renders when any of those
+  // references change.
+  const currentTheme = useUnitWallpaper();
   const mode = useThemeStore((s) => s.mode);
 
   const lastApplied = useRef<string | null>(null);
