@@ -145,8 +145,8 @@
       ],
       "verification_note": "Re-checked at lines 112–178; counter-argument 'iOS URL-encodes the input' considered — iOS does encode but does not refuse protocol-relative `//host` constructions. Instagram redirect surface is real.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Security/URL-guard concern — distinct seam from canonical-primitive consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "openExternalUrl helper enforces http/https/mailto/tel allowlist; MerchantDetailScreen routes BTCMap-supplied strings through it"
     },
     {
       "id": "F-004",
@@ -407,8 +407,8 @@
       ],
       "verification_note": "Confirmed all six call sites.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Error-handling cleanup; outside the canonical-primitive consolidation slice."
+      "completion_status": "complete",
+      "completion_note": "Linking call sites now return ResultAsync via openExternalUrl; MerchantDetailScreen.handleOpenURL surfaces failures via openLinkFailedPopup"
     },
     {
       "id": "F-016",

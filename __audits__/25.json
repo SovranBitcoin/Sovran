@@ -229,7 +229,9 @@
         "skill:security-review"
       ],
       "verification_note": "Re-read L428-448. Counter-argument: mint operator is trusted by definition — partially true, but mints displayed as 'untrusted' via `fromScan` / `fromAccepter` flows also render contact rows, and even trusted mints can be compromised upstream.",
-      "prior_audit_id": null
+      "prior_audit_id": null,
+      "completion_status": "complete",
+      "completion_note": "MintInfoScreen contact press now scheme-validates via openExternalUrl; falls back to clipboard on validation/open failure with explicit reason logging"
     },
     {
       "id": "F-010",
