@@ -1,71 +1,126 @@
 # codereview/
 
-Tooling and prompts for code-quality review. Three CLIs that produce
-machine-readable signals, two prompts that drive the review/fix workflow.
+Tooling and prompts for code-quality review.
 
 ```
 codereview/
-├── audit.md           # read-only review prompt — produces __audits__/NN.json
-├── fix.md             # write-capable counterpart — turns audits into PR-sized diffs
-├── analyze-structure/ # repo-wide structural metrics (fan-in, cycles, complexity, …)
-├── lookalikes/        # cross-file declaration similarity (collisions, near-matches)
-├── log-doctor/        # session-log preprocessing for LLM debugging
-└── shared/            # ignore lists, source utils, walker, ANSI, args
+├── audit.md             # read-only review prompt — produces __audits__/NN.json
+├── fix.md               # write-capable counterpart — turns audits into PR-sized diffs
+├── analyze-structure/   # repo-wide structural metrics + lookalikes subcommand
+│   ├── index.mjs              # CLI dispatch + structural reports
+│   ├── lookalikes-mode.mjs    # `lookalikes` subcommand entry
+│   ├── extract.mjs            # exports / imports / identifiers
+│   └── metrics.mjs            # LOC, complexity, type-smells, components, depth
+├── log-doctor/          # session-log preprocessing for LLM debugging
+│   ├── index.ts               # CLI dispatch + 18 modes
+│   └── test-dsl/              # phone-test runner used by `phone` mode
+└── shared/              # ignore lists, source utils, walker, ANSI, args
+    ├── ignore.mjs       # IGNORE_DIRS, IGNORE_FILES, TS_EXTS, isTestPath
+    ├── walk.mjs         # walkFiles
+    ├── source.mjs       # stripCodeNoise, findMatchingBrace, line-index helpers
+    ├── ansi.mjs         # dim/bold/yellow/red/green/cyan/magenta
+    └── args.mjs         # getNumericArg, getStringArg
 ```
 
-The three scripts share `shared/` for ignore lists, `stripCodeNoise`,
-the file walker, ANSI colors, and CLI helpers. `npm run
-analyze-structure` and `npm run log-doctor` invoke them by their
-canonical paths under `codereview/`.
+`npm run audit`, `npm run fix`, `npm run analyze-structure`, and
+`npm run log-doctor` invoke these by their canonical paths. There are no
+`scripts/` shims — paths in audit.md / fix.md / commands below match
+exactly what gets run.
+
+## Common conventions
+
+These hold across all three tools so you don't have to re-derive flag
+shapes per tool.
+
+| Convention                     | What it means                                                                                                                                                              |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Positional first arg**       | Scopes the run. For `analyze-structure` and its `lookalikes` subcommand, it's a path (subtree to scan). For `log-doctor`, it's a mode name (`stats`, `errors`, `slow`, …). |
+| `--json`                       | Machine-readable output — present everywhere. Pipe through `jq` to filter.                                                                                                 |
+| Compact output for LLM context | `analyze-structure --llm` (~5K tokens), `log-doctor full --format md` (~6K).                                                                                               |
+| `--no-<report>`                | Suppress a default-on report to compress output.                                                                                                                           |
+| `--<threshold> N`              | Numeric tuning flag. Each tool documents its set below.                                                                                                                    |
+
+Output too large to reason with? Pipe through `head -200`, narrow with
+grep, or scope harder. Never paste raw 100k-line output into a finding,
+slice plan, or commit message.
 
 ## When to reach for which
 
-| Symptom or question                               | Tool                | Mode / flag                     |
-| ------------------------------------------------- | ------------------- | ------------------------------- |
-| "Where should we refactor next?"                  | `analyze-structure` | `--llm` (score block)           |
-| "Which files are too coupled?"                    | `analyze-structure` | default — fanin/coupling/cycles |
-| "Where are the duplicate names?"                  | `lookalikes`        | default reports                 |
-| "Two values look the same — are they?"            | `lookalikes`        | `--by-value '#FF0000'`          |
-| "What's `red` defined as in this repo?"           | `lookalikes`        | `--by-name red`                 |
-| "Did this file change touch any near-duplicates?" | `lookalikes`        | `--focus path/to/file.ts`       |
-| "What broke in the last session?"                 | `log-doctor`        | `errors --latest --context 5`   |
-| "Why is the app slow on launch?"                  | `log-doctor`        | `startup --latest`              |
-| "What screens did the user hit before crashing?"  | `log-doctor`        | `screens --latest`              |
-| "Is there a memory leak?"                         | `log-doctor`        | `gc --latest`                   |
-| "Which mode fits in my context window?"           | `log-doctor`        | `budget`                        |
+| Symptom or question                               | Tool                           | Mode / flag                     |
+| ------------------------------------------------- | ------------------------------ | ------------------------------- |
+| "Where should we refactor next?"                  | `analyze-structure`            | `--llm` (score block)           |
+| "Which files are too coupled?"                    | `analyze-structure`            | default — fanin/coupling/cycles |
+| "Where are the duplicate names?"                  | `analyze-structure lookalikes` | default reports                 |
+| "Two values look the same — are they?"            | `analyze-structure lookalikes` | `--by-value '#FF0000'`          |
+| "What's `red` defined as in this repo?"           | `analyze-structure lookalikes` | `--by-name red`                 |
+| "Did this file change touch any near-duplicates?" | `analyze-structure lookalikes` | `--focus path/to/file.ts`       |
+| "What broke in the last session?"                 | `log-doctor`                   | `errors --latest --context 5`   |
+| "Why is the app slow on launch?"                  | `log-doctor`                   | `startup --latest`              |
+| "What screens did the user hit before crashing?"  | `log-doctor`                   | `screens --latest`              |
+| "Is there a memory leak?"                         | `log-doctor`                   | `gc --latest`                   |
+| "Which mode fits in my context window?"           | `log-doctor`                   | `budget`                        |
 
-## Dense-output recipes
+## analyze-structure
 
-Every recipe below is sized for an LLM context window. Token estimates are
-approximate — actual output scales with repo size / log volume.
+Repo-wide structural metrics. One CLI, two modes:
 
-### analyze-structure
+- **default** — structural / depth / quality / symbol / concept reports plus
+  the `--llm` compact summary (which includes the structural-health score).
+- **`lookalikes` subcommand** — cross-file declaration similarity reports
+  (name collisions, value collisions, color near-matches, name similarities,
+  focus / by-name / by-value / inventory lookups).
+
+Both share the file walker, source utilities, and ignore lists from
+`shared/`. The default mode also pulls per-file metrics from
+`metrics.mjs` and structural extraction from `extract.mjs`.
+
+### Dense-output recipes
 
 ```bash
-# 1. Score block only — lowest-cost signal, ~300 tokens.
-#    Use this when picking a slice or judging "did the refactor help?"
+# 1. Score block only (~300 tokens) — pick a slice, judge "did this help?"
 node codereview/analyze-structure/index.mjs --llm | sed -n '/^Overall:/,/^# Repo/p'
 
-# 2. Top of LLM summary — score + headline counts + top hotspots, ~2K tokens.
+# 2. Top of LLM summary (~2K tokens) — score + headline counts + top hotspots.
 node codereview/analyze-structure/index.mjs --llm | head -180
 
-# 3. Full LLM summary — every report, compacted, ~5K tokens.
+# 3. Full LLM summary (~5K tokens).
 node codereview/analyze-structure/index.mjs --llm
 
-# 4. Subtree only — scope the analysis to one feature.
+# 4. Subtree only.
 node codereview/analyze-structure/index.mjs features/payments --llm
+node codereview/analyze-structure/index.mjs coco-payment-ux --llm
 
-# 5. Single dimension — disable other reports for max signal-to-noise.
+# 5. Single dimension — disable everything else for max signal-to-noise.
 node codereview/analyze-structure/index.mjs --llm \
   --no-fanin --no-coupling --no-cycles --no-orphans --no-colocate \
   --no-component --no-typesafety
 ```
 
-`--llm` is the LLM-friendly compact format. `--json` is the same data
-machine-readable. Default human format is for terminal reading and is too
-large for context windows.
+### lookalikes subcommand recipes
 
-Tuning flags worth knowing:
+```bash
+# Default reports (whole repo).
+node codereview/analyze-structure/index.mjs lookalikes
+
+# Subtree only.
+node codereview/analyze-structure/index.mjs lookalikes features/payments
+
+# Targeted lookups (each <500 tokens). Use when an existing finding cites
+# a literal value or identifier and you want to know where else it lives.
+node codereview/analyze-structure/index.mjs lookalikes --by-name red
+node codereview/analyze-structure/index.mjs lookalikes --by-value '#FF0000'
+
+# Focus mode — full reports filtered to pairs involving one file.
+node codereview/analyze-structure/index.mjs lookalikes --focus shared/theme.ts
+
+# Inventory dump — every variable name in the repo, alphabetised.
+# ~40K tokens; pipe through grep to narrow.
+node codereview/analyze-structure/index.mjs lookalikes --dump variables | grep -i color
+```
+
+### Tuning flags
+
+**Default mode**
 
 | Flag                     | Default | What it does                            |
 | ------------------------ | ------- | --------------------------------------- |
@@ -80,30 +135,7 @@ Opt-in (off by default): `--history --since 6` (months of git history),
 `--reach`, `--leakage`, `--vocab-drift`, `--architecture` (uses
 `.architecture.json`), `--boundary <a> <b>`.
 
-### lookalikes
-
-```bash
-# 1. Inventory dump — every variable name in the repo, alphabetised.
-#    ~40K tokens; pipe through grep to narrow.
-node codereview/lookalikes/index.mjs --dump variables | grep -i 'color'
-
-# 2. By-name lookup — every definition of a single identifier, with file:line.
-#    <500 tokens for typical names.
-node codereview/lookalikes/index.mjs --by-name red
-
-# 3. By-value lookup — every place a literal value is bound.
-#    <500 tokens. Useful for hex colors, magic numbers, default strings.
-node codereview/lookalikes/index.mjs --by-value '#FF0000'
-
-# 4. Focus mode — full reports filtered to pairs involving one file.
-#    Sized to whatever the file's footprint is, usually <5K tokens.
-node codereview/lookalikes/index.mjs --focus shared/theme.ts
-
-# 5. Subtree only — limit the scan radius.
-node codereview/lookalikes/index.mjs features/payments
-```
-
-Tuning flags:
+**`lookalikes` subcommand**
 
 | Flag                                                     | Default | What it does                                      |
 | -------------------------------------------------------- | ------- | ------------------------------------------------- |
@@ -114,26 +146,26 @@ Tuning flags:
 | `--include-tests`                                        | off     | By default `__tests__` and `*.test.*` are skipped |
 | `--show-noise`                                           | off     | Include single-letter / generic names             |
 
-### log-doctor
+## log-doctor
 
 Reads structured JSON logs (from `dumpForLLM()` or piped input). Token
-costs below come from `npx tsx codereview/log-doctor/index.ts budget` on a
-typical session — your numbers will differ.
+costs below come from `npx tsx codereview/log-doctor/index.ts budget` on
+a typical session — your numbers will differ.
 
-| Mode        | Typical tokens | What it shows                            |
-| ----------- | -------------- | ---------------------------------------- |
-| `renders`   | ~266           | Re-render counts, why-did-update hints   |
-| `stats`     | ~1.1K          | Event frequency, slowest ops, error rate |
-| `coco`      | ~3K            | Coco wallet module breakdown             |
-| `network`   | ~4K            | Request/response pairs with latency      |
-| `timeline`  | ~5K            | One-line-per-entry with delta timing     |
-| `startup`   | ~5K            | Initialization waterfall, gate sequence  |
-| `full (md)` | ~6K            | Pipe-delimited dense summary             |
-| `slow`      | ~18K           | Operations exceeding threshold           |
-| `screens`   | ~70K           | Screen flow + content snapshots          |
-| `errors`    | ~90K           | Errors with full context                 |
+| Mode               | Typical tokens | What it shows                            |
+| ------------------ | -------------- | ---------------------------------------- |
+| `renders`          | ~266           | Re-render counts, why-did-update hints   |
+| `stats`            | ~1.1K          | Event frequency, slowest ops, error rate |
+| `coco`             | ~3K            | Coco wallet module breakdown             |
+| `network`          | ~4K            | Request/response pairs with latency      |
+| `timeline`         | ~5K            | One-line-per-entry with delta timing     |
+| `startup`          | ~5K            | Initialization waterfall, gate sequence  |
+| `full --format md` | ~6K            | Pipe-delimited dense summary             |
+| `slow`             | ~18K           | Operations exceeding threshold           |
+| `screens`          | ~70K           | Screen flow + content snapshots          |
+| `errors`           | ~90K           | Errors with full context                 |
 
-Recipes:
+### Recipes
 
 ```bash
 # Default audit-prep sequence — fits in <30K tokens together.
@@ -149,7 +181,7 @@ npx tsx codereview/log-doctor/index.ts errors --token-budget 8000
 npx tsx codereview/log-doctor/index.ts timeline --limit 200 --offset 0
 ```
 
-Tuning flags:
+### Tuning flags
 
 | Flag                            | Default   | What it does                                                 |
 | ------------------------------- | --------- | ------------------------------------------------------------ |
@@ -164,15 +196,15 @@ Tuning flags:
 
 ## How audit.md and fix.md use these
 
-`audit.md` runs in Phase 0:
+**audit.md, Pass 1:**
 
-1. `analyze-structure --llm` (score block) — picks a dimension.
-2. `lookalikes` (focused) — checks for duplicate-pattern clusters.
+1. `analyze-structure --llm` (score block first) — picks a dimension.
+2. `analyze-structure lookalikes <subtree>` (focused) — checks for duplicate-pattern clusters.
 3. `log-doctor stats/errors/slow/coco --latest` — pulls runtime evidence.
 
-`fix.md` does the same plus a cross-link rule: when picking a slice,
-findings whose files appear in the lowest-scoring `analyze-structure`
-sub-dimension OR in `lookalikes` collision reports are bundled together
-so one slice closes the audit _and_ improves structure.
-
-See those prompts for the full workflow.
+**fix.md** does the same plus a mandatory cross-link rule: when picking
+a slice, findings whose files appear in the lowest-scoring
+`analyze-structure` sub-dimension OR in `lookalikes` collision reports
+are bundled together so one slice closes the audit _and_ improves
+structure. The Phase 4 plan template has a "Structural signal folded in"
+line; self-check 10b enforces it.
