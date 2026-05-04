@@ -134,8 +134,8 @@
       ],
       "verification_note": "Re-read createMachine.ts:275-477. Confirmed sendLocked released at :380 and :466 before the guarded dispatchHandler. Counter-argument considered: the dispatchHandler is always a navigation, so the second event has nowhere to go — but the reason sendLocked exists at all is to prevent that assumption. Move the release into finally.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered for inclusion in slice d5dcbfaa but kept out of scope: sendLocked release-vs-dispatch ordering is a behaviour change, separate from the snapshot-discipline rewrites. Release-then-dispatch asymmetry still present at createMachine.ts CONFIRM_MELT/CONFIRM_PAYMENT_REQUEST branches."
+      "completion_status": "complete",
+      "completion_note": "Slice 23658223 wraps the post-execute dispatchHandler call in CONFIRM_MELT and CONFIRM_PAYMENT_REQUEST in a try/finally that releases sendLocked only after the navigation resolves. Both branches now mirror the main-path try/finally below — a re-entrant CONFIRM event during the navigation dispatch can no longer race the handler."
     },
     {
       "id": "F-006",
@@ -376,8 +376,8 @@
       ],
       "verification_note": "Re-read createMachine.ts:179,1098-1102. Confirmed closure-stored result. Counter-argument considered: the sendLocked guard prevents concurrent sends, so only one caller can be 'in flight' at a time — correct, but a second caller arriving during flight gets a stale-value return rather than a queue-or-reject semantic.",
       "prior_audit_id": null,
-      "completion_status": "deferred",
-      "completion_note": "Considered for inclusion in slice d5dcbfaa but the closure-variable plumbing is its own behavioural change — touches send()'s return type, not the stepData/mutation seam consolidated here. lastPaymentRequestResult still scoped at module level."
+      "completion_status": "complete",
+      "completion_note": "Slice 23658223 deletes the lastPaymentRequestResult closure variable in favour of pendingPaymentRequestConfirms — a queue of per-call holders. confirmPaymentRequest pushes its own holder before awaiting send() and reads it afterwards; the CONFIRM_PAYMENT_REQUEST handler snapshots holders right after the lock is acquired (before any await) and writes the captured result only to that snapshot. Concurrent callers blocked by sendLocked retain their own default { rolledBack: false } and can no longer observe a different call's outcome. Avoids changing send()'s return type — the holder lives outside the FlowEvent union."
     },
     {
       "id": "F-017",
